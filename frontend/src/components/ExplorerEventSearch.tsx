@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { searchEvents, type EventSearchResult } from '../api';
 import type { CalendarEvent } from '../types';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
@@ -12,6 +13,7 @@ interface ExplorerEventSearchProps {
     className?: string;
     /** Render a smaller trigger button (used inline in the passport Timeline tab). */
     small?: boolean;
+    triggerIcon?: 'search' | 'plus';
     /** Search past events (start in the past) instead of upcoming ones. */
     includePast?: boolean;
     /** Render an "Include past" checkbox that lets the user opt past events
@@ -80,6 +82,7 @@ export default function ExplorerEventSearch({
     compact = false,
     className = '',
     small = false,
+    triggerIcon = 'search',
     includePast = false,
     pastToggle = false,
     headerInline = false,
@@ -260,7 +263,9 @@ export default function ExplorerEventSearch({
                             : 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border border-line bg-surface px-2.5 py-1.5 text-sm font-medium text-ink hover:bg-canvas transition'}
                     data-testid="explorer-event-search-trigger"
                 >
-                    <img src="/search.png" alt="" aria-hidden="true" className={compact ? 'h-6 w-6' : small ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                    {triggerIcon === 'plus'
+                        ? <Plus className={small ? 'h-4 w-4' : 'h-5 w-5'} aria-hidden="true" />
+                        : <img src="/search.png" alt="" aria-hidden="true" className={compact ? 'h-6 w-6' : small ? 'h-3.5 w-3.5' : 'h-4 w-4'} />}
                     {!compact && <span>{triggerLabel}</span>}
                 </button>
             )}

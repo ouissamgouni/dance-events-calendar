@@ -26,6 +26,7 @@ import MySubscribersBadge from '../components/MySubscribersBadge';
 import { InterestFilterChips, type InterestFilterChange } from '../components/InterestFilter';
 import { firstNameOf, formatNameList } from '../utils/displayName';
 import type { CalendarEvent } from '../types';
+import MyEventsExperience from './MyEventsExperience';
 
 type Filter = 'all' | 'saved' | 'going';
 type InterestSource = 'follows' | 'friends' | null;
@@ -68,7 +69,7 @@ function downloadBlob(blob: Blob, filename: string) {
     URL.revokeObjectURL(url);
 }
 
-export default function MyCalendar() {
+function LegacyCalendar() {
     const location = useLocation();
     const navigate = useNavigate();
     const { savedEventIds, savedCount, isSaved } = useSavedEvents();
@@ -813,4 +814,9 @@ export default function MyCalendar() {
             </main>
         </div>
     );
+}
+
+export default function MyCalendar() {
+    const { pathname } = useLocation();
+    return pathname === '/mine/calendar' ? <MyEventsExperience /> : <LegacyCalendar />;
 }

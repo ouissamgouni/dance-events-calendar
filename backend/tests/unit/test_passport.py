@@ -61,13 +61,14 @@ def _going(session, user_id, event_id, *, device_id=None):
     )
 
 
-def _review(session, user_id, event_id, *, status="approved"):
+def _review(session, user_id, event_id, *, status="approved", created_at=None):
     session.add(
         EventRating(
             event_id=event_id,
             user_id=user_id,
             stars=4,
             status=status,
+            created_at=created_at or datetime.utcnow(),
         )
     )
 
@@ -745,5 +746,27 @@ class TestTimelineMarkers:
         # first_event fires on the earliest attended event.
         earliest = min(e.start for e in events)
         assert by_key["first_event"]["date"] == earliest
+        earliest_event = min(events, key=lambda event: event.start)
+        assert by_key["first_event"]["event_id"] == earliest_event.event_id
+        assert by_key["first_event"]["description"] == "Attend your first event"
         # Review milestones are not event-anchored, so never appear here.
         assert "first_review" not in by_key
+
+    def test_review_markers_use_threshold_review_date(self, session):
+        user = User(email="reviewer@example.com")
+        session.add(user)
+        dates = [_past(30), _past(20), _past(10)]
+        for index, created_at in enumerate(dates):
+            event_id = f"reviewed-{index}"
+            _event(session, event_id, _past(40 - index))
+            _review(session, user.id, event_id, created_at=created_at)
+        session.commit()
+
+        markers = passport_service.review_timeline_markers(session, user.id)
+        by_key = {marker["key"]: marker for marker in markers}
+
+        assert by_key["first_review"]["date"] == dates[0]
+        assert by_key["reviews_3"]["date"] == dates[2]
+        assert by_key["first_review"]["event_id"] is None
+        assert by_key["first_review"]["description"] == "Leave your first review"
+        assert "reviews_10" not in by_key

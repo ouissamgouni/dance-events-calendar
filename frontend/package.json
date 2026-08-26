@@ -27,6 +27,7 @@
     "@tailwindcss/vite": "^4.2.2",
     "html-to-image": "^1.11.13",
     "leaflet": "^1.9.4",
+    "leaflet-gesture-handling": "^1.2.2",
     "leaflet.markercluster": "^1.5.3",
     "lucide-react": "^1.34.0",
     "qrcode.react": "^4.2.0",

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { NAV_DESTINATIONS } from './navDestinations';
+import { useNavDestinations } from './navDestinations';
 import { useForYouHasNew } from '../hooks/useForYouHasNew';
 
 /**
@@ -10,10 +10,11 @@ export default function DesktopNav({ className = '' }: { className?: string }) {
     const { pathname } = useLocation();
     const forYouActive = pathname === '/for-you';
     const hasNewForYou = useForYouHasNew(forYouActive);
+    const navDestinations = useNavDestinations();
 
     return (
         <nav aria-label="Primary" className={`hidden md:flex items-center gap-1 ${className}`}>
-            {NAV_DESTINATIONS.map((dest) => {
+            {navDestinations.map((dest) => {
                 const active = dest.isActive(pathname);
                 const showDot = dest.id === 'for-you' && hasNewForYou;
                 return (

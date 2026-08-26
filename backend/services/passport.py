@@ -287,9 +287,39 @@ def timeline_milestone_markers(events: list[CachedEvent]) -> list[dict]:
                         "key": m.key,
                         "name": m.name,
                         "icon": m.icon,
+                        "description": m.description,
                         "date": event.start,
+                        "event_id": event.event_id,
                     }
                 )
+    return markers
+
+
+def review_timeline_markers(session: Session, user_id: UUID) -> list[dict]:
+    """Review milestones placed at the review that crossed each threshold."""
+    reviews = session.exec(
+        select(EventRating)
+        .where(EventRating.user_id == user_id)
+        .where(EventRating.status != "rejected")
+        .order_by(EventRating.created_at, EventRating.id)
+    ).all()
+    markers: list[dict] = []
+    for milestone in MILESTONES:
+        if milestone.category != "reviews" or len(reviews) < milestone.threshold:
+            continue
+        review = reviews[milestone.threshold - 1]
+        markers.append(
+            {
+                "key": milestone.key,
+                "name": milestone.name,
+                "icon": milestone.icon,
+                "description": "Leave your first review"
+                if milestone.key == "first_review"
+                else milestone.description,
+                "date": review.created_at,
+                "event_id": None,
+            }
+        )
     return markers
 
 
@@ -929,6 +959,17 @@ def _latest_event_by_month(events: list[CachedEvent]) -> dict[int, datetime]:
     return latest
 
 
+def _latest_event_records_by_month(
+    events: list[CachedEvent],
+) -> dict[int, CachedEvent]:
+    latest: dict[int, CachedEvent] = {}
+    for event in events:
+        month = _month_index(event.start)
+        if month not in latest or event.start > latest[month].start:
+            latest[month] = event
+    return latest
+
+
 def consistency_timeline_markers(
     events: list[CachedEvent], now: datetime | None = None
 ) -> list[dict]:
@@ -938,20 +979,25 @@ def consistency_timeline_markers(
     now = now or datetime.utcnow()
     months = active_month_indices(events)
     now_index = _month_index(now)
-    latest_by_month = _latest_event_by_month(events)
+    latest_by_month = _latest_event_records_by_month(events)
     markers: list[dict] = []
     for period in _consistency_periods(months, now_index):
         period_start = _month_label(period["start"])
         for reach in period["reaches"]:
-            anchor = latest_by_month.get(reach["month"])
-            if anchor is None:
+            event = latest_by_month.get(reach["month"])
+            if event is None:
                 continue
+            description = (
+                f"Active {reach['threshold']} of the last {CONSISTENCY_WINDOW} months"
+            )
             markers.append(
                 {
                     "key": f"{reach['key']}:{period_start}",
                     "name": reach["name"],
                     "icon": reach["icon"],
-                    "date": anchor,
+                    "description": description,
+                    "date": event.start,
+                    "event_id": event.event_id,
                     "label": f"{reach['threshold']}/{CONSISTENCY_WINDOW} active months",
                     "period_start": _month_label(
                         _earliest_active_in_window(months, reach["month"])

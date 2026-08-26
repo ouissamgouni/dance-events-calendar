@@ -95,6 +95,8 @@ export interface CalendarEvent {
     description: string | null;
     image_url?: string | null;
     location: string | null;
+    city?: string | null;
+    country?: string | null;
     latitude: number | null;
     longitude: number | null;
     start: string;
@@ -804,6 +806,7 @@ export type PassportSection = 'milestones' | 'timeline' | 'cities' | 'countries'
 
 export interface SharedPassportResponse {
     display_name: string | null;
+    avatar_url: string | null;
     stats: PassportStats;
     collections: PassportCollections;
     milestones: PassportMilestone[];
@@ -830,6 +833,7 @@ export interface PassportTimelineItem {
     location: string | null;
     city: string | null;
     country: string | null;
+    tags: string[];
     latitude: number | null;
     longitude: number | null;
 }
@@ -838,7 +842,9 @@ export interface PassportTimelineMarker {
     key: string;
     name: string;
     icon: string;
+    description?: string | null;
     date: string;
+    event_id?: string | null;
     /** Optional secondary line (recurring consistency reaches use it). */
     label?: string | null;
     /** Displayed period range ("YYYY-MM") for consistency reaches; null for

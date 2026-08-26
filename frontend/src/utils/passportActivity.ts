@@ -28,11 +28,11 @@ export function activityLevel(count: number): 0 | 1 | 2 | 3 | 4 {
 // scanner only picks up complete class strings). Light ramp sits on the app's
 // white/slate surfaces; the dark ramp sits on the slate-900 share card.
 export const LEVEL_RAMP_LIGHT: Record<0 | 1 | 2 | 3 | 4, string> = {
-    0: 'bg-slate-100',
-    1: 'bg-emerald-200',
-    2: 'bg-emerald-400',
-    3: 'bg-success',
-    4: 'bg-emerald-700',
+    0: 'bg-brand/5',
+    1: 'bg-brand/15',
+    2: 'bg-brand/30',
+    3: 'bg-brand/55',
+    4: 'bg-brand',
 };
 
 export const LEVEL_RAMP_DARK: Record<0 | 1 | 2 | 3 | 4, string> = {

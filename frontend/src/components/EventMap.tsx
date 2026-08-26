@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { MapContainer, Polygon, Rectangle, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Polygon, Polyline, Rectangle, TileLayer, useMap } from 'react-leaflet';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet.markercluster';
+import 'leaflet-gesture-handling';
+import 'leaflet-gesture-handling/dist/leaflet-gesture-handling.css';
 import type { CalendarEvent } from '../types';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
@@ -14,6 +16,7 @@ import TagBadges from './TagBadges';
 import AttendeeAvatarStack, { PEOPLE_ICON_PATH } from './AttendeeAvatarStack';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
+import { buildJourneyLegs } from '../utils/myEvents';
 
 export interface MapBounds {
     north: number;
@@ -146,6 +149,30 @@ function makeClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
     });
 }
 
+function escapeMarkerText(value: string): string {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function makeJourneyIcon(sequence: number, label: string, selected: boolean, routeOn: boolean): L.DivIcon {
+    const circleSize = selected ? 30 : 24;
+    const circleLeft = (100 - circleSize) / 2;
+    const number = routeOn ? String(sequence) : `#${sequence}`;
+    return L.divIcon({
+        className: '',
+        iconSize: [100, 48],
+        iconAnchor: [50, circleSize / 2],
+        html: `<div style="position:relative;width:100px;height:48px;pointer-events:none;font-family:inherit;">
+            <span style="position:absolute;left:${circleLeft}px;top:0;width:${circleSize}px;height:${circleSize}px;border-radius:9999px;background:#2563eb;color:white;border:${selected ? '3px' : '2px'} solid white;box-shadow:${selected ? '0 0 0 4px rgba(37,99,235,.2),0 2px 8px rgba(15,23,42,.25)' : '0 2px 6px rgba(15,23,42,.2)'};display:flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:${sequence >= 10 ? '9px' : '11px'};font-weight:800;line-height:1;">${number}</span>
+            <span style="position:absolute;left:0;right:0;top:${circleSize + 2}px;text-align:center;color:#172033;font-size:10px;font-weight:700;line-height:12px;text-shadow:0 1px 2px white,0 -1px 2px white,1px 0 2px white,-1px 0 2px white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeMarkerText(label)}</span>
+        </div>`,
+    });
+}
+
 interface Props {
     events: CalendarEvent[];
     focusedEvent?: CalendarEvent | null;
@@ -217,6 +244,14 @@ interface Props {
     /** Compact preview mode: hides the zoom buttons and the tile
      * attribution so the map reads as a small, non-chrome miniature. */
     compact?: boolean;
+    /** Require two-finger touch gestures so one finger can scroll the page. */
+    cooperativeGestures?: boolean;
+    /** Chronological sequence labels for the My Events journey map. */
+    journeySequence?: Record<string, number>;
+    /** Draw curved sequence arrows and omit the # prefix from journey pins. */
+    journeyRouteOn?: boolean;
+    /** Selected journey event, emphasized without changing zoom. */
+    journeySelectedEventId?: string | null;
 }
 
 interface PopupPortal {
@@ -388,6 +423,39 @@ function MapResizeController() {
         };
     }, [map]);
 
+    return null;
+}
+
+function JourneyRouteLayer({ events }: { events: CalendarEvent[] }) {
+    const legs = useMemo(() => buildJourneyLegs(events), [events]);
+    return (
+        <>
+            {legs.map((leg, index) => (
+                <Fragment key={index}>
+                    <Polyline
+                        positions={leg.path}
+                        pathOptions={{ color: '#2563eb', weight: 1.5, opacity: 0.7, interactive: false }}
+                    />
+                    <Polyline
+                        positions={leg.arrow}
+                        pathOptions={{ color: '#2563eb', weight: 1.5, opacity: 0.8, interactive: false }}
+                    />
+                </Fragment>
+            ))}
+        </>
+    );
+}
+
+function JourneySelectionController({ event }: { event: CalendarEvent | null }) {
+    const map = useMap();
+    useEffect(() => {
+        if (event?.latitude == null || event.longitude == null) return;
+        map.panInside(L.latLng(event.latitude, event.longitude), {
+            paddingTopLeft: L.point(48, 64),
+            paddingBottomRight: L.point(48, 220),
+            animate: true,
+        });
+    }, [event, map]);
     return null;
 }
 
@@ -695,6 +763,9 @@ function MarkerClusterLayer({
     onMarkSeen,
     disablePopups,
     minimalPopup,
+    journeySequence,
+    journeyRouteOn,
+    journeySelectedEventId,
 }: {
     events: CalendarEvent[];
     hoveredEventId?: string | null;
@@ -718,6 +789,9 @@ function MarkerClusterLayer({
     onMarkSeen?: (eventId: string) => void;
     disablePopups?: boolean;
     minimalPopup?: boolean;
+    journeySequence?: Record<string, number>;
+    journeyRouteOn: boolean;
+    journeySelectedEventId?: string | null;
 }) {
     const map = useMap();
     const [popupPortals, setPopupPortals] = useState<PopupPortal[]>([]);
@@ -765,8 +839,12 @@ function MarkerClusterLayer({
             const decorations: PinDecorations = minimalPopup
                 ? {}
                 : { trending, followingCount, newEvent, totalGoing };
+            const journeyNumber = journeySequence?.[event.event_id];
+            const journeyLabel = event.city || event.location?.split(',')[0]?.trim() || event.title;
             const marker = L.marker([event.latitude!, event.longitude!], {
-                icon: makeColoredIcon(eventColorBarColor, decorations),
+                icon: journeyNumber
+                    ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelectedEventId === event.event_id, journeyRouteOn)
+                    : makeColoredIcon(eventColorBarColor, decorations),
             });
             let popupHost: HTMLDivElement | null = null;
             if (!disablePopups) {
@@ -802,7 +880,7 @@ function MarkerClusterLayer({
             markerRefs.current.clear();
             setPopupPortals([]);
         };
-    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, journeyRouteOn, journeySelectedEventId, journeySequence, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
 
     // Swap the hovered marker's icon in place (highlighted vs normal) without
     // rebuilding the whole layer. Rebuilding on every hover change (as the
@@ -826,9 +904,13 @@ function MarkerClusterLayer({
                 ? {}
                 : { trending, followingCount, newEvent, totalGoing };
             const isHovered = hoveredEventId === event.event_id;
-            marker.setIcon(isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations));
+            const journeyNumber = journeySequence?.[event.event_id];
+            const journeyLabel = event.city || event.location?.split(',')[0]?.trim() || event.title;
+            marker.setIcon(journeyNumber
+                ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelectedEventId === event.event_id || isHovered, journeyRouteOn)
+                : isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations));
         });
-    }, [hoveredEventId, events, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs]);
+    }, [hoveredEventId, events, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs, journeyRouteOn, journeySelectedEventId, journeySequence]);
 
 
 
@@ -854,7 +936,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, journeySequence, journeyRouteOn = false, journeySelectedEventId = null }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -890,6 +972,11 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
     }, [focusedEvent]);
 
     const focusedEventId = focusedEvent?.event_id ?? null;
+    const journeySelectedEvent = useMemo(
+        () => geoEvents.find((event) => event.event_id === journeySelectedEventId) ?? null,
+        [geoEvents, journeySelectedEventId],
+    );
+    const cooperativeGestureOptions = cooperativeGestures ? { gestureHandling: true } : {};
 
     const formatDate = useCallback((e: CalendarEvent) => {
         const start = new Date(e.start);
@@ -914,6 +1001,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
 
     return (
         <MapContainer
+            {...cooperativeGestureOptions}
             {...(initialArea
                 ? { bounds: [[initialArea.min_lat, initialArea.min_lng], [initialArea.max_lat, initialArea.max_lng]] as L.LatLngBoundsExpression }
                 : { center: DEFAULT_AREA_CENTER, zoom: DEFAULT_ZOOM })}
@@ -974,6 +1062,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                     />
                 </>
             )}
+            {journeyRouteOn && <JourneyRouteLayer events={geoEvents} />}
             <MapController
                 positions={positions}
                 focusedEventId={focusedEventId}
@@ -986,6 +1075,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 preserveViewport={preserveViewport ?? false}
             />
             <MapResizeController />
+            <JourneySelectionController event={journeySelectedEvent} />
             <FlyToAreaController flyToArea={flyToArea} flyToAreaToken={flyToAreaToken} />
             {recenterTo && <RecenterControl recenterTo={recenterTo} />}
             <BoundsReporter onBoundsChange={onBoundsChange} />
@@ -1012,6 +1102,9 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 onMarkSeen={onMarkSeen}
                 disablePopups={disablePopups}
                 minimalPopup={minimalPopup}
+                journeySequence={journeySequence}
+                journeyRouteOn={journeyRouteOn}
+                journeySelectedEventId={journeySelectedEventId}
             />
         </MapContainer>
     );

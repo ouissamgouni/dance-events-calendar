@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Image, Link2, Pencil, Share2, X } from 'lucide-react';
 import {
     ackPassportMilestones,
     createPassportShare,
@@ -204,14 +205,14 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
 
     return (
         <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={onClose}
             role="dialog"
             aria-modal="true"
             aria-label="Share your Dance Passport"
         >
             <div
-                className="w-full max-w-md border border-line bg-surface shadow-xl"
+                className="max-h-[92dvh] w-full max-w-md overflow-hidden rounded-t-card bg-surface shadow-xl sm:rounded-card sm:border sm:border-line"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between border-b border-line px-4 py-3">
@@ -222,7 +223,7 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
                         aria-label="Close"
                         className="text-muted hover:text-ink-soft"
                     >
-                        ✕
+                        <X className="h-5 w-5" aria-hidden="true" />
                     </button>
                 </div>
 
@@ -346,7 +347,7 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
     );
 }
 
-/** Single "Share" trigger opening a menu: share as link or as card. */
+/** Compact header trigger opening the two-option Passport share sheet. */
 function SharePassportMenu({
     handle,
     displayName,
@@ -366,6 +367,8 @@ function SharePassportMenu({
 
     useEffect(() => {
         if (!menuOpen) return;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
         const onDown = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
         };
@@ -375,50 +378,70 @@ function SharePassportMenu({
         document.addEventListener('mousedown', onDown);
         document.addEventListener('keydown', onKey);
         return () => {
+            document.body.style.overflow = previousOverflow;
             document.removeEventListener('mousedown', onDown);
             document.removeEventListener('keydown', onKey);
         };
     }, [menuOpen]);
 
     return (
-        <div ref={menuRef} className="relative">
+        <div className="relative">
             <button
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}
-                aria-haspopup="menu"
+                aria-label="Share passport"
+                aria-haspopup="dialog"
                 aria-expanded={menuOpen}
-                className="inline-flex items-center gap-1.5 border border-action bg-action px-3 py-1.5 text-xs font-medium text-white hover:bg-action-strong"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-white hover:bg-white/10"
             >
-                Share
-                <span aria-hidden>▾</span>
+                <Share2 className="h-5 w-5" aria-hidden="true" />
             </button>
             {menuOpen && (
                 <div
-                    role="menu"
-                    className="absolute right-0 z-20 mt-1 w-40 border border-line bg-surface shadow-lg"
+                    className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
+                    onClick={() => setMenuOpen(false)}
                 >
-                    <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                            setMenuOpen(false);
-                            setModal('link');
-                        }}
-                        className="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-canvas"
+                    <div
+                        ref={menuRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Share my passport"
+                        className="w-full max-w-sm rounded-t-card bg-surface p-4 shadow-xl sm:rounded-card sm:border sm:border-line"
+                        onClick={(event) => event.stopPropagation()}
                     >
-                        As link
-                    </button>
-                    <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                            setMenuOpen(false);
-                            setModal('card');
-                        }}
-                        className="block w-full border-t border-card-line px-3 py-2 text-left text-sm text-ink hover:bg-canvas"
-                    >
-                        As card
-                    </button>
+                        <div className="mb-2 flex items-center justify-between">
+                            <h2 className="text-sm font-semibold text-ink">Share my passport</h2>
+                            <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close" className="flex h-9 w-9 items-center justify-center text-muted hover:text-ink">
+                                <X className="h-5 w-5" aria-hidden="true" />
+                            </button>
+                        </div>
+                        <div role="menu" className="divide-y divide-card-line">
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    setMenuOpen(false);
+                                    setModal('link');
+                                }}
+                                className="flex w-full items-center gap-3 px-1 py-4 text-left hover:bg-canvas"
+                            >
+                                <Link2 className="h-5 w-5 text-action" aria-hidden="true" />
+                                <span><span className="block text-sm font-semibold text-ink">As link</span><span className="block text-xs text-ink-soft">Control who can view your passport.</span></span>
+                            </button>
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    setMenuOpen(false);
+                                    setModal('card');
+                                }}
+                                className="flex w-full items-center gap-3 px-1 py-4 text-left hover:bg-canvas"
+                            >
+                                <Image className="h-5 w-5 text-brand" aria-hidden="true" />
+                                <span><span className="block text-sm font-semibold text-ink">As card</span><span className="block text-xs text-ink-soft">Create a shareable image.</span></span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
             {modal === 'link' && <SharePassportModal handle={handle} onClose={() => setModal(null)} />}
@@ -468,9 +491,6 @@ function SharePassportCardModal({
     const [sections, setSections] = useState({ badges: true, map: true, dancingSince: false, activity: true });
     const [busy, setBusy] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
-    const canNativeShare =
-        typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-
     // On open: build the profile link the QR resolves to (always available for a
     // valid handle, even when the passport is private — the profile shows the
     // dancer + a Follow gate), load the full event set for the scoped stats/map,
@@ -579,14 +599,14 @@ function SharePassportCardModal({
 
     return (
         <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={onClose}
             role="dialog"
             aria-modal="true"
             aria-label="Share your Dance Passport as a card"
         >
             <div
-                className="w-full max-w-sm border border-line bg-surface shadow-xl"
+                className="max-h-[92dvh] w-full max-w-sm overflow-y-auto rounded-t-card bg-surface shadow-xl sm:rounded-card sm:border sm:border-line"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between border-b border-line px-4 py-3">
@@ -597,7 +617,7 @@ function SharePassportCardModal({
                         aria-label="Close"
                         className="text-muted hover:text-ink-soft"
                     >
-                        ✕
+                        <X className="h-5 w-5" aria-hidden="true" />
                     </button>
                 </div>
 
@@ -654,16 +674,6 @@ function SharePassportCardModal({
                             />
                             Activity
                         </label>
-                        {scope === 'all' && data.stats.dancing_since && (
-                            <label className="inline-flex items-center gap-2 text-sm text-ink">
-                                <input
-                                    type="checkbox"
-                                    checked={sections.dancingSince}
-                                    onChange={(e) => setSections((s) => ({ ...s, dancingSince: e.target.checked }))}
-                                />
-                                Dancing since
-                            </label>
-                        )}
                     </div>
 
                     {ready ? (
@@ -727,16 +737,14 @@ function SharePassportCardModal({
                     >
                         Download
                     </button>
-                    {canNativeShare && (
-                        <button
-                            type="button"
-                            onClick={handleShare}
-                            disabled={!ready || busy}
-                            className="border border-action bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-strong disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            Share
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        onClick={handleShare}
+                        disabled={!ready || busy}
+                        className="border border-action bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-strong disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Share
+                    </button>
                 </div>
             </div>
         </div>
@@ -828,19 +836,20 @@ function DancingSinceControl({
                     </button>
                 </div>
             ) : (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <span>Dancing since {formatJourneyDate(effective)}</span>
                     <button
                         type="button"
                         onClick={startEdit}
-                        className="underline underline-offset-2 hover:text-white"
+                        className="inline-flex items-center text-white/60 hover:text-white shrink-0"
+                        aria-label="Edit dancing since date"
                     >
-                        Edit
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                 </div>
             )}
             {firstEventDate && (
-                <p className="mt-0.5 text-muted">
+                <p className="mt-0.5 text-muted text-[10px]">
                     First event on Movida {formatJourneyDate(firstEventDate)}
                 </p>
             )}
@@ -1045,7 +1054,8 @@ function AddPastEventControl({ onAdded, onOpenSubmitEvent }: { onAdded: () => vo
             <ExplorerEventSearch
                 includePast
                 small
-                triggerLabel="Add a past event"
+                triggerIcon="plus"
+                triggerLabel="Add past event"
                 onSelectEvent={(id) => setConfirmId(id)}
                 onOpenSubmitEvent={onOpenSubmitEvent}
             />
@@ -1075,6 +1085,8 @@ export default function PassportPage() {
     const [error, setError] = useState<string | null>(null);
     const [mapEvents, setMapEvents] = useState<PassportMapEvent[] | null>(null);
     const [showSuggestModal, setShowSuggestModal] = useState(false);
+    const timelineQueryRef = useRef('');
+    const timelineRequestRef = useRef(0);
     const mapEventsRef = useRef(false);
     const celebratedRef = useRef(false);
 
@@ -1133,7 +1145,7 @@ export default function PassportPage() {
     const loadMore = useCallback(async () => {
         setLoadingMore(true);
         try {
-            const next = await fetchPassportTimeline(items.length, PAGE_SIZE);
+            const next = await fetchPassportTimeline(items.length, PAGE_SIZE, timelineQueryRef.current);
             setItems((prev) => [...prev, ...next.items]);
             setTotal(next.total);
         } catch (e: unknown) {
@@ -1142,6 +1154,24 @@ export default function PassportPage() {
             setLoadingMore(false);
         }
     }, [items.length]);
+
+    const searchTimeline = useCallback(async (query: string) => {
+        const normalized = query.trim();
+        if (normalized === timelineQueryRef.current) return;
+        timelineQueryRef.current = normalized;
+        const request = ++timelineRequestRef.current;
+        try {
+            const timeline = await fetchPassportTimeline(0, PAGE_SIZE, normalized);
+            if (request !== timelineRequestRef.current) return;
+            setItems(timeline.items);
+            setMarkers(timeline.markers);
+            setTotal(timeline.total);
+        } catch (e: unknown) {
+            if (request === timelineRequestRef.current) {
+                setError(e instanceof Error ? e.message : String(e));
+            }
+        }
+    }, []);
 
     const hasMore = useMemo(() => items.length < total, [items.length, total]);
 
@@ -1220,7 +1250,7 @@ export default function PassportPage() {
     }
 
     return (
-        <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+        <div className="mx-auto max-w-4xl space-y-6 p-4">
             {error && (
                 <div className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-danger">
                     {error}
@@ -1235,6 +1265,9 @@ export default function PassportPage() {
                 <>
                     <PassportView
                         data={data}
+                        displayName={(user?.name || '').trim().split(/\s+/)[0] || user?.handle || 'Dancer'}
+                        handle={user?.handle ?? null}
+                        avatarUrl={user?.avatar_url ?? null}
                         headerActions={
                             user?.handle ? (
                                 <SharePassportMenu
@@ -1266,6 +1299,7 @@ export default function PassportPage() {
                         loadingMoreTimeline={loadingMore}
                         mapEvents={mapEvents}
                         onNeedMapEvents={loadMapEvents}
+                        onTimelineSearch={searchTimeline}
                     />
                 </>
             )}

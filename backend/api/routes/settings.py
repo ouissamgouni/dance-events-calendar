@@ -201,6 +201,10 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         network_going_snapshot_enabled=_get_bool_setting(
             session, "network_going_snapshot_enabled", default=True
         ),
+        my_events_route_enabled=_get_bool_setting(session, "my_events_route_enabled"),
+        my_events_nav_enabled=_get_bool_setting(
+            session, "my_events_nav_enabled", default=True
+        ),
         suggest_event_required_dance_group_id=_get_optional_int_setting(
             session, "suggest_event_required_dance_group_id"
         ),
@@ -509,6 +513,14 @@ def update_settings(
             "network_going_snapshot_enabled",
             body.network_going_snapshot_enabled,
         )
+
+    if body.my_events_route_enabled is not None:
+        _set_bool_setting(
+            session, "my_events_route_enabled", body.my_events_route_enabled
+        )
+
+    if body.my_events_nav_enabled is not None:
+        _set_bool_setting(session, "my_events_nav_enabled", body.my_events_nav_enabled)
 
     if body.suggest_event_required_dance_group_id is not None:
         row = session.get(SiteSetting, "suggest_event_required_dance_group_id")

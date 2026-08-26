@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { DATE_RANGE_PRESET_CHOICES, getDateRangePresetOptions } from '../utils/dateRangePresets';
-import type { DateRangePresetKey } from '../utils/dateRangePresets';
+import { getDateRangePresetOptions } from '../utils/dateRangePresets';
+import type { DateRangePresetKey, DateRangePresetOption } from '../utils/dateRangePresets';
 
 interface DateRangePickerProps {
     startDate: string;
@@ -16,10 +16,6 @@ const PRIMARY_PRESET_KEYS: DateRangePresetKey[] = [
     'next_30_days',
     'next_3_months',
 ];
-
-const PRESET_LABELS: Record<string, string> = Object.fromEntries(
-    DATE_RANGE_PRESET_CHOICES.map((c) => [c.key, c.label]),
-);
 
 function formatLong(iso: string): string {
     const [y, m, d] = iso.split('-').map(Number);
@@ -54,19 +50,19 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
         .filter((o): o is NonNullable<typeof o> => o != null);
     const extraOptions = options.filter((o) => !PRIMARY_PRESET_KEYS.includes(o.key));
 
-    const renderPreset = (key: DateRangePresetKey, start: string, end: string) => {
-        const active = startDate === start && endDate === end;
+    const renderPreset = (option: DateRangePresetOption) => {
+        const active = startDate === option.start && endDate === option.end;
         return (
             <button
-                key={key}
+                key={option.key}
                 type="button"
-                onClick={() => onChange(start, end)}
+                onClick={() => onChange(option.start, option.end)}
                 className={`rounded-card border px-3 py-3 text-sm font-medium transition ${active
                     ? 'border-action bg-action/5 text-action'
                     : 'border-line bg-surface text-ink hover:bg-canvas'}`}
                 aria-pressed={active}
             >
-                {PRESET_LABELS[key] ?? key}
+                {option.label}
             </button>
         );
     };
@@ -84,8 +80,8 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
             <section>
                 <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-soft">Presets</h4>
                 <div className="grid grid-cols-2 gap-3">
-                    {primaryOptions.map((o) => renderPreset(o.key, o.start, o.end))}
-                    {moreOpen && extraOptions.map((o) => renderPreset(o.key, o.start, o.end))}
+                    {primaryOptions.map((o) => renderPreset(o))}
+                    {moreOpen && extraOptions.map((o) => renderPreset(o))}
                     <button
                         type="button"
                         onClick={() => setMoreOpen((v) => !v)}

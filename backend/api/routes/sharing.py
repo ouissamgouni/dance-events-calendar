@@ -265,6 +265,8 @@ def get_shared_calendar(
                 title=e.title,
                 description=e.description,
                 location=e.location,
+                city=e.city,
+                country=e.country,
                 start=e.start,
                 end=e.end,
                 all_day=e.all_day,

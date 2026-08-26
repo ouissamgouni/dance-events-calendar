@@ -298,3 +298,29 @@ test_plan:
         • No new top-level dependency was added (check
           `frontend/package.json` diff is empty for `dependencies`
           and `devDependencies`).
+
+    - id: 9
+      title: "My Events tabs, contextual views, and journey map"
+      description: >
+        Sign in as viewer@example.com and open /mine/calendar at 390×844,
+        then repeat the map check on desktop.
+      expected: >
+        • Upcoming opens as a month-grouped list with Madrid, Paris, Lisbon,
+          Rome, and Amsterdam in chronological order. Paris has a real image;
+          every other row collapses the image column. No list row has an order
+          number or Save/Going action.
+        • Saved contains Paris (also Going), Berlin, and Secret Venue. Rows show
+          compact bookmark and hand actions. The unmapped event remains in List
+          and Calendar, while Map reports one event without a map location.
+        • Past contains the 12 passport attendances, recent-first in List and
+          oldest-first on Map. Its + search includes past events by default.
+        • List shows Calendar + Map in the floating capsule; Calendar shows
+          List + Map; Map shows List + Calendar. The separate + expands search
+          inline above the controls without navigating to Explore.
+        • Upcoming Map initially selects event 1 and shows one bottom preview.
+          Pins are blue numbered circles with city labels. Route defaults on for
+          Upcoming/Past and off for Saved; enabling Saved Route draws arrows.
+          Turning Route off keeps every pin and changes labels to #1, #2, etc.
+        • Swiping the single preview follows chronology and updates the selected
+          pin. Curved arrows remain visually subordinate to pins and clusters
+          use a distinct count treatment.

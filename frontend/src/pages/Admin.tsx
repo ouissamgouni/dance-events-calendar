@@ -16,6 +16,7 @@ import {
 } from '../api';
 import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse, EventSearchResult, ReviewPromptCandidate } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useUpdateFeatureFlag } from '../context/FeatureFlagsContext';
 import SyncProgressCard from '../components/SyncProgressCard';
 import SyncJobsHistoryTable from '../components/SyncJobsHistoryTable';
 import EventsPanel from '../components/EventsPanel';
@@ -234,6 +235,8 @@ export default function Admin() {
     const [forYouRailEnabled, setForYouRailEnabled] = useState(false);
     const [yourNextEventsRailEnabled, setYourNextEventsRailEnabled] = useState(false);
     const [networkGoingSnapshotEnabled, setNetworkGoingSnapshotEnabled] = useState(true);
+    const [myEventsRouteEnabled, setMyEventsRouteEnabled] = useState(false);
+    const [myEventsNavEnabled, setMyEventsNavEnabled] = useState(true);
     // Notification / re-engagement gates. Booleans are master switches
     // that override the corresponding env vars in ``config/loader.py``;
     // ``digestSchedule`` follows the ``dow[,dow] @ HH:MM`` grammar the
@@ -342,6 +345,7 @@ export default function Admin() {
     const [activeTab, setActiveTab] = useState<AdminTab>(isValidTab(tabParam) ? tabParam : 'data');
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const updateFlagFn = useUpdateFeatureFlag();
 
     // Sync activeTab with URL param (and redirect /admin -> /admin/data)
     useEffect(() => {
@@ -409,6 +413,8 @@ export default function Admin() {
             setForYouRailEnabled(s.for_you_rail_enabled ?? false);
             setYourNextEventsRailEnabled(s.your_next_events_rail_enabled ?? false);
             setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? true);
+            setMyEventsRouteEnabled(s.my_events_route_enabled ?? false);
+            setMyEventsNavEnabled(s.my_events_nav_enabled ?? true);
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
             setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
             setDigestV2Enabled(s.digest_v2_enabled ?? true);
@@ -786,6 +792,31 @@ export default function Admin() {
         } catch {
             setNetworkGoingSnapshotEnabled(!newVal);
             setMessage('Failed to update "Your Network" snapshot toggle.');
+        }
+    };
+
+    const handleToggleMyEventsRoute = async () => {
+        const newVal = !myEventsRouteEnabled;
+        setMyEventsRouteEnabled(newVal);
+        try {
+            await updateSettings({ my_events_route_enabled: newVal });
+            setMessage(`My Events journey routes ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setMyEventsRouteEnabled(!newVal);
+            setMessage('Failed to update My Events journey routes.');
+        }
+    };
+
+    const handleToggleMyEventsNav = async () => {
+        const newVal = !myEventsNavEnabled;
+        setMyEventsNavEnabled(newVal);
+        try {
+            await updateSettings({ my_events_nav_enabled: newVal });
+            updateFlagFn('myEventsNavEnabled', newVal);
+            setMessage(`My Events navigation ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setMyEventsNavEnabled(!newVal);
+            setMessage('Failed to update My Events navigation toggle.');
         }
     };
 
@@ -2113,6 +2144,34 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${networkGoingSnapshotEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${networkGoingSnapshotEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">My Events journey routes</span>
+                                        <p className="text-[10px] text-muted">Show Route controls and chronological arrows on My Events maps</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleMyEventsRoute}
+                                        aria-label="Toggle My Events journey routes"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${myEventsRouteEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${myEventsRouteEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">My Events navigation</span>
+                                        <p className="text-[10px] text-muted">Show "My Events" as a top-level navigation entry</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleMyEventsNav}
+                                        aria-label="Toggle My Events navigation"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${myEventsNavEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${myEventsNavEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

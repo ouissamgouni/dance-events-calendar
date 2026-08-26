@@ -6,7 +6,7 @@ import InterestProfilesManager from '../components/InterestProfilesManager';
 export default function DiscoveryProfilesPage() {
     return (
         <div className="mx-auto max-w-lg px-4 py-5">
-            <InterestProfilesManager />
+            <InterestProfilesManager showHeader={false} />
         </div>
     );
 }

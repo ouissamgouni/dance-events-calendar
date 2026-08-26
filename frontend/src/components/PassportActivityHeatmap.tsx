@@ -11,6 +11,7 @@ import {
     LEVEL_RAMP_LIGHT,
     MONTH_INITIALS,
     MONTH_SHORT,
+    takeLastYears,
 } from '../utils/passportActivity';
 
 interface PassportActivityHeatmapProps {
@@ -21,21 +22,22 @@ interface PassportActivityHeatmapProps {
     highlightMonth?: string | null;
 }
 
-const GRID_COLUMNS = 'auto repeat(12, minmax(0, 1fr))';
+const GRID_COLUMNS = '2.75rem repeat(12, minmax(0, 1fr))';
 
 export default function PassportActivityHeatmap({
     months,
     onSelectMonth,
     highlightMonth,
 }: PassportActivityHeatmapProps) {
-    const rows = buildYearGrid(months);
+    const rows = takeLastYears(buildYearGrid(months), 2).reverse();
     if (rows.length === 0) return null;
 
     return (
-        <div className="mb-4 border border-line bg-surface p-3">
-            <div className="overflow-x-auto">
+        <section className="rounded-card bg-brand/5 p-4">
+            <h2 className="mb-4 text-base font-semibold text-ink">Activity overview</h2>
+            <div>
                 <div
-                    className="inline-grid min-w-full gap-1"
+                    className="grid w-full gap-1"
                     style={{ gridTemplateColumns: GRID_COLUMNS }}
                     role="grid"
                     aria-label="Attended events per month"
@@ -44,7 +46,7 @@ export default function PassportActivityHeatmap({
                     {MONTH_INITIALS.map((initial, i) => (
                         <span
                             key={`h-${i}`}
-                            className="text-center text-[10px] leading-4 text-muted"
+                            className="text-center text-[10px] font-medium leading-4 text-ink-soft"
                             aria-hidden
                         >
                             {initial}
@@ -62,7 +64,7 @@ export default function PassportActivityHeatmap({
                     ))}
                 </div>
             </div>
-        </div>
+        </section>
     );
 }
 
@@ -79,7 +81,7 @@ function ActivityYearRow({
 }) {
     return (
         <>
-            <span className="pr-2 text-right text-xs leading-4 tabular-nums text-ink-soft">
+            <span className="pr-2 text-left text-xs font-semibold leading-5 tabular-nums text-ink">
                 {year}
             </span>
             {cells.map((count, i) => {
@@ -97,7 +99,7 @@ function ActivityYearRow({
                         aria-label={label}
                         disabled={!interactive}
                         onClick={interactive ? () => onSelectMonth?.(month) : undefined}
-                        className={`aspect-square h-5 w-5 sm:h-4 sm:w-4 ${LEVEL_RAMP_LIGHT[level]} ${ring} ${interactive ? 'cursor-pointer hover:ring-2 hover:ring-slate-400' : 'cursor-default'
+                        className={`aspect-square min-w-0 rounded-[3px] ${LEVEL_RAMP_LIGHT[level]} ${ring} ${interactive ? 'cursor-pointer hover:ring-2 hover:ring-brand/40' : 'cursor-default'
                             }`}
                     />
                 );

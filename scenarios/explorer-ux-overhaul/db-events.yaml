@@ -27,8 +27,12 @@ events:
       Kick off the weekend with a friendly Paris social featuring a short warm-up set, mixed salsa floors, and enough room for both casual dancers and regulars.
       Expect a relaxed crowd, easy partner rotation, and a final DJ block that keeps the energy high through the last hour.
     location: Studio A, 10 Rue de Rivoli, Paris, France
+    image_url: /friends-going-dance-floor.jpg
     latitude: 48.8566
     longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
     start: w0 Fri 20:00
     end: w0 Fri 23:00
     price_is_free: true
@@ -51,6 +55,9 @@ events:
     location: Hackescher Markt, Berlin, Germany
     latitude: 52.5226
     longitude: 13.4019
+    city: Berlin
+    country: Germany
+    country_code: DE
     start: w0 Fri 21:00
     end: w0 Sat 01:00
     price_is_free: true
@@ -73,6 +80,9 @@ events:
     location: Calle de Atocha 34, Madrid, Spain
     latitude: 40.4140
     longitude: -3.7035
+    city: Madrid
+    country: Spain
+    country_code: ES
     start: w0 Fri 19:00
     end: w0 Fri 20:30
     price_is_free: true
@@ -96,6 +106,9 @@ events:
     location: Cais do Sodre, Lisbon, Portugal
     latitude: 38.7077
     longitude: -9.1493
+    city: Lisbon
+    country: Portugal
+    country_code: PT
     start: w0 Sat 14:00
     end: w0 Sat 17:00
     price_is_free: true
@@ -118,6 +131,9 @@ events:
     location: Trastevere, Rome, Italy
     latitude: 41.8896
     longitude: 12.4695
+    city: Rome
+    country: Italy
+    country_code: IT
     start: w0 Sun 19:00
     end: w0 Sun 23:00
     price_is_free: true
@@ -142,6 +158,9 @@ events:
     location: Weteringschans, Amsterdam, Netherlands
     latitude: 52.3625
     longitude: 4.8836
+    city: Amsterdam
+    country: Netherlands
+    country_code: NL
     start: w1 Mon 20:00
     end: w1 Mon 22:00
     price_is_free: true
@@ -154,6 +173,18 @@ events:
         "venue:indoor",
         "level:intermediate",
       ]
+  - id: evt-my-events-unmapped
+    calendar_id: salsa-cal-001
+    title: Secret Venue Salsa Social
+    description: Saved-event fixture without coordinates for My Events map disclosure.
+    location: Venue announced to attendees, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    start: w3 Sat 20:00
+    end: w3 Sat 23:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "reach:local"]
   - id: evt-ux-007
     calendar_id: bachata-cal-002
     title: Vienna Bachata Wednesday Class
@@ -2372,6 +2403,394 @@ events:
         "scale:large",
         "misc:beach-side",
       ]
+
+  # ── Past events for reviews ────────────────────────────────────────────────
+  # Events in the past (week -1) that can accumulate reviews, messages, and
+  # exemplify community experience roll-ups alongside message boards.
+  - id: evt-ux-past-social
+    calendar_id: salsa-cal-001
+    title: Last Week's Vienna Salsa Social
+    description: |
+      A lively Vienna salsa social from last week with a diverse crowd,
+      great DJ set, and lots of partner rotation. This event exemplifies
+      the typical experience many dancers had at similar weekly events.
+    location: Stephansplatz, Vienna, Austria
+    latitude: 48.2088
+    longitude: 16.3728
+    start: w-1 Fri 21:00
+    end: w-1 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        "level:all-levels",
+        reach:regional,
+        "venue:indoor",
+        "scale:medium",
+      ]
+
+  - id: evt-ux-past-workshop
+    calendar_id: bachata-cal-002
+    title: Last Week's Bangkok Bachata Workshop
+    description: |
+      An intensive bachata workshop from last week focusing on musicality,
+      sensual styling, and partner connection. Attendees consistently praised
+      the teaching quality and relaxed atmosphere.
+    location: Silom, Bangkok, Thailand
+    latitude: 13.7300
+    longitude: 100.5300
+    start: w-1 Sat 14:00
+    end: w-1 Sat 17:00
+    price_is_free: false
+    price_min: 20
+    price_currency: THB
+    tags:
+      [
+        "format:workshop",
+        "dance-style:bachata",
+        "dance-style:kizomba",
+        "level:intermediate",
+        reach:international,
+        "venue:indoor",
+        "scale:small",
+      ]
+
+  - id: evt-ux-past-london
+    calendar_id: salsa-cal-001
+    title: Last Week's London Salsa Saturday Festival Preview
+    description: |
+      Last week's London Festival Preview social with guest DJs, excellent energy,
+      and a lively crowd. The event showcased festival-level vibes before the
+      main weekend festival program.
+    location: King's Cross, London, UK
+    latitude: 51.5320
+    longitude: -0.1233
+    start: w-1 Sat 20:00
+    end: w-1 Sun 02:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "format:day-social",
+        "dance-style:salsa",
+        reach:local,
+        "venue:indoor",
+        "scale:large",
+        "level:all-levels",
+        "misc:live-band",
+      ]
+
+# ── Event series ───────────────────────────────────────────────────────────
+# Weekly recurring events share a series to enable cross-edition aggregation
+# of reviews (Typical Experience roll-ups) on upcoming editions.
+event_series:
+  - canonical_title: Friday Prague Salsa Social
+    status: resolved
+    source: manual
+    members:
+      - evt-ux-008
+      - evt-ux-past-social
+
+  - canonical_title: London Salsa Saturday Festival Preview
+    status: resolved
+    source: manual
+    members:
+      - evt-ux-011
+      - evt-ux-past-london
+
+# ── Reviews / Ratings ──────────────────────────────────────────────────────
+# Community reviews seeded on past events and series to populate
+# "Community Experience" cards and support message boards with social proof.
+ratings:
+  # Reviews on evt-ux-past-social (last week's Vienna social)
+  - event_id: evt-ux-past-social
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: |
+      The energy was fantastic! Great DJ set and so many friendly people.
+      Partner rotation was smooth, and the venue was perfect for dancing.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+      venue-quality: 5
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - music:great-dj
+      - venue-quality:great-dance-floor
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-past-social
+    email: frank@example.com
+    overall_sentiment: great
+    comment: |
+      Solid Vienna event. The warm-up set was a bit slow, but the main
+      social block was very lively. Will definitely return.
+    aspect_scores:
+      atmosphere: 4
+      music: 4
+      venue-quality: 4
+    aspect_tags:
+      - atmosphere:good-energy
+      - music:good-playlist
+      - venue-quality:good-lighting
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-past-social
+    email: emma@example.com
+    overall_sentiment: great
+    comment: |
+      Loved the vibe here. The crowd was mixed — locals and travelers alike —
+      which always makes for the best social experiences.
+    aspect_scores:
+      atmosphere: 5
+    aspect_tags:
+      - atmosphere:friendly-crowd
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-past-social
+    email: rita@example.com
+    overall_sentiment: okay
+    comment: |
+      Nice enough, but a bit crowded by the end of the night. Still worth going
+      to if you're in the area.
+    aspect_scores:
+      atmosphere: 3
+      venue-quality: 2
+    aspect_tags:
+      - venue-quality:crowded
+    comment_status: approved
+    status: approved
+
+  # Reviews on evt-ux-past-workshop (Bangkok workshop)
+  - event_id: evt-ux-past-workshop
+    email: gina@example.com
+    overall_sentiment: amazing
+    comment: |
+      Best bachata workshop I've attended in a long time. The instructor broke
+      down musicality in a way that finally made sense. Highly recommend.
+    aspect_scores:
+      teaching-quality: 5
+      venue-quality: 5
+      music: 4
+    aspect_tags:
+      - teaching-quality:excellent-instruction
+      - venue-quality:great-environment
+      - music:good-playlist
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-past-workshop
+    email: hugo@example.com
+    overall_sentiment: great
+    comment: |
+      Well-organized, good pacing, and the instructor was very patient with
+      all levels in the room. Worth the trip to Bangkok.
+    aspect_scores:
+      teaching-quality: 4
+      atmosphere: 4
+    aspect_tags:
+      - teaching-quality:patient-instructor
+      - atmosphere:welcoming-vibe
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-past-workshop
+    email: samir@example.com
+    overall_sentiment: great
+    comment: |
+      Solid workshop with clear combinations and good music choices.
+      The venue was a bit small but cozy.
+    aspect_scores:
+      teaching-quality: 4
+      music: 4
+      venue-quality: 3
+    aspect_tags:
+      - music:good-playlist
+      - venue-quality:intimate-space
+    comment_status: approved
+    status: approved
+
+  # Reviews on evt-ux-past-london (Last week's London Festival Preview)
+  - event_id: evt-ux-past-london
+    email: bob@example.com
+    overall_sentiment: amazing
+    comment: |
+      What an incredible night! The energy was absolutely electric, the DJs
+      were top-notch, and the crowd was diverse and friendly. Best pre-party
+      I've experienced before a major festival.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+      venue-quality: 5
+    aspect_tags:
+      - atmosphere:electric-energy
+      - music:excellent-dj
+      - venue-quality:great-dance-floor
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-past-london
+    email: carol@example.com
+    overall_sentiment: amazing
+    comment: |
+      The vibe was incredible and everyone was genuinely welcoming. The music
+      selection showed real care — started mellow and built perfectly throughout
+      the night. Can't wait for the full festival!
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - music:great-dj
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-past-london
+    email: dave@example.com
+    overall_sentiment: great
+    comment: |
+      Really solid preview night. Nice variety on the floor, good pacing,
+      and I made some new dance friends. Only minor issue was it got pretty
+      crowded around midnight.
+    aspect_scores:
+      atmosphere: 4
+      music: 4
+      venue-quality: 3
+    aspect_tags:
+      - atmosphere:good-energy
+      - venue-quality:crowded-later
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-past-london
+    email: erin@example.com
+    overall_sentiment: great
+    comment: |
+      Fantastic starting point for festival weekend. The DJ transition between
+      sets was smooth, and the crowd stayed engaged all night.
+    aspect_scores:
+      music: 5
+      atmosphere: 4
+    aspect_tags:
+      - music:excellent-dj
+      - atmosphere:engaged-crowd
+    comment_status: approved
+    status: approved
+
+# ── Pre-seeded messages / Boards ───────────────────────────────────────────
+# Live discussion boards on key upcoming events showing real coordination,
+# questions, and social engagement (inspired by event-messages scenario).
+messages:
+  # ── Prague Friday (evt-ux-008) — upcoming, high-engagement social ────
+  - key: prague-accom
+    event_id: evt-ux-008
+    email: alice@example.com
+    category: accommodation
+    body: "Anyone looking for accommodation near King's Cross? I found a nice hostel with a big group discount."
+
+  - reply_to: prague-accom
+    event_id: evt-ux-008
+    email: bob@example.com
+    body: "Interested! Can you share the link?"
+
+  - reply_to: prague-accom
+    event_id: evt-ux-008
+    email: carol@example.com
+    body: "I'm already booked at the Old Town Plaza Hotel. Much nicer than a hostel, worth it IMO."
+
+  - reply_to: prague-accom
+    event_id: evt-ux-008
+    email: dave@example.com
+    body: "Thanks for the tip! Just booked the hostel. See you all there!"
+
+  - key: prague-transport
+    event_id: evt-ux-008
+    email: emma@example.com
+    category: ride
+    body: "I'm renting a car and driving from Vienna. Any one interested in splitting gas?"
+
+  - reply_to: prague-transport
+    event_id: evt-ux-008
+    email: frank@example.com
+    body: "That sounds perfect! I'm also coming from Vienna."
+
+  - key: prague-tips
+    event_id: evt-ux-008
+    email: gina@example.com
+    category: question
+    body: "Is this a beginner-friendly event? First time attending in Prague."
+
+  - reply_to: prague-tips
+    event_id: evt-ux-008
+    email: hugo@example.com
+    body: "Absolutely! The Prague Friday is known for being welcoming to all levels."
+
+  # ── London Festival (evt-ux-011) — upcoming, large social ────────────
+  - key: london-crowd
+    event_id: evt-ux-011
+    email: nia@example.com
+    category: question
+    body: "How packed does this usually get? I prefer dancing with breathing room."
+
+  - reply_to: london-crowd
+    event_id: evt-ux-011
+    email: omar@example.com
+    body: "It's a festival preview, so pretty packed. But the venue is huge and they manage flow well."
+
+  - key: london-dress
+    event_id: evt-ux-011
+    email: pablo@example.com
+    category: question
+    body: "What's the dress code? Smart casual or can we go more relaxed?"
+
+  - reply_to: london-dress
+    event_id: evt-ux-011
+    email: quinn@example.com
+    body: "Smart casual is the vibe. Dress shoes or smooth-soled sneakers recommended."
+
+  - key: london-schedule
+    event_id: evt-ux-011
+    email: rita@example.com
+    category: question
+    body: "I see it runs Sat 20:00 to Sun 02:00. Are there official breaks or is it dancing the whole time?"
+
+  - reply_to: london-schedule
+    event_id: evt-ux-011
+    email: samir@example.com
+    body: "There's a 30-min dinner break around 22:00 and a brief DJ reset around 01:00, but mostly continuous dancing."
+
+  # ── Budapest Pre-party (evt-ux-023) — upcoming, festival kickoff ─────
+  - key: budapest-festival
+    event_id: evt-ux-023
+    email: tara@example.com
+    category: question
+    body: "Is there a full festival weekend after this pre-party? Looking for an excuse to stay longer in Budapest."
+
+  - reply_to: budapest-festival
+    event_id: evt-ux-023
+    email: ulysses@example.com
+    body: "Yes! Full festival runs Fri–Sun with workshops, gala nights, and beach parties."
+
+  - key: budapest-meetup
+    event_id: evt-ux-023
+    email: nia@example.com
+    category: meetup
+    body: "Let's organize a group dinner before the pre-party on Friday! Who's in?"
+
+  - reply_to: budapest-meetup
+    event_id: evt-ux-023
+    email: s01@example.com
+    body: "Great idea! I'm in. Any suggestions for traditional Hungarian restaurants near the venue?"
+
+  - reply_to: budapest-meetup
+    event_id: evt-ux-023
+    email: s02@example.com
+    body: "Fisherman's Bastion area has amazing local places. Let's meet there around 19:00?"
 
 # Social proof seeds. Mirrors the map-clustering fixture style so Explorer
 # cards and pins show saved/going counts, following badges, and popularity.

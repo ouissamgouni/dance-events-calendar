@@ -13,12 +13,29 @@ import { makeUser } from '../test/handlers'
 import { renderCardToBlob, downloadImage } from '../utils/passportShareImage'
 
 // Covers the Passport page rendering summary stats, milestones and the
-// Timeline/Cities/Countries tabs from the mocked /api/passport +
+// Milestones/Journey/Places tabs from the mocked /api/passport +
 // /api/passport/timeline endpoints, plus the celebration toast for
 // newly-unlocked milestones. The Leaflet-backed EventMap is stubbed so the
-// Cities/Countries tabs render deterministically in jsdom.
+// Places tab renders deterministically in jsdom.
 vi.mock('../components/EventMap', () => ({
-    default: () => <div data-testid="passport-map">event map</div>,
+    default: ({ events, cooperativeGestures, detailLinkSource, onMarkerSelect }: {
+        events: Array<{ event_id: string; title: string; city?: string | null; country?: string | null }>;
+        cooperativeGestures?: boolean;
+        detailLinkSource?: string;
+        onMarkerSelect?: (event: { event_id: string; title: string; city?: string | null; country?: string | null }) => void;
+    }) => (
+        <div
+            data-testid="passport-map"
+            data-cooperative-gestures={String(cooperativeGestures === true)}
+            data-detail-link-source={detailLinkSource}
+        >
+            {events.map((event) => (
+                <button key={event.event_id} type="button" aria-label={`${event.title} marker`} onClick={() => onMarkerSelect?.(event)}>
+                    {event.title}
+                </button>
+            ))}
+        </div>
+    ),
 }))
 
 // Rasterising the share card needs a real canvas; stub the capture/share util
@@ -92,11 +109,11 @@ const PASSPORT = {
     collections: {
         cities: [
             { city: 'Paris', country: 'France', count: 6, latitude: 48.85, longitude: 2.35 },
-            { city: 'Berlin', country: 'Germany', count: 4, latitude: 52.52, longitude: 13.4 },
+            { city: 'Berlin', country: 'Germany', count: 1, latitude: 52.52, longitude: 13.4 },
         ],
         countries: [
             { country: 'France', count: 6 },
-            { country: 'Germany', count: 4 },
+            { country: 'Germany', count: 1 },
         ],
     },
     milestones: [
@@ -115,12 +132,14 @@ const TIMELINE = {
             location: 'Studio A',
             city: 'Paris',
             country: 'France',
+            tags: ['Salsa'],
             latitude: null,
             longitude: null,
         },
     ],
     markers: [
-        { key: 'first_event', name: 'First Steps', icon: '🎉', date: '2024-05-10T20:00:00' },
+        { key: 'first_event', name: 'First Steps', icon: '🎉', description: 'Attend your first event', date: '2024-05-10T20:00:00', event_id: 'evt-1' },
+        { key: 'cities_3', name: 'City Starter', icon: '🏙️', description: 'Dance in 3 cities', date: '2024-05-10T20:00:00', event_id: 'evt-1' },
     ],
     total: 1,
 }
@@ -135,45 +154,109 @@ describe('PassportPage', () => {
 
         renderPassport()
 
-        expect(await screen.findByText(/12 events · 3 cities · 2 countries/)).toBeInTheDocument()
-        // Cadence line in the summary header (avg_gap_days 11.5 -> 12 days).
-        expect(screen.getByText(/1 event every 12 days/)).toBeInTheDocument()
-        expect(screen.getByText('Events attended')).toBeInTheDocument()
-        // Frequency card renamed; the "Last 30 days" card was removed.
-        expect(screen.getByText('Days between events')).toBeInTheDocument()
+        expect(await screen.findByText('Your stats')).toBeInTheDocument()
+        expect(screen.getAllByText('Events').length).toBeGreaterThan(0)
+        expect(screen.getByText('Days / event')).toBeInTheDocument()
         expect(screen.queryByText('Last 30 days')).not.toBeInTheDocument()
         expect(screen.queryByText('Avg gap (days)')).not.toBeInTheDocument()
-        // Timeline lives under its own tab (Milestones is the default tab).
-        fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }))
+        expect(screen.queryByText(/12 events · 3 cities · 2 countries/)).not.toBeInTheDocument()
+        // Journey owns the timeline and heatmap (Milestones is the default tab).
+        fireEvent.click(screen.getByRole('tab', { name: 'Journey' }))
         expect(await screen.findByText('Paris Salsa Night')).toBeInTheDocument()
         // Milestone markers interleave into the timeline.
-        expect(screen.getByText(/First dance event/)).toBeInTheDocument()
+        expect(screen.getByText('First Steps')).toBeInTheDocument()
+        expect(screen.getByText('City Starter')).toBeInTheDocument()
+        expect(screen.getAllByTestId('journey-entry')).toHaveLength(1)
+        expect(screen.getByRole('heading', { name: '2024' })).toBeInTheDocument()
+        expect(screen.getByPlaceholderText('Search events by name, city or tag')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Show in map' })).toBeInTheDocument()
         // No "Styles danced" stat card.
         expect(screen.queryByText('Styles danced')).not.toBeInTheDocument()
     })
 
-    it('switches to the Cities and Countries tabs via the tab bar and stat links', async () => {
+    it('renders an independent milestone as its own chronological entry', async () => {
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/passport', () => HttpResponse.json(PASSPORT)),
+            http.get('*/api/passport/timeline', () => HttpResponse.json({
+                ...TIMELINE,
+                markers: [
+                    ...TIMELINE.markers,
+                    { key: 'first_review', name: 'Reviewer', icon: '✍️', description: 'Leave your first review', date: '2024-06-16T12:00:00', event_id: null },
+                ],
+            })),
+        )
+
+        renderPassport()
+        await screen.findByText('Your stats')
+        fireEvent.click(screen.getByRole('tab', { name: 'Journey' }))
+
+        expect(await screen.findByText('Reviewer')).toBeInTheDocument()
+        expect(screen.getAllByTestId('journey-entry')).toHaveLength(2)
+        expect(screen.queryByText(/Unlocked/)).not.toBeInTheDocument()
+    })
+
+    it('searches the owner timeline by the entered event query', async () => {
+        let query = ''
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/passport', () => HttpResponse.json(PASSPORT)),
+            http.get('*/api/passport/timeline', ({ request }) => {
+                query = new URL(request.url).searchParams.get('q') ?? ''
+                return HttpResponse.json(TIMELINE)
+            }),
+        )
+
+        renderPassport()
+        await screen.findByText('Your stats')
+        fireEvent.click(screen.getByRole('tab', { name: 'Journey' }))
+        fireEvent.change(screen.getByPlaceholderText('Search events by name, city or tag'), { target: { value: 'Salsa' } })
+
+        await waitFor(() => expect(query).toBe('Salsa'))
+    })
+
+    it('switches between Cities and Countries inside the Places tab', async () => {
+        const mapEvents = [
+            { event_id: 'paris-event', title: 'Paris Social', start: '2024-05-10T20:00:00', city: 'Paris', country: 'France', latitude: 48.85, longitude: 2.35 },
+            { event_id: 'berlin-event', title: 'Berlin Social', start: '2024-06-10T20:00:00', city: 'Berlin', country: 'Germany', latitude: 52.52, longitude: 13.4 },
+        ]
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
             http.get('*/api/passport', () => HttpResponse.json(PASSPORT)),
             http.get('*/api/passport/timeline', () => HttpResponse.json(TIMELINE)),
-            http.get('*/api/passport/events', () => HttpResponse.json([])),
+            http.get('*/api/passport/events', () => HttpResponse.json(mapEvents)),
         )
 
         renderPassport()
 
-        // Milestones is the default tab; collections live under their own tabs.
-        expect(await screen.findAllByText('First Steps')).not.toHaveLength(0)
+        // Milestones is the default tab; collections live under Places.
+        expect(await screen.findByText('Milestone progress')).toBeInTheDocument()
         expect(screen.queryByText('France')).not.toBeInTheDocument()
 
-        // The "Cities" stat-card label (on the Milestones tab) is a shortcut to
-        // the Cities tab, which shows the (stubbed) EventMap beside the list.
-        fireEvent.click(screen.getByRole('button', { name: 'Cities' }))
-        expect(await screen.findByTestId('passport-map')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('tab', { name: 'Places' }))
+        const map = await screen.findByTestId('passport-map')
+        expect(map).toHaveAttribute('data-cooperative-gestures', 'true')
+        expect(map).toHaveAttribute('data-detail-link-source', 'passport')
+        expect(screen.getByRole('button', { name: '3 cities' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: '2 countries' })).toHaveAttribute('aria-pressed', 'false')
+        expect(screen.getByRole('button', { name: 'Paris, France 6 events' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Berlin, Germany 1 event' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /^All/ })).not.toBeInTheDocument()
 
-        // The tab bar switches to the Countries tab.
-        fireEvent.click(screen.getByRole('tab', { name: 'Countries' }))
-        expect(await screen.findByText('France')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Paris, France 6 events' }))
+        expect(screen.getByText('Paris Social')).toBeInTheDocument()
+        expect(screen.queryByText('Berlin Social')).not.toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: '2 countries' }))
+        expect(screen.getByRole('button', { name: 'France 6 events' })).toBeInTheDocument()
+        expect(screen.getByText('Paris Social')).toBeInTheDocument()
+        expect(screen.getByText('Berlin Social')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: '3 cities' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Berlin Social marker' }))
+        expect(screen.getByRole('button', { name: 'Berlin, Germany 1 event' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByText('Paris Social')).toBeInTheDocument()
+        expect(screen.getByText('Berlin Social')).toBeInTheDocument()
     })
 
     it('renders milestones with goal text, locked progress and fires a toast for new unlocks', async () => {
@@ -198,14 +281,18 @@ describe('PassportPage', () => {
 
         renderPassport()
 
-        // Milestone badges render (unlocked "First Steps" with its achievement
-        // text + locked "Regular" showing the goal and distance to unlock).
-        expect(await screen.findByText('Milestones')).toBeInTheDocument()
+        expect(await screen.findByText('Milestone progress')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Community, 0 / 0 unlocked' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: /Events.*1 \/ 2 unlocked/ }))
+        expect(await screen.findByRole('dialog', { name: 'Events Milestones' })).toBeInTheDocument()
         expect(screen.getAllByText('First Steps').length).toBeGreaterThan(0)
         expect(screen.getByText('Attended your first event')).toBeInTheDocument()
         expect(screen.getByText('Regular')).toBeInTheDocument()
         expect(screen.getByText('Attend 10 events')).toBeInTheDocument()
-        expect(screen.getByText(/2 more to unlock/)).toBeInTheDocument()
+        expect(screen.getByText('8 / 10')).toBeInTheDocument()
+        expect(screen.getByRole('progressbar', { name: 'Regular progress' })).toHaveAttribute('aria-valuenow', '8')
+        fireEvent.click(screen.getByRole('button', { name: 'Close milestone details' }))
+        expect(screen.queryByRole('dialog', { name: 'Events Milestones' })).not.toBeInTheDocument()
 
         // Celebration toast for the newly-unlocked milestone.
         expect(await screen.findByText(/Milestone unlocked!/)).toBeInTheDocument()
@@ -246,9 +333,9 @@ describe('PassportPage', () => {
         renderPassport()
 
         // Opening the menu does not mint a link yet.
-        const openBtn = await screen.findByRole('button', { name: 'Share' })
+        const openBtn = await screen.findByRole('button', { name: 'Share passport' })
         fireEvent.click(openBtn)
-        fireEvent.click(await screen.findByRole('menuitem', { name: 'As link' }))
+        fireEvent.click(await screen.findByRole('menuitem', { name: /^As link/ }))
         expect(shareCalled).toBe(false)
 
         // The dialog's own "Share link" button performs the mint.
@@ -306,8 +393,8 @@ describe('PassportPage', () => {
 
         renderPassport()
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
-        fireEvent.click(await screen.findByRole('menuitem', { name: 'As card' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Share passport' }))
+        fireEvent.click(await screen.findByRole('menuitem', { name: /^As card/ }))
 
         // The dialog prepares the card (mints a link so the QR resolves, loads
         // events + section flags), then Download saves the PNG directly.
@@ -362,10 +449,12 @@ describe('PassportPage', () => {
 
         renderPassport()
 
-        // The "Add a past event" control lives at the top of the Timeline tab.
-        await screen.findByText(/12 events · 3 cities · 2 countries/)
-        fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }))
-        const addTrigger = await screen.findByRole('button', { name: 'Add a past event' })
+        // The "Add a past event" control lives at the top of Journey.
+        await screen.findByText('Your stats')
+        fireEvent.click(screen.getByRole('tab', { name: 'Journey' }))
+        const addTrigger = await screen.findByRole('button', { name: 'Add past event' })
+        expect(addTrigger.className).toContain('border-line')
+        expect(addTrigger.className).not.toContain('danger')
         fireEvent.click(addTrigger)
 
         // Type a query and pick the returned past event.
@@ -412,9 +501,9 @@ describe('PassportPage', () => {
 
         renderPassport()
 
-        await screen.findByText(/12 events · 3 cities · 2 countries/)
-        fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }))
-        fireEvent.click(await screen.findByRole('button', { name: 'Add a past event' }))
+        await screen.findByText('Your stats')
+        fireEvent.click(screen.getByRole('tab', { name: 'Journey' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Add past event' }))
 
         const input = await screen.findByLabelText('Search past events')
         fireEvent.change(input, { target: { value: 'Havana' } })

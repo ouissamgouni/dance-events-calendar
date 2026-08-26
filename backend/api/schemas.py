@@ -45,6 +45,8 @@ class EventResponse(BaseModel):
     description: Optional[str] = None
     image_url: Optional[str] = None
     location: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     start: datetime
     end: datetime
     all_day: bool = False
@@ -760,6 +762,10 @@ class SiteSettingsResponse(BaseModel):
     # Tribe > Calendars "Your Network" snapshot of upcoming events people
     # you follow are going to. When False, the snapshot is hidden.
     network_going_snapshot_enabled: bool = True
+    # My Events map journey arrows and per-tab Route control.
+    my_events_route_enabled: bool = False
+    # Show 'My Events' as a top-level navigation entry (admin feature).
+    my_events_nav_enabled: bool = True
     # Required tag-group ids used by the event suggestion form.
     suggest_event_required_dance_group_id: Optional[int] = None
     suggest_event_required_reach_group_id: Optional[int] = None
@@ -1028,6 +1034,8 @@ class SiteSettingsUpdateRequest(BaseModel):
     for_you_rail_enabled: Optional[bool] = None
     your_next_events_rail_enabled: Optional[bool] = None
     network_going_snapshot_enabled: Optional[bool] = None
+    my_events_route_enabled: Optional[bool] = None
+    my_events_nav_enabled: Optional[bool] = None
     suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
     suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)
     # Notification / re-engagement global gates.
@@ -2861,6 +2869,7 @@ class PassportTimelineItem(BaseModel):
     location: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
+    tags: list[str] = []
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
@@ -2869,7 +2878,9 @@ class PassportTimelineMarker(BaseModel):
     key: str
     name: str
     icon: str
+    description: Optional[str] = None
     date: datetime
+    event_id: Optional[str] = None
     # Optional secondary line (used by recurring consistency markers to state
     # the reach, e.g. "8/12 active months").
     label: Optional[str] = None
@@ -2890,6 +2901,7 @@ class SharedPassportResponse(BaseModel):
     """
 
     display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     stats: PassportStats
     collections: PassportCollections
     milestones: list[PassportMilestone] = []

@@ -616,7 +616,9 @@ function PassportTabContent({ handle }: { handle: string }) {
     return (
         <PassportView
             data={data}
-            title="Dance Passport"
+            displayName={data.display_name ?? handle}
+            handle={data.handle ?? handle}
+            avatarUrl={data.avatar_url}
             sections={data.sections}
             timelineItems={data.timeline_items}
             timelineMarkers={data.timeline_markers}

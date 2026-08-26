@@ -1,4 +1,92 @@
 attendances:
+  # ── Past event attendances (for reviews) ────────────────────────────
+  # evt-ux-past-social: Vienna social reviewers
+  - {
+      event_id: evt-ux-past-social,
+      email: alice@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-ux-past-social,
+      email: frank@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-ux-past-social,
+      email: emma@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-ux-past-social,
+      email: rita@example.com,
+      share_publicly: true,
+    }
+
+  # evt-ux-past-workshop: Bangkok workshop reviewers
+  - {
+      event_id: evt-ux-past-workshop,
+      email: gina@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-ux-past-workshop,
+      email: hugo@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-ux-past-workshop,
+      email: samir@example.com,
+      share_publicly: true,
+    }
+
+  # evt-ux-past-london: London Festival Preview reviewers
+  - {
+      event_id: evt-ux-past-london,
+      email: bob@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-ux-past-london,
+      email: carol@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-ux-past-london,
+      email: dave@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-ux-past-london,
+      email: erin@example.com,
+      share_publicly: true,
+    }
+
+  # ── Existing attendances for message participants ────────────────────
+  # Ensure key message participants are attendees/savers (Going ∪ Saved)
+  - { event_id: evt-ux-008, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: bob@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: carol@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: dave@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: hugo@example.com, share_publicly: true }
+
+  # evt-ux-011 (London Festival) message participants
+  - { event_id: evt-ux-011, email: nia@example.com, share_publicly: true }
+  - { event_id: evt-ux-011, email: omar@example.com, share_publicly: true }
+  - { event_id: evt-ux-011, email: pablo@example.com, share_publicly: true }
+  - { event_id: evt-ux-011, email: quinn@example.com, share_publicly: true }
+  - { event_id: evt-ux-011, email: rita@example.com, share_publicly: true }
+  - { event_id: evt-ux-011, email: samir@example.com, share_publicly: true }
+
+  # evt-ux-023 (Budapest Pre-party) message participants
+  - { event_id: evt-ux-023, email: tara@example.com, share_publicly: true }
+  - { event_id: evt-ux-023, email: ulysses@example.com, share_publicly: true }
+  - { event_id: evt-ux-023, email: nia@example.com, share_publicly: true }
+  - { event_id: evt-ux-023, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-023, email: s02@example.com, share_audience: public }
+
   # ── Viewer's passport: 12 past events with mixed audiences ────────
   # Supports the Dance Passport page; audiences (public/friends/private)
   # are mixed so all count toward the self-only passport view. All events
@@ -64,6 +152,13 @@ attendances:
       email: viewer@example.com,
       share_audience: friends,
     }
+
+  # My Events Upcoming journey: Madrid → Paris → Lisbon → Rome → Amsterdam.
+  - { event_id: evt-ux-003, email: viewer@example.com, share_audience: public }
+  - { event_id: evt-ux-001, email: viewer@example.com, share_audience: friends }
+  - { event_id: evt-ux-004, email: viewer@example.com, share_audience: public }
+  - { event_id: evt-ux-005, email: viewer@example.com, share_audience: private }
+  - { event_id: evt-ux-006, email: viewer@example.com, share_audience: friends }
 
   # Hero Paris social: friends + one-way followees + strangers.
   - { event_id: evt-ux-008, email: alice@example.com, share_publicly: true }

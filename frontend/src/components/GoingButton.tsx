@@ -28,6 +28,7 @@ interface Props {
     className?: string;
     /** When true, the event has already ended — labels use past tense ("Attended"). */
     isPast?: boolean;
+    iconVariant?: 'hand' | 'person';
 }
 
 function RaisedHandIcon({ solid, className }: { solid: boolean; className: string }) {
@@ -143,10 +144,12 @@ export default function GoingButton({
     stopPropagation = false,
     className = '',
     isPast = false,
+    iconVariant,
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user, refreshUser } = useAuth();
     const { goingButtonIconVariant } = useFeatureFlags();
+    const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
     const going = isAttending(eventId);
 
     const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -521,7 +524,7 @@ export default function GoingButton({
                         aria-label={tooltip}
                         className="text-xs px-3 py-1 transition flex items-center gap-1.5 hover:bg-blue-100"
                     >
-                        <AttendanceIcon variant={goingButtonIconVariant} solid className="w-3.5 h-3.5" />
+                        <AttendanceIcon variant={resolvedIconVariant} solid className="w-3.5 h-3.5" />
                         {goingLabel}
                     </button>
                     <button
@@ -553,7 +556,7 @@ export default function GoingButton({
                     }
                 >
                     <AttendanceIcon
-                        variant={goingButtonIconVariant}
+                        variant={resolvedIconVariant}
                         solid={going}
                         className={prominent && !going ? 'w-4 h-4' : 'w-3.5 h-3.5'}
                     />
@@ -573,9 +576,9 @@ export default function GoingButton({
                 onClick={handleClick}
                 aria-label={tooltip}
                 title={tooltip}
-                className={`relative inline-flex shrink-0 items-center justify-center rounded-full border border-line bg-surface shadow-sm transition-colors ${size === 'sm' ? 'h-7 w-7' : 'h-9 w-9'} ${going ? 'text-action hover:bg-blue-50' : 'text-ink hover:bg-canvas'} ${className}`.trim()}
+                className={`relative inline-flex shrink-0 items-center justify-center rounded-full border border-line bg-transparent shadow-sm transition-colors ${size === 'sm' ? 'h-7 w-7' : 'h-9 w-9'} ${going ? 'text-action hover:bg-blue-50' : 'text-ink-soft hover:bg-canvas'} ${className}`.trim()}
             >
-                <AttendanceIcon variant={goingButtonIconVariant} solid={going} className={iconSizeClass} />
+                <AttendanceIcon variant={resolvedIconVariant} solid={going} className={iconSizeClass} />
             </button>
 
             {popover}

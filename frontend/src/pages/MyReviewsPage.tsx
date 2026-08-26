@@ -72,7 +72,6 @@ export default function MyReviewsPage() {
 
     return (
         <div className="mx-auto max-w-xl px-4 py-4">
-            <h1 className="mb-3 text-sm font-semibold text-ink">My Reviews</h1>
             {myRatings === null ? (
                 <p className="text-sm text-muted">Loading…</p>
             ) : myRatings.length === 0 ? (

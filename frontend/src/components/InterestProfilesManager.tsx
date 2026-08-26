@@ -91,7 +91,7 @@ function Sheet({ children, onClose, label, wide = false }: { children: ReactNode
     );
 }
 
-export default function InterestProfilesManager() {
+export default function InterestProfilesManager({ showHeader = true }: { showHeader?: boolean }) {
     const toast = useToast();
     const { profiles, error, setError, createProfile, updateProfile, deleteProfile, activateProfile } = useInterestProfiles();
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
@@ -173,10 +173,12 @@ export default function InterestProfilesManager() {
 
     return (
         <div data-testid="interest-profiles-manager">
-            <header className="mb-5">
-                <h1 className="text-2xl font-bold text-ink">Search profiles</h1>
-                <p className="mt-2 max-w-sm text-sm text-ink-soft">Use a profile to find events in Explore and get alerts that match your preferences.</p>
-            </header>
+            {showHeader && (
+                <header className="mb-5">
+                    <h1 className="text-2xl font-bold text-ink">Search profiles</h1>
+                    <p className="mt-2 max-w-sm text-sm text-ink-soft">Use a profile to find events in Explore and get alerts that match your preferences.</p>
+                </header>
+            )}
 
             {profiles === null ? <p className="text-sm text-muted">Loading…</p> : (
                 <div className="space-y-5">

@@ -143,43 +143,54 @@ export default function MineHub() {
         <div className="min-h-full bg-canvas">
             <div className="mx-auto max-w-3xl space-y-4 px-4 py-4">
                 <section className="overflow-hidden rounded-card bg-brand-strong p-4 text-white shadow-sm" aria-label="My dance journey">
-                    <div className="grid min-h-20 grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] items-start gap-2">
-                        <div className="relative z-10 flex items-center gap-2 pt-1">
-                            {user?.avatar_url ? (
-                                <img
-                                    src={user.avatar_url}
-                                    alt=""
-                                    className="h-12 w-12 shrink-0 rounded-full border-[3px] border-white/40 object-cover"
-                                    referrerPolicy="no-referrer"
-                                />
-                            ) : (
-                                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg font-bold">
-                                    {displayName.charAt(0).toUpperCase()}
-                                </span>
-                            )}
-                            <div className="min-w-0">
-                                <h1 className="truncate text-2xl font-bold">{displayName}</h1>
-                                {user?.handle && <p className="mt-1 truncate text-sm text-white/80">@{user.handle}</p>}
+                    <div className="grid min-h-20 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                        <div className="flex flex-col gap-1">
+                            <div className="relative z-10 flex items-center gap-2">
+                                {user?.avatar_url ? (
+                                    <img
+                                        src={user.avatar_url}
+                                        alt=""
+                                        className="h-12 w-12 shrink-0 rounded-full border-[3px] border-white/40 object-cover"
+                                        referrerPolicy="no-referrer"
+                                    />
+                                ) : (
+                                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg font-bold">
+                                        {displayName.charAt(0).toUpperCase()}
+                                    </span>
+                                )}
+                                <div className="min-w-0">
+                                    <h1 className="truncate text-2xl font-bold">{displayName}</h1>
+                                    {user?.handle && <p className="mt-1 truncate text-sm text-white/80">@{user.handle}</p>}
+                                </div>
                             </div>
+                            <div className="relative z-10 text-sm font-bold leading-none">
+                                {plural(stats?.total_events_attended ?? 0, 'event')}
+                            </div>
+                            <Link
+                                to="/mine/passport"
+                                className="flex items-center gap-1.5 text-xs font-semibold text-white/80 transition hover:text-white focus:outline-none focus:ring-2 focus:ring-white w-fit whitespace-nowrap"
+                                aria-label="Visit passport"
+                            >
+                                <span>{plural(stats?.cities_visited ?? 0, 'city', 'cities')}</span>
+                                <span aria-hidden="true">·</span>
+                                <span>{plural(stats?.countries_visited ?? 0, 'country', 'countries')}</span>
+                                <img
+                                    src="/passport.png"
+                                    alt=""
+                                    className="h-6 w-6 shrink-0"
+                                    style={{ filter: 'invert(1)' }}
+                                    aria-hidden="true"
+                                />
+                            </Link>
                         </div>
-                        <div className="h-20 min-w-0 opacity-90">
-                            <MyDanceJourneyMap coords={coords} />
+                        <div className="min-w-0 opacity-90 flex flex-col gap-0.5">
+                            <div className="h-20">
+                                <MyDanceJourneyMap coords={coords} />
+                            </div>
+                            {passport?.monthly_activity && (
+                                <MyDanceActivityStrip months={passport.monthly_activity} size="xs" />
+                            )}
                         </div>
-                    </div>
-
-                    <div className="mt-1 flex items-end justify-between gap-3 tabular-nums" aria-label="Attended event statistics">
-                        <p className="shrink-0 text-3xl font-bold leading-none">
-                            {plural(stats?.total_events_attended ?? 0, 'event')}
-                        </p>
-                        <p className="flex min-w-0 items-center gap-1.5 pb-0.5 text-xs font-semibold text-white/80">
-                            <span>{plural(stats?.cities_visited ?? 0, 'city', 'cities')}</span>
-                            <span aria-hidden="true">·</span>
-                            <span>{plural(stats?.countries_visited ?? 0, 'country', 'countries')}</span>
-                        </p>
-                    </div>
-
-                    <div className="mt-3">
-                        <MyDanceActivityStrip months={passport?.monthly_activity ?? []} />
                     </div>
                 </section>
 

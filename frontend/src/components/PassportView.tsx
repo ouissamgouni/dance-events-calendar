@@ -1,18 +1,25 @@
-/**
- * PassportView — the read-only presentational surface of a Dance Passport.
- *
- * Extracted from PassportPage so the exact same experience (summary header,
- * stat cards and the Milestones/Timeline/Cities/Countries tabs) can be reused
- * by the owner's own /passport page, a profile "Dance Passport" tab and the
- * public shared link. Callers own data fetching; this component only renders.
- */
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+/** Shared owner, profile, and public Dance Passport presentation. */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import {
+    ArrowRight,
+    CalendarDays,
+    Check,
+    ChevronRight,
+    Clock3,
+    Globe2,
+    LockKeyhole,
+    MapPin,
+    MessageSquareText,
+    Search,
+    Trophy,
+    X,
+} from 'lucide-react';
 import EventMap from './EventMap';
+import MyDanceActivityStrip from './MyDanceActivityStrip';
+import MyDanceJourneyMap from './MyDanceJourneyMap';
 import PassportActivityHeatmap from './PassportActivityHeatmap';
-import ScrollDotsIndicator from './ScrollDots';
-import { useScrollDots } from '../hooks/useScrollDots';
 import type {
     PassportConsistency,
     PassportMapEvent,
@@ -26,6 +33,9 @@ import type {
 export type { PassportSection };
 
 const ALL_SECTIONS: PassportSection[] = ['milestones', 'timeline', 'cities', 'countries'];
+type PassportTab = 'milestones' | 'journey' | 'places';
+type MilestoneCategoryKey = 'events' | 'consistency' | 'cities' | 'countries' | 'reviews';
+type MilestoneCardState = 'unlocked' | 'in-progress' | 'locked';
 
 function formatDate(iso: string): string {
     try {
@@ -39,9 +49,397 @@ function formatDate(iso: string): string {
     }
 }
 
-// Factual, past-tense milestone copy for the timeline (badges use the catalog
-// name/description instead). Icons mirror the catalog except where a plain
-// label reads better. Unknown keys fall back to the marker icon + description.
+function formatPeriodRange(startYm: string, endYm: string): string {
+    const [startYear, startMonth] = startYm.split('-').map(Number);
+    const [endYear, endMonth] = endYm.split('-').map(Number);
+    if (!startYear || !startMonth || !endYear || !endMonth) return `${startYm}-${endYm}`;
+    const month = (year: number, value: number) =>
+        new Date(year, value - 1, 1).toLocaleDateString(undefined, { month: 'short' });
+    if (startYear === endYear && startMonth === endMonth) return `${month(startYear, startMonth)} ${startYear}`;
+    if (startYear === endYear) return `${month(startYear, startMonth)}-${month(endYear, endMonth)} ${endYear}`;
+    return `${month(startYear, startMonth)} ${startYear}-${month(endYear, endMonth)} ${endYear}`;
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+    return (
+        <button
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={onClick}
+            className={active
+                ? 'flex-1 border-b-2 border-brand px-3 py-3 text-sm font-semibold text-brand'
+                : 'flex-1 border-b-2 border-transparent px-3 py-3 text-sm font-medium text-ink-soft hover:text-ink'}
+        >
+            {children}
+        </button>
+    );
+}
+
+function PassportAvatar({ name, url }: { name: string; url: string | null }) {
+    if (url) {
+        return (
+            <img
+                src={url}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="h-16 w-16 shrink-0 rounded-full border-4 border-white/40 object-cover"
+            />
+        );
+    }
+    return (
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-white/40 bg-white/15 text-2xl font-semibold text-white">
+            {name.trim().charAt(0).toUpperCase() || '?'}
+        </span>
+    );
+}
+
+function SummaryHeader({
+    data,
+    displayName,
+    handle,
+    avatarUrl,
+    actions,
+    dancingSinceSlot,
+}: {
+    data: PassportResponse;
+    displayName: string;
+    handle: string | null;
+    avatarUrl: string | null;
+    actions?: ReactNode;
+    dancingSinceSlot?: ReactNode;
+}) {
+    const mapCoords = data.collections.cities.flatMap((city) =>
+        city.latitude != null && city.longitude != null
+            ? [{ lat: city.latitude, lng: city.longitude }]
+            : [],
+    );
+    return (
+        <header className="relative overflow-hidden rounded-card bg-brand-strong p-4 text-white shadow-sm">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                <div className="flex flex-col gap-1">
+                    <div className="relative z-10 flex min-w-0 items-center gap-3">
+                        <PassportAvatar name={displayName} url={avatarUrl} />
+                        <div className="min-w-0">
+                            <h1 className="truncate text-xl font-semibold">{displayName}</h1>
+                            {handle && <p className="truncate text-sm text-white/75">@{handle}</p>}
+                        </div>
+                    </div>
+                    <div className="relative z-10 text-sm font-semibold">
+                        {data.stats.total_events_attended} events
+                    </div>
+                    <div className="relative z-10 text-[9px] leading-5 text-white/85">
+                        {dancingSinceSlot ?? (
+                            <>
+                                <div className="whitespace-nowrap">Dancing since {formatDate(data.stats.dancing_since ?? data.stats.member_since)}</div>
+                                {data.stats.first_event_date && (
+                                    <p>First event on Movida {formatDate(data.stats.first_event_date)}</p>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+                <div className="pointer-events-none min-w-0 opacity-90 flex flex-col gap-0.5">
+                    <div className="h-18">
+                        <MyDanceJourneyMap coords={mapCoords} />
+                    </div>
+                    <MyDanceActivityStrip months={data.monthly_activity ?? []} size="xs" />
+                </div>
+            </div>
+            {actions && (
+                <div className="absolute bottom-4 right-4 z-[9000]">
+                    {actions}
+                </div>
+            )}
+        </header>
+    );
+}
+
+function StatCell({ value, label, icon }: { value: number | string; label: string; icon: ReactNode }) {
+    return (
+        <div className="flex min-h-20 flex-col items-center justify-center px-2 py-3 text-center">
+            <div className="flex items-center gap-2">
+                {icon}
+                <span className="text-xl font-semibold text-ink tabular-nums">{value}</span>
+            </div>
+            <div className="mt-1 text-[11px] font-medium leading-tight text-ink-soft">{label}</div>
+        </div>
+    );
+}
+
+function PassportStatsPanel({ data }: { data: PassportResponse }) {
+    const cadence = data.stats.avg_gap_days == null ? '-' : Math.max(1, Math.round(data.stats.avg_gap_days));
+    return (
+        <section aria-label="Your stats" className="rounded-card bg-brand/5 p-2">
+            <h2 className="px-2 pt-1 text-xs font-semibold uppercase text-ink-soft">Your stats</h2>
+            <div className="mt-1 grid grid-cols-3 divide-x divide-y divide-brand/10">
+                <StatCell value={data.stats.total_events_attended} label="Events" icon={<Trophy className="h-5 w-5 text-amber-600" aria-hidden="true" />} />
+                <StatCell value={data.stats.cities_visited} label="Cities" icon={<MapPin className="h-5 w-5 text-brand" aria-hidden="true" />} />
+                <StatCell value={data.stats.countries_visited} label="Countries" icon={<Globe2 className="h-5 w-5 text-action" aria-hidden="true" />} />
+                <StatCell value={`${data.stats.active_months_last_12}/12`} label="Active months" icon={<CalendarDays className="h-5 w-5 text-brand" aria-hidden="true" />} />
+                <StatCell value={cadence} label="Days / event" icon={<Clock3 className="h-5 w-5 text-brand" aria-hidden="true" />} />
+                <StatCell value={data.stats.reviews_written} label="Reviews" icon={<MessageSquareText className="h-5 w-5 text-ink-soft" aria-hidden="true" />} />
+            </div>
+        </section>
+    );
+}
+
+interface MilestoneCardModel {
+    key: string;
+    name: string;
+    description: string;
+    icon: string;
+    state: MilestoneCardState;
+    progress?: string;
+    progressValue?: number;
+    progressThreshold?: number;
+    date?: string;
+}
+
+interface MilestoneCategoryModel {
+    key: MilestoneCategoryKey;
+    label: string;
+    description: string;
+    cards: MilestoneCardModel[];
+    unlockedCount: number;
+}
+
+const MILESTONE_CATEGORY_ORDER: MilestoneCategoryKey[] = ['events', 'consistency', 'cities', 'countries', 'reviews'];
+const MILESTONE_CATEGORY_META: Record<MilestoneCategoryKey, {
+    label: string;
+    description: string;
+    iconClass: string;
+    progressClass: string;
+}> = {
+    events: { label: 'Events', description: 'Attend events and build your dance journey.', iconClass: 'text-amber-600', progressClass: 'border-amber-300 bg-amber-50' },
+    consistency: { label: 'Consistency', description: 'Build a steady rhythm across active months.', iconClass: 'text-brand', progressClass: 'border-brand/30 bg-brand/5' },
+    cities: { label: 'Cities', description: 'Discover dance communities in new cities.', iconClass: 'text-action', progressClass: 'border-action/30 bg-blue-50' },
+    countries: { label: 'Countries', description: 'Take your dance journey across borders.', iconClass: 'text-success', progressClass: 'border-success/30 bg-emerald-50' },
+    reviews: { label: 'Community', description: 'Help dancers with useful event reviews.', iconClass: 'text-violet-600', progressClass: 'border-violet-300 bg-violet-50' },
+};
+
+function CategoryIcon({ category, className = 'h-5 w-5' }: { category: MilestoneCategoryKey; className?: string }) {
+    const classes = `${className} ${MILESTONE_CATEGORY_META[category].iconClass}`;
+    if (category === 'events') return <Trophy className={classes} aria-hidden="true" />;
+    if (category === 'consistency') return <CalendarDays className={classes} aria-hidden="true" />;
+    if (category === 'cities') return <MapPin className={classes} aria-hidden="true" />;
+    if (category === 'countries') return <Globe2 className={classes} aria-hidden="true" />;
+    return <MessageSquareText className={classes} aria-hidden="true" />;
+}
+
+function ordinaryMilestoneCards(milestones: PassportMilestone[]): MilestoneCardModel[] {
+    const nextLocked = milestones.find((milestone) => !milestone.unlocked)?.key ?? null;
+    return milestones.map((milestone) => ({
+        key: milestone.key,
+        name: milestone.name,
+        description: milestone.unlocked ? milestone.achieved_description : milestone.description,
+        icon: milestone.icon,
+        state: milestone.unlocked ? 'unlocked' : milestone.key === nextLocked ? 'in-progress' : 'locked',
+        progress: milestone.key === nextLocked
+            ? `${Math.min(milestone.progress, milestone.threshold)} / ${milestone.threshold}`
+            : undefined,
+        progressValue: milestone.key === nextLocked ? Math.min(milestone.progress, milestone.threshold) : undefined,
+        progressThreshold: milestone.key === nextLocked ? milestone.threshold : undefined,
+        date: milestone.unlocked_at ? `Unlocked ${formatDate(milestone.unlocked_at)}` : undefined,
+    }));
+}
+
+function consistencyCards(consistency: PassportConsistency | null | undefined): MilestoneCardModel[] {
+    if (!consistency) return [];
+    const firstLocked = consistency.locked[0]?.key ?? null;
+    return [
+        ...consistency.earned.map((card) => ({
+            key: card.key,
+            name: card.name,
+            description: `${card.threshold}/${consistency.window} active months`,
+            icon: card.icon,
+            state: 'unlocked' as const,
+            date: `Reached ${formatPeriodRange(card.period_start, card.reached)}`,
+        })),
+        ...consistency.locked.map((card) => ({
+            key: card.key,
+            name: card.name,
+            description: `Be active in ${card.threshold} of ${consistency.window} months`,
+            icon: card.icon,
+            state: card.key === firstLocked ? 'in-progress' as const : 'locked' as const,
+            progress: card.key === firstLocked ? `${card.active_months} / ${card.threshold}` : undefined,
+            progressValue: card.key === firstLocked ? card.active_months : undefined,
+            progressThreshold: card.key === firstLocked ? card.threshold : undefined,
+        })),
+    ];
+}
+
+function buildMilestoneCategories(data: PassportResponse): MilestoneCategoryModel[] {
+    const byCategory = new Map<string, PassportMilestone[]>();
+    for (const milestone of data.milestones) {
+        const current = byCategory.get(milestone.category) ?? [];
+        current.push(milestone);
+        byCategory.set(milestone.category, current);
+    }
+    return MILESTONE_CATEGORY_ORDER.map((key) => {
+        const cards = key === 'consistency'
+            ? consistencyCards(data.consistency)
+            : ordinaryMilestoneCards(byCategory.get(key) ?? []);
+        return {
+            key,
+            label: MILESTONE_CATEGORY_META[key].label,
+            description: MILESTONE_CATEGORY_META[key].description,
+            cards,
+            unlockedCount: cards.filter((card) => card.state === 'unlocked').length,
+        };
+    });
+}
+
+function MilestoneStateIcons({ cards }: { cards: MilestoneCardModel[] }) {
+    return (
+        <span className="flex min-h-5 items-center justify-end gap-1.5 overflow-hidden" aria-hidden="true">
+            {cards.map((card) => (
+                <span
+                    key={card.key}
+                    className={card.state === 'unlocked'
+                        ? 'shrink-0 text-base leading-none'
+                        : card.state === 'in-progress'
+                            ? 'shrink-0 text-base leading-none opacity-80'
+                            : 'shrink-0 text-base leading-none grayscale opacity-70 contrast-125'}
+                >
+                    {card.icon}
+                </span>
+            ))}
+            {cards.length === 0 && <span className="text-[11px] text-muted">No milestones yet</span>}
+        </span>
+    );
+}
+
+function MilestoneCategoryRow({ category, onOpen }: { category: MilestoneCategoryModel; onOpen: () => void }) {
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            aria-label={`${category.label}, ${category.unlockedCount} / ${category.cards.length} unlocked`}
+            className="grid min-h-16 w-full grid-cols-[2.25rem_minmax(0,1fr)_auto_1.25rem] items-center gap-3 rounded-card border border-card-line bg-surface/60 p-3 text-left transition hover:border-line hover:bg-surface"
+        >
+            <span className={`flex h-9 w-9 items-center justify-center self-center rounded-lg border ${MILESTONE_CATEGORY_META[category.key].progressClass}`}>
+                <CategoryIcon category={category.key} />
+            </span>
+            <span className="min-w-[6.5rem] flex-1">
+                <span className="block truncate text-sm font-semibold text-ink">{category.label}</span>
+                <span className="block text-[11px] tabular-nums text-ink-soft">
+                    {category.unlockedCount} / {category.cards.length} unlocked
+                </span>
+            </span>
+            <MilestoneStateIcons cards={category.cards} />
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
+        </button>
+    );
+}
+
+function MilestonesOverview({ categories, onOpen }: { categories: MilestoneCategoryModel[]; onOpen: (key: MilestoneCategoryKey) => void }) {
+    const unlocked = categories.reduce((sum, category) => sum + category.unlockedCount, 0);
+    const total = categories.reduce((sum, category) => sum + category.cards.length, 0);
+    return (
+        <section>
+            <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold uppercase text-ink-soft">Milestone progress</h2>
+                <span className="text-xs tabular-nums text-ink-soft">{unlocked} / {total} unlocked</span>
+            </div>
+            <div className="space-y-2">
+                {categories.map((category) => (
+                    <MilestoneCategoryRow key={category.key} category={category} onOpen={() => onOpen(category.key)} />
+                ))}
+            </div>
+        </section>
+    );
+}
+
+function MilestoneDetailCard({ card, category }: { card: MilestoneCardModel; category: MilestoneCategoryKey }) {
+    const stateClass = card.state === 'unlocked'
+        ? 'border-success/20 bg-success/5'
+        : card.state === 'in-progress'
+            ? MILESTONE_CATEGORY_META[category].progressClass
+            : 'border-line bg-surface';
+    const progressPercent = card.progressValue != null && card.progressThreshold
+        ? Math.min(100, Math.round((card.progressValue / card.progressThreshold) * 100))
+        : 0;
+    return (
+        <article className={`relative flex min-h-32 flex-col items-center rounded-card border p-3 text-center ${stateClass}`}>
+            {card.state === 'unlocked' && (
+                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-success text-white">
+                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="sr-only">Unlocked</span>
+                </span>
+            )}
+            {card.state === 'locked' && <LockKeyhole className="absolute right-2 top-2 h-4 w-4 text-muted" aria-label="Locked" />}
+            <div className={card.state === 'locked' ? 'text-2xl opacity-60 grayscale' : 'text-2xl'}>{card.icon}</div>
+            <h3 className={card.state === 'locked' ? 'mt-2 text-xs font-semibold text-muted' : 'mt-2 text-xs font-semibold text-ink'}>{card.name}</h3>
+            <p className={card.state === 'locked' ? 'mt-1 text-[11px] leading-4 text-muted' : 'mt-1 text-[11px] leading-4 text-ink-soft'}>{card.description}</p>
+            {card.progress && (
+                <div className="mt-2 w-full">
+                    <div
+                        role="progressbar"
+                        aria-label={`${card.name} progress`}
+                        aria-valuemin={0}
+                        aria-valuemax={card.progressThreshold}
+                        aria-valuenow={card.progressValue}
+                        className="h-1.5 overflow-hidden rounded-full bg-line"
+                    >
+                        <div className="h-full rounded-full bg-brand" style={{ width: `${progressPercent}%` }} />
+                    </div>
+                    <p className={`mt-1 text-xs font-semibold tabular-nums ${MILESTONE_CATEGORY_META[category].iconClass}`}>{card.progress}</p>
+                </div>
+            )}
+            {card.date && <p className="mt-2 text-[10px] text-ink-soft">{card.date}</p>}
+        </article>
+    );
+}
+
+function MilestoneCategorySheet({ category, onClose }: { category: MilestoneCategoryModel; onClose: () => void }) {
+    return (
+        <div
+            className="fixed inset-0 z-[11000] flex items-end justify-center bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${category.label} Milestones`}
+        >
+            <div
+                className="max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-card bg-canvas shadow-xl"
+                style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div className="sticky top-0 z-10 flex min-h-12 items-center border-b border-line bg-surface px-2">
+                    <span className="h-10 w-10" aria-hidden="true" />
+                    <h1 className="flex-1 text-center text-sm font-semibold text-ink">{category.label} Milestones</h1>
+                    <button type="button" onClick={onClose} aria-label="Close milestone details" className="flex h-10 w-10 items-center justify-center text-ink-soft hover:text-ink">
+                        <X className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                </div>
+                <div className="p-4">
+                    <section className={`rounded-card border p-4 ${MILESTONE_CATEGORY_META[category.key].progressClass}`}>
+                        <div className="flex items-center gap-3">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface/80">
+                                <CategoryIcon category={category.key} className="h-6 w-6" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <h2 className="text-sm font-semibold text-ink">{category.label}</h2>
+                                <p className="text-xs tabular-nums text-ink-soft">{category.unlockedCount} / {category.cards.length} unlocked</p>
+                            </div>
+                            <div className="max-w-[45%] overflow-hidden"><MilestoneStateIcons cards={category.cards} /></div>
+                        </div>
+                        <p className="mt-3 text-xs leading-5 text-ink-soft">{category.description}</p>
+                    </section>
+                    {category.cards.length > 0 ? (
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                            {category.cards.map((card) => <MilestoneDetailCard key={card.key} card={card} category={category.key} />)}
+                        </div>
+                    ) : (
+                        <div className="mt-3 rounded-card bg-surface p-6 text-center text-sm text-ink-soft">No milestones yet.</div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 const TIMELINE_MILESTONE: Record<string, { icon: string; label: string }> = {
     first_event: { icon: '💃', label: 'First dance event' },
     events_5: { icon: '🔥', label: 'Danced at 5 events' },
@@ -69,109 +467,72 @@ const TIMELINE_MILESTONE: Record<string, { icon: string; label: string }> = {
     reviews_50: { icon: '🏆', label: 'Wrote 50 reviews' },
 };
 
-function StatCard({
-    value,
-    label,
-    onLabelClick,
-    action,
-}: {
-    value: number | string;
-    label: string;
-    onLabelClick?: () => void;
-    action?: { label: string; onClick: () => void };
-}) {
+function railDate(iso: string): { weekday: string; month: string; day: number } {
+    const date = new Date(iso);
+    return {
+        weekday: date.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase(),
+        month: date.toLocaleDateString(undefined, { month: 'short' }).toUpperCase(),
+        day: date.getDate(),
+    };
+}
+
+function MilestoneCard({ marker }: { marker: PassportTimelineMarker }) {
+    const copy = TIMELINE_MILESTONE[marker.key.split(':')[0]];
+    const description = marker.description ?? marker.label ?? copy?.label;
     return (
-        <div className="border border-line bg-surface p-2 text-center">
-            <div className="text-lg font-semibold text-ink tabular-nums">{value}</div>
-            <div className="mt-0.5 text-[11px] leading-tight text-ink-soft">
-                {onLabelClick ? (
-                    <button
-                        type="button"
-                        onClick={onLabelClick}
-                        className="font-medium text-action underline hover:text-action"
-                    >
-                        {label}
-                    </button>
-                ) : (
-                    label
-                )}
+        <div className="flex gap-2.5 bg-orange-50/70 px-3 py-2 first:rounded-t-card last:rounded-b-card">
+            <Trophy className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" aria-hidden="true" />
+            <div className="min-w-0">
+                <div className="text-sm font-semibold leading-4 text-ink">
+                    {marker.name} <span className="ml-1" aria-hidden="true">{marker.icon ?? copy?.icon}</span>
+                </div>
+                {description && <div className="mt-0.5 text-xs leading-4 text-ink-soft">{description}</div>}
             </div>
-            {action && (
-                <button
-                    type="button"
-                    onClick={action.onClick}
-                    className="mt-0.5 text-[10px] font-medium text-action hover:underline"
-                >
-                    {action.label} →
-                </button>
-            )}
         </div>
     );
 }
 
-function TabButton({
-    active,
-    onClick,
-    children,
-}: {
-    active: boolean;
-    onClick: () => void;
-    children: ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={onClick}
-            className={
-                active
-                    ? 'border-b-2 border-action px-4 py-2 text-sm font-semibold text-ink'
-                    : 'border-b-2 border-transparent px-4 py-2 text-sm font-medium text-ink-soft hover:text-ink'
-            }
-        >
-            {children}
-        </button>
-    );
+interface JourneyEntry {
+    key: string;
+    date: string;
+    event?: PassportTimelineItem;
+    markers: PassportTimelineMarker[];
 }
 
-function SummaryHeader({
-    data,
-    title,
-    actions,
-    dancingSinceSlot,
-}: {
-    data: PassportResponse;
-    title: string;
-    actions?: ReactNode;
-    dancingSinceSlot?: ReactNode;
-}) {
-    const { stats } = data;
-    const parts = [
-        `${stats.total_events_attended} ${stats.total_events_attended === 1 ? 'event' : 'events'}`,
-        `${stats.cities_visited} ${stats.cities_visited === 1 ? 'city' : 'cities'}`,
-        `${stats.countries_visited} ${stats.countries_visited === 1 ? 'country' : 'countries'}`,
-    ];
-    const cadence =
-        stats.avg_gap_days == null ? null : Math.max(1, Math.round(stats.avg_gap_days));
+function JourneyEntryRow({ entry, anchorMonth, highlighted }: { entry: JourneyEntry; anchorMonth?: string | null; highlighted?: boolean }) {
+    const date = railDate(entry.date);
+    const place = entry.event
+        ? [entry.event.city, entry.event.country].filter(Boolean).join(', ') || entry.event.location
+        : null;
     return (
-        <header className="bg-brand p-6 text-white">
-            <h1 className="text-lg font-semibold">{title}</h1>
-            <p className="mt-2 text-2xl font-semibold tabular-nums">{parts.join(' · ')}</p>
-            {cadence != null && (
-                <p className="mt-1 font-semibold text-sm text-white/80 tabular-nums">
-                    1 event every {cadence} {cadence === 1 ? 'day' : 'days'}
-                </p>
-            )}
-            <div className="mt-1 flex items-center justify-between gap-4">
-                {dancingSinceSlot ?? (
-                    <p className="text-xs text-white/70">
-                        Dancing since {formatDate(stats.dancing_since ?? stats.member_since)}
-                    </p>
-                )}
-                {actions && <div className="flex justify-end">{actions}</div>}
+        <li className="relative grid grid-cols-[3rem_1.25rem_minmax(0,1fr)] gap-x-2 pb-5 last:pb-1" data-month-anchor={anchorMonth ?? undefined} data-testid="journey-entry">
+            <div className="pt-0.5 text-center leading-none">
+                <div className="text-[10px] font-semibold text-brand">{date.weekday}</div>
+                <div className="mt-1 text-[10px] font-medium text-ink-soft">{date.month}</div>
+                <div className="mt-1 text-lg font-semibold text-ink">{date.day}</div>
             </div>
-        </header>
+            <div className="relative flex justify-center">
+                <span className="relative z-10 mt-2 h-2.5 w-2.5 rounded-full bg-brand ring-[3px] ring-canvas" aria-hidden="true" />
+            </div>
+            <div className={`min-w-0 ${highlighted ? 'rounded-card bg-blue-50 ring-2 ring-action' : ''}`}>
+                {entry.event && (
+                    <Link to={`/event/${entry.event.event_id}`} className="group block px-1 pb-2 pt-0.5">
+                        <div className="text-sm font-semibold leading-5 text-ink group-hover:text-action">{entry.event.title}</div>
+                        {place && (
+                            <div className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
+                                <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span className="truncate">{place}</span>
+                            </div>
+                        )}
+                    </Link>
+                )}
+                {entry.markers.length > 0 && (
+                    <div className="max-w-[420px] divide-y divide-orange-100">
+                        {entry.markers.map((marker) => <MilestoneCard key={marker.key} marker={marker} />)}
+                    </div>
+                )}
+            </div>
+        </li>
     );
 }
 
@@ -185,486 +546,188 @@ function FilterableEventMap({
 }: {
     events: PassportMapEvent[];
     entries: FilterEntry[];
-    eventKeyOf: (e: PassportMapEvent) => string | null;
+    eventKeyOf: (event: PassportMapEvent) => string | null;
     emptyLabel: string;
 }) {
-    const [selected, setSelected] = useState<string>('all');
-    const total = useMemo(() => entries.reduce((sum, e) => sum + e.count, 0), [entries]);
+    const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const [activeFilterKey, setActiveFilterKey] = useState<string | null>(null);
     const [autoFitToken, setAutoFitToken] = useState(0);
-    useEffect(() => {
-        setAutoFitToken((n) => n + 1);
-    }, [selected]);
+    const listRef = useRef<HTMLUListElement>(null);
+    const rowRefs = useRef(new Map<string, HTMLLIElement>());
     const filtered = useMemo(
-        () => (selected === 'all' ? events : events.filter((e) => eventKeyOf(e) === selected)),
-        [events, selected, eventKeyOf],
+        () => activeFilterKey === null ? events : events.filter((event) => eventKeyOf(event) === activeFilterKey),
+        [activeFilterKey, events, eventKeyOf],
     );
-
-    function optionClass(active: boolean): string {
-        return active
-            ? 'flex w-full items-center justify-between bg-slate-900 px-2 py-1.5 text-left text-sm font-medium text-white'
-            : 'flex w-full items-center justify-between px-2 py-1.5 text-left text-sm text-ink hover:bg-canvas';
-    }
-
+    const selectEntry = (key: string) => {
+        setSelectedKey(key);
+        setActiveFilterKey(key);
+        setAutoFitToken((token) => token + 1);
+    };
+    const revealEntry = useCallback((key: string) => {
+        const list = listRef.current;
+        const row = rowRefs.current.get(key);
+        if (!list || !row) return;
+        const rowTop = row.offsetTop;
+        const rowBottom = rowTop + row.offsetHeight;
+        if (rowTop < list.scrollTop) list.scrollTop = rowTop;
+        else if (rowBottom > list.scrollTop + list.clientHeight) list.scrollTop = rowBottom - list.clientHeight;
+    }, []);
+    const selectMarker = useCallback((event: PassportMapEvent) => {
+        const key = eventKeyOf(event);
+        if (!key || !rowRefs.current.has(key)) return;
+        setSelectedKey(key);
+        revealEntry(key);
+    }, [eventKeyOf, revealEntry]);
+    const optionClass = (active: boolean) => active
+        ? 'flex h-12 w-full items-center justify-between gap-4 bg-action/5 px-4 text-left text-action'
+        : 'flex h-12 w-full items-center justify-between gap-4 px-4 text-left text-ink hover:bg-canvas';
     return (
-        <div className="grid gap-4 md:grid-cols-[minmax(0,220px)_1fr]">
-            <div className="border border-line bg-surface p-1">
-                <ul className="max-h-[360px] space-y-0.5 overflow-y-auto">
-                    <li>
-                        <button
-                            type="button"
-                            onClick={() => setSelected('all')}
-                            className={optionClass(selected === 'all')}
-                        >
-                            <span>All</span>
-                            <span className="tabular-nums opacity-70">{total}</span>
-                        </button>
-                    </li>
-                    {entries.map((entry) => (
-                        <li key={entry.key}>
-                            <button
-                                type="button"
-                                onClick={() => setSelected(entry.key)}
-                                className={optionClass(selected === entry.key)}
-                            >
-                                <span className="truncate">{entry.label}</span>
-                                <span className="tabular-nums opacity-70">{entry.count}</span>
-                            </button>
-                        </li>
-                    ))}
-                    {entries.length === 0 && (
-                        <li className="px-2 py-1.5 text-xs text-muted">{emptyLabel}</li>
-                    )}
-                </ul>
-            </div>
-            <div className="h-[360px] border border-line">
+        <div>
+            <div className="h-60 w-full overflow-hidden bg-surface sm:h-[360px]">
                 <EventMap
                     events={filtered}
                     minimalPopup
                     detailLinkSource="passport"
                     autoFitToken={autoFitToken}
+                    onMarkerSelect={(event) => selectMarker(event as PassportMapEvent)}
                     showFollowingBadgeOverlay={false}
                     showTrendingOverlay={false}
+                    cooperativeGestures
                 />
             </div>
+            <div className="bg-surface">
+                <ul ref={listRef} className="relative h-60 divide-y divide-line overflow-y-auto overscroll-contain">
+                    {entries.map((entry) => (
+                        <li
+                            key={entry.key}
+                            ref={(element) => {
+                                if (element) rowRefs.current.set(entry.key, element);
+                                else rowRefs.current.delete(entry.key);
+                            }}
+                        >
+                            <button
+                                type="button"
+                                aria-pressed={selectedKey === entry.key}
+                                aria-label={`${entry.label} ${entry.count} ${entry.count === 1 ? 'event' : 'events'}`}
+                                onClick={() => selectEntry(entry.key)}
+                                className={optionClass(selectedKey === entry.key)}
+                            >
+                                <span className="min-w-0 truncate text-base font-semibold">{entry.label}</span>
+                                <span className="shrink-0 text-sm font-normal text-ink-soft tabular-nums">
+                                    {entry.count} {entry.count === 1 ? 'event' : 'events'}
+                                </span>
+                            </button>
+                        </li>
+                    ))}
+                    {entries.length === 0 && <li className="flex h-12 items-center px-4 text-sm text-muted">{emptyLabel}</li>}
+                </ul>
+            </div>
         </div>
     );
 }
 
-function cityKey(city: string, country: string | null): string {
-    return `${city}|${country ?? ''}`;
+function cityKey(city: string, country: string | null, includeCountry: boolean): string {
+    return includeCountry ? `${city}|${country ?? ''}` : city;
 }
 
-function CitiesPanel({ data, events }: { data: PassportResponse; events: PassportMapEvent[] }) {
-    const { cities } = data.collections;
-    const entries: FilterEntry[] = cities.map((c) => ({
-        key: cityKey(c.city, c.country),
-        label: c.country ? `${c.city}, ${c.country}` : c.city,
-        count: c.count,
-    }));
-    return (
-        <FilterableEventMap
-            events={events}
-            entries={entries}
-            eventKeyOf={(e) => (e.city ? cityKey(e.city, e.country) : null)}
-            emptyLabel="No cities yet."
-        />
-    );
-}
-
-function CountriesPanel({ data, events }: { data: PassportResponse; events: PassportMapEvent[] }) {
-    const { countries } = data.collections;
-    const entries: FilterEntry[] = countries.map((c) => ({
-        key: c.country,
-        label: c.country,
-        count: c.count,
-    }));
-    return (
-        <FilterableEventMap
-            events={events}
-            entries={entries}
-            eventKeyOf={(e) => e.country ?? null}
-            emptyLabel="No countries yet."
-        />
-    );
-}
-
-function TimelineRow({ item, anchorMonth, highlighted }: { item: PassportTimelineItem; anchorMonth?: string | null; highlighted?: boolean }) {
-    const place = [item.city, item.country].filter(Boolean).join(', ');
-    return (
-        <li className="relative pl-6" data-month-anchor={anchorMonth ?? undefined}>
-            {/* eslint-disable-next-line no-restricted-syntax -- small timeline status dot */}
-            <span className="absolute left-[1px] top-[6px] h-3 w-3 rounded-full bg-slate-300 ring-2 ring-white" aria-hidden />
-            <Link
-                to={`/event/${item.event_id}`}
-                className={`group block py-1 hover:bg-canvas ${highlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
-            >
-                <div className="text-sm font-semibold text-ink group-hover:text-action">
-                    {item.title}
-                </div>
-                <div className="text-xs text-ink-soft">
-                    {formatDate(item.start)}
-                    {place ? ` · ${place}` : item.location ? ` · ${item.location}` : ''}
-                </div>
-            </Link>
-        </li>
-    );
-}
-
-function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
-    const single = markers.length === 1 ? markers[0] : null;
-    return (
-        <li className="relative pl-9">
-            <span className="absolute left-4 top-0 text-xs leading-5" aria-hidden>
-                🏅
-            </span>
-            {single ? (
-                <div className="max-w-[420px] text-xs leading-5 text-ink-soft">
-                    <span className="font-semibold text-ink">{single.name}</span>
-                    {(single.label ?? TIMELINE_MILESTONE[single.key]?.label) && (
-                        <> · {single.label ?? TIMELINE_MILESTONE[single.key]?.label}</>
-                    )}
-                </div>
-            ) : (
-                <div className="max-w-[420px] text-xs leading-5 text-ink-soft">
-                    <div className="font-medium text-ink">
-                        {markers.length} milestones unlocked
-                    </div>
-                    <ul className="mt-0.5 space-y-0.5 pl-4">
-                        {markers.map((m) => {
-                            const copy = TIMELINE_MILESTONE[m.key];
-                            const icon = copy?.icon ?? m.icon;
-                            const label = m.label ?? copy?.label;
-                            return (
-                                <li key={m.key}>
-                                    <span aria-hidden>{icon}</span>{' '}
-                                    <span className="font-semibold text-ink">{m.name}</span>
-                                    {label && <> · {label}</>}
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </div>
-            )}
-        </li>
-    );
-}
-
-function MilestoneBadge({ milestone }: { milestone: PassportMilestone }) {
-    const { unlocked, progress, threshold } = milestone;
-    const remaining = Math.max(0, threshold - progress);
-    return (
-        <div
-            className={
-                unlocked
-                    ? 'flex h-full flex-col border border-amber-300 bg-amber-50 p-2 text-center'
-                    : 'flex h-full flex-col border border-line bg-surface p-2 text-center'
-            }
-            title={milestone.description}
-        >
-            <div className={unlocked ? 'text-xl' : 'text-xl opacity-30 grayscale'}>
-                {milestone.icon}
-            </div>
-            <div
-                className={
-                    unlocked
-                        ? 'mt-1 text-xs font-semibold text-ink'
-                        : 'mt-1 text-xs font-medium text-muted'
-                }
-            >
-                {milestone.name}
-            </div>
-            {unlocked ? (
-                <div className="mt-0.5 text-[10px] leading-tight text-ink-soft">
-                    {milestone.achieved_description}
-                </div>
-            ) : (
-                <>
-                    <div className="mt-0.5 text-[10px] leading-tight text-muted">
-                        {milestone.description}
-                    </div>
-                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-ink-soft">
-                        {remaining} more to unlock
-                    </div>
-                </>
-            )}
-        </div>
-    );
-}
-
-// Category rows, in display order. Unknown categories fall back to a title-cased
-// label and are appended after these.
-const MILESTONE_CATEGORY_ORDER = [
-    'events',
-    'cities',
-    'countries',
-    'reviews',
-] as const;
-
-const MILESTONE_CATEGORY_LABEL: Record<string, string> = {
-    events: 'Events',
-    cities: 'Cities',
-    countries: 'Countries',
-    reviews: 'Reviews',
-};
-
-// Each category is a single horizontally-scrollable row: achieved badges come
-// first (catalog order is threshold-ascending), then the next goals. Cards are
-// sized so ~4 fit on mobile and ~6 on desktop before the row scrolls.
-function MilestoneCategoryRow({
-    label,
-    milestones,
+function PlacesPanel({
+    data,
+    events,
+    showCities,
+    showCountries,
 }: {
-    label: string;
-    milestones: PassportMilestone[];
+    data: PassportResponse;
+    events: PassportMapEvent[];
+    showCities: boolean;
+    showCountries: boolean;
 }) {
-    const unlockedCount = milestones.filter((m) => m.unlocked).length;
-    const scrollerRef = useRef<HTMLDivElement>(null);
-    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [milestones.length]);
-    return (
-        <div>
-            <div className="mb-1.5 flex items-baseline justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                    {label}
-                </h3>
-                <span className="text-[11px] tabular-nums text-muted">
-                    {unlockedCount}/{milestones.length}
-                </span>
-            </div>
-            <div ref={scrollerRef} className="-mx-1 flex snap-x gap-2 overflow-x-auto scrollbar-hide px-1 pb-1">
-                {milestones.map((m) => (
-                    <div
-                        key={m.key}
-                        className="shrink-0 basis-[calc(25%_-_0.375rem)] snap-start md:basis-[calc(16.666%_-_0.417rem)]"
-                    >
-                        <MilestoneBadge milestone={m} />
-                    </div>
-                ))}
-            </div>
-            <ScrollDotsIndicator
-                count={dotCount}
-                activeIndex={activeIndex}
-                onSelect={scrollToIndex}
-                label={`${label} scroll position`}
-            />
-        </div>
-    );
-}
-
-// Consistency is rendered as the second trail (right after Events), so it lives
-// inside the milestone grid rather than as a standalone panel.
-function MilestonesGrid({
-    milestones,
-    consistency,
-}: {
-    milestones: PassportMilestone[];
-    consistency?: PassportConsistency | null;
-}) {
-    const consistencyRow = consistency ? (
-        <ConsistencyTrailRow consistency={consistency} />
-    ) : null;
-    if (milestones.length === 0) {
-        return (
-            <div className="space-y-4">
-                {consistencyRow}
-                <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
-                    No milestones yet.
-                </div>
-            </div>
-        );
-    }
-    const byCategory = new Map<string, PassportMilestone[]>();
-    for (const m of milestones) {
-        const arr = byCategory.get(m.category);
-        if (arr) arr.push(m);
-        else byCategory.set(m.category, [m]);
-    }
-    const orderedCats = [
-        ...MILESTONE_CATEGORY_ORDER.filter((c) => byCategory.has(c)),
-        ...[...byCategory.keys()].filter(
-            (c) => !MILESTONE_CATEGORY_ORDER.includes(c as (typeof MILESTONE_CATEGORY_ORDER)[number]),
-        ),
+    const [mode, setMode] = useState<'cities' | 'countries'>(showCities ? 'cities' : 'countries');
+    const baseCityEntries: FilterEntry[] = data.collections.cities.map((city) => ({
+        key: cityKey(city.city, city.country, showCountries),
+        label: showCountries && city.country ? `${city.city}, ${city.country}` : city.city,
+        count: city.count,
+    }));
+    const baseCountryEntries: FilterEntry[] = data.collections.countries.map((country) => ({
+        key: country.country,
+        label: country.country,
+        count: country.count,
+    }));
+    const cityEntries: FilterEntry[] = [
+        { key: null, label: 'All', count: baseCityEntries.reduce((sum, entry) => sum + entry.count, 0) },
+        ...baseCityEntries,
     ];
-    const unlockedCount = milestones.filter((m) => m.unlocked).length;
-    return (
-        <>
-            <div className="mb-2 text-xs tabular-nums text-muted">
-                {unlockedCount}/{milestones.length} unlocked
-            </div>
-            <div className="space-y-4">
-                {orderedCats.map((cat, idx) => (
-                    <Fragment key={cat}>
-                        <MilestoneCategoryRow
-                            label={MILESTONE_CATEGORY_LABEL[cat] ?? cat}
-                            milestones={byCategory.get(cat) ?? []}
-                        />
-                        {idx === 0 && consistencyRow}
-                    </Fragment>
-                ))}
-            </div>
-        </>
-    );
-}
-
-function formatPeriodRange(startYm: string, endYm: string): string {
-    const [sy, sm] = startYm.split('-').map((n) => Number(n));
-    const [ey, em] = endYm.split('-').map((n) => Number(n));
-    if (!sy || !sm || !ey || !em) return `${startYm}–${endYm}`;
-    const mon = (y: number, m: number) =>
-        new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short' });
-    if (sy === ey && sm === em) return `${mon(sy, sm)} ${sy}`;
-    if (sy === ey) return `${mon(sy, sm)}–${mon(ey, em)} ${ey}`;
-    return `${mon(sy, sm)} ${sy}–${mon(ey, em)} ${ey}`;
-}
-
-// Recurring "Consistency" achievements: sustained activity over a rolling 12
-// calendar months (no consecutive-month requirement). Rendered as a chronological
-// trail — every upward reach is a permanent card (repeats are never collapsed),
-// historical periods first, then the current period's earned cards, then the
-// remaining locked/progress levels.
-interface ConsistencyCardModel {
-    key: string;
-    icon: string;
-    name: string;
-    earned: boolean;
-    // Earned: "{threshold}/{window} active months". Locked: the goal description.
-    activeLine: string;
-    // Earned only: the period range.
-    period?: string;
-    // Locked only: count still needed to unlock.
-    remaining?: number;
-}
-
-function ConsistencyCard({ card }: { card: ConsistencyCardModel }) {
-    return (
-        <div
-            className={
-                card.earned
-                    ? 'flex h-full flex-col border border-amber-300 bg-amber-50 p-2 text-center'
-                    : 'flex h-full flex-col border border-line bg-surface p-2 text-center'
-            }
-        >
-            <div className={card.earned ? 'text-xl' : 'text-xl opacity-30 grayscale'}>
-                {card.icon}
-            </div>
-            <div
-                className={
-                    card.earned
-                        ? 'mt-1 text-xs font-semibold text-ink'
-                        : 'mt-1 text-xs font-medium text-muted'
-                }
-            >
-                {card.name}
-            </div>
-            <div
-                className={
-                    card.earned
-                        ? 'mt-0.5 text-[10px] leading-tight tabular-nums text-ink-soft'
-                        : 'mt-0.5 text-[10px] leading-tight text-muted'
-                }
-            >
-                {card.activeLine}
-            </div>
-            {card.earned
-                ? card.period && (
-                    <div className="mt-0.5 text-[10px] leading-tight text-muted">
-                        {card.period}
-                    </div>
-                )
-                : card.remaining != null && (
-                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-ink-soft">
-                        {card.remaining} more to unlock
-                    </div>
-                )}
-        </div>
-    );
-}
-
-function ConsistencyTrailRow({ consistency }: { consistency: PassportConsistency }) {
-    const scrollerRef = useRef<HTMLDivElement>(null);
-    const cards: ConsistencyCardModel[] = [
-        ...consistency.earned.map((c) => ({
-            key: c.key,
-            icon: c.icon,
-            name: c.name,
-            earned: true,
-            activeLine: `${c.threshold}/${consistency.window} active months`,
-            period: formatPeriodRange(c.period_start, c.reached),
-        })),
-        ...consistency.locked.map((c) => ({
-            key: c.key,
-            icon: c.icon,
-            name: c.name,
-            earned: false,
-            activeLine: `Be active in ${c.threshold} of ${consistency.window} months`,
-            remaining: Math.max(0, c.threshold - c.active_months),
-        })),
+    const countryEntries: FilterEntry[] = [
+        { key: null, label: 'All', count: baseCountryEntries.reduce((sum, entry) => sum + entry.count, 0) },
+        ...baseCountryEntries,
     ];
-    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [cards.length]);
-    if (cards.length === 0) return null;
+    const cityEvents = showCountries ? events : events.map((event) => ({ ...event, country: null }));
+    const countryEvents = showCities ? events : events.map((event) => ({ ...event, city: null }));
+    const available = mode === 'cities' ? showCities : showCountries;
+    const cityCount = data.stats.cities_visited;
+    const countryCount = data.stats.countries_visited;
     return (
-        <div>
-            <div className="mb-1.5 flex items-baseline justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                    Consistency
-                </h3>
-                <span className="text-[11px] tabular-nums text-muted">
-                    Current · {consistency.active_months}/{consistency.window} active months
-                </span>
+        <section>
+            <div className="grid grid-cols-2 border-b border-line bg-surface" role="group" aria-label="Place type">
+                <button type="button" aria-pressed={mode === 'cities'} onClick={() => setMode('cities')} className={mode === 'cities' ? 'whitespace-nowrap border-b-2 border-action px-3 py-3 text-base font-semibold text-action' : 'whitespace-nowrap border-b-2 border-transparent px-3 py-3 text-base font-medium text-ink-soft'}>
+                    {cityCount} {cityCount === 1 ? 'city' : 'cities'}
+                </button>
+                <button type="button" aria-pressed={mode === 'countries'} onClick={() => setMode('countries')} className={mode === 'countries' ? 'whitespace-nowrap border-b-2 border-action px-3 py-3 text-base font-semibold text-action' : 'whitespace-nowrap border-b-2 border-transparent px-3 py-3 text-base font-medium text-ink-soft'}>
+                    {countryCount} {countryCount === 1 ? 'country' : 'countries'}
+                </button>
             </div>
-            <div ref={scrollerRef} className="-mx-1 flex snap-x gap-2 overflow-x-auto scrollbar-hide px-1 pb-1">
-                {cards.map((c) => (
-                    <div
-                        key={c.key}
-                        className="shrink-0 basis-[calc(25%_-_0.375rem)] snap-start md:basis-[calc(16.666%_-_0.417rem)]"
-                    >
-                        <ConsistencyCard card={c} />
-                    </div>
-                ))}
-            </div>
-            <ScrollDotsIndicator
-                count={dotCount}
-                activeIndex={activeIndex}
-                onSelect={scrollToIndex}
-                label="Consistency scroll position"
-            />
-        </div>
+            {!available ? (
+                <UnavailableState message={`${mode === 'cities' ? 'Cities' : 'Countries'} are not shared on this passport.`} />
+            ) : mode === 'cities' ? (
+                <FilterableEventMap
+                    key="cities"
+                    events={cityEvents}
+                    entries={cityEntries}
+                    eventKeyOf={(event) => event.city ? cityKey(event.city, event.country, showCountries) : null}
+                    emptyLabel="No cities yet."
+                />
+            ) : (
+                <FilterableEventMap
+                    key="countries"
+                    events={countryEvents}
+                    entries={countryEntries}
+                    eventKeyOf={(event) => event.country ?? null}
+                    emptyLabel="No countries yet."
+                />
+            )}
+        </section>
     );
 }
 
-const SECTION_LABELS: Record<PassportSection, string> = {
-    milestones: 'Milestones',
-    timeline: 'Timeline',
-    cities: 'Cities',
-    countries: 'Countries',
-};
+function UnavailableState({ message }: { message: string }) {
+    return <div className="rounded-card bg-surface p-6 text-center text-sm text-ink-soft">{message}</div>;
+}
 
 export interface PassportViewProps {
     data: PassportResponse;
+    displayName?: string;
+    handle?: string | null;
+    avatarUrl?: string | null;
     title?: string;
-    /** Which tabs to render, in order. Defaults to all four. */
     sections?: PassportSection[];
-    /** Owner-only controls rendered under the summary header (e.g. share button). */
     headerActions?: ReactNode;
-    /** Owner-only replacement for the "Dancing since" line (editable date + first-event). */
     dancingSinceSlot?: ReactNode;
-    /** Owner-only controls rendered at the top of the Timeline tab (e.g. add past event). */
     timelineActions?: ReactNode;
-    // Timeline data (only used when 'timeline' is in sections).
     timelineItems?: PassportTimelineItem[];
     timelineMarkers?: PassportTimelineMarker[];
     timelineHasMore?: boolean;
     onLoadMoreTimeline?: () => void;
     loadingMoreTimeline?: boolean;
-    // Map data (only used when 'cities'/'countries' are in sections). When
-    // mapEvents is null and onNeedMapEvents is provided, the view requests a
-    // lazy load on first opening a map tab.
     mapEvents?: PassportMapEvent[] | null;
     onNeedMapEvents?: () => void;
+    onTimelineSearch?: (query: string) => void;
 }
 
 export default function PassportView({
     data,
-    title = 'Your Dance Passport',
+    displayName,
+    handle = null,
+    avatarUrl = null,
+    title = 'Dance Passport',
     sections = ALL_SECTIONS,
     headerActions,
     dancingSinceSlot,
@@ -676,237 +739,211 @@ export default function PassportView({
     loadingMoreTimeline = false,
     mapEvents = null,
     onNeedMapEvents,
+    onTimelineSearch,
 }: PassportViewProps) {
-    const shown = ALL_SECTIONS.filter((s) => sections.includes(s));
-    const [tab, setTab] = useState<PassportSection>(shown[0] ?? 'milestones');
-    const tabsRef = useRef<HTMLDivElement>(null);
-    const has = (s: PassportSection) => shown.includes(s);
+    const [tab, setTab] = useState<PassportTab>('milestones');
+    const [selectedCategory, setSelectedCategory] = useState<MilestoneCategoryKey | null>(null);
+    const hasMilestones = sections.includes('milestones');
+    const hasJourney = sections.includes('timeline');
+    const hasCities = sections.includes('cities');
+    const hasCountries = sections.includes('countries');
+    const categories = useMemo(() => buildMilestoneCategories(data), [data]);
+    const activeCategory = categories.find((category) => category.key === selectedCategory) ?? null;
 
-    const selectTab = useCallback((next: PassportSection) => {
+    const selectTab = useCallback((next: PassportTab) => {
+        setSelectedCategory(null);
         setTab(next);
-        requestAnimationFrame(() => {
-            tabsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-        });
     }, []);
 
-    // Ask the caller to load map events the first time a map tab is opened.
     useEffect(() => {
-        if (tab !== 'cities' && tab !== 'countries') return;
-        if (mapEvents !== null) return;
+        if (tab !== 'places' || (!hasCities && !hasCountries) || mapEvents !== null) return;
         onNeedMapEvents?.();
-    }, [tab, mapEvents, onNeedMapEvents]);
+    }, [tab, hasCities, hasCountries, mapEvents, onNeedMapEvents]);
 
-    type Row =
-        | { kind: 'event'; date: number; item: PassportTimelineItem }
-        | { kind: 'marker'; date: number; markers: PassportTimelineMarker[] };
-    const timelineRows = useMemo<Row[]>(() => {
-        const eventRows: Row[] = timelineItems.map((item) => ({
-            kind: 'event',
-            date: new Date(item.start).getTime(),
-            item,
-        }));
-        const oldestLoaded =
-            timelineHasMore && eventRows.length > 0
-                ? eventRows[eventRows.length - 1].date
-                : -Infinity;
-        // Group markers unlocked at the same time (same triggering event) into one row.
-        const byTime = new Map<number, PassportTimelineMarker[]>();
-        for (const m of timelineMarkers) {
-            const raw = new Date(m.date).getTime();
-            if (raw < oldestLoaded) continue;
-            const list = byTime.get(raw);
-            if (list) list.push(m);
-            else byTime.set(raw, [m]);
+    const [timelineSearch, setTimelineSearch] = useState('');
+    useEffect(() => {
+        if (!onTimelineSearch) return;
+        const timer = window.setTimeout(() => onTimelineSearch(timelineSearch), 250);
+        return () => window.clearTimeout(timer);
+    }, [timelineSearch, onTimelineSearch]);
+    const visibleTimelineItems = useMemo(() => {
+        const query = timelineSearch.trim().toLocaleLowerCase();
+        if (!query) return timelineItems;
+        return timelineItems.filter((item) =>
+            item.title.toLocaleLowerCase().includes(query)
+            || (item.city ?? '').toLocaleLowerCase().includes(query)
+            || (item.tags ?? []).some((tag) => tag.toLocaleLowerCase().includes(query)),
+        );
+    }, [timelineItems, timelineSearch]);
+    const timelineEntries = useMemo<JourneyEntry[]>(() => {
+        const entries = new Map<string, JourneyEntry>();
+        for (const item of visibleTimelineItems) {
+            entries.set(item.event_id, { key: `event-${item.event_id}`, date: item.start, event: item, markers: [] });
         }
-        const markerRows: Row[] = [...byTime.entries()].map(([raw, markers]) => ({
-            kind: 'marker',
-            // Sort a hair below the same-dated event so the milestone renders just
-            // after (directly under) the event that unlocked it, not the newer one
-            // above it (list is newest-first).
-            date: raw - 1,
-            markers,
-        }));
-        return [...eventRows, ...markerRows].sort((a, b) => b.date - a.date);
-    }, [timelineItems, timelineMarkers, timelineHasMore]);
+        const oldestLoaded = timelineHasMore && timelineItems.length > 0
+            ? Math.min(...timelineItems.map((item) => new Date(item.start).getTime()))
+            : -Infinity;
+        for (const marker of timelineMarkers) {
+            if (marker.event_id) {
+                entries.get(marker.event_id)?.markers.push(marker);
+                continue;
+            }
+            if (timelineSearch.trim()) continue;
+            const timestamp = new Date(marker.date).getTime();
+            if (timestamp < oldestLoaded) continue;
+            entries.set(`marker-${marker.key}`, { key: `marker-${marker.key}`, date: marker.date, markers: [marker] });
+        }
+        return [...entries.values()].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+    }, [visibleTimelineItems, timelineItems, timelineMarkers, timelineHasMore, timelineSearch]);
+    const timelineYears = useMemo(() => {
+        const years = new Map<number, JourneyEntry[]>();
+        for (const entry of timelineEntries) {
+            const year = new Date(entry.date).getFullYear();
+            years.set(year, [...(years.get(year) ?? []), entry]);
+        }
+        return [...years.entries()];
+    }, [timelineEntries]);
 
-    // First (newest) event of each month gets a scroll anchor so the activity
-    // heatmap can jump the timeline to a clicked month.
     const monthAnchorIds = useMemo(() => {
         const seen = new Set<string>();
-        const byEvent = new Map<string, string>();
-        for (const row of timelineRows) {
-            if (row.kind !== 'event') continue;
-            const month = row.item.start.slice(0, 7);
+        const anchors = new Map<string, string>();
+        for (const row of timelineEntries) {
+            if (!row.event) continue;
+            const month = row.event.start.slice(0, 7);
             if (!seen.has(month)) {
                 seen.add(month);
-                byEvent.set(row.item.event_id, month);
+                anchors.set(row.event.event_id, month);
             }
         }
-        return byEvent;
-    }, [timelineRows]);
+        return anchors;
+    }, [timelineEntries]);
 
-    const timelineListRef = useRef<HTMLUListElement>(null);
+    const timelineListRef = useRef<HTMLDivElement>(null);
     const [highlightMonth, setHighlightMonth] = useState<string | null>(null);
     const pendingMonthRef = useRef<string | null>(null);
-
     const scrollToMonth = useCallback((month: string) => {
-        const el = timelineListRef.current?.querySelector(
-            `[data-month-anchor="${month}"]`,
-        );
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            return true;
-        }
-        return false;
+        const element = timelineListRef.current?.querySelector(`[data-month-anchor="${month}"]`);
+        if (!element) return false;
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return true;
     }, []);
-
-    const handleSelectMonth = useCallback(
-        (month: string) => {
-            setHighlightMonth(month);
-            // Scroll now if the month is loaded; otherwise remember it and page
-            // in more history until its events arrive.
-            if (!scrollToMonth(month) && timelineHasMore) {
-                pendingMonthRef.current = month;
-                onLoadMoreTimeline?.();
-            }
-        },
-        [scrollToMonth, timelineHasMore, onLoadMoreTimeline],
-    );
-
-    // Resolve a pending month scroll once newly-loaded items arrive.
+    const handleSelectMonth = useCallback((month: string) => {
+        setTimelineSearch('');
+        setHighlightMonth(month);
+        if (!scrollToMonth(month) && timelineHasMore) {
+            pendingMonthRef.current = month;
+            onLoadMoreTimeline?.();
+        }
+    }, [scrollToMonth, timelineHasMore, onLoadMoreTimeline]);
     useEffect(() => {
         const month = pendingMonthRef.current;
         if (!month) return;
-        if (scrollToMonth(month)) {
-            pendingMonthRef.current = null;
-        } else if (timelineHasMore && !loadingMoreTimeline) {
-            onLoadMoreTimeline?.();
-        } else {
-            pendingMonthRef.current = null;
-        }
+        if (scrollToMonth(month)) pendingMonthRef.current = null;
+        else if (timelineHasMore && !loadingMoreTimeline) onLoadMoreTimeline?.();
+        else pendingMonthRef.current = null;
     }, [timelineItems, scrollToMonth, timelineHasMore, loadingMoreTimeline, onLoadMoreTimeline]);
 
     return (
         <>
-            <SummaryHeader data={data} title={title} actions={headerActions} dancingSinceSlot={dancingSinceSlot} />
-
-            <section ref={tabsRef}>
-                <div role="tablist" className="flex border-b border-line">
-                    {shown.map((s) => (
-                        <TabButton key={s} active={tab === s} onClick={() => setTab(s)}>
-                            {SECTION_LABELS[s]}
-                        </TabButton>
-                    ))}
-                </div>
-
-                <div className="mt-4">
-                    {tab === 'milestones' && has('milestones') && (
-                        <>
-                            <section className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
-                                <StatCard
-                                    value={data.stats.total_events_attended}
-                                    label="Events attended"
-                                    action={
-                                        has('timeline')
-                                            ? { label: 'Timeline', onClick: () => selectTab('timeline') }
-                                            : undefined
-                                    }
-                                />
-                                <StatCard
-                                    value={data.stats.cities_visited}
-                                    label="Cities"
-                                    onLabelClick={has('cities') ? () => selectTab('cities') : undefined}
-                                />
-                                <StatCard
-                                    value={data.stats.countries_visited}
-                                    label="Countries"
-                                    onLabelClick={has('countries') ? () => selectTab('countries') : undefined}
-                                />
-                                <StatCard
-                                    value={`${data.stats.active_months_last_12}/12`}
-                                    label="Active months"
-                                />
-                                <StatCard
-                                    value={data.stats.avg_gap_days == null ? '—' : Math.max(1, Math.round(data.stats.avg_gap_days))}
-                                    label="Days between events"
-                                />
-                                <StatCard value={data.stats.reviews_written} label="Reviews written" />
-                            </section>
-                            <MilestonesGrid
-                                milestones={data.milestones}
-                                consistency={data.consistency}
-                            />
-                        </>
-                    )}
-                    {tab === 'timeline' && has('timeline') && (
-                        <>
-                            {timelineActions && (
-                                <div className="mb-3 flex justify-end">{timelineActions}</div>
-                            )}
-                            <PassportActivityHeatmap
-                                months={data.monthly_activity ?? []}
-                                onSelectMonth={handleSelectMonth}
-                                highlightMonth={highlightMonth}
-                            />
-                            {timelineItems.length === 0 ? (
-                                <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
-                                    No attended events yet.
-                                </div>
-                            ) : (
-                                <ul className="relative space-y-1.5" ref={timelineListRef}>
-                                    <span
-                                        className="absolute left-[6px] top-2 bottom-2 w-px bg-slate-200"
-                                        aria-hidden
-                                    />
-                                    {timelineRows.map((row) =>
-                                        row.kind === 'event' ? (
-                                            <TimelineRow
-                                                key={`e-${row.item.event_id}`}
-                                                item={row.item}
-                                                anchorMonth={monthAnchorIds.get(row.item.event_id) ?? null}
-                                                highlighted={highlightMonth != null && row.item.start.slice(0, 7) === highlightMonth}
-                                            />
-                                        ) : (
-                                            <TimelineMarkerRow
-                                                key={`m-${row.date}`}
-                                                markers={row.markers}
-                                            />
-                                        ),
+            <div className="overflow-hidden bg-canvas sm:rounded-card">
+                <SummaryHeader
+                    data={data}
+                    displayName={displayName ?? title}
+                    handle={handle}
+                    avatarUrl={avatarUrl}
+                    actions={headerActions}
+                    dancingSinceSlot={dancingSinceSlot}
+                />
+                <section>
+                    <div role="tablist" className="flex border-b border-line bg-surface">
+                        <TabButton active={tab === 'milestones'} onClick={() => selectTab('milestones')}>Milestones</TabButton>
+                        <TabButton active={tab === 'journey'} onClick={() => selectTab('journey')}>Journey</TabButton>
+                        <TabButton active={tab === 'places'} onClick={() => selectTab('places')}>Places</TabButton>
+                    </div>
+                    <div className="space-y-6 py-4">
+                        {tab === 'milestones' && (
+                            <>
+                                <PassportStatsPanel data={data} />
+                                {hasMilestones
+                                    ? <MilestonesOverview categories={categories} onOpen={setSelectedCategory} />
+                                    : <UnavailableState message="Milestones are not shared on this passport." />}
+                            </>
+                        )}
+                        {tab === 'journey' && (
+                            hasJourney ? (
+                                <div className="space-y-6 px-4">
+                                    <PassportActivityHeatmap months={data.monthly_activity ?? []} onSelectMonth={handleSelectMonth} highlightMonth={highlightMonth} />
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <h2 className="text-xl font-semibold text-ink">Timeline</h2>
+                                            {(hasCities || hasCountries) && (
+                                                <button type="button" onClick={() => selectTab('places')} className="inline-flex items-center gap-1 text-sm font-medium text-action hover:underline">
+                                                    <MapPin className="h-4 w-4" aria-hidden="true" />
+                                                    Show in map
+                                                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <label className="flex min-w-0 flex-1 items-center gap-2 border border-line bg-surface px-3 py-2">
+                                                <Search className="h-4 w-4 shrink-0 text-ink-soft" aria-hidden="true" />
+                                                <span className="sr-only">Search timeline events</span>
+                                                <input
+                                                    type="search"
+                                                    value={timelineSearch}
+                                                    onChange={(event) => setTimelineSearch(event.target.value)}
+                                                    placeholder="Search events by name, city or tag"
+                                                    className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
+                                                />
+                                            </label>
+                                            <div className="shrink-0">
+                                                {timelineActions}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {timelineEntries.length === 0 ? (
+                                        <UnavailableState message="No attended events yet." />
+                                    ) : (
+                                        <div className="space-y-6" ref={timelineListRef}>
+                                            {timelineYears.map(([year, entries]) => (
+                                                <section key={year} aria-labelledby={`journey-year-${year}`}>
+                                                    <h3 id={`journey-year-${year}`} className="mb-3 text-xl font-semibold text-ink">{year}</h3>
+                                                    <ul className="relative">
+                                                        <span className="absolute bottom-1 left-[3.6rem] top-2 w-px bg-line" aria-hidden="true" />
+                                                        {entries.map((entry) => (
+                                                            <JourneyEntryRow
+                                                                key={entry.key}
+                                                                entry={entry}
+                                                                anchorMonth={entry.event ? monthAnchorIds.get(entry.event.event_id) ?? null : null}
+                                                                highlighted={entry.event != null && highlightMonth != null && entry.event.start.slice(0, 7) === highlightMonth}
+                                                            />
+                                                        ))}
+                                                    </ul>
+                                                </section>
+                                            ))}
+                                        </div>
                                     )}
-                                </ul>
-                            )}
-                            {timelineHasMore && (
-                                <button
-                                    type="button"
-                                    onClick={onLoadMoreTimeline}
-                                    disabled={loadingMoreTimeline}
-                                    className="mt-4 w-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50"
-                                >
-                                    {loadingMoreTimeline ? 'Loading…' : 'Show more'}
-                                </button>
-                            )}
-                        </>
-                    )}
-                    {tab === 'cities' && has('cities') && (
-                        mapEvents === null ? (
-                            <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
-                                Loading map…
-                            </div>
-                        ) : (
-                            <CitiesPanel data={data} events={mapEvents} />
-                        )
-                    )}
-                    {tab === 'countries' && has('countries') && (
-                        mapEvents === null ? (
-                            <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
-                                Loading map…
-                            </div>
-                        ) : (
-                            <CountriesPanel data={data} events={mapEvents} />
-                        )
-                    )}
-                </div>
-            </section>
+                                    {timelineHasMore && (
+                                        <button type="button" onClick={onLoadMoreTimeline} disabled={loadingMoreTimeline} className="w-full rounded-card border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50">
+                                            {loadingMoreTimeline ? 'Loading...' : 'Show more'}
+                                        </button>
+                                    )}
+                                </div>
+                            ) : <UnavailableState message="Journey is not shared on this passport." />
+                        )}
+                        {tab === 'places' && (
+                            !hasCities && !hasCountries ? (
+                                <UnavailableState message="Places are not shared on this passport." />
+                            ) : mapEvents === null ? (
+                                <UnavailableState message="Loading map..." />
+                            ) : (
+                                <PlacesPanel data={data} events={mapEvents} showCities={hasCities} showCountries={hasCountries} />
+                            )
+                        )}
+                    </div>
+                </section>
+            </div>
+            {activeCategory && <MilestoneCategorySheet category={activeCategory} onClose={() => setSelectedCategory(null)} />}
         </>
     );
 }

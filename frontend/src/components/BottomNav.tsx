@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { NAV_DESTINATIONS } from './navDestinations';
+import { useNavDestinations } from './navDestinations';
 import { useForYouHasNew } from '../hooks/useForYouHasNew';
 
 /**
@@ -11,6 +11,7 @@ export default function BottomNav() {
     const { pathname } = useLocation();
     const forYouActive = pathname === '/for-you';
     const hasNewForYou = useForYouHasNew(forYouActive);
+    const navDestinations = useNavDestinations();
 
     return (
         <nav
@@ -18,7 +19,7 @@ export default function BottomNav() {
             className="md:hidden shrink-0 flex items-stretch border-t border-line bg-surface z-[8001]"
             style={{ height: 'calc(64px + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-            {NAV_DESTINATIONS.map((dest) => {
+            {navDestinations.map((dest) => {
                 const active = dest.isActive(pathname);
                 const showDot = dest.id === 'for-you' && hasNewForYou;
                 return (

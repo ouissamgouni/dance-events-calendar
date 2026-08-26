@@ -10,7 +10,14 @@ from sqlalchemy.pool import StaticPool
 from backend.api.deps import get_current_user_optional, require_user
 from backend.api.main import app
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, User, UserEventAttendance
+from backend.db.models import (
+    CachedEvent,
+    EventTag,
+    Tag,
+    TagGroup,
+    User,
+    UserEventAttendance,
+)
 
 NOW = datetime.utcnow()
 
@@ -170,6 +177,32 @@ class TestPassportTimeline:
         keys = {m["key"] for m in markers}
         assert "first_event" in keys
 
+    def test_timeline_searches_title_city_and_tag_before_pagination(
+        self, client_with_user
+    ):
+        client, engine, user_id = client_with_user
+        _seed_going(engine, user_id, "salsa", NOW - timedelta(days=2), city="Berlin")
+        _seed_going(engine, user_id, "bachata", NOW - timedelta(days=3), city="Paris")
+        with Session(engine) as session:
+            group = TagGroup(slug="dance-style", label="Dance style")
+            session.add(group)
+            session.commit()
+            tag = Tag(group_id=group.id, slug="sensual", label="Sensual")
+            session.add(tag)
+            session.commit()
+            session.add(EventTag(event_id="bachata", tag_id=tag.id))
+            session.commit()
+
+        assert (
+            client.get("/api/passport/timeline?q=salsa").json()["items"][0]["event_id"]
+            == "salsa"
+        )
+        assert client.get("/api/passport/timeline?q=berlin").json()["total"] == 1
+        tag_result = client.get("/api/passport/timeline?q=sensual&limit=1").json()
+        assert tag_result["total"] == 1
+        assert tag_result["items"][0]["tags"] == ["Sensual"]
+        assert all(marker["event_id"] == "bachata" for marker in tag_result["markers"])
+
 
 @pytest.mark.unit
 class TestPassportEvents:
@@ -263,6 +296,7 @@ class TestPassportShare:
         # present-but-empty.
         assert set(body.keys()) == {
             "display_name",
+            "avatar_url",
             "stats",
             "collections",
             "milestones",
@@ -280,6 +314,7 @@ class TestPassportShare:
         assert body["timeline_markers"] == []
         # Activity heatmap is gated by the timeline section (off by default).
         assert body["monthly_activity"] == []
+        assert body["avatar_url"] is None
         assert "@" not in (body["display_name"] or "")
 
     def test_shared_honors_section_toggles(self, client_with_user):

@@ -117,6 +117,46 @@ class TestSettingsEndpoint:
         assert resp.json()["trending_banner_enabled"] is True
         assert resp.json()["default_explorer_period"] == "next_3_months"
         assert resp.json()["going_button_icon_variant"] == "hand"
+        assert resp.json()["my_events_route_enabled"] is False
+
+    def test_settings_returns_my_events_nav_enabled_default_true(self, sqlite_client):
+        """Verify My Events nav defaults to enabled when not in database."""
+        client, _engine = sqlite_client
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["my_events_nav_enabled"] is True
+
+    def test_admin_can_update_my_events_nav_enabled_flag(self, sqlite_client):
+        """Verify admin can explicitly disable My Events nav and it persists."""
+        client, engine = sqlite_client
+
+        # Disable the flag
+        resp = client.put("/api/settings", json={"my_events_nav_enabled": False})
+        assert resp.status_code == 200
+        assert resp.json()["my_events_nav_enabled"] is False
+
+        # Verify it persists in the database
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "my_events_nav_enabled")
+            assert row is not None
+            assert row.value == "false"
+
+        # Re-enable it
+        resp = client.put("/api/settings", json={"my_events_nav_enabled": True})
+        assert resp.status_code == 200
+        assert resp.json()["my_events_nav_enabled"] is True
+
+    def test_admin_can_update_my_events_route_flag(self, sqlite_client):
+        client, engine = sqlite_client
+
+        resp = client.put("/api/settings", json={"my_events_route_enabled": True})
+        assert resp.status_code == 200
+        assert resp.json()["my_events_route_enabled"] is True
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "my_events_route_enabled")
+            assert row is not None
+            assert row.value == "true"
 
     def test_admin_can_update_trending_banner_flag(self, sqlite_client):
         client, engine = sqlite_client

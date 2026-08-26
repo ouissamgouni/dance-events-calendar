@@ -231,6 +231,8 @@ export interface SiteSettings {
     for_you_rail_enabled?: boolean;
     your_next_events_rail_enabled?: boolean;
     network_going_snapshot_enabled?: boolean;
+    my_events_route_enabled?: boolean;
+    my_events_nav_enabled?: boolean;
     /** Experiment: two-line, icon-prefixed filter summary bar with the
      * Map/Calendar controls pinned to its right. */
     suggest_event_required_dance_group_id?: number | null;
@@ -3922,11 +3924,13 @@ export async function fetchPassportEvents(): Promise<PassportMapEvent[]> {
 export async function fetchPassportTimeline(
     offset = 0,
     limit = 20,
+    query = '',
 ): Promise<PassportTimelineResponse> {
     const params = new URLSearchParams([
         ['offset', String(offset)],
         ['limit', String(limit)],
     ]);
+    if (query.trim()) params.set('q', query.trim());
     const res = await fetch(`${BASE}/passport/timeline?${params}`, {
         credentials: 'include',
     });

@@ -30,6 +30,10 @@ interface FeatureFlags {
     /** Tribe > Calendars "Your Network" snapshot of upcoming events people
      * you follow are going to. When false, the snapshot is hidden. */
     networkGoingSnapshotEnabled: boolean;
+    /** Show Route controls and journey arrows on My Events maps. */
+    myEventsRouteEnabled: boolean;
+    /** Show 'My Events' as a top-level navigation entry (admin feature). */
+    myEventsNavEnabled: boolean;
     /** Show the optional event-size question in the review wizard. */
     eventReviewSizeStepEnabled: boolean;
     /** When true, tags on event cards render as colored badges (legacy
@@ -67,6 +71,8 @@ const defaultFlags: FeatureFlags = {
     forYouRailEnabled: false,
     yourNextEventsRailEnabled: false,
     networkGoingSnapshotEnabled: true,
+    myEventsRouteEnabled: false,
+    myEventsNavEnabled: true,
     eventReviewSizeStepEnabled: true,
     tagAsBadge: false,
     tagBadgeColored: false,
@@ -74,10 +80,19 @@ const defaultFlags: FeatureFlags = {
     tagsPerCard: 3,
 };
 
-const FeatureFlagsContext = createContext<FeatureFlags>(defaultFlags);
+const FeatureFlagsContext = createContext<{
+    flags: FeatureFlags;
+    updateFlag: (key: keyof FeatureFlags, value: any) => void;
+} | null>(null);
+
+export { FeatureFlagsContext };
 
 export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
+
+    const updateFlag = (key: keyof FeatureFlags, value: any) => {
+        setFlags((prev) => ({ ...prev, [key]: value }));
+    };
 
     useEffect(() => {
         fetchSettings()
@@ -102,6 +117,8 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     forYouRailEnabled: s.for_you_rail_enabled ?? false,
                     yourNextEventsRailEnabled: s.your_next_events_rail_enabled ?? false,
                     networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? true,
+                    myEventsRouteEnabled: s.my_events_route_enabled ?? false,
+                    myEventsNavEnabled: s.my_events_nav_enabled ?? true,
                     eventReviewSizeStepEnabled: s.event_review_size_step_enabled ?? true,
                     tagAsBadge: s.tag_as_badge_enabled ?? false,
                     tagBadgeColored: s.tag_badge_colored ?? false,
@@ -115,12 +132,20 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     }, []);
 
     return (
-        <FeatureFlagsContext.Provider value={flags}>
+        <FeatureFlagsContext.Provider value={{ flags, updateFlag }}>
             {children}
         </FeatureFlagsContext.Provider>
     );
 }
 
 export function useFeatureFlags(): FeatureFlags {
-    return useContext(FeatureFlagsContext);
+    const context = useContext(FeatureFlagsContext);
+    if (!context) throw new Error('useFeatureFlags must be used within FeatureFlagsProvider');
+    return context.flags;
+}
+
+export function useUpdateFeatureFlag() {
+    const context = useContext(FeatureFlagsContext);
+    if (!context) throw new Error('useUpdateFeatureFlag must be used within FeatureFlagsProvider');
+    return context.updateFlag;
 }

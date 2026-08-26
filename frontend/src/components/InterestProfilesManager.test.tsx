@@ -73,11 +73,11 @@ vi.mock('../api', async (importOriginal) => {
     };
 });
 
-function renderManager() {
+function renderManager(props: { showHeader?: boolean } = {}) {
     return render(
         <MemoryRouter initialEntries={['/mine/profiles']}>
             <Routes>
-                <Route path="/mine/profiles" element={<InterestProfilesManager />} />
+                <Route path="/mine/profiles" element={<InterestProfilesManager {...props} />} />
                 <Route path="/mine/profiles/:profileId/edit" element={<p>Edit route</p>} />
             </Routes>
         </MemoryRouter>,
@@ -91,6 +91,12 @@ describe('InterestProfilesManager', () => {
             { id: 1, slug: 'dance-style', label: 'Dance styles', tags: [{ id: 10, slug: 'salsa', label: 'Salsa' }] },
             { id: 2, slug: 'reach', label: 'Reach', tags: [{ id: 21, slug: 'international', label: 'International' }] },
         ] as never);
+    });
+
+    it('hides the page header when a parent route already renders the title', async () => {
+        renderManager({ showHeader: false });
+
+        expect(screen.queryByRole('heading', { name: 'Search profiles' })).not.toBeInTheDocument();
     });
 
     it('keeps card editing separate from management actions', async () => {

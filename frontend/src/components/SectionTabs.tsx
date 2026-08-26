@@ -1,5 +1,6 @@
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import MyEventsUtilityMenu from './MyEventsUtilityMenu';
 
 export interface SectionTab {
     label: string;
@@ -40,6 +41,15 @@ const SECTION_GATE: Record<SectionKey, { title: string; body: string }> = {
     },
 };
 
+function getTitleForMinePath(pathname: string): string | null {
+    // Map /mine sub-paths to their display titles
+    if (pathname === '/mine/calendar') return 'My Events';
+    if (pathname === '/mine/passport') return 'Passport';
+    if (pathname === '/mine/profiles' || pathname.startsWith('/mine/profiles/')) return 'Profiles';
+    if (pathname === '/mine/reviews') return 'Reviews';
+    return null;
+}
+
 function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: string; hub: string }) {
     return (
         <nav
@@ -79,6 +89,7 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
     const { user, loading } = useAuth();
     const { hub, tabs } = SECTION_CONFIG[section];
     const title = section === 'tribe' ? 'Your Tribe' : null;
+    const minePageTitle = section === 'mine' ? getTitleForMinePath(pathname) : null;
 
     // Whole-section login gate (soft in-page callout). Every /tribe/* and
     // /mine/* route is signed-in only.
@@ -104,10 +115,25 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
 
     return (
         <div className="min-h-full bg-[#f8fafc]">
-            {(section !== 'mine' || pathname !== hub) && (
+            {section !== 'mine' && (
                 <div className="border-b border-line bg-surface px-4 pt-1">
                     {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-ink">{title}</h1>}
                     <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
+                </div>
+            )}
+            {section === 'mine' && pathname !== hub && minePageTitle && (
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="flex items-center gap-2 text-xl font-semibold text-ink">
+                        <Link
+                            to="/mine"
+                            className="text-action hover:text-action focus:outline-none"
+                        >
+                            MyDance
+                        </Link>
+                        <span className="text-ink-soft">&gt;</span>
+                        <span>{minePageTitle}</span>
+                    </div>
+                    {pathname === '/mine/calendar' && <MyEventsUtilityMenu />}
                 </div>
             )}
             <Outlet />

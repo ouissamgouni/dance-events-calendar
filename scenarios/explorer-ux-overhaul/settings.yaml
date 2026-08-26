@@ -20,6 +20,7 @@ settings:
 
   your_next_events_rail_enabled: true
   tag_as_badge_enabled: true
+  my_events_route_enabled: true
 
   # Experiment under test: two-line, icon-prefixed filter summary bar with
   # the Map/Calendar controls pinned to its right.

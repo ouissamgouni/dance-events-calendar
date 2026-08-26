@@ -36,8 +36,6 @@ export default function SharedPassportPage() {
     }, [token]);
 
     const name = data?.display_name ?? 'A dancer';
-    const title = `${name}${name.endsWith('s') ? "'" : "'s"} Dance Passport`;
-
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-3xl px-4 py-6">
@@ -75,22 +73,22 @@ export default function SharedPassportPage() {
                     <div className="mt-4">
                         <PassportView
                             data={data}
-                            title={title}
+                            displayName={name}
+                            handle={data.handle}
+                            avatarUrl={data.avatar_url}
                             sections={data.sections}
-                            headerActions={
-                                <div className="flex justify-end">
-                                    <PassportFollowCta
-                                        handle={data.handle}
-                                        isSelf={data.is_self}
-                                        isFollowing={data.is_following}
-                                        displayName={data.display_name}
-                                    />
-                                </div>
-                            }
                             timelineItems={data.timeline_items}
                             timelineMarkers={data.timeline_markers}
                             mapEvents={data.events}
                         />
+                        <div className="mt-3 flex justify-end">
+                            <PassportFollowCta
+                                handle={data.handle}
+                                isSelf={data.is_self}
+                                isFollowing={data.is_following}
+                                displayName={data.display_name}
+                            />
+                        </div>
                     </div>
                 )}
             </main>

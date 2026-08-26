@@ -1,13 +1,43 @@
 saves:
+  # My Events Saved queue: Paris overlaps Upcoming; Berlin is saved-only;
+  # the secret-venue event verifies map disclosure without a sequence gap.
+  - { event_id: evt-ux-001, email: viewer@example.com, audience: friends }
+  - { event_id: evt-ux-002, email: viewer@example.com, audience: private }
+  - {
+      event_id: evt-my-events-unmapped,
+      email: viewer@example.com,
+      audience: public,
+    }
+
+  # ── Past events (saved for engagement tracking) ─────────────────────
+  - { event_id: evt-ux-past-social, email: bob@example.com, audience: public }
+  - { event_id: evt-ux-past-social, email: carol@example.com, audience: public }
+  - {
+      event_id: evt-ux-past-workshop,
+      email: hugo@example.com,
+      audience: public,
+    }
+  - { event_id: evt-ux-past-london, email: pablo@example.com, audience: public }
+  - { event_id: evt-ux-past-london, email: quinn@example.com, audience: public }
+
+  # ── Key upcoming events (for message boards) ────────────────────────
+  # Prague Friday (evt-ux-008) — savers for engagement
   - { event_id: evt-ux-008, email: nia@example.com, audience: friends }
   - { event_id: evt-ux-008, email: omar@example.com, audience: friends }
   - { event_id: evt-ux-008, email: t01@example.com, audience: public }
   - { event_id: evt-ux-008, email: t02@example.com, audience: public }
   - { event_id: evt-ux-008, email: t03@example.com, audience: public }
+
+  # London Festival (evt-ux-011) — savers for engagement
   - { event_id: evt-ux-011, email: t04@example.com, audience: public }
   - { event_id: evt-ux-011, email: t05@example.com, audience: public }
-  - { event_id: evt-ux-020, email: nia@example.com, audience: friends }
-  - { event_id: evt-ux-024, email: omar@example.com, audience: friends }
+  - { event_id: evt-ux-011, email: nia@example.com, audience: public }
+  - { event_id: evt-ux-011, email: omar@example.com, audience: friends }
+
+  # Budapest Pre-party (evt-ux-023) — savers for engagement
+  - { event_id: evt-ux-023, email: s03@example.com, audience: public }
+  - { event_id: evt-ux-023, email: s04@example.com, audience: public }
+  - { event_id: evt-ux-023, email: s05@example.com, audience: public }
 
   # ── Interested across the extended 2-year / all-continent dataset ─
   # "Interested" (saves) by viewer's friends + one-way followees so the
