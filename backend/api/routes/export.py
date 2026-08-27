@@ -1,15 +1,17 @@
 import io
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 from backend.api.rate_limit import client_ip
+from sqlalchemy import or_
 from sqlmodel import Session, select
 
+from backend.api.deps import get_current_user_optional
 from backend.api.schemas import ExportRequest
 from backend.db.database import get_session
-from backend.db.models import CachedEvent
+from backend.db.models import CachedEvent, User, UserEventAttendance, UserSavedEvent
 from backend.services.ics import build_ics, ics_escape
 
 router = APIRouter(prefix="/api/events/export", tags=["export"])
@@ -50,10 +52,14 @@ def export_ics(
 ):
     events = _fetch_events(session, payload.event_ids)
     ics_content = _build_ics(events)
+
+    # Contextual filename: my-movida-events-upcoming.ics or just my-movida-events.ics
+    filename = f"my-movida-events{f'-{payload.view}' if payload.view else ''}.ics"
+
     return StreamingResponse(
         io.BytesIO(ics_content.encode("utf-8")),
         media_type="text/calendar",
-        headers={"Content-Disposition": "attachment; filename=my-movida-events.ics"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
@@ -63,18 +69,58 @@ def export_xlsx(
     request: Request,
     payload: ExportRequest,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
+    """Export events to XLSX with Status column showing RSVP status.
+
+    Requires authentication to populate Status column accurately.
+    """
     from openpyxl import Workbook
 
     events = _fetch_events(session, payload.event_ids)
     events.sort(key=lambda e: e.start)
 
+    # Build status map if user is authenticated
+    status_map: dict[str, str] = {}
+    if current_user:
+        # Fetch user's attending events
+        attending = session.exec(
+            select(UserEventAttendance).where(
+                or_(
+                    UserEventAttendance.user_id == current_user.id,
+                    UserEventAttendance.device_id is not None,  # Include device-based
+                )
+            )
+        ).all()
+        attending_ids = {row.event_id for row in attending}
+
+        # Fetch user's saved/interested events
+        saved = session.exec(
+            select(UserSavedEvent).where(
+                or_(
+                    UserSavedEvent.user_id == current_user.id,
+                    UserSavedEvent.device_id is not None,  # Include device-based
+                )
+            )
+        ).all()
+        saved_ids = {row.event_id for row in saved}
+
+        # Map each event ID to its status
+        for event_id in payload.event_ids:
+            if event_id in attending_ids:
+                status_map[event_id] = "I'm going"
+            elif event_id in saved_ids:
+                status_map[event_id] = "I'm interested"
+
     wb = Workbook()
     ws = wb.active
-    ws.title = "My Movida Events"
-    ws.append(
-        ["Title", "Date", "Start Time", "End Time", "Location", "Description", "Price"]
-    )
+
+    # Contextual worksheet title
+    view_labels = {"upcoming": "Upcoming", "saved": "Saved", "past": "Past"}
+    ws.title = f"{view_labels.get(payload.view or 'all', 'My Movida')} Events"
+
+    # New column set: Title, Date, Start Time, End Time, Location, Status
+    ws.append(["Title", "Date", "Start Time", "End Time", "Location", "Status"])
 
     for e in events:
         if e.all_day:
@@ -86,14 +132,8 @@ def export_xlsx(
             start_time = e.start.strftime("%H:%M")
             end_time = e.end.strftime("%H:%M")
 
-        if e.price_is_free:
-            price = "Free"
-        elif e.price_min is not None and e.price_currency:
-            price = f"{e.price_currency} {e.price_min}"
-            if e.price_max is not None and e.price_max != e.price_min:
-                price += f"–{e.price_max}"
-        else:
-            price = ""
+        # Get status for this event
+        status = status_map.get(e.event_id, "")
 
         ws.append(
             [
@@ -102,8 +142,7 @@ def export_xlsx(
                 start_time,
                 end_time,
                 e.location or "",
-                (e.description or "")[:500],
-                price,
+                status,
             ]
         )
 
@@ -111,8 +150,11 @@ def export_xlsx(
     wb.save(buf)
     buf.seek(0)
 
+    # Contextual filename
+    filename = f"my-movida-events{f'-{payload.view}' if payload.view else ''}.xlsx"
+
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=my-movida-events.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )

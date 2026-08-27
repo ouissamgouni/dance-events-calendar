@@ -3112,21 +3112,21 @@ export async function fetchEventsByIds(eventIds: string[]): Promise<CalendarEven
 
 // --- Export ---
 
-export async function exportIcs(eventIds: string[]): Promise<Blob> {
+export async function exportIcs(eventIds: string[], view?: string): Promise<Blob> {
     const res = await fetch(`${BASE}/events/export/ics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_ids: eventIds }),
+        body: JSON.stringify({ event_ids: eventIds, view: view || undefined }),
     });
     if (!res.ok) throw new Error('Failed to export ICS');
     return res.blob();
 }
 
-export async function exportXlsx(eventIds: string[]): Promise<Blob> {
+export async function exportXlsx(eventIds: string[], view?: string): Promise<Blob> {
     const res = await fetch(`${BASE}/events/export/xlsx`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_ids: eventIds }),
+        body: JSON.stringify({ event_ids: eventIds, view: view || undefined }),
     });
     if (!res.ok) throw new Error('Failed to export XLSX');
     return res.blob();
@@ -3145,18 +3145,50 @@ export async function createShareToken(deviceId: string): Promise<{ token: strin
 }
 
 /**
+ * Fetch existing share token for current user without creating a new one.
+ * Returns 404 if no token exists (caller can then create one).
+ */
+export async function getShareToken(): Promise<{ token: string }> {
+    const res = await fetch(`${BASE}/share/calendar/token`, {
+        credentials: 'include',
+    });
+    if (res.status === 404) throw new Error('not_found');
+    if (!res.ok) throw new Error('Failed to fetch share token');
+    return res.json();
+}
+
+/**
+ * App share URL for a token with optional view context.
+ */
+export function getAppShareUrl(
+    token: string,
+    view?: 'upcoming' | 'saved' | 'past',
+): string {
+    const params = view ? `?view=${view}` : '';
+    return `${window.location.origin}/shared/${encodeURIComponent(token)}${params}`;
+}
+
+/**
  * Absolute, subscribable iCalendar feed URL for a share token. Calendar
  * clients (Apple/Google) poll this directly, so it must be fully-qualified
  * even when ``BASE`` is the relative ``/api`` used by the Vite dev proxy.
+ *
+ * Supports scope for legacy compatibility (saved/going/all) or view for
+ * My Events context (upcoming/saved/past).
  */
 export function getCalendarFeedUrl(
     token: string,
-    scope: 'all' | 'saved' | 'going' = 'all',
+    view?: string | ('all' | 'saved' | 'going'),
 ): string {
     const base = BASE.startsWith('http')
         ? BASE
         : `${window.location.origin}${BASE}`;
-    return `${base}/share/calendar/${encodeURIComponent(token)}.ics?scope=${scope}`;
+
+    // Map MyEventsTab to appropriate query param
+    const isMyEventsView = ['upcoming', 'saved', 'past'].includes(view as string);
+    const param = isMyEventsView ? `view=${view}` : `scope=${view || 'all'}`;
+
+    return `${base}/share/calendar/${encodeURIComponent(token)}.ics?${param}`;
 }
 
 export interface SharedCalendarPayload {
@@ -3164,8 +3196,9 @@ export interface SharedCalendarPayload {
     owner_display_name: string | null;
 }
 
-export async function fetchSharedCalendar(token: string): Promise<SharedCalendarPayload> {
-    const res = await fetch(`${BASE}/share/calendar/${encodeURIComponent(token)}`);
+export async function fetchSharedCalendar(token: string, view?: string | null): Promise<SharedCalendarPayload> {
+    const params = view && ['upcoming', 'saved', 'past'].includes(view) ? `?view=${view}` : '';
+    const res = await fetch(`${BASE}/share/calendar/${encodeURIComponent(token)}${params}`);
     if (res.status === 404) throw new Error('not_found');
     if (!res.ok) throw new Error('Failed to fetch shared calendar');
     const data = await res.json();

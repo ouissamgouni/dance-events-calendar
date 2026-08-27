@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { fetchSharedCalendar } from '../api';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { trackView } from '../utils/tracking';
@@ -9,8 +9,16 @@ import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
 import type { CalendarEvent } from '../types';
 
+const VIEW_LABELS: Record<string, string> = {
+    upcoming: 'Upcoming',
+    saved: 'Saved',
+    past: 'Past',
+};
+
 export default function SharedCalendarPage() {
     const { token } = useParams<{ token: string }>();
+    const [searchParams] = useSearchParams();
+    const view = searchParams.get('view') || undefined;
     const { showPrices, showPopularity } = useFeatureFlags();
 
     const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -25,7 +33,7 @@ export default function SharedCalendarPage() {
         if (!token) return;
         setLoading(true);
         setNotFound(false);
-        fetchSharedCalendar(token)
+        fetchSharedCalendar(token, view)
             .then((payload) => {
                 setEvents(payload.events);
                 setOwnerName(payload.owner_display_name);
@@ -36,7 +44,7 @@ export default function SharedCalendarPage() {
                 setOwnerName(null);
             })
             .finally(() => setLoading(false));
-    }, [token]);
+    }, [token, view]);
 
     const handleEventClick = useCallback((evt: CalendarEvent) => {
         trackView(evt.event_id, 'direct');
@@ -63,6 +71,7 @@ export default function SharedCalendarPage() {
                             <path fillRule="evenodd" d="M15.621 4.379a3 3 0 0 0-4.242 0l-7 7a3 3 0 0 0 4.241 4.243h.001l.497-.5a.75.75 0 0 1 1.064 1.057l-.498.501-.002.002a4.5 4.5 0 0 1-6.364-6.364l7-7a4.5 4.5 0 0 1 6.368 6.36l-3.455 3.553A2.625 2.625 0 1 1 9.52 9.52l3.45-3.451a.75.75 0 1 1 1.061 1.06l-3.45 3.451a1.125 1.125 0 0 0 1.587 1.595l3.454-3.553a3 3 0 0 0 0-4.243Z" clipRule="evenodd" />
                         </svg>
                         {ownerName ? `${ownerName}'s Calendar` : 'Shared Calendar'}
+                        {view && <span className="ml-2 text-sm font-normal text-ink-soft">— {VIEW_LABELS[view] || view}</span>}
                         {!loading && !notFound && (
                             <span className="ml-2 text-sm font-normal text-ink-soft">
                                 ({events.length} event{events.length !== 1 ? 's' : ''})

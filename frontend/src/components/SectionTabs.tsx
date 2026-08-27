@@ -1,6 +1,5 @@
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import MyEventsUtilityMenu from './MyEventsUtilityMenu';
 
 export interface SectionTab {
     label: string;
@@ -138,7 +137,6 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
                             <span>{minePageTitle}</span>
                         </div>
                     )}
-                    {pathname === '/mine/calendar' && <MyEventsUtilityMenu />}
                 </div>
             )}
             <Outlet />

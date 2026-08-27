@@ -415,3 +415,145 @@ class TestCalendarFeed:
         resp = c.get("/api/share/calendar/test-token-uuid.ics?scope=going")
         assert resp.status_code == 200
         assert "DTSTART;VALUE=DATE:20260510" in resp.text
+
+    def test_view_upcoming_filters_by_start_time(self, client):
+        """view=upcoming should only include events with start > now."""
+        from unittest.mock import patch
+
+        c, session = client
+        share = _sample_share_token()
+
+        # Create events: one past, one future
+        past_event = _sample_event(
+            event_id="evt-past-001",
+            title="Past Event",
+            start=datetime(2025, 1, 1, 20, 0),
+            end=datetime(2025, 1, 1, 23, 0),
+        )
+        future_event = _sample_event(
+            event_id="evt-future-001",
+            title="Future Event",
+            start=datetime(2026, 12, 31, 20, 0),
+            end=datetime(2026, 12, 31, 23, 0),
+        )
+
+        _feed_mock(
+            session,
+            share=share,
+            attending=[
+                _sample_attending_row(event_id="evt-past-001"),
+                _sample_attending_row(event_id="evt-future-001"),
+            ],
+            events=[past_event, future_event],
+        )
+
+        with patch("backend.api.routes.sharing.datetime") as mock_datetime:
+            mock_datetime.utcnow.return_value = datetime(2026, 6, 15, 12, 0)
+            resp = c.get("/api/share/calendar/test-token-uuid.ics?view=upcoming")
+
+        assert resp.status_code == 200
+        body = resp.text
+        assert "Future Event" in body
+        assert "Past Event" not in body
+        assert "X-WR-CALNAME:My Movida — Upcoming" in body
+
+    def test_view_past_filters_by_end_time(self, client):
+        """view=past should only include events with end <= now."""
+        from unittest.mock import patch
+
+        c, session = client
+        share = _sample_share_token()
+
+        # Create events: one past, one future
+        past_event = _sample_event(
+            event_id="evt-past-001",
+            title="Past Event",
+            start=datetime(2025, 1, 1, 20, 0),
+            end=datetime(2025, 1, 1, 23, 0),
+        )
+        future_event = _sample_event(
+            event_id="evt-future-001",
+            title="Future Event",
+            start=datetime(2026, 12, 31, 20, 0),
+            end=datetime(2026, 12, 31, 23, 0),
+        )
+
+        _feed_mock(
+            session,
+            share=share,
+            attending=[
+                _sample_attending_row(event_id="evt-past-001"),
+                _sample_attending_row(event_id="evt-future-001"),
+            ],
+            events=[past_event, future_event],
+        )
+
+        with patch("backend.api.routes.sharing.datetime") as mock_datetime:
+            mock_datetime.utcnow.return_value = datetime(2026, 6, 15, 12, 0)
+            resp = c.get("/api/share/calendar/test-token-uuid.ics?view=past")
+
+        assert resp.status_code == 200
+        body = resp.text
+        assert "Past Event" in body
+        assert "Future Event" not in body
+        assert "X-WR-CALNAME:My Movida — Past" in body
+
+    def test_view_saved_filters_saved_events_only(self, client):
+        """view=saved should only include saved event IDs, not attending."""
+        c, session = client
+        share = _sample_share_token()
+
+        saved_event = _sample_event(event_id="evt-saved-001", title="Saved Event")
+        attending_event = _sample_event(event_id="evt-going-001", title="Going Event")
+
+        _feed_mock(
+            session,
+            share=share,
+            saved=[_sample_saved_row(event_id="evt-saved-001")],
+            attending=[_sample_attending_row(event_id="evt-going-001")],
+            events=[saved_event, attending_event],
+        )
+
+        resp = c.get("/api/share/calendar/test-token-uuid.ics?view=saved")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "Saved Event" in body
+        assert "Going Event" not in body
+        assert "X-WR-CALNAME:My Movida — Saved" in body
+
+    def test_view_param_takes_precedence_over_scope(self, client):
+        """view parameter should override legacy scope parameter."""
+        from unittest.mock import patch
+
+        c, session = client
+        share = _sample_share_token()
+
+        past_event = _sample_event(
+            event_id="evt-past-001",
+            title="Past Event",
+            start=datetime(2025, 1, 1, 20, 0),
+            end=datetime(2025, 1, 1, 23, 0),
+        )
+        going_event = _sample_event(event_id="evt-going-001", title="Going Event")
+
+        _feed_mock(
+            session,
+            share=share,
+            attending=[
+                _sample_attending_row(event_id="evt-past-001"),
+                _sample_attending_row(event_id="evt-going-001"),
+            ],
+            events=[past_event, going_event],
+        )
+
+        with patch("backend.api.routes.sharing.datetime") as mock_datetime:
+            mock_datetime.utcnow.return_value = datetime(2026, 6, 15, 12, 0)
+            # Provide both scope=going and view=past; view should win
+            resp = c.get(
+                "/api/share/calendar/test-token-uuid.ics?scope=going&view=past"
+            )
+
+        assert resp.status_code == 200
+        body = resp.text
+        assert "Past Event" in body
+        assert "Going Event" not in body

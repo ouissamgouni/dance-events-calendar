@@ -7,6 +7,7 @@ import EventModal from '../components/EventModal';
 import MyEventsAddSearch from '../components/MyEventsAddSearch';
 import MyEventsList from '../components/MyEventsList';
 import MyEventsMapPreview from '../components/MyEventsMapPreview';
+import MyEventsUtilityMenu from '../components/MyEventsUtilityMenu';
 import MyEventsViewControls from '../components/MyEventsViewControls';
 import SuggestEventModal from '../components/SuggestEventModal';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
@@ -90,8 +91,14 @@ export default function MyEventsExperience() {
         const item = sequence[index];
         if (item) setSelectedIds((current) => ({ ...current, [activeTab]: item.event.event_id }));
     };
+    const activeTabEventIds = useMemo(() => activeEvents.map(e => e.event_id), [activeEvents]);
+
     return (
         <div ref={rootRef} className="relative flex min-h-0 flex-1 flex-col bg-canvas">
+            <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 bg-surface border-b border-line">
+                <h1 className="text-2xl font-bold text-ink">My Events</h1>
+                <MyEventsUtilityMenu activeTab={activeTab} eventIds={activeTabEventIds} />
+            </div>
             <div className="sticky top-0 z-[7600] shrink-0 bg-surface">
                 <nav aria-label="My Events" className="grid grid-cols-3 border-b border-line bg-surface">
                     {tabs.map((tab) => {

@@ -4,6 +4,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# My Events context view type: mirrors frontend MyEventsTab
+MyEventsView = Literal["upcoming", "saved", "past"]
+
 
 class LinkItem(BaseModel):
     url: str
@@ -508,6 +511,9 @@ class EventBatchRequest(BaseModel):
 
 class ExportRequest(BaseModel):
     event_ids: list[str] = Field(..., min_length=1, max_length=100)
+    view: Optional[MyEventsView] = Field(
+        default=None, description="Optional context: upcoming, saved, or past"
+    )
 
 
 class HealthResponse(BaseModel):

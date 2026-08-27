@@ -80,6 +80,29 @@ def create_share_token(
     return ShareTokenResponse(token=token)
 
 
+@router.get("/calendar/token", response_model=ShareTokenResponse)
+@limiter.limit("60/minute")
+def get_share_token(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
+):
+    """Get existing share token for current user without creating a new one.
+
+    Returns 404 if no token exists (user can then call POST to create).
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    existing = session.exec(
+        select(ShareToken).where(ShareToken.user_id == current_user.id)
+    ).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="No share token found")
+
+    return ShareTokenResponse(token=existing.token)
+
+
 def _scoped_event_ids(session: Session, share: ShareToken, scope: str) -> list[str]:
     """Collect the share owner's event ids for the requested scope.
 
@@ -114,20 +137,37 @@ def _scoped_event_ids(session: Session, share: ShareToken, scope: str) -> list[s
     return list(ids)
 
 
+def _view_to_scope(view: str | None) -> str:
+    """Map MyEventsView context to legacy scope for backward compatibility.
+
+    upcoming -> going (not ended, attending)
+    saved -> saved (not ended, saved)
+    past -> going (ended, attending)
+    all/None -> all (both)
+    """
+    view_scope_map = {"upcoming": "going", "saved": "saved", "past": "going"}
+    return view_scope_map.get(view or "", "all")
+
+
 @router.get("/calendar/{token}.ics")
 @limiter.limit("120/minute")
 def get_calendar_feed(
     request: Request,
     token: str,
     scope: str = "all",
+    view: str | None = None,
     session: Session = Depends(get_session),
 ):
     """Public live iCalendar feed for a share token (subscribable in Apple/Google).
 
     Unlike the one-shot export, this is polled periodically by calendar clients,
     so saved/going events stay in sync. ``scope`` selects saved, going or all.
+    ``view`` is the My Events context (upcoming/saved/past) for contextual title.
     """
-    if scope not in ("saved", "going", "all"):
+    # Support both legacy scope and new view parameters
+    if view and view in ("upcoming", "saved", "past"):
+        scope = _view_to_scope(view)
+    elif scope not in ("saved", "going", "all"):
         scope = "all"
 
     share = session.exec(select(ShareToken).where(ShareToken.token == token)).first()
@@ -153,12 +193,32 @@ def get_calendar_feed(
                     )
                 ).all()
             )
+
+    # Filter by date for upcoming/past views
+    if view in ("upcoming", "past"):
+        from datetime import datetime
+
+        now = datetime.utcnow()
+        if view == "upcoming":
+            events = [e for e in events if e.start > now]
+        elif view == "past":
+            events = [e for e in events if e.end and e.end <= now]
+
     events.sort(key=lambda e: e.start)
 
-    scope_label = {"saved": "Saved", "going": "Going", "all": "Saved & Going"}[scope]
+    # Set calendar name based on view or scope
+    if view:
+        view_labels = {"upcoming": "Upcoming", "saved": "Saved", "past": "Past"}
+        calendar_name = f"My Movida — {view_labels.get(view)}"
+    else:
+        scope_label = {"saved": "Saved", "going": "Going", "all": "Saved & Going"}[
+            scope
+        ]
+        calendar_name = f"My Movida — {scope_label}"
+
     ics_content = build_ics(
         events,
-        calendar_name=f"My Movida — {scope_label}",
+        calendar_name=calendar_name,
         refresh_hours=12,
     )
     return Response(
@@ -176,9 +236,10 @@ def get_calendar_feed(
 def get_shared_calendar(
     request: Request,
     token: str,
+    view: str | None = None,
     session: Session = Depends(get_session),
 ):
-    """Return the live saved-events list for the share token owner."""
+    """Return the live events list for the share token owner, optionally filtered by view."""
     share = session.exec(select(ShareToken).where(ShareToken.token == token)).first()
     if not share:
         raise HTTPException(status_code=404, detail="Share link not found")
@@ -208,9 +269,8 @@ def get_shared_calendar(
         )
     saved_rows = session.exec(saved_query).all()
     attending_rows = session.exec(attending_query).all()
-    event_ids = list(
-        {row.event_id for row in saved_rows} | {row.event_id for row in attending_rows}
-    )
+    saved_event_ids = {row.event_id for row in saved_rows}
+    attending_event_ids = {row.event_id for row in attending_rows}
 
     # First name only — we never expose the owner's email or full display name
     # on the public share page.
@@ -223,6 +283,14 @@ def get_shared_calendar(
                 owner_display_name = raw.split()[0]
             elif owner.email:
                 owner_display_name = owner.email.split("@", 1)[0]
+
+    # Filter event IDs by view context
+    if view == "saved":
+        event_ids = list(saved_event_ids)
+    elif view in ("upcoming", "past"):
+        event_ids = list(attending_event_ids)
+    else:
+        event_ids = list(saved_event_ids | attending_event_ids)
 
     if not event_ids:
         return SharedCalendarResponse(events=[], owner_display_name=owner_display_name)
@@ -243,6 +311,16 @@ def get_shared_calendar(
             CachedEvent.deleted_at == None,
         )
     ).all()
+
+    # Filter by date for upcoming/past views
+    if view in ("upcoming", "past"):
+        from datetime import datetime
+
+        now = datetime.utcnow()
+        if view == "upcoming":
+            events = [e for e in events if e.start > now]
+        elif view == "past":
+            events = [e for e in events if e.end and e.end <= now]
 
     fetched_ids = [e.event_id for e in events]
     view_counts: dict[str, int] = {}

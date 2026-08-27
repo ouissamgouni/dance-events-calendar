@@ -206,6 +206,61 @@ class TestExportXlsx:
         finally:
             app.dependency_overrides.clear()
 
+    def test_export_xlsx_with_view_in_filename(self):
+        """Test that view parameter is included in the filename."""
+        event = _sample_event()
+        mock_session = _make_mock_session(events=[event])
+        app.dependency_overrides[get_session] = lambda: mock_session
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/api/events/export/xlsx",
+                json={"event_ids": ["evt-1"], "view": "upcoming"},
+            )
+            assert resp.status_code == 200
+            # Check Content-Disposition header includes context
+            disposition = resp.headers.get("content-disposition", "")
+            assert "my-movida-events-upcoming.xlsx" in disposition
+        finally:
+            app.dependency_overrides.clear()
+
+
+@pytest.mark.unit
+class TestExportContextualFilenames:
+    """Test that export filenames reflect the view context."""
+
+    def test_ics_filename_includes_view(self):
+        event = _sample_event()
+        mock_session = _make_mock_session(events=[event])
+        app.dependency_overrides[get_session] = lambda: mock_session
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/api/events/export/ics",
+                json={"event_ids": ["evt-1"], "view": "saved"},
+            )
+            assert resp.status_code == 200
+            disposition = resp.headers.get("content-disposition", "")
+            assert "my-movida-events-saved.ics" in disposition
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_xlsx_filename_no_view_is_generic(self):
+        event = _sample_event()
+        mock_session = _make_mock_session(events=[event])
+        app.dependency_overrides[get_session] = lambda: mock_session
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/api/events/export/xlsx",
+                json={"event_ids": ["evt-1"]},  # No view
+            )
+            assert resp.status_code == 200
+            disposition = resp.headers.get("content-disposition", "")
+            assert "my-movida-events.xlsx" in disposition
+        finally:
+            app.dependency_overrides.clear()
+
 
 @pytest.mark.unit
 class TestIcsBuild:
