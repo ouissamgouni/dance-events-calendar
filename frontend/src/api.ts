@@ -248,6 +248,15 @@ export interface SiteSettings {
     /** Maximum number of tags rendered inline on an event card. Client
      * default: 3. */
     tags_per_card?: number;
+    /** When true, the event card RSVP action moves onto the attendee
+     * avatar row (right-aligned). Client default: false. */
+    event_card_rsvp_action_in_avatar_row_enabled?: boolean;
+    /** When true, save/going counts render next to their action buttons on
+     * event cards. Client default: false. */
+    event_card_rsvp_and_save_stats_next_to_action_enabled?: boolean;
+    /** When true, the "You might like"/"New" trails use the new date-first
+     * event card layout. Client default: false. */
+    for_you_event_cards_date_first_layout_enabled?: boolean;
     /** Global notification / re-engagement gates (admin-configurable).
      * Each flag mirrors an env-var in ``backend/config/loader.py``; when
      * set here it overrides that default without requiring a redeploy. */
@@ -1780,6 +1789,7 @@ export async function removeMySubscriber(handle: string): Promise<void> {
 
 export type NotificationKind =
     | 'subscription_going'
+    | 'subscription_saved'
     | 'subscription_suggested'
     | 'subscription_review'
     | 'subscription_milestone'
@@ -1815,7 +1825,19 @@ export interface NotificationItem {
     event_id: string | null;
     event_title: string | null;
     event_start: string | null;
+    /** Optional event cover image; rendered as a small thumbnail on the row
+     *  (no placeholder is shown when null). */
+    event_image_url?: string | null;
     actor: NotificationActor;
+    /** Distinct actors folded into an aggregated row (most-recent first,
+     *  capped). Equals `[actor]` for non-aggregated rows. */
+    actors?: NotificationActor[];
+    /** Total distinct actors in the group (drives the "+N others" preview).
+     *  1 for non-aggregated rows. */
+    actor_count?: number;
+    /** All raw notification ids folded into this group, so a single
+     *  mark-read clears every sibling. */
+    member_ids?: number[];
     /** Extra rendering context, e.g. the matched interest profile label(s)
      *  for `interest_event` rows (comma-joined when multiple profiles
      *  matched). Null for kinds that don't use it. */

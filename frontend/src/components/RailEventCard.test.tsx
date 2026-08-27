@@ -1,10 +1,11 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { FeatureFlagsProvider } from '../context/FeatureFlagsContext'
 import type { CalendarEvent } from '../types'
 import RailEventCard from './RailEventCard'
 
 vi.mock('./AttendeeAvatarStack', () => ({
-    default: () => <span data-testid="attendee-avatar-stack">Attendees</span>,
+    default: ({ size }: { size?: string }) => <span data-testid="attendee-avatar-stack" data-size={size}>Attendees</span>,
 }))
 
 const event: CalendarEvent = {
@@ -38,12 +39,14 @@ const inlineDate = start.toLocaleDateString(undefined, {
 describe('RailEventCard', () => {
     it('renders the opt-in date rail with location above attendees', () => {
         render(
-            <RailEventCard
-                event={event}
-                onClick={vi.fn()}
-                variant="compact"
-                dateRail
-            />,
+            <FeatureFlagsProvider>
+                <RailEventCard
+                    event={event}
+                    onClick={vi.fn()}
+                    variant="compact"
+                    dateRail
+                />
+            </FeatureFlagsProvider>,
         )
 
         const button = screen.getByRole('button', { name: /Open Salsa Social Friday/ })
@@ -61,15 +64,18 @@ describe('RailEventCard', () => {
         const attendees = screen.getByTestId('rail-card-attendees')
         expect(location.compareDocumentPosition(attendees) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(within(attendees).getByTestId('attendee-avatar-stack')).toBeInTheDocument()
+        expect(within(attendees).getByTestId('attendee-avatar-stack')).toHaveAttribute('data-size', 'md')
     })
 
     it('keeps the existing compact layout when the date rail is disabled', () => {
         render(
-            <RailEventCard
-                event={event}
-                onClick={vi.fn()}
-                variant="compact"
-            />,
+            <FeatureFlagsProvider>
+                <RailEventCard
+                    event={event}
+                    onClick={vi.fn()}
+                    variant="compact"
+                />
+            </FeatureFlagsProvider>,
         )
 
         const button = screen.getByRole('button', { name: /Open Salsa Social Friday/ })

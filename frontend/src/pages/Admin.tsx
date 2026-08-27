@@ -412,7 +412,7 @@ export default function Admin() {
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
             setForYouRailEnabled(s.for_you_rail_enabled ?? false);
             setYourNextEventsRailEnabled(s.your_next_events_rail_enabled ?? false);
-            setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? true);
+            setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? false);
             setMyEventsRouteEnabled(s.my_events_route_enabled ?? false);
             setMyEventsNavEnabled(s.my_events_nav_enabled ?? true);
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);

@@ -1,28 +1,48 @@
-import { useRef, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { useRef } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CalendarEvent } from '../types';
-import type { MyEventsTab } from '../utils/myEvents';
-import { eventPlace } from '../utils/myEvents';
-import AttendeeAvatarStack from './AttendeeAvatarStack';
-import GoingButton from './GoingButton';
-import SaveEventButton from './SaveEventButton';
+import EventCard from './EventCard';
 
 interface Props {
     event: CalendarEvent;
-    sequence: number;
-    tab: MyEventsTab;
+    /** Order-number badge in the date rail (journey view). Omit to hide it. */
+    sequence?: number;
     hasPrevious: boolean;
     hasNext: boolean;
     onPrevious: () => void;
     onNext: () => void;
     onOpen: () => void;
+    /** Show the attendee avatar stack (explorer preview shows it). */
+    showAvatars?: boolean;
+    /** Show tags + reviews line (explorer preview shows them). */
+    showTags?: boolean;
+    showReviews?: boolean;
+    showRatings?: boolean;
+    followingBadgeEnabled?: boolean;
 }
 
-export default function MyEventsMapPreview({ event, sequence, tab, hasPrevious, hasNext, onPrevious, onNext, onOpen }: Props) {
+/**
+ * Swipeable bottom-sheet preview for the map surfaces: prev/next chevrons,
+ * horizontal swipe, and left/right arrow keys page through the list. The
+ * card itself is the shared, borderless `EventCard` so the sheet matches the
+ * list cards. Reused by My Events (journey, with order numbers) and the
+ * Explorer map (no order numbers, full elements).
+ */
+export default function MyEventsMapPreview({
+    event,
+    sequence,
+    hasPrevious,
+    hasNext,
+    onPrevious,
+    onNext,
+    onOpen,
+    showAvatars = false,
+    showTags = false,
+    showReviews = false,
+    showRatings = false,
+    followingBadgeEnabled = false,
+}: Props) {
     const pointerStart = useRef<number | null>(null);
-    const [imageFailed, setImageFailed] = useState(false);
-    const start = new Date(event.start);
-    const when = `${start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${event.all_day ? 'All day' : start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
 
     const finishSwipe = (clientX: number) => {
         if (pointerStart.current == null) return;
@@ -35,7 +55,7 @@ export default function MyEventsMapPreview({ event, sequence, tab, hasPrevious, 
     return (
         <div
             role="group"
-            aria-label={`Event ${sequence}: ${event.title}`}
+            aria-label={sequence != null ? `Event ${sequence}: ${event.title}` : event.title}
             tabIndex={0}
             onPointerDown={(pointerEvent) => { pointerStart.current = pointerEvent.clientX; }}
             onPointerUp={(pointerEvent) => finishSwipe(pointerEvent.clientX)}
@@ -44,38 +64,40 @@ export default function MyEventsMapPreview({ event, sequence, tab, hasPrevious, 
                 if (keyEvent.key === 'ArrowLeft' && hasPrevious) onPrevious();
                 if (keyEvent.key === 'ArrowRight' && hasNext) onNext();
             }}
-            className="absolute inset-x-0 bottom-0 z-[750] rounded-t-card border-t border-line bg-surface px-4 pb-20 pt-4 shadow-xl focus:outline-none"
+            className="shrink-0 border-t border-line bg-surface px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-xl focus:outline-none"
             data-testid="my-events-map-preview"
         >
-            <div className="mx-auto flex max-w-2xl items-center gap-3">
-                {event.image_url && !imageFailed && (
-                    <img
-                        src={event.image_url}
-                        alt=""
-                        className="h-20 w-16 shrink-0 rounded-card object-cover"
-                        onError={() => setImageFailed(true)}
-                        data-testid="my-events-preview-image"
-                    />
-                )}
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-action text-xs font-bold text-white">{sequence}</span>
-                        <h3 className="truncate text-sm font-semibold text-ink">{event.title}</h3>
-                    </div>
-                    <p className="mt-1 text-xs text-ink-soft">{when}</p>
-                    <p className="truncate text-xs text-ink-soft">{eventPlace(event)}</p>
-                    <div className="mt-2 flex min-h-5 items-center gap-2">
-                        <AttendeeAvatarStack eventId={event.event_id} friendsPreview={event.following_friends_preview} size="sm" />
-                        {tab === 'saved' && (
-                            <div className="ml-auto flex items-center gap-1">
-                                <SaveEventButton eventId={event.event_id} appearance="icon" size="sm" />
-                                <GoingButton eventId={event.event_id} appearance="icon" size="sm" iconVariant="hand" />
-                            </div>
-                        )}
-                    </div>
-                </div>
-                <button type="button" onClick={onOpen} aria-label={`Open ${event.title}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-ink-soft hover:text-action">
-                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            <div className="mx-auto grid max-w-2xl grid-cols-[40px_minmax(0,1fr)_40px] items-center gap-2">
+                <button
+                    type="button"
+                    onClick={onPrevious}
+                    disabled={!hasPrevious}
+                    aria-label="Previous event"
+                    className="inline-flex h-10 w-10 items-center justify-center text-ink disabled:cursor-not-allowed disabled:text-muted/40"
+                >
+                    <ChevronLeft className="h-6 w-6" aria-hidden="true" />
+                </button>
+                <EventCard
+                    event={event}
+                    onOpen={onOpen}
+                    dateSequence={sequence}
+                    borderless
+                    showAvatars={showAvatars}
+                    showTags={showTags}
+                    showReviews={showReviews}
+                    showRatings={showRatings}
+                    followingBadgeEnabled={followingBadgeEnabled}
+                    goingIconVariant="hand"
+                    testId="my-events-map-card"
+                />
+                <button
+                    type="button"
+                    onClick={onNext}
+                    disabled={!hasNext}
+                    aria-label="Next event"
+                    className="inline-flex h-10 w-10 items-center justify-center text-ink disabled:cursor-not-allowed disabled:text-muted/40"
+                >
+                    <ChevronRight className="h-6 w-6" aria-hidden="true" />
                 </button>
             </div>
         </div>

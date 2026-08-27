@@ -8,11 +8,33 @@ users:
     handle: viewer
     account_visibility: public
     avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Viewer%20Explorer"
+    # Notification preferences: all channels enabled (heavy engagement)
+    email_social_activity_enabled: true
+    push_social_activity_enabled: true
+    email_event_reminders_enabled: true
+    push_event_reminders_enabled: true
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: true
+    email_friend_milestones_enabled: true
+    push_friend_milestones_enabled: true
+    email_review_prompt_enabled: true
+    push_review_prompt_enabled: true
   - email: bob@example.com
     name: Bob Martin
     handle: bob
     account_visibility: public
     avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Bob%20Martin"
+    # Notification preferences: email only, push disabled (opt-in control)
+    email_social_activity_enabled: true
+    push_social_activity_enabled: false
+    email_event_reminders_enabled: true
+    push_event_reminders_enabled: false
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: false
+    email_friend_milestones_enabled: true
+    push_friend_milestones_enabled: false
+    email_review_prompt_enabled: true
+    push_review_prompt_enabled: false
   - email: admin@example.com
     name: Admin
     handle: admin
@@ -25,6 +47,16 @@ users:
       handle: alice,
       account_visibility: public,
       avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Alice%20Rivera",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: true,
     }
   - {
       email: emma@example.com,
@@ -32,6 +64,16 @@ users:
       handle: emma,
       account_visibility: public,
       avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Emma%20Larsen",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: false,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: false,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: false,
     }
   - {
       email: frank@example.com,
@@ -39,6 +81,16 @@ users:
       handle: frank,
       account_visibility: public,
       avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Frank%20Dubois",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: false,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: false,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: true,
     }
   - {
       email: gina@example.com,
@@ -46,6 +98,16 @@ users:
       handle: gina,
       account_visibility: public,
       avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Gina%20Costa",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: true,
     }
   - {
       email: hugo@example.com,
@@ -53,6 +115,16 @@ users:
       handle: hugo,
       account_visibility: public,
       avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Hugo%20Schmidt",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: false,
+      push_review_prompt_enabled: false,
     }
   - {
       email: nia@example.com,
@@ -60,6 +132,16 @@ users:
       handle: nia,
       account_visibility: public,
       avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Nia%20Okafor",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: true,
     }
   - {
       email: omar@example.com,

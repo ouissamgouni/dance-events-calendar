@@ -75,6 +75,11 @@ export function useMyRating(eventId: string | null | undefined): MyRating | null
     return ctx.get(eventId);
 }
 
+export function useMyRatingsLoaded(): boolean {
+    const ctx = useContext(MyRatingsCtx);
+    return ctx?.loaded ?? true;
+}
+
 export function useUpsertMyRating(): (eventId: string, rating: EventRating | null) => void {
     const ctx = useContext(MyRatingsCtx);
     return ctx?.upsert ?? (() => { /* no-op */ });

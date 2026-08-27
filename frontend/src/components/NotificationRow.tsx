@@ -1,9 +1,27 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+    Bell,
+    Bookmark,
+    CalendarCheck,
+    CalendarPlus,
+    Clock,
+    Flag,
+    type LucideIcon,
+    MessageCircle,
+    Sparkles,
+    SquarePen,
+    Star,
+    Tag,
+    Trophy,
+    UserPlus,
+    Users,
+} from 'lucide-react';
+import {
     approveFollowRequest,
     declineFollowRequest,
     followUser,
+    type NotificationActor,
     type NotificationItem,
 } from '../api';
 import {
@@ -14,6 +32,75 @@ import {
 } from '../utils/notificationRender';
 
 type Variant = 'page' | 'panel';
+
+/** Per-kind tinted type icon shown at the far left of every row. Soft
+ *  circular backgrounds, never saturated blocks. */
+const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: string }> = {
+    subscription_going: { Icon: CalendarCheck, cls: 'bg-violet-100 text-violet-600' },
+    subscription_saved: { Icon: Bookmark, cls: 'bg-blue-100 text-action' },
+    subscription_suggested: { Icon: CalendarPlus, cls: 'bg-emerald-100 text-emerald-600' },
+    subscription_review: { Icon: SquarePen, cls: 'bg-violet-100 text-violet-600' },
+    subscription_milestone: { Icon: Trophy, cls: 'bg-amber-100 text-amber-600' },
+    milestone_unlocked: { Icon: Trophy, cls: 'bg-amber-100 text-amber-600' },
+    new_follower: { Icon: UserPlus, cls: 'bg-blue-100 text-action' },
+    follow_request: { Icon: UserPlus, cls: 'bg-blue-100 text-action' },
+    follow_request_approved: { Icon: UserPlus, cls: 'bg-blue-100 text-action' },
+    new_friend: { Icon: Users, cls: 'bg-emerald-100 text-emerald-600' },
+    event_reminder: { Icon: Clock, cls: 'bg-rose-100 text-rose-600' },
+    event_review_prompt: { Icon: Star, cls: 'bg-violet-100 text-violet-600' },
+    interest_event: { Icon: Sparkles, cls: 'bg-blue-100 text-action' },
+    promo_code_added: { Icon: Tag, cls: 'bg-amber-100 text-amber-600' },
+    promo_code_approved: { Icon: Tag, cls: 'bg-amber-100 text-amber-600' },
+    promo_code_rejected: { Icon: Tag, cls: 'bg-amber-100 text-amber-600' },
+    organizer_claim_decided: { Icon: Bell, cls: 'bg-slate-100 text-ink-soft' },
+    event_message: { Icon: MessageCircle, cls: 'bg-sky-100 text-sky-600' },
+    event_message_reply: { Icon: MessageCircle, cls: 'bg-sky-100 text-sky-600' },
+    event_message_reported: { Icon: Flag, cls: 'bg-sky-100 text-sky-600' },
+};
+
+/** Kinds that carry a real person and render an avatar next to the type icon.
+ *  System kinds (reminders, promos, event messages, personal milestone) show
+ *  the tinted type icon only. */
+const AVATAR_KINDS = new Set<NotificationItem['kind']>([
+    'subscription_going',
+    'subscription_saved',
+    'subscription_suggested',
+    'subscription_review',
+    'subscription_milestone',
+    'new_follower',
+    'new_friend',
+    'follow_request',
+    'follow_request_approved',
+]);
+
+const displayNameOf = (a: NotificationActor): string =>
+    a.display_name || (a.handle ? `@${a.handle}` : 'Someone');
+
+/** "Emma", "Emma and Samir", or "Emma, Samir +9 others". */
+function formatActorNames(actors: NotificationActor[], total: number): string {
+    const names = actors.map(displayNameOf);
+    if (total <= 1) return names[0] ?? 'Someone';
+    if (total === 2) return `${names[0]} and ${names[1]}`;
+    const shown = names.slice(0, 2);
+    return `${shown.join(', ')} +${total - shown.length} others`;
+}
+
+/** Plural verb for aggregated multi-actor event rows. */
+function groupVerb(item: NotificationItem): string {
+    switch (item.kind) {
+        case 'subscription_going':
+            return 'are going to';
+        case 'subscription_saved':
+            return 'are interested in';
+        case 'subscription_suggested':
+            return 'added';
+        case 'subscription_review':
+            return 'reviewed';
+        default:
+            return getNotificationVerb(item);
+    }
+}
+
 
 /**
  * Single source of truth for rendering one notification.
@@ -105,40 +192,100 @@ export default function NotificationRow({
     const actorName = isAnonReview
         ? 'Someone'
         : item.actor.display_name || `@${item.actor.handle}`;
-    const initial = (actorName || '?').trim().charAt(0).toUpperCase();
     const noEventSuffix = !hasEventSuffix(item);
-    const showFollowBack = item.kind === 'new_follower' && !item.actor.is_following;
 
     // Variant style tokens.
-    const iconSize = isPanel ? 'w-8 h-8 sm:w-7 sm:h-7 shrink-0' : 'w-8 h-8';
-    const specialTitle = isPanel
-        ? 'text-xs text-ink truncate'
-        : 'text-sm text-ink';
-    const defaultTitle = isPanel ? 'text-xs text-ink truncate' : 'text-xs text-ink';
+    const mainCls = isPanel
+        ? 'text-sm leading-snug text-ink'
+        : 'text-[15px] leading-snug text-ink';
     const timeClass = isPanel
-        ? 'text-[10px] text-muted mt-0.5'
-        : 'text-xs text-muted mt-0.5';
-    const subLabelSize = isPanel ? 'text-[11px]' : 'text-xs';
+        ? 'text-[11px] text-muted mt-0.5'
+        : 'text-[13px] text-muted mt-0.5';
+    const specialTitle = mainCls;
+    const subLabelSize = isPanel ? 'text-[11px]' : 'text-[13px]';
     const descClass = isPanel
-        ? 'text-[10px] text-ink-soft mt-0.5'
-        : 'text-xs text-ink-soft mt-0.5';
+        ? 'text-[11px] text-ink-soft mt-0.5'
+        : 'text-[13px] text-ink-soft mt-0.5';
 
-    const iconCircle = (extra: string, glyph: string): ReactNode => (
+    const avatarSize = isPanel ? 'w-8 h-8' : 'w-10 h-10';
+    const { Icon: TypeGlyph, cls: typeCls } = TYPE_ICON[item.kind] ?? {
+        Icon: Bell,
+        cls: 'bg-slate-100 text-ink-soft',
+    };
+    const typeIcon = (
         <div
-            // eslint-disable-next-line no-restricted-syntax -- circular icon badge (allowed exception per frontend rules)
-            className={`${iconSize} rounded-full flex items-center justify-center ${extra}`}
+            // eslint-disable-next-line no-restricted-syntax -- circular tinted type badge (allowed exception per frontend rules)
+            className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${typeCls}`}
             aria-hidden="true"
         >
-            {glyph}
+            <TypeGlyph size={18} strokeWidth={2} />
         </div>
     );
 
-    let icon: ReactNode;
+    const avatarEl = (a: NotificationActor, size: string): ReactNode =>
+        a.avatar_url ? (
+            <img
+                src={a.avatar_url}
+                alt=""
+                // eslint-disable-next-line no-restricted-syntax -- avatar (allowed exception per frontend rules)
+                className={`${size} rounded-full object-cover bg-slate-100 shrink-0`}
+            />
+        ) : (
+            <div
+                // eslint-disable-next-line no-restricted-syntax -- avatar placeholder (allowed exception per frontend rules)
+                className={`${size} rounded-full bg-slate-200 text-ink-soft flex items-center justify-center font-semibold shrink-0 ${isPanel ? 'text-xs' : 'text-sm'}`}
+            >
+                {(displayNameOf(a) || '?').trim().charAt(0).toUpperCase()}
+            </div>
+        );
+
+    const actorsList: NotificationActor[] =
+        item.actors && item.actors.length > 0 ? item.actors : [item.actor];
+    const actorCount = item.actor_count ?? actorsList.length;
+    const isAvatarKind = AVATAR_KINDS.has(item.kind);
+    const isMulti = isAvatarKind && actorCount > 1;
+
+    const thumbNode: ReactNode = item.event_image_url ? (
+        <img
+            src={item.event_image_url}
+            alt=""
+            // eslint-disable-next-line no-restricted-syntax -- event thumbnail uses card radius (allowed per frontend rules)
+            className="w-14 h-14 rounded-card object-cover bg-slate-100 shrink-0"
+        />
+    ) : null;
+
+    const avatarStack = (
+        <div className="flex items-center">
+            {actorsList.slice(0, 3).map((a, i) => (
+                <span key={a.handle || i} className={i > 0 ? '-ml-2' : ''}>
+                    {avatarEl(a, 'w-8 h-8 ring-2 ring-surface')}
+                </span>
+            ))}
+            {actorCount > 3 && (
+                <span
+                    // eslint-disable-next-line no-restricted-syntax -- avatar overflow bubble (allowed exception per frontend rules)
+                    className="-ml-2 w-8 h-8 rounded-full bg-slate-100 ring-2 ring-surface text-[11px] font-semibold text-ink-soft flex items-center justify-center shrink-0"
+                >
+                    +{actorCount - 3}
+                </span>
+            )}
+        </div>
+    );
+
+    const orgaBadge = item.actor.is_verified_organizer ? (
+        <img
+            src="/orga.png"
+            alt=""
+            title="Verified organizer"
+            aria-label="Verified organizer"
+            className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
+        />
+    ) : null;
+
     let body: ReactNode;
 
     if (item.kind === 'interest_event') {
         const label = item.context || 'your saved search';
-        icon = iconCircle('bg-blue-100 text-action', '✨');
         body = (
             <>
                 <p className={specialTitle}>
@@ -178,7 +325,6 @@ export default function NotificationRow({
                 minute: '2-digit',
             })
             : null;
-        icon = iconCircle('bg-rose-100 text-rose-600', '🕒');
         body = (
             <>
                 <p className={specialTitle}>
@@ -197,7 +343,6 @@ export default function NotificationRow({
             </>
         );
     } else if (item.kind === 'promo_code_added') {
-        icon = iconCircle('bg-amber-100 text-amber-600', '🏷️');
         body = (
             <>
                 <p className={specialTitle}>
@@ -213,7 +358,6 @@ export default function NotificationRow({
             </>
         );
     } else if (item.kind === 'event_review_prompt') {
-        icon = iconCircle('bg-violet-100 text-violet-600', '⭐');
         body = (
             <>
                 <p className={specialTitle}>
@@ -233,7 +377,6 @@ export default function NotificationRow({
             </>
         );
     } else if (item.kind === 'milestone_unlocked') {
-        icon = iconCircle('bg-amber-100 text-amber-600', '🏆');
         body = (
             <>
                 <p className={specialTitle}>
@@ -251,8 +394,6 @@ export default function NotificationRow({
         item.kind === 'event_message_reply' ||
         item.kind === 'event_message_reported'
     ) {
-        const emoji = item.kind === 'event_message_reported' ? '🚩' : '💬';
-        icon = iconCircle('bg-sky-100 text-sky-600', emoji);
         body = (
             <>
                 <p className={specialTitle}>
@@ -267,101 +408,99 @@ export default function NotificationRow({
             </>
         );
     } else {
-        icon = item.actor.avatar_url ? (
-            <img
-                src={item.actor.avatar_url}
-                alt=""
-                // eslint-disable-next-line no-restricted-syntax -- avatar (allowed exception per frontend rules)
-                className={`${iconSize} rounded-full object-cover bg-slate-100`}
-            />
-        ) : (
-            <div
-                // eslint-disable-next-line no-restricted-syntax -- avatar placeholder (allowed exception per frontend rules)
-                className={`${iconSize} rounded-full bg-slate-200 text-ink-soft flex items-center justify-center font-semibold ${isPanel ? 'text-xs' : 'text-sm'}`}
-            >
-                {initial}
-            </div>
-        );
+        const nameText = isMulti
+            ? formatActorNames(actorsList, actorCount)
+            : item.kind === 'subscription_going' && item.also_going
+                ? `You and ${actorName}`
+                : actorName;
+        const verbText = isMulti ? groupVerb(item) : verb;
         body = (
             <>
-                <p className={defaultTitle}>
-                    <span className="font-medium text-ink">
-                        {item.kind === 'subscription_going' && item.also_going
-                            ? `You and ${actorName}`
-                            : actorName}
-                    </span>
-                    {item.actor.is_verified_organizer && (
-                        <img
-                            src="/orga.png"
-                            alt=""
-                            title="Verified organizer"
-                            aria-label="Verified organizer"
-                            className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
-                        />
-                    )}{' '}
-                    <span className="text-ink-soft">{verb}</span>
+                <p className={mainCls}>
+                    <span className="font-semibold text-ink">{nameText}</span>
+                    {!isMulti && orgaBadge}{' '}
+                    <span className="text-ink-soft">{verbText}</span>
                     {!noEventSuffix && (
                         <>
                             {' '}
-                            <span className="font-medium text-ink">
+                            <span className="font-semibold text-ink">
                                 {item.event_title || 'an event'}
                             </span>
                         </>
                     )}
                 </p>
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
-                {showFollowBack && (
-                    <div className="mt-2">
-                        {following ? (
-                            <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
-                                ✓ Following
-                            </span>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={handleFollowBack}
-                                disabled={followBusy}
-                                className="px-2 py-1 text-[11px] bg-action text-white hover:bg-action disabled:opacity-60"
-                            >
-                                {followBusy ? 'Following…' : 'Follow back'}
-                            </button>
-                        )}
-                    </div>
-                )}
-                {item.kind === 'follow_request' && (
-                    <div className="mt-2 flex gap-2">
-                        {requestHandled === 'approved' ? (
-                            <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
-                                ✓ Approved
-                            </span>
-                        ) : requestHandled === 'declined' ? (
-                            <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
-                                Declined
-                            </span>
-                        ) : (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={handleApprove}
-                                    disabled={requestBusy}
-                                    className="px-2 py-1 text-[11px] bg-action text-white hover:bg-action disabled:opacity-60"
-                                >
-                                    {requestBusy ? '…' : 'Approve'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleDecline}
-                                    disabled={requestBusy}
-                                    className="px-2 py-1 text-[11px] border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-60"
-                                >
-                                    Decline
-                                </button>
-                            </>
-                        )}
-                    </div>
-                )}
             </>
         );
+    }
+
+    const avatarNode: ReactNode = !isAvatarKind
+        ? null
+        : isMulti
+            ? avatarStack
+            : avatarEl(item.actor, avatarSize);
+
+    // Inline affordances that live in the row's trailing slot (page) or inside
+    // the row button (panel).
+    let actionNode: ReactNode = null;
+    if (item.kind === 'new_follower') {
+        actionNode = following ? (
+            <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
+                ✓ Following
+            </span>
+        ) : (
+            <button
+                type="button"
+                onClick={handleFollowBack}
+                disabled={followBusy}
+                className="px-2 py-1 text-[11px] bg-action text-white hover:bg-action disabled:opacity-60"
+            >
+                {followBusy ? 'Following…' : 'Follow back'}
+            </button>
+        );
+    } else if (item.kind === 'new_friend') {
+        actionNode = (
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(destination);
+                }}
+                className="px-2 py-1 text-[11px] border border-line bg-surface text-ink hover:bg-canvas"
+            >
+                View profile
+            </button>
+        );
+    } else if (item.kind === 'follow_request') {
+        actionNode =
+            requestHandled === 'approved' ? (
+                <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
+                    ✓ Approved
+                </span>
+            ) : requestHandled === 'declined' ? (
+                <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
+                    Declined
+                </span>
+            ) : (
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={handleApprove}
+                        disabled={requestBusy}
+                        className="px-2 py-1 text-[11px] bg-action text-white hover:bg-action disabled:opacity-60"
+                    >
+                        {requestBusy ? '…' : 'Approve'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleDecline}
+                        disabled={requestBusy}
+                        className="px-2 py-1 text-[11px] border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-60"
+                    >
+                        Decline
+                    </button>
+                </div>
+            );
     }
 
     if (isPanel) {
@@ -370,10 +509,15 @@ export default function NotificationRow({
                 <button
                     type="button"
                     onClick={handleNavigate}
-                    className={`w-full text-left flex items-start gap-3 px-4 py-3 sm:px-3 sm:py-2 hover:bg-canvas ${isUnread ? 'bg-blue-50/40' : 'bg-surface'}`}
+                    className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-canvas ${isUnread ? 'bg-blue-50/40' : 'bg-surface'}`}
                 >
-                    {icon}
-                    <div className="min-w-0 flex-1">{body}</div>
+                    {typeIcon}
+                    {avatarNode}
+                    <div className="min-w-0 flex-1">
+                        {body}
+                        {actionNode && <div className="mt-2">{actionNode}</div>}
+                    </div>
+                    {thumbNode}
                     {isUnread && (
                         <span
                             // eslint-disable-next-line no-restricted-syntax -- small unread status dot (allowed exception per frontend rules)
@@ -388,9 +532,10 @@ export default function NotificationRow({
 
     return (
         <li
-            className={`flex items-start gap-3 px-3 py-3 ${isUnread ? 'bg-blue-50/40' : 'bg-surface'}`}
+            className={`flex items-start gap-3 px-4 py-3.5 ${isUnread ? 'bg-blue-50/40' : 'bg-surface'}`}
         >
-            {icon}
+            {typeIcon}
+            {avatarNode}
             <button
                 type="button"
                 onClick={handleNavigate}
@@ -398,24 +543,20 @@ export default function NotificationRow({
             >
                 {body}
             </button>
-            {isUnread ? (
-                <button
-                    type="button"
-                    onClick={onMarkRead}
-                    disabled={busy}
-                    className="shrink-0 text-xs text-ink-soft hover:text-action disabled:opacity-50"
-                >
-                    {busy ? '…' : 'Mark read'}
-                </button>
-            ) : (
-                <span
-                    className="shrink-0 text-xs text-slate-300"
-                    aria-label="Read"
-                    title="Read"
-                >
-                    ●
-                </span>
-            )}
+            {thumbNode}
+            <div className="shrink-0 flex flex-col items-end gap-2">
+                {actionNode}
+                {isUnread && (
+                    <button
+                        type="button"
+                        onClick={onMarkRead}
+                        disabled={busy}
+                        className="text-[13px] text-ink-soft hover:text-action disabled:opacity-50"
+                    >
+                        {busy ? '…' : 'Mark read'}
+                    </button>
+                )}
+            </div>
         </li>
     );
 }

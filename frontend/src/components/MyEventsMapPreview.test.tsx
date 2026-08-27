@@ -33,17 +33,17 @@ describe('MyEventsMapPreview', () => {
     it('swipes and uses arrow keys to move through chronology', () => {
         const onPrevious = vi.fn();
         const onNext = vi.fn();
+        const onOpen = vi.fn();
         renderWithProviders(
             <FeatureFlagsProvider>
                 <MyEventsMapPreview
                     event={event}
                     sequence={2}
-                    tab="upcoming"
                     hasPrevious
                     hasNext
                     onPrevious={onPrevious}
                     onNext={onNext}
-                    onOpen={vi.fn()}
+                    onOpen={onOpen}
                 />
             </FeatureFlagsProvider>,
         );
@@ -52,18 +52,24 @@ describe('MyEventsMapPreview', () => {
         fireEvent.pointerDown(preview, { clientX: 120 });
         fireEvent.pointerUp(preview, { clientX: 60 });
         fireEvent.keyDown(preview, { key: 'ArrowLeft' });
+        fireEvent.click(screen.getByRole('button', { name: 'Next event' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Open Paris Social' }));
 
-        expect(onNext).toHaveBeenCalledOnce();
+        expect(onNext).toHaveBeenCalledTimes(2);
         expect(onPrevious).toHaveBeenCalledOnce();
+        expect(onOpen).toHaveBeenCalledOnce();
+        expect(screen.queryByTestId('attendee-avatar-stack')).not.toBeInTheDocument();
+        expect(screen.getByTestId('event-date-sequence')).toHaveTextContent('2');
+        expect(screen.getByTestId('my-events-map-card')).not.toHaveClass('border');
+        expect(screen.queryByTestId('my-events-preview-image')).not.toBeInTheDocument();
     });
 
-    it('collapses the optional image when loading fails', () => {
+    it('shows only the compact event details and disables boundary navigation', () => {
         renderWithProviders(
             <FeatureFlagsProvider>
                 <MyEventsMapPreview
                     event={event}
                     sequence={1}
-                    tab="upcoming"
                     hasPrevious={false}
                     hasNext={false}
                     onPrevious={vi.fn()}
@@ -73,7 +79,12 @@ describe('MyEventsMapPreview', () => {
             </FeatureFlagsProvider>,
         );
 
-        fireEvent.error(screen.getByTestId('my-events-preview-image'));
         expect(screen.queryByTestId('my-events-preview-image')).not.toBeInTheDocument();
+        expect(screen.getByText('Paris Social')).toBeInTheDocument();
+        expect(screen.getByTestId('event-date-sequence')).toHaveTextContent('1');
+        expect(screen.getByTestId('event-date-sequence')).not.toHaveTextContent('#1');
+        expect(screen.getByText('Paris, France')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Previous event' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Next event' })).toBeDisabled();
     });
 });

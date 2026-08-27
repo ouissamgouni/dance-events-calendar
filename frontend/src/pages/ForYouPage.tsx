@@ -14,6 +14,7 @@ import { trackView } from '../utils/tracking';
 import { isTrendingScore } from '../utils/trending';
 import YourNextEventsRail from '../components/YourNextEventsRail';
 import RailEventCard from '../components/RailEventCard';
+import EventCard from '../components/EventCard';
 import FriendsAreGoingCard from '../components/FriendsAreGoingCard';
 import ShareExperienceCard from '../components/ShareExperienceCard';
 import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
@@ -57,6 +58,8 @@ interface LensTrailProps {
     testId: string;
     headerAction?: SectionHeadingAction;
     cardVariant?: 'default' | 'friends-going';
+    /** Opt this trail into the date-first EventCard layout when the flag is on. */
+    dateFirstEligible?: boolean;
 }
 
 export function LensTrail(props: LensTrailProps) {
@@ -65,9 +68,11 @@ export function LensTrail(props: LensTrailProps) {
         hoveredEventId, onEventHover, trendingEnabled, popularityThreshold,
         trendingTopN, trendingTopPercent, newEventIds, unseenStateEnabled,
         followingBadgeEnabled, emptyContent, contextLabel, testId, headerAction,
-        cardVariant = 'default',
+        cardVariant = 'default', dateFirstEligible = false,
     } = props;
+    const { forYouEventCardsDateFirstLayoutEnabled, showRatings } = useFeatureFlags();
     const friendsGoing = cardVariant === 'friends-going';
+    const dateFirst = dateFirstEligible && forYouEventCardsDateFirstLayoutEnabled && !friendsGoing;
     const [displayCap, setDisplayCap] = useState(DISPLAY_CAP);
     const visibleEvents = events.slice(0, displayCap);
     const hasLocalMore = events.length > visibleEvents.length;
@@ -110,6 +115,23 @@ export function LensTrail(props: LensTrailProps) {
                         const isNew = unseenStateEnabled && newEventIds.has(event.event_id);
                         const isTrending = trendingEnabled
                             && isTrendingScore(event.popularity_score ?? 0, allScores, popularityThreshold, trendingTopN, trendingTopPercent);
+                        if (dateFirst) {
+                            return (
+                                <EventCard
+                                    key={event.event_id}
+                                    event={event}
+                                    onOpen={onEventClick}
+                                    onHover={onEventHover}
+                                    highlighted={hoveredEventId === event.event_id}
+                                    isNew={isNew}
+                                    isTrending={isTrending}
+                                    followingBadgeEnabled={followingBadgeEnabled}
+                                    showRatings={showRatings}
+                                    widthClass="w-[248px]"
+                                    goingIconVariant="hand"
+                                />
+                            );
+                        }
                         return (
                             <RailEventCard
                                 key={event.event_id}
@@ -352,6 +374,7 @@ export default function ForYouPage() {
                             title="You might like"
                             testId="for-you-you-might-like"
                             contextLabel="you might like event"
+                            dateFirstEligible
                             emptyContent={(
                                 <>
                                     Save a few dance styles in your profile to see recommendations here.{' '}
@@ -436,6 +459,7 @@ export default function ForYouPage() {
                             title="New"
                             testId="for-you-new"
                             contextLabel="new event"
+                            dateFirstEligible
                             emptyContent="No new matches since your last visit."
                             events={newEvents}
                             hasMore={youMightLikeLens.hasMore}

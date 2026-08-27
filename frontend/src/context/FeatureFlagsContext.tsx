@@ -49,6 +49,15 @@ interface FeatureFlags {
     trendingTrailRichEnabled: boolean;
     /** Number of tags to render inline per event card. */
     tagsPerCard: number;
+    /** When true, the event card's RSVP action moves onto the attendee
+     * avatar row (right-aligned) instead of the top-right cluster. */
+    eventCardRsvpActionInAvatarRowEnabled: boolean;
+    /** When true, save/going counts render next to their action buttons
+     * on event cards. */
+    eventCardRsvpAndSaveStatsNextToActionEnabled: boolean;
+    /** When true, the "You might like" and "New" For-you trails use the
+     * new date-first event card layout. */
+    forYouEventCardsDateFirstLayoutEnabled: boolean;
 }
 
 const defaultFlags: FeatureFlags = {
@@ -70,7 +79,7 @@ const defaultFlags: FeatureFlags = {
     organizerClaimsEnabled: false,
     forYouRailEnabled: false,
     yourNextEventsRailEnabled: false,
-    networkGoingSnapshotEnabled: true,
+    networkGoingSnapshotEnabled: false,
     myEventsRouteEnabled: false,
     myEventsNavEnabled: true,
     eventReviewSizeStepEnabled: true,
@@ -78,6 +87,9 @@ const defaultFlags: FeatureFlags = {
     tagBadgeColored: false,
     trendingTrailRichEnabled: false,
     tagsPerCard: 3,
+    eventCardRsvpActionInAvatarRowEnabled: false,
+    eventCardRsvpAndSaveStatsNextToActionEnabled: false,
+    forYouEventCardsDateFirstLayoutEnabled: false,
 };
 
 const FeatureFlagsContext = createContext<{
@@ -116,7 +128,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     organizerClaimsEnabled: s.organizer_claims_enabled ?? false,
                     forYouRailEnabled: s.for_you_rail_enabled ?? false,
                     yourNextEventsRailEnabled: s.your_next_events_rail_enabled ?? false,
-                    networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? true,
+                    networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? false,
                     myEventsRouteEnabled: s.my_events_route_enabled ?? false,
                     myEventsNavEnabled: s.my_events_nav_enabled ?? true,
                     eventReviewSizeStepEnabled: s.event_review_size_step_enabled ?? true,
@@ -124,6 +136,9 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     tagBadgeColored: s.tag_badge_colored ?? false,
                     trendingTrailRichEnabled: s.trending_trail_rich_enabled ?? false,
                     tagsPerCard: s.tags_per_card ?? 3,
+                    eventCardRsvpActionInAvatarRowEnabled: s.event_card_rsvp_action_in_avatar_row_enabled ?? false,
+                    eventCardRsvpAndSaveStatsNextToActionEnabled: s.event_card_rsvp_and_save_stats_next_to_action_enabled ?? false,
+                    forYouEventCardsDateFirstLayoutEnabled: s.for_you_event_cards_date_first_layout_enabled ?? false,
                 });
             })
             .catch(() => {
@@ -142,6 +157,16 @@ export function useFeatureFlags(): FeatureFlags {
     const context = useContext(FeatureFlagsContext);
     if (!context) throw new Error('useFeatureFlags must be used within FeatureFlagsProvider');
     return context.flags;
+}
+
+/**
+ * Like {@link useFeatureFlags} but returns the built-in defaults instead of
+ * throwing when rendered outside a provider. Use in widely-reused low-level
+ * components (e.g. buttons) that may be mounted in isolation.
+ */
+export function useOptionalFeatureFlags(): FeatureFlags {
+    const context = useContext(FeatureFlagsContext);
+    return context?.flags ?? defaultFlags;
 }
 
 export function useUpdateFeatureFlag() {

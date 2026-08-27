@@ -324,3 +324,143 @@ test_plan:
         • Swiping the single preview follows chronology and updates the selected
           pin. Curved arrows remain visually subordinate to pins and clusters
           use a distinct count treatment.
+  # ──── NOTIFICATIONS COVERAGE ────────────────────────────────────────
+  notifications:
+    name: "Notifications system integration with Explorer and tribe activity"
+    description: >
+      Verify comprehensive notification coverage spanning all core
+      notification types triggered by social activity (follows,
+      attendances, reviews, messages) within the explorer-ux-overhaul
+      scenario. This enables testing the broader notification system
+      alongside Explorer UI interactions (e.g., seeing "Friend is going"
+      badges while browsing the landing page).
+
+    cast:
+      - handle: viewer
+        email: viewer@example.com
+        preferences: "All notifications enabled (email + push)"
+        roles: "Signed-in user, central hub of social graph"
+      - handle: alice
+        email: alice@example.com
+        preferences: "All enabled; subset of push-only (interests, milestones)"
+        roles: "Mutual friend of viewer; posts Going/reviews/messages"
+      - handle: emma
+        email: emma@example.com
+        preferences: "Email ON for activity; push OFF for interests/milestones"
+        roles: "Mutual friend; moderate engagement"
+      - handle: frank
+        email: frank@example.com
+        preferences: "Selective: email ON, push ON (activity); inverted on milestones"
+        roles: "Mutual friend; opt-out on review prompts"
+      - handle: bob
+        email: bob@example.com
+        preferences: "Email-only (no push); control for push opt-out testing"
+        roles: "Out-of-graph control; independent attendee"
+      - handle: gina
+        email: gina@example.com
+        preferences: "All enabled"
+        roles: "Mutual friend; event participant"
+      - handle: hugo
+        email: hugo@example.com
+        preferences: "All enabled except review prompts (both channels)"
+        roles: "Mutual friend; event participant"
+      - handle: nia
+        email: nia@example.com
+        preferences: "All enabled"
+        roles: "Mutual friend; message participant"
+
+    covered_notification_types:
+      - kind: new_follower
+        trigger: "emit_notifications: true in db-follows.yaml"
+        example: "viewer follows alice (new_follower to alice)"
+        participants: "alice (recipient), viewer (actor)"
+
+      - kind: new_friend
+        trigger: "emit_notifications: true in db-follows.yaml + mutual follow"
+        example: "viewer ↔ alice (bidirectional follow)"
+        participants: "viewer + alice (both directions)"
+
+      - kind: subscription_going
+        trigger: "emit_notifications: true in db-attendances.yaml + share_publicly: true"
+        example: "alice marks Going publicly → viewer [follower] receives notification"
+        participants: "Users who mark Going (alice, bob, carol, etc.); followers see it"
+
+      - kind: subscription_review
+        trigger: "emit_notifications: true in db-events.yaml + ratings section"
+        example: "alice posts review on evt-ux-past-social → her followers see subscription_review"
+        participants: "alice, frank, emma, rita post reviews; viewers of these users see them"
+
+      - kind: event_message
+        trigger: "emit_notifications: true in db-event-messages.yaml (new file)"
+        example: "alice posts message on evt-ux-008 → all Going/Saved users (bob, carol, dave, etc.) see it"
+        participants: "Message authors on evt-ux-008 (alice, bob, carol, dave, emma, frank, gina, hugo); evt-ux-011 (nia, omar, pablo, quinn, rita)"
+
+      - kind: event_message_reply
+        trigger: "Replies in db-event-messages.yaml threads with emit_notifications: true"
+        example: "emma replies to alice's question on evt-ux-008 → alice + thread participants notified"
+        participants: "Reply threads on evt-ux-008 and evt-ux-011"
+
+      - kind: subscription_saved
+        trigger: "emit_notifications: true in db-saves.yaml (if saves have notifications)"
+        example: "user marks event saved with share_publicly: true"
+        participants: "Followers see when users save events"
+
+      - kind: subscription_suggested
+        trigger: "User-submitted event approvals (if supported in scenario)"
+        example: "Approved suggestion fan-out to suggester's followers"
+        participants: "Suggestion authors and their subscribers"
+
+    expected_inbox_states:
+      viewer:
+        - "new_follower from mutual friends (alice, emma, frank, gina, hugo, nia); one-way followees (omar, pablo, etc.)"
+        - "new_friend from mutual friends"
+        - "subscription_going when friends mark Going publicly"
+        - "subscription_review from friend reviews on past events"
+        - "event_message from messages on evt-ux-008 and evt-ux-011"
+        - "event_message_reply from thread participation"
+
+      alice:
+        - "new_follower when viewer starts following"
+        - "new_friend when viewer becomes mutual"
+        - "subscription_going from her public attendance on evt-ux-008"
+        - "subscription_review notification when she posts review on evt-ux-past-social"
+        - "event_message notifications from posts/replies on evt-ux-008"
+
+      bob:
+        - "Same as alice, BUT push notifications disabled (email-only)"
+        - "subscription_going from public attendances"
+        - "event_message from evt-ux-008 (Going user)"
+
+      emma:
+        - "All activity notifications (follows, Going, reviews, messages)"
+        - "Email for interests/milestones; push disabled for those features"
+
+    seeding_summary:
+      - "db-follows.yaml: emit_notifications=true → new_follower, new_friend (9 kinds covered)"
+      - "db-attendances.yaml: emit_notifications=true → subscription_going (8+ events with public attendances)"
+      - "db-events.yaml: emit_notifications=true + ratings section → subscription_review (12 reviews across 3 past events)"
+      - "db-event-messages.yaml: emit_notifications=true + top-level posts + threads → event_message, event_message_reply (8+ messages on 2 events)"
+      - "mock-users.yaml: expanded with notification preference toggles for viewer, alice, emma, frank, bob, gina, hugo, nia"
+
+    test_approach:
+      - "Seed scenario: `task start:scenario SCENARIO=explorer-ux-overhaul`"
+      - "Verify Postgres notifications table contains rows for all covered kinds"
+      - "Inspect notification_preferences rows to confirm user toggles match mock-users.yaml"
+      - "Manual UI test: Open explorer as viewer → check app notification inbox for activity (friends going, reviews, messages)"
+      - "Verify read/unread state toggling in notifications center"
+      - "Test preference opt-out: confirm bob receives emails but no push notifications"
+
+    deferred_notifications:
+      - "event_reminder: scheduler-based (pre-event notifications) — can be tested post-seed with manual scheduler call"
+      - "event_review_prompt: scheduler-based (post-event prompts) — deferred to scheduler testing"
+      - "interest_event: scheduler-based (matches saved searches) — requires interest_profiles + scheduler run"
+      - "milestone_unlocked: Milestones UNLOCK during seeding (viewer has 12 passport attendances → cities_10, countries_8, events_12+ unlocked); notifications are created by scheduler post-seed"
+      - "follow_request / follow_request_approved: Phase E8 feature; deferred if E8 not active in scenario"
+
+    milestone_data_in_scenario:
+      - "viewer@example.com has 12 seeded passport attendances (evt-passport-01 through evt-passport-12)"
+      - "Passport attendances span 10 distinct cities: Paris, Barcelona, Berlin, Milan, Amsterdam, Vienna, Prague, London, Lisbon, Rome"
+      - "Passport attendances span 8 distinct countries: France, Spain, Germany, Italy, Netherlands, Austria, Czech Republic, UK"
+      - "Milestones unlocked during initial seed: cities_10, countries_8, events_12+ (specific values depend on exact event counts)"
+      - "All users have milestone notification preferences configured (email/push toggles)"
+      - "To test milestone_unlocked notifications: Run scheduler post-seed → notifications created for milestone recipients"

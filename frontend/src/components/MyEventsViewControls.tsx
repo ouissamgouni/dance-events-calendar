@@ -14,34 +14,40 @@ const options: Array<{ view: MyEventsView; label: string; icon: typeof List }> =
     { view: 'map', label: 'Map', icon: Map },
 ];
 
+const orderByView: Record<MyEventsView, MyEventsView[]> = {
+    list: ['map', 'calendar'],
+    calendar: ['list', 'map'],
+    map: ['list', 'calendar'],
+};
+
 export default function MyEventsViewControls({ view, searchOpen, onViewChange, onToggleSearch }: Props) {
+    const visibleOptions = orderByView[view].map((nextView) => options.find((option) => option.view === nextView)!);
     return (
-        <div className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] left-1/2 z-[7800] flex -translate-x-1/2 items-center gap-2 md:bottom-6" data-testid="my-events-view-controls">
-            <div className="flex h-11 items-stretch overflow-hidden rounded-full border border-line bg-surface p-1 shadow-lg">
-                {options.filter((option) => option.view !== view).map((option) => {
-                    const Icon = option.icon;
-                    return (
-                        <button
-                            key={option.view}
-                            type="button"
-                            onClick={() => onViewChange(option.view)}
-                            className="inline-flex min-w-24 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium text-ink-soft hover:bg-canvas hover:text-action"
-                            aria-label={`${option.label} view`}
-                        >
-                            <Icon className="h-4 w-4" aria-hidden="true" />
-                            {option.label}
-                        </button>
-                    );
-                })}
-            </div>
+        <div className="grid grid-cols-3 border-b border-line bg-canvas px-3 py-2 sm:px-4" data-testid="my-events-view-controls">
+            {visibleOptions.map((option) => {
+                const Icon = option.icon;
+                return (
+                    <button
+                        key={option.view}
+                        type="button"
+                        onClick={() => onViewChange(option.view)}
+                        className="inline-flex h-9 min-w-0 items-center justify-center gap-1.5 border-r border-line px-2 text-xs font-semibold text-ink-soft transition first:border-l hover:bg-surface hover:text-ink"
+                        aria-label={`${option.label} view`}
+                    >
+                        <Icon className="h-4 w-4" aria-hidden="true" />
+                        {option.label}
+                    </button>
+                );
+            })}
             <button
                 type="button"
                 onClick={onToggleSearch}
                 aria-label={searchOpen ? 'Close event search' : 'Add an event'}
                 aria-expanded={searchOpen}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-action text-white shadow-lg hover:opacity-90"
+                className={`inline-flex h-9 min-w-0 items-center justify-center gap-1.5 border-r border-line px-2 text-xs font-semibold transition ${searchOpen ? 'bg-surface text-action' : 'text-ink-soft hover:bg-surface hover:text-ink'}`}
             >
-                <Plus className={`h-6 w-6 transition ${searchOpen ? 'rotate-45' : ''}`} aria-hidden="true" />
+                <Plus className={`h-4 w-4 transition ${searchOpen ? 'rotate-45' : ''}`} aria-hidden="true" />
+                <span>{searchOpen ? 'Close' : 'Add event'}</span>
             </button>
         </div>
     );

@@ -96,6 +96,7 @@ function AppShell() {
   const qaPinnedWidth = useQaPinnedWidth();
   const mainRef = useRef<HTMLElement | null>(null);
   const isMineDashboard = location.pathname === '/mine';
+  const isMyEvents = location.pathname === '/mine/calendar';
 
   // Full-screen flows (auth, onboarding) and leaf detail pages (event/series,
   // admin, notifications, shared views) suppress the primary bottom nav.
@@ -165,7 +166,7 @@ function AppShell() {
           <SignUpBanner />
           <ShareReferralBanner />
           <OnboardingGate />
-          <main ref={mainRef} className="flex-1 overflow-auto">
+          <main ref={mainRef} className={`flex-1 ${isMyEvents ? 'min-h-0 overflow-hidden' : 'overflow-auto'}`}>
             <Suspense fallback={null}>
               <Routes>
                 <Route path="/" element={<Home />} />
@@ -245,7 +246,7 @@ function AppShell() {
                 />
               </Routes>
             </Suspense>
-            {!isMineDashboard && (
+            {!isMineDashboard && !isMyEvents && (
               <footer className="py-3 text-center flex items-center justify-center gap-3">
                 <Link to="/privacy" className="text-[11px] text-muted hover:text-ink-soft transition">
                   Privacy Policy

@@ -23,13 +23,15 @@ describe('GoingButton (anonymous)', () => {
         const { user } = renderGoingButton('evt-1')
 
         const button = await screen.findByRole('button', { name: "I'm going" })
+        expect(button).toHaveClass('h-8', 'w-8', 'rounded-lg', 'bg-action-tile')
+        expect(button).not.toHaveClass('shadow-sm', 'border')
         expect(button.querySelector('[data-icon-family="hand"][data-icon-state="default"]')).toBeInTheDocument()
         await user.click(button)
 
         await waitFor(() => {
             const goingButton = screen.getByRole('button', { name: 'Not going' })
-            expect(goingButton).toHaveClass('text-action')
-            expect(goingButton.querySelector('[data-icon-family="hand"][data-icon-state="going"]')).toBeInTheDocument()
+            expect(goingButton).toHaveClass('text-action', 'bg-action/10')
+            expect(goingButton.querySelector('[data-icon-family="hand"][data-icon-state="going"]')).toHaveAttribute('fill', 'none')
         })
     })
 
@@ -50,8 +52,8 @@ describe('GoingButton (anonymous)', () => {
 
         await waitFor(() => {
             const goingButton = screen.getByRole('button', { name: 'Not going' })
-            expect(goingButton).toHaveClass('text-action')
-            expect(goingButton.querySelector('[data-icon-family="person"][data-icon-state="going"]')).toBeInTheDocument()
+            expect(goingButton).toHaveClass('text-action', 'bg-action/10')
+            expect(goingButton.querySelector('[data-icon-family="person"][data-icon-state="going"]')).toHaveAttribute('fill', 'none')
         })
     })
 

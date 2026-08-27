@@ -33,7 +33,12 @@ from backend.services.ip_geolocation import geolocate_ip
 from backend.services import milestone_notification_service
 from backend.services import passport as passport_service
 from backend.services import activity_instant
-from backend.services.notifications import fan_out_going, withdraw_going
+from backend.services.notifications import (
+    fan_out_going,
+    fan_out_saved,
+    withdraw_going,
+    withdraw_saved,
+)
 
 router = APIRouter(prefix="/api", tags=["tracking"])
 
@@ -203,6 +208,19 @@ def track_event_save(
                     audience=audience,
                 )
             )
+        # Fan out to subscribers when the save ends up shared (public or
+        # friends) and the actor is authenticated. Idempotent via the
+        # unique (recipient, kind, actor, event) constraint, so repeat
+        # saves don't duplicate rows.
+        if current_user is not None:
+            save_audience = existing.audience if existing is not None else audience
+            if save_audience in ("public", "friends"):
+                fan_out_saved(
+                    session,
+                    current_user,
+                    payload.event_id,
+                    audience=save_audience,
+                )
     else:
         # Unsave: when authed, remove every row for this event owned by the user
         # across all their devices so the cross-device view is consistent.
@@ -228,6 +246,10 @@ def track_event_save(
             ).first()
             if row:
                 session.delete(row)
+        # Withdraw any fanned-out save notifications so unsaving clears
+        # the activity from subscribers' feeds.
+        if current_user is not None:
+            withdraw_saved(session, current_user, payload.event_id)
 
     session.commit()
     return {"status": "tracked"}

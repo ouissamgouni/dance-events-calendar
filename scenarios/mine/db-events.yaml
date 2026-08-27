@@ -358,7 +358,6 @@ ratings:
   - event_id: evt-mine-p02
     email: me@example.com
     overall_sentiment: amazing
-    comment: "Incredible DJ set. Worth the trip to Lyon."
     aspect_scores: { music: 5, atmosphere: 4 }
     aspect_tags:
       - music:great-playlist
@@ -374,11 +373,6 @@ ratings:
     overall_sentiment: okay
     comment: "Great line-up but far too crowded on the main floor."
     aspect_scores: { music: 4, atmosphere: 3, venue-quality: 2 }
-    aspect_tags:
-      - venue-quality:crowded
-      - atmosphere:international-crowd
-    audience_tags:
-      - audience:advanced
     comment_status: approved
     status: approved
     is_anonymous: false

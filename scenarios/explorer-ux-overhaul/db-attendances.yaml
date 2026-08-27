@@ -1,3 +1,4 @@
+emit_notifications: true
 attendances:
   # ── Past event attendances (for reviews) ────────────────────────────
   # evt-ux-past-social: Vienna social reviewers

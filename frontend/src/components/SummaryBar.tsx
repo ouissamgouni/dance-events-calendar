@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { TagGroup } from '../types';
 import { REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS, type ReachFilter } from '../utils/reach';
+import PeopleAvatarTrack, { type PersonMini } from './PeopleAvatarTrack';
 
 // SummaryBar — single-line filter summary with deterministic, width-based
 // priority collapse. Fixed semantic priority (left→right):
@@ -54,6 +55,9 @@ export interface SummaryBarProps {
     interestSource: InterestSource;
     interestKind: InterestKind;
     interestUserHandles: string[];
+    /** Resolved minis for the selected handles — renders avatar faces in the
+     * people-type chip instead of a bare count. */
+    interestUserPeople?: PersonMini[];
     interestMatch: InterestMatch;
     onEditPeople?: () => void;
 
@@ -72,9 +76,13 @@ function formatPeriodLabel(startDate: string, endDate: string): string {
     };
     const start = parse(startDate);
     const end = parse(endDate);
-    if (!start || !end) return `${startDate}-${endDate}`;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    // No end cap (Tribe's all-upcoming mode).
+    if (start && !endDate) {
+        return start.getTime() === today.getTime() ? 'All upcoming' : `From ${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+    }
+    if (!start || !end) return `${startDate}-${endDate}`;
     const sameYear = start.getFullYear() === end.getFullYear();
     const currentYear = today.getFullYear();
     const fmt = (d: Date, withYear: boolean) =>
@@ -165,7 +173,7 @@ const peopleIcon = (
     </svg>
 );
 
-type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people';
+type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people' | 'people-status';
 
 export default function SummaryBar(props: SummaryBarProps) {
     const {
@@ -187,6 +195,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         interestSource,
         interestKind,
         interestUserHandles,
+        interestUserPeople,
         onEditPeople,
         onOpenFilters,
     } = props;
@@ -201,18 +210,18 @@ export default function SummaryBar(props: SummaryBarProps) {
 
     // Opt-in: a status-only selection (kind alone) never surfaces a chip.
     const peopleActive = interestSource !== null || interestUserHandles.length > 0;
-    // WHO · STATUS label, or '' when nothing is applied.
-    const peopleLabel = useMemo(() => {
+    // Split people display: a WHO chip (Following / Friends / selected-people
+    // avatar track) and a STATUS chip (Going / Interested / Both).
+    const peopleStatusLabel = useMemo(() => {
         if (!peopleActive) return '';
-        const status = interestKind === 'going' ? 'Going' : interestKind === 'saved' ? 'Interested' : 'Both';
+        return interestKind === 'going' ? 'Going' : interestKind === 'saved' ? 'Interested' : 'Both';
+    }, [peopleActive, interestKind]);
+    const peopleTypeLabel = useMemo(() => {
+        if (!peopleActive) return '';
         const n = interestUserHandles.length;
-        const who = n > 0
-            ? `${n} ${n === 1 ? 'person' : 'people'}`
-            : interestSource === 'friends'
-                ? 'Friends'
-                : 'Following';
-        return `${who} · ${status}`;
-    }, [peopleActive, interestSource, interestKind, interestUserHandles]);
+        if (n > 0) return `${n} ${n === 1 ? 'person' : 'people'}`;
+        return interestSource === 'friends' ? 'Friends' : 'Following';
+    }, [peopleActive, interestSource, interestUserHandles]);
 
     // Every selected tag group that isn't surfaced as its own pill (Dance /
     // Reach, when provided) folds into "+X" — each group counts once,
@@ -235,7 +244,10 @@ export default function SummaryBar(props: SummaryBarProps) {
         const list: CandidateKey[] = ['period', 'area'];
         if (danceGroup && danceSel.count > 0) list.push('dance');
         if (reachGroup) list.push('reach');
-        if (peopleActive && onEditPeople) list.push('people');
+        if (peopleActive && onEditPeople) {
+            list.push('people');
+            list.push('people-status');
+        }
         return list;
     }, [danceGroup, danceSel.count, reachGroup, peopleActive, onEditPeople]);
 
@@ -279,7 +291,7 @@ export default function SummaryBar(props: SummaryBarProps) {
             count += 1;
         }
         setVisibleCount(count);
-    }, [candidates, containerWidth, foldedRemainingCount, danceSel.label, areaLabel, startDate, endDate, peopleLabel, reachFilter]);
+    }, [candidates, containerWidth, foldedRemainingCount, danceSel.label, areaLabel, startDate, endDate, peopleTypeLabel, peopleStatusLabel, reachFilter]);
 
     const hiddenActivePrimaries = Math.max(0, candidates.length - visibleCount);
     const extraCount = foldedRemainingCount + hiddenActivePrimaries;
@@ -331,16 +343,31 @@ export default function SummaryBar(props: SummaryBarProps) {
                         testId={tid('summary-chip-reach')}
                     />
                 );
-            case 'people':
+            case 'people': {
+                const hasFaces = interestUserHandles.length > 0 && (interestUserPeople?.length ?? 0) > 0;
                 return (
                     <Pill
                         key="people"
-                        icon={peopleIcon}
-                        label={peopleLabel || undefined}
+                        icon={hasFaces
+                            ? <PeopleAvatarTrack people={interestUserPeople!} total={interestUserHandles.length} max={3} size="sm" />
+                            : peopleIcon}
+                        label={hasFaces ? undefined : (peopleTypeLabel || undefined)}
                         ariaLabel="People"
-                        title="People"
+                        title={`People: ${peopleTypeLabel}`}
                         onClick={onEditPeople}
                         testId={tid('summary-chip-people')}
+                    />
+                );
+            }
+            case 'people-status':
+                return (
+                    <Pill
+                        key="people-status"
+                        label={peopleStatusLabel || undefined}
+                        ariaLabel={`Status: ${peopleStatusLabel}`}
+                        title={`Status: ${peopleStatusLabel}`}
+                        onClick={onEditPeople}
+                        testId={tid('summary-chip-people-status')}
                     />
                 );
         }

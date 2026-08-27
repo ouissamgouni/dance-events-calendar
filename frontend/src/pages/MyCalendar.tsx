@@ -27,6 +27,7 @@ import { InterestFilterChips, type InterestFilterChange } from '../components/In
 import { firstNameOf, formatNameList } from '../utils/displayName';
 import type { CalendarEvent } from '../types';
 import MyEventsExperience from './MyEventsExperience';
+import { TribeCalendarsView } from './Home';
 
 type Filter = 'all' | 'saved' | 'going';
 type InterestSource = 'follows' | 'friends' | null;
@@ -818,5 +819,7 @@ function LegacyCalendar() {
 
 export default function MyCalendar() {
     const { pathname } = useLocation();
-    return pathname === '/mine/calendar' ? <MyEventsExperience /> : <LegacyCalendar />;
+    if (pathname === '/mine/calendar') return <MyEventsExperience />;
+    if (pathname === '/tribe/calendars') return <TribeCalendarsView />;
+    return <LegacyCalendar />;
 }

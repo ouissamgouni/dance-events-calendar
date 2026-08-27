@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import type { CalendarEvent } from '../types';
 import TagBadges from './TagBadges';
 import SaveEventButton from './SaveEventButton';
@@ -47,6 +47,16 @@ interface RailEventCardProps {
     tagPriorityGroups?: string[];
     /** Forces colored tag badges regardless of the feature flag. */
     forceTagColored?: boolean;
+    /** Full-width list treatment used by My Events. */
+    presentation?: 'rail' | 'my-events';
+    /** Context-owned controls rendered without triggering the card. */
+    actions?: ReactNode;
+    /** Hide the avatar track when the viewer is the only attendee. */
+    hideIfOnlyCurrentUser?: boolean;
+    /** Past-list treatment: neutral date rail, no image, and no social metadata. */
+    pastPresentation?: boolean;
+    /** Content rendered below My Events metadata with its own interaction target. */
+    supplementalContent?: ReactNode;
 }
 
 function formatRailDate(value: string): string {
@@ -91,8 +101,14 @@ export default function RailEventCard({
     tagSingleLine = false,
     tagPriorityGroups,
     forceTagColored = false,
+    presentation = 'rail',
+    actions,
+    hideIfOnlyCurrentUser = false,
+    pastPresentation = false,
+    supplementalContent,
 }: RailEventCardProps) {
     const { tagsPerCard } = useFeatureFlags();
+    const [imageFailed, setImageFailed] = useState(false);
     const start = new Date(event.start);
     const startLabel = formatRailDate(event.start);
     const label = `Open ${event.title}, ${contextLabel} on ${startLabel}`;
@@ -107,6 +123,63 @@ export default function RailEventCard({
 
     const handleMouseEnter = useCallback(() => onHover?.(event.event_id), [onHover, event.event_id]);
     const handleMouseLeave = useCallback(() => onHover?.(null), [onHover]);
+
+    if (presentation === 'my-events') {
+        const time = event.all_day
+            ? 'All day'
+            : start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        return (
+            <div
+                className="group relative flex min-h-28 w-full overflow-hidden rounded-card border border-card-line bg-surface text-left shadow-sm transition hover:border-line focus-within:ring-2 focus-within:ring-action/30"
+                data-testid="my-events-row"
+            >
+                <button
+                    type="button"
+                    aria-label={label}
+                    onClick={() => onClick(event)}
+                    className="absolute inset-0 z-0 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-action/30"
+                />
+                <div className="pointer-events-none relative z-[1] flex shrink-0 self-stretch">
+                    <EventDateRail start={start} tone={pastPresentation ? 'neutral' : 'default'} />
+                </div>
+                {!pastPresentation && event.image_url && !imageFailed && (
+                    <img
+                        src={event.image_url}
+                        alt=""
+                        className="my-3 ml-3 h-20 w-20 shrink-0 rounded-card object-cover"
+                        onError={() => setImageFailed(true)}
+                        data-testid="my-events-row-image"
+                    />
+                )}
+                <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 flex-col justify-center px-3 py-3">
+                    <h3 className="truncate text-sm font-semibold text-ink group-hover:text-action sm:text-base" title={event.title}>{event.title}</h3>
+                    <p className="mt-1 truncate text-sm text-ink-soft">{[time, location].filter(Boolean).join(' · ')}</p>
+                    {!pastPresentation && <div className="mt-2 flex min-h-6 items-center gap-2">
+                        <AttendeeAvatarStack
+                            eventId={event.event_id}
+                            size="md"
+                            friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                            hideIfOnlyCurrentUser={hideIfOnlyCurrentUser}
+                        />
+                        {actions && (
+                            <div
+                                className="ml-auto flex items-center gap-1"
+                                onClick={(clickEvent) => clickEvent.stopPropagation()}
+                                onKeyDown={(keyEvent) => keyEvent.stopPropagation()}
+                            >
+                                {actions}
+                            </div>
+                        )}
+                    </div>}
+                    {supplementalContent && (
+                        <div className="pointer-events-auto mt-3" onClick={(clickEvent) => clickEvent.stopPropagation()}>
+                            {supplementalContent}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -162,11 +235,6 @@ export default function RailEventCard({
                         <div className="mt-1 flex items-center gap-3">
                             <span className="truncate text-xs font-medium text-ink-soft">{startLabel}</span>
                             {extraBadge}
-                            <AttendeeAvatarStack
-                                eventId={event.event_id}
-                                size="sm"
-                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
-                            />
                         </div>
                     )}
                     {location && (
@@ -178,13 +246,14 @@ export default function RailEventCard({
                             {location}
                         </p>
                     )}
-                    {dateRail && (
+                    {(dateRail || showExtras) && (
                         <div className="mt-1 flex min-w-0 items-center gap-3" data-testid="rail-card-attendees">
-                            {extraBadge}
+                            {dateRail && extraBadge}
                             <AttendeeAvatarStack
                                 eventId={event.event_id}
-                                size="sm"
+                                size="md"
                                 friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                                hideIfOnlyCurrentUser={hideIfOnlyCurrentUser}
                             />
                         </div>
                     )}

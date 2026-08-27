@@ -42,13 +42,25 @@ test_plan:
         sub-page (My Events, Passport, Profiles, Reviews, Settings).
 
     - id: 3
-      title: "My Events lists saved + upcoming going events without sub-tabs"
+      title: "My Events uses approved tabs, sticky controls and shared cards"
       description: "Open the My Events tab (/mine/calendar)."
       expected: >
-        The calendar shows my 8 upcoming saved + going events across
-        Europe (going first). There is NO internal "My events / From
-        people I follow" toggle and NO back button — the section tab bar
-        is the only navigation.
+        The header reads "My Events" with one share icon and no ellipsis or
+        breadcrumb. Equal-width Upcoming, Saved and Past tabs use blue text
+        and a thin underline only for the active tab. The compact secondary bar
+        hides the active view: List offers Map then Calendar, while Calendar and
+        Map offer List first; Add event remains last. Events are grouped
+        under strong month headings in rounded cards with a left date rail,
+        event details, and no right chevron or sequence number. Upcoming has no
+        Save/Going action and Saved has bookmark and small hand actions. Past
+        keeps the same card structure with a neutral date rail but no images,
+        event tags or attendee avatars. Reviewed Past cards show YOUR REVIEW,
+        the mood emoji and label, a comment clamped to two lines when present,
+        and at most two review tags plus +N. Unreviewed cards show Write a review.
+        Tapping review content opens the view/edit review flow while tapping the
+        rest of the card opens event details. No empty comment or tag row appears.
+        An Upcoming card does not show an avatar stack when the viewer is its
+        only attendee.
 
     - id: 4
       title: "Passport reflects the seeded journey and unlocked milestones"
@@ -81,3 +93,68 @@ test_plan:
       expected: >
         Navigates to /account (unchanged Settings page). Its in-page nav
         bar includes Profile, Notifications and Privacy pills.
+
+    - id: 8
+      title: "Calendar fills remaining space with a range-scoped map"
+      description: "From My Events, open Calendar and navigate backward and forward through seeded events."
+      expected: >
+        The My Events header, tabs and compact controls remain visible. Calendar
+        defaults to a 3-week range with previous, Today and next navigation.
+        Every event overlapping the displayed range appears in the calendar.
+        When at least 200px remains between the calendar and app navigation, a
+        map fills exactly that space and centers only mapped events overlapping
+        the visible range. With less than 200px, no map is shown. The map uses
+        cooperative gestures and has no calendar/map toggle. Selecting a
+        calendar or map event opens its event modal. The compact bar hides
+        Calendar while this view is active and offers List, Map and Add event.
+
+    - id: 9
+      title: "Standalone map preserves chronological navigation"
+      description: "From Upcoming, open Map at 390x844 and desktop widths, then switch tabs."
+      expected: >
+        CARTO's Positron vector basemap renders crisply without an API-key
+        watermark. The map occupies its own flex row and fills the available space
+        between the List/Calendar/Add bar and the preview below, with no page scrolling.
+        The compact bar hides Map while this view is active and offers List, Calendar
+        and Add event. Every mappable event in the active tab appears, independent
+        of Calendar's visible range, with chronologically numbered pins and initially
+        frames all pins within the unobstructed map canvas with adaptive tight margins.
+        Route displays as a visual toggle switch (track and thumb) with action-blue
+        when on and slate when off; it defaults on for Upcoming/Past and off for
+        Saved; switching Route draws or removes curved arrows and changes pin/preview
+        labels between 1 and #1. One-finger gestures move the map normally. The control
+        above the Route toggle fits all mapped events in the active tab with the same
+        adaptive margins. The preview is a separate row below the map, stays visible,
+        and has no card border, image, avatars or actions: its sequence number sits above
+        the left date rail, followed only by title, time and location. Tapping the
+        card opens the event modal; previous/next buttons, swipe and keyboard arrows
+        move chronologically. A count of events without coordinates links to List.
+
+    - id: 10
+      title: "Switching My Events views resets scroll position"
+      description: "Scroll deep in List, switch through Calendar and Map, then return to List."
+      expected: >
+        Each newly selected view starts at its own top rather than inheriting
+        the previous view's scroll level. Changing tabs or selecting a map pin
+        does not create an unrelated page scroll jump.
+
+    - id: 11
+      title: "Add event is contextual and confirms before mutation"
+      description: "Use Add event from Upcoming, Saved and Past; also search for a missing event."
+      expected: >
+        Search stays inline and never navigates to Explore. Its initial one-line
+        prompt prefixes "Type at least 2 letters" with the upcoming/past scope.
+        Results use the same rich cards and keyboard selection as header event
+        search, but do not navigate or open an event modal. Tapping a result card asks for confirmation before
+        Going, Save or Attended state changes. Already-applied events are absent.
+        Empty results offer Suggest an event.
+
+    - id: 12
+      title: "Share and export uses the approved bottom sheet"
+      description: "Tap the My Events share icon."
+      expected: >
+        A Share & export bottom sheet opens with Share My Events, Subscribe in
+        another calendar, an Export heading, Export calendar (.ics), and Export
+        spreadsheet (.xlsx), using the approved descriptions. It contains no RSS.
+        Actions cover the union of all saved and attended events; backdrop, close
+        button and Escape dismiss the sheet, and exports download their files.

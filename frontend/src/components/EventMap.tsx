@@ -31,6 +31,12 @@ const DEFAULT_AREA_CENTER: [number, number] = [
 ];
 const DEFAULT_ZOOM = 5;
 const CITY_ZOOM = 13;
+const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const CARTO_BASEMAP_KEY = (import.meta.env.VITE_CARTO_BASEMAP_KEY as string | undefined)?.trim();
+const BASEMAP_URL = CARTO_BASEMAP_KEY
+    ? `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(CARTO_BASEMAP_KEY)}`
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /**
  * Pick a fitBounds padding that won't cause Leaflet to fall back to a much
@@ -158,16 +164,15 @@ function escapeMarkerText(value: string): string {
         .replaceAll("'", '&#039;');
 }
 
-function makeJourneyIcon(sequence: number, label: string, selected: boolean, routeOn: boolean): L.DivIcon {
+function makeJourneyIcon(sequence: number, label: string, selected: boolean): L.DivIcon {
     const circleSize = selected ? 30 : 24;
     const circleLeft = (100 - circleSize) / 2;
-    const number = routeOn ? String(sequence) : `#${sequence}`;
     return L.divIcon({
         className: '',
         iconSize: [100, 48],
         iconAnchor: [50, circleSize / 2],
         html: `<div style="position:relative;width:100px;height:48px;pointer-events:none;font-family:inherit;">
-            <span style="position:absolute;left:${circleLeft}px;top:0;width:${circleSize}px;height:${circleSize}px;border-radius:9999px;background:#2563eb;color:white;border:${selected ? '3px' : '2px'} solid white;box-shadow:${selected ? '0 0 0 4px rgba(37,99,235,.2),0 2px 8px rgba(15,23,42,.25)' : '0 2px 6px rgba(15,23,42,.2)'};display:flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:${sequence >= 10 ? '9px' : '11px'};font-weight:800;line-height:1;">${number}</span>
+            <span style="position:absolute;left:${circleLeft}px;top:0;width:${circleSize}px;height:${circleSize}px;border-radius:9999px;background:#2563eb;color:white;border:${selected ? '3px' : '2px'} solid white;box-shadow:${selected ? '0 0 0 4px rgba(37,99,235,.2),0 2px 8px rgba(15,23,42,.25)' : '0 2px 6px rgba(15,23,42,.2)'};display:flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:${sequence >= 10 ? '9px' : '11px'};font-weight:800;line-height:1;">${sequence}</span>
             <span style="position:absolute;left:0;right:0;top:${circleSize + 2}px;text-align:center;color:#172033;font-size:10px;font-weight:700;line-height:12px;text-shadow:0 1px 2px white,0 -1px 2px white,1px 0 2px white,-1px 0 2px white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeMarkerText(label)}</span>
         </div>`,
     });
@@ -246,10 +251,14 @@ interface Props {
     compact?: boolean;
     /** Require two-finger touch gestures so one finger can scroll the page. */
     cooperativeGestures?: boolean;
+    /** Show a control below zoom that fits every currently rendered marker. */
+    fitMarkersControl?: boolean;
     /** Chronological sequence labels for the My Events journey map. */
     journeySequence?: Record<string, number>;
-    /** Draw curved sequence arrows and omit the # prefix from journey pins. */
+    /** Draw curved sequence arrows between journey pins. */
     journeyRouteOn?: boolean;
+    /** Toggle the journey route lines from a map control. */
+    onJourneyRouteToggle?: () => void;
     /** Selected journey event, emphasized without changing zoom. */
     journeySelectedEventId?: string | null;
 }
@@ -446,13 +455,43 @@ function JourneyRouteLayer({ events }: { events: CalendarEvent[] }) {
     );
 }
 
-function JourneySelectionController({ event }: { event: CalendarEvent | null }) {
+function JourneyViewportController({
+    events,
+    event,
+}: {
+    events: CalendarEvent[];
+    event: CalendarEvent | null;
+}) {
     const map = useMap();
+    const positions = useMemo<[number, number][]>(
+        () => events
+            .filter((item) => item.latitude != null && item.longitude != null)
+            .map((item) => [item.latitude!, item.longitude!]),
+        [events],
+    );
+
+    useEffect(() => {
+        if (positions.length === 0) return;
+        const frame = window.requestAnimationFrame(() => {
+            map.invalidateSize({ pan: false });
+            if (positions.length === 1) {
+                map.setView(positions[0], CITY_ZOOM, { animate: false });
+                return;
+            }
+            const padding = adaptiveMarkerPadding(map);
+            map.fitBounds(L.latLngBounds(positions), {
+                padding: padding,
+                animate: false,
+            });
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [map, positions]);
+
     useEffect(() => {
         if (event?.latitude == null || event.longitude == null) return;
+        const padding = adaptiveMarkerPadding(map);
         map.panInside(L.latLng(event.latitude, event.longitude), {
-            paddingTopLeft: L.point(48, 64),
-            paddingBottomRight: L.point(48, 220),
+            padding: padding,
             animate: true,
         });
     }, [event, map]);
@@ -740,6 +779,116 @@ function RecenterControl({ recenterTo }: { recenterTo: [number, number] }) {
     return null;
 }
 
+function FitMarkersControl({ positions }: { positions: [number, number][] }) {
+    const map = useMap();
+    useEffect(() => {
+        if (positions.length === 0) return;
+        const control = new L.Control({ position: 'topleft' });
+        control.onAdd = () => {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            const link = L.DomUtil.create('a', '', container) as HTMLAnchorElement;
+            link.href = '#';
+            link.title = 'Fit current events';
+            link.setAttribute('role', 'button');
+            link.setAttribute('aria-label', 'Fit current events');
+            link.style.display = 'flex';
+            link.style.alignItems = 'center';
+            link.style.justifyContent = 'center';
+            link.innerHTML =
+                '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" ' +
+                'viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>' +
+                '<circle cx="12" cy="12" r="2"/></svg>';
+            L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.on(link, 'click', (event) => {
+                L.DomEvent.stop(event);
+                map.invalidateSize();
+                if (positions.length === 1) {
+                    map.setView(positions[0], CITY_ZOOM, { animate: true });
+                    return;
+                }
+                map.fitBounds(L.latLngBounds(positions), { padding: adaptiveMarkerPadding(map), animate: true });
+            });
+            return container;
+        };
+        control.addTo(map);
+        return () => {
+            control.remove();
+        };
+    }, [map, positions]);
+    return null;
+}
+
+function JourneyRouteControl({ routeOn, onToggle }: { routeOn: boolean; onToggle: () => void }) {
+    const map = useMap();
+    const buttonRef = useRef<HTMLButtonElement | null>(null);
+    const onToggleRef = useRef(onToggle);
+
+    useEffect(() => {
+        onToggleRef.current = onToggle;
+    }, [onToggle]);
+
+    useEffect(() => {
+        const control = new L.Control({ position: 'topright' });
+        control.onAdd = () => {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            const button = L.DomUtil.create('button', '', container) as HTMLButtonElement;
+            button.type = 'button';
+            button.style.width = '30px';
+            button.style.height = '30px';
+            button.style.display = 'flex';
+            button.style.alignItems = 'center';
+            button.style.justifyContent = 'center';
+            button.style.padding = '0';
+            button.style.background = 'var(--color-surface, #fff)';
+            button.style.border = '0';
+            button.style.borderRadius = '2px';
+            button.style.cursor = 'pointer';
+            button.innerHTML =
+                '<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="26" height="26" ' +
+                'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+                'stroke-linecap="round" stroke-linejoin="round">' +
+                '<path data-route-pin d="M8.25 3.25a3.5 3.5 0 0 0-3.5 3.5c0 2.65 3.5 6.75 3.5 6.75s3.5-4.1 3.5-6.75a3.5 3.5 0 0 0-3.5-3.5Z"/>' +
+                '<circle cx="8.25" cy="6.75" r="1.15" fill="var(--color-surface, #fff)"/>' +
+                '<path d="m9.4 14.45 5.2-2.9"/>' +
+                '<path data-route-pin d="M16.25 6.75a3.5 3.5 0 0 0-3.5 3.5c0 2.65 3.5 6.75 3.5 6.75s3.5-4.1 3.5-6.75a3.5 3.5 0 0 0-3.5-3.5Z"/>' +
+                '<circle cx="16.25" cy="10.25" r="1.15" fill="var(--color-surface, #fff)"/>' +
+                '</svg>';
+            L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.disableScrollPropagation(container);
+            L.DomEvent.on(button, 'click', (event) => {
+                L.DomEvent.stop(event);
+                onToggleRef.current();
+            });
+            buttonRef.current = button;
+            return container;
+        };
+        control.addTo(map);
+        return () => {
+            buttonRef.current = null;
+            control.remove();
+        };
+    }, [map]);
+
+    useEffect(() => {
+        const button = buttonRef.current;
+        if (!button) return;
+        const label = routeOn ? 'Hide route' : 'Show route';
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', String(routeOn));
+        button.style.color = routeOn
+            ? 'var(--color-action, #2563eb)'
+            : 'var(--color-text-ink-soft, #667085)';
+        button.querySelectorAll<SVGPathElement>('[data-route-pin]').forEach((pin) => {
+            pin.setAttribute('fill', routeOn ? 'currentColor' : 'none');
+        });
+    }, [routeOn]);
+
+    return null;
+}
+
 function MarkerClusterLayer({
     events,
     hoveredEventId,
@@ -764,7 +913,6 @@ function MarkerClusterLayer({
     disablePopups,
     minimalPopup,
     journeySequence,
-    journeyRouteOn,
     journeySelectedEventId,
 }: {
     events: CalendarEvent[];
@@ -790,7 +938,6 @@ function MarkerClusterLayer({
     disablePopups?: boolean;
     minimalPopup?: boolean;
     journeySequence?: Record<string, number>;
-    journeyRouteOn: boolean;
     journeySelectedEventId?: string | null;
 }) {
     const map = useMap();
@@ -843,7 +990,7 @@ function MarkerClusterLayer({
             const journeyLabel = event.city || event.location?.split(',')[0]?.trim() || event.title;
             const marker = L.marker([event.latitude!, event.longitude!], {
                 icon: journeyNumber
-                    ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelectedEventId === event.event_id, journeyRouteOn)
+                    ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelectedEventId === event.event_id)
                     : makeColoredIcon(eventColorBarColor, decorations),
             });
             let popupHost: HTMLDivElement | null = null;
@@ -880,7 +1027,7 @@ function MarkerClusterLayer({
             markerRefs.current.clear();
             setPopupPortals([]);
         };
-    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, journeyRouteOn, journeySelectedEventId, journeySequence, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, journeySelectedEventId, journeySequence, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
 
     // Swap the hovered marker's icon in place (highlighted vs normal) without
     // rebuilding the whole layer. Rebuilding on every hover change (as the
@@ -907,10 +1054,10 @@ function MarkerClusterLayer({
             const journeyNumber = journeySequence?.[event.event_id];
             const journeyLabel = event.city || event.location?.split(',')[0]?.trim() || event.title;
             marker.setIcon(journeyNumber
-                ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelectedEventId === event.event_id || isHovered, journeyRouteOn)
+                ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelectedEventId === event.event_id || isHovered)
                 : isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations));
         });
-    }, [hoveredEventId, events, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs, journeyRouteOn, journeySelectedEventId, journeySequence]);
+    }, [hoveredEventId, events, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs, journeySelectedEventId, journeySequence]);
 
 
 
@@ -936,7 +1083,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, journeySequence, journeyRouteOn = false, journeySelectedEventId = null }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -1007,6 +1154,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 : { center: DEFAULT_AREA_CENTER, zoom: DEFAULT_ZOOM })}
             className="h-full w-full shadow-sm"
             scrollWheelZoom={true}
+            maxZoom={20}
             zoomSnap={0.5}
             zoomDelta={0.5}
             wheelPxPerZoomLevel={120}
@@ -1014,8 +1162,10 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
             attributionControl={!compact}
         >
             <TileLayer
-                attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                attribution={CARTO_BASEMAP_KEY ? CARTO_ATTRIBUTION : OSM_ATTRIBUTION}
+                url={BASEMAP_URL}
+                subdomains={CARTO_BASEMAP_KEY ? 'abcd' : 'abc'}
+                maxZoom={20}
             />
             {areaOverlay && (
                 <>
@@ -1075,9 +1225,11 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 preserveViewport={preserveViewport ?? false}
             />
             <MapResizeController />
-            <JourneySelectionController event={journeySelectedEvent} />
+            {journeySequence && <JourneyViewportController events={geoEvents} event={journeySelectedEvent} />}
             <FlyToAreaController flyToArea={flyToArea} flyToAreaToken={flyToAreaToken} />
             {recenterTo && <RecenterControl recenterTo={recenterTo} />}
+            {fitMarkersControl && <FitMarkersControl positions={positions} />}
+            {onJourneyRouteToggle && <JourneyRouteControl routeOn={journeyRouteOn} onToggle={onJourneyRouteToggle} />}
             <BoundsReporter onBoundsChange={onBoundsChange} />
             <MarkerClusterLayer
                 events={geoEvents}
@@ -1103,7 +1255,6 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 disablePopups={disablePopups}
                 minimalPopup={minimalPopup}
                 journeySequence={journeySequence}
-                journeyRouteOn={journeyRouteOn}
                 journeySelectedEventId={journeySelectedEventId}
             />
         </MapContainer>

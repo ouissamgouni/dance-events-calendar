@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useRatingAggregate, useInvalidateRatingAggregate } from '../context/RatingAggregatesContext';
-import { useMyRating, useUpsertMyRating } from '../context/MyRatingsContext';
+import { useMyRating, useMyRatingsLoaded, useUpsertMyRating } from '../context/MyRatingsContext';
 import RateEventModal from './RateEventModal';
 import type { EventRating } from '../types';
 import { trackRatingModalOpened, type RatingEntryPoint } from '../utils/tracking';
+import { SENTIMENT_META } from '../utils/reviewSentiment';
+import { Pencil } from 'lucide-react';
 
 interface Props {
     eventId: string;
-    appearance?: 'icon' | 'pill' | 'count';
+    appearance?: 'icon' | 'pill' | 'count' | 'preview';
     size?: 'sm' | 'md';
     stopPropagation?: boolean;
     className?: string;
@@ -31,6 +33,10 @@ interface Props {
      * reviewed, so the button renders disabled with an explanatory tooltip.
      * Defaults to true (reviewable) when unknown. */
     isPast?: boolean;
+    /** Labels for the current user's selected aspect/audience tag ids. */
+    reviewTagLabels?: Map<number, string>;
+    /** Open the review modal here instead of navigating through event details. */
+    inlineModal?: boolean;
 }
 
 export default function RateEventButton({
@@ -47,12 +53,15 @@ export default function RateEventButton({
     isEventDetailPage,
     showCount = true,
     isPast = true,
+    reviewTagLabels,
+    inlineModal = false,
 }: Props) {
     const { user } = useAuth();
     const location = useLocation();
     const aggregate = useRatingAggregate(eventId);
     const invalidateAggregate = useInvalidateRatingAggregate();
     const myRatingFromCtx = useMyRating(eventId);
+    const ratingsLoaded = useMyRatingsLoaded();
     const upsertMyRating = useUpsertMyRating();
     const [open, setOpen] = useState(false);
     const [showSignIn, setShowSignIn] = useState(false);
@@ -125,7 +134,8 @@ export default function RateEventButton({
             setShowSignIn((s) => !s);
             return;
         }
-        trackRatingModalOpened(entryPoint ?? (appearance === 'count' ? 'icon' : appearance), !!myRating);
+        const trackedEntryPoint = appearance === 'count' || appearance === 'preview' ? 'icon' : appearance;
+        trackRatingModalOpened(entryPoint ?? trackedEntryPoint, !!myRating);
         setOpen(true);
     };
 
@@ -162,8 +172,49 @@ export default function RateEventButton({
 
     const countText = showCount && hasAggregate ? String(aggCount) : null;
 
+    const selectedTagIds = myRating
+        ? [...myRating.aspect_tag_ids, ...myRating.audience_tag_ids]
+        : [];
+    const selectedTagLabels = selectedTagIds
+        .map((tagId) => reviewTagLabels?.get(tagId))
+        .filter((tagLabel): tagLabel is string => !!tagLabel);
+
+    const previewContent = myRating?.overall_sentiment ? (
+        <span className="block text-left">
+            <span className="block text-[10px] font-semibold uppercase text-ink-soft">Your review</span>
+            <span className="mt-1 line-clamp-2 block text-sm leading-5 text-ink">
+                {SENTIMENT_META[myRating.overall_sentiment].emoji}{' '}
+                <span className="font-medium">{SENTIMENT_META[myRating.overall_sentiment].label}</span>
+                {myRating.comment && (
+                    <span className="italic"> · “{myRating.comment}”</span>
+                )}
+            </span>
+            {selectedTagLabels.length > 0 && (
+                <span className="mt-2 flex flex-wrap items-center gap-2">
+                    {selectedTagLabels.slice(0, 2).map((tagLabel, index) => (
+                        <span key={`${selectedTagIds[index]}-${tagLabel}`} className="bg-emerald-50 px-3 py-1 text-xs font-medium text-success">
+                            {tagLabel}
+                        </span>
+                    ))}
+                    {selectedTagLabels.length > 2 && (
+                        <span className="bg-canvas px-2 py-1 text-xs font-medium text-ink-soft">+{selectedTagLabels.length - 2}</span>
+                    )}
+                </span>
+            )}
+        </span>
+    ) : (
+        <span className="flex items-center gap-2 bg-action/5 px-3 py-2 text-sm font-medium text-action">
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+            Write a review
+        </span>
+    );
+
+    if (appearance === 'preview' && !ratingsLoaded) {
+        return <span className="block h-16 animate-pulse bg-canvas" aria-label="Loading your review" />;
+    }
+
     // Common content for both button and link
-    const buttonContent = appearance === 'pill' ? (
+    const buttonContent = appearance === 'preview' ? previewContent : appearance === 'pill' ? (
         <>
             <span className="relative inline-flex">
                 {ReviewIcon}
@@ -199,11 +250,13 @@ export default function RateEventButton({
         </>
     );
 
-    const buttonClasses = appearance === 'pill'
-        ? `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-ink-soft bg-surface border-line hover:bg-canvas'} ${className}`.trim()
-        : appearance === 'count'
-            ? `inline-flex items-center gap-1 text-ink-soft hover:text-ink ${className}`.trim()
-            : `transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-sky-600 hover:text-sky-700' : 'text-slate-300 hover:text-ink-soft'} ${className}`.trim();
+    const buttonClasses = appearance === 'preview'
+        ? `block w-full text-left ${className}`.trim()
+        : appearance === 'pill'
+            ? `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-ink-soft bg-surface border-line hover:bg-canvas'} ${className}`.trim()
+            : appearance === 'count'
+                ? `inline-flex items-center gap-1 text-ink-soft hover:text-ink ${className}`.trim()
+                : `transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-sky-600 hover:text-sky-700' : 'text-slate-300 hover:text-ink-soft'} ${className}`.trim();
 
     // Upcoming editions can't be reviewed — hide the button entirely (except the
     // read-only "count" appearance, which is naturally empty).
@@ -216,7 +269,7 @@ export default function RateEventButton({
     // "Review" CTAs (pill/icon) target the `/review` deep-link route so they
     // auto-open the Rate modal on arrival — same as clicking Review on the
     // detail page itself.
-    if (!isOnEventDetailPage) {
+    if (!isOnEventDetailPage && !inlineModal) {
         const linkTo = appearance === 'count'
             ? `/event/${eventId}#community`
             : `/event/${eventId}/review`;

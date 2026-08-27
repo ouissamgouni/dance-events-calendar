@@ -80,6 +80,10 @@
   /* action / selected / link */
   --color-action-strong: #1d4ed8;
   /* action hover/pressed */
+  --color-action-tile: #f5f6f7;
+  /* neutral icon-action surface */
+  --color-saved: #4b5563;
+  /* selected Save state */
   --color-ink: #172033;
   /* main text */
   --color-ink-soft: #667085;
@@ -730,8 +734,7 @@ body {
 }
 
 .event-card-highlighted .event-card-date {
-  border-left: 3px solid rgba(37, 99, 235, 0.4);
-  padding-left: 0.5rem;
+  /* border-left removed */
 }
 
 .event-card-past {
@@ -743,13 +746,11 @@ body {
 }
 
 .event-card-user-going .event-card-date {
-  border-left: 3px solid rgba(7, 148, 85, 0.4);
-  padding-left: 0.5rem;
+  /* border-left removed */
 }
 
 .event-card-user-saved .event-card-date {
-  border-left: 3px solid rgba(152, 162, 179, 0.4);
-  padding-left: 0.5rem;
+  /* border-left removed */
 }
 
 .event-card-offmap-badge {

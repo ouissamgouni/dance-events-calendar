@@ -22,5 +22,10 @@ settings:
   tag_as_badge_enabled: true
   my_events_route_enabled: true
 
+  # Event card redesign
+  event_card_rsvp_action_in_avatar_row_enabled: true
+  event_card_rsvp_and_save_stats_next_to_action_enabled: true
+  for_you_event_cards_date_first_layout_enabled: true
+
   # Experiment under test: two-line, icon-prefixed filter summary bar with
   # the Map/Calendar controls pinned to its right.

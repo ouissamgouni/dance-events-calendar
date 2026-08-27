@@ -761,7 +761,7 @@ class SiteSettingsResponse(BaseModel):
     your_next_events_rail_enabled: bool = True
     # Tribe > Calendars "Your Network" snapshot of upcoming events people
     # you follow are going to. When False, the snapshot is hidden.
-    network_going_snapshot_enabled: bool = True
+    network_going_snapshot_enabled: bool = False
     # My Events map journey arrows and per-tab Route control.
     my_events_route_enabled: bool = False
     # Show 'My Events' as a top-level navigation entry (admin feature).
@@ -850,6 +850,15 @@ class SiteSettingsResponse(BaseModel):
     # The admin Series panel and manual "Scan now"/"Group as series" actions
     # are always available regardless of this flag.
     series_auto_detect_enabled: bool = False
+    # When True, the event card's "I'm going" RSVP action moves onto the
+    # attendee avatar row (right-aligned) instead of the top-right cluster.
+    event_card_rsvp_action_in_avatar_row_enabled: bool = False
+    # When True, the save/going counts render next to their action buttons
+    # on event cards; when False the counts are hidden.
+    event_card_rsvp_and_save_stats_next_to_action_enabled: bool = False
+    # When True, the "You might like" and "New" For-you trails render the
+    # new date-first event card layout instead of the legacy rail card.
+    for_you_event_cards_date_first_layout_enabled: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -2226,8 +2235,21 @@ class NotificationItem(BaseModel):
     event_id: Optional[str] = None
     event_title: Optional[str] = None
     event_start: Optional[datetime] = None
+    # Optional event cover image, when the linked event has one. Rendered as
+    # a small thumbnail on the feed row (no placeholder when absent).
+    event_image_url: Optional[str] = None
     actor: NotificationActor
+    # Aggregation (multi-person rows): ``actors`` lists the distinct actors
+    # collapsed into this row (most-recent first, capped), ``actor_count`` is
+    # the total distinct actor count, and ``member_ids`` are all the raw
+    # notification ids folded into this group (so a single mark-read clears
+    # them all). For non-aggregated rows ``actors == [actor]`` and
+    # ``actor_count == 1``.
+    actors: list[NotificationActor] = []
+    actor_count: int = 1
+    member_ids: list[int] = []
     context: Optional[str] = None
+
     subject_key: Optional[str] = None
     # Optional narrative field for kinds that benefit from additional context
     # beyond name/context. Used in milestone notifications.

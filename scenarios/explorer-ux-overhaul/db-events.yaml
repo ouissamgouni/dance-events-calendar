@@ -18,6 +18,7 @@
 # All events are price-free and tagged with the default explorer tags
 # so the default landing (no tag filter applied) shows them all.
 base_week: 0
+emit_notifications: true
 events:
   # ── Week 0 — same-day cluster for day-grouping QA ─────────────────
   - id: evt-ux-001
@@ -34,7 +35,7 @@ events:
     country: France
     country_code: FR
     start: w0 Fri 20:00
-    end: w0 Fri 23:00
+    end: w1 Mon 09:00
     price_is_free: true
     tags:
       [
@@ -42,7 +43,7 @@ events:
         "dance-style:salsa",
         "dance-style:mambo",
         "level:all-levels",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "scale:medium",
       ]
@@ -67,7 +68,7 @@ events:
         "dance-style:bachata",
         "dance-style:kizomba",
         "level:all-levels",
-        reach:local,
+        "reach:local",
         "venue:indoor",
         "misc:trip",
       ]
@@ -91,7 +92,7 @@ events:
         "format:class",
         "dance-style:salsa",
         "level:beginner-friendly",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "scale:small",
       ]
@@ -118,7 +119,7 @@ events:
         "dance-style:salsa",
         "dance-style:cuban",
         "level:intermediate",
-        reach:local,
+        "reach:local",
         "venue:outdoor",
         "scale:medium",
       ]
@@ -134,8 +135,8 @@ events:
     city: Rome
     country: Italy
     country_code: IT
-    start: w0 Sun 19:00
-    end: w0 Sun 23:00
+    start: w0 Fri 20:00
+    end: w1 Mon 09:00
     price_is_free: true
     tags:
       [
@@ -143,7 +144,7 @@ events:
         "dance-style:bachata",
         "dance-style:semba",
         "level:all-levels",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "misc:trip",
       ]
@@ -169,7 +170,7 @@ events:
         "format:practice",
         "dance-style:salsa",
         "dance-style:rueda",
-        reach:local,
+        "reach:local",
         "venue:indoor",
         "level:intermediate",
       ]
@@ -194,8 +195,8 @@ events:
     location: Volksgarten, Vienna, Austria
     latitude: 48.2082
     longitude: 16.3669
-    start: w1 Wed 19:30
-    end: w1 Wed 21:00
+    start: w1 Fri 20:00
+    end: w2 Mon 09:00
     price_is_free: true
     tags:
       [
@@ -203,7 +204,7 @@ events:
         "dance-style:bachata",
         "dance-style:kizomba",
         "level:beginner-friendly",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "scale:small",
       ]
@@ -216,15 +217,15 @@ events:
     location: Dlouha, Prague, Czechia
     latitude: 50.0894
     longitude: 14.4256
-    start: w1 Fri 21:00
-    end: w1 Sat 01:00
+    start: w1 Fri 20:00
+    end: w2 Mon 09:00
     price_is_free: true
     tags:
       [
         "format:social",
         "dance-style:salsa",
         "dance-style:mambo",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "scale:large",
         "level:all-levels",
@@ -248,7 +249,7 @@ events:
         "format:class",
         "dance-style:salsa",
         "dance-style:cuban",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "level:intermediate",
         "scale:small",
@@ -270,7 +271,7 @@ events:
         "format:workshop",
         "dance-style:bachata",
         "dance-style:zouk",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "level:intermediate",
         "scale:medium",
@@ -292,7 +293,7 @@ events:
         "format:social",
         "format:day-social",
         "dance-style:salsa",
-        reach:local,
+        "reach:local",
         "venue:indoor",
         "scale:large",
         "level:all-levels",
@@ -309,15 +310,15 @@ events:
     location: El Born, Barcelona, Spain
     latitude: 41.3851
     longitude: 2.1734
-    start: w4 Mon 20:00
-    end: w4 Mon 22:00
+    start: w4 Fri 20:00
+    end: w5 Mon 09:00
     price_is_free: true
     tags:
       [
         "format:practice",
         "dance-style:salsa",
         "dance-style:rueda",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "level:intermediate",
         "scale:medium",
@@ -339,7 +340,7 @@ events:
         "format:social",
         "dance-style:bachata",
         "dance-style:semba",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "level:intermediate",
         "scale:medium",
@@ -362,7 +363,7 @@ events:
         "format:workshop",
         "dance-style:salsa",
         "dance-style:mambo",
-        reach:local,
+        "reach:local",
         "venue:indoor",
         "level:intermediate",
         "scale:medium",
@@ -379,15 +380,15 @@ events:
     location: Praga, Warsaw, Poland
     latitude: 52.2297
     longitude: 21.0122
-    start: w6 Wed 20:00
-    end: w6 Wed 23:00
+    start: w6 Fri 20:00
+    end: w7 Mon 09:00
     price_is_free: true
     tags:
       [
         "format:social",
         "dance-style:salsa",
         "dance-style:cuban",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "level:all-levels",
         "scale:medium",
@@ -409,7 +410,7 @@ events:
         "format:workshop",
         "dance-style:bachata",
         "dance-style:kizomba",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "level:intermediate",
         "scale:small",
@@ -424,15 +425,15 @@ events:
     location: Psirri, Athens, Greece
     latitude: 37.9838
     longitude: 23.7275
-    start: w6 Sat 22:00
-    end: w6 Sun 03:00
+    start: w6 Fri 20:00
+    end: w7 Mon 09:00
     price_is_free: true
     tags:
       [
         "format:social",
         "dance-style:salsa",
         "dance-style:mambo",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "level:advanced",
         "scale:large",
@@ -457,7 +458,7 @@ events:
         "dance-style:salsa",
         "dance-style:rueda",
         "level:beginner-friendly",
-        reach:local,
+        "reach:local",
         "venue:indoor",
         "scale:small",
       ]
@@ -470,15 +471,15 @@ events:
     location: Florentin, Tel Aviv, Israel
     latitude: 32.0853
     longitude: 34.7818
-    start: w8 Thu 19:30
-    end: w8 Thu 21:00
+    start: w8 Fri 20:00
+    end: w9 Mon 09:00
     price_is_free: true
     tags:
       [
         "format:class",
         "dance-style:bachata",
         "dance-style:zouk",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "level:beginner-friendly",
         "scale:small",
@@ -500,7 +501,7 @@ events:
         "format:social",
         "dance-style:salsa",
         "dance-style:mambo",
-        reach:local,
+        "reach:local",
         "venue:indoor",
         "scale:large",
         "level:all-levels",
@@ -522,7 +523,7 @@ events:
         "format:social",
         "format:day-social",
         "dance-style:bachata",
-        reach:local,
+        "reach:local",
         "venue:indoor",
         "scale:medium",
         "level:all-levels",
@@ -539,8 +540,8 @@ events:
     location: Ribeira, Porto, Portugal
     latitude: 41.1579
     longitude: -8.6291
-    start: w10 Sat 10:00
-    end: w10 Sat 17:00
+    start: w10 Fri 20:00
+    end: w11 Mon 09:00
     price_is_free: true
     tags:
       [
@@ -549,7 +550,7 @@ events:
         "dance-style:salsa",
         "dance-style:cuban",
         "level:intermediate",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "scale:medium",
         "misc:trip",
@@ -563,8 +564,8 @@ events:
     location: Erzsebetvaros, Budapest, Hungary
     latitude: 47.4979
     longitude: 19.0402
-    start: w10 Fri 22:00
-    end: w10 Sat 03:00
+    start: w10 Fri 20:00
+    end: w11 Mon 09:00
     price_is_free: true
     tags:
       [
@@ -572,7 +573,7 @@ events:
         "format:festival",
         "dance-style:bachata",
         "dance-style:semba",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "scale:large",
         "level:all-levels",
@@ -589,8 +590,8 @@ events:
     location: Poble-sec, Barcelona, Spain
     latitude: 41.3750
     longitude: 2.1686
-    start: w14 Sat 19:00
-    end: w14 Sun 04:00
+    start: w14 Fri 20:00
+    end: w15 Mon 09:00
     price_is_free: true
     tags:
       [
@@ -598,7 +599,7 @@ events:
         "format:festival",
         "dance-style:salsa",
         "dance-style:mambo",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "scale:large",
         "level:all-levels",
@@ -622,7 +623,7 @@ events:
         "format:weekender",
         "dance-style:bachata",
         "dance-style:kizomba",
-        reach:local,
+        "reach:local",
         "venue:indoor",
         "scale:medium",
         "level:intermediate",
@@ -645,7 +646,7 @@ events:
         "format:social",
         "dance-style:salsa",
         "dance-style:cuban",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "scale:medium",
         "level:all-levels",
@@ -669,7 +670,7 @@ events:
         "format:pool-party",
         "dance-style:bachata",
         "dance-style:zouk",
-        reach:local,
+        "reach:local",
         "venue:outdoor",
         "scale:large",
         "level:all-levels",
@@ -688,8 +689,8 @@ events:
     location: Midtown, New York, USA
     latitude: 40.7580
     longitude: -73.9855
-    start: w2 Sat 21:00
-    end: w2 Sun 02:00
+    start: w2 Fri 20:00
+    end: w3 Mon 09:00
     price_is_free: true
     tags:
       [
@@ -761,8 +762,8 @@ events:
     location: Lungomare, Naples, Italy
     latitude: 40.8518
     longitude: 14.2681
-    start: w26 Sat 21:00
-    end: w26 Sun 01:00
+    start: w26 Fri 20:00
+    end: w27 Mon 09:00
     price_is_free: true
     tags:
       [
@@ -791,7 +792,7 @@ events:
         "format:social",
         "dance-style:kizomba",
         "dance-style:semba",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "scale:small",
         "level:intermediate",
@@ -805,8 +806,8 @@ events:
     location: Presqu'île, Lyon, France
     latitude: 45.7640
     longitude: 4.8357
-    start: w30 Sat 15:00
-    end: w30 Sun 04:00
+    start: w30 Fri 20:00
+    end: w31 Mon 09:00
     price_is_free: false
     price_min: 60
     price_max: 95
@@ -827,8 +828,8 @@ events:
     location: Triana, Seville, Spain
     latitude: 37.3891
     longitude: -5.9845
-    start: w32 Sat 20:00
-    end: w32 Sun 05:00
+    start: w32 Fri 20:00
+    end: w33 Mon 09:00
     price_is_free: false
     price_min: 75
     price_max: 120
@@ -860,7 +861,7 @@ events:
         "format:social",
         "dance-style:bachata",
         "dance-style:zouk",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "scale:medium",
         "level:intermediate",
@@ -881,7 +882,7 @@ events:
         "format:practice",
         "dance-style:zouk",
         "dance-style:semba",
-        reach:local,
+        "reach:local",
         "level:intermediate",
         "scale:small",
         "venue:indoor",
@@ -894,8 +895,8 @@ events:
     location: Gornji Grad, Zagreb, Croatia
     latitude: 45.8150
     longitude: 15.9819
-    start: w38 Fri 21:00
-    end: w38 Sat 01:00
+    start: w38 Fri 20:00
+    end: w39 Mon 09:00
     price_is_free: false
     price_min: 8
     price_max: 12
@@ -927,7 +928,7 @@ events:
         "format:social",
         "dance-style:salsa",
         "dance-style:mambo",
-        reach:regional,
+        "reach:regional",
         "scale:medium",
         "venue:indoor",
         "level:intermediate",
@@ -948,7 +949,7 @@ events:
         "format:class",
         "dance-style:bachata",
         "dance-style:kizomba",
-        reach:local,
+        "reach:local",
         "level:beginner-friendly",
         "scale:small",
         "venue:indoor",
@@ -961,8 +962,8 @@ events:
     location: Kallio, Helsinki, Finland
     latitude: 60.1699
     longitude: 24.9384
-    start: w44 Sat 20:00
-    end: w44 Sun 00:00
+    start: w44 Fri 20:00
+    end: w45 Mon 09:00
     price_is_free: false
     price_min: 12
     price_max: 15
@@ -993,7 +994,7 @@ events:
         "format:social",
         "dance-style:bachata",
         "dance-style:semba",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "scale:medium",
         "level:intermediate",
@@ -1028,8 +1029,8 @@ events:
     location: Pâquis, Geneva, Switzerland
     latitude: 46.2044
     longitude: 6.1432
-    start: w50 Sat 13:00
-    end: w50 Sat 22:00
+    start: w50 Fri 20:00
+    end: w51 Mon 09:00
     price_is_free: false
     price_min: 45
     price_max: 60
@@ -1050,8 +1051,8 @@ events:
     location: Promenade des Anglais, Nice, France
     latitude: 43.7102
     longitude: 7.2620
-    start: w52 Sat 18:00
-    end: w52 Sat 23:00
+    start: w52 Fri 20:00
+    end: w53 Mon 09:00
     price_is_free: false
     price_min: 10
     price_max: 10
@@ -1072,8 +1073,8 @@ events:
     location: Malagueta, Málaga, Spain
     latitude: 36.7213
     longitude: -4.4213
-    start: w54 Fri 16:00
-    end: w54 Sun 06:00
+    start: w54 Fri 20:00
+    end: w55 Mon 09:00
     price_is_free: false
     price_min: 70
     price_max: 110
@@ -1118,7 +1119,7 @@ events:
         "format:social",
         "dance-style:kizomba",
         "dance-style:semba",
-        reach:local,
+        "reach:local",
         "scale:small",
         "venue:indoor",
         "level:intermediate",
@@ -1131,8 +1132,8 @@ events:
     location: Vanalinn, Tallinn, Estonia
     latitude: 59.4370
     longitude: 24.7536
-    start: w60 Sat 12:00
-    end: w60 Sun 23:00
+    start: w60 Fri 20:00
+    end: w61 Mon 09:00
     price_is_free: false
     price_min: 55
     price_max: 80
@@ -1170,8 +1171,8 @@ events:
     location: Old Town, Ljubljana, Slovenia
     latitude: 46.0569
     longitude: 14.5058
-    start: w64 Fri 21:00
-    end: w64 Sat 01:00
+    start: w64 Fri 20:00
+    end: w65 Mon 09:00
     price_is_free: false
     price_min: 8
     price_max: 10
@@ -1193,8 +1194,8 @@ events:
     location: Harbourfront, Toronto, Canada
     latitude: 43.6532
     longitude: -79.3832
-    start: w25 Sat 21:00
-    end: w25 Sun 02:00
+    start: w25 Fri 20:00
+    end: w26 Mon 09:00
     price_is_free: false
     price_min: 20
     price_max: 25
@@ -1214,8 +1215,8 @@ events:
     location: Condesa, Mexico City, Mexico
     latitude: 19.4326
     longitude: -99.1332
-    start: w33 Sat 16:00
-    end: w33 Sun 05:00
+    start: w33 Fri 20:00
+    end: w34 Mon 09:00
     price_is_free: false
     price_min: 400
     price_max: 700
@@ -1236,8 +1237,8 @@ events:
     location: Downtown, Los Angeles, USA
     latitude: 34.0522
     longitude: -118.2437
-    start: w41 Sat 15:00
-    end: w41 Sun 04:00
+    start: w41 Fri 20:00
+    end: w42 Mon 09:00
     price_is_free: false
     price_min: 90
     price_max: 150
@@ -1274,8 +1275,8 @@ events:
     location: South Beach, Miami, USA
     latitude: 25.7617
     longitude: -80.1918
-    start: w57 Sat 13:00
-    end: w57 Sat 19:00
+    start: w57 Fri 20:00
+    end: w58 Mon 09:00
     price_is_free: false
     price_min: 30
     price_max: 45
@@ -1331,8 +1332,8 @@ events:
     location: Habana Vieja, Havana, Cuba
     latitude: 23.1136
     longitude: -82.3666
-    start: w81 Sat 18:00
-    end: w81 Sun 04:00
+    start: w81 Fri 20:00
+    end: w82 Mon 09:00
     price_is_free: false
     price_min: 80
     price_max: 130
@@ -1355,8 +1356,8 @@ events:
     location: Shinjuku, Tokyo, Japan
     latitude: 35.6762
     longitude: 139.6503
-    start: w27 Sat 20:00
-    end: w27 Sun 00:00
+    start: w27 Fri 20:00
+    end: w28 Mon 09:00
     price_is_free: false
     price_min: 3000
     price_max: 4000
@@ -1398,8 +1399,8 @@ events:
     location: Sukhumvit, Bangkok, Thailand
     latitude: 13.7563
     longitude: 100.5018
-    start: w43 Sat 15:00
-    end: w43 Sun 03:00
+    start: w43 Fri 20:00
+    end: w44 Mon 09:00
     price_is_free: false
     price_min: 1500
     price_max: 2500
@@ -1453,8 +1454,8 @@ events:
     location: The Bund, Shanghai, China
     latitude: 31.2304
     longitude: 121.4737
-    start: w67 Sat 20:00
-    end: w67 Sun 00:00
+    start: w67 Fri 20:00
+    end: w68 Mon 09:00
     price_is_free: false
     price_min: 100
     price_max: 150
@@ -1487,8 +1488,8 @@ events:
     location: Marina, Dubai, UAE
     latitude: 25.2048
     longitude: 55.2708
-    start: w83 Fri 16:00
-    end: w83 Sun 03:00
+    start: w83 Fri 20:00
+    end: w84 Mon 09:00
     price_is_free: false
     price_min: 300
     price_max: 500
@@ -1511,8 +1512,8 @@ events:
     location: San Telmo, Buenos Aires, Argentina
     latitude: -34.6037
     longitude: -58.3816
-    start: w29 Sat 22:00
-    end: w29 Sun 04:00
+    start: w29 Fri 20:00
+    end: w30 Mon 09:00
     price_is_free: false
     price_min: 5000
     price_max: 8000
@@ -1532,8 +1533,8 @@ events:
     location: Vila Madalena, São Paulo, Brazil
     latitude: -23.5505
     longitude: -46.6333
-    start: w45 Fri 18:00
-    end: w45 Sun 06:00
+    start: w45 Fri 20:00
+    end: w46 Mon 09:00
     price_is_free: false
     price_min: 200
     price_max: 350
@@ -1554,8 +1555,8 @@ events:
     location: Chapinero, Bogotá, Colombia
     latitude: 4.7110
     longitude: -74.0721
-    start: w53 Sat 15:00
-    end: w53 Sun 04:00
+    start: w53 Fri 20:00
+    end: w54 Mon 09:00
     price_is_free: false
     price_min: 120000
     price_max: 200000
@@ -1604,8 +1605,8 @@ events:
     location: El Poblado, Medellín, Colombia
     latitude: 6.2442
     longitude: -75.5812
-    start: w90 Sat 16:00
-    end: w90 Sun 04:00
+    start: w90 Fri 20:00
+    end: w91 Mon 09:00
     price_is_free: false
     price_min: 100000
     price_max: 180000
@@ -1641,8 +1642,8 @@ events:
     location: Victoria Island, Lagos, Nigeria
     latitude: 6.5244
     longitude: 3.3792
-    start: w63 Sat 18:00
-    end: w63 Sun 00:00
+    start: w63 Fri 20:00
+    end: w64 Mon 09:00
     price_is_free: false
     price_min: 8000
     price_max: 12000
@@ -1681,8 +1682,8 @@ events:
     location: Zamalek, Cairo, Egypt
     latitude: 30.0444
     longitude: 31.2357
-    start: w87 Fri 17:00
-    end: w87 Sun 02:00
+    start: w87 Fri 20:00
+    end: w88 Mon 09:00
     price_is_free: false
     price_min: 1200
     price_max: 2000
@@ -1705,8 +1706,8 @@ events:
     location: Darling Harbour, Sydney, Australia
     latitude: -33.8688
     longitude: 151.2093
-    start: w55 Sat 15:00
-    end: w55 Sun 03:00
+    start: w55 Fri 20:00
+    end: w56 Mon 09:00
     price_is_free: false
     price_min: 120
     price_max: 190
@@ -1743,8 +1744,8 @@ events:
     location: Wynyard Quarter, Auckland, New Zealand
     latitude: -36.8485
     longitude: 174.7633
-    start: w98 Sat 20:00
-    end: w98 Sun 00:00
+    start: w98 Fri 20:00
+    end: w99 Mon 09:00
     price_is_free: false
     price_min: 20
     price_max: 25
@@ -1787,7 +1788,7 @@ events:
     latitude: 52.5100
     longitude: 13.4450
     start: w5 Fri 20:00
-    end: w5 Sun 03:00
+    end: w6 Mon 09:00
     price_is_free: false
     price_min: 45
     price_max: 85
@@ -1813,8 +1814,8 @@ events:
     location: Le Marais, Paris, France
     latitude: 48.8597
     longitude: 2.3644
-    start: w4 Wed 21:00
-    end: w4 Thu 02:00
+    start: w4 Fri 20:00
+    end: w5 Mon 09:00
     price_is_free: false
     price_min: 15
     price_max: 18
@@ -1840,8 +1841,8 @@ events:
     location: Poble-Sec, Barcelona, Spain
     latitude: 41.3720
     longitude: 2.1630
-    start: w7 Sat 18:00
-    end: w7 Sun 06:00
+    start: w7 Fri 20:00
+    end: w8 Mon 09:00
     price_is_free: false
     price_min: 50
     price_max: 90
@@ -1867,8 +1868,8 @@ events:
     location: Canal Ring, Amsterdam, Netherlands
     latitude: 52.3676
     longitude: 4.9041
-    start: w6 Fri 20:30
-    end: w6 Sat 02:30
+    start: w6 Fri 20:00
+    end: w7 Mon 09:00
     price_is_free: false
     price_min: 18
     price_max: 22
@@ -1894,8 +1895,8 @@ events:
     location: Malasaña, Madrid, Spain
     latitude: 40.4300
     longitude: -3.7050
-    start: w9 Fri 18:00
-    end: w9 Sun 04:00
+    start: w9 Fri 20:00
+    end: w10 Mon 09:00
     price_is_free: false
     price_min: 75
     price_max: 130
@@ -2160,8 +2161,8 @@ events:
     city: São Paulo
     country: Brazil
     country_code: BR
-    start: w5 Sun 14:00
-    end: w5 Sun 15:30
+    start: w5 Fri 20:00
+    end: w6 Mon 09:00
     price_is_free: true
     tags:
       [
@@ -2207,8 +2208,8 @@ events:
     city: Toronto
     country: Canada
     country_code: CA
-    start: w7 Sat 21:00
-    end: w7 Sun 02:00
+    start: w7 Fri 20:00
+    end: w8 Mon 09:00
     price_is_free: false
     price_min: 15
     price_max: 20
@@ -2308,8 +2309,8 @@ events:
     city: Seoul
     country: South Korea
     country_code: KR
-    start: w11 Tue 20:00
-    end: w11 Tue 21:30
+    start: w11 Fri 20:00
+    end: w12 Mon 09:00
     price_is_free: false
     price_min: 12
     price_max: 15
@@ -2426,7 +2427,7 @@ events:
         "dance-style:salsa",
         "dance-style:mambo",
         "level:all-levels",
-        reach:regional,
+        "reach:regional",
         "venue:indoor",
         "scale:medium",
       ]
@@ -2452,7 +2453,7 @@ events:
         "dance-style:bachata",
         "dance-style:kizomba",
         "level:intermediate",
-        reach:international,
+        "reach:international",
         "venue:indoor",
         "scale:small",
       ]
@@ -2475,7 +2476,7 @@ events:
         "format:social",
         "format:day-social",
         "dance-style:salsa",
-        reach:local,
+        "reach:local",
         "venue:indoor",
         "scale:large",
         "level:all-levels",

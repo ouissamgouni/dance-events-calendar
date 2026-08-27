@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CalendarEvent } from '../types';
 import RailEventCard from './RailEventCard';
+import EventCard from './EventCard';
 import ScrollDotsIndicator from './ScrollDots';
 import { useScrollDots } from '../hooks/useScrollDots';
 import { isTrendingScore } from '../utils/trending';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 
 type ForYouLens = 'you-might-like' | 'friends' | 'new';
 
@@ -66,6 +68,7 @@ export default function ForYouRail({
     followingBadgeEnabled = false,
     className = '',
 }: ForYouRailProps) {
+    const { forYouEventCardsDateFirstLayoutEnabled, showRatings } = useFeatureFlags();
     // Rails are expanded by default on both mobile and desktop; the
     // header caret still lets the viewer collapse them per session.
     const [collapsed, setCollapsed] = useState(false);
@@ -188,6 +191,27 @@ export default function ForYouRail({
                         const isNew = !!unseenStateEnabled && !!newEventIds?.has(event.event_id);
                         const isTrending = trendingEnabled
                             && isTrendingScore(event.popularity_score ?? 0, allScoresForLens, popularityThreshold, trendingTopN, trendingTopPercent);
+                        // Date-first layout is opt-in for the preference lenses
+                        // ("You might like" / "New"); "Friends going" keeps the tile.
+                        if (forYouEventCardsDateFirstLayoutEnabled && activeLens !== 'friends') {
+                            return (
+                                <EventCard
+                                    key={event.event_id}
+                                    event={event}
+                                    onOpen={onEventClick}
+                                    onHover={onEventHover}
+                                    highlighted={hoveredEventId === event.event_id}
+                                    isNew={isNew}
+                                    isTrending={isTrending}
+                                    followingBadgeEnabled={followingBadgeEnabled}
+                                    showRatings={showRatings}
+                                    widthClass="w-[248px]"
+                                    goingIconVariant="hand"
+                                    actionsTestId="for-you-card-actions"
+                                    newDotTestId="for-you-new-dot"
+                                />
+                            );
+                        }
                         return (
                             <RailEventCard
                                 key={event.event_id}

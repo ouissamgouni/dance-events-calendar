@@ -8,6 +8,7 @@ import { EventListCard } from './EventListPanel';
 
 interface ExplorerEventSearchProps {
     onSelectEvent: (eventId: string) => void;
+    onSelectResult?: (result: EventSearchResult) => void;
     triggerLabel?: string;
     compact?: boolean;
     className?: string;
@@ -25,6 +26,13 @@ interface ExplorerEventSearchProps {
     headerInline?: boolean;
     /** Callback to open the submit event form (shown in search overlay footer when includePast is true). */
     onOpenSubmitEvent?: () => void;
+    /** Always-open result surface used when search is embedded in page content. */
+    embedded?: boolean;
+    /** Text prepended to the minimum-query instruction in embedded contexts. */
+    guidancePrefix?: string;
+    resultFilter?: (result: EventSearchResult) => boolean;
+    onNoResultsAction?: () => void;
+    noResultsActionLabel?: string;
 }
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -62,22 +70,9 @@ function toSearchCardEvent(row: EventSearchResult): CalendarEvent {
     };
 }
 
-/** Date with the year, so past events are unambiguous in the results list. */
-function formatPastDate(iso: string | null): string {
-    if (!iso) return '';
-    try {
-        return new Date(iso).toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    } catch {
-        return '';
-    }
-}
-
 export default function ExplorerEventSearch({
     onSelectEvent,
+    onSelectResult,
     triggerLabel = 'Search events',
     compact = false,
     className = '',
@@ -87,8 +82,13 @@ export default function ExplorerEventSearch({
     pastToggle = false,
     headerInline = false,
     onOpenSubmitEvent,
+    embedded = false,
+    guidancePrefix,
+    resultFilter,
+    onNoResultsAction,
+    noResultsActionLabel = 'Suggest an event',
 }: ExplorerEventSearchProps) {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(embedded);
     const [q, setQ] = useState('');
     const [results, setResults] = useState<EventSearchResult[]>([]);
     const [loading, setLoading] = useState(false);
@@ -104,9 +104,9 @@ export default function ExplorerEventSearch({
     const { isAttending } = useAttendingEvents();
 
     useEffect(() => {
-        if (!open) return;
+        if (!open && !embedded) return;
         inputRef.current?.focus();
-    }, [open]);
+    }, [embedded, open]);
 
     useEffect(() => {
         const onDoc = (event: MouseEvent) => {
@@ -122,7 +122,7 @@ export default function ExplorerEventSearch({
     }, []);
 
     useEffect(() => {
-        if (!open) return;
+        if (!open && !embedded) return;
         const term = debounced.trim();
         if (term.length < 2) {
             setResults([]);
@@ -149,27 +149,31 @@ export default function ExplorerEventSearch({
         return () => {
             cancelled = true;
         };
-    }, [debounced, open, effectiveIncludePast, includePast]);
+    }, [debounced, embedded, open, effectiveIncludePast, includePast]);
 
     const term = q.trim();
 
     // In past-event (passport) mode, only offer events the viewer hasn't
     // already added to their passport.
     const visibleResults = useMemo(
-        () => (includePast ? results.filter((r) => !isAttending(r.event_id)) : results),
-        [results, includePast, isAttending],
+        () => {
+            const attendanceFiltered = includePast ? results.filter((result) => !isAttending(result.event_id)) : results;
+            return resultFilter ? attendanceFiltered.filter(resultFilter) : attendanceFiltered;
+        },
+        [results, includePast, isAttending, resultFilter],
     );
 
     const reset = () => {
-        setOpen(false);
+        if (!embedded) setOpen(false);
         setQ('');
         setResults([]);
         setLoading(false);
         setActiveIdx(-1);
     };
 
-    const selectEvent = (eventId: string) => {
-        onSelectEvent(eventId);
+    const selectEvent = (result: EventSearchResult) => {
+        onSelectEvent(result.event_id);
+        onSelectResult?.(result);
         reset();
     };
 
@@ -191,19 +195,21 @@ export default function ExplorerEventSearch({
         }
         if (event.key === 'Enter' && activeIdx >= 0 && visibleResults[activeIdx]) {
             event.preventDefault();
-            selectEvent(visibleResults[activeIdx].event_id);
+            selectEvent(visibleResults[activeIdx]);
         }
     };
 
-    const panelClassName = compact
-        ? 'fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg'
-        : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-line bg-surface shadow-lg';
+    const panelClassName = embedded
+        ? 'w-full border-y border-line bg-surface'
+        : compact
+            ? 'fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg'
+            : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-line bg-surface shadow-lg';
     const panelStyle = compact
         ? { top: 'calc(64px + env(safe-area-inset-top) + 6px)' }
         : undefined;
 
     // Desktop inline mode: show input directly instead of trigger button
-    const isDesktopInline = !compact && !small;
+    const isDesktopInline = !embedded && !compact && !small;
 
     return (
         <div ref={containerRef} className={`relative ${className}`}>
@@ -249,7 +255,7 @@ export default function ExplorerEventSearch({
             )}
 
             {/* Mobile/compact: trigger button */}
-            {!isDesktopInline && (
+            {!isDesktopInline && !embedded && (
                 <button
                     ref={triggerRef}
                     type="button"
@@ -269,7 +275,7 @@ export default function ExplorerEventSearch({
                     {!compact && <span>{triggerLabel}</span>}
                 </button>
             )}
-            {open && (
+            {(open || embedded) && (
                 <div className={panelClassName} style={panelStyle}>
                     {!headerInline && (
                         <div className="border-b border-line p-2">
@@ -306,7 +312,7 @@ export default function ExplorerEventSearch({
                                         onChange={(event) => setQ(event.target.value)}
                                         onKeyDown={onKeyDown}
                                         placeholder={effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
-                                        aria-label={effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
+                                        aria-label={embedded ? triggerLabel : effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
                                         className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
                                     />
                                 </div>
@@ -316,7 +322,7 @@ export default function ExplorerEventSearch({
                     <div className="max-h-80 overflow-auto bg-canvas px-2 py-1.5">
                         {term.length < 2 && (
                             <div className="bg-surface p-3 text-xs text-ink-soft">
-                                Type at least 2 letters to find {includePast ? 'past' : 'upcoming'} events.
+                                {guidancePrefix ? `${guidancePrefix} ` : ''}Type at least 2 letters to find {includePast ? 'past' : 'upcoming'} events.
                             </div>
                         )}
                         {term.length >= 2 && loading && (
@@ -325,7 +331,7 @@ export default function ExplorerEventSearch({
                         {term.length >= 2 && !loading && visibleResults.length === 0 && (
                             <div className="bg-surface p-3 text-xs text-ink-soft">
                                 No {effectiveIncludePast ? 'past' : 'upcoming'} events match “{term}”.
-                                {effectiveIncludePast && (
+                                {effectiveIncludePast && !embedded && (
                                     <>
                                         {' '}
                                         <Link
@@ -338,17 +344,23 @@ export default function ExplorerEventSearch({
                                         to find past events with filters.
                                     </>
                                 )}
+                                {onNoResultsAction && (
+                                    <button type="button" onClick={onNoResultsAction} className="ml-1 font-semibold text-action hover:underline">
+                                        {noResultsActionLabel}
+                                    </button>
+                                )}
                             </div>
                         )}
                         {visibleResults.map((row, index) => {
                             const place = [row.city, row.country].filter(Boolean).join(', ');
-                            if (effectiveIncludePast) {
-                                const when = formatPastDate(row.start);
+                            if (effectiveIncludePast && !embedded) {
+                                const when = row.start ? new Date(row.start).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
                                 return (
                                     <button
                                         key={row.event_id}
                                         type="button"
-                                        onClick={() => selectEvent(row.event_id)}
+                                        onClick={() => selectEvent(row)}
+                                        aria-label={`Open ${row.title}`}
                                         data-testid={`explorer-event-search-result-${index}`}
                                         className={`mb-1.5 flex w-full flex-col items-start gap-0.5 border bg-surface px-3 py-2 text-left last:mb-0 hover:bg-canvas ${index === activeIdx ? 'border-blue-300 ring-2 ring-blue-300' : 'border-line'}`}
                                     >
@@ -371,7 +383,7 @@ export default function ExplorerEventSearch({
                                     <EventListCard
                                         event={event}
                                         mapBounds={null}
-                                        onEventClick={() => selectEvent(row.event_id)}
+                                        onEventClick={() => selectEvent(row)}
                                         showPrices={false}
                                         showPopularity={false}
                                         popularityThreshold={0}

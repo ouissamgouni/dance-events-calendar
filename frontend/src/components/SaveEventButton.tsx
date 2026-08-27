@@ -49,14 +49,12 @@ function computePopoverPos(
 export default function SaveEventButton({
     eventId,
     appearance = 'icon',
-    size = 'md',
     stopPropagation = false,
     className = '',
 }: Props) {
     const { isSaved, toggleSave, getSavedAudience, setSavedAudience } = useSavedEvents();
     const { user } = useAuth();
     const saved = isSaved(eventId);
-    const iconSizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
     const buttonRef = useRef<HTMLButtonElement | null>(null);
     const popoverRef = useRef<HTMLDivElement | null>(null);
     const toast = useAnchoredToast(buttonRef);
@@ -228,12 +226,26 @@ export default function SaveEventButton({
                 <button
                     ref={buttonRef}
                     onClick={handleClick}
-                    className={`text-xs rounded-full px-3 py-1 transition flex items-center gap-1 ${saved ? 'text-ink bg-slate-200 hover:bg-slate-300' : 'text-ink-soft bg-slate-100 hover:bg-canvas'} ${className}`.trim()}
+                    className={`flex h-10 items-center gap-2 rounded-xl bg-action-tile px-3 text-sm transition-colors focus-visible:outline-none ${className} ${saved ? 'text-saved' : 'text-ink-soft hover:text-ink'}`.trim()}
                     aria-label={saved ? 'Edit saved visibility' : 'Save event'}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                        <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
-                    </svg>
+                    <span className="flex h-[22px] w-[22px] items-center justify-center" aria-hidden="true">
+                        <svg
+                            data-icon-family="bookmark"
+                            data-icon-state={saved ? 'saved' : 'default'}
+                            viewBox="0 0 24 24"
+                            fill={saved ? 'currentColor' : 'none'}
+                            stroke="currentColor"
+                            strokeWidth={1.7}
+                            className="h-[17px] w-[17px]"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4V5z"
+                            />
+                        </svg>
+                    </span>
                     {saved ? 'Saved' : 'Save'}
                 </button>
                 {toast.node}
@@ -248,12 +260,26 @@ export default function SaveEventButton({
             <button
                 ref={buttonRef}
                 onClick={handleClick}
-                className={`rounded-full transition ${size === 'sm' ? 'p-0.5' : 'p-1.5'} ${saved ? 'text-ink hover:text-ink' : 'text-slate-300 hover:text-ink-soft'} ${className}`.trim()}
+                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-action-tile transition-colors focus-visible:outline-none ${className} ${saved ? 'text-saved' : 'text-ink-soft hover:text-ink'}`.trim()}
                 aria-label={saved ? 'Edit saved visibility' : 'Save event'}
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={iconSizeClass}>
-                    <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
-                </svg>
+                <span className="flex h-[22px] w-[22px] items-center justify-center" aria-hidden="true">
+                    <svg
+                        data-icon-family="bookmark"
+                        data-icon-state={saved ? 'saved' : 'default'}
+                        viewBox="0 0 24 24"
+                        fill={saved ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        strokeWidth={1.7}
+                        className="h-[17px] w-[17px]"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4V5z"
+                        />
+                    </svg>
+                </span>
             </button>
             {toast.node}
             {popover}

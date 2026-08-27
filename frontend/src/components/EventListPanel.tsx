@@ -4,17 +4,14 @@ import type { CalendarEvent } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
-import SaveEventButton from './SaveEventButton';
-import GoingButton from './GoingButton';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
 import TagBadges from './TagBadges';
-import { useRatingAggregate } from '../context/RatingAggregatesContext';
-import { useEventMessageCount } from '../context/MessageCountsContext';
 import { isTrendingScore } from '../utils/trending';
 import { shortLocation } from '../utils/locationShort';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
-import { currencySymbol } from '../utils/currency';
+import { PriceBadge, DiscountBadge } from './CardPriceBadges';
+import CardActionCluster from './CardActionCluster';
+import CardReviewsLine from './CardReviewsLine';
 
 interface MapBounds {
     north: number;
@@ -73,6 +70,9 @@ interface EventListPanelProps {
      * (``going_count + saved_count`` desc) instead of date/popularity, and
      * skip day-group headers. Used by the Tribe (subscriptions) list. */
     orderByFollows?: boolean;
+    /** When true, render each card with the Tribe face-first layout
+     * (large avatar stack above the title + "{names} are going" line). */
+    tribeCard?: boolean;
     /**
      * Fires once per event id when a card has been at least 50% visible
      * inside the list scroller for ~500ms on touch devices (`hover:
@@ -111,43 +111,10 @@ export interface EventListCardProps {
     /** When true, render the left date rail (timeline layout) and move the
         attendee avatar stack onto its own line. */
     timeline?: boolean;
-}
-
-function PriceBadge({ event }: { event: CalendarEvent }) {
-    if (event.price_is_free) {
-        return (
-            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-ink-soft">
-                <img src="/price-tag.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
-                Free
-            </span>
-        );
-    }
-    if (event.price_min != null && event.price_currency) {
-        const sign = currencySymbol(event.price_currency);
-        const priceText = event.price_max != null && event.price_max !== event.price_min
-            ? `${sign}${event.price_min}–${sign}${event.price_max}`
-            : `${sign}${event.price_min}`;
-        return (
-            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-ink-soft">
-                <img src="/price-tag.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
-                {priceText}
-            </span>
-        );
-    }
-    return null;
-}
-
-function DiscountBadge() {
-    return (
-        <span
-            className="inline-flex items-center gap-1 bg-amber-50 px-1.5 py-px text-[10px] font-medium leading-3 text-amber-700"
-            title="Has promo codes"
-            data-testid="event-card-promo-icon"
-        >
-            <img src="/promo-code.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
-            Discount
-        </span>
-    );
+    /** Tribe variant: render a large face-first avatar stack above the title
+        with a "{names} are going" line, and force Save + RSVP in the
+        top-right action cluster. */
+    tribeLayout?: boolean;
 }
 
 function PopularityBadge({
@@ -210,41 +177,6 @@ const INITIAL_VISIBLE = 10;
 /** How many additional events each Show more click reveals. */
 const SHOW_MORE_INCREMENT = 10;
 
-function CardEngagementBadges({ eventId, showRatings }: { eventId: string; showRatings: boolean }) {
-    const agg = useRatingAggregate(eventId);
-    const messageCount = useEventMessageCount(eventId);
-    const reviews = showRatings ? (agg?.count ?? 0) : 0;
-    const messages = messageCount ?? 0;
-    if (reviews === 0 && messages === 0) return null;
-    return (
-        <div className="flex shrink-0 items-center gap-2">
-            {reviews > 0 && (
-                <Link
-                    to={`/event/${encodeURIComponent(eventId)}#community`}
-                    onClick={(e) => e.stopPropagation()}
-                    title="See reviews"
-                    aria-label={`${reviews} review${reviews === 1 ? '' : 's'}`}
-                    className="flex items-center gap-1 text-ink-soft hover:text-ink"
-                >
-                    <img src="/star.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
-                    <span className="tabular-nums text-[10px] font-medium">{reviews}</span>
-                </Link>
-            )}
-            {messages > 0 && (
-                <Link
-                    to={`/event/${encodeURIComponent(eventId)}#messages`}
-                    onClick={(e) => e.stopPropagation()}
-                    title="See messages"
-                    aria-label={`${messages} message${messages === 1 ? '' : 's'}`}
-                    className="flex items-center gap-1 text-ink-soft hover:text-ink"
-                >
-                    <img src="/comment.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
-                    <span className="tabular-nums text-[10px] font-medium">{messages}</span>
-                </Link>
-            )}
-        </div>
-    );
-}
 
 export function EventListCard({
     event,
@@ -266,8 +198,9 @@ export function EventListCard({
     tagsAsBadge = false,
     isPast = false,
     timeline = false,
+    tribeLayout = false,
 }: EventListCardProps) {
-    const { tagsPerCard } = useFeatureFlags();
+    const { tagsPerCard, eventCardRsvpActionInAvatarRowEnabled, eventCardRsvpAndSaveStatsNextToActionEnabled } = useFeatureFlags();
     const priceVisible = isPriceSectionVisible(event, showPrices);
     const start = new Date(event.start);
     const end = new Date(event.end);
@@ -311,6 +244,17 @@ export function EventListCard({
                     </div>
                 )}
                 <div className="event-card-content relative">
+                    {tribeLayout && (
+                        <div className="mb-2 pr-14">
+                            <AttendeeAvatarStack
+                                eventId={event.event_id}
+                                size="lg"
+                                layout="stacked"
+                                max={5}
+                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                            />
+                        </div>
+                    )}
                     <h4
                         className={`event-card-title${isNew ? ' font-semibold' : ''}`}
                         data-new={isNew ? 'true' : undefined}
@@ -336,20 +280,12 @@ export function EventListCard({
                             />
                         </div>
                     )}
-                    <div className="flex items-center gap-8">
+                    <div className="flex items-center">
                         <p className="event-card-date shrink-0">
                             {timeline
                                 ? timelineWhen
                                 : (event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`)}
                         </p>
-                        {!timeline && (
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                <AttendeeAvatarStack
-                                    eventId={event.event_id}
-                                    friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
-                                />
-                            </div>
-                        )}
                     </div>
                     {(priceVisible || event.has_active_promo_codes || event.location) ? (
                         <p className="event-card-location gap-1.5">
@@ -371,33 +307,46 @@ export function EventListCard({
                             </span>
                         )
                     )}
-                    {timeline && (
+                    {!tribeLayout && (
                         <div className="mt-1.5 flex items-center gap-1.5 min-w-0">
                             <AttendeeAvatarStack
                                 eventId={event.event_id}
                                 friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
                             />
+                            {eventCardRsvpActionInAvatarRowEnabled && (
+                                <div
+                                    className="ml-auto flex shrink-0 items-center"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                >
+                                    <CardActionCluster
+                                        eventId={event.event_id}
+                                        isPast={new Date(event.end).getTime() < Date.now()}
+                                        include={['going']}
+                                        showStats={eventCardRsvpAndSaveStatsNextToActionEnabled}
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
                     {event.tags?.length > 0 && (
-                        <div className="mt-1 flex items-center justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                                <TagBadges
-                                    tags={event.tags}
-                                    maxVisible={tagsAsBadge ? 4 : tagsPerCard}
-                                    forceBadge={tagsAsBadge}
-                                />
-                            </div>
-                            <CardEngagementBadges eventId={event.event_id} showRatings={showRatings} />
+                        <div className="mt-1">
+                            <TagBadges
+                                tags={event.tags}
+                                maxVisible={tagsAsBadge ? 4 : tagsPerCard}
+                                forceBadge={tagsAsBadge}
+                            />
                         </div>
                     )}
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                        {!(event.tags?.length > 0) && (
-                            <CardEngagementBadges eventId={event.event_id} showRatings={showRatings} />
-                        )}
-                    </div>
+                    <CardReviewsLine eventId={event.event_id} showRatings={showRatings} />
                     <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
-                        <ActionCountCluster eventId={event.event_id} isSavedFlag={isSavedFlag} isPast={new Date(event.end).getTime() < Date.now()} />
+                        <CardActionCluster
+                            eventId={event.event_id}
+                            isSavedFlag={isSavedFlag}
+                            isPast={new Date(event.end).getTime() < Date.now()}
+                            include={tribeLayout ? ['save', 'going'] : (eventCardRsvpActionInAvatarRowEnabled ? ['save'] : ['save', 'going'])}
+                            showStats={eventCardRsvpAndSaveStatsNextToActionEnabled}
+                        />
                     </div>
                 </div>
             </div>
@@ -431,6 +380,7 @@ export default function EventListPanel({
     onMarkSeen,
     tagsAsBadge = false,
     orderByFollows = false,
+    tribeCard = false,
     headerSlot,
 }: EventListPanelProps) {
     const { user } = useAuth();
@@ -761,6 +711,7 @@ export default function EventListPanel({
                                                 tagsAsBadge={tagsAsBadge}
                                                 isPast={isPast}
                                                 timeline
+                                                tribeLayout={tribeCard}
                                             />
                                         </Fragment>
                                     );
@@ -836,50 +787,5 @@ export default function EventListPanel({
                 {showBottomFade && <div className="event-list-fade" />}
             </div>
         </div>
-    );
-}
-
-/**
- * CTA cluster for an event card: each action icon is paired with its live
- * count (saved / going), Twitter-style. Counts are hidden when zero so
- * cards with no engagement stay quiet. Single source of truth for the
- * number is the attendance summary — `AttendeeAvatarStack` shows *who*,
- * not *how many*.
- */
-function ActionCountCluster({ eventId, isSavedFlag, isPast = false }: { eventId: string; isSavedFlag: boolean; isPast?: boolean }) {
-    const summary = useAttendanceSummary(eventId);
-    const savedCount = summary?.total_saved ?? 0;
-    const goingCount = summary?.total_going ?? 0;
-    return (
-        <>
-            <span className="inline-flex items-center">
-                <SaveEventButton
-                    eventId={eventId}
-                    appearance="icon"
-                    size="sm"
-                    stopPropagation
-                    className={isSavedFlag ? 'text-ink' : ''}
-                />
-                {savedCount > 0 && (
-                    <span className="text-[11px] text-ink-soft -ml-0.5 mr-1 tabular-nums" aria-label={`${savedCount} saved`}>
-                        {savedCount}
-                    </span>
-                )}
-            </span>
-            <span className="inline-flex items-center">
-                <GoingButton
-                    eventId={eventId}
-                    appearance="icon"
-                    size="sm"
-                    stopPropagation
-                    isPast={isPast}
-                />
-                {goingCount > 0 && (
-                    <span className="text-[11px] text-action ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} ${isPast ? 'attended' : 'going'}`}>
-                        {goingCount}
-                    </span>
-                )}
-            </span>
-        </>
     );
 }

@@ -1,24 +1,22 @@
-import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CalendarEvent, TagGroup } from '../types';
-import { fetchEvents, fetchSettings, fetchTagGroups, type ReachFilter } from '../api';
+import { fetchEvents, fetchSettings, fetchTagGroups, fetchMyFollowing, type ReachFilter, type FollowUser } from '../api';
 import PeopleFilterPanel from '../components/PeopleFilterPanel';
+import PeopleAvatarTrack, { type PersonMini } from '../components/PeopleAvatarTrack';
 import { trackView } from '../utils/tracking';
 import { filterEventsByTags } from '../utils/tagFilter';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import type FullCalendar from '@fullcalendar/react';
-// FullCalendar is heavy (~ tens of KB) and only rendered in the "/calendar"
-// view. Lazy-load it so the default explorer/map landing route (the LCP path)
-// doesn't ship the FullCalendar bundle.
-const Calendar = lazy(() => import('../components/Calendar'));
 import type { CalendarViewMode } from '../components/Calendar';
+import CalendarMapWorkspace from '../components/CalendarMapWorkspace';
 import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
 import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import DateRangePicker from '../components/DateRangePicker';
-import EventListPanel, { EventListCard } from '../components/EventListPanel';
+import EventListPanel from '../components/EventListPanel';
+import MyEventsMapPreview from '../components/MyEventsMapPreview';
 import SummaryBar from '../components/SummaryBar';
 import ViewSwitcher from '../components/ViewSwitcher';
 import type { ExploreView } from '../components/ViewSwitcher';
@@ -35,7 +33,6 @@ import { useInterestProfiles } from '../hooks/useInterestProfiles';
 import { matchSearchProfile } from '../utils/searchProfiles';
 import { eventMatchesReach, REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS } from '../utils/reach';
 import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummariesContext';
-import { useSavedEvents } from '../context/SavedEventsContext';
 
 import { AREA_PRESETS, DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL } from '../constants/area';
 import type { PreferredAreaPayload, InterestProfile, InterestProfileUpdatePayload } from '../api';
@@ -64,6 +61,50 @@ type InterestSource = 'follows' | 'friends';
 type InterestKind = 'any' | 'going' | 'saved';
 type InterestMatch = 'any' | 'all';
 type ExplorerSort = 'date' | 'popularity';
+
+// Drives the two flavors of this view: the public Explorer ("/") and the
+// signed-in Tribe list ("/tribe/calendars"). Both render the same component;
+// only these defaults differ.
+export interface ExplorerViewConfig {
+    variant: 'explorer' | 'tribe';
+    /** Interest-source the view opens on when the URL doesn't specify one. */
+    defaultInterestSource: InterestSource | null;
+    defaultInterestKind: InterestKind;
+    defaultSort: ExplorerSort;
+    /** 'show-all' opens with no geo restriction (worldwide). */
+    areaMode: 'preset' | 'show-all';
+    /** 'all' opens with no end-date cap (all upcoming events). */
+    dateMode: 'preset' | 'all';
+    cardVariant: 'default' | 'tribe';
+    /** When true, clearing the people filter falls back to 'follows' instead
+     * of removing it entirely (Tribe always keeps at least Following). */
+    peopleFilterMinimum: boolean;
+    requireAuth: boolean;
+}
+
+const EXPLORER_CONFIG: ExplorerViewConfig = {
+    variant: 'explorer',
+    defaultInterestSource: null,
+    defaultInterestKind: 'going',
+    defaultSort: 'date',
+    areaMode: 'preset',
+    dateMode: 'preset',
+    cardVariant: 'default',
+    peopleFilterMinimum: false,
+    requireAuth: false,
+};
+
+const TRIBE_CONFIG: ExplorerViewConfig = {
+    variant: 'tribe',
+    defaultInterestSource: 'follows',
+    defaultInterestKind: 'going',
+    defaultSort: 'popularity',
+    areaMode: 'show-all',
+    dateMode: 'all',
+    cardVariant: 'tribe',
+    peopleFilterMinimum: true,
+    requireAuth: true,
+};
 
 interface FutureEventBatch {
     endDate: string;
@@ -138,22 +179,22 @@ function normalizeUserHandleParam(value: string | null): string | null {
     return trimmed.length ? trimmed : null;
 }
 
-function readInitialExplorerState(searchParams: URLSearchParams): InitialExplorerState {
+function readInitialExplorerState(searchParams: URLSearchParams, config: ExplorerViewConfig): InitialExplorerState {
     const defaults = defaultExplorerDateRange();
     const interestUserHandles = Array.from(new Set(
         searchParams.getAll('interest_user_handle')
             .map(normalizeUserHandleParam)
             .filter((h): h is string => h !== null),
     ));
-    const interestSource = parseInterestSource(searchParams.get('interest_source')) ?? (interestUserHandles.length ? 'follows' : null);
+    const interestSource = parseInterestSource(searchParams.get('interest_source')) ?? (interestUserHandles.length ? 'follows' : config.defaultInterestSource);
     return {
         startDate: parseDateParam(searchParams.get('start_date')) ?? defaults.startDate,
-        endDate: parseDateParam(searchParams.get('end_date')) ?? defaults.endDate,
+        endDate: parseDateParam(searchParams.get('end_date')) ?? (config.dateMode === 'all' ? '' : defaults.endDate),
         interestSource,
-        interestKind: parseInterestKind(searchParams.get('interest_kind')) ?? 'going',
+        interestKind: parseInterestKind(searchParams.get('interest_kind')) ?? config.defaultInterestKind,
         interestUserHandles,
         interestMatch: parseInterestMatch(searchParams.get('interest_match')) ?? 'any',
-        sortBy: parseExplorerSort(searchParams.get('sort_by')) ?? 'date',
+        sortBy: parseExplorerSort(searchParams.get('sort_by')) ?? config.defaultSort,
     };
 }
 
@@ -172,7 +213,9 @@ function writeExplorerStateToSearchParams(
     },
 ) {
     next.set('start_date', state.startDate);
-    next.set('end_date', state.endDate);
+    // Empty endDate = "no end cap" (Tribe's all-upcoming mode); omit the param.
+    if (state.endDate) next.set('end_date', state.endDate);
+    else next.delete('end_date');
 
     const tagIds = [...state.activeTagIds].sort((a, b) => a - b);
     if (tagIds.length > 0) next.set('tag_ids', tagIds.join(','));
@@ -201,16 +244,15 @@ function writeExplorerStateToSearchParams(
 // Loose OR match used previously by the "For you" rail's Recommended lens
 // lives on the /for-you page now.
 
-export default function Home() {
-    const { user } = useAuth();
+export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerViewConfig }) {
+    const { user, loading: authLoading } = useAuth();
     const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
-    const { isSaved } = useSavedEvents();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     const mapFollowingBadgeOverlay = true;
     const mapTrendingOverlay = true;
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const [initialExplorerState] = useState(() => readInitialExplorerState(searchParams));
+    const [initialExplorerState] = useState(() => readInitialExplorerState(searchParams, config));
     const [initialUrlHadDateRange] = useState(() => searchParams.has('start_date') || searchParams.has('end_date'));
 
     // Allow opening the suggest modal from anywhere via ?submit=1 (e.g. mobile header link).
@@ -335,7 +377,7 @@ export default function Home() {
         | { kind: 'show-all' }
         | { kind: 'preset'; area: SearchArea }
         | null
-    >(null);
+    >(config.areaMode === 'show-all' ? { kind: 'show-all' } : null);
 
     // Parse explicit bbox from the URL exactly once on mount; treat the four
     // params as all-or-nothing to match the backend validator.
@@ -521,11 +563,6 @@ export default function Home() {
         return { kind: 'default', label: DEFAULT_AREA_LABEL };
     }, [userMapBounds, areaSessionOverride, prefs.area]);
 
-    // Calendar view section visibility. Map is always shown; this toggle
-    // only switches between the default (calendar + map) and map-only
-    // layouts — there is no calendar-only state.
-    const [showCalendarGrid, setShowCalendarGrid] = useState(true);
-
     // Mobile calendar view: 3-week (default on mobile) vs full month. Persisted.
     const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < 640);
     useEffect(() => {
@@ -580,12 +617,44 @@ export default function Home() {
     const [interestKind, setInterestKind] = useState<InterestKind>(initialExplorerState.interestKind);
     const [interestUserHandles, setInterestUserHandles] = useState<string[]>(initialExplorerState.interestUserHandles);
     const [interestMatch, setInterestMatch] = useState<InterestMatch>(initialExplorerState.interestMatch);
+    // Resolve explicitly-selected people handles to avatar minis so the filter
+    // bar's people chip and the filter sheet's people row can show faces
+    // instead of a bare count. Falls back to initials when the viewer isn't
+    // following the selected user (or isn't signed in).
+    const [followingIndex, setFollowingIndex] = useState<Record<string, FollowUser>>({});
+    useEffect(() => {
+        if (!user || interestUserHandles.length === 0) return;
+        let cancelled = false;
+        fetchMyFollowing({ limit: 200 })
+            .then((res) => {
+                if (cancelled) return;
+                const idx: Record<string, FollowUser> = {};
+                for (const u of res.items) idx[u.handle.replace(/^@/, '')] = u;
+                setFollowingIndex(idx);
+            })
+            .catch(() => { /* keep initials fallback */ });
+        return () => { cancelled = true; };
+    }, [user, interestUserHandles.length]);
+    const interestUserPeople = useMemo<PersonMini[]>(
+        () => interestUserHandles.map((h) => {
+            const f = followingIndex[h.replace(/^@/, '')];
+            return { handle: h, display_name: f?.display_name ?? null, avatar_url: f?.avatar_url ?? null };
+        }),
+        [interestUserHandles, followingIndex],
+    );
     const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
     const [calMapBounds, setCalMapBounds] = useState<MapBounds | null>(null);
 
     const navigate = useNavigate();
+
+    // Auth-gated variants (Tribe) bounce signed-out visitors to sign-in.
+    useEffect(() => {
+        if (config.requireAuth && !authLoading && !user) {
+            navigate(`/login?next=${encodeURIComponent(location.pathname)}`, { replace: true });
+        }
+    }, [config.requireAuth, authLoading, user, navigate, location.pathname]);
 
     // Cross-component hover highlight
     const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
@@ -693,7 +762,7 @@ export default function Home() {
             // matching events in the active/default area.
             params = {
                 startDate,
-                endDate,
+                endDate: endDate || undefined,
                 interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                 interestKind: interestActive ? interestKind : undefined,
                 interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
@@ -712,7 +781,7 @@ export default function Home() {
             // Calendar mode initial load: use same default as explorer
             params = {
                 startDate,
-                endDate,
+                endDate: endDate || undefined,
                 interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                 interestKind: interestActive ? interestKind : undefined,
                 interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
@@ -734,7 +803,7 @@ export default function Home() {
                 if (viewMode === 'explorer' && !initialUrlHadDateRange && !userTouchedDateRangeRef.current) {
                     const defaults = defaultExplorerDateRange(nextDefaultPeriod);
                     setStartDate(defaults.startDate);
-                    setEndDate(defaults.endDate);
+                    setEndDate(config.dateMode === 'all' ? '' : defaults.endDate);
                 }
                 const loadedReachGroup = groups.find((group) => group.slug === 'reach');
                 const selectedReachTags = loadedReachGroup?.tags.filter((tag) => activeTagIds.has(tag.id)) ?? [];
@@ -762,7 +831,7 @@ export default function Home() {
                 setLoading(false);
                 initialLoadDone.current = true;
             });
-    }, [viewMode, startDate, endDate, visibleRange, interestSource, interestKind, interestUserHandles, interestMatch, initialUrlHadDateRange]);
+    }, [viewMode, startDate, endDate, visibleRange, interestSource, interestKind, interestUserHandles, interestMatch, initialUrlHadDateRange, config.dateMode]);
 
     const handleDateRangeChange = useCallback((start: string, end: string) => {
         userTouchedDateRangeRef.current = true;
@@ -841,24 +910,24 @@ export default function Home() {
         setActiveTagIds(new Set());
         userTouchedReachRef.current = true;
         setReachFilter('any');
-        setInterestSource(null);
-        setInterestKind('any');
+        setInterestSource(config.peopleFilterMinimum ? 'follows' : null);
+        setInterestKind(config.peopleFilterMinimum ? config.defaultInterestKind : 'any');
         setInterestUserHandles([]);
         setStartDate(defaults.startDate);
-        setEndDate(defaults.endDate);
-        setAreaSessionOverride(null);
+        setEndDate(config.dateMode === 'all' ? '' : defaults.endDate);
+        setAreaSessionOverride(config.areaMode === 'show-all' ? { kind: 'show-all' } : null);
         bumpAutoFit();
-    }, [bumpAutoFit, defaultExplorerPeriod]);
+    }, [bumpAutoFit, config.areaMode, config.dateMode, config.defaultInterestKind, config.peopleFilterMinimum, defaultExplorerPeriod]);
 
     const handleClearCalendarFilters = useCallback(() => {
         userTouchedTagsRef.current = true;
         setPreserveViewportAfterSearch(false);
         setActiveTagIds(new Set());
-        setInterestSource(null);
-        setInterestKind('any');
+        setInterestSource(config.peopleFilterMinimum ? 'follows' : null);
+        setInterestKind(config.peopleFilterMinimum ? config.defaultInterestKind : 'any');
         setInterestUserHandles([]);
         bumpAutoFit();
-    }, [bumpAutoFit]);
+    }, [bumpAutoFit, config.defaultInterestKind, config.peopleFilterMinimum]);
 
     // Clear area filter and show events from all areas worldwide.
     const handleClearAreaOverride = useCallback(() => {
@@ -879,25 +948,25 @@ export default function Home() {
         setActiveTagIds(new Set(prefs.tagIds));
         userTouchedReachRef.current = true;
         setReachFilter(activeProfile?.reach_filter ?? 'any');
-        setInterestSource(null);
-        setInterestKind('going');
+        setInterestSource(config.peopleFilterMinimum ? 'follows' : null);
+        setInterestKind(config.defaultInterestKind);
         setInterestUserHandles([]);
         setStartDate(defaults.startDate);
-        setEndDate(defaults.endDate);
-        setAreaSessionOverride(null);
+        setEndDate(config.dateMode === 'all' ? '' : defaults.endDate);
+        setAreaSessionOverride(config.areaMode === 'show-all' ? { kind: 'show-all' } : null);
         bumpAutoFit();
-    }, [activeProfile?.reach_filter, bumpAutoFit, defaultExplorerPeriod, prefs.tagIds]);
+    }, [activeProfile?.reach_filter, bumpAutoFit, config.areaMode, config.dateMode, config.defaultInterestKind, config.peopleFilterMinimum, defaultExplorerPeriod, prefs.tagIds]);
 
     // People-scoped Clear (sub-editor header action): remove the People filter
     // entirely — no scope, any status, no specific people. Never re-selects a
     // default scope, and never unfollows anyone.
     const handleClearPeople = useCallback(() => {
-        setInterestSource(null);
-        setInterestKind('any');
+        setInterestSource(config.peopleFilterMinimum ? 'follows' : null);
+        setInterestKind(config.peopleFilterMinimum ? config.defaultInterestKind : 'any');
         setInterestUserHandles([]);
         setInterestMatch('any');
         bumpAutoFit();
-    }, [bumpAutoFit]);
+    }, [bumpAutoFit, config.defaultInterestKind, config.peopleFilterMinimum]);
 
     // Dedicated area picker (reached from the area chip in the list, the
     // fullscreen map header, and desktop) is now the FilterSheet's "Area"
@@ -1099,10 +1168,28 @@ export default function Home() {
         [explorerMatchingEvents, selectedExplorerMapEventId],
     );
 
-    const explorerAllViewCounts = useMemo(
-        () => explorerMatchingEvents.map((event) => event.popularity_score ?? 0),
-        [explorerMatchingEvents],
-    );
+    // Mobile explorer map preview: a persistent bottom sheet (mirroring My
+    // Events) previews an event and pages through the list. It defaults to
+    // the first matching event so the sheet is never empty.
+    const explorerPreviewEvent = (mapFullscreen && !isDesktop)
+        ? (selectedExplorerMapEvent ?? explorerMatchingEvents[0] ?? null)
+        : null;
+    const explorerPreviewIndex = explorerPreviewEvent
+        ? explorerMatchingEvents.findIndex((event) => event.event_id === explorerPreviewEvent.event_id)
+        : -1;
+    const stepExplorerMapPreview = useCallback((delta: number) => {
+        setSelectedExplorerMapEventId((currentId) => {
+            const anchorId = currentId ?? explorerMatchingEvents[0]?.event_id ?? null;
+            const idx = explorerMatchingEvents.findIndex((event) => event.event_id === anchorId);
+            if (idx < 0) return currentId;
+            const nextIdx = Math.min(explorerMatchingEvents.length - 1, Math.max(0, idx + delta));
+            const target = explorerMatchingEvents[nextIdx];
+            if (!target) return currentId;
+            setHoveredEventId(target.event_id);
+            return target.event_id;
+        });
+    }, [explorerMatchingEvents]);
+
     const showTrendingBanner = viewMode === 'explorer'
         && trendingEnabled
         && trendingBannerEnabled
@@ -1258,11 +1345,6 @@ export default function Home() {
         setHoveredEventId(evt.event_id);
     }, []);
 
-    const handleCloseExplorerMapSelection = useCallback(() => {
-        if (selectedExplorerMapEventId && hoveredEventId === selectedExplorerMapEventId) setHoveredEventId(null);
-        setSelectedExplorerMapEventId(null);
-    }, [hoveredEventId, selectedExplorerMapEventId]);
-
     const handleCloseModal = useCallback(() => {
         setSelectedEventRect(null);
         setSelectedEvent(null);
@@ -1335,36 +1417,6 @@ export default function Home() {
         }, 0);
     }, [explorerMatchingEvents, mapBounds]);
 
-    // Calendar ref + navigation (FC is always mounted in calendar mode)
-    const calendarRef = useRef<FullCalendar>(null);
-
-    const handleCalPrev = useCallback(() => calendarRef.current?.getApi().prev(), []);
-    const handleCalNext = useCallback(() => calendarRef.current?.getApi().next(), []);
-    const handleCalToday = useCallback(() => calendarRef.current?.getApi().today(), []);
-
-    const calendarTitle = useMemo(() => {
-        if (!visibleRange) return '';
-        const spanDays = (visibleRange.end.getTime() - visibleRange.start.getTime()) / (1000 * 60 * 60 * 24);
-        // Month view spans ~5-6 weeks (35-42 days). 3-week view spans 21 days.
-        if (spanDays <= 28) {
-            const start = visibleRange.start;
-            // FullCalendar's range end is exclusive; subtract one day for display.
-            const endInclusive = new Date(visibleRange.end.getTime() - 24 * 60 * 60 * 1000);
-            const sameYear = start.getFullYear() === endInclusive.getFullYear();
-            const sameMonth = sameYear && start.getMonth() === endInclusive.getMonth();
-            const startStr = start.toLocaleDateString('en-US', sameMonth
-                ? { month: 'short', day: 'numeric' }
-                : { month: 'short', day: 'numeric' });
-            const endStr = endInclusive.toLocaleDateString('en-US', sameYear
-                ? { month: sameMonth ? undefined : 'short', day: 'numeric' }
-                : { month: 'short', day: 'numeric', year: 'numeric' });
-            const yearSuffix = sameYear ? `, ${endInclusive.getFullYear()}` : '';
-            return `${startStr} – ${endStr}${yearSuffix}`;
-        }
-        const mid = new Date((visibleRange.start.getTime() + visibleRange.end.getTime()) / 2);
-        return mid.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    }, [visibleRange]);
-
     // Shared filter controls JSX, rendered inside the FilterSheet (bottom
     // sheet on mobile, centered modal on desktop — see `variant` on
     // <FilterSheet> below).
@@ -1381,7 +1433,7 @@ export default function Home() {
             onChange={(next) => {
                 bumpAutoFit();
                 if (Object.prototype.hasOwnProperty.call(next, 'source')) {
-                    setInterestSource(next.source ?? null);
+                    setInterestSource(next.source ?? (config.peopleFilterMinimum ? 'follows' : null));
                     if (next.source === null) setInterestUserHandles([]);
                 }
                 if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
@@ -1502,7 +1554,7 @@ export default function Home() {
             label: 'Dates',
             icon: <img src="/calendar.png" alt="" className="h-4 w-4" />,
             group: 'Dates',
-            summary: `${fmtDateShort(startDate)} – ${fmtDateShort(endDate)}`,
+            summary: endDate ? `${fmtDateShort(startDate)} – ${fmtDateShort(endDate)}` : 'All upcoming',
             render: () => (
                 <DateRangePicker startDate={startDate} endDate={endDate} onChange={handleDateRangeChange} />
             ),
@@ -1587,6 +1639,16 @@ export default function Home() {
             icon: <img src="/high-five.png" alt="" className="h-4 w-4" />,
             group: 'Other filters',
             summary: peopleSummary,
+            preview: (interestSource !== null || interestUserHandles.length > 0) ? (
+                <div className="flex items-center gap-2">
+                    {interestUserHandles.length > 0 && (
+                        <PeopleAvatarTrack people={interestUserPeople} total={interestUserHandles.length} max={3} size="md" />
+                    )}
+                    <span className="text-xs font-medium text-ink-soft">
+                        {interestKind === 'going' ? 'Going' : interestKind === 'saved' ? 'Interested' : 'Both'}
+                    </span>
+                </div>
+            ) : undefined,
             headerAction: (
                 <button
                     type="button"
@@ -1660,33 +1722,12 @@ export default function Home() {
                 interestSource={interestSource}
                 interestKind={interestKind}
                 interestUserHandles={interestUserHandles}
+                interestUserPeople={interestUserPeople}
                 interestMatch={interestMatch}
                 onEditPeople={() => openFilterSheet('people')}
                 loading={loading}
                 onOpenFilters={() => openFilterSheet(null)}
             />
-        );
-    };
-
-    // Calendar-mode map/calendar layout toggle. A single button: default
-    // state shows both calendar and map (icon = map, tapping hides the
-    // calendar to show map-only); map-only state shows the calendar icon
-    // (tapping restores the default, both-shown state). There is no
-    // calendar-only state.
-    const renderCalendarSectionsToggle = () => {
-        const mapOnly = !showCalendarGrid;
-        return (
-            <button
-                type="button"
-                onClick={() => setShowCalendarGrid((v) => !v)}
-                className="inline-flex items-center justify-center w-7 h-7 border border-line bg-surface text-ink hover:bg-canvas transition"
-                aria-pressed={mapOnly}
-                aria-label={mapOnly ? 'Show calendar and map' : 'Show map only'}
-                title={mapOnly ? 'Show calendar and map' : 'Show map only'}
-                data-testid="calendar-map-toggle"
-            >
-                {mapOnly ? '📅' : '📍'}
-            </button>
         );
     };
 
@@ -1757,6 +1798,7 @@ export default function Home() {
                                             nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
                                             gateMoreEventsForAnonymous
                                             tagsAsBadge
+                                            tribeCard={config.cardVariant === 'tribe'}
                                             headerSlot={trendingBanner}
                                         />
                                     </div>
@@ -1769,102 +1811,86 @@ export default function Home() {
                                     <div
                                         className={
                                             mapFullscreen
-                                                ? 'explorer-map-shell fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] md:bottom-0 top-[calc(64px+env(safe-area-inset-top))] z-[8000] bg-surface overflow-hidden'
-                                                : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden'
+                                                ? 'explorer-map-shell fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] md:bottom-0 top-[calc(64px+env(safe-area-inset-top))] z-[8000] bg-surface overflow-hidden flex flex-col'
+                                                : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden flex flex-col'
                                         }
                                         data-testid="explorer-map-shell"
                                         data-fullscreen={mapFullscreen ? 'true' : 'false'}
                                     >
-                                        <EventMap
-                                            events={explorerMatchingEvents}
-                                            onEventClick={handleExplorerMapEventClick}
-                                            onBoundsChange={handleBoundsChange}
-                                            hoveredEventId={hoveredEventId}
-                                            onEventHover={handleEventHover}
-                                            detailLinkSource="explorer-map"
-                                            autoFitToken={mapAutoFitToken}
-                                            flyToArea={flyToAreaBbox}
-                                            flyToAreaToken={flyToAreaToken}
-                                            initialArea={resolvedInitialArea}
-                                            preserveViewport={preserveViewportAfterSearch}
-                                            newEventIds={newEventIds}
-                                            popularityThreshold={popularityThreshold}
-                                            onMarkSeen={markSeen}
-                                            disablePopups={!isDesktop}
-                                            onMarkerSelect={!isDesktop ? handleExplorerMapMarkerSelect : undefined}
-                                            showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
-                                            showTrendingOverlay={mapTrendingOverlay}
-                                            compact={false}
-                                        />
-                                        {selectedExplorerMapEvent && !isDesktop && mapFullscreen && (
-                                            <div className="map-selected-event-card absolute inset-x-2 bottom-2 z-[700] lg:hidden border border-blue-100 bg-surface shadow-lg" data-testid="explorer-map-selected-event">
-                                                <button
-                                                    type="button"
-                                                    onClick={handleCloseExplorerMapSelection}
-                                                    className="absolute -top-7 right-0 z-[701] inline-flex h-6 w-6 items-center justify-center border border-blue-100 bg-surface text-ink-soft shadow-sm hover:text-ink"
-                                                    aria-label="Close selected event"
-                                                >
-                                                    ×
-                                                </button>
-                                                <EventListCard
-                                                    event={selectedExplorerMapEvent}
-                                                    mapBounds={mapBounds}
-                                                    onEventClick={handleExplorerMapEventClick}
-                                                    showPrices={showPrices}
-                                                    showPopularity={showPopularity && trendingEnabled}
-                                                    popularityThreshold={popularityThreshold}
-                                                    trendingTopN={trendingTopN}
-                                                    trendingTopPercent={trendingTopPercent}
-                                                    allViewCounts={explorerAllViewCounts}
-                                                    followingBadgeEnabled={followingBadgeEnabled}
-                                                    showRatings={!!showRatings}
-                                                    isSavedFlag={isSaved(selectedExplorerMapEvent.event_id)}
-                                                    isNew={unseenStateEnabled && newEventIds.has(selectedExplorerMapEvent.event_id)}
-                                                    onEventHover={handleEventHover}
-                                                />
-                                                <Link
-                                                    to={`/event/${selectedExplorerMapEvent.event_id}?src=explorer-map`}
-                                                    className="absolute bottom-2 right-2 z-[701] text-[11px] font-semibold text-action underline underline-offset-2 hover:text-action hover:no-underline"
-                                                >
-                                                    Details
-                                                </Link>
-                                            </div>
-                                        )}
-                                        {/* Search-this-area pill. Appears when
+                                        <div className="relative flex min-h-0 flex-1">
+                                            <EventMap
+                                                events={explorerMatchingEvents}
+                                                focusedEvent={mapFullscreen && !isDesktop ? selectedExplorerMapEvent : undefined}
+                                                onEventClick={handleExplorerMapEventClick}
+                                                onBoundsChange={handleBoundsChange}
+                                                hoveredEventId={hoveredEventId}
+                                                onEventHover={handleEventHover}
+                                                detailLinkSource="explorer-map"
+                                                autoFitToken={mapAutoFitToken}
+                                                flyToArea={flyToAreaBbox}
+                                                flyToAreaToken={flyToAreaToken}
+                                                initialArea={resolvedInitialArea}
+                                                preserveViewport={preserveViewportAfterSearch}
+                                                newEventIds={newEventIds}
+                                                popularityThreshold={popularityThreshold}
+                                                onMarkSeen={markSeen}
+                                                disablePopups={!isDesktop}
+                                                onMarkerSelect={!isDesktop ? handleExplorerMapMarkerSelect : undefined}
+                                                showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
+                                                showTrendingOverlay={mapTrendingOverlay}
+                                                compact={false}
+                                            />
+                                            {/* Search-this-area pill. Appears when
                                     the user has panned/zoomed away from the
                                     current effective area filter; tapping it
                                     commits the live viewport as the area
                                     filter and clears the userMapBounds flag
                                     so the pill disappears. */}
-                                        {userMapBounds && (
-                                            <button
-                                                type="button"
-                                                onClick={handleSearchThisArea}
-                                                className={`absolute left-1/2 -translate-x-1/2 z-[703] inline-flex items-center gap-1 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-action text-xs font-semibold px-3 py-1.5 shadow-md transition ${mapFullscreen && !isDesktop ? 'top-14' : 'top-2'}`}
-                                                data-testid="map-search-this-area"
-                                            >
-                                                Search this area
-                                            </button>
-                                        )}
-                                        {/* Fullscreen toggle — desktop only. On
+                                            {userMapBounds && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSearchThisArea}
+                                                    className={`absolute left-1/2 -translate-x-1/2 z-[703] inline-flex items-center gap-1 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-action text-xs font-semibold px-3 py-1.5 shadow-md transition ${mapFullscreen && !isDesktop ? 'top-14' : 'top-2'}`}
+                                                    data-testid="map-search-this-area"
+                                                >
+                                                    Search this area
+                                                </button>
+                                            )}
+                                            {/* Fullscreen toggle — desktop only. On
                                     mobile the miniature opens the map and the
                                     header / View-list controls exit it. */}
-                                        {isDesktop && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setMapFullscreen((v) => !v)}
-                                                aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
-                                                title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
-                                                className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas shadow-sm transition"
-                                                data-testid="map-fullscreen-toggle"
-                                            >
-                                                {mapFullscreen ? '×' : '⤢'}
-                                            </button>
-                                        )}
-                                        {mapFullscreen && !isDesktop && (
-                                            <div className="absolute top-0 inset-x-0 z-[702] flex items-center bg-surface/95 backdrop-blur" data-testid="map-fullscreen-header">
-                                                {renderFilterSummaryBar({ className: 'flex-1 min-w-0' })}
-                                            </div>
+                                            {isDesktop && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setMapFullscreen((v) => !v)}
+                                                    aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
+                                                    title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
+                                                    className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas shadow-sm transition"
+                                                    data-testid="map-fullscreen-toggle"
+                                                >
+                                                    {mapFullscreen ? '×' : '⤢'}
+                                                </button>
+                                            )}
+                                            {mapFullscreen && !isDesktop && (
+                                                <div className="absolute top-0 inset-x-0 z-[702] flex items-center bg-surface/95 backdrop-blur" data-testid="map-fullscreen-header">
+                                                    {renderFilterSummaryBar({ className: 'flex-1 min-w-0' })}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {mapFullscreen && !isDesktop && explorerPreviewEvent && (
+                                            <MyEventsMapPreview
+                                                event={explorerPreviewEvent}
+                                                hasPrevious={explorerPreviewIndex > 0}
+                                                hasNext={explorerPreviewIndex < explorerMatchingEvents.length - 1}
+                                                onPrevious={() => stepExplorerMapPreview(-1)}
+                                                onNext={() => stepExplorerMapPreview(1)}
+                                                onOpen={() => handleExplorerMapEventClick(explorerPreviewEvent)}
+                                                showAvatars
+                                                showTags
+                                                showReviews
+                                                showRatings={!!showRatings}
+                                                followingBadgeEnabled={followingBadgeEnabled}
+                                            />
                                         )}
                                     </div>
                                     {/* Map footer: quick area presets + off-map
@@ -1969,6 +1995,7 @@ export default function Home() {
                                     nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
                                     gateMoreEventsForAnonymous
                                     tagsAsBadge
+                                    tribeCard={config.cardVariant === 'tribe'}
                                     headerSlot={trendingBanner}
                                 />
                             </div>
@@ -1976,75 +2003,33 @@ export default function Home() {
                     </div>
                 )}
                 {(!loading || initialLoadDone.current) && !error && viewMode === 'calendar' && (
-                    <>
-                        {/* Calendar toolbar: month navigation + mobile view
-                        mode + the calendar/map layout toggle. */}
-                        <div className="mb-4 flex items-center gap-4 flex-wrap">
-                            <div className="flex items-center gap-1.5 sm:gap-2">
-                                <div className="flex">
-                                    <button className="px-2 py-1 text-sm border border-line bg-surface hover:bg-canvas" onClick={handleCalPrev}>‹</button>
-                                    <button className="px-2.5 py-1 text-sm border-y border-line bg-surface hover:bg-canvas" onClick={handleCalToday}>today</button>
-                                    <button className="px-2 py-1 text-sm border border-line bg-surface hover:bg-canvas" onClick={handleCalNext}>›</button>
-                                </div>
-                                <h2 className="text-xs sm:text-sm font-semibold tracking-tight text-ink whitespace-nowrap leading-none">{calendarTitle}</h2>
-                            </div>
-                            {isMobileViewport && (
-                                <div className="flex gap-1 bg-slate-200 p-1 shrink-0 sm:hidden">
-                                    <button
-                                        className={`px-2 py-1 text-xs font-medium transition ${mobileCalendarView === '3week' ? 'bg-surface text-ink shadow-sm' : 'text-ink-soft hover:text-ink'}`}
-                                        onClick={() => setMobileCalendarView('3week')}
-                                        aria-pressed={mobileCalendarView === '3week'}
-                                    >
-                                        3 wk
-                                    </button>
-                                    <button
-                                        className={`px-2 py-1 text-xs font-medium transition ${mobileCalendarView === 'month' ? 'bg-surface text-ink shadow-sm' : 'text-ink-soft hover:text-ink'}`}
-                                        onClick={() => setMobileCalendarView('month')}
-                                        aria-pressed={mobileCalendarView === 'month'}
-                                    >
-                                        30d
-                                    </button>
-                                </div>
-                            )}
-                            {renderCalendarSectionsToggle()}
-                        </div>
-                        <div className="flex flex-col lg:flex-row gap-6">
-                            {/* Calendar always mounted — CSS-hidden when toggled off */}
-                            <div className={showCalendarGrid ? 'min-w-0 flex-1' : 'calendar-hide-grid h-0 overflow-hidden'}>
-                                <Suspense fallback={null}>
-                                    <Calendar
-                                        ref={calendarRef}
-                                        events={filteredEvents}
-                                        sinceDate={sinceDate ?? undefined}
-                                        onDatesChange={handleDatesChange}
-                                        onEventClick={handleEventClick}
-                                        hoveredEventId={hoveredEventId}
-                                        onEventHover={handleEventHover}
-                                        offMapEventIds={offMapEventIds}
-                                        viewMode={calendarViewMode}
-                                    />
-                                </Suspense>
-                            </div>
-                            <div className={showCalendarGrid
-                                ? 'h-[400px] lg:w-[420px] lg:shrink-0 lg:h-[calc(100vh-200px)] lg:sticky lg:top-6'
-                                : 'h-[70vh] w-full'
-                            }>
-                                <EventMap
-                                    key={String(showCalendarGrid)}
-                                    events={calendarVisibleEvents}
-                                    focusedEvent={selectedEvent}
-                                    onEventClick={handleCalMapEventClick}
-                                    onBoundsChange={handleCalBoundsChange}
-                                    hoveredEventId={hoveredEventId}
-                                    onEventHover={handleEventHover}
-                                    detailLinkSource="calendar-map"
-                                    newEventIds={newEventIds}
-                                    popularityThreshold={popularityThreshold}
-                                    onMarkSeen={markSeen}
-                                />
-                            </div>
-                        </div>
-                    </>
+                    <CalendarMapWorkspace
+                        events={filteredEvents}
+                        viewMode={calendarViewMode}
+                        onViewModeChange={setMobileCalendarView}
+                        rangeSelector="mobile"
+                        sinceDate={sinceDate ?? undefined}
+                        onDatesChange={handleDatesChange}
+                        onEventClick={handleEventClick}
+                        hoveredEventId={hoveredEventId}
+                        onEventHover={handleEventHover}
+                        offMapEventIds={offMapEventIds}
+                        map={(calendarVisible) => (
+                            <EventMap
+                                key={String(calendarVisible)}
+                                events={calendarVisibleEvents}
+                                focusedEvent={selectedEvent}
+                                onEventClick={handleCalMapEventClick}
+                                onBoundsChange={handleCalBoundsChange}
+                                hoveredEventId={hoveredEventId}
+                                onEventHover={handleEventHover}
+                                detailLinkSource="calendar-map"
+                                newEventIds={newEventIds}
+                                popularityThreshold={popularityThreshold}
+                                onMarkSeen={markSeen}
+                            />
+                        )}
+                    />
                 )}
             </main>
 
@@ -2123,4 +2108,12 @@ export default function Home() {
             )}
         </div>
     );
+}
+
+export default function Home() {
+    return <ExplorerView config={EXPLORER_CONFIG} />;
+}
+
+export function TribeCalendarsView() {
+    return <ExplorerView config={TRIBE_CONFIG} />;
 }

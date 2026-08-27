@@ -99,8 +99,11 @@ export default function NotificationsPanel({
          *           to the bottom as a bottom sheet (h-[80vh]).
          *   Desktop (≥sm): row — scrim on the left (flex-1), panel slides
          *           in from the right (h-full, max-w-sm).
+         *
+         * z-index note: Uses z-[10000] to appear above all sticky headers
+         * (e.g., MyEventsExperience's z-[7600]) and other overlays.
          */
-        <div className="fixed inset-0 z-50 flex flex-col sm:flex-row">
+        <div className="fixed inset-0 z-[10000] flex flex-col sm:flex-row">
             {/* Scrim */}
             <button
                 type="button"

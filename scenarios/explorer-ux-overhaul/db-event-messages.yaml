@@ -1,0 +1,89 @@
+# Event messages for Explorer UX overhaul scenario.
+# Messages on high-traffic events (evt-ux-008, evt-ux-011) to test
+# event_message notifications to Going/Saved users.
+# When emit_notifications: true, messages fan out to event participants.
+emit_notifications: true
+messages:
+  # ── evt-ux-008 messages (Amsterdam Social) ────────────────────────
+  # This event has 8 attendees (alice, bob, carol, dave, emma, frank, gina, hugo)
+  - key: msg-ux-008-q1
+    event_id: evt-ux-008
+    email: alice@example.com
+    category: question
+    body: "Hi everyone! Is there a beginner's room or a separate slower floor? I'm a bit rusty."
+    is_hidden: false
+
+  - reply_to: msg-ux-008-q1
+    event_id: evt-ux-008
+    email: emma@example.com
+    body: "Absolutely! The organizers always set up a separate beginner area in the side studio. Very welcoming."
+
+  - reply_to: msg-ux-008-q1
+    event_id: evt-ux-008
+    email: frank@example.com
+    body: "Can confirm — you'll have plenty of space to practice. It's one of the best-organized socials in Amsterdam."
+
+  - key: msg-ux-008-meetup
+    event_id: evt-ux-008
+    email: bob@example.com
+    category: meetup
+    body: "Anyone want to grab dinner before the social? Planning to meet at 7pm near Centraal Station."
+    is_hidden: false
+
+  - reply_to: msg-ux-008-meetup
+    event_id: evt-ux-008
+    email: carol@example.com
+    body: "I'm in! Love that spot. See you at 7."
+
+  - reply_to: msg-ux-008-meetup
+    event_id: evt-ux-008
+    email: gina@example.com
+    body: "Can't make dinner but heading straight to the venue by 8:30. Will catch you there!"
+
+  - key: msg-ux-008-ride
+    event_id: evt-ux-008
+    email: hugo@example.com
+    category: ride
+    body: "Driving from Leiden, have 2 spare seats if anyone needs a ride. Leaving at 7:15pm."
+    is_hidden: false
+
+  - reply_to: msg-ux-008-ride
+    event_id: evt-ux-008
+    email: dave@example.com
+    body: "Perfect! I'd love a ride. I'm near the train station."
+
+  # ── evt-ux-011 messages (London Festival) ────────────────────────
+  # This event has 5 attendees (nia, omar, pablo, quinn, rita)
+  - key: msg-ux-011-q1
+    event_id: evt-ux-011
+    email: nia@example.com
+    category: question
+    body: "Will this festival have a kids area? I'm thinking of bringing my 8-year-old cousin."
+    is_hidden: false
+
+  - reply_to: msg-ux-011-q1
+    event_id: evt-ux-011
+    email: rita@example.com
+    body: "There's a family-friendly afternoon slot (2–5pm) with kids workshops. Main social starts at 8pm."
+
+  - reply_to: msg-ux-011-q1
+    event_id: evt-ux-011
+    email: omar@example.com
+    body: "Great atmosphere for families. Lots of beginner-friendly music too!"
+
+  - key: msg-ux-011-accommodation
+    event_id: evt-ux-011
+    email: pablo@example.com
+    category: accommodation
+    body: "Looking for someone to share an Airbnb near the venue. Would make the weekend more fun!"
+    is_hidden: false
+
+  - reply_to: msg-ux-011-accommodation
+    event_id: evt-ux-011
+    email: quinn@example.com
+    body: "I'm interested! How many nights? Budget range?"
+
+  - reply_to: msg-ux-011-accommodation
+    event_id: evt-ux-011
+    email: nia@example.com
+    body: "Room for one more? I'm in for the whole weekend."

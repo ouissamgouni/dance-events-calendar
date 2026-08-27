@@ -3,6 +3,7 @@ import type { CalendarEvent } from '../types';
 import {
     buildJourneyLegs,
     eventsForMyEventsTab,
+    eventsOverlappingRange,
     groupMyEventsByMonth,
     initialMyEventsTab,
     sequenceMappableEvents,
@@ -63,6 +64,18 @@ describe('eventsForMyEventsTab', () => {
 });
 
 describe('My Events chronology', () => {
+    it('includes every event overlapping the visible calendar range', () => {
+        const rangeStart = new Date('2026-09-01T00:00:00Z');
+        const rangeEnd = new Date('2026-09-22T00:00:00Z');
+        const spanningStart = event('spanning-start', '2026-08-31T20:00:00Z', '2026-09-01T01:00:00Z');
+        const endingAtStart = event('ending-at-start', '2026-08-31T20:00:00Z', '2026-09-01T00:00:00Z');
+        const startingAtEnd = event('starting-at-end', '2026-09-22T00:00:00Z', '2026-09-22T02:00:00Z');
+
+        expect(eventsOverlappingRange([first, spanningStart, endingAtStart, startingAtEnd], rangeStart, rangeEnd)
+            .map((item) => item.event_id))
+            .toEqual(['first', 'spanning-start', 'ending-at-start']);
+    });
+
     it('groups the rendered order by month and sequences only mappable events oldest-first', () => {
         expect(groupMyEventsByMonth([first, overlap]).map((group) => group.key)).toEqual(['2026-09', '2026-10']);
         expect(sequenceMappableEvents([overlap, unmapped, first]).map(({ event: item, sequence }) => [item.event_id, sequence]))

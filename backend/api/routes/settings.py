@@ -199,7 +199,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
             session, "your_next_events_rail_enabled", default=True
         ),
         network_going_snapshot_enabled=_get_bool_setting(
-            session, "network_going_snapshot_enabled", default=True
+            session, "network_going_snapshot_enabled", default=False
         ),
         my_events_route_enabled=_get_bool_setting(session, "my_events_route_enabled"),
         my_events_nav_enabled=_get_bool_setting(
@@ -306,6 +306,15 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         ),
         series_auto_detect_enabled=_get_bool_setting(
             session, "series_auto_detect_enabled"
+        ),
+        event_card_rsvp_action_in_avatar_row_enabled=_get_bool_setting(
+            session, "event_card_rsvp_action_in_avatar_row_enabled"
+        ),
+        event_card_rsvp_and_save_stats_next_to_action_enabled=_get_bool_setting(
+            session, "event_card_rsvp_and_save_stats_next_to_action_enabled"
+        ),
+        for_you_event_cards_date_first_layout_enabled=_get_bool_setting(
+            session, "for_you_event_cards_date_first_layout_enabled"
         ),
     )
 

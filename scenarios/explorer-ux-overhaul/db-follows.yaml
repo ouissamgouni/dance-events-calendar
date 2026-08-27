@@ -1,6 +1,7 @@
 # Follow graph for Explorer UX social filtering, centred on `viewer`.
 # `viewer` has mutual friends plus one-way followees so the "Following" and
 # "Friends" people filters produce visibly different event sets.
+emit_notifications: true
 follows:
   # ── Mutual friends (viewer <-> X) — 6 people ────────────────────
   - { follower: viewer, followee: alice }

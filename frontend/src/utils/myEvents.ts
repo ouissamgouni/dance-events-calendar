@@ -74,6 +74,14 @@ export function sequenceMappableEvents(events: CalendarEvent[]): SequencedEvent[
         .map((event, index) => ({ event, sequence: index + 1 }));
 }
 
+export function eventsOverlappingRange(events: CalendarEvent[], start: Date, end: Date): CalendarEvent[] {
+    return events.filter((event) => {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end || event.start);
+        return eventEnd >= start && eventStart < end;
+    });
+}
+
 export function eventPlace(event: CalendarEvent): string | null {
     const structured = [event.city, event.country].filter(Boolean).join(', ');
     return structured || event.location;

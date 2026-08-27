@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { LensTrail, timeOfDayGreeting } from './ForYouPage';
+import { FeatureFlagsProvider } from '../context/FeatureFlagsContext';
 import { renderWithProviders } from '../test/render';
 
 describe('timeOfDayGreeting', () => {
@@ -31,6 +32,7 @@ describe('LensTrail friends-going pagination', () => {
         })) as any;
 
         renderWithProviders(
+            <FeatureFlagsProvider>
             <LensTrail
                 title="Friends are going"
                 events={events}
@@ -50,7 +52,8 @@ describe('LensTrail friends-going pagination', () => {
                 contextLabel="friends going event"
                 testId="friends-going-trail"
                 cardVariant="friends-going"
-            />,
+            />
+            </FeatureFlagsProvider>,
         );
 
         expect(screen.getByRole('tablist', { name: 'Friends are going scroll position' })).toBeInTheDocument();
@@ -72,6 +75,7 @@ describe('LensTrail friends-going pagination', () => {
         })) as any;
 
         renderWithProviders(
+            <FeatureFlagsProvider>
             <LensTrail
                 title="Friends are going"
                 events={events}
@@ -91,7 +95,8 @@ describe('LensTrail friends-going pagination', () => {
                 contextLabel="friends going event"
                 testId="friends-going-trail"
                 cardVariant="friends-going"
-            />,
+            />
+            </FeatureFlagsProvider>,
         );
 
         const scroller = screen.getByLabelText('Friends are going');

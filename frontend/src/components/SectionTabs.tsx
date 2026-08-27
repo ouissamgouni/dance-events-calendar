@@ -90,6 +90,7 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
     const { hub, tabs } = SECTION_CONFIG[section];
     const title = section === 'tribe' ? 'Your Tribe' : null;
     const minePageTitle = section === 'mine' ? getTitleForMinePath(pathname) : null;
+    const isMyEvents = pathname === '/mine/calendar';
 
     // Whole-section login gate (soft in-page callout). Every /tribe/* and
     // /mine/* route is signed-in only.
@@ -114,7 +115,7 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
     }
 
     return (
-        <div className="min-h-full bg-[#f8fafc]">
+        <div className={isMyEvents ? 'flex h-full min-h-0 flex-col overflow-hidden bg-canvas' : 'min-h-full bg-[#f8fafc]'}>
             {section !== 'mine' && (
                 <div className="border-b border-line bg-surface px-4 pt-1">
                     {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-ink">{title}</h1>}
@@ -122,17 +123,21 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
                 </div>
             )}
             {section === 'mine' && pathname !== hub && minePageTitle && (
-                <div className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="flex items-center gap-2 text-xl font-semibold text-ink">
-                        <Link
-                            to="/mine"
-                            className="text-action hover:text-action focus:outline-none"
-                        >
-                            MyDance
-                        </Link>
-                        <span className="text-ink-soft">&gt;</span>
-                        <span>{minePageTitle}</span>
-                    </div>
+                <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
+                    {pathname === '/mine/calendar' ? (
+                        <h1 className="text-2xl font-bold text-ink">My Events</h1>
+                    ) : (
+                        <div className="flex items-center gap-2 text-xl font-semibold text-ink">
+                            <Link
+                                to="/mine"
+                                className="text-action hover:text-action focus:outline-none"
+                            >
+                                MyDance
+                            </Link>
+                            <span className="text-ink-soft">&gt;</span>
+                            <span>{minePageTitle}</span>
+                        </div>
+                    )}
                     {pathname === '/mine/calendar' && <MyEventsUtilityMenu />}
                 </div>
             )}

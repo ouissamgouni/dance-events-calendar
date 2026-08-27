@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { UserRoundCheck, UserRoundPlus } from 'lucide-react';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
-import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { updateMyVisibility, type ShareAudience } from '../api';
 import { trackShareConversion } from '../utils/tracking';
 import { getActiveReferral } from '../hooks/useReferralAttribution';
@@ -32,36 +33,38 @@ interface Props {
 }
 
 function RaisedHandIcon({ solid, className }: { solid: boolean; className: string }) {
-    if (solid) {
-        return (
-            <svg aria-hidden="true" data-icon-family="hand" data-icon-state="going" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
-                <path d="M10.5 1.875C10.5 1.25368 11.0037 0.75 11.625 0.75C12.2463 0.75 12.75 1.25368 12.75 1.875V10.0938C13.2674 10.2561 13.7708 10.4757 14.25 10.7527V3.375C14.25 2.75368 14.7537 2.25 15.375 2.25C15.9963 2.25 16.5 2.75368 16.5 3.375V14.3122C15.0821 14.5501 13.8891 15.451 13.2506 16.6852C14.4554 16.0866 15.8134 15.75 17.25 15.75C17.6642 15.75 18 15.4142 18 15V12.75L18 12.7336C18.0042 11.8771 18.3339 11.0181 18.9885 10.3635C19.4278 9.92417 20.1402 9.92417 20.5795 10.3635C21.0188 10.8028 21.0188 11.5152 20.5795 11.9545C20.361 12.173 20.2514 12.4567 20.25 12.7445L20.25 12.75L20.25 15.75H20.2454C20.1863 17.2558 19.5623 18.6877 18.4926 19.7574L16.7574 21.4926C15.6321 22.6179 14.106 23.25 12.5147 23.25H10.5C6.35786 23.25 3 19.8921 3 15.75V6.375C3 5.75368 3.50368 5.25 4.125 5.25C4.74632 5.25 5.25 5.75368 5.25 6.375V11.8939C5.71078 11.4421 6.2154 11.0617 6.75 10.7527V3.375C6.75 2.75368 7.25368 2.25 7.875 2.25C8.49632 2.25 9 2.75368 9 3.375V9.90069C9.49455 9.80023 9.99728 9.75 10.5 9.75V1.875Z" />
-            </svg>
-        );
-    }
     return (
-        <svg aria-hidden="true" data-icon-family="hand" data-icon-state="default" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className={className}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m0 0a4.49 4.49 0 0 1 .437-1.997" />
-        </svg>
+        <span className={`flex h-[22px] w-[22px] items-center justify-center ${className}`.trim()} aria-hidden="true">
+            <svg
+                data-icon-family="hand"
+                data-icon-state={solid ? 'going' : 'default'}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.7}
+                className="h-[17px] w-[17px]"
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m0 0a4.49 4.49 0 0 1 .437-1.997"
+                />
+            </svg>
+        </span>
     );
 }
 
 function PersonAttendanceIcon({ solid, className }: { solid: boolean; className: string }) {
-    if (solid) {
-        return (
-            <svg aria-hidden="true" data-icon-family="person" data-icon-state="going" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className={className}>
-                <circle cx="8.5" cy="6.5" r="3.5" fill="currentColor" />
-                <path d="M2 20c0-4.15 2.91-7 6.5-7 2.3 0 4.3 1.17 5.44 3.08A5.5 5.5 0 0 0 13.5 18c0 .7.13 1.38.37 2H2Z" fill="currentColor" />
-                <path d="m14.5 17.25 2.1 2.1 4.4-4.7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        );
-    }
+    const PersonIcon = solid ? UserRoundCheck : UserRoundPlus;
     return (
-        <svg aria-hidden="true" data-icon-family="person" data-icon-state="default" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-            <circle cx="8.5" cy="6.5" r="3.5" />
-            <path d="M2 20c0-4.15 2.91-7 6.5-7 2.63 0 4.86 1.53 5.88 3.92" strokeLinecap="round" />
-            <path d="M18.5 9.5v7M15 13h7" strokeLinecap="round" />
-        </svg>
+        <span className={`flex h-[22px] w-[22px] items-center justify-center ${className}`.trim()} aria-hidden="true">
+            <PersonIcon
+                data-icon-family="person"
+                data-icon-state={solid ? 'going' : 'default'}
+                className="h-3.5 w-3.5"
+                strokeWidth={1.9}
+            />
+        </span>
     );
 }
 
@@ -139,8 +142,6 @@ const POPOVER_WIDTH = 272; // Tailwind w-68 equiv (matches className below).
 export default function GoingButton({
     eventId,
     appearance = 'icon',
-    size = 'md',
-    prominent = false,
     stopPropagation = false,
     className = '',
     isPast = false,
@@ -148,7 +149,7 @@ export default function GoingButton({
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user, refreshUser } = useAuth();
-    const { goingButtonIconVariant } = useFeatureFlags();
+    const { goingButtonIconVariant } = useOptionalFeatureFlags();
     const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
     const going = isAttending(eventId);
 
@@ -302,7 +303,6 @@ export default function GoingButton({
         setPopoverKind('edit');
     };
 
-    const iconSizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
     const goingLabel = isPast ? 'Attended' : 'Going';
     const markLabel = isPast ? 'I attended' : "I'm going";
     const unmarkLabel = isPast ? "Didn't attend" : 'Not going';
@@ -514,7 +514,7 @@ export default function GoingButton({
         if (going && user) {
             return (
                 <div
-                    className={`relative inline-flex items-stretch rounded-full overflow-hidden bg-blue-50 text-action ${className}`.trim()}
+                    className={`relative inline-flex h-10 items-stretch overflow-hidden rounded-xl bg-action/10 text-action ${className}`.trim()}
                 >
                     <button
                         ref={triggerRef}
@@ -522,9 +522,9 @@ export default function GoingButton({
                         onClick={handleClick}
                         title={tooltip}
                         aria-label={tooltip}
-                        className="text-xs px-3 py-1 transition flex items-center gap-1.5 hover:bg-blue-100"
+                        className="flex items-center gap-2 px-3 text-sm transition-colors hover:bg-action/10 focus-visible:outline-none"
                     >
-                        <AttendanceIcon variant={resolvedIconVariant} solid className="w-3.5 h-3.5" />
+                        <AttendanceIcon variant={resolvedIconVariant} solid className="shrink-0" />
                         {goingLabel}
                     </button>
                     <button
@@ -532,7 +532,7 @@ export default function GoingButton({
                         onClick={openEditShare}
                         title={`Visibility: ${getAudience(eventId)} \u2014 click to edit`}
                         aria-label={`Visibility: ${getAudience(eventId)} \u2014 edit`}
-                        className="px-2 transition flex items-center hover:bg-blue-100 border-l border-blue-200 text-action"
+                        className="flex items-center border-l border-action/20 px-2 text-action transition-colors hover:bg-action/10 focus-visible:outline-none"
                     >
                         <AudienceTierIcon audience={getAudience(eventId)} className="w-3.5 h-3.5" />
                     </button>
@@ -549,16 +549,12 @@ export default function GoingButton({
                     onClick={handleClick}
                     title={tooltip}
                     aria-label={tooltip}
-                    className={
-                        prominent && !going
-                            ? `rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition flex items-center gap-2 bg-action text-white hover:opacity-90 ${className}`.trim()
-                            : `text-xs rounded-full px-3 py-1 transition flex items-center gap-1.5 ${going ? 'text-action bg-blue-50 hover:bg-blue-100' : 'text-ink-soft bg-slate-100 hover:bg-canvas'} ${className}`.trim()
-                    }
+                    className={`flex h-10 items-center gap-2 rounded-xl px-3 text-sm transition-colors focus-visible:outline-none ${className} ${going ? 'bg-action/10 text-action hover:bg-action/10' : 'bg-action-tile text-ink-soft hover:text-ink'}`.trim()}
                 >
                     <AttendanceIcon
                         variant={resolvedIconVariant}
                         solid={going}
-                        className={prominent && !going ? 'w-4 h-4' : 'w-3.5 h-3.5'}
+                        className="shrink-0"
                     />
                     {going ? goingLabel : markLabel}
                 </button>
@@ -576,9 +572,9 @@ export default function GoingButton({
                 onClick={handleClick}
                 aria-label={tooltip}
                 title={tooltip}
-                className={`relative inline-flex shrink-0 items-center justify-center rounded-full border border-line bg-transparent shadow-sm transition-colors ${size === 'sm' ? 'h-7 w-7' : 'h-9 w-9'} ${going ? 'text-action hover:bg-blue-50' : 'text-ink-soft hover:bg-canvas'} ${className}`.trim()}
+                className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none ${className} ${going ? 'bg-action/10 text-action hover:bg-action/10' : 'bg-action-tile text-ink-soft hover:text-ink'}`.trim()}
             >
-                <AttendanceIcon variant={resolvedIconVariant} solid={going} className={iconSizeClass} />
+                <AttendanceIcon variant={resolvedIconVariant} solid={going} className="shrink-0" />
             </button>
 
             {popover}

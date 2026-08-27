@@ -8,6 +8,7 @@ interface ConfirmDialogProps {
     confirmLabel?: string;
     cancelLabel?: string;
     destructive?: boolean;
+    busy?: boolean;
     onConfirm: () => void;
     onCancel: () => void;
 }
@@ -26,6 +27,7 @@ export function ConfirmDialog({
     confirmLabel = 'Confirm',
     cancelLabel = 'Cancel',
     destructive = false,
+    busy = false,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
@@ -50,6 +52,7 @@ export function ConfirmDialog({
                     <button
                         type="button"
                         onClick={onCancel}
+                        disabled={busy}
                         className="border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas"
                     >
                         {cancelLabel}
@@ -57,11 +60,12 @@ export function ConfirmDialog({
                     <button
                         type="button"
                         onClick={onConfirm}
+                        disabled={busy}
                         className={destructive
-                            ? 'bg-danger px-3 py-1.5 text-sm font-medium text-white hover:bg-danger/90'
-                            : 'bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action'}
+                            ? 'bg-danger px-3 py-1.5 text-sm font-medium text-white hover:bg-danger/90 disabled:opacity-50'
+                            : 'bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action disabled:opacity-50'}
                     >
-                        {confirmLabel}
+                        {busy ? 'Working…' : confirmLabel}
                     </button>
                 </div>
             </div>
