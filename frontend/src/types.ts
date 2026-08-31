@@ -130,7 +130,7 @@ export interface CalendarEvent {
     price_min: number | null;
     price_max: number | null;
     price_currency: string | null;
-    price_is_free: boolean;
+    price_is_free: boolean | null;
     review_status?: string;
     is_hidden?: boolean;
     is_blocked?: boolean;
@@ -346,6 +346,12 @@ export interface Attendee {
     avatar_url: string | null;
     handle: string | null;
     viewer_follow_status?: 'pending' | 'approved';
+    /** Event "People" tab: attendee is a mutual friend of the viewer. */
+    is_friend?: boolean;
+    /** Event "People" tab: count of the viewer's friends who follow this attendee. */
+    mutual_friend_count?: number;
+    /** "going" (RSVP'd) or "interested" (saved). Defaults to "going". */
+    attendance_status?: 'going' | 'interested';
 }
 
 export interface FriendMini {
@@ -475,7 +481,7 @@ export interface EventSuggestion {
     price_min?: number | null;
     price_max?: number | null;
     price_currency?: string | null;
-    price_is_free?: boolean;
+    price_is_free?: boolean | null;
     created_at: string;
     reviewed_at: string | null;
     reviewed_by: string | null;

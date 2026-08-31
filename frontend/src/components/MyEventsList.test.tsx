@@ -85,23 +85,26 @@ function reviewGroups(): TagGroup[] {
 }
 
 describe('MyEventsList', () => {
-    it('groups rows by month without map sequence numbers and shows Upcoming actions', () => {
+    it('groups rows by month without map sequence numbers and shows the base Upcoming card', () => {
         renderList('upcoming', [event('one', '/event.jpg'), event('two', null)]);
 
         expect(screen.getByText('September 2026')).toBeInTheDocument();
         expect(screen.getAllByTestId('my-events-row')).toHaveLength(2);
         expect(screen.getAllByTestId('event-card-image')).toHaveLength(1);
         expect(screen.queryByText('#1')).not.toBeInTheDocument();
-        expect(screen.getAllByRole('button', { name: 'Save event' }).length).toBeGreaterThan(0);
-        expect(screen.getAllByRole('button', { name: "I'm going" }).length).toBeGreaterThan(0);
+        // Upcoming keeps the base card (picture, title, time, location) plus
+        // the avatars stack — no Save / I'm going action buttons.
+        expect(screen.queryByRole('button', { name: 'Save event' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: "I'm going" })).not.toBeInTheDocument();
     });
 
-    it('removes a failed image and shows compact Saved actions', () => {
+    it('removes a failed image and shows only the I\'m going button on Saved', () => {
         renderList('saved', [event('saved', '/broken.jpg')]);
 
         fireEvent.error(screen.getByTestId('event-card-image'));
         expect(screen.queryByTestId('event-card-image')).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Save event' })).toBeInTheDocument();
+        // Saved adds the I'm going button to the base card, but not Save.
+        expect(screen.queryByRole('button', { name: 'Save event' })).not.toBeInTheDocument();
         const going = screen.getByRole('button', { name: "I'm going" });
         expect(going.querySelector('[data-icon-family="hand"]')).toBeInTheDocument();
     });

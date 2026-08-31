@@ -17,6 +17,12 @@ interface Props {
     /** Show tags + reviews line (explorer preview shows them). */
     showTags?: boolean;
     showReviews?: boolean;
+    /** Show the price / discount line (explorer preview shows it). */
+    showPrice?: boolean;
+    /** Show the Save / I'm going action cluster (explorer preview shows it). */
+    showActions?: boolean;
+    /** Which actions to offer when `showActions` is set. */
+    actions?: ReadonlyArray<'save' | 'going'>;
     showRatings?: boolean;
     followingBadgeEnabled?: boolean;
 }
@@ -39,6 +45,9 @@ export default function MyEventsMapPreview({
     showAvatars = false,
     showTags = false,
     showReviews = false,
+    showPrice = false,
+    showActions = false,
+    actions,
     showRatings = false,
     followingBadgeEnabled = false,
 }: Props) {
@@ -67,7 +76,7 @@ export default function MyEventsMapPreview({
             className="shrink-0 border-t border-line bg-surface px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-xl focus:outline-none"
             data-testid="my-events-map-preview"
         >
-            <div className="mx-auto grid max-w-2xl grid-cols-[40px_minmax(0,1fr)_40px] items-center gap-2">
+            <div className="mx-auto grid max-w-3xl grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-2">
                 <button
                     type="button"
                     onClick={onPrevious}
@@ -85,6 +94,9 @@ export default function MyEventsMapPreview({
                     showAvatars={showAvatars}
                     showTags={showTags}
                     showReviews={showReviews}
+                    showPrice={showPrice}
+                    showActions={showActions}
+                    actions={actions}
                     showRatings={showRatings}
                     followingBadgeEnabled={followingBadgeEnabled}
                     goingIconVariant="hand"

@@ -1,10 +1,6 @@
 import type { Tag } from '../types';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 
-/** The "International" reach tag renders as an icon (globe) instead of a
- * text label across all cards. */
-const isInternationalReach = (t: Tag) => t.group_slug === 'reach' && t.slug === 'international';
-
 interface Props {
     tags: Tag[];
     maxVisible?: number;
@@ -13,6 +9,11 @@ interface Props {
     /** Force the colored variant even when the `tagBadgeColored` flag is
      * off. Ignored in plain-text mode. */
     forceColored?: boolean;
+    /** Force calm grey chips regardless of the colored flag/prop — used on the
+     * event page/modal where taxonomy colour is intentionally suppressed. */
+    neutral?: boolean;
+    /** Chip scale. `sm` renders the larger event-page chips (~11px, rounded). */
+    size?: 'xs' | 'sm';
     /** Keep badges on a single line, clipping overflow (paired with a low
      * `maxVisible` + "+x" so the row never wraps). */
     singleLine?: boolean;
@@ -20,7 +21,7 @@ interface Props {
     priorityGroups?: string[];
 }
 
-export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, forceColored = false, singleLine = false, priorityGroups }: Props) {
+export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, forceColored = false, neutral = false, size = 'xs', singleLine = false, priorityGroups }: Props) {
     const { tagAsBadge, tagBadgeColored } = useFeatureFlags();
     const filtered = tags.filter((tag) => tag.enabled);
     if (!filtered.length) return null;
@@ -45,9 +46,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
                 {visible.map((t, i) => (
                     <span key={t.id}>
                         {i > 0 && ' \u00b7 '}
-                        {isInternationalReach(t)
-                            ? <img src="/international-reach.png" alt={t.label} title={t.label} className="inline-block h-3 w-3 align-text-bottom object-contain" />
-                            : t.label}
+                        {t.label}
                     </span>
                 ))}
                 {overflowLabel}
@@ -57,27 +56,17 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
 
     // Badge mode. Colored variant is opt-in via `tagBadgeColored` flag
     // or explicit `forceColored` prop; otherwise render calm grey chips.
-    const useColor = forceColored || tagBadgeColored;
+    const useColor = !neutral && (forceColored || tagBadgeColored);
+    const chip = size === 'sm' ? 'px-2 py-0.5 text-[11px] rounded-md' : 'px-1.5 py-px text-[9px] leading-3';
     return (
         <div className={singleLine ? 'flex flex-nowrap gap-1 overflow-hidden' : 'flex flex-wrap gap-1'}>
             {visible.map((tag) => {
-                if (isInternationalReach(tag)) {
-                    return (
-                        <span
-                            key={tag.id}
-                            className="inline-flex items-center bg-slate-100 px-1 py-px leading-3"
-                            title={`${tag.group_label}: ${tag.label}`}
-                        >
-                            <img src="/international-reach.png" alt={tag.label} className="h-3 w-3 object-contain" />
-                        </span>
-                    );
-                }
                 if (useColor) {
                     const c = tag.group_color ?? tag.color ?? '#6b7280';
                     return (
                         <span
                             key={tag.id}
-                            className="inline-flex items-center px-1.5 py-px text-[9px] font-medium leading-3"
+                            className={`inline-flex items-center font-medium ${chip}`}
                             style={{
                                 backgroundColor: `${c}20`,
                                 color: c,
@@ -92,7 +81,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
                 return (
                     <span
                         key={tag.id}
-                        className="inline-flex items-center bg-slate-100 px-1.5 py-px text-[9px] font-medium leading-3 text-ink-soft"
+                        className={`inline-flex items-center bg-slate-100 font-medium text-ink-soft ${chip}`}
                         title={`${tag.group_label}: ${tag.label}`}
                     >
                         {tag.label}
@@ -100,7 +89,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
                 );
             })}
             {overflow > 0 && (
-                <span className="inline-flex items-center px-1.5 py-px text-[9px] font-medium leading-3 text-muted">
+                <span className={`inline-flex items-center font-medium text-muted ${chip}`}>
                     +{overflow}
                 </span>
             )}

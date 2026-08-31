@@ -22,6 +22,8 @@ import type {
 } from '../types';
 import MyDanceActivityStrip from '../components/MyDanceActivityStrip';
 import MyDanceJourneyMap from '../components/MyDanceJourneyMap';
+import MilestoneCarousel from '../components/MilestoneCarousel';
+import PassportSummaryCard from '../components/PassportSummaryCard';
 import SectionHeading from '../components/SectionHeading';
 import YourNextEventsRail from '../components/YourNextEventsRail';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +38,12 @@ export function closestMilestone(milestones: PassportMilestone[]): PassportMiles
             ? milestone
             : best,
     );
+}
+
+export function inProgressMilestones(milestones: PassportMilestone[]): PassportMilestone[] {
+    return milestones
+        .filter((m) => !m.unlocked && m.threshold > 0)
+        .sort((a, b) => (b.progress / b.threshold) - (a.progress / a.threshold));
 }
 
 interface ShortcutProps {
@@ -142,90 +150,39 @@ export default function MineHub() {
     return (
         <div className="min-h-full bg-canvas">
             <div className="mx-auto max-w-3xl space-y-4 px-4 py-4">
-                <section className="overflow-hidden rounded-card bg-brand-strong p-4 text-white shadow-sm" aria-label="My dance journey">
-                    <div className="grid min-h-20 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-                        <div className="flex flex-col gap-1">
-                            <div className="relative z-10 flex items-center gap-2">
-                                {user?.avatar_url ? (
-                                    <img
-                                        src={user.avatar_url}
-                                        alt=""
-                                        className="h-12 w-12 shrink-0 rounded-full border-[3px] border-white/40 object-cover"
-                                        referrerPolicy="no-referrer"
-                                    />
-                                ) : (
-                                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg font-bold">
-                                        {displayName.charAt(0).toUpperCase()}
-                                    </span>
-                                )}
-                                <div className="min-w-0">
-                                    <h1 className="truncate text-2xl font-bold">{displayName}</h1>
-                                    {user?.handle && <p className="mt-1 truncate text-sm text-white/80">@{user.handle}</p>}
-                                </div>
-                            </div>
-                            <div className="relative z-10 text-sm font-bold leading-none">
-                                {plural(stats?.total_events_attended ?? 0, 'event')}
-                            </div>
-                            <Link
-                                to="/mine/passport"
-                                className="flex items-center gap-1.5 text-xs font-semibold text-white/80 transition hover:text-white focus:outline-none focus:ring-2 focus:ring-white w-fit whitespace-nowrap"
-                                aria-label="Visit passport"
-                            >
-                                <span>{plural(stats?.cities_visited ?? 0, 'city', 'cities')}</span>
-                                <span aria-hidden="true">·</span>
-                                <span>{plural(stats?.countries_visited ?? 0, 'country', 'countries')}</span>
-                                <img
-                                    src="/passport.png"
-                                    alt=""
-                                    className="h-6 w-6 shrink-0"
-                                    style={{ filter: 'invert(1)' }}
-                                    aria-hidden="true"
-                                />
-                            </Link>
-                        </div>
-                        <div className="min-w-0 opacity-90 flex flex-col gap-0.5">
-                            <div className="h-20">
-                                <MyDanceJourneyMap coords={coords} />
-                            </div>
-                            {passport?.monthly_activity && (
-                                <MyDanceActivityStrip months={passport.monthly_activity} size="xs" />
-                            )}
-                        </div>
-                    </div>
-                </section>
+                <PassportSummaryCard
+                    displayName={displayName}
+                    handle={user?.handle ?? null}
+                    avatarUrl={user?.avatar_url ?? null}
+                    eventsCount={stats?.total_events_attended ?? 0}
+                    citiesCount={stats?.cities_visited ?? 0}
+                    countriesCount={stats?.countries_visited ?? 0}
+                    coords={coords}
+                    monthlyActivity={passport?.monthly_activity ?? []}
+                    mapOverlay={
+                        <Link
+                            to="/mine/passport"
+                            className="flex flex-col items-center gap-0.5 text-white hover:text-white/80 transition focus:outline-none focus:ring-2 focus:ring-white rounded p-1"
+                            aria-label="View passport"
+                        >
+                            <img
+                                src="/passport.png"
+                                alt=""
+                                className="h-5 w-5"
+                                style={{ filter: 'invert(1)' }}
+                                aria-hidden="true"
+                            />
+                            <span className="h-0.5 w-2 bg-white/80 rounded-full" aria-hidden="true" />
+                        </Link>
+                    }
+                />
 
                 <YourNextEventsRail
                     events={goingEvents}
                     loading={attendingLoading || loading}
                 />
 
-                {milestone && (
-                    <section aria-labelledby="next-milestone-title">
-                        <SectionHeading
-                            id="next-milestone-title"
-                            title="Next Milestone"
-                            action={{ label: 'See all', to: '/mine/passport' }}
-                        />
-                        <Link
-                            to="/mine/passport"
-                            className="flex items-center rounded-card border border-card-line bg-surface p-3 shadow-sm transition hover:border-action focus:outline-none focus:ring-2 focus:ring-action"
-                        >
-                            <span className="mr-4 text-4xl" aria-hidden="true">{milestone.icon || '🏆'}</span>
-                            <span className="min-w-0 flex-1">
-                                <span className="block text-lg font-bold text-ink">{milestone.name}</span>
-                                <span className="mt-1 block text-sm font-semibold text-ink-soft tabular-nums">
-                                    {milestone.progress} / {milestone.threshold} {milestone.unit}
-                                </span>
-                                <span className="mt-3 block h-2 overflow-hidden rounded-full bg-line">
-                                    <span
-                                        className="block h-full rounded-full bg-brand"
-                                        style={{ width: `${Math.min(100, (milestone.progress / milestone.threshold) * 100)}%` }}
-                                    />
-                                </span>
-                            </span>
-                        </Link>
-                    </section>
-                )}
+                <MilestoneCarousel milestones={inProgressMilestones(passport?.milestones ?? [])} />
 
                 <section aria-labelledby="my-dance-title">
                     <h2 id="my-dance-title" className="mb-2 text-lg font-bold text-ink">My Dance</h2>

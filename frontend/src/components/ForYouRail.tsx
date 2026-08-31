@@ -90,12 +90,17 @@ export default function ForYouRail({
     // scroll offset persists and the first card of the new lens can be
     // partially off-screen.
     const scrollerRef = useRef<HTMLDivElement | null>(null);
+    const lensTabsRef = useRef<HTMLDivElement | null>(null);
 
     const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [
         collapsed,
         activeLens,
         displayCap,
         lensState[activeLens].events.length,
+    ]);
+
+    const { dotCount: lensDotCount, activeIndex: lensActiveIndex, scrollToIndex: lensScrollToIndex } = useScrollDots(lensTabsRef, [
+        availableLenses.length,
     ]);
 
     useEffect(() => {
@@ -150,30 +155,36 @@ export default function ForYouRail({
                     For you
                 </button>
                 {!collapsed && availableLenses.length > 1 && (
-                    <div
-                        className="flex min-w-0 items-center gap-1 overflow-x-auto"
-                        role="tablist"
-                        aria-label="For you lens"
-                    >
-                        {availableLenses.map((lens) => {
-                            const isActive = activeLens === lens;
-                            return (
-                                <button
-                                    key={lens}
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={isActive}
-                                    data-testid={`for-you-lens-tab-${lens}`}
-                                    onClick={() => setActiveLens(lens)}
-                                    className={`shrink-0 px-1.5 py-px text-[11px] font-medium transition border ${isActive
-                                        ? 'bg-surface border-blue-300 text-action shadow-sm'
-                                        : 'bg-blue-50 border-blue-100 text-action hover:bg-surface hover:border-blue-300'}`}
-                                >
-                                    {LENS_LABELS[lens]}
-                                </button>
-                            );
-                        })}
-                    </div>
+                    <>
+                        <div
+                            ref={lensTabsRef}
+                            className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                            role="tablist"
+                            aria-label="For you lens"
+                        >
+                            {availableLenses.map((lens) => {
+                                const isActive = activeLens === lens;
+                                return (
+                                    <button
+                                        key={lens}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={isActive}
+                                        data-testid={`for-you-lens-tab-${lens}`}
+                                        onClick={() => setActiveLens(lens)}
+                                        className={`shrink-0 px-1.5 py-px text-[11px] font-medium transition border ${isActive
+                                            ? 'bg-surface border-blue-300 text-action shadow-sm'
+                                            : 'bg-blue-50 border-blue-100 text-action hover:bg-surface hover:border-blue-300'}`}
+                                    >
+                                        {LENS_LABELS[lens]}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="flex justify-center">
+                            <ScrollDotsIndicator count={lensDotCount} activeIndex={lensActiveIndex} onSelect={lensScrollToIndex} />
+                        </div>
+                    </>
                 )}
                 <button
                     type="button"

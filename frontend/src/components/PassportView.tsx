@@ -20,6 +20,7 @@ import EventMap from './EventMap';
 import MyDanceActivityStrip from './MyDanceActivityStrip';
 import MyDanceJourneyMap from './MyDanceJourneyMap';
 import PassportActivityHeatmap from './PassportActivityHeatmap';
+import PassportSummaryCard from './PassportSummaryCard';
 import type {
     PassportConsistency,
     PassportMapEvent,
@@ -76,23 +77,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     );
 }
 
-function PassportAvatar({ name, url }: { name: string; url: string | null }) {
-    if (url) {
-        return (
-            <img
-                src={url}
-                alt=""
-                referrerPolicy="no-referrer"
-                className="h-16 w-16 shrink-0 rounded-full border-4 border-white/40 object-cover"
-            />
-        );
-    }
-    return (
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-white/40 bg-white/15 text-2xl font-semibold text-white">
-            {name.trim().charAt(0).toUpperCase() || '?'}
-        </span>
-    );
-}
+
 
 function SummaryHeader({
     data,
@@ -115,43 +100,27 @@ function SummaryHeader({
             : [],
     );
     return (
-        <header className="relative overflow-hidden rounded-card bg-brand-strong p-4 text-white shadow-sm">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-                <div className="flex flex-col gap-1">
-                    <div className="relative z-10 flex min-w-0 items-center gap-3">
-                        <PassportAvatar name={displayName} url={avatarUrl} />
-                        <div className="min-w-0">
-                            <h1 className="truncate text-xl font-semibold">{displayName}</h1>
-                            {handle && <p className="truncate text-sm text-white/75">@{handle}</p>}
-                        </div>
-                    </div>
-                    <div className="relative z-10 text-sm font-semibold">
-                        {data.stats.total_events_attended} events
-                    </div>
-                    <div className="relative z-10 text-[9px] leading-5 text-white/85">
-                        {dancingSinceSlot ?? (
-                            <>
-                                <div className="whitespace-nowrap">Dancing since {formatDate(data.stats.dancing_since ?? data.stats.member_since)}</div>
-                                {data.stats.first_event_date && (
-                                    <p>First event on Movida {formatDate(data.stats.first_event_date)}</p>
-                                )}
-                            </>
+        <PassportSummaryCard
+            displayName={displayName}
+            handle={handle}
+            avatarUrl={avatarUrl}
+            eventsCount={data.stats.total_events_attended}
+            citiesCount={data.stats.cities_visited}
+            countriesCount={data.stats.countries_visited}
+            coords={mapCoords}
+            monthlyActivity={data.monthly_activity ?? []}
+            actions={actions}
+            footer={
+                dancingSinceSlot ?? (
+                    <div className="text-xs leading-5 text-white/85 space-y-1">
+                        <div className="whitespace-nowrap">Dancing since {formatDate(data.stats.dancing_since ?? data.stats.member_since)}</div>
+                        {data.stats.first_event_date && (
+                            <div className="whitespace-nowrap">First event on Movida {formatDate(data.stats.first_event_date)}</div>
                         )}
                     </div>
-                </div>
-                <div className="pointer-events-none min-w-0 opacity-90 flex flex-col gap-0.5">
-                    <div className="h-18">
-                        <MyDanceJourneyMap coords={mapCoords} />
-                    </div>
-                    <MyDanceActivityStrip months={data.monthly_activity ?? []} size="xs" />
-                </div>
-            </div>
-            {actions && (
-                <div className="absolute bottom-4 right-4 z-[9000]">
-                    {actions}
-                </div>
-            )}
-        </header>
+                )
+            }
+        />
     );
 }
 

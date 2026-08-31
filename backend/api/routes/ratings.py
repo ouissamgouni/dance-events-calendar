@@ -861,25 +861,12 @@ def get_series_rollup(
 def get_rating_aggregates_batch(
     body: BatchAggregateRequest,
     session: Session = Depends(get_session),
-    # Count-only response — open to anonymous visitors so signed-out cards and
-    # the community-experience header can show "N reviews" (content stays gated).
     user: User | None = Depends(get_current_user_optional),
 ):
-    rows = session.exec(
-        select(EventRating.event_id).where(
-            col(EventRating.event_id).in_(body.event_ids),
-            EventRating.status != "rejected",
-        )
-    ).all()
+    min_reviews = get_review_mood_headline_min_reviews(session)
+    results: dict[str, EventRatingAggregate] = {}
 
-    counts: dict[str, int] = {eid: 0 for eid in body.event_ids}
-    for eid in rows:
-        if eid in counts:
-            counts[eid] += 1
-
-    # Upcoming editions in a resolved series with history surface the series'
-    # pooled review count (so a fresh edition isn't shown as review-less) —
-    # mirroring the cross-edition roll-up used by the full experience section.
+    # Identify upcoming events in resolved series for special handling
     now = datetime.utcnow()
     upcoming_ids = [
         ev_id
@@ -891,6 +878,9 @@ def get_rating_aggregates_batch(
         if end is not None and end > now
     ]
 
+    series_by_event: dict[str, int] = {}
+    resolved_series_ids: set[int] = set()
+
     if upcoming_ids:
         series_by_event = {
             ev_id: sid
@@ -900,8 +890,8 @@ def get_rating_aggregates_batch(
                 )
             ).all()
         }
-        resolved = (
-            {
+        if series_by_event:
+            resolved_series_ids = {
                 s_id
                 for s_id in session.exec(
                     select(EventSeries.id).where(
@@ -910,40 +900,74 @@ def get_rating_aggregates_batch(
                     )
                 ).all()
             }
-            if series_by_event
-            else set()
+
+    # Process series roll-ups first
+    if resolved_series_ids:
+        all_members = session.exec(
+            select(EventSeriesMember.series_id, EventSeriesMember.event_id).where(
+                col(EventSeriesMember.series_id).in_(resolved_series_ids)
+            )
+        ).all()
+        member_event_ids = [ev_id for _sid, ev_id in all_members]
+
+        # Compute mood per edition in the series
+        edition_moods: dict[str, MoodMetrics] = {}
+        if member_event_ids:
+            for eid in member_event_ids:
+                total, dist, *_ = _aggregate_core(session, [eid])
+                mood = compute_mood_metrics(dist, min_reviews)
+                edition_moods[eid] = mood
+
+        # Build series roll-ups
+        for series_id in resolved_series_ids:
+            edition_ids = [ev_id for sid, ev_id in all_members if sid == series_id]
+            edition_averages = [
+                edition_moods[eid].average_mood
+                for eid in edition_ids
+                if eid in edition_moods
+            ]
+            edition_positives = [
+                edition_moods[eid].positive_percentage
+                for eid in edition_ids
+                if eid in edition_moods
+            ]
+            total_reviews = sum(
+                edition_moods[eid].review_count
+                for eid in edition_ids
+                if eid in edition_moods
+            )
+
+            rollup = mood_metrics_from_averages(
+                edition_averages, total_reviews, edition_positives, min_reviews
+            )
+
+            for ev_id in edition_ids:
+                if ev_id in series_by_event and series_by_event[ev_id] == series_id:
+                    results[ev_id] = EventRatingAggregate(
+                        event_id=ev_id,
+                        count=rollup.review_count,
+                        average_mood=rollup.average_mood,
+                        mood_label=rollup.mood_label,
+                        display_state=rollup.display_state,
+                    )
+
+    # Process remaining events (past, non-series, or non-resolved series)
+    processed = set(results.keys())
+    remaining = [eid for eid in body.event_ids if eid not in processed]
+
+    for event_id in remaining:
+        total, sentiment_dist, *_ = _aggregate_core(session, [event_id])
+        mood = compute_mood_metrics(sentiment_dist, min_reviews)
+        results[event_id] = EventRatingAggregate(
+            event_id=event_id,
+            count=mood.review_count,
+            average_mood=mood.average_mood,
+            mood_label=mood.mood_label,
+            display_state=mood.display_state,
         )
 
-        if resolved:
-            all_members = session.exec(
-                select(EventSeriesMember.series_id, EventSeriesMember.event_id).where(
-                    col(EventSeriesMember.series_id).in_(resolved)
-                )
-            ).all()
-            member_event_ids = [ev_id for _sid, ev_id in all_members]
-            rating_counts: dict[str, int] = {}
-            if member_event_ids:
-                for ev_id in session.exec(
-                    select(EventRating.event_id).where(
-                        col(EventRating.event_id).in_(member_event_ids),
-                        EventRating.status != "rejected",
-                    )
-                ).all():
-                    rating_counts[ev_id] = rating_counts.get(ev_id, 0) + 1
-            pooled_by_series: dict[int, int] = {}
-            for sid, ev_id in all_members:
-                pooled_by_series[sid] = pooled_by_series.get(
-                    sid, 0
-                ) + rating_counts.get(ev_id, 0)
-            for ev_id in upcoming_ids:
-                sid = series_by_event.get(ev_id)
-                if sid in resolved:
-                    pooled = pooled_by_series.get(sid, 0)
-                    if pooled > 0:
-                        counts[ev_id] = pooled
-
     return [
-        EventRatingAggregate(event_id=eid, count=counts[eid]) for eid in body.event_ids
+        results.get(eid, EventRatingAggregate(event_id=eid)) for eid in body.event_ids
     ]
 
 

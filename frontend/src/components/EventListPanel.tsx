@@ -12,6 +12,7 @@ import { isPriceSectionVisible } from '../utils/sectionVisibility';
 import { PriceBadge, DiscountBadge } from './CardPriceBadges';
 import CardActionCluster from './CardActionCluster';
 import CardReviewsLine from './CardReviewsLine';
+import EventCard from './EventCard';
 
 interface MapBounds {
     north: number;
@@ -219,6 +220,33 @@ export function EventListCard({
         </span>
     ) : null;
 
+    // Explorer opt-in: render the shared My Events card style while keeping
+    // all of the explorer card's data (trending, avatars, tags, reviews).
+    // NOTE: explorerEventCardCardStyleEnabled flag does not exist yet.
+    const explorerEventCardCardStyleEnabled = false;
+    if (explorerEventCardCardStyleEnabled) {
+        return (
+            <div ref={cardRef}>
+                <EventCard
+                    event={event}
+                    onOpen={onEventClick}
+                    onHover={onEventHover}
+                    dateRail={timeline}
+                    highlighted={isHighlighted}
+                    isNew={isNew}
+                    isTrending={showPopularity && isTrendingScore(event.popularity_score ?? 0, allViewCounts, popularityThreshold, trendingTopN, trendingTopPercent)}
+                    followingBadgeEnabled={followingBadgeEnabled}
+                    showRatings={showRatings}
+                    isSavedFlag={isSavedFlag}
+                    isPast={isPast}
+                    tagsAsBadge={tagsAsBadge}
+                    goingIconVariant="hand"
+                    testId="event-list-card"
+                />
+            </div>
+        );
+    }
+
     return (
         <>
             <div
@@ -287,17 +315,11 @@ export function EventListCard({
                                 : (event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`)}
                         </p>
                     </div>
-                    {(priceVisible || event.has_active_promo_codes || event.location) ? (
+                    {event.location ? (
                         <p className="event-card-location gap-1.5">
                             {offMapBadge}
                             {event.location && (
                                 <span className="event-card-location-text" title={event.location ?? undefined}>{shortLocation(event.location) ?? event.location}</span>
-                            )}
-                            {(priceVisible || event.has_active_promo_codes) && (
-                                <span className="ml-auto flex shrink-0 items-center gap-1.5">
-                                    {priceVisible && <PriceBadge event={event} />}
-                                    {event.has_active_promo_codes && <DiscountBadge />}
-                                </span>
                             )}
                         </p>
                     ) : (
@@ -306,6 +328,12 @@ export function EventListCard({
                                 <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
                             </span>
                         )
+                    )}
+                    {(priceVisible || event.has_active_promo_codes) && (
+                        <p className="event-card-location gap-1.5">
+                            {priceVisible && <PriceBadge event={event} />}
+                            {event.has_active_promo_codes && <DiscountBadge />}
+                        </p>
                     )}
                     {!tribeLayout && (
                         <div className="mt-1.5 flex items-center gap-1.5 min-w-0">
@@ -777,7 +805,7 @@ export default function EventListPanel({
                                                 ? 'Looking ahead…'
                                                 : nextPeriodEventCount === 0
                                                     ? 'No future events found'
-                                                    : `+ ${nextPeriodEventCount} more`}
+                                                    : `Search later dates (${nextPeriodEventCount})`}
                                     </button>
                                 </div>
                             )}

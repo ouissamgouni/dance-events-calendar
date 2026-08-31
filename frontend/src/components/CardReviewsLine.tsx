@@ -35,8 +35,8 @@ export default function CardReviewsLine({ eventId, showRatings, separator = true
                 >
                     {hasMood ? (
                         <span className="truncate">
-                            {aspectMood(agg!.average_mood).emoji} Usually {agg!.mood_label!.toLowerCase()}
-                            {reviews > 0 && ` - ${reviews} review${reviews === 1 ? '' : 's'}`}
+                            {aspectMood(agg!.average_mood).emoji} {agg!.mood_label}
+                            {reviews > 0 && ` \u00b7 ${reviews} review${reviews === 1 ? '' : 's'}`}
                         </span>
                     ) : (
                         <span className="flex items-center gap-1">
@@ -55,7 +55,7 @@ export default function CardReviewsLine({ eventId, showRatings, separator = true
                     className="ml-auto flex shrink-0 items-center gap-1 text-ink-soft hover:text-ink"
                 >
                     <img src="/question.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
-                    <span className="tabular-nums text-[10px] font-medium">{messages}</span>
+                    <span className="tabular-nums text-[10px] font-medium">{messages} posts</span>
                 </Link>
             )}
         </div>

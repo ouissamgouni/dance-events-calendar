@@ -248,12 +248,22 @@ export interface SiteSettings {
     /** Maximum number of tags rendered inline on an event card. Client
      * default: 3. */
     tags_per_card?: number;
-    /** When true, the event card RSVP action moves onto the attendee
-     * avatar row (right-aligned). Client default: false. */
-    event_card_rsvp_action_in_avatar_row_enabled?: boolean;
-    /** When true, save/going counts render next to their action buttons on
-     * event cards. Client default: false. */
-    event_card_rsvp_and_save_stats_next_to_action_enabled?: boolean;
+    /** When true, the saved count renders next to the Save action on event
+     * cards. Client default: false. */
+    event_card_save_show_stats_enabled?: boolean;
+    /** When true, the going count renders next to the "I'm going" action.
+     * Client default: false. */
+    event_card_imgoing_show_stats_enabled?: boolean;
+    /** When true, the "I'm going" action sits bottom-right on the tags row;
+     * when false it sits in the top-right cluster next to Save. Client
+     * default: true. */
+    event_card_imgoing_location_bottom_enabled?: boolean;
+    /** When true, event cards show the people icon prefixing the avatar
+     * stack. Client default: false. */
+    event_card_show_people_icon_enabled?: boolean;
+    /** When true, the explorer list renders the shared My Events card style.
+     * Client default: false. */
+    explorer_event_card_card_style_enabled?: boolean;
     /** When true, the "You might like"/"New" trails use the new date-first
      * event card layout. Client default: false. */
     for_you_event_cards_date_first_layout_enabled?: boolean;
@@ -1439,6 +1449,30 @@ export async function fetchFriendsLeaderboard(
     );
     return parseJsonResponse<FriendsLeaderboardResponse>(
         res, 'Failed to fetch leaderboard',
+    );
+}
+
+// Following "Most active": everyone you follow ranked by Going count.
+export type FollowingActivityPeriod = '365d' | '180d' | '90d';
+
+export interface FollowingMostActiveResponse {
+    period: FollowingActivityPeriod;
+    items: FriendsLeaderboardEntry[];
+}
+
+export async function fetchFollowingMostActive(
+    opts?: { period?: FollowingActivityPeriod; limit?: number },
+): Promise<FollowingMostActiveResponse> {
+    const sp = new URLSearchParams();
+    if (opts?.period) sp.set('period', opts.period);
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/following/most-active${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FollowingMostActiveResponse>(
+        res, 'Failed to fetch most active following',
     );
 }
 

@@ -307,11 +307,20 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         series_auto_detect_enabled=_get_bool_setting(
             session, "series_auto_detect_enabled"
         ),
-        event_card_rsvp_action_in_avatar_row_enabled=_get_bool_setting(
-            session, "event_card_rsvp_action_in_avatar_row_enabled"
+        event_card_save_show_stats_enabled=_get_bool_setting(
+            session, "event_card_save_show_stats_enabled"
         ),
-        event_card_rsvp_and_save_stats_next_to_action_enabled=_get_bool_setting(
-            session, "event_card_rsvp_and_save_stats_next_to_action_enabled"
+        event_card_imgoing_show_stats_enabled=_get_bool_setting(
+            session, "event_card_imgoing_show_stats_enabled"
+        ),
+        event_card_imgoing_location_bottom_enabled=_get_bool_setting(
+            session, "event_card_imgoing_location_bottom_enabled", default=True
+        ),
+        event_card_show_people_icon_enabled=_get_bool_setting(
+            session, "event_card_show_people_icon_enabled"
+        ),
+        explorer_event_card_card_style_enabled=_get_bool_setting(
+            session, "explorer_event_card_card_style_enabled"
         ),
         for_you_event_cards_date_first_layout_enabled=_get_bool_setting(
             session, "for_you_event_cards_date_first_layout_enabled"
@@ -504,6 +513,48 @@ def update_settings(
             session,
             "series_auto_detect_enabled",
             body.series_auto_detect_enabled,
+        )
+
+    if body.event_card_save_show_stats_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_card_save_show_stats_enabled",
+            body.event_card_save_show_stats_enabled,
+        )
+
+    if body.event_card_imgoing_show_stats_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_card_imgoing_show_stats_enabled",
+            body.event_card_imgoing_show_stats_enabled,
+        )
+
+    if body.event_card_imgoing_location_bottom_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_card_imgoing_location_bottom_enabled",
+            body.event_card_imgoing_location_bottom_enabled,
+        )
+
+    if body.event_card_show_people_icon_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_card_show_people_icon_enabled",
+            body.event_card_show_people_icon_enabled,
+        )
+
+    if body.explorer_event_card_card_style_enabled is not None:
+        _set_bool_setting(
+            session,
+            "explorer_event_card_card_style_enabled",
+            body.explorer_event_card_card_style_enabled,
+        )
+
+    if body.for_you_event_cards_date_first_layout_enabled is not None:
+        _set_bool_setting(
+            session,
+            "for_you_event_cards_date_first_layout_enabled",
+            body.for_you_event_cards_date_first_layout_enabled,
         )
 
     if body.for_you_rail_enabled is not None:

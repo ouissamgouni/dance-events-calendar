@@ -5,7 +5,7 @@ import NetworkPanel from '../components/NetworkPanel';
  * section. */
 export default function NetworkPage() {
     return (
-        <div className="mx-auto max-w-xl px-4 py-4 text-xs">
+        <div className="mx-auto max-w-xl bg-surface px-4 py-4">
             <NetworkPanel />
         </div>
     );

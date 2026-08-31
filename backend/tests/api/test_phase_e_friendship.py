@@ -410,3 +410,123 @@ def test_e9_leaderboard_period_filters_by_window(client, session):
     body_30 = client.get("/api/social/me/friends/leaderboard?period=30d").json()
     assert body_7["items"][0]["going_count"] == 1
     assert body_30["items"][0]["going_count"] == 2
+
+
+# --- Following "Most active" -------------------------------------------------
+
+
+def test_following_most_active_requires_auth(client, session):
+    r = client.get("/api/social/me/following/most-active")
+    assert r.status_code == 401
+
+
+def test_following_most_active_rejects_invalid_period(client, session):
+    _make_user(session, "alice@example.com", "alice")
+    _login(client, "alice@example.com")
+    r = client.get("/api/social/me/following/most-active?period=30d")
+    assert r.status_code == 400
+
+
+def test_following_most_active_ranks_followees_with_handle_tiebreak(client, session):
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    # People the viewer follows (one-directional, NOT mutual).
+    alpha = _make_user(session, "alpha@example.com", "alpha")
+    beta = _make_user(session, "beta@example.com", "beta")
+    delta = _make_user(session, "delta@example.com", "delta")
+    # Stranger the viewer does NOT follow — must never appear.
+    stranger = _make_user(session, "stranger@example.com", "stranger")
+
+    for u in (alpha, beta, delta):
+        _follow(session, viewer, u)
+
+    _make_calendar(session)
+    e1 = _make_event(session, days_offset=1, event_id="e1")
+    e2 = _make_event(session, days_offset=2, event_id="e2")
+    e3 = _make_event(session, days_offset=3, event_id="e3")
+    e4 = _make_event(session, days_offset=4, event_id="e4")
+
+    # alpha: 2 public going. beta: 1 public. delta: 1 public. Tie → handle ASC.
+    _attend(session, alpha, e1, audience="public")
+    _attend(session, alpha, e2, audience="public")
+    _attend(session, beta, e3, audience="public")
+    _attend(session, delta, e4, audience="public")
+    # Stranger has activity but isn't followed.
+    _attend(session, stranger, e1, audience="public")
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/me/following/most-active?period=365d").json()
+    assert body["period"] == "365d"
+    handles = [it["handle"] for it in body["items"]]
+    assert "stranger" not in handles
+    assert handles[:3] == ["alpha", "beta", "delta"]
+    assert [it["going_count"] for it in body["items"][:3]] == [2, 1, 1]
+    assert [it["rank"] for it in body["items"][:3]] == [1, 2, 3]
+
+
+def test_following_most_active_hides_friends_audience_of_non_mutuals(client, session):
+    """A followed user's ``friends``-audience RSVPs only count when the
+    viewer is a mutual friend; ``private`` never counts."""
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    # onedir: viewer follows but no follow-back → not a friend.
+    onedir = _make_user(session, "onedir@example.com", "onedir")
+    _follow(session, viewer, onedir)
+    # buddy: mutual friend.
+    buddy = _make_user(session, "buddy@example.com", "buddy")
+    _mutual(session, viewer, buddy)
+
+    _make_calendar(session)
+    e1 = _make_event(session, days_offset=1, event_id="e1")
+    e2 = _make_event(session, days_offset=2, event_id="e2")
+    e3 = _make_event(session, days_offset=3, event_id="e3")
+
+    # onedir: 1 public (counts) + 1 friends (hidden, not mutual).
+    _attend(session, onedir, e1, audience="public")
+    _attend(session, onedir, e2, audience="friends")
+    # buddy: 1 friends (counts, mutual) + 1 private (never counts).
+    _attend(session, buddy, e1, audience="friends")
+    _attend(session, buddy, e3, audience="private")
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/me/following/most-active?period=365d").json()
+    counts = {it["handle"]: it["going_count"] for it in body["items"]}
+    assert counts.get("onedir") == 1
+    assert counts.get("buddy") == 1
+
+
+def test_following_most_active_period_filters_by_window(client, session):
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    followee = _make_user(session, "followee@example.com", "followee")
+    _follow(session, viewer, followee)
+
+    _make_calendar(session)
+    inside = CachedEvent(
+        event_id="inside",
+        calendar_id="cal-e",
+        title="Inside",
+        start=datetime.utcnow() - timedelta(days=100),
+        end=datetime.utcnow() - timedelta(days=100, hours=-2),
+        all_day=False,
+    )
+    outside = CachedEvent(
+        event_id="outside",
+        calendar_id="cal-e",
+        title="Outside",
+        start=datetime.utcnow() - timedelta(days=300),
+        end=datetime.utcnow() - timedelta(days=300, hours=-2),
+        all_day=False,
+    )
+    session.add(inside)
+    session.add(outside)
+    session.commit()
+    _attend(session, followee, inside, audience="public")
+    _attend(session, followee, outside, audience="public")
+
+    _login(client, "viewer@example.com")
+    body_90 = client.get("/api/social/me/following/most-active?period=90d").json()
+    body_180 = client.get("/api/social/me/following/most-active?period=180d").json()
+    body_365 = client.get("/api/social/me/following/most-active?period=365d").json()
+    # 90d window excludes both (inside is 100d ago); 180d includes inside only;
+    # 365d includes both.
+    assert body_90["items"] == []
+    assert body_180["items"][0]["going_count"] == 1
+    assert body_365["items"][0]["going_count"] == 2

@@ -17,6 +17,11 @@ interface Props {
 function MyEventRow({ event, tab, onEventClick, reviewTagLabels }: { event: CalendarEvent; tab: MyEventsTab; onEventClick: (event: CalendarEvent) => void; reviewTagLabels: Map<number, string> }) {
     const { showRatings } = useFeatureFlags();
     const isPast = tab === 'past';
+    const isUpcoming = tab === 'upcoming';
+    const isSaved = tab === 'saved';
+    // Base My Events card keeps picture, title, time and location only.
+    // Upcoming adds the avatars stack; Saved adds the "I'm going" button;
+    // Past keeps the base plus the rate-event affordance below.
     return (
         <>
             <EventCard
@@ -25,9 +30,13 @@ function MyEventRow({ event, tab, onEventClick, reviewTagLabels }: { event: Cale
                 followingBadgeEnabled
                 showRatings={showRatings}
                 isPast={isPast}
-                showAvatars={!isPast}
-                showActions={!isPast}
-                hideAvatarsIfOnlyCurrentUser={tab === 'upcoming'}
+                showAvatars={isUpcoming}
+                showTags={false}
+                showReviews={false}
+                showPrice={false}
+                showActions={isSaved}
+                actions={isSaved ? ['going'] : undefined}
+                hideAvatarsIfOnlyCurrentUser={isUpcoming}
                 goingIconVariant="hand"
                 testId="my-events-row"
             />

@@ -83,7 +83,7 @@ class EventResponse(BaseModel):
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
-    price_is_free: bool = False
+    price_is_free: Optional[bool] = None
     review_status: str = "reviewed"
     links: Optional[list[LinkItem]] = None
     tags: list[TagResponse] = []
@@ -189,6 +189,16 @@ class AttendeeResponse(BaseModel):
     # can render the correct "Follow" / "Following" / "Requested" state on
     # first paint (no per-attendee status fetch needed).
     viewer_follow_status: Optional[str] = None
+    # Event detail "People" tab: whether the attendee is a mutual friend of
+    # the viewer, and how many of the viewer's friends also follow them
+    # (follows-in-common). Both default to the safe "no relationship" values
+    # so anonymous/relationship-less callers render a plain row.
+    is_friend: bool = False
+    mutual_friend_count: int = 0
+    # "going" (RSVP'd via UserEventAttendance) or "interested" (saved via
+    # UserSavedEvent). Defaults to "going" so existing callers (wedge,
+    # summary preview) keep their prior meaning.
+    attendance_status: str = "going"
 
 
 class AttendanceSummaryResponse(BaseModel):
@@ -856,12 +866,17 @@ class SiteSettingsResponse(BaseModel):
     # The admin Series panel and manual "Scan now"/"Group as series" actions
     # are always available regardless of this flag.
     series_auto_detect_enabled: bool = False
-    # When True, the event card's "I'm going" RSVP action moves onto the
-    # attendee avatar row (right-aligned) instead of the top-right cluster.
-    event_card_rsvp_action_in_avatar_row_enabled: bool = False
-    # When True, the save/going counts render next to their action buttons
-    # on event cards; when False the counts are hidden.
-    event_card_rsvp_and_save_stats_next_to_action_enabled: bool = False
+    # When True, the saved count renders next to the Save action on cards.
+    event_card_save_show_stats_enabled: bool = False
+    # When True, the going count renders next to the "I'm going" action.
+    event_card_imgoing_show_stats_enabled: bool = False
+    # When True, the "I'm going" action sits bottom-right on the tags row;
+    # when False it sits in the top-right cluster next to Save.
+    event_card_imgoing_location_bottom_enabled: bool = True
+    # When True, event cards show the people icon prefixing the avatar stack.
+    event_card_show_people_icon_enabled: bool = False
+    # When True, the explorer list renders the shared My Events card style.
+    explorer_event_card_card_style_enabled: bool = False
     # When True, the "You might like" and "New" For-you trails render the
     # new date-first event card layout instead of the legacy rail card.
     for_you_event_cards_date_first_layout_enabled: bool = False
@@ -1100,6 +1115,12 @@ class SiteSettingsUpdateRequest(BaseModel):
     event_message_cta_min_going: Optional[int] = Field(default=None, ge=1, le=10000)
     duplicate_auto_detect_enabled: Optional[bool] = None
     series_auto_detect_enabled: Optional[bool] = None
+    event_card_save_show_stats_enabled: Optional[bool] = None
+    event_card_imgoing_show_stats_enabled: Optional[bool] = None
+    event_card_imgoing_location_bottom_enabled: Optional[bool] = None
+    event_card_show_people_icon_enabled: Optional[bool] = None
+    explorer_event_card_card_style_enabled: Optional[bool] = None
+    for_you_event_cards_date_first_layout_enabled: Optional[bool] = None
 
 
 class EventUpdateRequest(BaseModel):
@@ -1199,7 +1220,7 @@ class EventSuggestionCreate(BaseModel):
     price_min: Optional[float] = Field(default=None, ge=0)
     price_max: Optional[float] = Field(default=None, ge=0)
     price_currency: Optional[str] = Field(default=None, max_length=8)
-    price_is_free: bool = False
+    price_is_free: Optional[bool] = None
     # When True (default), an approved suggestion is auto-saved to the
     # authenticated submitter's Calendar tab via UserSavedEvent. Has no
     # effect for anonymous submissions.
@@ -1243,7 +1264,7 @@ class EventSuggestionResponse(BaseModel):
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
-    price_is_free: bool = False
+    price_is_free: Optional[bool] = None
     created_at: datetime
     reviewed_at: Optional[datetime] = None
     reviewed_by: Optional[str] = None
@@ -2077,6 +2098,13 @@ class FriendsLeaderboardEntry(BaseModel):
 
 class FriendsLeaderboardResponse(BaseModel):
     period: str  # "7d" | "30d" | "90d"
+    items: list[FriendsLeaderboardEntry]
+
+
+class FollowingMostActiveResponse(BaseModel):
+    """People the viewer follows, ranked by Going count over a window."""
+
+    period: str  # "90d" | "180d" | "365d"
     items: list[FriendsLeaderboardEntry]
 
 

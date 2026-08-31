@@ -624,7 +624,7 @@ class DatabaseSeeder:
                         price_min=evt_data.get("price_min"),
                         price_max=evt_data.get("price_max"),
                         price_currency=evt_data.get("price_currency"),
-                        price_is_free=evt_data.get("price_is_free", False),
+                        price_is_free=evt_data.get("price_is_free"),
                         review_status="reviewed",
                         is_hidden=evt_data.get("is_hidden", False),
                         show_price_override=evt_data.get("show_price_override"),

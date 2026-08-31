@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { firstNameOf } from '../utils/displayName';
 import type { Attendee, FriendMini } from '../types';
 
@@ -28,9 +29,11 @@ interface Props {
      * Layout mode. `inline` (default) renders a single row: people icon +
      * faces + a trailing "N are going" phrase. `stacked` renders the faces
      * on their own row with a names line underneath ("Alice, Bob +5 are
-     * going") — used by the Tribe event card.
+     * going") — used by the Tribe event card. `faces` renders only the
+     * overlapping avatar faces (no icon, no sentence) — the caller supplies
+     * its own wording alongside.
      */
-    layout?: 'inline' | 'stacked';
+    layout?: 'inline' | 'stacked' | 'faces';
 }
 
 interface SizeStyles {
@@ -176,6 +179,7 @@ function namesGoingSentence(names: string[], totalGoing: number, viewerGoing: bo
 export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, size = 'md', hideIfOnlyCurrentUser = false, layout = 'inline' }: Props) {
     const { user } = useAuth();
     const { isAttending } = useAttendingEvents();
+    const { eventCardShowPeopleIconEnabled } = useOptionalFeatureFlags();
     const location = useLocation();
     const summary = useAttendanceSummary(eventId);
     const styles = SIZE_STYLES[size];
@@ -197,6 +201,9 @@ export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, 
     const shown = combined.slice(0, max);
 
     if (shown.length === 0) {
+        // Faces-only mode carries no wording, so an empty face set renders
+        // nothing — the caller's own sentence provides the social proof.
+        if (layout === 'faces') return null;
         const totalGoing = summary?.total_going ?? 0;
         if (!user) {
             if (totalGoing === 0) return null;
@@ -209,7 +216,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, 
                     title={totalGoing === 1 ? '1 person is going — sign in to see who' : `${totalGoing} people are going — sign in to see who`}
                     data-testid="anonymous-attendee-prompt"
                 >
-                    <PeopleIcon className={`${styles.icon} shrink-0`} color="text-blue-400" />
+                    {eventCardShowPeopleIconEnabled && <PeopleIcon className={`${styles.icon} shrink-0`} color="text-blue-400" />}
                     <span>{goingSentence(false, totalGoing)}</span>
                 </Link>
             );
@@ -226,7 +233,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, 
                 title={goingSentence(viewerGoing, totalGoing)}
                 data-testid="attendee-track"
             >
-                <PeopleIcon className={styles.icon} color="text-blue-400" />
+                {eventCardShowPeopleIconEnabled && <PeopleIcon className={styles.icon} color="text-blue-400" />}
                 <span>{goingSentence(viewerGoing, totalGoing)}</span>
             </Link>
         );
@@ -236,6 +243,29 @@ export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, 
     const overflow = Math.max(0, totalKnown - shown.length);
     const hasFriend = friends.length > 0;
     const namesTitle = `${shown.map((p) => p.display_name ?? 'Attendee').join(', ')}${overflow > 0 ? ` and ${overflow} more` : ''}`;
+
+    if (layout === 'faces') {
+        return (
+            <Link
+                to={`/event/${eventId}#attendees`}
+                onClick={(e) => e.stopPropagation()}
+                className={styles.stack}
+                title={namesTitle}
+                data-testid={hasFriend ? 'attendee-track-with-friends' : 'attendee-track'}
+            >
+                {shown.map((p, i) => (
+                    <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isFriend={p.isFriend} styles={styles} />
+                ))}
+                {overflow > 0 && (
+                    <span
+                        className={`${styles.avatar} rounded-full bg-slate-100 text-ink-soft ${styles.initial} font-semibold flex items-center justify-center ${styles.ring} ring-white`}
+                    >
+                        +{overflow}
+                    </span>
+                )}
+            </Link>
+        );
+    }
 
     if (layout === 'stacked') {
         const nameLine = namesGoingSentence(shown.map((p) => firstNameOf(p.display_name)), totalKnown, viewerGoing);
@@ -272,7 +302,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, 
             title={namesTitle}
             data-testid={hasFriend ? 'attendee-track-with-friends' : 'attendee-track'}
         >
-            <PeopleIcon className={styles.icon} color="text-blue-400" />
+            {eventCardShowPeopleIconEnabled && <PeopleIcon className={styles.icon} color="text-blue-400" />}
             <span className={styles.stack}>
                 {shown.map((p, i) => (
                     <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isFriend={p.isFriend} styles={styles} />

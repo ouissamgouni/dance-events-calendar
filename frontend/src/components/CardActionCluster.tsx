@@ -6,8 +6,10 @@ interface CardActionClusterProps {
     eventId: string;
     isSavedFlag?: boolean;
     isPast?: boolean;
-    /** Show the live count next to each action (save / going). */
-    showStats?: boolean;
+    /** Show the live saved count next to the Save action. */
+    showSaveStats?: boolean;
+    /** Show the live going count next to the "I'm going" action. */
+    showGoingStats?: boolean;
     /** Which actions to render, in order. Defaults to both. */
     include?: ReadonlyArray<'save' | 'going'>;
     size?: 'sm' | 'md';
@@ -18,15 +20,17 @@ interface CardActionClusterProps {
 /**
  * CTA cluster for an event card: each action icon is paired with its live
  * count (saved / going), Twitter-style. Counts are hidden when zero so
- * cards with no engagement stay quiet, and can be hidden entirely via
- * `showStats={false}`. Single source of truth for the number is the
- * attendance summary — `AttendeeAvatarStack` shows *who*, not *how many*.
+ * cards with no engagement stay quiet, and each count can be hidden via
+ * `showSaveStats` / `showGoingStats`. Single source of truth for the number
+ * is the attendance summary — `AttendeeAvatarStack` shows *who*, not *how
+ * many*.
  */
 export default function CardActionCluster({
     eventId,
     isSavedFlag = false,
     isPast = false,
-    showStats = true,
+    showSaveStats = false,
+    showGoingStats = false,
     include = ['save', 'going'],
     size = 'sm',
     goingIconVariant,
@@ -45,7 +49,7 @@ export default function CardActionCluster({
                         stopPropagation
                         className={isSavedFlag ? 'text-ink' : ''}
                     />
-                    {showStats && savedCount > 0 && (
+                    {showSaveStats && savedCount > 0 && (
                         <span className="text-[11px] text-ink-soft -ml-0.5 mr-1 tabular-nums" aria-label={`${savedCount} saved`}>
                             {savedCount}
                         </span>
@@ -62,7 +66,7 @@ export default function CardActionCluster({
                         isPast={isPast}
                         iconVariant={goingIconVariant}
                     />
-                    {showStats && goingCount > 0 && (
+                    {showGoingStats && goingCount > 0 && (
                         <span className="text-[11px] text-action ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} ${isPast ? 'attended' : 'going'}`}>
                             {goingCount}
                         </span>

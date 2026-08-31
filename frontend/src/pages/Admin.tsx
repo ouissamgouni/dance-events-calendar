@@ -237,6 +237,11 @@ export default function Admin() {
     const [networkGoingSnapshotEnabled, setNetworkGoingSnapshotEnabled] = useState(true);
     const [myEventsRouteEnabled, setMyEventsRouteEnabled] = useState(false);
     const [myEventsNavEnabled, setMyEventsNavEnabled] = useState(true);
+    const [eventCardSaveShowStatsEnabled, setEventCardSaveShowStatsEnabled] = useState(false);
+    const [eventCardImgoingShowStatsEnabled, setEventCardImgoingShowStatsEnabled] = useState(false);
+    const [eventCardImgoingLocationBottomEnabled, setEventCardImgoingLocationBottomEnabled] = useState(true);
+    const [eventCardShowPeopleIconEnabled, setEventCardShowPeopleIconEnabled] = useState(false);
+    const [explorerEventCardCardStyleEnabled, setExplorerEventCardCardStyleEnabled] = useState(false);
     // Notification / re-engagement gates. Booleans are master switches
     // that override the corresponding env vars in ``config/loader.py``;
     // ``digestSchedule`` follows the ``dow[,dow] @ HH:MM`` grammar the
@@ -415,6 +420,11 @@ export default function Admin() {
             setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? false);
             setMyEventsRouteEnabled(s.my_events_route_enabled ?? false);
             setMyEventsNavEnabled(s.my_events_nav_enabled ?? true);
+            setEventCardSaveShowStatsEnabled(s.event_card_save_show_stats_enabled ?? false);
+            setEventCardImgoingShowStatsEnabled(s.event_card_imgoing_show_stats_enabled ?? false);
+            setEventCardImgoingLocationBottomEnabled(s.event_card_imgoing_location_bottom_enabled ?? true);
+            setEventCardShowPeopleIconEnabled(s.event_card_show_people_icon_enabled ?? false);
+            setExplorerEventCardCardStyleEnabled(s.explorer_event_card_card_style_enabled ?? false);
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
             setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
             setDigestV2Enabled(s.digest_v2_enabled ?? true);
@@ -817,6 +827,66 @@ export default function Admin() {
         } catch {
             setMyEventsNavEnabled(!newVal);
             setMessage('Failed to update My Events navigation toggle.');
+        }
+    };
+
+    const handleToggleEventCardSaveShowStats = async () => {
+        const newVal = !eventCardSaveShowStatsEnabled;
+        setEventCardSaveShowStatsEnabled(newVal);
+        try {
+            await updateSettings({ event_card_save_show_stats_enabled: newVal });
+            setMessage(`Save stats on cards ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventCardSaveShowStatsEnabled(!newVal);
+            setMessage('Failed to update save stats toggle.');
+        }
+    };
+
+    const handleToggleEventCardImgoingShowStats = async () => {
+        const newVal = !eventCardImgoingShowStatsEnabled;
+        setEventCardImgoingShowStatsEnabled(newVal);
+        try {
+            await updateSettings({ event_card_imgoing_show_stats_enabled: newVal });
+            setMessage(`"I'm going" stats on cards ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventCardImgoingShowStatsEnabled(!newVal);
+            setMessage('Failed to update "I\'m going" stats toggle.');
+        }
+    };
+
+    const handleToggleEventCardImgoingLocationBottom = async () => {
+        const newVal = !eventCardImgoingLocationBottomEnabled;
+        setEventCardImgoingLocationBottomEnabled(newVal);
+        try {
+            await updateSettings({ event_card_imgoing_location_bottom_enabled: newVal });
+            setMessage(`"I'm going" bottom placement ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventCardImgoingLocationBottomEnabled(!newVal);
+            setMessage('Failed to update "I\'m going" placement toggle.');
+        }
+    };
+
+    const handleToggleEventCardShowPeopleIcon = async () => {
+        const newVal = !eventCardShowPeopleIconEnabled;
+        setEventCardShowPeopleIconEnabled(newVal);
+        try {
+            await updateSettings({ event_card_show_people_icon_enabled: newVal });
+            setMessage(`People icon on cards ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventCardShowPeopleIconEnabled(!newVal);
+            setMessage('Failed to update people icon toggle.');
+        }
+    };
+
+    const handleToggleExplorerEventCardCardStyle = async () => {
+        const newVal = !explorerEventCardCardStyleEnabled;
+        setExplorerEventCardCardStyleEnabled(newVal);
+        try {
+            await updateSettings({ explorer_event_card_card_style_enabled: newVal });
+            setMessage(`Explorer card style ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setExplorerEventCardCardStyleEnabled(!newVal);
+            setMessage('Failed to update explorer card style toggle.');
         }
     };
 
@@ -2099,6 +2169,81 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${unseenStateEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${unseenStateEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Event card: save stats */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Save stats on cards</span>
+                                        <p className="text-[10px] text-muted">Show the saved count next to the Save action</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleEventCardSaveShowStats}
+                                        aria-label="Toggle save stats on cards"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventCardSaveShowStatsEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventCardSaveShowStatsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Event card: "I'm going" stats */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">"I'm going" stats on cards</span>
+                                        <p className="text-[10px] text-muted">Show the going count next to the "I'm going" action</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleEventCardImgoingShowStats}
+                                        aria-label="Toggle I'm going stats on cards"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventCardImgoingShowStatsEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventCardImgoingShowStatsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Event card: "I'm going" bottom placement */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">"I'm going" bottom placement</span>
+                                        <p className="text-[10px] text-muted">Place the "I'm going" action bottom-right by the tags (off: next to Save)</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleEventCardImgoingLocationBottom}
+                                        aria-label="Toggle I'm going bottom placement"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventCardImgoingLocationBottomEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventCardImgoingLocationBottomEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Event card: people icon */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">People icon on cards</span>
+                                        <p className="text-[10px] text-muted">Show the people icon prefixing the avatar stack</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleEventCardShowPeopleIcon}
+                                        aria-label="Toggle people icon on cards"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventCardShowPeopleIconEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventCardShowPeopleIconEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Explorer: My Events card style */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Explorer card style</span>
+                                        <p className="text-[10px] text-muted">Render the explorer list with the shared My Events card style</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleExplorerEventCardCardStyle}
+                                        aria-label="Toggle explorer card style"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${explorerEventCardCardStyleEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${explorerEventCardCardStyleEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

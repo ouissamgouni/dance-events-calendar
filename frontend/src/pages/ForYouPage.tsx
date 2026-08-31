@@ -128,6 +128,7 @@ export function LensTrail(props: LensTrailProps) {
                                     followingBadgeEnabled={followingBadgeEnabled}
                                     showRatings={showRatings}
                                     widthClass="w-[248px]"
+                                    dateHeaderRow
                                     goingIconVariant="hand"
                                 />
                             );

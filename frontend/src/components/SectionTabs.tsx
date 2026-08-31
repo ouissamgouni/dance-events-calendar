@@ -1,4 +1,7 @@
+import { useRef } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
+import { useScrollDots } from '../hooks/useScrollDots';
+import ScrollDotsIndicator from './ScrollDots';
 import { useAuth } from '../context/AuthContext';
 
 export interface SectionTab {
@@ -50,32 +53,39 @@ function getTitleForMinePath(pathname: string): string | null {
 }
 
 function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: string; hub: string }) {
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [tabs.length, pathname]);
+
     return (
-        <nav
-            aria-label="Section"
-            className="flex items-center gap-1 overflow-x-auto border-b border-line px-4 scrollbar-none"
-        >
-            {tabs.map((t) => {
-                // The hub tab (e.g. /mine) matches its own path exactly so it
-                // doesn't stay active on deeper sub-routes like /mine/calendar.
-                const active = t.path === hub
-                    ? pathname === hub
-                    : pathname === t.path || pathname.startsWith(t.path + '/');
-                return (
-                    <Link
-                        key={t.path}
-                        to={t.path}
-                        aria-current={active ? 'page' : undefined}
-                        className={`shrink-0 -mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition ${active
-                            ? 'border-action text-action'
-                            : 'border-transparent text-ink-soft hover:text-ink'
-                            }`}
-                    >
-                        {t.label}
-                    </Link>
-                );
-            })}
-        </nav>
+        <>
+            <nav
+                ref={scrollerRef}
+                aria-label="Section"
+                className="flex items-center gap-1 overflow-x-auto border-b border-line px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+                {tabs.map((t) => {
+                    // The hub tab (e.g. /mine) matches its own path exactly so it
+                    // doesn't stay active on deeper sub-routes like /mine/calendar.
+                    const active = t.path === hub
+                        ? pathname === hub
+                        : pathname === t.path || pathname.startsWith(t.path + '/');
+                    return (
+                        <Link
+                            key={t.path}
+                            to={t.path}
+                            aria-current={active ? 'page' : undefined}
+                            className={`shrink-0 -mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition ${active
+                                ? 'border-action text-action'
+                                : 'border-transparent text-ink-soft hover:text-ink'
+                                }`}
+                        >
+                            {t.label}
+                        </Link>
+                    );
+                })}
+            </nav>
+            <ScrollDotsIndicator count={dotCount} activeIndex={activeIndex} onSelect={scrollToIndex} className="px-4 pb-0.5" />
+        </>
     );
 }
 

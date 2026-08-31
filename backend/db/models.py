@@ -407,7 +407,9 @@ class CachedEvent(SQLModel, table=True):
     price_min: Optional[float] = Field(default=None)
     price_max: Optional[float] = Field(default=None)
     price_currency: Optional[str] = Field(default=None)
-    price_is_free: bool = Field(default=False)
+    # Tri-state: ``True`` = free, ``False`` = has a price, ``None`` = unknown
+    # (not extracted yet). ``None`` renders as no price rather than "Free".
+    price_is_free: Optional[bool] = Field(default=None)
     review_status: str = Field(default="pending")
     links: Optional[list] = Field(default=None, sa_column=Column(JSON))
     content_hash: Optional[str] = Field(default=None, index=True)
@@ -784,7 +786,7 @@ class EventSuggestion(SQLModel, table=True):
     price_min: Optional[float] = Field(default=None)
     price_max: Optional[float] = Field(default=None)
     price_currency: Optional[str] = Field(default=None)
-    price_is_free: bool = Field(default=False)
+    price_is_free: Optional[bool] = Field(default=None)
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     reviewed_at: Optional[datetime] = Field(default=None)

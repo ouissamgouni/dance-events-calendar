@@ -167,6 +167,9 @@ export default function MyEventsExperience() {
                             onPrevious={() => selectIndex(selectedIndex - 1)}
                             onNext={() => selectIndex(selectedIndex + 1)}
                             onOpen={() => setModalEvent(selected.event)}
+                            showAvatars={activeTab === 'upcoming'}
+                            showActions={activeTab === 'saved'}
+                            actions={activeTab === 'saved' ? ['going'] : undefined}
                         />
                     )}
                 </div>

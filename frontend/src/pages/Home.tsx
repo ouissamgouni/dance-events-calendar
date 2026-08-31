@@ -1639,15 +1639,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             icon: <img src="/high-five.png" alt="" className="h-4 w-4" />,
             group: 'Other filters',
             summary: peopleSummary,
-            preview: (interestSource !== null || interestUserHandles.length > 0) ? (
-                <div className="flex items-center gap-2">
-                    {interestUserHandles.length > 0 && (
-                        <PeopleAvatarTrack people={interestUserPeople} total={interestUserHandles.length} max={3} size="md" />
-                    )}
-                    <span className="text-xs font-medium text-ink-soft">
-                        {interestKind === 'going' ? 'Going' : interestKind === 'saved' ? 'Interested' : 'Both'}
-                    </span>
-                </div>
+            preview: (interestUserHandles.length > 0) ? (
+                <PeopleAvatarTrack people={interestUserPeople} total={interestUserHandles.length} max={3} size="md" />
             ) : undefined,
             headerAction: (
                 <button
@@ -1820,7 +1813,6 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                         <div className="relative flex min-h-0 flex-1">
                                             <EventMap
                                                 events={explorerMatchingEvents}
-                                                focusedEvent={mapFullscreen && !isDesktop ? selectedExplorerMapEvent : undefined}
                                                 onEventClick={handleExplorerMapEventClick}
                                                 onBoundsChange={handleBoundsChange}
                                                 hoveredEventId={hoveredEventId}
@@ -1888,6 +1880,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                 showAvatars
                                                 showTags
                                                 showReviews
+                                                showPrice
+                                                showActions
                                                 showRatings={!!showRatings}
                                                 followingBadgeEnabled={followingBadgeEnabled}
                                             />
@@ -2033,7 +2027,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 )}
             </main>
 
-            <ViewSwitcher currentView={activeView} onSelect={handleSelectView} />
+            <ViewSwitcher currentView={activeView} onSelect={handleSelectView} mapPreviewVisible={mapFullscreen && !isDesktop && !!explorerPreviewEvent} />
 
             {/* Overlay modal — calendar mode mobile + explorer (both breakpoints) */}
             {selectedEvent && (viewMode === 'explorer' || (viewMode === 'calendar' && !isDesktop)) && (

@@ -49,12 +49,17 @@ interface FeatureFlags {
     trendingTrailRichEnabled: boolean;
     /** Number of tags to render inline per event card. */
     tagsPerCard: number;
-    /** When true, the event card's RSVP action moves onto the attendee
-     * avatar row (right-aligned) instead of the top-right cluster. */
-    eventCardRsvpActionInAvatarRowEnabled: boolean;
-    /** When true, save/going counts render next to their action buttons
-     * on event cards. */
-    eventCardRsvpAndSaveStatsNextToActionEnabled: boolean;
+    /** When true, the saved count renders next to the Save action on cards. */
+    eventCardSaveShowStatsEnabled: boolean;
+    /** When true, the going count renders next to the "I'm going" action. */
+    eventCardImgoingShowStatsEnabled: boolean;
+    /** When true, the "I'm going" action sits bottom-right on the tags row;
+     * when false it sits in the top-right cluster next to Save. */
+    eventCardImgoingLocationBottomEnabled: boolean;
+    /** When true, event cards show the people icon prefixing the avatar stack. */
+    eventCardShowPeopleIconEnabled: boolean;
+    /** When true, the explorer list renders the shared My Events card style. */
+    explorerEventCardCardStyleEnabled: boolean;
     /** When true, the "You might like" and "New" For-you trails use the
      * new date-first event card layout. */
     forYouEventCardsDateFirstLayoutEnabled: boolean;
@@ -87,8 +92,11 @@ const defaultFlags: FeatureFlags = {
     tagBadgeColored: false,
     trendingTrailRichEnabled: false,
     tagsPerCard: 3,
-    eventCardRsvpActionInAvatarRowEnabled: false,
-    eventCardRsvpAndSaveStatsNextToActionEnabled: false,
+    eventCardSaveShowStatsEnabled: false,
+    eventCardImgoingShowStatsEnabled: false,
+    eventCardImgoingLocationBottomEnabled: true,
+    eventCardShowPeopleIconEnabled: false,
+    explorerEventCardCardStyleEnabled: false,
     forYouEventCardsDateFirstLayoutEnabled: false,
 };
 
@@ -136,8 +144,11 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     tagBadgeColored: s.tag_badge_colored ?? false,
                     trendingTrailRichEnabled: s.trending_trail_rich_enabled ?? false,
                     tagsPerCard: s.tags_per_card ?? 3,
-                    eventCardRsvpActionInAvatarRowEnabled: s.event_card_rsvp_action_in_avatar_row_enabled ?? false,
-                    eventCardRsvpAndSaveStatsNextToActionEnabled: s.event_card_rsvp_and_save_stats_next_to_action_enabled ?? false,
+                    eventCardSaveShowStatsEnabled: s.event_card_save_show_stats_enabled ?? false,
+                    eventCardImgoingShowStatsEnabled: s.event_card_imgoing_show_stats_enabled ?? false,
+                    eventCardImgoingLocationBottomEnabled: s.event_card_imgoing_location_bottom_enabled ?? true,
+                    eventCardShowPeopleIconEnabled: s.event_card_show_people_icon_enabled ?? false,
+                    explorerEventCardCardStyleEnabled: s.explorer_event_card_card_style_enabled ?? false,
                     forYouEventCardsDateFirstLayoutEnabled: s.for_you_event_cards_date_first_layout_enabled ?? false,
                 });
             })

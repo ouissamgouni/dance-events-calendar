@@ -3,6 +3,7 @@ export type ExploreView = 'list' | 'map' | 'calendar';
 interface ViewSwitcherProps {
     currentView: ExploreView;
     onSelect: (view: ExploreView) => void;
+    mapPreviewVisible?: boolean;
 }
 
 const destinations: Record<ExploreView, ExploreView[]> = {
@@ -41,11 +42,11 @@ function ViewIcon({ view }: { view: ExploreView }) {
     );
 }
 
-export default function ViewSwitcher({ currentView, onSelect }: ViewSwitcherProps) {
+export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible }: ViewSwitcherProps) {
     return (
         <nav
             aria-label="Change event view"
-            className="fixed bottom-[calc(80px+env(safe-area-inset-bottom))] right-4 z-[8000] flex items-center border-2 border-line bg-surface shadow-xl md:bottom-4"
+            className={`fixed right-4 z-[8000] flex items-center border-2 border-line bg-surface shadow-xl md:bottom-4 ${mapPreviewVisible ? 'bottom-[calc(100vh_-_120px)]' : 'bottom-[calc(80px+env(safe-area-inset-bottom))]'}`}
             data-testid="view-switcher"
         >
             {destinations[currentView].map((view, index) => (

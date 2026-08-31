@@ -176,30 +176,27 @@ describe('SummaryBar', () => {
         expect(screen.getByTestId('summary-chip-reach').querySelector('img[src="/international-reach.png"]')).toBeInTheDocument();
     });
 
-    it('renders the People WHO + STATUS pills and deep-links', async () => {
+    it('renders the consolidated People chip (WHO · STATUS) and deep-links', async () => {
         const onEditPeople = vi.fn();
         const { rerender } = render(<SummaryBar {...baseProps()} />);
         expect(screen.queryByTestId('summary-chip-people')).toBeNull();
 
-        // Scope-only (no handles) → WHO "Following" + STATUS "Both" (kind 'any').
+        // Scope-only (no handles) → consolidated "Following · Both" (kind 'any').
         rerender(<SummaryBar {...baseProps({ onEditPeople, interestSource: 'follows' })} />);
         const scoped = screen.getByTestId('summary-chip-people');
-        expect(scoped).toHaveTextContent('Following');
-        expect(screen.getByTestId('summary-chip-people-status')).toHaveTextContent('Both');
+        expect(scoped).toHaveTextContent('Following · Both');
         await userEvent.click(scoped);
         expect(onEditPeople).toHaveBeenCalledTimes(1);
 
-        // Friends scope + Going status.
+        // Friends scope + Going status → "Friends · Going".
         rerender(<SummaryBar {...baseProps({ onEditPeople, interestSource: 'friends', interestKind: 'going' })} />);
-        expect(screen.getByTestId('summary-chip-people')).toHaveTextContent('Friends');
-        expect(screen.getByTestId('summary-chip-people-status')).toHaveTextContent('Going');
+        expect(screen.getByTestId('summary-chip-people')).toHaveTextContent('Friends · Going');
 
-        // Explicit handles → WHO "N people" + STATUS.
+        // Explicit handles → "N people · Going".
         rerender(
             <SummaryBar {...baseProps({ onEditPeople, interestSource: 'follows', interestUserHandles: ['a', 'b', 'c'], interestKind: 'going' })} />,
         );
-        expect(screen.getByTestId('summary-chip-people')).toHaveTextContent('3 people');
-        expect(screen.getByTestId('summary-chip-people-status')).toHaveTextContent('Going');
+        expect(screen.getByTestId('summary-chip-people')).toHaveTextContent('3 people · Going');
     });
 
     it('folds selected non-primary groups into the "+X ⚙" control and opens the sheet', async () => {
@@ -239,26 +236,24 @@ describe('SummaryBar', () => {
         const bar = screen.getByTestId('summary-bar');
         expect(bar).toHaveAttribute('data-variant', 'single');
         expect(bar.querySelector('.flex-wrap')).toBeNull();
-        // Wide: all primary pills fit (people splits into WHO + STATUS);
+        // Wide: all primary pills fit (people now consolidated into single chip);
         // only Format folds → +1.
         setBarWidth(1000);
+        expect(screen.getByTestId('summary-chip-people')).toBeInTheDocument();
         expect(screen.getByTestId('summary-chip-period')).toBeInTheDocument();
         expect(screen.getByTestId('summary-chip-area')).toBeInTheDocument();
         expect(screen.getByTestId('summary-chip-dance')).toBeInTheDocument();
         expect(screen.getByTestId('summary-chip-reach')).toBeInTheDocument();
-        expect(screen.getByTestId('summary-chip-people')).toBeInTheDocument();
-        expect(screen.getByTestId('summary-chip-people-status')).toBeInTheDocument();
         expect(screen.getByTestId('summary-open-filters')).toHaveTextContent('+1');
 
-        // Narrow: reserve gear (80+8) leaves room for only Date + Area; the
-        // four lower-priority active pills fold in → +5 (Format + 4 hidden).
+        // Narrow: reserve gear (80+8) leaves room for People + Period; the
+        // remaining active pills fold in → +4 (Area + Dance + Reach + Format).
         setBarWidth(300);
+        expect(screen.getByTestId('summary-chip-people')).toBeInTheDocument();
         expect(screen.getByTestId('summary-chip-period')).toBeInTheDocument();
-        expect(screen.getByTestId('summary-chip-area')).toBeInTheDocument();
+        expect(screen.queryByTestId('summary-chip-area')).toBeNull();
         expect(screen.queryByTestId('summary-chip-dance')).toBeNull();
         expect(screen.queryByTestId('summary-chip-reach')).toBeNull();
-        expect(screen.queryByTestId('summary-chip-people')).toBeNull();
-        expect(screen.queryByTestId('summary-chip-people-status')).toBeNull();
-        expect(screen.getByTestId('summary-open-filters')).toHaveTextContent('+5');
+        expect(screen.getByTestId('summary-open-filters')).toHaveTextContent('+4');
     });
 });

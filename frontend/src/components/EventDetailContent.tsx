@@ -137,7 +137,7 @@ export default function EventDetailContent({
 
     const startPriceEdit = () => {
         setSaveError(null);
-        setEditIsFree(event.price_is_free);
+        setEditIsFree(event.price_is_free ?? false);
         setEditPriceMin(event.price_min != null ? String(event.price_min) : '');
         setEditPriceMax(event.price_max != null ? String(event.price_max) : '');
         setEditCurrency(event.price_currency ?? 'EUR');

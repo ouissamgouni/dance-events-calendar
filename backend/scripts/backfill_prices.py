@@ -67,7 +67,7 @@ def main() -> None:
                         event.price_min = None
                         event.price_max = None
                         event.price_currency = None
-                        event.price_is_free = False
+                        event.price_is_free = None
                         session.add(event)
                 continue
 

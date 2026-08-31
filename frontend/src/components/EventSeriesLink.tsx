@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { fetchEventSeriesRollup } from '../api';
 import { useAuth } from '../context/AuthContext';
+import SeriesRow from './event-summary/SeriesRow';
 import type { SeriesRatingRollup } from '../types';
 
 interface Props {
@@ -28,16 +28,5 @@ export default function EventSeriesLink({ eventId }: Props) {
 
     if (!series) return null;
 
-    return (
-        <p className="text-xs text-ink-soft">
-            This event belongs to the{' '}
-            <Link
-                to={`/series/${series.series_id}`}
-                className="font-medium text-action hover:text-action hover:underline"
-            >
-                {series.canonical_title}
-            </Link>{' '}
-            series.
-        </p>
-    );
+    return <SeriesRow title={series.canonical_title} to={`/series/${series.series_id}`} />;
 }

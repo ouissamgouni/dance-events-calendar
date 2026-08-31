@@ -173,7 +173,7 @@ const peopleIcon = (
     </svg>
 );
 
-type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people' | 'people-status';
+type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people';
 
 export default function SummaryBar(props: SummaryBarProps) {
     const {
@@ -238,16 +238,16 @@ export default function SummaryBar(props: SummaryBarProps) {
         return n;
     }, [tagGroups, activeTagIds, danceGroup, reachGroup]);
 
-    // Ordered candidate pills. Date, Area, and Reach are always present;
+    // Ordered candidate pills. People appear first (highest priority), then Date, Area, and Reach.
     // Dance and People appear when they carry a selection.
     const candidates = useMemo(() => {
-        const list: CandidateKey[] = ['period', 'area'];
-        if (danceGroup && danceSel.count > 0) list.push('dance');
-        if (reachGroup) list.push('reach');
+        const list: CandidateKey[] = [];
         if (peopleActive && onEditPeople) {
             list.push('people');
-            list.push('people-status');
         }
+        list.push('period', 'area');
+        if (danceGroup && danceSel.count > 0) list.push('dance');
+        if (reachGroup) list.push('reach');
         return list;
     }, [danceGroup, danceSel.count, reachGroup, peopleActive, onEditPeople]);
 
@@ -345,31 +345,29 @@ export default function SummaryBar(props: SummaryBarProps) {
                 );
             case 'people': {
                 const hasFaces = interestUserHandles.length > 0 && (interestUserPeople?.length ?? 0) > 0;
+                // Consolidated chip: {WHO} · {STATUS} (e.g., "Following · Going")
+                const n = interestUserHandles.length;
+                let whoLabel = '';
+                if (n > 0) {
+                    whoLabel = `${n} ${n === 1 ? 'person' : 'people'}`;
+                } else {
+                    whoLabel = interestSource === 'friends' ? 'Friends' : 'Following';
+                }
+                const combinedLabel = `${whoLabel} · ${peopleStatusLabel}`;
                 return (
                     <Pill
                         key="people"
                         icon={hasFaces
                             ? <PeopleAvatarTrack people={interestUserPeople!} total={interestUserHandles.length} max={3} size="sm" />
-                            : peopleIcon}
-                        label={hasFaces ? undefined : (peopleTypeLabel || undefined)}
+                            : undefined}
+                        label={combinedLabel}
                         ariaLabel="People"
-                        title={`People: ${peopleTypeLabel}`}
+                        title={`People: ${combinedLabel}`}
                         onClick={onEditPeople}
                         testId={tid('summary-chip-people')}
                     />
                 );
             }
-            case 'people-status':
-                return (
-                    <Pill
-                        key="people-status"
-                        label={peopleStatusLabel || undefined}
-                        ariaLabel={`Status: ${peopleStatusLabel}`}
-                        title={`Status: ${peopleStatusLabel}`}
-                        onClick={onEditPeople}
-                        testId={tid('summary-chip-people-status')}
-                    />
-                );
         }
     };
 

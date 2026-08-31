@@ -25,7 +25,15 @@ import {
  * - "Decline" silently removes the row and the inbox notification.
  *   The requester is NOT notified of the decline (per product spec).
  */
-export default function FollowRequestsPanel() {
+export default function FollowRequestsPanel({
+    variant = 'banner',
+    onCount,
+}: {
+    /** 'banner' = highlighted box hidden when empty (legacy). 'tab' =
+     * plain list that stays mounted with an empty state. */
+    variant?: 'banner' | 'tab';
+    onCount?: (count: number) => void;
+} = {}) {
     const [items, setItems] = useState<FollowRequestItem[]>([]);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -40,6 +48,11 @@ export default function FollowRequestsPanel() {
     }, []);
 
     useEffect(() => {
+        onCount?.(items.length);
+    }, [items.length, onCount]);
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- initial async load of pending requests
         void load();
         // Refresh after follow graph mutations elsewhere in the app.
         const h = () => void load();
@@ -81,7 +94,75 @@ export default function FollowRequestsPanel() {
         [],
     );
 
-    if (items.length === 0) return null;
+    if (variant === 'banner' && items.length === 0) return null;
+
+    if (variant === 'tab') {
+        return (
+            <div data-testid="follow-requests-panel">
+                {items.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-ink-soft">
+                        No pending follow requests.
+                    </p>
+                ) : (
+                    <ul className="divide-y divide-line">
+                        {items.map((it) => (
+                            <li
+                                key={it.handle}
+                                className="flex items-center gap-3 py-3"
+                                data-testid={`follow-request-${it.handle}`}
+                            >
+                                {it.avatar_url ? (
+                                    <img
+                                        src={it.avatar_url}
+                                        alt=""
+                                        // eslint-disable-next-line no-restricted-syntax -- circular avatar
+                                        className="h-10 w-10 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    // eslint-disable-next-line no-restricted-syntax -- circular avatar placeholder
+                                    <div className="h-10 w-10 rounded-full bg-slate-200" />
+                                )}
+                                <Link
+                                    to={`/u/${it.handle}`}
+                                    className="min-w-0 flex-1 text-sm text-ink hover:underline"
+                                >
+                                    <span className="block truncate font-medium">
+                                        {it.display_name || `@${it.handle}`}
+                                    </span>
+                                    <span className="block truncate text-xs text-ink-soft">
+                                        @{it.handle}
+                                    </span>
+                                </Link>
+                                <button
+                                    type="button"
+                                    disabled={busy === it.handle}
+                                    onClick={() => void onApprove(it.handle)}
+                                    className="px-2.5 py-1 text-xs font-semibold bg-action text-white hover:bg-action-strong disabled:opacity-50"
+                                    data-testid={`approve-${it.handle}`}
+                                >
+                                    Approve
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={busy === it.handle}
+                                    onClick={() => void onDecline(it.handle)}
+                                    className="px-2.5 py-1 text-xs font-medium border border-line bg-surface text-ink-soft hover:bg-canvas disabled:opacity-50"
+                                    data-testid={`decline-${it.handle}`}
+                                >
+                                    Decline
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {error && (
+                    <p className="mt-2 text-xs text-danger" role="alert">
+                        {error}
+                    </p>
+                )}
+            </div>
+        );
+    }
 
     return (
         <section
@@ -102,9 +183,11 @@ export default function FollowRequestsPanel() {
                             <img
                                 src={it.avatar_url}
                                 alt=""
+                                // eslint-disable-next-line no-restricted-syntax -- circular avatar
                                 className="h-8 w-8 rounded-full object-cover"
                             />
                         ) : (
+                            // eslint-disable-next-line no-restricted-syntax -- circular avatar placeholder
                             <div className="h-8 w-8 rounded-full bg-slate-200" />
                         )}
                         <Link
