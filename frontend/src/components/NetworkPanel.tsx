@@ -346,8 +346,8 @@ export default function NetworkPanel() {
                                     aria-selected={active}
                                     onClick={() => setParam('tab', t.key)}
                                     className={`-mb-px shrink-0 border-b-2 py-2 text-sm whitespace-nowrap ${active
-                                            ? 'border-action font-semibold text-ink'
-                                            : 'border-transparent font-normal text-ink-soft hover:text-ink'
+                                        ? 'border-action font-semibold text-ink'
+                                        : 'border-transparent font-normal text-ink-soft hover:text-ink'
                                         }`}
                                 >
                                     {t.label}
@@ -492,8 +492,8 @@ function FollowingView({
                             aria-pressed={active}
                             onClick={() => onSubChange(s)}
                             className={`h-9 border px-4 text-sm ${i === 0 ? 'rounded-l' : '-ml-px rounded-r'} ${active
-                                    ? 'border-action bg-action/5 font-semibold text-ink'
-                                    : 'border-line bg-surface font-normal text-ink-soft hover:text-ink'
+                                ? 'border-action bg-action/5 font-semibold text-ink'
+                                : 'border-line bg-surface font-normal text-ink-soft hover:text-ink'
                                 }`}
                         >
                             {s === 'all' ? 'All following' : 'Most active'}
@@ -580,8 +580,8 @@ function MostActiveView({
                             aria-pressed={active}
                             onClick={() => onPeriodChange(p)}
                             className={`h-9 border px-3 text-sm ${active
-                                    ? 'border-action bg-action/5 font-semibold text-ink'
-                                    : 'border-line bg-surface font-normal text-ink-soft hover:text-ink'
+                                ? 'border-action bg-action/5 font-semibold text-ink'
+                                : 'border-line bg-surface font-normal text-ink-soft hover:text-ink'
                                 }`}
                         >
                             {PERIOD_LABEL[p]}
