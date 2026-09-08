@@ -106,7 +106,7 @@ export default function EventDetailsPanel({
                     </button>
                 )}
             </div>
-            <div className={`modal-scroll overflow-y-auto overscroll-contain px-4 py-4 ${bodyClassName}`.trim()}>
+            <div className={`modal-scroll overflow-y-auto overscroll-contain px-3 py-4 ${bodyClassName}`.trim()}>
                 <EventSummary
                     event={event}
                     variant="modal"

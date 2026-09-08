@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { MapCoord } from '../types';
+import type { JourneyCoordinate } from '../utils/journeyMap';
 import MyDanceJourneyMap from './MyDanceJourneyMap';
 import MyDanceActivityStrip from './MyDanceActivityStrip';
 
@@ -10,7 +10,7 @@ interface PassportSummaryCardProps {
     eventsCount: number;
     citiesCount: number;
     countriesCount: number;
-    coords: MapCoord[];
+    coords: JourneyCoordinate[];
     monthlyActivity: Array<{ month: string; count: number }>;
     /** Slot for map overlay (e.g., top-right passport icon link). Positioned absolutely top-right of map. */
     mapOverlay?: ReactNode;

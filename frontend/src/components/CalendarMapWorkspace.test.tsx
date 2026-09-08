@@ -73,10 +73,10 @@ describe('CalendarMapWorkspace', () => {
         [500, true],
         [499, false],
     ])('renders a 200px remaining map only when the content height is %ipx', async (contentHeight, visible) => {
-        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function () {
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
             return this.dataset.testid === 'calendar-map-content' ? contentHeight : 0;
         });
-        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function () {
+        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLElement) {
             return this.dataset.testid === 'calendar-container' ? 300 : 0;
         });
 

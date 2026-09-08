@@ -20,11 +20,8 @@ import type {
     PassportMilestone,
     PassportResponse,
 } from '../types';
-import MyDanceActivityStrip from '../components/MyDanceActivityStrip';
-import MyDanceJourneyMap from '../components/MyDanceJourneyMap';
 import MilestoneCarousel from '../components/MilestoneCarousel';
 import PassportSummaryCard from '../components/PassportSummaryCard';
-import SectionHeading from '../components/SectionHeading';
 import YourNextEventsRail from '../components/YourNextEventsRail';
 import { useAuth } from '../context/AuthContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
@@ -148,7 +145,6 @@ export default function MineHub() {
     }, [attendingEventIds]);
 
     const stats = passport?.stats;
-    const milestone = passport ? closestMilestone(passport.milestones) : null;
     const displayName = firstNameOf(user?.name, user?.handle) || 'MyDance';
     const coords = useMemo(() => mapEvents.flatMap((event) =>
         event.latitude != null && event.longitude != null

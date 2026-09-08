@@ -17,12 +17,8 @@ import {
     X,
 } from 'lucide-react';
 import EventMap from './EventMap';
-import MyDanceActivityStrip from './MyDanceActivityStrip';
-import MyDanceJourneyMap from './MyDanceJourneyMap';
 import PassportActivityHeatmap from './PassportActivityHeatmap';
 import PassportSummaryCard from './PassportSummaryCard';
-import ScrollDotsIndicator from './ScrollDots';
-import { useScrollDots } from '../hooks/useScrollDots';
 import type {
     PassportConsistency,
     PassportMapEvent,
@@ -625,11 +621,11 @@ function PlacesPanel({
         count: country.count,
     }));
     const cityEntries: FilterEntry[] = [
-        { key: null, label: 'All', count: baseCityEntries.reduce((sum, entry) => sum + entry.count, 0) },
+        { key: null as string | null, label: 'All', count: baseCityEntries.reduce((sum, entry) => sum + entry.count, 0) },
         ...baseCityEntries,
     ];
     const countryEntries: FilterEntry[] = [
-        { key: null, label: 'All', count: baseCountryEntries.reduce((sum, entry) => sum + entry.count, 0) },
+        { key: null as string | null, label: 'All', count: baseCountryEntries.reduce((sum, entry) => sum + entry.count, 0) },
         ...baseCountryEntries,
     ];
     const cityEvents = showCountries ? events : events.map((event) => ({ ...event, country: null }));

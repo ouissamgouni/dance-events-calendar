@@ -47,7 +47,7 @@ export default function ShareLinkRow({
                     title: 'My Movida Calendar',
                     url,
                 });
-            } else {
+            } else if (typeof navigator !== 'undefined' && 'clipboard' in navigator) {
                 await navigator.clipboard.writeText(url);
                 setCopyStatus('copied');
             }

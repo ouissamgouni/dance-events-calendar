@@ -10,7 +10,7 @@
  *
  * Pipeline-stage strip is rendered above the tabs (not inside Logs).
  */
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type {
     CalendarStatus,
     FailureEntry,

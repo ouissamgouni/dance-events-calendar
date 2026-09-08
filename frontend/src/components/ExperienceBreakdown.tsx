@@ -30,7 +30,7 @@ function ReviewRail({ title, itemCount, children }: { title: string; itemCount: 
 
     return (
         <div>
-            <div className="mt-6 mb-3 text-sm font-semibold leading-5 text-[#526078]">{title}</div>
+            <div className="mt-1 mb-3 text-sm font-semibold leading-5 text-[#526078]">{title}</div>
             <div ref={scrollerRef} className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
                 {children}
             </div>
@@ -102,7 +102,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
             {/* Numeric mood breakdown — collapsed by default, directly under the headline */}
             {sentimentTotal > 0 && (
                 <details className="text-xs">
-                    <summary className="cursor-pointer text-[9px] font-semibold uppercase tracking-wide text-ink-soft select-none">
+                    <summary className="cursor-pointer text-sm font-semibold leading-5 text-[#526078] select-none">
                         Show mood breakdown
                     </summary>
                     <div className="space-y-1 mt-1.5">
@@ -127,7 +127,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
 
             {/* Community summary — each group on one horizontally scrollable line */}
             {(appreciated.length > 0 || mentioned.length > 0 || recommendedFor.length > 0) && (
-                <div className="space-y-3 border-t border-card-line pt-4">
+                <div className="space-y-3 border-t border-card-line pt-1">
                     {appreciated.length > 0 && (
                         <ReviewRail title="People appreciated" itemCount={appreciated.length}>
                             {appreciated.map((t) => (
@@ -161,10 +161,11 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                 </div>
             )}
 
-            {/* By aspect — one horizontally scrollable line of badges */}
+            {/* By aspect — wrapping grid of badges (no horizontal scroll) */}
             {aspects.length > 0 && (
-                <div className="border-t border-card-line pt-4">
-                    <ReviewRail title="Ratings by area" itemCount={aspects.length}>
+                <div className="border-t border-card-line pt-1">
+                    <div className="mt-1 mb-3 text-sm font-semibold leading-5 text-[#526078]">Ratings by area</div>
+                    <div className="flex flex-wrap gap-1.5 pb-1">
                         {aspects.map((a) => {
                             const m = aspectMood(a.average);
                             return (
@@ -176,7 +177,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                                 </span>
                             );
                         })}
-                    </ReviewRail>
+                    </div>
                 </div>
             )}
         </div>
