@@ -521,17 +521,17 @@ function FilterableEventMap({
     const [activeFilterKey, setActiveFilterKey] = useState<string | null>(null);
     const [autoFitToken, setAutoFitToken] = useState(0);
     const listRef = useRef<HTMLUListElement>(null);
-    const rowRefs = useRef(new Map<string, HTMLLIElement>());
+    const rowRefs = useRef(new Map<string | null, HTMLLIElement>());
     const filtered = useMemo(
         () => activeFilterKey === null ? events : events.filter((event) => eventKeyOf(event) === activeFilterKey),
         [activeFilterKey, events, eventKeyOf],
     );
-    const selectEntry = (key: string) => {
+    const selectEntry = (key: string | null) => {
         setSelectedKey(key);
         setActiveFilterKey(key);
         setAutoFitToken((token) => token + 1);
     };
-    const revealEntry = useCallback((key: string) => {
+    const revealEntry = useCallback((key: string | null) => {
         const list = listRef.current;
         const row = rowRefs.current.get(key);
         if (!list || !row) return;
