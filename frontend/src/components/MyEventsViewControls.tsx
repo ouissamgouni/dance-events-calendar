@@ -44,7 +44,7 @@ export default function MyEventsViewControls({ view, searchOpen, onViewChange, o
                 onClick={onToggleSearch}
                 aria-label={searchOpen ? 'Close event search' : 'Add an event'}
                 aria-expanded={searchOpen}
-                className={`inline-flex h-9 min-w-0 items-center justify-center gap-1.5 border-r border-line px-2 text-xs font-semibold transition ${searchOpen ? 'bg-surface text-action' : 'text-ink-soft hover:bg-surface hover:text-ink'}`}
+                className={`inline-flex h-9 min-w-0 items-center justify-center gap-1.5 px-2 text-xs font-semibold text-action transition hover:underline ${searchOpen ? 'underline' : ''}`}
             >
                 <Plus className={`h-4 w-4 transition ${searchOpen ? 'rotate-45' : ''}`} aria-hidden="true" />
                 <span>{searchOpen ? 'Close' : 'Add event'}</span>

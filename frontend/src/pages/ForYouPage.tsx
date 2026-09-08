@@ -70,9 +70,9 @@ export function LensTrail(props: LensTrailProps) {
         followingBadgeEnabled, emptyContent, contextLabel, testId, headerAction,
         cardVariant = 'default', dateFirstEligible = false,
     } = props;
-    const { forYouEventCardsDateFirstLayoutEnabled, showRatings } = useFeatureFlags();
+    const { showRatings } = useFeatureFlags();
     const friendsGoing = cardVariant === 'friends-going';
-    const dateFirst = dateFirstEligible && forYouEventCardsDateFirstLayoutEnabled && !friendsGoing;
+    const dateFirst = dateFirstEligible && !friendsGoing;
     const [displayCap, setDisplayCap] = useState(DISPLAY_CAP);
     const visibleEvents = events.slice(0, displayCap);
     const hasLocalMore = events.length > visibleEvents.length;
@@ -127,8 +127,10 @@ export function LensTrail(props: LensTrailProps) {
                                     isTrending={isTrending}
                                     followingBadgeEnabled={followingBadgeEnabled}
                                     showRatings={showRatings}
-                                    widthClass="w-[248px]"
+                                    showReviews={false}
+                                    widthClass="w-[300px]"
                                     dateHeaderRow
+                                    twoLineTitle
                                     goingIconVariant="hand"
                                 />
                             );

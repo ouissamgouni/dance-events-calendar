@@ -132,7 +132,7 @@ export default function AreaEditor({
         'preference',
     );
     const myAreaMatchesProfile = profileEntries.some(({ area }) => searchAreasEqual(area, myAreaEntry));
-    const quickAreas = AREA_PRESETS.filter((preset) => preset.label !== 'Worldwide');
+    const quickAreas = AREA_PRESETS;
     const isSelectedArea = (area: SearchArea) => searchAreasEqual(draft, area) && draft.label === area.label;
 
     return (

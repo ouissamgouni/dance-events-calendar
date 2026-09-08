@@ -21,6 +21,8 @@ import MyDanceActivityStrip from './MyDanceActivityStrip';
 import MyDanceJourneyMap from './MyDanceJourneyMap';
 import PassportActivityHeatmap from './PassportActivityHeatmap';
 import PassportSummaryCard from './PassportSummaryCard';
+import ScrollDotsIndicator from './ScrollDots';
+import { useScrollDots } from '../hooks/useScrollDots';
 import type {
     PassportConsistency,
     PassportMapEvent,
@@ -302,6 +304,7 @@ function MilestoneCategoryRow({ category, onOpen }: { category: MilestoneCategor
     );
 }
 
+/** One "next milestone" per category in a single-item, dot-paged carousel. */
 function MilestonesOverview({ categories, onOpen }: { categories: MilestoneCategoryModel[]; onOpen: (key: MilestoneCategoryKey) => void }) {
     const unlocked = categories.reduce((sum, category) => sum + category.unlockedCount, 0);
     const total = categories.reduce((sum, category) => sum + category.cards.length, 0);
@@ -834,7 +837,9 @@ export default function PassportView({
                             <>
                                 <PassportStatsPanel data={data} />
                                 {hasMilestones
-                                    ? <MilestonesOverview categories={categories} onOpen={setSelectedCategory} />
+                                    ? (
+                                        <MilestonesOverview categories={categories} onOpen={setSelectedCategory} />
+                                    )
                                     : <UnavailableState message="Milestones are not shared on this passport." />}
                             </>
                         )}

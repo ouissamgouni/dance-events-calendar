@@ -24,18 +24,18 @@ export default function MilestoneCarousel({ milestones }: MilestoneCarouselProps
             />
             <div
                 ref={scrollerRef}
-                className="flex overflow-x-auto snap-x snap-mandatory gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4 -mx-4"
+                className="flex overflow-x-auto snap-x snap-mandatory gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
                 {milestones.map((m) => (
                     <Link
                         key={m.key}
                         to="/mine/passport"
-                        className="w-full shrink-0 snap-start flex items-center rounded-card border border-card-line bg-surface p-2.5 shadow-sm transition hover:border-action focus:outline-none focus:ring-2 focus:ring-action"
+                        className="w-full shrink-0 snap-start flex min-h-28 items-center gap-3 rounded-card border border-card-line bg-surface px-3 py-4 shadow-sm transition hover:border-action focus:outline-none focus:ring-2 focus:ring-action"
                     >
-                        <span className="mr-2 text-2xl shrink-0" aria-hidden="true">{m.icon || '🏆'}</span>
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface/70 text-2xl" aria-hidden="true">{m.icon || '🏆'}</span>
                         <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-bold text-ink">{m.name}</span>
-                            <span className="mt-0.5 block text-xs font-semibold text-ink-soft tabular-nums">
+                            <span className="block text-sm font-semibold text-ink">{m.name}</span>
+                            <span className="mt-0.5 block text-[11px] font-semibold text-ink-soft tabular-nums">
                                 {m.progress} / {m.threshold} {m.unit}
                             </span>
                             <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-line">

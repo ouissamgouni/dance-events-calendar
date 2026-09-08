@@ -232,8 +232,6 @@ export default function Admin() {
     const [trendingTopPercent, setTrendingTopPercent] = useState(100);
     const [promoCodesEnabled, setPromoCodesEnabled] = useState(false);
     const [organizerClaimsEnabled, setOrganizerClaimsEnabled] = useState(false);
-    const [forYouRailEnabled, setForYouRailEnabled] = useState(false);
-    const [yourNextEventsRailEnabled, setYourNextEventsRailEnabled] = useState(false);
     const [networkGoingSnapshotEnabled, setNetworkGoingSnapshotEnabled] = useState(true);
     const [myEventsRouteEnabled, setMyEventsRouteEnabled] = useState(false);
     const [myEventsNavEnabled, setMyEventsNavEnabled] = useState(true);
@@ -241,6 +239,7 @@ export default function Admin() {
     const [eventCardImgoingShowStatsEnabled, setEventCardImgoingShowStatsEnabled] = useState(false);
     const [eventCardImgoingLocationBottomEnabled, setEventCardImgoingLocationBottomEnabled] = useState(true);
     const [eventCardShowPeopleIconEnabled, setEventCardShowPeopleIconEnabled] = useState(false);
+    const [eventCardShowTimeLocationIconsEnabled, setEventCardShowTimeLocationIconsEnabled] = useState(false);
     const [explorerEventCardCardStyleEnabled, setExplorerEventCardCardStyleEnabled] = useState(false);
     // Notification / re-engagement gates. Booleans are master switches
     // that override the corresponding env vars in ``config/loader.py``;
@@ -415,8 +414,6 @@ export default function Admin() {
             setTrendingTopPercent(s.trending_top_percent ?? 100);
             setPromoCodesEnabled(s.promo_codes_enabled ?? false);
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
-            setForYouRailEnabled(s.for_you_rail_enabled ?? false);
-            setYourNextEventsRailEnabled(s.your_next_events_rail_enabled ?? false);
             setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? false);
             setMyEventsRouteEnabled(s.my_events_route_enabled ?? false);
             setMyEventsNavEnabled(s.my_events_nav_enabled ?? true);
@@ -424,6 +421,7 @@ export default function Admin() {
             setEventCardImgoingShowStatsEnabled(s.event_card_imgoing_show_stats_enabled ?? false);
             setEventCardImgoingLocationBottomEnabled(s.event_card_imgoing_location_bottom_enabled ?? true);
             setEventCardShowPeopleIconEnabled(s.event_card_show_people_icon_enabled ?? false);
+            setEventCardShowTimeLocationIconsEnabled(s.event_card_show_time_location_icons_enabled ?? false);
             setExplorerEventCardCardStyleEnabled(s.explorer_event_card_card_style_enabled ?? false);
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
             setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
@@ -769,30 +767,6 @@ export default function Admin() {
         }
     };
 
-    const handleToggleForYouRail = async () => {
-        const newVal = !forYouRailEnabled;
-        setForYouRailEnabled(newVal);
-        try {
-            await updateSettings({ for_you_rail_enabled: newVal });
-            setMessage(`"For you" rail ${newVal ? 'enabled' : 'disabled'}.`);
-        } catch {
-            setForYouRailEnabled(!newVal);
-            setMessage('Failed to update "For you" rail toggle.');
-        }
-    };
-
-    const handleToggleYourNextEventsRail = async () => {
-        const newVal = !yourNextEventsRailEnabled;
-        setYourNextEventsRailEnabled(newVal);
-        try {
-            await updateSettings({ your_next_events_rail_enabled: newVal });
-            setMessage(`"Your next events" rail ${newVal ? 'enabled' : 'disabled'}.`);
-        } catch {
-            setYourNextEventsRailEnabled(!newVal);
-            setMessage('Failed to update "Your next events" rail toggle.');
-        }
-    };
-
     const handleToggleNetworkGoingSnapshot = async () => {
         const newVal = !networkGoingSnapshotEnabled;
         setNetworkGoingSnapshotEnabled(newVal);
@@ -875,6 +849,18 @@ export default function Admin() {
         } catch {
             setEventCardShowPeopleIconEnabled(!newVal);
             setMessage('Failed to update people icon toggle.');
+        }
+    };
+
+    const handleToggleEventCardShowTimeLocationIcons = async () => {
+        const newVal = !eventCardShowTimeLocationIconsEnabled;
+        setEventCardShowTimeLocationIconsEnabled(newVal);
+        try {
+            await updateSettings({ event_card_show_time_location_icons_enabled: newVal });
+            setMessage(`Time & location icons on cards ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventCardShowTimeLocationIconsEnabled(!newVal);
+            setMessage('Failed to update time & location icons toggle.');
         }
     };
 
@@ -2232,6 +2218,21 @@ export default function Admin() {
                                     </button>
                                 </div>
 
+                                {/* Event card: time & location icons */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Time &amp; location icons on cards</span>
+                                        <p className="text-[10px] text-muted">Show clock (time) and pin (location) icons on event cards</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleEventCardShowTimeLocationIcons}
+                                        aria-label="Toggle time and location icons on cards"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventCardShowTimeLocationIconsEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventCardShowTimeLocationIconsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
                                 {/* Explorer: My Events card style */}
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -2244,36 +2245,6 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${explorerEventCardCardStyleEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${explorerEventCardCardStyleEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                    </button>
-                                </div>
-
-                                {/* Explorer "For you" discovery rail */}
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <span className="text-[11px] font-medium text-ink">For you rail</span>
-                                        <p className="text-[10px] text-muted">Collapsible Explorer rail with You might like/Friends going/New lenses</p>
-                                    </div>
-                                    <button
-                                        onClick={handleToggleForYouRail}
-                                        aria-label="Toggle for you rail"
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${forYouRailEnabled ? 'bg-success' : 'bg-gray-300'}`}
-                                    >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${forYouRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                    </button>
-                                </div>
-
-                                {/* Explorer "Your next events" rail */}
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <span className="text-[11px] font-medium text-ink">Your next events rail</span>
-                                        <p className="text-[10px] text-muted">Explorer rail showing the viewer's own saved/going events</p>
-                                    </div>
-                                    <button
-                                        onClick={handleToggleYourNextEventsRail}
-                                        aria-label="Toggle your next events rail"
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${yourNextEventsRailEnabled ? 'bg-success' : 'bg-gray-300'}`}
-                                    >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${yourNextEventsRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

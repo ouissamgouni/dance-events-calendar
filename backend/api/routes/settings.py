@@ -194,10 +194,6 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         going_button_icon_variant=_get_going_button_icon_variant(session),
         promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
         organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
-        for_you_rail_enabled=_get_bool_setting(session, "for_you_rail_enabled"),
-        your_next_events_rail_enabled=_get_bool_setting(
-            session, "your_next_events_rail_enabled", default=True
-        ),
         network_going_snapshot_enabled=_get_bool_setting(
             session, "network_going_snapshot_enabled", default=False
         ),
@@ -319,11 +315,11 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         event_card_show_people_icon_enabled=_get_bool_setting(
             session, "event_card_show_people_icon_enabled"
         ),
+        event_card_show_time_location_icons_enabled=_get_bool_setting(
+            session, "event_card_show_time_location_icons_enabled"
+        ),
         explorer_event_card_card_style_enabled=_get_bool_setting(
             session, "explorer_event_card_card_style_enabled"
-        ),
-        for_you_event_cards_date_first_layout_enabled=_get_bool_setting(
-            session, "for_you_event_cards_date_first_layout_enabled"
         ),
     )
 
@@ -543,28 +539,18 @@ def update_settings(
             body.event_card_show_people_icon_enabled,
         )
 
+    if body.event_card_show_time_location_icons_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_card_show_time_location_icons_enabled",
+            body.event_card_show_time_location_icons_enabled,
+        )
+
     if body.explorer_event_card_card_style_enabled is not None:
         _set_bool_setting(
             session,
             "explorer_event_card_card_style_enabled",
             body.explorer_event_card_card_style_enabled,
-        )
-
-    if body.for_you_event_cards_date_first_layout_enabled is not None:
-        _set_bool_setting(
-            session,
-            "for_you_event_cards_date_first_layout_enabled",
-            body.for_you_event_cards_date_first_layout_enabled,
-        )
-
-    if body.for_you_rail_enabled is not None:
-        _set_bool_setting(session, "for_you_rail_enabled", body.for_you_rail_enabled)
-
-    if body.your_next_events_rail_enabled is not None:
-        _set_bool_setting(
-            session,
-            "your_next_events_rail_enabled",
-            body.your_next_events_rail_enabled,
         )
 
     if body.network_going_snapshot_enabled is not None:

@@ -769,12 +769,6 @@ class SiteSettingsResponse(BaseModel):
     # admin-moderated). When False, the Account application section
     # and event "Organized by" pill are hidden.
     organizer_claims_enabled: bool = False
-    # Explorer "For you" discovery rail (You might like/Friends going/New lenses).
-    # When False, the rail is hidden entirely.
-    for_you_rail_enabled: bool = False
-    # Explorer "Your next events" rail (viewer's own saved/going events).
-    # When False, the rail is hidden entirely.
-    your_next_events_rail_enabled: bool = True
     # Tribe > Calendars "Your Network" snapshot of upcoming events people
     # you follow are going to. When False, the snapshot is hidden.
     network_going_snapshot_enabled: bool = False
@@ -875,11 +869,10 @@ class SiteSettingsResponse(BaseModel):
     event_card_imgoing_location_bottom_enabled: bool = True
     # When True, event cards show the people icon prefixing the avatar stack.
     event_card_show_people_icon_enabled: bool = False
+    # When True, event cards show clock (time) and pin (location) icons.
+    event_card_show_time_location_icons_enabled: bool = False
     # When True, the explorer list renders the shared My Events card style.
     explorer_event_card_card_style_enabled: bool = False
-    # When True, the "You might like" and "New" For-you trails render the
-    # new date-first event card layout instead of the legacy rail card.
-    for_you_event_cards_date_first_layout_enabled: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -1061,8 +1054,6 @@ class SiteSettingsUpdateRequest(BaseModel):
     going_button_icon_variant: Optional[GoingButtonIconVariant] = None
     promo_codes_enabled: Optional[bool] = None
     organizer_claims_enabled: Optional[bool] = None
-    for_you_rail_enabled: Optional[bool] = None
-    your_next_events_rail_enabled: Optional[bool] = None
     network_going_snapshot_enabled: Optional[bool] = None
     my_events_route_enabled: Optional[bool] = None
     my_events_nav_enabled: Optional[bool] = None
@@ -1119,8 +1110,8 @@ class SiteSettingsUpdateRequest(BaseModel):
     event_card_imgoing_show_stats_enabled: Optional[bool] = None
     event_card_imgoing_location_bottom_enabled: Optional[bool] = None
     event_card_show_people_icon_enabled: Optional[bool] = None
+    event_card_show_time_location_icons_enabled: Optional[bool] = None
     explorer_event_card_card_style_enabled: Optional[bool] = None
-    for_you_event_cards_date_first_layout_enabled: Optional[bool] = None
 
 
 class EventUpdateRequest(BaseModel):

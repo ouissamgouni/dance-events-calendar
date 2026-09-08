@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { TagGroup } from '../types';
-import { REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS, type ReachFilter } from '../utils/reach';
+import { REACH_FILTER_LABELS, type ReachFilter } from '../utils/reach';
 import PeopleAvatarTrack, { type PersonMini } from './PeopleAvatarTrack';
 
 // SummaryBar — single-line filter summary with deterministic, width-based
@@ -80,7 +80,7 @@ function formatPeriodLabel(startDate: string, endDate: string): string {
     today.setHours(0, 0, 0, 0);
     // No end cap (Tribe's all-upcoming mode).
     if (start && !endDate) {
-        return start.getTime() === today.getTime() ? 'All upcoming' : `From ${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+        return start.getTime() === today.getTime() ? 'Any' : `From ${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
     }
     if (!start || !end) return `${startDate}-${endDate}`;
     const sameYear = start.getFullYear() === end.getFullYear();
@@ -162,16 +162,8 @@ function Pill({ label, title, icon, onClick, onRemove, removeAriaLabel, testId, 
 
 const ICON_CLS = 'h-4 w-4 shrink-0';
 
-// Text chips (period/area/dance) are iconless to save width; only reach and
-// people carry an icon since the icon *is* their identifier (reach is icon-only,
-// people shows an optional count that would be meaningless on its own).
-const peopleIcon = (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className={ICON_CLS} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="7" cy="7" r="2.4" />
-        <path d="M2.5 16c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" />
-        <path d="M13 6.2a2.2 2.2 0 0 1 0 4.2M14 12.4c2 .4 3.5 1.8 3.5 3.6" />
-    </svg>
-);
+// Every chip carries the same icon its filter-sheet section uses, so the
+// summary bar reads as a compact echo of the open Filters sheet.
 
 type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people';
 
@@ -203,7 +195,7 @@ export default function SummaryBar(props: SummaryBarProps) {
     const danceSel = useMemo(() => {
         if (!danceGroup) return { label: '', count: 0 };
         const selected = danceGroup.tags.filter((t) => activeTagIds.has(t.id));
-        if (selected.length === 0) return { label: '', count: 0 };
+        if (selected.length === 0) return { label: 'Any', count: 0 };
         const first = selected[0].label;
         return { label: selected.length > 1 ? `${first} +${selected.length - 1}` : first, count: selected.length };
     }, [danceGroup, activeTagIds]);
@@ -246,7 +238,7 @@ export default function SummaryBar(props: SummaryBarProps) {
             list.push('people');
         }
         list.push('period', 'area');
-        if (danceGroup && danceSel.count > 0) list.push('dance');
+        if (danceGroup) list.push('dance');
         if (reachGroup) list.push('reach');
         return list;
     }, [danceGroup, danceSel.count, reachGroup, peopleActive, onEditPeople]);
@@ -282,7 +274,9 @@ export default function SummaryBar(props: SummaryBarProps) {
             return;
         }
         // Reserve the always-present Filters pill before fitting candidates.
-        let avail = containerWidth - gearW - GAP;
+        // Each candidate below accounts for the single gap to its right, so
+        // only the gear width (not an extra gap) is reserved up front.
+        let avail = containerWidth - gearW;
         let count = 0;
         for (let i = 0; i < widths.length; i += 1) {
             const next = widths[i] + GAP;
@@ -304,6 +298,7 @@ export default function SummaryBar(props: SummaryBarProps) {
                 return (
                     <Pill
                         key="period"
+                        icon={<img src="/calendar.png" alt="" aria-hidden="true" className={ICON_CLS} />}
                         label={formatPeriodLabel(startDate, endDate)}
                         onClick={onEditPeriod}
                         testId={tid('summary-chip-period')}
@@ -326,40 +321,49 @@ export default function SummaryBar(props: SummaryBarProps) {
                 return (
                     <Pill
                         key="dance"
+                        icon={<img src="/dance.png" alt="" aria-hidden="true" className={ICON_CLS} />}
                         label={danceSel.label}
                         title={`Dance styles: ${danceSel.label}`}
                         onClick={onEditDance}
                         testId={tid('summary-chip-dance')}
                     />
                 );
-            case 'reach':
+            case 'reach': {
+                // Text label instead of an icon; truncate long labels to 3
+                // chars but keep short words (e.g. "Any", "local") intact.
+                const full = REACH_FILTER_LABELS[reachFilter];
+                const short = full.length <= 5 ? full : full.slice(0, 3);
                 return (
                     <Pill
                         key="reach"
-                        icon={<img src={REACH_FILTER_ICON_SRC[reachFilter]} alt="" className={ICON_CLS} aria-hidden="true" />}
-                        ariaLabel={`Event reach: ${REACH_FILTER_LABELS[reachFilter]}`}
-                        title={`Event reach: ${REACH_FILTER_LABELS[reachFilter]}`}
+                        label={short}
+                        ariaLabel={`Event reach: ${full}`}
+                        title={`Event reach: ${full}`}
                         onClick={onEditReach}
                         testId={tid('summary-chip-reach')}
                     />
                 );
+            }
             case 'people': {
                 const hasFaces = interestUserHandles.length > 0 && (interestUserPeople?.length ?? 0) > 0;
-                // Consolidated chip: {WHO} · {STATUS} (e.g., "Following · Going")
+                // Consolidated, shortened chip. The default "Following" source is
+                // implied, so it collapses to just the status ("Going" /
+                // "Interested"); "Both" drops the status entirely.
                 const n = interestUserHandles.length;
-                let whoLabel = '';
-                if (n > 0) {
-                    whoLabel = `${n} ${n === 1 ? 'person' : 'people'}`;
-                } else {
-                    whoLabel = interestSource === 'friends' ? 'Friends' : 'Following';
-                }
-                const combinedLabel = `${whoLabel} · ${peopleStatusLabel}`;
+                const who = n > 0
+                    ? `${n} ${n === 1 ? 'person' : 'people'}`
+                    : interestSource === 'friends' ? 'Friends' : 'Following';
+                const status = interestKind === 'going' ? 'Going' : interestKind === 'saved' ? 'Interested' : '';
+                const followingImplied = n === 0 && interestSource !== 'friends';
+                const combinedLabel = followingImplied
+                    ? (status || 'Following')
+                    : status ? `${who} ${status.toLowerCase()}` : who;
                 return (
                     <Pill
                         key="people"
                         icon={hasFaces
                             ? <PeopleAvatarTrack people={interestUserPeople!} total={interestUserHandles.length} max={3} size="sm" />
-                            : undefined}
+                            : <img src="/high-five.png" alt="" aria-hidden="true" className={ICON_CLS} />}
                         label={combinedLabel}
                         ariaLabel="People"
                         title={`People: ${combinedLabel}`}

@@ -30,8 +30,6 @@ function renderAt(path: string, contextValue?: { flags: any; updateFlag: any }) 
             goingButtonIconVariant: 'hand' as const,
             promoCodesEnabled: false,
             organizerClaimsEnabled: false,
-            forYouRailEnabled: false,
-            yourNextEventsRailEnabled: false,
             networkGoingSnapshotEnabled: true,
             myEventsRouteEnabled: false,
             eventReviewSizeStepEnabled: true,

@@ -166,9 +166,13 @@ export default function MyEventsExperience() {
                             hasNext={selectedIndex < sequence.length - 1}
                             onPrevious={() => selectIndex(selectedIndex - 1)}
                             onNext={() => selectIndex(selectedIndex + 1)}
+                            index={selectedIndex}
+                            count={sequence.length}
+                            onSelectIndex={selectIndex}
                             onOpen={() => setModalEvent(selected.event)}
                             showAvatars={activeTab === 'upcoming'}
                             showActions={activeTab === 'saved'}
+                            showPrice={false}
                             actions={activeTab === 'saved' ? ['going'] : undefined}
                         />
                     )}

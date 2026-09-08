@@ -41,9 +41,18 @@ export function closestMilestone(milestones: PassportMilestone[]): PassportMiles
 }
 
 export function inProgressMilestones(milestones: PassportMilestone[]): PassportMilestone[] {
-    return milestones
-        .filter((m) => !m.unlocked && m.threshold > 0)
-        .sort((a, b) => (b.progress / b.threshold) - (a.progress / a.threshold));
+    const inProgress = milestones.filter((m) => !m.unlocked && m.threshold > 0);
+    // Surface only the single "next" milestone per category (the one closest
+    // to being unlocked) so the carousel reads as one goal per area rather
+    // than every locked tier at once.
+    const nextByCategory = new Map<string, PassportMilestone>();
+    for (const m of inProgress) {
+        const current = nextByCategory.get(m.category);
+        if (!current || m.progress / m.threshold > current.progress / current.threshold) {
+            nextByCategory.set(m.category, m);
+        }
+    }
+    return [...nextByCategory.values()].sort((a, b) => (b.progress / b.threshold) - (a.progress / a.threshold));
 }
 
 interface ShortcutProps {

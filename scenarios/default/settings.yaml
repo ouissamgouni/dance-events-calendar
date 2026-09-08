@@ -11,6 +11,4 @@ settings:
   trending_banner_enabled: true
   promo_codes_enabled: true
   organizer_claims_enabled: true
-  for_you_rail_enabled: true
-  your_next_events_rail_enabled: true
   tag_as_badge_enabled: true

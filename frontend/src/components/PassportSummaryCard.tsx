@@ -53,10 +53,10 @@ export default function PassportSummaryCard({
                         )}
                         <div className="min-w-0">
                             <h1 className="truncate text-2xl font-bold">{displayName}</h1>
-                            {handle && <p className="mt-1 truncate text-sm text-white/80">@{handle}</p>}
+                            {handle && <p className="mt-1 truncate text-xs text-white/80">@{handle}</p>}
                         </div>
                     </div>
-                    <div className="relative z-10 text-sm font-bold leading-none">{eventsCount}</div>
+                    <div className="mt-4 relative z-10 text-sm font-bold leading-none">{eventsCount} Events</div>
                     {(citiesCount > 0 || countriesCount > 0) && (
                         <div className="relative z-10 text-xs font-semibold text-white/80">
                             <span>{citiesCount} {citiesCount === 1 ? 'city' : 'cities'}</span>

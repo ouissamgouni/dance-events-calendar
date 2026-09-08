@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { firstNameOf } from '../utils/displayName';
-import { useNavDestinations } from './navDestinations';
 
 /**
  * Primary menu drawer opened by the header burger (top-right). Holds the
@@ -13,7 +12,6 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
     const { user, logout } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
-    const navDestinations = useNavDestinations();
 
     // Close on route change and on Escape.
     useEffect(() => {
@@ -93,22 +91,6 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                 )}
 
                 <nav aria-label="Menu" className="py-2">
-                    <div className="md:hidden">
-                        {navDestinations.map((dest) => (
-                            <Link
-                                key={dest.id}
-                                to={dest.path}
-                                onClick={onClose}
-                                aria-current={dest.isActive(location.pathname) ? 'page' : undefined}
-                                className={rowClass}
-                            >
-                                <img src={dest.icon} alt="" aria-hidden="true" className={iconClass} />
-                                {dest.label}
-                            </Link>
-                        ))}
-                        {divider}
-                    </div>
-
                     {user ? (
                         <>
                             <Link to="/mine/passport" onClick={onClose} className={rowClass}>

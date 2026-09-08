@@ -1,7 +1,4 @@
-import { useRef } from 'react';
 import type { EventDetailTab } from './EventSummary';
-import { useScrollDots } from '../hooks/useScrollDots';
-import ScrollDotsIndicator from './ScrollDots';
 
 interface TabDef {
     id: EventDetailTab;
@@ -31,13 +28,9 @@ interface Props {
  * tabs together.
  */
 export default function EventDetailTabsBar({ active, onSelect, variant = 'section' }: Props) {
-    const scrollerRef = useRef<HTMLDivElement>(null);
-    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [active]);
-
     return (
         <div className={`bg-surface ${variant === 'entry' ? 'border-y border-line' : 'border-b border-line'}`}>
             <div
-                ref={scrollerRef}
                 role="tablist"
                 aria-label="Event details"
                 className="flex flex-nowrap gap-1 overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -61,7 +54,6 @@ export default function EventDetailTabsBar({ active, onSelect, variant = 'sectio
                     );
                 })}
             </div>
-            <ScrollDotsIndicator count={dotCount} activeIndex={activeIndex} onSelect={scrollToIndex} className="pb-1" />
         </div>
     );
 }

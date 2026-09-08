@@ -36,7 +36,6 @@ const MyCalendar = lazy(() => import('./pages/MyCalendar'));
 const PassportPage = lazy(() => import('./pages/PassportPage'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const DiscoverPage = lazy(() => import('./pages/DiscoverPage'));
 const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
 const SharedPassportPage = lazy(() => import('./pages/SharedPassportPage'));
 const Privacy = lazy(() => import('./pages/Privacy'));
@@ -192,7 +191,7 @@ function AppShell() {
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="discover" element={<DiscoverPage />} />
+                  <Route path="discover" element={<Navigate to="/tribe/network" replace />} />
                   <Route path="network" element={<NetworkPage />} />
                   <Route path="reviews" element={<FollowingReviewsPage />} />
                 </Route>

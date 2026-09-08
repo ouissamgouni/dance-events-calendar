@@ -25,4 +25,14 @@ describe('ViewSwitcher', () => {
         await userEvent.click(screen.getByRole('button', { name: 'Calendar view' }));
         expect(onSelect).toHaveBeenCalledWith('calendar');
     });
+
+    it('renders the create (+) button only when onCreate is provided and fires it', async () => {
+        const onCreate = vi.fn();
+        const { rerender } = render(<ViewSwitcher currentView="map" onSelect={vi.fn()} />);
+        expect(screen.queryByTestId('view-switcher-create')).toBeNull();
+
+        rerender(<ViewSwitcher currentView="map" onSelect={vi.fn()} onCreate={onCreate} />);
+        await userEvent.click(screen.getByTestId('view-switcher-create'));
+        expect(onCreate).toHaveBeenCalledTimes(1);
+    });
 });

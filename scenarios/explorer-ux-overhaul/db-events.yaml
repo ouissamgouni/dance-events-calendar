@@ -28,7 +28,7 @@ events:
       Kick off the weekend with a friendly Paris social featuring a short warm-up set, mixed salsa floors, and enough room for both casual dancers and regulars.
       Expect a relaxed crowd, easy partner rotation, and a final DJ block that keeps the energy high through the last hour.
     location: Studio A, 10 Rue de Rivoli, Paris, France
-    image_url: /friends-going-dance-floor.jpg
+    image_url: https://picsum.photos/seed/evt-ux-001/800/600
     latitude: 48.8566
     longitude: 2.3522
     city: Paris
@@ -61,7 +61,10 @@ events:
     country_code: DE
     start: w0 Fri 21:00
     end: w0 Sat 01:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 12
+    price_max: 15
+    price_currency: EUR
     tags:
       [
         "format:social",
@@ -79,6 +82,7 @@ events:
       Beginner-friendly partnerwork class covering basic timing, right turns, and simple social-floor transitions in a small central Madrid studio.
       The pace is intentionally gentle, with recap time built in so first-timers can stay comfortable through the full session.
     location: Calle de Atocha 34, Madrid, Spain
+    image_url: https://picsum.photos/seed/evt-ux-003/800/600
     latitude: 40.4140
     longitude: -3.7035
     city: Madrid
@@ -112,7 +116,10 @@ events:
     country_code: PT
     start: w0 Sat 14:00
     end: w0 Sat 17:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 8
+    price_max: 12
+    price_currency: EUR
     tags:
       [
         "format:workshop",
@@ -130,6 +137,7 @@ events:
       Sunday evening bachata social in Trastevere with a mellow start, a social-heavy playlist, and a crowd that tends to stay until closing.
       It is the kind of end-of-weekend event where people come to dance a lot, catch up, and wind down without a formal class block.
     location: Trastevere, Rome, Italy
+    image_url: https://picsum.photos/seed/evt-ux-005/800/600
     latitude: 41.8896
     longitude: 12.4695
     city: Rome
@@ -179,6 +187,7 @@ events:
     title: Secret Venue Salsa Social
     description: Saved-event fixture without coordinates for My Events map disclosure.
     location: Venue announced to attendees, Paris, France
+    image_url: https://picsum.photos/seed/evt-my-events-unmapped/800/600
     city: Paris
     country: France
     country_code: FR
@@ -197,7 +206,10 @@ events:
     longitude: 16.3669
     start: w1 Fri 20:00
     end: w2 Mon 09:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 10
+    price_max: 14
+    price_currency: EUR
     tags:
       [
         "format:class",
@@ -239,6 +251,7 @@ events:
       Flexible Tuesday drop-in designed for people who want a useful class without committing to a longer course block.
       Expect a quick fundamentals recap, one compact pattern, and practice rounds that let improvers sharpen timing and confidence.
     location: Grand Place, Brussels, Belgium
+    image_url: https://picsum.photos/seed/evt-ux-009/800/600
     latitude: 50.8467
     longitude: 4.3525
     start: w2 Tue 19:00
@@ -265,7 +278,10 @@ events:
     longitude: 12.5701
     start: w2 Thu 19:00
     end: w2 Thu 22:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 15
+    price_max: 20
+    price_currency: EUR
     tags:
       [
         "format:workshop",
@@ -283,6 +299,7 @@ events:
       Large Saturday preview social with guest DJs, a fuller crowd than a regular weekly night, and a program that hints at festival-weekend energy.
       Expect a busier entrance, stronger social buzz, and long stretches of uninterrupted dancing once the room fills up.
     location: King's Cross, London, UK
+    image_url: https://picsum.photos/seed/evt-ux-011/800/600
     latitude: 51.5320
     longitude: -0.1233
     start: w2 Sat 20:00
@@ -330,11 +347,15 @@ events:
       Friday-night bachata social with a polished crowd, balanced music selection, and enough space for both close connection and more open styling.
       The event normally builds slowly, then turns into a steady late-night floor once the after-work crowd arrives.
     location: Langstrasse, Zurich, Switzerland
+    image_url: https://picsum.photos/seed/evt-ux-013/800/600
     latitude: 47.3769
     longitude: 8.5417
     start: w4 Fri 21:00
     end: w4 Sat 01:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 5
+    price_max: 8
+    price_currency: EUR
     tags:
       [
         "format:social",
@@ -378,6 +399,7 @@ events:
       Open-floor social in Warsaw with no formal class, just a clean setup for dancing, meeting people, and staying out for a few solid hours midweek.
       The vibe is straightforward and dance-first, which makes it useful for people who mainly care about floor time and partner variety.
     location: Praga, Warsaw, Poland
+    image_url: https://picsum.photos/seed/evt-ux-015/800/600
     latitude: 52.2297
     longitude: 21.0122
     start: w6 Fri 20:00
@@ -404,7 +426,10 @@ events:
     longitude: 18.0686
     start: w6 Sat 15:00
     end: w6 Sat 18:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 18
+    price_max: 25
+    price_currency: EUR
     tags:
       [
         "format:workshop",
@@ -423,6 +448,7 @@ events:
       Late-night Athens salsa social that really gets going after 23:00, with a louder room, committed dancers, and a more club-like energy.
       People tend to stay for long sets, so it works well for anyone looking for a fuller night out instead of a quick weekday practice.
     location: Psirri, Athens, Greece
+    image_url: https://picsum.photos/seed/evt-ux-017/800/600
     latitude: 37.9838
     longitude: 23.7275
     start: w6 Fri 20:00
@@ -469,11 +495,15 @@ events:
       Short-format Thursday drop-in built for people who want practical bachata technique without committing an entire evening to classwork.
       Expect a concise lesson, a few guided repetitions, and just enough social time afterward to test the material on the floor.
     location: Florentin, Tel Aviv, Israel
+    image_url: https://picsum.photos/seed/evt-ux-019/800/600
     latitude: 32.0853
     longitude: 34.7818
     start: w8 Fri 20:00
     end: w9 Mon 09:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 10
+    price_max: 12
+    price_currency: EUR
     tags:
       [
         "format:class",
@@ -513,6 +543,7 @@ events:
       Daytime bachata brunch social mixing lighter music, coffee-and-conversation energy, and relaxed partner rotation across the afternoon.
       It feels intentionally softer than a late-night event, making it easy for newer dancers and friend groups to settle in.
     location: Temple Bar, Dublin, Ireland
+    image_url: https://picsum.photos/seed/evt-ux-021/800/600
     latitude: 53.3498
     longitude: -6.2603
     start: w8 Sun 12:00
@@ -542,7 +573,10 @@ events:
     longitude: -8.6291
     start: w10 Fri 20:00
     end: w11 Mon 09:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 20
+    price_max: 30
+    price_currency: EUR
     tags:
       [
         "format:workshop",
@@ -562,6 +596,7 @@ events:
       Festival pre-party designed to feel bigger than a normal social, with guest visitors in town early and a late finish once the crowd locks in.
       Music leans social and crowd-pleasing, making it a strong warm-up event ahead of a larger weekend program.
     location: Erzsebetvaros, Budapest, Hungary
+    image_url: https://picsum.photos/seed/evt-ux-023/800/600
     latitude: 47.4979
     longitude: 19.0402
     start: w10 Fri 20:00
@@ -612,11 +647,15 @@ events:
       Two-day bachata workshop weekend with progressive material, multiple teaching blocks, and a schedule aimed at dancers who want a deeper practice cycle.
       Expect a more serious instructional tone during the day and plenty of conversation around technique between sessions.
     location: Vesterbro, Copenhagen, Denmark
+    image_url: https://picsum.photos/seed/evt-ux-025/800/600
     latitude: 55.6680
     longitude: 12.5425
     start: w16 Sat 11:00
     end: w16 Sun 18:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 9
+    price_max: 14
+    price_currency: EUR
     tags:
       [
         "format:workshop",
@@ -659,6 +698,7 @@ events:
       Seasonal kickoff social built around warm-weather energy, approachable bachata programming, and a crowd that treats the night as a small celebration.
       It reads like a genuine special event rather than a placeholder, which helps the scenario feel richer when future results appear.
     location: Sea Point, Cape Town, South Africa
+    image_url: https://picsum.photos/seed/evt-ux-027/800/600
     latitude: -33.9189
     longitude: 18.4233
     start: w20 Sat 20:00
@@ -691,7 +731,10 @@ events:
     longitude: -73.9855
     start: w2 Fri 20:00
     end: w3 Mon 09:00
-    price_is_free: true
+    price_is_free: false
+    price_min: 25
+    price_max: 35
+    price_currency: EUR
     tags:
       [
         "format:social",
@@ -716,6 +759,7 @@ events:
     description: |
       Old-town salsa social on the main square with a mixed local-and-visitor crowd and a social-first DJ set.
     location: Rynek Glowny, Kraków, Poland
+    image_url: https://picsum.photos/seed/evt-ux-029/800/600
     latitude: 50.0647
     longitude: 19.9450
     start: w22 Fri 21:00
@@ -760,6 +804,7 @@ events:
     description: |
       Warm seafront salsa night with a festive local crowd and a long social block by the bay.
     location: Lungomare, Naples, Italy
+    image_url: https://picsum.photos/seed/evt-ux-031/800/600
     latitude: 40.8518
     longitude: 14.2681
     start: w26 Fri 20:00
@@ -804,6 +849,7 @@ events:
     description: |
       International salsa festival weekend with workshops by day and packed party rooms at night.
     location: Presqu'île, Lyon, France
+    image_url: https://picsum.photos/seed/evt-ux-033/800/600
     latitude: 45.7640
     longitude: 4.8357
     start: w30 Fri 20:00
@@ -848,6 +894,7 @@ events:
     description: |
       Relaxed after-work bachata social with an easy start and a steady late-evening floor.
     location: Glockenbach, Munich, Germany
+    image_url: https://picsum.photos/seed/evt-ux-035/800/600
     latitude: 48.1351
     longitude: 11.5820
     start: w34 Thu 20:00
@@ -893,6 +940,7 @@ events:
     description: |
       Rooftop salsa social with skyline views and an international summer crowd.
     location: Gornji Grad, Zagreb, Croatia
+    image_url: https://picsum.photos/seed/evt-ux-037/800/600
     latitude: 45.8150
     longitude: 15.9819
     start: w38 Fri 20:00
@@ -939,6 +987,7 @@ events:
     description: |
       Free beginner-friendly bachata class covering the basics before a short social.
     location: Center, Sofia, Bulgaria
+    image_url: https://picsum.photos/seed/evt-ux-039/800/600
     latitude: 42.6977
     longitude: 23.3219
     start: w42 Wed 19:00
@@ -981,6 +1030,7 @@ events:
     description: |
       Bachata social with a friendly regional crowd and a mellow sensual set.
     location: Grünerløkka, Oslo, Norway
+    image_url: https://picsum.photos/seed/evt-ux-041/800/600
     latitude: 59.9139
     longitude: 10.7522
     start: w46 Fri 21:00
@@ -1027,6 +1077,7 @@ events:
     description: |
       International salsa workshop day with visiting instructors and an evening social.
     location: Pâquis, Geneva, Switzerland
+    image_url: https://picsum.photos/seed/evt-ux-043/800/600
     latitude: 46.2044
     longitude: 6.1432
     start: w50 Fri 20:00
@@ -1071,6 +1122,7 @@ events:
     description: |
       Coastal bachata festival with pool parties by day and international socials at night.
     location: Malagueta, Málaga, Spain
+    image_url: https://picsum.photos/seed/evt-ux-045/800/600
     latitude: 36.7213
     longitude: -4.4213
     start: w54 Fri 20:00
@@ -1106,6 +1158,7 @@ events:
     description: |
       Kizomba social by the canals with a small, welcoming local crowd.
     location: Patershol, Ghent, Belgium
+    image_url: https://picsum.photos/seed/evt-ux-047/800/600
     latitude: 51.0543
     longitude: 3.7174
     start: w58 Fri 20:30
@@ -1151,6 +1204,7 @@ events:
     description: |
       Free seaside bachata social with a regional summer crowd and a long open floor.
     location: Ladadika, Thessaloniki, Greece
+    image_url: https://picsum.photos/seed/evt-ux-049/800/600
     latitude: 40.6401
     longitude: 22.9444
     start: w62 Sat 21:00
@@ -1192,6 +1246,7 @@ events:
     description: |
       International salsa social on the waterfront with a big, diverse city crowd.
     location: Harbourfront, Toronto, Canada
+    image_url: https://picsum.photos/seed/evt-ux-051/800/600
     latitude: 43.6532
     longitude: -79.3832
     start: w25 Fri 20:00
@@ -1235,6 +1290,7 @@ events:
     description: |
       West-coast salsa congress with On1/On2 rooms and a late international social.
     location: Downtown, Los Angeles, USA
+    image_url: https://picsum.photos/seed/evt-ux-053/800/600
     latitude: 34.0522
     longitude: -118.2437
     start: w41 Fri 20:00
@@ -1273,6 +1329,7 @@ events:
     description: |
       Daytime salsa pool party with an international crowd and a live percussion set.
     location: South Beach, Miami, USA
+    image_url: https://picsum.photos/seed/evt-ux-055/800/600
     latitude: 25.7617
     longitude: -80.1918
     start: w57 Fri 20:00
@@ -1317,6 +1374,7 @@ events:
     description: |
       Free Sunday salsa social with a friendly regional crowd and an easy open floor.
     location: Gastown, Vancouver, Canada
+    image_url: https://picsum.photos/seed/evt-ux-057/800/600
     latitude: 49.2827
     longitude: -123.1207
     start: w73 Sun 19:00
@@ -1354,6 +1412,7 @@ events:
     description: |
       High-rise salsa social with an international crowd and a polished city-event feel.
     location: Shinjuku, Tokyo, Japan
+    image_url: https://picsum.photos/seed/evt-ux-059/800/600
     latitude: 35.6762
     longitude: 139.6503
     start: w27 Fri 20:00
@@ -1397,6 +1456,7 @@ events:
     description: |
       International salsa festival with tropical pool parties and late-night socials.
     location: Sukhumvit, Bangkok, Thailand
+    image_url: https://picsum.photos/seed/evt-ux-061/800/600
     latitude: 13.7563
     longitude: 100.5018
     start: w43 Fri 20:00
@@ -1434,6 +1494,7 @@ events:
     description: |
       Free bachata workshop with a growing regional scene and an enthusiastic beginner track.
     location: Indiranagar, Bengaluru, India
+    image_url: https://picsum.photos/seed/evt-ux-063/800/600
     latitude: 12.9716
     longitude: 77.5946
     start: w59 Sat 16:00
@@ -1473,6 +1534,7 @@ events:
     description: |
       Free bayside salsa social with a lively regional crowd and live percussion.
     location: Malate, Manila, Philippines
+    image_url: https://picsum.photos/seed/evt-ux-065/800/600
     latitude: 14.5995
     longitude: 120.9842
     start: w75 Sat 20:00
@@ -1510,6 +1572,7 @@ events:
     description: |
       International salsa social in a classic dance house with a passionate late-night crowd.
     location: San Telmo, Buenos Aires, Argentina
+    image_url: https://picsum.photos/seed/evt-ux-067/800/600
     latitude: -34.6037
     longitude: -58.3816
     start: w29 Fri 20:00
@@ -1553,6 +1616,7 @@ events:
     description: |
       High-energy salsa congress with Cali-style shows and a huge international social.
     location: Chapinero, Bogotá, Colombia
+    image_url: https://picsum.photos/seed/evt-ux-069/800/600
     latitude: 4.7110
     longitude: -74.0721
     start: w53 Fri 20:00
@@ -1588,6 +1652,7 @@ events:
     description: |
       Local salsa night in the bohemian quarter with live son and a dance-first crowd.
     location: Barranco, Lima, Peru
+    image_url: https://picsum.photos/seed/evt-ux-071/800/600
     latitude: -12.0464
     longitude: -77.0428
     start: w77 Sat 21:00
@@ -1627,6 +1692,7 @@ events:
     description: |
       Free rooftop salsa social with a growing regional scene and a warm evening crowd.
     location: Westlands, Nairobi, Kenya
+    image_url: https://picsum.photos/seed/evt-ux-073/800/600
     latitude: -1.2921
     longitude: 36.8219
     start: w47 Sat 19:00
@@ -1662,6 +1728,7 @@ events:
     description: |
       Free community salsa workshop building the local scene with a beginner-friendly track.
     location: Osu, Accra, Ghana
+    image_url: https://picsum.photos/seed/evt-ux-075/800/600
     latitude: 5.6037
     longitude: -0.1870
     start: w79 Sat 15:00
@@ -1704,6 +1771,7 @@ events:
     description: |
       International salsa festival by the harbour with pool parties and headline socials.
     location: Darling Harbour, Sydney, Australia
+    image_url: https://picsum.photos/seed/evt-ux-077/800/600
     latitude: -33.8688
     longitude: 151.2093
     start: w55 Fri 20:00
@@ -1742,6 +1810,7 @@ events:
     description: |
       International salsa social on the waterfront with a warm, welcoming island crowd.
     location: Wynyard Quarter, Auckland, New Zealand
+    image_url: https://picsum.photos/seed/evt-ux-079/800/600
     latitude: -36.8485
     longitude: 174.7633
     start: w98 Fri 20:00
@@ -1785,6 +1854,7 @@ events:
       Explosive multi-room salsa festival in Berlin's Friedrichshain district with international headliners, live bands, and packed dance floors across the entire weekend.
       This year's edition is already trending with early registrations from across Europe; expect a buzzing crowd and high-energy socials all night.
     location: Friedrichshain, Berlin, Germany
+    image_url: https://picsum.photos/seed/evt-ux-081/800/600
     latitude: 52.5100
     longitude: 13.4450
     start: w5 Fri 20:00
@@ -1839,6 +1909,7 @@ events:
       Cutting-edge urban salsa festival merging street culture with club socials, featuring emerging choreographers, freestyle battles, and late-night socials.
       Already gaining momentum on social media with trending hashtags and influencer visibility; expect a younger, creative crowd.
     location: Poble-Sec, Barcelona, Spain
+    image_url: https://picsum.photos/seed/evt-ux-083/800/600
     latitude: 41.3720
     longitude: 2.1630
     start: w7 Fri 20:00
@@ -1893,6 +1964,7 @@ events:
       Premier international dance weekend in Madrid's Malasaña quarter with curated workshops by world-class instructors, headliner socials, and a packed festival atmosphere.
       Currently trending across dance communities with travelers planning around this destination event; high energy and cosmopolitan crowd expected.
     location: Malasaña, Madrid, Spain
+    image_url: https://picsum.photos/seed/evt-ux-085/800/600
     latitude: 40.4300
     longitude: -3.7050
     start: w9 Fri 20:00
@@ -1927,6 +1999,7 @@ events:
     title: Paris Salsa Night
     description: Paris salsa social.
     location: Paris, France
+    image_url: https://picsum.photos/seed/evt-passport-01/800/600
     latitude: 48.8566
     longitude: 2.3522
     city: Paris
@@ -1942,6 +2015,7 @@ events:
     title: Barcelona Bachata Festival
     description: Barcelona bachata festival.
     location: Barcelona, Spain
+    image_url: https://picsum.photos/seed/evt-passport-02/800/600
     latitude: 41.3851
     longitude: 2.1734
     city: Barcelona
@@ -1957,6 +2031,7 @@ events:
     title: Berlin Salsa Marathon
     description: Berlin salsa marathon.
     location: Berlin, Germany
+    image_url: https://picsum.photos/seed/evt-passport-03/800/600
     latitude: 52.5200
     longitude: 13.4050
     city: Berlin
@@ -1972,6 +2047,7 @@ events:
     title: Milan Bachata Social
     description: Milan bachata social.
     location: Milan, Italy
+    image_url: https://picsum.photos/seed/evt-passport-04/800/600
     latitude: 45.4642
     longitude: 9.1900
     city: Milan
@@ -1987,6 +2063,7 @@ events:
     title: Amsterdam Salsa Practice
     description: Amsterdam salsa practice.
     location: Amsterdam, Netherlands
+    image_url: https://picsum.photos/seed/evt-passport-05/800/600
     latitude: 52.3625
     longitude: 4.8836
     city: Amsterdam
@@ -2002,6 +2079,7 @@ events:
     title: Vienna Bachata Evening
     description: Vienna bachata evening.
     location: Vienna, Austria
+    image_url: https://picsum.photos/seed/evt-passport-06/800/600
     latitude: 48.2082
     longitude: 16.3669
     city: Vienna
@@ -2017,6 +2095,7 @@ events:
     title: Prague Salsa Social
     description: Prague salsa social.
     location: Prague, Czechia
+    image_url: https://picsum.photos/seed/evt-passport-07/800/600
     latitude: 50.0894
     longitude: 14.4256
     city: Prague
@@ -2032,6 +2111,7 @@ events:
     title: London Bachata Night
     description: London bachata night.
     location: London, UK
+    image_url: https://picsum.photos/seed/evt-passport-08/800/600
     latitude: 51.5074
     longitude: -0.1278
     city: London
@@ -2047,6 +2127,7 @@ events:
     title: Lisbon Salsa Festival
     description: Lisbon salsa festival.
     location: Lisbon, Portugal
+    image_url: https://picsum.photos/seed/evt-passport-09/800/600
     latitude: 38.7077
     longitude: -9.1493
     city: Lisbon
@@ -2062,6 +2143,7 @@ events:
     title: Rome Bachata Social
     description: Rome bachata social.
     location: Rome, Italy
+    image_url: https://picsum.photos/seed/evt-passport-10/800/600
     latitude: 41.9028
     longitude: 12.4964
     city: Rome
@@ -2077,6 +2159,7 @@ events:
     title: Warsaw Salsa Open Floor
     description: Warsaw salsa open floor.
     location: Warsaw, Poland
+    image_url: https://picsum.photos/seed/evt-passport-11/800/600
     latitude: 52.2297
     longitude: 21.0122
     city: Warsaw
@@ -2092,6 +2175,7 @@ events:
     title: Stockholm Salsa Summer
     description: Stockholm salsa summer social.
     location: Stockholm, Sweden
+    image_url: https://picsum.photos/seed/evt-passport-12/800/600
     latitude: 59.3293
     longitude: 18.0686
     city: Stockholm
@@ -2110,6 +2194,7 @@ events:
     title: Evening Social
     description: A fun evening dance social for all skill levels.
     location: Shibuya, Tokyo, Japan
+    image_url: https://picsum.photos/seed/evt-ux-search-001/800/600
     latitude: 35.6595
     longitude: 139.7004
     city: Tokyo
@@ -2133,6 +2218,7 @@ events:
     title: Morning Workshop
     description: A beginner-friendly morning dance workshop.
     location: Palermo, Buenos Aires, Argentina
+    image_url: https://picsum.photos/seed/evt-ux-search-002/800/600
     latitude: -34.6037
     longitude: -58.3816
     city: Buenos Aires
@@ -2156,6 +2242,7 @@ events:
     title: Afternoon Class
     description: Intermediate-level dance class in a local studio.
     location: Vila Mariana, São Paulo, Brazil
+    image_url: https://picsum.photos/seed/evt-ux-search-003/800/600
     latitude: -23.5505
     longitude: -46.6333
     city: São Paulo
@@ -2179,6 +2266,7 @@ events:
     title: Late Night Dance
     description: A vibrant late-night dance party.
     location: Roma, Mexico City, Mexico
+    image_url: https://picsum.photos/seed/evt-ux-search-004/800/600
     latitude: 19.4326
     longitude: -99.1332
     city: Mexico City
@@ -2203,6 +2291,7 @@ events:
     title: Weekend Party
     description: A weekend dance celebration with live music.
     location: Yorkville, Toronto, Canada
+    image_url: https://picsum.photos/seed/evt-ux-search-005/800/600
     latitude: 43.6629
     longitude: -79.3957
     city: Toronto
@@ -2232,6 +2321,7 @@ events:
     title: Midweek Practice
     description: A casual midweek dance practice session.
     location: Darling Harbour, Sydney, Australia
+    image_url: https://picsum.photos/seed/evt-ux-search-006/800/600
     latitude: -33.8688
     longitude: 151.1957
     city: Sydney
@@ -2255,6 +2345,7 @@ events:
     title: Sunday Gathering
     description: A relaxed Sunday gathering for social dancing.
     location: Silom, Bangkok, Thailand
+    image_url: https://picsum.photos/seed/evt-ux-search-007/800/600
     latitude: 13.7360
     longitude: 100.5326
     city: Bangkok
@@ -2279,6 +2370,7 @@ events:
     title: Friday Night Event
     description: A festive Friday night dancing experience.
     location: Zamalek, Cairo, Egypt
+    image_url: https://picsum.photos/seed/evt-ux-search-008/800/600
     latitude: 30.0626
     longitude: 31.2715
     city: Cairo
@@ -2304,6 +2396,7 @@ events:
     title: Tuesday Session
     description: A weekly Tuesday dance class and practice.
     location: Gangnam, Seoul, South Korea
+    image_url: https://picsum.photos/seed/evt-ux-search-009/800/600
     latitude: 37.4979
     longitude: 127.0276
     city: Seoul
@@ -2331,6 +2424,7 @@ events:
     title: Thursday Dance
     description: A lively Thursday night dance experience.
     location: Sandton, Johannesburg, South Africa
+    image_url: https://picsum.photos/seed/evt-ux-search-010/800/600
     latitude: -26.1090
     longitude: 28.0550
     city: Johannesburg
@@ -2356,6 +2450,7 @@ events:
     title: Monday Training
     description: An intensive Monday training session.
     location: Makati, Manila, Philippines
+    image_url: https://picsum.photos/seed/evt-ux-search-011/800/600
     latitude: 14.5586
     longitude: 121.0228
     city: Manila
@@ -2381,6 +2476,7 @@ events:
     title: Saturday Special
     description: A special Saturday dance celebration.
     location: Phuket Town, Phuket, Thailand
+    image_url: https://picsum.photos/seed/evt-ux-search-012/800/600
     latitude: 8.1100
     longitude: 98.3891
     city: Phuket
@@ -2416,6 +2512,7 @@ events:
       great DJ set, and lots of partner rotation. This event exemplifies
       the typical experience many dancers had at similar weekly events.
     location: Stephansplatz, Vienna, Austria
+    image_url: https://picsum.photos/seed/evt-ux-past-social/800/600
     latitude: 48.2088
     longitude: 16.3728
     start: w-1 Fri 21:00
@@ -2440,6 +2537,7 @@ events:
       sensual styling, and partner connection. Attendees consistently praised
       the teaching quality and relaxed atmosphere.
     location: Silom, Bangkok, Thailand
+    image_url: https://picsum.photos/seed/evt-ux-past-workshop/800/600
     latitude: 13.7300
     longitude: 100.5300
     start: w-1 Sat 14:00
@@ -2466,6 +2564,7 @@ events:
       and a lively crowd. The event showcased festival-level vibes before the
       main weekend festival program.
     location: King's Cross, London, UK
+    image_url: https://picsum.photos/seed/evt-ux-past-london/800/600
     latitude: 51.5320
     longitude: -0.1233
     start: w-1 Sat 20:00

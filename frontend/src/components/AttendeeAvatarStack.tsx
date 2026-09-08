@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
@@ -155,6 +156,19 @@ export function goingSentence(viewerGoing: boolean, totalGoing: number): string 
     return totalGoing === 1 ? '1 is going' : `${totalGoing} are going`;
 }
 
+/** Same as `goingSentence` but renders the leading "You" as a pill tinted to
+ * match the going-hand color when the viewer is attending. */
+function renderGoingSentence(viewerGoing: boolean, totalGoing: number): ReactNode {
+    if (!viewerGoing) return goingSentence(false, totalGoing);
+    const others = Math.max(0, totalGoing - 1);
+    return (
+        <>
+            <span className="rounded-full bg-action/10 px-1.5 py-0.5 font-medium text-action">You</span>
+            {others > 0 ? ` +${others} are going` : ' are going'}
+        </>
+    );
+}
+
 /** Names-first social-proof sentence for the Tribe card: up to three first
  * names, then "+N" for the remaining goers, then "are going". Falls back to
  * the plain count when no names are available. */
@@ -234,7 +248,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, 
                 data-testid="attendee-track"
             >
                 {eventCardShowPeopleIconEnabled && <PeopleIcon className={styles.icon} color="text-blue-400" />}
-                <span>{goingSentence(viewerGoing, totalGoing)}</span>
+                <span>{renderGoingSentence(viewerGoing, totalGoing)}</span>
             </Link>
         );
     }
@@ -308,7 +322,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, 
                     <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isFriend={p.isFriend} styles={styles} />
                 ))}
             </span>
-            <span className="truncate">{goingSentence(viewerGoing, totalKnown)}</span>
+            <span className="truncate">{renderGoingSentence(viewerGoing, totalKnown)}</span>
         </Link>
     );
 }

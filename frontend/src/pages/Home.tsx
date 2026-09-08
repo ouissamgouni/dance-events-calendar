@@ -643,6 +643,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         [interestUserHandles, followingIndex],
     );
     const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
+    const [explorerPreviewHeight, setExplorerPreviewHeight] = useState(0);
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
     const [calMapBounds, setCalMapBounds] = useState<MapBounds | null>(null);
@@ -1189,8 +1190,15 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             return target.event_id;
         });
     }, [explorerMatchingEvents]);
+    const jumpExplorerMapPreview = useCallback((index: number) => {
+        const target = explorerMatchingEvents[index];
+        if (!target) return;
+        setHoveredEventId(target.event_id);
+        setSelectedExplorerMapEventId(target.event_id);
+    }, [explorerMatchingEvents]);
 
     const showTrendingBanner = viewMode === 'explorer'
+        && config.variant !== 'tribe'
         && trendingEnabled
         && trendingBannerEnabled
         && showPopularity
@@ -1554,7 +1562,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             label: 'Dates',
             icon: <img src="/calendar.png" alt="" className="h-4 w-4" />,
             group: 'Dates',
-            summary: endDate ? `${fmtDateShort(startDate)} – ${fmtDateShort(endDate)}` : 'All upcoming',
+            summary: endDate ? `${fmtDateShort(startDate)} – ${fmtDateShort(endDate)}` : 'Any',
             render: () => (
                 <DateRangePicker startDate={startDate} endDate={endDate} onChange={handleDateRangeChange} />
             ),
@@ -1876,6 +1884,9 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                 hasNext={explorerPreviewIndex < explorerMatchingEvents.length - 1}
                                                 onPrevious={() => stepExplorerMapPreview(-1)}
                                                 onNext={() => stepExplorerMapPreview(1)}
+                                                index={explorerPreviewIndex}
+                                                count={explorerMatchingEvents.length}
+                                                onSelectIndex={jumpExplorerMapPreview}
                                                 onOpen={() => handleExplorerMapEventClick(explorerPreviewEvent)}
                                                 showAvatars
                                                 showTags
@@ -1884,6 +1895,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                 showActions
                                                 showRatings={!!showRatings}
                                                 followingBadgeEnabled={followingBadgeEnabled}
+                                                onHeightChange={setExplorerPreviewHeight}
                                             />
                                         )}
                                     </div>
@@ -2027,7 +2039,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 )}
             </main>
 
-            <ViewSwitcher currentView={activeView} onSelect={handleSelectView} mapPreviewVisible={mapFullscreen && !isDesktop && !!explorerPreviewEvent} />
+            <ViewSwitcher currentView={activeView} onSelect={handleSelectView} mapPreviewVisible={mapFullscreen && !isDesktop && !!explorerPreviewEvent} previewOffsetPx={explorerPreviewHeight} onCreate={() => setShowSuggestModal(true)} />
 
             {/* Overlay modal — calendar mode mobile + explorer (both breakpoints) */}
             {selectedEvent && (viewMode === 'explorer' || (viewMode === 'calendar' && !isDesktop)) && (

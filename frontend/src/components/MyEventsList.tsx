@@ -21,27 +21,27 @@ function MyEventRow({ event, tab, onEventClick, reviewTagLabels }: { event: Cale
     const isSaved = tab === 'saved';
     // Base My Events card keeps picture, title, time and location only.
     // Upcoming adds the avatars stack; Saved adds the "I'm going" button;
-    // Past keeps the base plus the rate-event affordance below.
-    return (
-        <>
-            <EventCard
-                event={event}
-                onOpen={onEventClick}
-                followingBadgeEnabled
-                showRatings={showRatings}
-                isPast={isPast}
-                showAvatars={isUpcoming}
-                showTags={false}
-                showReviews={false}
-                showPrice={false}
-                showActions={isSaved}
-                actions={isSaved ? ['going'] : undefined}
-                hideAvatarsIfOnlyCurrentUser={isUpcoming}
-                goingIconVariant="hand"
-                testId="my-events-row"
-            />
-            {isPast && (
-                <div className="mt-1.5">
+    // Past wraps the (borderless) card and its rate-event affordance in a
+    // single bordered container so they read as one unit.
+    if (isPast) {
+        return (
+            <div className="overflow-hidden rounded-card border border-card-line bg-surface">
+                <EventCard
+                    event={event}
+                    onOpen={onEventClick}
+                    followingBadgeEnabled
+                    showRatings={showRatings}
+                    isPast
+                    showAvatars={false}
+                    showTags={false}
+                    showReviews={false}
+                    showPrice={false}
+                    showActions={false}
+                    goingIconVariant="hand"
+                    borderless
+                    testId="my-events-row"
+                />
+                <div className="border-t border-card-line px-3 py-2">
                     <RateEventButton
                         eventId={event.event_id}
                         appearance="preview"
@@ -51,8 +51,26 @@ function MyEventRow({ event, tab, onEventClick, reviewTagLabels }: { event: Cale
                         reviewTagLabels={reviewTagLabels}
                     />
                 </div>
-            )}
-        </>
+            </div>
+        );
+    }
+    return (
+        <EventCard
+            event={event}
+            onOpen={onEventClick}
+            followingBadgeEnabled
+            showRatings={showRatings}
+            isPast={isPast}
+            showAvatars={isUpcoming}
+            showTags={false}
+            showReviews={false}
+            showPrice={false}
+            showActions={isSaved}
+            actions={isSaved ? ['going'] : undefined}
+            hideAvatarsIfOnlyCurrentUser={isUpcoming}
+            goingIconVariant="hand"
+            testId="my-events-row"
+        />
     );
 }
 

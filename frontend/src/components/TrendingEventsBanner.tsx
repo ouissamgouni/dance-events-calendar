@@ -1,9 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import type { CalendarEvent } from '../types';
-import RailEventCard from './RailEventCard';
+import EventCard from './EventCard';
 import ScrollDotsIndicator from './ScrollDots';
 import { useScrollDots } from '../hooks/useScrollDots';
-import { useFeatureFlags } from '../context/FeatureFlagsContext';
 
 interface TrendingEventsBannerProps {
     events: CalendarEvent[];
@@ -33,7 +32,6 @@ export default function TrendingEventsBanner({
 }: TrendingEventsBannerProps) {
     const [collapsed, setCollapsed] = useState(false);
     const scrollerRef = useRef<HTMLDivElement>(null);
-    const { trendingTrailRichEnabled } = useFeatureFlags();
     const trendingEvents = useMemo(() => {
         if (!showPopularity || events.length === 0) return [];
         const candidates = events
@@ -68,23 +66,23 @@ export default function TrendingEventsBanner({
             </button>
             {!collapsed && (
                 <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Trending events">
-                    {trendingEvents.map((event) => {
-                        return (
-                            <RailEventCard
-                                key={event.event_id}
-                                event={event}
-                                onClick={onEventClick}
-                                onHover={onEventHover}
-                                highlighted={hoveredEventId === event.event_id}
-                                variant="compact"
-                                dateRail
-                                compactShowExtras={trendingTrailRichEnabled}
-                                followingBadgeEnabled={followingBadgeEnabled}
-                                contextLabel="trending event"
-                                extraBadge={undefined}
-                            />
-                        );
-                    })}
+                    {trendingEvents.map((event) => (
+                        <EventCard
+                            key={event.event_id}
+                            event={event}
+                            onOpen={onEventClick}
+                            onHover={onEventHover}
+                            highlighted={hoveredEventId === event.event_id}
+                            followingBadgeEnabled={followingBadgeEnabled}
+                            showReviews={false}
+                            showTags={false}
+                            showActions={false}
+                            widthClass="w-[300px]"
+                            dateHeaderRow
+                            twoLineTitle
+                            goingIconVariant="hand"
+                        />
+                    ))}
                 </div>
             )}
             {!collapsed && (

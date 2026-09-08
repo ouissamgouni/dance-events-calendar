@@ -3,10 +3,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import SectionLayout from './SectionTabs';
 
-vi.mock('./MyEventsUtilityMenu', () => ({
-    default: () => <button type="button">Share and export My Events</button>,
-}));
-
 vi.mock('../context/AuthContext', () => ({
     useAuth: () => ({ user: { user_id: 'user-1' }, loading: false }),
 }));
@@ -41,11 +37,14 @@ describe('Mine SectionLayout', () => {
         expect(screen.queryByRole('navigation', { name: 'Section' })).not.toBeInTheDocument();
     });
 
-    it('renders the approved My Events title and share action', () => {
+    it('delegates the My Events title to the page on the calendar route', () => {
         renderMineRoute('/mine/calendar');
 
-        expect(screen.getByRole('heading', { name: 'My Events' })).toBeInTheDocument();
+        expect(screen.getByText('Calendar content')).toBeInTheDocument();
+        // The "My Events" title now lives in the page itself (merged into its
+        // header row), so the layout renders neither its own heading nor the
+        // Mine breadcrumb on this route.
+        expect(screen.queryByRole('heading', { name: 'My Events' })).not.toBeInTheDocument();
         expect(screen.queryByRole('link', { name: 'MyDance' })).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Share and export My Events' })).toBeInTheDocument();
     });
 });

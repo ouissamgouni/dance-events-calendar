@@ -201,7 +201,7 @@ export function EventListCard({
     timeline = false,
     tribeLayout = false,
 }: EventListCardProps) {
-    const { tagsPerCard, eventCardRsvpActionInAvatarRowEnabled, eventCardRsvpAndSaveStatsNextToActionEnabled } = useFeatureFlags();
+    const { tagsPerCard, eventCardImgoingLocationBottomEnabled, eventCardImgoingShowStatsEnabled, eventCardSaveShowStatsEnabled, explorerEventCardCardStyleEnabled } = useFeatureFlags();
     const priceVisible = isPriceSectionVisible(event, showPrices);
     const start = new Date(event.start);
     const end = new Date(event.end);
@@ -222,11 +222,11 @@ export function EventListCard({
 
     // Explorer opt-in: render the shared My Events card style while keeping
     // all of the explorer card's data (trending, avatars, tags, reviews).
-    // NOTE: explorerEventCardCardStyleEnabled flag does not exist yet.
-    const explorerEventCardCardStyleEnabled = false;
+    // Tribe keeps its face-first header (large avatar stack + "who's going")
+    // above the shared card content.
     if (explorerEventCardCardStyleEnabled) {
         return (
-            <div ref={cardRef}>
+            <div ref={cardRef} className="my-1">
                 <EventCard
                     event={event}
                     onOpen={onEventClick}
@@ -241,6 +241,16 @@ export function EventListCard({
                     isPast={isPast}
                     tagsAsBadge={tagsAsBadge}
                     goingIconVariant="hand"
+                    showAvatars={!tribeLayout}
+                    headerSlot={tribeLayout ? (
+                        <AttendeeAvatarStack
+                            eventId={event.event_id}
+                            size="lg"
+                            layout="stacked"
+                            max={5}
+                            friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                        />
+                    ) : undefined}
                     testId="event-list-card"
                 />
             </div>
@@ -341,7 +351,7 @@ export function EventListCard({
                                 eventId={event.event_id}
                                 friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
                             />
-                            {eventCardRsvpActionInAvatarRowEnabled && (
+                            {eventCardImgoingLocationBottomEnabled && (
                                 <div
                                     className="ml-auto flex shrink-0 items-center"
                                     onClick={(e) => e.stopPropagation()}
@@ -351,7 +361,7 @@ export function EventListCard({
                                         eventId={event.event_id}
                                         isPast={new Date(event.end).getTime() < Date.now()}
                                         include={['going']}
-                                        showStats={eventCardRsvpAndSaveStatsNextToActionEnabled}
+                                        showGoingStats={eventCardImgoingShowStatsEnabled}
                                     />
                                 </div>
                             )}
@@ -372,8 +382,9 @@ export function EventListCard({
                             eventId={event.event_id}
                             isSavedFlag={isSavedFlag}
                             isPast={new Date(event.end).getTime() < Date.now()}
-                            include={tribeLayout ? ['save', 'going'] : (eventCardRsvpActionInAvatarRowEnabled ? ['save'] : ['save', 'going'])}
-                            showStats={eventCardRsvpAndSaveStatsNextToActionEnabled}
+                            include={tribeLayout ? ['save', 'going'] : (eventCardImgoingLocationBottomEnabled ? ['save'] : ['save', 'going'])}
+                            showSaveStats={eventCardSaveShowStatsEnabled}
+                            showGoingStats={eventCardImgoingShowStatsEnabled}
                         />
                     </div>
                 </div>

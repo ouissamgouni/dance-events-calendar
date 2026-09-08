@@ -36,7 +36,7 @@ type Variant = 'page' | 'panel';
 /** Per-kind tinted type icon shown at the far left of every row. Soft
  *  circular backgrounds, never saturated blocks. */
 const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: string }> = {
-    subscription_going: { Icon: CalendarCheck, cls: 'bg-violet-100 text-violet-600' },
+    subscription_going: { Icon: CalendarCheck, cls: 'bg-blue-100 text-action' },
     subscription_saved: { Icon: Bookmark, cls: 'bg-blue-100 text-action' },
     subscription_suggested: { Icon: CalendarPlus, cls: 'bg-emerald-100 text-emerald-600' },
     subscription_review: { Icon: SquarePen, cls: 'bg-violet-100 text-violet-600' },
@@ -512,8 +512,9 @@ export default function NotificationRow({
                     className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-canvas ${isUnread ? 'bg-blue-50/40' : 'bg-surface'}`}
                 >
                     {typeIcon}
-                    {avatarNode}
+                    {!isMulti && avatarNode}
                     <div className="min-w-0 flex-1">
+                        {isMulti && avatarNode && <div className="mb-1.5">{avatarNode}</div>}
                         {body}
                         {actionNode && <div className="mt-2">{actionNode}</div>}
                     </div>
@@ -535,14 +536,17 @@ export default function NotificationRow({
             className={`flex items-start gap-3 px-4 py-3.5 ${isUnread ? 'bg-blue-50/40' : 'bg-surface'}`}
         >
             {typeIcon}
-            {avatarNode}
-            <button
-                type="button"
-                onClick={handleNavigate}
-                className="min-w-0 flex-1 text-left"
-            >
-                {body}
-            </button>
+            {!isMulti && avatarNode}
+            <div className="min-w-0 flex-1">
+                {isMulti && avatarNode && <div className="mb-1.5">{avatarNode}</div>}
+                <button
+                    type="button"
+                    onClick={handleNavigate}
+                    className="block w-full text-left"
+                >
+                    {body}
+                </button>
+            </div>
             {thumbNode}
             <div className="shrink-0 flex flex-col items-end gap-2">
                 {actionNode}

@@ -20,8 +20,6 @@ import type {
     ProcessedEventSummary,
 } from '../api';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
-import ScrollDotsIndicator from './ScrollDots';
-import { useScrollDots } from '../hooks/useScrollDots';
 
 const STATUS_BADGE: Record<string, string> = {
     running: 'bg-blue-100 text-action',
@@ -110,7 +108,6 @@ export default function CalendarRunPanel({
 }: Props) {
     const [tab, setTab] = useState<CalTab>('logs');
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-    const tabsContainerRef = useRef<HTMLDivElement>(null);
     const events = cal.processed_events ?? [];
 
     const synced = events.filter((e) => e.action === 'new');
@@ -179,8 +176,6 @@ export default function CalendarRunPanel({
             ? [{ id: 'issues' as CalTab, label: 'Issues' }]
             : []),
     ];
-
-    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(tabsContainerRef, [tabs.length]);
 
     const showRetry =
         !!onRetry &&
@@ -272,7 +267,7 @@ export default function CalendarRunPanel({
             )}
 
             {/* Tabs */}
-            <div ref={tabsContainerRef} className="border-b border-line -mx-4 px-4 flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="border-b border-line -mx-4 px-4 flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {tabs.map((t) => (
                     <button
                         key={t.id}
@@ -286,9 +281,6 @@ export default function CalendarRunPanel({
                         <span className="text-muted font-normal">({counts[t.id]})</span>
                     </button>
                 ))}
-            </div>
-            <div className="flex justify-center pb-1">
-                <ScrollDotsIndicator count={dotCount} activeIndex={activeIndex} onSelect={scrollToIndex} />
             </div>
 
             {/* Tab body */}

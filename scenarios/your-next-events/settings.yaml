@@ -1,5 +1,3 @@
 # Enables friend previews for the shared compact next-event section.
 settings:
-  your_next_events_rail_enabled: true
-  for_you_rail_enabled: false
   following_badge_enabled: true

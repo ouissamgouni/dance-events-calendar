@@ -122,7 +122,7 @@ describe('SummaryBar', () => {
         window.ResizeObserver = OriginalResizeObserver;
     });
 
-    it('renders the area chip with a pin icon and opens the area picker on click', async () => {
+    it('renders the area chip with a map icon and opens the area picker on click', async () => {
         const onEditArea = vi.fn();
         render(<SummaryBar {...baseProps({ onEditArea })} />);
         const chip = screen.getByTestId('summary-chip-area');
@@ -160,43 +160,51 @@ describe('SummaryBar', () => {
         expect(screen.getByTestId('summary-chip-dance')).toHaveTextContent('Salsa +1');
     });
 
-    it('renders the scalar Reach pill icon-only and deep-links', async () => {
+    it('shows the Dance chip as "Any" when no dance style is selected', () => {
+        render(<SummaryBar {...baseProps({ onEditDance: vi.fn() })} />);
+        expect(screen.getByTestId('summary-chip-dance')).toHaveTextContent('Any');
+    });
+
+    it('renders the scalar Reach pill as a short text label and deep-links', async () => {
         const onEditReach = vi.fn();
         const { rerender } = render(<SummaryBar {...baseProps({ reachFilter: 'any', onEditReach })} />);
         const reach = screen.getByTestId('summary-chip-reach');
-        expect(reach).toHaveTextContent('');
-        expect(reach.querySelector('img[src="/reach.png"]')).toBeInTheDocument();
+        expect(reach).toHaveTextContent('Any');
         await userEvent.click(reach);
         expect(onEditReach).toHaveBeenCalledTimes(1);
 
         rerender(<SummaryBar {...baseProps({ reachFilter: 'regional_plus', onEditReach })} />);
-        expect(screen.getByTestId('summary-chip-reach').querySelector('img[src="/nearby-reach.png"]')).toBeInTheDocument();
+        expect(screen.getByTestId('summary-chip-reach')).toHaveTextContent('Reg');
 
         rerender(<SummaryBar {...baseProps({ reachFilter: 'international', onEditReach })} />);
-        expect(screen.getByTestId('summary-chip-reach').querySelector('img[src="/international-reach.png"]')).toBeInTheDocument();
+        expect(screen.getByTestId('summary-chip-reach')).toHaveTextContent('Int');
     });
 
-    it('renders the consolidated People chip (WHO · STATUS) and deep-links', async () => {
+    it('renders the consolidated, shortened People chip and deep-links', async () => {
         const onEditPeople = vi.fn();
         const { rerender } = render(<SummaryBar {...baseProps()} />);
         expect(screen.queryByTestId('summary-chip-people')).toBeNull();
 
-        // Scope-only (no handles) → consolidated "Following · Both" (kind 'any').
+        // Default "Following" source with no status → just "Following".
         rerender(<SummaryBar {...baseProps({ onEditPeople, interestSource: 'follows' })} />);
         const scoped = screen.getByTestId('summary-chip-people');
-        expect(scoped).toHaveTextContent('Following · Both');
+        expect(scoped).toHaveTextContent('Following');
         await userEvent.click(scoped);
         expect(onEditPeople).toHaveBeenCalledTimes(1);
 
-        // Friends scope + Going status → "Friends · Going".
-        rerender(<SummaryBar {...baseProps({ onEditPeople, interestSource: 'friends', interestKind: 'going' })} />);
-        expect(screen.getByTestId('summary-chip-people')).toHaveTextContent('Friends · Going');
+        // Following + Going → the redundant source drops to just "Going".
+        rerender(<SummaryBar {...baseProps({ onEditPeople, interestSource: 'follows', interestKind: 'going' })} />);
+        expect(screen.getByTestId('summary-chip-people')).toHaveTextContent('Going');
 
-        // Explicit handles → "N people · Going".
+        // Friends scope + Going status → "Friends going".
+        rerender(<SummaryBar {...baseProps({ onEditPeople, interestSource: 'friends', interestKind: 'going' })} />);
+        expect(screen.getByTestId('summary-chip-people')).toHaveTextContent('Friends going');
+
+        // Explicit handles → "N people going".
         rerender(
             <SummaryBar {...baseProps({ onEditPeople, interestSource: 'follows', interestUserHandles: ['a', 'b', 'c'], interestKind: 'going' })} />,
         );
-        expect(screen.getByTestId('summary-chip-people')).toHaveTextContent('3 people · Going');
+        expect(screen.getByTestId('summary-chip-people')).toHaveTextContent('3 people going');
     });
 
     it('folds selected non-primary groups into the "+X ⚙" control and opens the sheet', async () => {

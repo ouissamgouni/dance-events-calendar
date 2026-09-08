@@ -25,8 +25,6 @@ interface FeatureFlags {
     goingButtonIconVariant: 'hand' | 'person';
     promoCodesEnabled: boolean;
     organizerClaimsEnabled: boolean;
-    forYouRailEnabled: boolean;
-    yourNextEventsRailEnabled: boolean;
     /** Tribe > Calendars "Your Network" snapshot of upcoming events people
      * you follow are going to. When false, the snapshot is hidden. */
     networkGoingSnapshotEnabled: boolean;
@@ -58,11 +56,10 @@ interface FeatureFlags {
     eventCardImgoingLocationBottomEnabled: boolean;
     /** When true, event cards show the people icon prefixing the avatar stack. */
     eventCardShowPeopleIconEnabled: boolean;
+    /** When true, event cards show clock (time) and pin (location) icons. */
+    eventCardShowTimeLocationIconsEnabled: boolean;
     /** When true, the explorer list renders the shared My Events card style. */
     explorerEventCardCardStyleEnabled: boolean;
-    /** When true, the "You might like" and "New" For-you trails use the
-     * new date-first event card layout. */
-    forYouEventCardsDateFirstLayoutEnabled: boolean;
 }
 
 const defaultFlags: FeatureFlags = {
@@ -82,8 +79,6 @@ const defaultFlags: FeatureFlags = {
     goingButtonIconVariant: 'hand',
     promoCodesEnabled: false,
     organizerClaimsEnabled: false,
-    forYouRailEnabled: false,
-    yourNextEventsRailEnabled: false,
     networkGoingSnapshotEnabled: false,
     myEventsRouteEnabled: false,
     myEventsNavEnabled: true,
@@ -96,8 +91,8 @@ const defaultFlags: FeatureFlags = {
     eventCardImgoingShowStatsEnabled: false,
     eventCardImgoingLocationBottomEnabled: true,
     eventCardShowPeopleIconEnabled: false,
+    eventCardShowTimeLocationIconsEnabled: false,
     explorerEventCardCardStyleEnabled: false,
-    forYouEventCardsDateFirstLayoutEnabled: false,
 };
 
 const FeatureFlagsContext = createContext<{
@@ -134,8 +129,6 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     goingButtonIconVariant: s.going_button_icon_variant === 'person' ? 'person' : 'hand',
                     promoCodesEnabled: s.promo_codes_enabled ?? false,
                     organizerClaimsEnabled: s.organizer_claims_enabled ?? false,
-                    forYouRailEnabled: s.for_you_rail_enabled ?? false,
-                    yourNextEventsRailEnabled: s.your_next_events_rail_enabled ?? false,
                     networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? false,
                     myEventsRouteEnabled: s.my_events_route_enabled ?? false,
                     myEventsNavEnabled: s.my_events_nav_enabled ?? true,
@@ -148,8 +141,8 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     eventCardImgoingShowStatsEnabled: s.event_card_imgoing_show_stats_enabled ?? false,
                     eventCardImgoingLocationBottomEnabled: s.event_card_imgoing_location_bottom_enabled ?? true,
                     eventCardShowPeopleIconEnabled: s.event_card_show_people_icon_enabled ?? false,
+                    eventCardShowTimeLocationIconsEnabled: s.event_card_show_time_location_icons_enabled ?? false,
                     explorerEventCardCardStyleEnabled: s.explorer_event_card_card_style_enabled ?? false,
-                    forYouEventCardsDateFirstLayoutEnabled: s.for_you_event_cards_date_first_layout_enabled ?? false,
                 });
             })
             .catch(() => {

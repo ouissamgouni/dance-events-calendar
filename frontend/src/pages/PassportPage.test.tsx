@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import PassportPage from './PassportPage'
@@ -284,13 +284,14 @@ describe('PassportPage', () => {
         expect(await screen.findByText('Milestone progress')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Community, 0 / 0 unlocked' })).toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: /Events.*1 \/ 2 unlocked/ }))
-        expect(await screen.findByRole('dialog', { name: 'Events Milestones' })).toBeInTheDocument()
-        expect(screen.getAllByText('First Steps').length).toBeGreaterThan(0)
-        expect(screen.getByText('Attended your first event')).toBeInTheDocument()
-        expect(screen.getByText('Regular')).toBeInTheDocument()
-        expect(screen.getByText('Attend 10 events')).toBeInTheDocument()
-        expect(screen.getByText('8 / 10')).toBeInTheDocument()
-        expect(screen.getByRole('progressbar', { name: 'Regular progress' })).toHaveAttribute('aria-valuenow', '8')
+        const dialog = await screen.findByRole('dialog', { name: 'Events Milestones' })
+        expect(dialog).toBeInTheDocument()
+        expect(within(dialog).getAllByText('First Steps').length).toBeGreaterThan(0)
+        expect(within(dialog).getByText('Attended your first event')).toBeInTheDocument()
+        expect(within(dialog).getByText('Regular')).toBeInTheDocument()
+        expect(within(dialog).getByText('Attend 10 events')).toBeInTheDocument()
+        expect(within(dialog).getByText('8 / 10')).toBeInTheDocument()
+        expect(within(dialog).getByRole('progressbar', { name: 'Regular progress' })).toHaveAttribute('aria-valuenow', '8')
         fireEvent.click(screen.getByRole('button', { name: 'Close milestone details' }))
         expect(screen.queryByRole('dialog', { name: 'Events Milestones' })).not.toBeInTheDocument()
 

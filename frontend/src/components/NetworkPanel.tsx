@@ -20,9 +20,7 @@ import FollowRequestsPanel from './FollowRequestsPanel';
 import SuggestionsCarousel from './SuggestionsCarousel';
 import PersonRowMenu, { type RowMenuItem } from './PersonRowMenu';
 import UserResultCard from './UserResultCard';
-import ScrollDotsIndicator from './ScrollDots';
 import { ConfirmDialog } from './AppDialog';
-import { useScrollDots } from '../hooks/useScrollDots';
 
 /**
  * The People page (`/tribe/network`). Lets the signed-in user discover
@@ -99,7 +97,6 @@ export default function NetworkPanel() {
     } | null>(null);
 
     const searchRef = useRef<HTMLInputElement>(null);
-    const tablistRef = useRef<HTMLDivElement>(null);
 
     const invalidate = useCallback(() => {
         setListData({ followers: null, following: null, friends: null });
@@ -286,18 +283,10 @@ export default function NetworkPanel() {
         [followingTotal, counts.followers, counts.friends, requestCount],
     );
 
-    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(tablistRef, [tabDefs.length]);
-
     return (
         <div>
-            <h1 className="mb-4 text-2xl font-bold text-ink">People</h1>
-
             {/* Discover / search block */}
             <div className="mb-5">
-                <h2 className="text-base font-semibold text-ink">Discover people</h2>
-                <p className="mt-0.5 text-sm text-ink-soft">
-                    Find dancers, organizers, and venues to follow.
-                </p>
                 <input
                     ref={searchRef}
                     type="search"
@@ -305,8 +294,8 @@ export default function NetworkPanel() {
                     onChange={(e) => setSearchInput(e.target.value)}
                     placeholder="Search by name or handle…"
                     aria-label="Search by name or handle"
-                    className="mt-3 w-full border border-line bg-surface px-3.5 text-sm text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
-                    style={{ height: 54 }}
+                    className="w-full border border-line bg-surface px-3.5 text-sm text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
+                    style={{ height: 40 }}
                 />
                 <p className="mt-2 text-xs text-ink-soft">
                     Can’t find them?{' '}
@@ -331,10 +320,9 @@ export default function NetworkPanel() {
 
                     {/* Top-level tabs */}
                     <div
-                        ref={tablistRef}
                         role="tablist"
                         aria-label="People"
-                        className="sticky top-0 z-10 -mx-4 mb-4 flex gap-5 border-b border-line bg-surface px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                        className="sticky top-0 z-10 -mx-4 mb-4 flex gap-5 border-b border-line bg-surface px-4"
                     >
                         {tabDefs.map((t) => {
                             const active = t.key === tab;
@@ -357,9 +345,6 @@ export default function NetworkPanel() {
                                 </button>
                             );
                         })}
-                    </div>
-                    <div className="flex justify-center mb-3">
-                        <ScrollDotsIndicator count={dotCount} activeIndex={activeIndex} onSelect={scrollToIndex} />
                     </div>
 
                     {tab === 'following' && (

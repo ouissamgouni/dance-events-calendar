@@ -228,8 +228,6 @@ export interface SiteSettings {
     promo_codes_enabled?: boolean;
     organizer_claims_enabled?: boolean;
     duplicate_auto_detect_enabled?: boolean;
-    for_you_rail_enabled?: boolean;
-    your_next_events_rail_enabled?: boolean;
     network_going_snapshot_enabled?: boolean;
     my_events_route_enabled?: boolean;
     my_events_nav_enabled?: boolean;
@@ -261,12 +259,12 @@ export interface SiteSettings {
     /** When true, event cards show the people icon prefixing the avatar
      * stack. Client default: false. */
     event_card_show_people_icon_enabled?: boolean;
+    /** When true, event cards show clock (time) and pin (location) icons.
+     * Client default: false. */
+    event_card_show_time_location_icons_enabled?: boolean;
     /** When true, the explorer list renders the shared My Events card style.
      * Client default: false. */
     explorer_event_card_card_style_enabled?: boolean;
-    /** When true, the "You might like"/"New" trails use the new date-first
-     * event card layout. Client default: false. */
-    for_you_event_cards_date_first_layout_enabled?: boolean;
     /** Global notification / re-engagement gates (admin-configurable).
      * Each flag mirrors an env-var in ``backend/config/loader.py``; when
      * set here it overrides that default without requiring a redeploy. */

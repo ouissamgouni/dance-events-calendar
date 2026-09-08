@@ -75,8 +75,7 @@ describe('NetworkPanel (People page)', () => {
         server.use(...baseHandlers())
         renderWithProviders(<NetworkPanel />)
 
-        expect(await screen.findByRole('heading', { name: 'People' })).toBeInTheDocument()
-        expect(screen.getByText('Discover people')).toBeInTheDocument()
+        expect(await screen.findByLabelText('Search by name or handle')).toBeInTheDocument()
         // All following is the default sub-view with an implicit count header.
         expect(await screen.findByText('2 people')).toBeInTheDocument()
         expect(screen.getByText('ALPHA')).toBeInTheDocument()

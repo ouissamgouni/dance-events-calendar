@@ -12,7 +12,7 @@ import {
 } from '../api';
 import type { CalendarEvent, PassportMilestone, PassportResponse } from '../types';
 import { renderWithProviders } from '../test/render';
-import MineHub, { closestMilestone } from './MineHub';
+import MineHub, { closestMilestone, inProgressMilestones } from './MineHub';
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
@@ -115,6 +115,20 @@ describe('closestMilestone', () => {
         ]);
 
         expect(selected?.key).toBe('first');
+    });
+});
+
+describe('inProgressMilestones', () => {
+    it('returns only the next (closest) locked milestone per category', () => {
+        const result = inProgressMilestones([
+            milestone({ key: 'events_10', category: 'events', progress: 8, threshold: 10 }),
+            milestone({ key: 'events_25', category: 'events', progress: 8, threshold: 25 }),
+            milestone({ key: 'cities_5', category: 'cities', progress: 2, threshold: 5 }),
+            milestone({ key: 'events_5', category: 'events', progress: 5, threshold: 5, unlocked: true }),
+        ]);
+
+        // One per category, closest-to-completion within each, sorted by ratio.
+        expect(result.map((m) => m.key)).toEqual(['events_10', 'cities_5']);
     });
 });
 

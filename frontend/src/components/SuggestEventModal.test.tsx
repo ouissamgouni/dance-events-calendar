@@ -114,8 +114,6 @@ function setupTagGroups() {
                 default_explorer_period: 'next_3_months',
                 promo_codes_enabled: false,
                 organizer_claims_enabled: false,
-                for_you_rail_enabled: false,
-                your_next_events_rail_enabled: true,
                 suggest_event_required_dance_group_id: 1,
                 suggest_event_required_reach_group_id: 2,
                 tag_as_badge_enabled: false,

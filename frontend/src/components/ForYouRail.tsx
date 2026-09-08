@@ -68,7 +68,7 @@ export default function ForYouRail({
     followingBadgeEnabled = false,
     className = '',
 }: ForYouRailProps) {
-    const { forYouEventCardsDateFirstLayoutEnabled, showRatings } = useFeatureFlags();
+    const { showRatings } = useFeatureFlags();
     // Rails are expanded by default on both mobile and desktop; the
     // header caret still lets the viewer collapse them per session.
     const [collapsed, setCollapsed] = useState(false);
@@ -202,9 +202,9 @@ export default function ForYouRail({
                         const isNew = !!unseenStateEnabled && !!newEventIds?.has(event.event_id);
                         const isTrending = trendingEnabled
                             && isTrendingScore(event.popularity_score ?? 0, allScoresForLens, popularityThreshold, trendingTopN, trendingTopPercent);
-                        // Date-first layout is opt-in for the preference lenses
+                        // Date-first layout is used for the preference lenses
                         // ("You might like" / "New"); "Friends going" keeps the tile.
-                        if (forYouEventCardsDateFirstLayoutEnabled && activeLens !== 'friends') {
+                        if (activeLens !== 'friends') {
                             return (
                                 <EventCard
                                     key={event.event_id}
@@ -216,7 +216,10 @@ export default function ForYouRail({
                                     isTrending={isTrending}
                                     followingBadgeEnabled={followingBadgeEnabled}
                                     showRatings={showRatings}
-                                    widthClass="w-[248px]"
+                                    showReviews={false}
+                                    widthClass="w-[300px]"
+                                    dateHeaderRow
+                                    twoLineTitle
                                     goingIconVariant="hand"
                                     actionsTestId="for-you-card-actions"
                                     newDotTestId="for-you-new-dot"

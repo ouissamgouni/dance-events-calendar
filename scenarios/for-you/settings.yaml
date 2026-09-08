@@ -1,7 +1,5 @@
-# `for_you_rail_enabled` is set here for completeness, but it does NOT
-# currently gate the /for-you page (that route has no feature-flag
-# check). `unseen_state_enabled` drives the "New" section's unseen-badge
-# visual treatment.
+# The /for-you page has no feature-flag check. `unseen_state_enabled`
+# drives the "New" section's unseen-badge visual treatment.
 #
 # Trending badge tuning (mirrors scenarios/trending-events/settings.yaml):
 #   * `trending_enabled: true`, `show_popularity: true`, and
@@ -19,7 +17,6 @@
 #     scoring events in the lens with the 🔥 badge, matching the
 #     trending-events scenario's cap.
 settings:
-  for_you_rail_enabled: true
   unseen_state_enabled: true
   trending_enabled: true
   show_popularity: true

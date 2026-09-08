@@ -64,15 +64,6 @@ function formatRailDate(value: string): string {
     return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-// Titles render inside a fixed-width flex column with CSS `truncate`; the
-// JS clamp used to be tight (22 chars) which cut off common event names
-// well before the ellipsis width. Bumping to 40 lets the column absorb
-// most reasonable titles and leaves the CSS truncation as the true limit.
-function truncateText(value: string, maxLength = 40): string {
-    if (value.length <= maxLength) return value;
-    return `${value.slice(0, maxLength - 3).trimEnd()}...`;
-}
-
 /**
  * Shared card used by all Home-page rails (For you, Trending) so the
  * scroll rows look and behave identically regardless of the source
@@ -112,7 +103,6 @@ export default function RailEventCard({
     const start = new Date(event.start);
     const startLabel = formatRailDate(event.start);
     const label = `Open ${event.title}, ${contextLabel} on ${startLabel}`;
-    const title = truncateText(event.title);
     const location = shortLocation(event.location);
     const compact = variant === 'compact';
     const showExtras = !compact || compactShowExtras;
@@ -152,7 +142,7 @@ export default function RailEventCard({
                     />
                 )}
                 <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 flex-col justify-center px-3 py-3">
-                    <h3 className="truncate text-sm font-semibold text-ink group-hover:text-action sm:text-base" title={event.title}>{event.title}</h3>
+                    <h3 className="line-clamp-2 text-sm font-semibold text-ink group-hover:text-action sm:text-base" title={event.title}>{event.title}</h3>
                     <p className="mt-1 truncate text-sm text-ink-soft">{[time, location].filter(Boolean).join(' · ')}</p>
                     {!pastPresentation && <div className="mt-2 flex min-h-6 items-center gap-2">
                         <AttendeeAvatarStack
@@ -209,7 +199,7 @@ export default function RailEventCard({
                     <EventDateRail start={start} />
                 )}
                 <div className={`flex min-w-0 flex-1 flex-col ${dateRail ? 'px-2.5 py-2.5' : ''}`}>
-                    <h3 className={`min-w-0 truncate text-sm font-semibold leading-snug text-ink group-hover:text-action ${compact ? '' : 'pr-16'}`} title={event.title}>
+                    <h3 className={`min-w-0 line-clamp-2 text-sm font-semibold leading-snug text-ink group-hover:text-action ${compact ? '' : 'pr-16'}`} title={event.title}>
                         {isNew && (
                             <span
                                 // eslint-disable-next-line no-restricted-syntax -- small status dot (new event indicator) — allowed exception per frontend rules
@@ -218,7 +208,7 @@ export default function RailEventCard({
                                 data-testid={newDotTestId}
                             />
                         )}
-                        {title}
+                        {event.title}
                     </h3>
                     {isTrending && (
                         <div className="mt-1">

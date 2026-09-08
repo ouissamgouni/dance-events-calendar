@@ -1,7 +1,4 @@
-import { useRef } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
-import { useScrollDots } from '../hooks/useScrollDots';
-import ScrollDotsIndicator from './ScrollDots';
 import { useAuth } from '../context/AuthContext';
 
 export interface SectionTab {
@@ -12,8 +9,7 @@ export interface SectionTab {
 export const TRIBE_TABS: SectionTab[] = [
     { label: 'Calendars', path: '/tribe/calendars' },
     { label: 'Activity', path: '/tribe/activity' },
-    { label: 'Discover', path: '/tribe/discover' },
-    { label: 'Network', path: '/tribe/network' },
+    { label: 'People', path: '/tribe/network' },
     { label: 'Reviews', path: '/tribe/reviews' },
 ];
 
@@ -53,39 +49,32 @@ function getTitleForMinePath(pathname: string): string | null {
 }
 
 function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: string; hub: string }) {
-    const scrollerRef = useRef<HTMLDivElement>(null);
-    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [tabs.length, pathname]);
-
     return (
-        <>
-            <nav
-                ref={scrollerRef}
-                aria-label="Section"
-                className="flex items-center gap-1 overflow-x-auto border-b border-line px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-                {tabs.map((t) => {
-                    // The hub tab (e.g. /mine) matches its own path exactly so it
-                    // doesn't stay active on deeper sub-routes like /mine/calendar.
-                    const active = t.path === hub
-                        ? pathname === hub
-                        : pathname === t.path || pathname.startsWith(t.path + '/');
-                    return (
-                        <Link
-                            key={t.path}
-                            to={t.path}
-                            aria-current={active ? 'page' : undefined}
-                            className={`shrink-0 -mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition ${active
-                                ? 'border-action text-action'
-                                : 'border-transparent text-ink-soft hover:text-ink'
-                                }`}
-                        >
-                            {t.label}
-                        </Link>
-                    );
-                })}
-            </nav>
-            <ScrollDotsIndicator count={dotCount} activeIndex={activeIndex} onSelect={scrollToIndex} className="px-4 pb-0.5" />
-        </>
+        <nav
+            aria-label="Section"
+            className="flex items-center gap-1 overflow-x-auto border-b border-line px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+            {tabs.map((t) => {
+                // The hub tab (e.g. /mine) matches its own path exactly so it
+                // doesn't stay active on deeper sub-routes like /mine/calendar.
+                const active = t.path === hub
+                    ? pathname === hub
+                    : pathname === t.path || pathname.startsWith(t.path + '/');
+                return (
+                    <Link
+                        key={t.path}
+                        to={t.path}
+                        aria-current={active ? 'page' : undefined}
+                        className={`shrink-0 -mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition ${active
+                            ? 'border-action text-action'
+                            : 'border-transparent text-ink-soft hover:text-ink'
+                            }`}
+                    >
+                        {t.label}
+                    </Link>
+                );
+            })}
+        </nav>
     );
 }
 
@@ -126,12 +115,12 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
     return (
         <div className={isMyEvents ? 'flex h-full min-h-0 flex-col overflow-hidden bg-canvas' : 'min-h-full bg-[#f8fafc]'}>
             {section !== 'mine' && (
-                <div className="border-b border-line bg-surface px-4 pt-1">
+                <div className="bg-surface px-4 pt-1">
                     {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-ink">{title}</h1>}
                     <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
                 </div>
             )}
-            {section === 'mine' && pathname !== hub && minePageTitle && (
+            {section === 'mine' && pathname !== hub && minePageTitle && !isMyEvents && (
                 <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
                     {pathname === '/mine/calendar' ? (
                         <h1 className="text-2xl font-bold text-ink">My Events</h1>
