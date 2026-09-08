@@ -504,7 +504,7 @@ function JourneyEntryRow({ entry, anchorMonth, highlighted }: { entry: JourneyEn
     );
 }
 
-type FilterEntry = { key: string; label: string; count: number };
+type FilterEntry = { key: string | null; label: string; count: number };
 
 function FilterableEventMap({
     events,

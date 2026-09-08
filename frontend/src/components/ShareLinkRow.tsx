@@ -48,7 +48,7 @@ export default function ShareLinkRow({
                     url,
                 });
             } else if (typeof navigator !== 'undefined' && 'clipboard' in navigator) {
-                await navigator.clipboard.writeText(url);
+                await (navigator as any).clipboard.writeText(url);
                 setCopyStatus('copied');
             }
         } catch (error) {
