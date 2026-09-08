@@ -87,6 +87,182 @@ attendances:
   - { event_id: evt-ux-023, email: nia@example.com, share_publicly: true }
   - { event_id: evt-ux-023, email: s01@example.com, share_audience: public }
   - { event_id: evt-ux-023, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-023, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-023, email: emma@example.com, share_publicly: true }
+
+  # ── Additional upcoming events with multiple attendees for reviews ──
+  # evt-ux-001 (Salsa Social Friday) - 6+ attendees for reviews
+  - { event_id: evt-ux-001, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-001, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-001, email: frank@example.com, share_audience: public }
+  - { event_id: evt-ux-001, email: gina@example.com, share_audience: public }
+  - { event_id: evt-ux-001, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-001, email: s01@example.com, share_audience: public }
+
+  # evt-ux-002 (Berlin Bachata) - 5+ attendees
+  - { event_id: evt-ux-002, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-002, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-002, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-002, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-002, email: s02@example.com, share_audience: public }
+
+  # evt-ux-003 (Madrid Beginner Class) - 6+ attendees
+  - { event_id: evt-ux-003, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-003, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-003, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-003, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-003, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-003, email: s04@example.com, share_audience: public }
+
+  # evt-ux-004 (Lisbon Workshop) - 7+ attendees
+  - { event_id: evt-ux-004, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-004, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-004, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-ux-004, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-004, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-004, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-004, email: s02@example.com, share_audience: public }
+
+  # evt-ux-005 (Rome Bachata) - 6+ attendees
+  - { event_id: evt-ux-005, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-005, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-005, email: frank@example.com, share_audience: public }
+  - { event_id: evt-ux-005, email: nia@example.com, share_audience: public }
+  - { event_id: evt-ux-005, email: omar@example.com, share_audience: public }
+  - { event_id: evt-ux-005, email: s03@example.com, share_audience: public }
+
+  # evt-ux-006 (Amsterdam Practice) - 5+ attendees
+  - { event_id: evt-ux-006, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-006, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-006, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-006, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-006, email: s04@example.com, share_audience: public }
+
+  # evt-ux-007 (Vienna Bachata Class) - 6+ attendees
+  - { event_id: evt-ux-007, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-007, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-007, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-007, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-007, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-007, email: s02@example.com, share_audience: public }
+
+  # evt-ux-009 (Brussels Drop-in) - 5+ attendees
+  - { event_id: evt-ux-009, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-009, email: frank@example.com, share_audience: public }
+  - { event_id: evt-ux-009, email: gina@example.com, share_audience: public }
+  - { event_id: evt-ux-009, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-009, email: s03@example.com, share_audience: public }
+
+  # evt-ux-010 (Copenhagen Workshop) - 6+ attendees
+  - { event_id: evt-ux-010, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-010, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-010, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-010, email: nia@example.com, share_audience: public }
+  - { event_id: evt-ux-010, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-010, email: s05@example.com, share_audience: public }
+
+  # evt-ux-012 (Barcelona Practice) - 6+ attendees
+  - { event_id: evt-ux-012, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-012, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-012, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-012, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-012, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-012, email: s02@example.com, share_audience: public }
+
+  # evt-ux-013 (Zurich Bachata) - 7+ attendees
+  - { event_id: evt-ux-013, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-013, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-013, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-013, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-013, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-013, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-013, email: s04@example.com, share_audience: public }
+
+  # evt-ux-014 (Milan Workshop) - 5+ attendees
+  - { event_id: evt-ux-014, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-014, email: gina@example.com, share_audience: public }
+  - { event_id: evt-ux-014, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-014, email: s05@example.com, share_audience: public }
+  - { event_id: evt-ux-014, email: s01@example.com, share_audience: public }
+
+  # evt-ux-015 (Warsaw Social) - 6+ attendees
+  - { event_id: evt-ux-015, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-015, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-015, email: nia@example.com, share_audience: public }
+  - { event_id: evt-ux-015, email: omar@example.com, share_audience: public }
+  - { event_id: evt-ux-015, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-015, email: s03@example.com, share_audience: public }
+
+  # evt-ux-016 (Stockholm Workshop) - 5+ attendees
+  - { event_id: evt-ux-016, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-016, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-016, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-016, email: s05@example.com, share_audience: public }
+  - { event_id: evt-ux-016, email: s01@example.com, share_audience: public }
+
+  # evt-ux-017 (Athens Late Night) - 6+ attendees
+  - { event_id: evt-ux-017, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-017, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-017, email: gina@example.com, share_audience: public }
+  - { event_id: evt-ux-017, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-017, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-017, email: s03@example.com, share_audience: public }
+
+  # evt-ux-018 (Istanbul Class) - 5+ attendees
+  - { event_id: evt-ux-018, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-018, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-018, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-018, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-018, email: s05@example.com, share_audience: public }
+
+  # evt-ux-019 (Tel Aviv Drop-in) - 6+ attendees
+  - { event_id: evt-ux-019, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-019, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-019, email: nia@example.com, share_audience: public }
+  - { event_id: evt-ux-019, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-019, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-019, email: s03@example.com, share_audience: public }
+
+  # evt-ux-021 (Dublin Brunch) - 5+ attendees
+  - { event_id: evt-ux-021, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-021, email: frank@example.com, share_audience: public }
+  - { event_id: evt-ux-021, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-021, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-021, email: s05@example.com, share_audience: public }
+
+  # evt-ux-022 (Porto Intensive) - 7+ attendees
+  - { event_id: evt-ux-022, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-022, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-022, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-022, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-022, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-022, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-022, email: s02@example.com, share_audience: public }
+
+  # evt-ux-024 (Barcelona Spring Festival) - 8+ attendees
+  - { event_id: evt-ux-024, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-024, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-024, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-024, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-024, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-024, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-024, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-024, email: s05@example.com, share_audience: public }
+
+  # evt-ux-025 (Copenhagen Spring Weekend) - 6+ attendees
+  - { event_id: evt-ux-025, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-025, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-025, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-025, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-025, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-025, email: s03@example.com, share_audience: public }
+
+  # evt-ux-026 (Montreal Social) - 5+ attendees
+  - { event_id: evt-ux-026, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-026, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-026, email: tara@example.com, share_audience: public }
+  - { event_id: evt-ux-026, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-026, email: s05@example.com, share_audience: public }
 
   # ── Viewer's passport: 12 past events with mixed audiences ────────
   # Supports the Dance Passport page; audiences (public/friends/private)

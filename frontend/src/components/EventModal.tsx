@@ -31,7 +31,7 @@ export default function EventModal({ event, onClose, onEdit, source }: Props) {
                     onEdit={onEdit}
                     surface="card"
                     className="w-full max-h-[90vh]"
-                    bodyClassName="max-h-[calc(90vh-92px)]"
+                    bodyClassName="flex-1 min-h-0"
                     source={source}
                 />
             </div>

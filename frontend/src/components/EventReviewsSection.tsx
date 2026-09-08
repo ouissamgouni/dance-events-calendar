@@ -256,14 +256,8 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
         // Nothing to gate behind sign-in when the event has no reviews yet.
         if (count === 0) return null;
         return (
-            <section className="mt-4 border-t border-line pt-3 space-y-2">
-                <h3 className="text-base font-bold text-ink">
-                    {collapseChevron}
-                    Community Experience{' '}
-                    <span className="text-sm font-normal tabular-nums text-ink-soft">
-                        · {count} review{count === 1 ? '' : 's'}
-                    </span>
-                </h3>
+            <section className="mt-4 border-t border-line px-1 pt-3 space-y-2">
+                {collapseChevron}
                 {!collapsed && (
                     <p className="text-[11px] text-ink-soft">
                         <Link
@@ -281,8 +275,8 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
 
     if (!effectiveAggregate || effectiveAggregate.count === 0) {
         return (
-            <section className="mt-4 border-t border-line pt-3 space-y-2">
-                <h3 className="text-base font-bold text-ink">{collapseChevron}Community Experience</h3>
+            <section className="mt-4 border-t border-line px-1 pt-3 space-y-2">
+                {collapseChevron}
                 {!collapsed && (
                     <>
                         {typicalCard}
@@ -312,11 +306,8 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
     }
 
     return (
-        <section className="mt-4 border-t border-line pt-3 space-y-4 max-w-full overflow-hidden">
-            <h3 className="text-base font-bold text-ink">
-                {collapseChevron}
-                Community Experience <span className="font-medium text-muted">({effectiveAggregate.count})</span>
-            </h3>
+        <section className="mt-4 border-t border-line px-1 pt-3 space-y-4 max-w-full overflow-hidden">
+            {collapseChevron}
 
             {!collapsed && (
                 <>
@@ -341,8 +332,8 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                         </select>
                     </div>
 
-                    <div ref={reviewsScrollerRef} className="max-w-full overflow-x-auto pb-2 -mx-1 px-1">
-                        <div className="flex gap-4 divide-x divide-slate-200">
+                    <div ref={reviewsScrollerRef} className="max-w-full overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1">
+                        <div className="flex gap-4">
                             {reviews.map((r) => {
                                 const meta = r.overall_sentiment ? SENTIMENT_META[r.overall_sentiment] : null;
                                 const initials =
@@ -357,7 +348,7 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                                 const shown = tags.slice(0, CARD_TAGS_SHOWN);
                                 const extra = tags.length - shown.length;
                                 return (
-                                    <div key={r.id} className="w-56 shrink-0 space-y-1.5 pl-4 first:pl-0">
+                                    <div key={r.id} className="w-56 shrink-0 space-y-1.5 rounded-lg border border-line bg-white p-3">
                                         <div className="flex items-center gap-2">
                                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-ink-soft">
                                                 {initials}

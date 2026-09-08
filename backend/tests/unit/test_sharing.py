@@ -534,7 +534,14 @@ class TestCalendarFeed:
             start=datetime(2025, 1, 1, 20, 0),
             end=datetime(2025, 1, 1, 23, 0),
         )
-        going_event = _sample_event(event_id="evt-going-001", title="Going Event")
+        # Upcoming (future) going event: view=past must hide it even though the
+        # legacy scope=going would otherwise include it.
+        going_event = _sample_event(
+            event_id="evt-going-001",
+            title="Going Event",
+            start=datetime(2026, 12, 1, 20, 0),
+            end=datetime(2026, 12, 1, 23, 0),
+        )
 
         _feed_mock(
             session,

@@ -1,4 +1,14 @@
 import { Link } from 'react-router-dom';
+import type { ReviewSentiment } from '../types';
+
+/** Subtle background tint per overall mood (only applied in the 'full' state). */
+const MOOD_BG: Record<ReviewSentiment, string> = {
+    amazing: 'bg-green-50',
+    great: 'bg-green-50',
+    okay: 'bg-amber-50',
+    disappointing: 'bg-orange-50',
+    bad: 'bg-red-50',
+};
 
 interface Props {
     /** Section header, e.g. "Overall experience" or "Typical experience". */
@@ -7,6 +17,8 @@ interface Props {
     displayState: 'none' | 'early' | 'full';
     /** Mood emoji (from ``aspectMood(average).emoji``). */
     emoji: string;
+    /** Overall mood sentiment; drives the background tint in the 'full' state. */
+    mood?: ReviewSentiment;
     /** Public mood label ("Well received"); null below the review threshold. */
     moodLabel?: string | null;
     /** When true, render "Usually {mood}" (lower-cased) — used for pooled series. */
@@ -30,6 +42,7 @@ export default function ExperienceMoodBox({
     label,
     displayState,
     emoji,
+    mood,
     moodLabel,
     usually = false,
     positivePercentage,
@@ -39,9 +52,10 @@ export default function ExperienceMoodBox({
     if (displayState === 'none') return null;
 
     const positivePct = Math.round(positivePercentage ?? 0);
+    const bg = displayState === 'full' && mood ? MOOD_BG[mood] : 'bg-canvas';
 
     return (
-        <div className="border border-line bg-canvas px-3 py-2.5 space-y-1">
+        <div className={`border border-line ${bg} px-3 py-2.5 space-y-1`}>
             <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
                 {label}
             </div>

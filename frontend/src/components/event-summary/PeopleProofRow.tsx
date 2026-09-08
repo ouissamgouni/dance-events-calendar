@@ -1,4 +1,3 @@
-import { ArrowUp } from 'lucide-react';
 import type { CalendarEvent } from '../../types';
 import { useAttendanceSummary } from '../../context/AttendanceSummariesContext';
 import AttendeeAvatarStack from '../AttendeeAvatarStack';
@@ -31,30 +30,35 @@ export default function PeopleProofRow({ event, postsCount, onOpenPosts }: Props
             : '';
 
     return (
-        <div className="flex items-center gap-2 text-xs text-ink-soft">
-            <AttendeeAvatarStack
-                eventId={event.event_id}
-                max={3}
-                friendsPreview={event.friends_going_preview}
-                size="md"
-                layout="faces"
-                hideIfOnlyCurrentUser
-            />
-            <span className="min-w-0 truncate">
-                {goingText}
-                {goingText && totalSaved > 0 && ' · '}
-                {totalSaved > 0 && `${totalSaved} saved`}
-            </span>
-            {postsCount > 0 && (
-                <button
-                    type="button"
-                    onClick={onOpenPosts}
-                    className="ml-auto inline-flex shrink-0 items-center gap-1 font-medium text-action hover:underline"
-                >
-                    <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
-                    {postsCount} Post{postsCount === 1 ? '' : 's'}
-                </button>
+        <div className="space-y-2">
+            {totalGoing > 0 && (
+                <div className="text-sm font-semibold leading-5 text-[#526078]">People going</div>
             )}
+            <div className="flex items-center gap-2 text-xs text-ink-soft">
+                <AttendeeAvatarStack
+                    eventId={event.event_id}
+                    max={3}
+                    friendsPreview={event.friends_going_preview}
+                    size="lg"
+                    layout="faces"
+                    hideIfOnlyCurrentUser
+                />
+                <span className="min-w-0 truncate">
+                    {goingText}
+                    {goingText && totalSaved > 0 && ' · '}
+                    {totalSaved > 0 && `${totalSaved} saved`}
+                </span>
+                {postsCount > 0 && (
+                    <button
+                        type="button"
+                        onClick={onOpenPosts}
+                        className="ml-auto inline-flex shrink-0 items-center gap-1 font-medium text-action hover:underline"
+                    >
+                        <img src="/question.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
+                        {postsCount} Post{postsCount === 1 ? '' : 's'}
+                    </button>
+                )}
+            </div>
         </div>
     );
 }

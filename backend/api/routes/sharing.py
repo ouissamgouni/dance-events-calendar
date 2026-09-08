@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -184,20 +185,21 @@ def get_calendar_feed(
             )
         ).all()
         if visible_calendars:
-            events = list(
-                session.exec(
+            scoped_ids = set(event_ids)
+            events = [
+                event
+                for event in session.exec(
                     select(CachedEvent).where(
                         CachedEvent.event_id.in_(event_ids),
                         CachedEvent.calendar_id.in_(visible_calendars),
                         CachedEvent.deleted_at == None,
                     )
                 ).all()
-            )
+                if event.event_id in scoped_ids
+            ]
 
     # Filter by date for upcoming/past views
     if view in ("upcoming", "past"):
-        from datetime import datetime
-
         now = datetime.utcnow()
         if view == "upcoming":
             events = [e for e in events if e.start > now]

@@ -5,11 +5,11 @@ import MyEventsUtilityMenu from './MyEventsUtilityMenu';
 
 describe('MyEventsUtilityMenu', () => {
     it('opens the approved Share and export sheet without RSS', async () => {
-        const { user } = renderWithProviders(<MyEventsUtilityMenu />);
+        const { user } = renderWithProviders(<MyEventsUtilityMenu activeTab="upcoming" eventIds={[]} />);
 
         await user.click(screen.getByRole('button', { name: 'Share and export My Events' }));
 
-        expect(screen.getByRole('dialog', { name: 'Share & export' })).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: /Share & export/ })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Share My Events/ })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Subscribe in another calendar/ })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Export calendar \(.ics\)/ })).toBeInTheDocument();

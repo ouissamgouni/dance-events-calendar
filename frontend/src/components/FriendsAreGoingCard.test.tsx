@@ -51,7 +51,7 @@ describe('FriendsAreGoingCard', () => {
         expect(screen.getByTestId('friends-going-event-image')).toHaveAttribute('src', '/event.jpg');
         expect(within(screen.getByTestId('friends-going-avatars')).getAllByRole('link')).toHaveLength(4);
         expect(screen.getByRole('link', { name: 'See 2 more friends going' })).toHaveTextContent('+2');
-        expect(screen.getByAltText('Martina')).toHaveClass('h-[18px]', 'w-[18px]');
+        expect(screen.getByAltText('Martina')).toHaveClass('h-[20px]', 'w-[20px]');
         expect(screen.getByText('Martina, Christian, Mido')).toBeInTheDocument();
         expect(screen.getByText('friends are going to')).toBeInTheDocument();
         expect(screen.getByText('Oct 10\u201312 \u00b7 Cologne, Germany')).toBeInTheDocument();

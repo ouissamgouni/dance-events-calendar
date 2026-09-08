@@ -30,8 +30,8 @@ function ReviewRail({ title, itemCount, children }: { title: string; itemCount: 
 
     return (
         <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">{title}</div>
-            <div ref={scrollerRef} className="flex gap-1.5 overflow-x-auto pb-1">
+            <div className="mt-6 mb-3 text-sm font-semibold leading-5 text-[#526078]">{title}</div>
+            <div ref={scrollerRef} className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
                 {children}
             </div>
             <ScrollDotsIndicator
@@ -90,6 +90,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                     label="Overall experience"
                     displayState={aggregate.display_state}
                     emoji={aspectMood(aggregate.average_mood).emoji}
+                    mood={aspectMood(aggregate.average_mood).value}
                     moodLabel={aggregate.mood_label}
                     positivePercentage={aggregate.positive_percentage ?? 0}
                     subline={editionCount != null

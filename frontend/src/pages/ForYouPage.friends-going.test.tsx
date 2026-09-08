@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { LensTrail, timeOfDayGreeting } from './ForYouPage';
 import { FeatureFlagsProvider } from '../context/FeatureFlagsContext';
@@ -18,6 +18,18 @@ describe('timeOfDayGreeting', () => {
 });
 
 describe('LensTrail friends-going pagination', () => {
+    // jsdom reports 0 for layout dimensions, so useScrollDots would never see an
+    // overflow. Stub the rail geometry (200px viewport, 600px content) so it
+    // computes 3 pages and renders the scroll dots.
+    beforeEach(() => {
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 200 });
+        Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, value: 600 });
+    });
+    afterEach(() => {
+        delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+        delete (HTMLElement.prototype as { scrollWidth?: number }).scrollWidth;
+    });
+
     it('renders the shared scroll dots for the friends-going trail', () => {
         const events = Array.from({ length: 6 }, (_, index) => ({
             event_id: `evt-${index}`,
@@ -33,26 +45,26 @@ describe('LensTrail friends-going pagination', () => {
 
         renderWithProviders(
             <FeatureFlagsProvider>
-            <LensTrail
-                title="Friends are going"
-                events={events}
-                hasMore={false}
-                loading={false}
-                onLoadMore={vi.fn()}
-                onEventClick={vi.fn()}
-                hoveredEventId={null}
-                onEventHover={vi.fn()}
-                trendingEnabled={false}
-                popularityThreshold={0}
-                trendingTopN={0}
-                trendingTopPercent={0}
-                newEventIds={new Set()}
-                unseenStateEnabled={false}
-                followingBadgeEnabled={false}
-                contextLabel="friends going event"
-                testId="friends-going-trail"
-                cardVariant="friends-going"
-            />
+                <LensTrail
+                    title="Friends are going"
+                    events={events}
+                    hasMore={false}
+                    loading={false}
+                    onLoadMore={vi.fn()}
+                    onEventClick={vi.fn()}
+                    hoveredEventId={null}
+                    onEventHover={vi.fn()}
+                    trendingEnabled={false}
+                    popularityThreshold={0}
+                    trendingTopN={0}
+                    trendingTopPercent={0}
+                    newEventIds={new Set()}
+                    unseenStateEnabled={false}
+                    followingBadgeEnabled={false}
+                    contextLabel="friends going event"
+                    testId="friends-going-trail"
+                    cardVariant="friends-going"
+                />
             </FeatureFlagsProvider>,
         );
 
@@ -76,26 +88,26 @@ describe('LensTrail friends-going pagination', () => {
 
         renderWithProviders(
             <FeatureFlagsProvider>
-            <LensTrail
-                title="Friends are going"
-                events={events}
-                hasMore={false}
-                loading={false}
-                onLoadMore={vi.fn()}
-                onEventClick={vi.fn()}
-                hoveredEventId={null}
-                onEventHover={vi.fn()}
-                trendingEnabled={false}
-                popularityThreshold={0}
-                trendingTopN={0}
-                trendingTopPercent={0}
-                newEventIds={new Set()}
-                unseenStateEnabled={false}
-                followingBadgeEnabled={false}
-                contextLabel="friends going event"
-                testId="friends-going-trail"
-                cardVariant="friends-going"
-            />
+                <LensTrail
+                    title="Friends are going"
+                    events={events}
+                    hasMore={false}
+                    loading={false}
+                    onLoadMore={vi.fn()}
+                    onEventClick={vi.fn()}
+                    hoveredEventId={null}
+                    onEventHover={vi.fn()}
+                    trendingEnabled={false}
+                    popularityThreshold={0}
+                    trendingTopN={0}
+                    trendingTopPercent={0}
+                    newEventIds={new Set()}
+                    unseenStateEnabled={false}
+                    followingBadgeEnabled={false}
+                    contextLabel="friends going event"
+                    testId="friends-going-trail"
+                    cardVariant="friends-going"
+                />
             </FeatureFlagsProvider>,
         );
 

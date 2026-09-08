@@ -781,6 +781,51 @@ class TestEventsEndpoint:
         assert by_id["evt-override"]["has_active_promo_codes"] is True
         assert by_id["evt-default"]["has_active_promo_codes"] is False
 
+    def test_get_event_reports_active_promo_code(self, sqlite_client):
+        client, engine = sqlite_client
+        now = datetime.now(UTC).replace(tzinfo=None)
+
+        with Session(engine) as session:
+            session.add(
+                CalendarSetting(
+                    calendar_id="cal-1",
+                    name="Test Calendar",
+                    enabled=True,
+                    show_events=True,
+                    color="#ff0000",
+                )
+            )
+            submitter = User(email="submitter@example.com")
+            session.add(submitter)
+            session.add(
+                CachedEvent(
+                    event_id="evt-override",
+                    calendar_id="cal-1",
+                    title="Override Event",
+                    start=now + timedelta(days=1),
+                    end=now + timedelta(days=1, hours=3),
+                    is_hidden=False,
+                    show_promo_override=True,
+                )
+            )
+            session.commit()
+            session.refresh(submitter)
+            session.add(
+                EventPromoCode(
+                    event_id="evt-override",
+                    code="SAVE10",
+                    status="approved",
+                    submitter_user_id=submitter.id,
+                )
+            )
+            session.commit()
+
+        # Single-event share endpoint must surface the same promo flag as the
+        # list endpoint (regression: it previously always returned False).
+        resp = client.get("/api/events/evt-override")
+        assert resp.status_code == 200
+        assert resp.json()["has_active_promo_codes"] is True
+
     def test_get_events_omits_has_more_header_when_unpaginated(
         self, sample_calendar, sample_events
     ):

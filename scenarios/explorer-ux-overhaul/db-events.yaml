@@ -2782,6 +2782,537 @@ ratings:
     comment_status: approved
     status: approved
 
+  # ── Reviews on upcoming events ──────────────────────────────────────────────
+  # Upcoming events with reviews from attendees to provide social proof
+
+  # Reviews on evt-ux-001 (Salsa Social Friday)
+  - event_id: evt-ux-001
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: |
+      What an amazing Friday! The energy was infectious, DJ kept the energy high,
+      and the crowd was super friendly. Perfect mix of skill levels on the floor.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+      venue-quality: 5
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - music:great-dj
+      - venue-quality:great-dance-floor
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-001
+    email: emma@example.com
+    overall_sentiment: great
+    comment: |
+      Solid event with good pacing. The room felt spacious enough for dancing
+      without feeling crowded. Will definitely return next week.
+    aspect_scores:
+      atmosphere: 4
+      venue-quality: 4
+    aspect_tags:
+      - venue-quality:good-space
+      - atmosphere:good-energy
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-001
+    email: frank@example.com
+    overall_sentiment: great
+    comment: |
+      Great social. Lots of partner rotation and the music mix was excellent throughout.
+    aspect_scores:
+      music: 5
+      atmosphere: 4
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:good-energy
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-001
+    email: gina@example.com
+    overall_sentiment: amazing
+    comment: |
+      One of the best Paris socials I've been to. The organizers clearly care about
+      creating a welcoming atmosphere for all levels.
+    aspect_scores:
+      atmosphere: 5
+      music: 4
+    aspect_tags:
+      - atmosphere:welcoming-vibe
+      - atmosphere:friendly-crowd
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-001
+    email: hugo@example.com
+    overall_sentiment: great
+    comment: |
+      Really enjoyed this one. Good mix of classic salsa and modern tracks.
+    aspect_scores:
+      music: 4
+      atmosphere: 4
+    aspect_tags:
+      - music:good-playlist
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-001
+    email: s01@example.com
+    overall_sentiment: okay
+    comment: |
+      Fun enough, though it got pretty packed toward the end of the night.
+    aspect_scores:
+      venue-quality: 3
+    aspect_tags:
+      - venue-quality:crowded
+    comment_status: approved
+    status: approved
+
+  # Reviews on evt-ux-004 (Lisbon Workshop)
+  - event_id: evt-ux-004
+    email: frank@example.com
+    overall_sentiment: amazing
+    comment: |
+      Excellent workshop! The instructors really know how to break down the technique.
+      Left feeling much more confident about my timing and lead-follow connection.
+    aspect_scores:
+      teaching-quality: 5
+      music: 5
+      atmosphere: 5
+    aspect_tags:
+      - teaching-quality:excellent-instruction
+      - atmosphere:welcoming-vibe
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-004
+    email: gina@example.com
+    overall_sentiment: great
+    comment: |
+      Great Saturday workshop. Well-organized, clear progressions, and the tempo
+      was perfect for practicing new material.
+    aspect_scores:
+      teaching-quality: 4
+      music: 4
+    aspect_tags:
+      - teaching-quality:patient-instructor
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-004
+    email: hugo@example.com
+    overall_sentiment: great
+    comment: |
+      Solid teaching. The venue was bright and spacious, which made it easier to
+      focus on the material.
+    aspect_scores:
+      venue-quality: 4
+      teaching-quality: 4
+    aspect_tags:
+      - venue-quality:good-space
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-004
+    email: rita@example.com
+    overall_sentiment: amazing
+    comment: |
+      This was my third time and I keep coming back because the instruction is top-notch.
+      The body movement focus was exactly what I needed to improve.
+    aspect_scores:
+      teaching-quality: 5
+      music: 4
+    aspect_tags:
+      - teaching-quality:excellent-instruction
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-004
+    email: samir@example.com
+    overall_sentiment: great
+    comment: |
+      Good workshop with practical combinations I can use in socials immediately.
+    aspect_scores:
+      teaching-quality: 4
+    aspect_tags:
+      - teaching-quality:practical-lessons
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-004
+    email: s02@example.com
+    overall_sentiment: great
+    comment: |
+      Nice afternoon session. The pace allowed me to keep up without feeling rushed.
+    aspect_scores:
+      teaching-quality: 4
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:welcoming-vibe
+    comment_status: approved
+    status: approved
+
+  # Reviews on evt-ux-008 (Prague Friday Social)
+  - event_id: evt-ux-008
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: |
+      Incredible energy! The Prague Friday lived up to the hype. The crowd was
+      international and genuinely friendly. DJ kept things fresh all night.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+      venue-quality: 5
+    aspect_tags:
+      - atmosphere:electric-energy
+      - music:excellent-dj
+      - venue-quality:great-dance-floor
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-008
+    email: bob@example.com
+    overall_sentiment: great
+    comment: |
+      Really enjoyed the vibe here. Good mix of dancers and the music progression
+      was thoughtful.
+    aspect_scores:
+      atmosphere: 4
+      music: 4
+    aspect_tags:
+      - music:good-playlist
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-008
+    email: carol@example.com
+    overall_sentiment: amazing
+    comment: |
+      What a night! Made so many new friends and the dance floor was packed with
+      people having a genuine good time.
+    aspect_scores:
+      atmosphere: 5
+      music: 4
+    aspect_tags:
+      - atmosphere:friendly-crowd
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-008
+    email: dave@example.com
+    overall_sentiment: great
+    comment: |
+      Solid Prague social. Beginner area was perfect for warming up before hitting
+      the main floor.
+    aspect_scores:
+      atmosphere: 4
+      venue-quality: 4
+    aspect_tags:
+      - venue-quality:good-layout
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-008
+    email: emma@example.com
+    overall_sentiment: amazing
+    comment: |
+      Best social I've been to this year! The energy was perfect and the crowd was
+      so welcoming to newcomers. Can't wait to go back!
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - atmosphere:electric-energy
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-008
+    email: frank@example.com
+    overall_sentiment: great
+    comment: |
+      Great event with solid DJ work and good partner rotation opportunities.
+    aspect_scores:
+      music: 4
+      atmosphere: 4
+    aspect_tags:
+      - music:good-playlist
+    comment_status: approved
+    status: approved
+
+  # Reviews on evt-ux-013 (Zurich Bachata)
+  - event_id: evt-ux-013
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: |
+      Fantastic Zurich evening! The sensual bachata playlist was perfectly curated,
+      and the crowd was sophisticated and welcoming.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+      venue-quality: 5
+    aspect_tags:
+      - music:excellent-dj
+      - atmosphere:friendly-crowd
+      - venue-quality:great-dance-floor
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-013
+    email: emma@example.com
+    overall_sentiment: great
+    comment: |
+      Really enjoyed the music selection here. The progressive flow from early evening
+      to late night was well thought out.
+    aspect_scores:
+      music: 5
+      atmosphere: 4
+    aspect_tags:
+      - music:excellent-dj
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-013
+    email: gina@example.com
+    overall_sentiment: great
+    comment: |
+      Good bachata social with quality music and nice people. Will definitely return.
+    aspect_scores:
+      music: 4
+      atmosphere: 4
+    aspect_tags:
+      - music:good-playlist
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-013
+    email: rita@example.com
+    overall_sentiment: amazing
+    comment: |
+      One of the best bachata venues in Europe. The attention to detail in the music
+      selection and atmosphere is exceptional.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+    aspect_tags:
+      - atmosphere:welcoming-vibe
+      - music:excellent-dj
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-013
+    email: samir@example.com
+    overall_sentiment: great
+    comment: |
+      Solid event with good energy and the drinks weren't overpriced!
+    aspect_scores:
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:good-energy
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-013
+    email: s03@example.com
+    overall_sentiment: great
+    comment: |
+      Great night out with a truly international crowd. Really enjoyed the vibe.
+    aspect_scores:
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:friendly-crowd
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-013
+    email: s04@example.com
+    overall_sentiment: okay
+    comment: |
+      Fun enough, but a bit pricey for the venue size. Music was good though.
+    aspect_scores:
+      music: 4
+      venue-quality: 3
+    aspect_tags:
+      - venue-quality:intimate-space
+    comment_status: approved
+    status: approved
+
+  # Reviews on evt-ux-020 (Marrakech Big Social)
+  - event_id: evt-ux-020
+    email: pablo@example.com
+    overall_sentiment: amazing
+    comment: |
+      Marrakech absolutely delivered! The energy was electric from the moment
+      the DJ dropped the first track. Incredible crowd, amazing venue.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+      venue-quality: 5
+    aspect_tags:
+      - atmosphere:electric-energy
+      - music:excellent-dj
+      - venue-quality:great-dance-floor
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-020
+    email: quinn@example.com
+    overall_sentiment: amazing
+    comment: |
+      Best social of the season! The international crowd was welcoming and the
+      music kept building perfectly all night.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - music:excellent-dj
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-020
+    email: s04@example.com
+    overall_sentiment: great
+    comment: |
+      Fantastic event. Venue was huge and well-managed despite the big crowd.
+    aspect_scores:
+      venue-quality: 4
+      atmosphere: 4
+    aspect_tags:
+      - venue-quality:great-layout
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-020
+    email: s05@example.com
+    overall_sentiment: great
+    comment: |
+      Really enjoyed Marrakech. The late-night energy was just perfect.
+    aspect_scores:
+      atmosphere: 4
+      music: 4
+    aspect_tags:
+      - atmosphere:good-energy
+    comment_status: approved
+    status: approved
+
+  # Reviews on evt-ux-024 (Barcelona Spring Festival)
+  - event_id: evt-ux-024
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: |
+      Spring festival at its finest! The energy builds perfectly throughout the
+      weekend and the community feel is unmatched.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+      venue-quality: 5
+    aspect_tags:
+      - atmosphere:electric-energy
+      - music:excellent-dj
+      - venue-quality:great-dance-floor
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-024
+    email: emma@example.com
+    overall_sentiment: amazing
+    comment: |
+      Every year Barcelona delivers! This year's lineup was exceptional and the
+      crowd brought amazing energy. Can't wait for next year!
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+    aspect_tags:
+      - music:excellent-dj
+      - atmosphere:friendly-crowd
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-024
+    email: frank@example.com
+    overall_sentiment: great
+    comment: |
+      Solid festival with great organization and diverse programming.
+    aspect_scores:
+      music: 4
+      atmosphere: 4
+    aspect_tags:
+      - music:good-playlist
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-024
+    email: gina@example.com
+    overall_sentiment: great
+    comment: |
+      Barcelona Spring Festival delivered on all fronts. Great venue, great music,
+      great people!
+    aspect_scores:
+      atmosphere: 4
+      music: 4
+      venue-quality: 4
+    aspect_tags:
+      - venue-quality:great-venue
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-024
+    email: hugo@example.com
+    overall_sentiment: amazing
+    comment: |
+      This festival just keeps getting better. The community aspect is what makes
+      it special. Looking forward to next year already!
+    aspect_scores:
+      atmosphere: 5
+      music: 4
+    aspect_tags:
+      - atmosphere:welcoming-vibe
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-024
+    email: s03@example.com
+    overall_sentiment: great
+    comment: |
+      Great festival experience. Good mix of workshops and socials throughout
+      the weekend.
+    aspect_scores:
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:good-energy
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-024
+    email: s04@example.com
+    overall_sentiment: great
+    comment: |
+      Solid festival with good vibes and quality programming.
+    aspect_scores:
+      music: 4
+      atmosphere: 4
+    aspect_tags:
+      - music:good-playlist
+    comment_status: approved
+    status: approved
+
+  - event_id: evt-ux-024
+    email: s05@example.com
+    overall_sentiment: great
+    comment: |
+      Really enjoyed my first Barcelona festival. Definitely coming back next year!
+    aspect_scores:
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:welcoming-vibe
+    comment_status: approved
+    status: approved
+
 # ── Pre-seeded messages / Boards ───────────────────────────────────────────
 # Live discussion boards on key upcoming events showing real coordination,
 # questions, and social engagement (inspired by event-messages scenario).

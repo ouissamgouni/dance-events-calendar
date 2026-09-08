@@ -87,3 +87,147 @@ messages:
     event_id: evt-ux-011
     email: nia@example.com
     body: "Room for one more? I'm in for the whole weekend."
+
+  # ── evt-ux-004 messages (Lisbon Workshop) ──────────────────────────
+  - key: msg-ux-004-technique
+    event_id: evt-ux-004
+    email: frank@example.com
+    category: question
+    body: "Is this workshop good for someone refining their timing? Looking to work on musical precision."
+    is_hidden: false
+
+  - reply_to: msg-ux-004-technique
+    event_id: evt-ux-004
+    email: gina@example.com
+    body: "Absolutely! The instructors are super focused on timing and connection. Perfect fit for what you want."
+
+  - reply_to: msg-ux-004-technique
+    event_id: evt-ux-004
+    email: hugo@example.com
+    body: "This is my third time — highly recommend. The pace is manageable and they break everything down."
+
+  # ── evt-ux-012 messages (Barcelona Practice) ────────────────────────
+  - key: msg-ux-012-practice
+    event_id: evt-ux-012
+    email: alice@example.com
+    category: question
+    body: "How crowded does this usually get? Looking for more partner rotation time."
+    is_hidden: false
+
+  - reply_to: msg-ux-012-practice
+    event_id: evt-ux-012
+    email: frank@example.com
+    body: "Pretty intimate group — usually 15-20 people. Lots of rotation time, much less crowded than the Friday social."
+
+  - reply_to: msg-ux-012-practice
+    event_id: evt-ux-012
+    email: pablo@example.com
+    body: "It's perfect for practicing without feeling rushed. Great vibe."
+
+  # ── evt-ux-013 messages (Zurich Bachata) ───────────────────────────
+  - key: msg-ux-013-music
+    event_id: evt-ux-013
+    email: alice@example.com
+    category: question
+    body: "What's the typical DJ vibe here? Looking for sensual bachata, not reggaeton-heavy."
+    is_hidden: false
+
+  - reply_to: msg-ux-013-music
+    event_id: evt-ux-013
+    email: emma@example.com
+    body: "You'll love it! The DJs play classic bachata sensual for the first half, then mix it up later. Very classy."
+
+  - reply_to: msg-ux-013-music
+    event_id: evt-ux-013
+    email: gina@example.com
+    body: "One of the best music selections I've heard in a while. High-quality playlist."
+
+  - key: msg-ux-013-venue
+    event_id: evt-ux-013
+    email: rita@example.com
+    category: question
+    body: "Is the venue easy to find? I'm new to the area."
+    is_hidden: false
+
+  - reply_to: msg-ux-013-venue
+    event_id: evt-ux-013
+    email: samir@example.com
+    body: "Right on Langstrasse, very central. Lots of signs and the organizers are usually at the door."
+
+  # ── evt-ux-020 messages (Marrakech Big Social) ──────────────────────
+  - key: msg-ux-020-crowd
+    event_id: evt-ux-020
+    email: pablo@example.com
+    category: question
+    body: "How's the crowd energy at this one? Is it a fun tourist vibe or more local?"
+    is_hidden: false
+
+  - reply_to: msg-ux-020-crowd
+    event_id: evt-ux-020
+    email: quinn@example.com
+    body: "Amazing mix of both! Lots of international visitors but also strong local community. Very welcoming."
+
+  - reply_to: msg-ux-020-crowd
+    event_id: evt-ux-020
+    email: s04@example.com
+    body: "The energy is incredible. Stays lively all night long. Definitely worth making the trip."
+
+  - key: msg-ux-020-logistics
+    event_id: evt-ux-020
+    email: s05@example.com
+    category: logistics
+    body: "For anyone flying in: Airport is about 20 min away. The venue is in the heart of Gueliz district."
+    is_hidden: false
+
+  # ── evt-ux-022 messages (Porto Intensive) ───────────────────────────
+  - key: msg-ux-022-prep
+    event_id: evt-ux-022
+    email: alice@example.com
+    category: question
+    body: "What's the recommended level? Is this beginner-friendly or more advanced?"
+    is_hidden: false
+
+  - reply_to: msg-ux-022-prep
+    event_id: evt-ux-022
+    email: frank@example.com
+    body: "Listed as intermediate but they have modifications for all levels. The instructors are super accommodating."
+
+  - reply_to: msg-ux-022-prep
+    event_id: evt-ux-022
+    email: gina@example.com
+    body: "I'm solidly intermediate and loved it. Felt challenged but not overwhelmed."
+
+  - reply_to: msg-ux-022-prep
+    event_id: evt-ux-022
+    email: hugo@example.com
+    body: "The workshop blocks are long but well-paced. Bring water and good shoes!"
+
+  # ── evt-ux-024 messages (Barcelona Spring Festival) ─────────────────
+  - key: msg-ux-024-festival
+    event_id: evt-ux-024
+    email: alice@example.com
+    category: question
+    body: "Is this a multi-day festival or just one big social?"
+    is_hidden: false
+
+  - reply_to: msg-ux-024-festival
+    event_id: evt-ux-024
+    email: emma@example.com
+    body: "It's a whole weekend! Friday pre-party, Saturday workshops, Sunday social. Tons of energy."
+
+  - reply_to: msg-ux-024-festival
+    event_id: evt-ux-024
+    email: frank@example.com
+    body: "Definitely book your hotel now. This one fills up quick and the community is amazing."
+
+  - key: msg-ux-024-travel
+    event_id: evt-ux-024
+    email: gina@example.com
+    category: accommodation
+    body: "Anyone looking to split accommodations or make a travel group? Would love to connect with fellow dancers!"
+    is_hidden: false
+
+  - reply_to: msg-ux-024-travel
+    event_id: evt-ux-024
+    email: hugo@example.com
+    body: "Count me in! I'm flying in Friday morning."

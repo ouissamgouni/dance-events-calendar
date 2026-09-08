@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
 import EventSummary, { type EventDetailTab } from './EventSummary';
+import EventActions from './event-summary/EventActions';
 
 interface Props {
     event: CalendarEvent;
@@ -43,6 +44,7 @@ export default function EventDetailsPanel({
 
     const detailPath = `/event/${event.event_id}${source ? `?src=${source}` : ''}`;
     const shareUrl = `${window.location.origin}/event/${event.event_id}`;
+    const isPast = new Date(event.end).getTime() < Date.now();
 
     const goToTab = (tab: EventDetailTab, opts?: { anchor?: string }) => {
         const params = new URLSearchParams();
@@ -111,16 +113,26 @@ export default function EventDetailsPanel({
                     shareUrl={shareUrl}
                     onOpenTab={goToTab}
                     onPostMessage={() => goToTab('discussion')}
+                    showActions={false}
                 />
             </div>
-            <div className="border-t border-card-line px-4 py-3">
-                <Link
-                    to={detailPath}
-                    onClick={() => onClose?.()}
-                    className="text-xs font-medium text-action hover:underline"
-                >
-                    See full details →
-                </Link>
+            <div className="border-t border-card-line bg-surface px-4 py-3 space-y-2">
+                <div className="flex justify-end">
+                    <Link
+                        to={detailPath}
+                        onClick={() => onClose?.()}
+                        className="text-xs font-medium text-action hover:underline"
+                    >
+                        See full details →
+                    </Link>
+                </div>
+                <EventActions
+                    event={event}
+                    isPast={isPast}
+                    canReviewInline={isPast}
+                    shareUrl={shareUrl}
+                    onPostMessage={() => goToTab('discussion')}
+                />
             </div>
         </div>
     );

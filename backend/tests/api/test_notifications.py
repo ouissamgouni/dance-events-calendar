@@ -294,6 +294,8 @@ def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(
     _subscribe(session, bob, alice)
 
     _login(client, "alice@example.com")
+    start = (datetime.utcnow() + timedelta(days=1)).replace(microsecond=0)
+    end = start + timedelta(hours=3)
     r = client.post(
         "/api/suggestions",
         json={
@@ -301,8 +303,8 @@ def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(
             "location": "Berlin Center",
             "latitude": 52.52,
             "longitude": 13.405,
-            "start": "2026-09-01T20:00:00",
-            "end": "2026-09-01T23:00:00",
+            "start": start.isoformat(),
+            "end": end.isoformat(),
             "going": True,
             "going_audience": "friends",
         },

@@ -13,7 +13,7 @@ import SaveEventButton from '../components/SaveEventButton';
 import ShareButton from '../components/ShareButton';
 import EventSummary, { type EventDetailTab } from '../components/EventSummary';
 import EventDetailTabsBar from '../components/EventDetailTabsBar';
-import EventSectionHeader from '../components/EventSectionHeader';
+import SummaryHeader from '../components/event-summary/SummaryHeader';
 import EventActionDock from '../components/EventActionDock';
 import AboutTab from '../components/event-tabs/AboutTab';
 import LocationTab from '../components/event-tabs/LocationTab';
@@ -64,31 +64,17 @@ export default function EventDetailPage() {
     // to an in-tab anchor (e.g. `#series`/`#discounts`) once the tab renders.
     const initialTab = ((): EventDetailTab => {
         const t = searchParams.get('tab');
-        if (t === 'about' || t === 'location' || t === 'people' || t === 'reviews' || t === 'discussion') return t;
+        if (t === 'overview' || t === 'about' || t === 'location' || t === 'people' || t === 'reviews' || t === 'discussion') return t;
         if (location.hash === '#community') return 'reviews';
         if (location.hash === '#messages') return 'discussion';
-        return 'about';
+        return 'overview';
     })();
     const [activeTab, setActiveTab] = useState<EventDetailTab>(initialTab);
     const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
 
-    // The page has two modes: `overview` shows the full EventSummary plus the
-    // section entry-tabs; selecting a section switches to `section` mode, which
-    // hides the overview behind a compact header and shows only that section.
-    // Deep links (?tab=, #community/#messages, /review, /ask) open directly in
-    // section mode.
-    const deepLinkedToSection =
-        searchParams.get('tab') !== null
-        || location.hash === '#community'
-        || location.hash === '#messages'
-        || location.pathname.endsWith('/review')
-        || location.pathname.endsWith('/ask');
-    const [mode, setMode] = useState<'overview' | 'section'>(deepLinkedToSection ? 'section' : 'overview');
-
     const goToTab = (tab: EventDetailTab, opts?: { anchor?: string }) => {
         setActiveTab(tab);
         setPendingAnchor(opts?.anchor ?? null);
-        setMode('section');
     };
 
     // After a tab switch that requested an anchor, scroll to it once painted.
@@ -165,16 +151,14 @@ export default function EventDetailPage() {
     // once the event (and the section) has rendered.
     useEffect(() => {
         if (location.hash !== '#community' || !event) return;
-        setActiveTab((prev) => (prev === 'reviews' ? prev : 'reviews'));
-        setMode('section');
+        setActiveTab('reviews');
     }, [location.hash, event]);
 
     // Switch to the Discussion tab when arriving via a `#messages` link (e.g.
     // an event-message notification). Mirrors the `#community` handler above.
     useEffect(() => {
         if (location.hash !== '#messages' || !event) return;
-        setActiveTab((prev) => (prev === 'discussion' ? prev : 'discussion'));
-        setMode('section');
+        setActiveTab('discussion');
     }, [location.hash, event]);
 
     // Capture `?ref=share&src=` from the URL so any subsequent RSVP on
@@ -312,16 +296,13 @@ export default function EventDetailPage() {
 
             <div className="min-h-screen bg-canvas overflow-x-hidden">
                 <div className="mx-auto max-w-[480px] px-3 py-5 sm:py-8">
-                    {/* Back link — hidden in section mode, where the compact
-                        header carries its own back arrow (to the overview). */}
-                    {mode === 'overview' && (
-                        <button
-                            onClick={handleBack}
-                            className="text-sm text-action hover:underline mb-3 inline-flex items-center gap-1"
-                        >
-                            ← Back
-                        </button>
-                    )}
+                    {/* Back link to the previous view. */}
+                    <button
+                        onClick={handleBack}
+                        className="text-sm text-action hover:underline mb-3 inline-flex items-center gap-1"
+                    >
+                        ← Back
+                    </button>
                     {editMode && user?.is_admin ? (
                         <>
                             {/* Admin inline editing keeps the legacy detail editor. */}
@@ -372,12 +353,20 @@ export default function EventDetailPage() {
                         </>
                     ) : (
                         <>
-                            {mode === 'overview' ? (
-                                <>
-                                    {/* Overview — the shared summary (identical to the
-                                        modal's) followed by the section entry-tabs. The
-                                        persistent dock owns the actions, so the summary
-                                        hides its inline action row here. */}
+                            <SummaryHeader event={event} variant="page" />
+
+                            {/* Tabs pinned under the header; the active tab's
+                                content renders below. Overview is the shared
+                                summary body (the persistent dock owns actions). */}
+                            <div className="sticky top-0 z-20 -mx-3 mt-4">
+                                <EventDetailTabsBar
+                                    active={activeTab}
+                                    onSelect={(t) => goToTab(t)}
+                                />
+                            </div>
+
+                            <div className="mt-4">
+                                {activeTab === 'overview' && (
                                     <EventSummary
                                         event={event}
                                         variant="page"
@@ -385,64 +374,37 @@ export default function EventDetailPage() {
                                         onOpenTab={goToTab}
                                         onPostMessage={() => { setAskComposeToken((t) => t + 1); goToTab('discussion'); }}
                                         showActions={false}
+                                        omitHeader
                                     />
-
-                                    <div className="mt-4">
-                                        <EventDetailTabsBar
-                                            active={activeTab}
-                                            onSelect={(t) => goToTab(t)}
-                                            variant="entry"
+                                )}
+                                {activeTab === 'about' && <AboutTab event={event} />}
+                                {activeTab === 'location' && <LocationTab event={event} />}
+                                {activeTab === 'people' && <PeopleTab eventId={event.event_id} />}
+                                {activeTab === 'reviews' && (
+                                    showRatings ? (
+                                        <div id="community">
+                                            <ReviewsTab
+                                                eventId={event.event_id}
+                                                isPast={isPast}
+                                                onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)}
+                                                onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)}
+                                                refreshToken={reviewsRefreshToken}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-ink-soft">Reviews are not available for this event.</p>
+                                    )
+                                )}
+                                {activeTab === 'discussion' && (
+                                    <div id="messages">
+                                        <DiscussionTab
+                                            eventId={event.event_id}
+                                            isPast={isPast}
+                                            openComposeToken={askComposeToken}
                                         />
                                     </div>
-                                </>
-                            ) : (
-                                <>
-                                    {/* Section mode — the overview is replaced by a
-                                        compact sticky header + tab bar, and only the
-                                        selected section renders below. */}
-                                    <div className="sticky top-0 z-20 -mx-3">
-                                        <EventSectionHeader
-                                            event={event}
-                                            shareUrl={shareUrl}
-                                            onBack={() => setMode('overview')}
-                                        />
-                                        <EventDetailTabsBar
-                                            active={activeTab}
-                                            onSelect={(t) => goToTab(t)}
-                                        />
-                                    </div>
-
-                                    <div className="mt-4">
-                                        {activeTab === 'about' && <AboutTab event={event} />}
-                                        {activeTab === 'location' && <LocationTab event={event} />}
-                                        {activeTab === 'people' && <PeopleTab eventId={event.event_id} />}
-                                        {activeTab === 'reviews' && (
-                                            showRatings ? (
-                                                <div id="community">
-                                                    <ReviewsTab
-                                                        eventId={event.event_id}
-                                                        isPast={isPast}
-                                                        onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)}
-                                                        onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)}
-                                                        refreshToken={reviewsRefreshToken}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm text-ink-soft">Reviews are not available for this event.</p>
-                                            )
-                                        )}
-                                        {activeTab === 'discussion' && (
-                                            <div id="messages">
-                                                <DiscussionTab
-                                                    eventId={event.event_id}
-                                                    isPast={isPast}
-                                                    openComposeToken={askComposeToken}
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
-                            )}
+                                )}
+                            </div>
                         </>
                     )}
 

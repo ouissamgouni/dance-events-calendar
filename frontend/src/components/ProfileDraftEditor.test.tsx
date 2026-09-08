@@ -36,7 +36,7 @@ describe('ProfileDraftEditor', () => {
         expect(screen.getByLabelText('Profile name')).toHaveValue('Any style · Europe · International');
         await user.click(screen.getByRole('button', { name: /dance styles/i }));
         await user.click(screen.getByRole('button', { name: 'Salsa' }));
-        await user.click(screen.getByRole('button', { name: /profile summary/i }));
+        await user.click(screen.getByRole('button', { name: /back/i }));
         expect(screen.getByLabelText('Profile name')).toHaveValue('Salsa · Europe · International');
 
         await user.click(screen.getByRole('button', { name: 'Create profile' }));

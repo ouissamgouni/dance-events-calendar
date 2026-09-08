@@ -1,5 +1,7 @@
 import type { CalendarEvent } from '../../types';
 import { currencySymbol } from '../../utils/currency';
+import { useFeatureFlags } from '../../context/FeatureFlagsContext';
+import { isPriceSectionVisible } from '../../utils/sectionVisibility';
 import TagBadges from '../TagBadges';
 import ExpandableDescription from '../ExpandableDescription';
 import EventSeriesLink from '../EventSeriesLink';
@@ -22,7 +24,8 @@ function priceRange(event: CalendarEvent): string | null {
 
 /** Details tab: description, tags, series, links, price & promo codes. */
 export default function AboutTab({ event }: Props) {
-    const price = priceRange(event);
+    const { showPrices } = useFeatureFlags();
+    const price = isPriceSectionVisible(event, showPrices) ? priceRange(event) : null;
     return (
         <div className="space-y-6">
             {event.description && (
@@ -49,6 +52,11 @@ export default function AboutTab({ event }: Props) {
                         <p className="text-lg font-bold text-ink">{price}</p>
                         <p className="text-xs text-muted">Typical admission price</p>
                     </div>
+                    <EventPromoCodes event={event} variant="rows" />
+                </section>
+            ) : event.has_active_promo_codes ? (
+                <section id="discounts" className="scroll-mt-24 space-y-3">
+                    <h3 className="text-sm font-semibold text-ink">Promo codes</h3>
                     <EventPromoCodes event={event} variant="rows" />
                 </section>
             ) : (

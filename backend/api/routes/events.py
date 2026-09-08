@@ -1269,6 +1269,26 @@ def get_event(
                     is_verified_organizer=u.is_verified_organizer,
                 )
 
+    promo_eligible = (
+        event.show_promo_override
+        if event.show_promo_override is not None
+        else _promo_codes_enabled(session)
+    )
+    has_active_promo_codes = False
+    if promo_eligible:
+        has_active_promo_codes = (
+            session.exec(
+                select(EventPromoCode.event_id)
+                .where(EventPromoCode.event_id == event_id)
+                .where(EventPromoCode.status == "approved")
+                .where(
+                    (EventPromoCode.expires_at.is_(None))
+                    | (EventPromoCode.expires_at > datetime.utcnow())
+                )
+            ).first()
+            is not None
+        )
+
     data = EventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
@@ -1296,6 +1316,7 @@ def get_event(
         organizer=organizer_mini,
         show_price_override=event.show_price_override,
         show_promo_override=event.show_promo_override,
+        has_active_promo_codes=has_active_promo_codes,
     )
     response = JSONResponse(content=data.model_dump(mode="json"))
     response.headers["Cache-Control"] = "public, max-age=60"

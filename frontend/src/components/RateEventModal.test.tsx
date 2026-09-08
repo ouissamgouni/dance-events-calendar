@@ -38,12 +38,14 @@ describe('RateEventModal', () => {
         )
 
         const { user } = renderWithProviders(
-            <RateEventModal
-                eventId="evt-1"
-                initialRating={null}
-                onClose={() => { }}
-                onSubmitted={() => { }}
-            />,
+            <FeatureFlagsProvider>
+                <RateEventModal
+                    eventId="evt-1"
+                    initialRating={null}
+                    onClose={() => { }}
+                    onSubmitted={() => { }}
+                />
+            </FeatureFlagsProvider>,
         )
 
         await user.click(screen.getByRole('radio', { name: /Amazing/i }))
@@ -59,12 +61,14 @@ describe('RateEventModal', () => {
     it('requires a sentiment before continuing', async () => {
         server.use(http.get('*/api/tags', () => HttpResponse.json([])))
         const { user } = renderWithProviders(
-            <RateEventModal
-                eventId="evt-1"
-                initialRating={null}
-                onClose={() => { }}
-                onSubmitted={() => { }}
-            />,
+            <FeatureFlagsProvider>
+                <RateEventModal
+                    eventId="evt-1"
+                    initialRating={null}
+                    onClose={() => { }}
+                    onSubmitted={() => { }}
+                />
+            </FeatureFlagsProvider>,
         )
 
         // Continue is disabled until a sentiment is chosen.
@@ -98,12 +102,14 @@ describe('RateEventModal', () => {
         )
 
         const { user } = renderWithProviders(
-            <RateEventModal
-                eventId="evt-1"
-                initialRating={null}
-                onClose={() => { }}
-                onSubmitted={() => { }}
-            />,
+            <FeatureFlagsProvider>
+                <RateEventModal
+                    eventId="evt-1"
+                    initialRating={null}
+                    onClose={() => { }}
+                    onSubmitted={() => { }}
+                />
+            </FeatureFlagsProvider>,
         )
 
         await user.click(screen.getByRole('radio', { name: /Amazing/i }))
@@ -146,12 +152,14 @@ describe('RateEventModal', () => {
         )
 
         const { user } = renderWithProviders(
-            <RateEventModal
-                eventId="evt-1"
-                initialRating={null}
-                onClose={() => { }}
-                onSubmitted={() => { }}
-            />,
+            <FeatureFlagsProvider>
+                <RateEventModal
+                    eventId="evt-1"
+                    initialRating={null}
+                    onClose={() => { }}
+                    onSubmitted={() => { }}
+                />
+            </FeatureFlagsProvider>,
         )
 
         await user.click(screen.getByRole('radio', { name: /Amazing/i }))
@@ -197,7 +205,9 @@ describe('RateEventModal', () => {
         )
 
         const { user } = renderWithProviders(
-            <RateEventModal eventId="evt-1" initialRating={null} onClose={() => { }} onSubmitted={() => { }} />,
+            <FeatureFlagsProvider>
+                <RateEventModal eventId="evt-1" initialRating={null} onClose={() => { }} onSubmitted={() => { }} />
+            </FeatureFlagsProvider>,
         )
 
         await user.click(screen.getByRole('radio', { name: /Amazing/i }))

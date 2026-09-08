@@ -102,6 +102,9 @@ function event(eventId: string, located: boolean, start = '2026-09-05T20:00:00Z'
 
 describe('MyEventsExperience view modes', () => {
     beforeEach(() => {
+        // Freeze "now" before the fixture dates so the mapped/outside events stay
+        // in the upcoming tab (restoreMocks resets the spy between tests).
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-01T00:00:00Z'));
         vi.stubGlobal('scrollTo', vi.fn());
         vi.mocked(fetchEventsByIds).mockResolvedValue([
             event('mapped', true),

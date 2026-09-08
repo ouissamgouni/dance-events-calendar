@@ -26,11 +26,13 @@ export default function ReviewOverviewCard({ aggregate, crossEdition, onOpen }: 
         : 'Early feedback';
 
     return (
-        <button
-            type="button"
-            onClick={onOpen}
-            className="flex w-full items-start gap-3 rounded-md border-l-4 border-l-success bg-green-50/50 px-3 py-2.5 text-left transition hover:bg-green-50"
-        >
+        <div className="space-y-2 pt-1">
+            <div className="text-sm font-semibold leading-5 text-[#526078]">Past attendee feedback</div>
+            <button
+                type="button"
+                onClick={onOpen}
+                className="flex w-full items-start gap-3 rounded-md border-l-4 border-l-success bg-green-50/50 px-3 py-2.5 text-left transition hover:bg-green-50"
+            >
             <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex items-center gap-1.5">
                     <span className="text-sm font-bold text-ink">
@@ -58,6 +60,7 @@ export default function ReviewOverviewCard({ aggregate, crossEdition, onOpen }: 
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true">
                 <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clipRule="evenodd" />
             </svg>
-        </button>
+            </button>
+        </div>
     );
 }

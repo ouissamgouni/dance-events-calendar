@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Clock, MapPin } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import { currencySymbol } from '../utils/currency';
 import { fetchEventMessages } from '../api';
 import { useCommunityExperience } from '../hooks/useCommunityExperience';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { isPriceSectionVisible } from '../utils/sectionVisibility';
 import TagBadges from './TagBadges';
-import DateBlock from './event-summary/DateBlock';
+import { DiscountBadge } from './CardPriceBadges';
+import SummaryHeader from './event-summary/SummaryHeader';
 import PeopleProofRow from './event-summary/PeopleProofRow';
 import ReviewOverviewCard from './event-summary/ReviewOverviewCard';
 import LinksRow from './event-summary/LinksRow';
@@ -14,7 +16,7 @@ import SeriesRow from './event-summary/SeriesRow';
 import EventActions from './event-summary/EventActions';
 
 /** Detail tabs the summary can deep-link into. */
-export type EventDetailTab = 'about' | 'location' | 'people' | 'reviews' | 'discussion';
+export type EventDetailTab = 'overview' | 'about' | 'location' | 'people' | 'reviews' | 'discussion';
 
 interface Props {
     event: CalendarEvent;
@@ -33,6 +35,9 @@ interface Props {
     /** Render the trailing inline action row. The full page hides it (a
      * persistent dock owns the actions); the modal keeps it. Defaults to true. */
     showActions?: boolean;
+    /** Omit the identity header (image + date/title/time/location). The full
+     * page renders that header above the tabs itself. Defaults to false. */
+    omitHeader?: boolean;
 }
 
 function priceCompact(event: CalendarEvent): string | null {
@@ -64,10 +69,11 @@ export default function EventSummary({
     onPostMessage,
     onSuggestEdit,
     showActions = true,
+    omitHeader = false,
 }: Props) {
-    const start = new Date(event.start);
     const end = new Date(event.end);
     const isPast = end.getTime() < Date.now();
+    const { showPrices } = useFeatureFlags();
     const { series, crossEdition, aggregate } = useCommunityExperience(event.event_id, isPast);
     const [postsCount, setPostsCount] = useState(0);
 
@@ -79,63 +85,24 @@ export default function EventSummary({
         return () => { cancelled = true; };
     }, [event.event_id]);
 
-    const timeFmt = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-    const dayFmt = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    const sameDay = start.toDateString() === end.toDateString();
-    const timeLine = event.all_day
-        ? (sameDay ? 'All day' : `${dayFmt(start)} – ${dayFmt(end)}`)
-        : `${timeFmt(start)} → ${sameDay ? '' : `${dayFmt(end)} · `}${timeFmt(end)}`;
-
-    const locationText = variant === 'modal'
-        ? [event.city, event.country].filter(Boolean).join(', ') || event.location
-        : event.location;
-    const price = priceCompact(event);
+    const priceVisible = isPriceSectionVisible(event, showPrices);
+    const price = priceVisible ? priceCompact(event) : null;
+    const hasPromo = event.has_active_promo_codes;
 
     return (
-        <div className="space-y-3">
-            {/* Optional image — omitted entirely when absent */}
-            {event.image_url && (
-                <img
-                    src={event.image_url}
-                    alt=""
-                    className="h-[140px] w-full object-cover"
-                />
-            )}
+        <div className="space-y-5">
+            {!omitHeader && <SummaryHeader event={event} variant={variant} />}
 
-            {/* Event identity */}
-            <div className="flex gap-3">
-                <DateBlock date={start} />
-                <div className="min-w-0 flex-1 space-y-1">
-                    <h2 className="text-xl font-bold leading-snug text-ink">{event.title}</h2>
-                    <p className="flex items-center gap-1.5 text-xs text-ink-soft">
-                        <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                        <span className="min-w-0 truncate">{timeLine}</span>
-                    </p>
-                    <div className="flex items-start justify-between gap-2 text-xs text-ink-soft">
-                        {locationText && (
-                            <span className="inline-flex min-w-0 items-center gap-1.5">
-                                <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                <span className="min-w-0 truncate">{locationText}</span>
-                            </span>
-                        )}
-                        <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
-                            {price && <span className="font-semibold text-ink">{price}</span>}
-                            {event.has_active_promo_codes && (
-                                <button
-                                    type="button"
-                                    onClick={() => onOpenTab('about', { anchor: 'discounts' })}
-                                    className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-action transition hover:bg-blue-100"
-                                >
-                                    Promo codes
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Tags — single line, neutral grey, never wraps */}
-            <TagBadges tags={event.tags} maxVisible={6} forceBadge neutral size="sm" singleLine />
+            {/* Tags — single line, neutral grey; overflow collapses to a
+                clickable "+x" that opens the About tag list. */}
+            <TagBadges
+                tags={event.tags}
+                forceBadge
+                neutral
+                size="sm"
+                fitWidth
+                onOverflowClick={() => onOpenTab('about')}
+            />
 
             {/* People / social proof */}
             <PeopleProofRow
@@ -150,6 +117,22 @@ export default function EventSummary({
                 crossEdition={crossEdition}
                 onOpen={() => onOpenTab('reviews')}
             />
+
+            {/* Price + discount — one line under the review section */}
+            {(price || hasPromo) && (
+                <div className="flex items-center gap-2 text-sm">
+                    {price && <span className="font-semibold text-ink">{price}</span>}
+                    {hasPromo && (
+                        <button
+                            type="button"
+                            onClick={() => onOpenTab('about', { anchor: 'discounts' })}
+                            aria-label="View discounts"
+                        >
+                            <DiscountBadge />
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Series */}
             {series && (

@@ -241,7 +241,7 @@ describe('PassportPage', () => {
         expect(screen.getByRole('button', { name: '2 countries' })).toHaveAttribute('aria-pressed', 'false')
         expect(screen.getByRole('button', { name: 'Paris, France 6 events' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Berlin, Germany 1 event' })).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: /^All/ })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'All 7 events' })).toBeInTheDocument()
 
         fireEvent.click(screen.getByRole('button', { name: 'Paris, France 6 events' }))
         expect(screen.getByText('Paris Social')).toBeInTheDocument()

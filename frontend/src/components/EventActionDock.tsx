@@ -74,7 +74,7 @@ export default function EventActionDock({
                     eventId={event.event_id}
                     title={event.title}
                     url={shareUrl}
-                    className="inline-flex shrink-0 items-center rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-ink transition hover:bg-canvas"
+                    className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas"
                 />
                 <div ref={menuRef} className="relative ml-auto">
                     <button

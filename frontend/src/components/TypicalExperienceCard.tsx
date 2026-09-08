@@ -23,6 +23,7 @@ export default function TypicalExperienceCard({ series }: Props) {
             label="Typical experience"
             displayState={series.display_state}
             emoji={aspectMood(series.average_mood).emoji}
+            mood={aspectMood(series.average_mood).value}
             moodLabel={series.mood_label}
             usually
             positivePercentage={series.positive_percentage ?? 0}
