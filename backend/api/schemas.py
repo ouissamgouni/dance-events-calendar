@@ -1152,6 +1152,7 @@ class GeocodeSuggestion(BaseModel):
     country: Optional[str] = None
     region: Optional[str] = None
     place_kind: Literal[
+        "continent",
         "country",
         "region",
         "county",
@@ -2356,6 +2357,13 @@ class AdminUser(BaseModel):
     # Admin override: bypasses InstallPrompt's 24h push opt-in dismiss
     # snooze for this user (see force_enable_push_prompt on the User model).
     force_enable_push_prompt: bool = False
+    # Onboarding status surfaced in the Admin Users tab. ``onboarded_at``
+    # is null until the user completes/skips the wizard; ``needs_onboarding``
+    # is computed the same way as ``/auth/me`` (never onboarded OR stored
+    # version below the current server version).
+    onboarded_at: Optional[datetime] = None
+    onboarding_version: int = 0
+    needs_onboarding: bool = False
     deleted_at: Optional[datetime] = None
     created_at: datetime
     # Most recent visit timestamp + the raw ``User-Agent`` header captured

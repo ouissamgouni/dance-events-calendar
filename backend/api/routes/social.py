@@ -238,6 +238,12 @@ def _to_admin_user(session: Session, user: User) -> AdminUser:
         force_install_prompt=bool(user.force_install_prompt),
         installed_at=user.installed_at,
         force_enable_push_prompt=bool(user.force_enable_push_prompt),
+        onboarded_at=user.onboarded_at,
+        onboarding_version=user.onboarding_version or 0,
+        needs_onboarding=(
+            user.onboarded_at is None
+            or (user.onboarding_version or 0) < get_current_onboarding_version()
+        ),
         deleted_at=user.deleted_at,
         created_at=user.created_at,
         last_visit_at=user.last_visit_at,
@@ -2909,6 +2915,31 @@ def admin_set_force_enable_push_prompt_by_id(
     """
     user = _resolve_admin_user_id(session, user_id)
     _set_force_enable_push_prompt(session, user, payload.force_enable_push_prompt)
+    return _to_admin_user(session, user)
+
+
+# --- Admin: reset onboarding (force re-trigger) -----------------------------
+
+
+@router.patch("/admin/users/id/{user_id}/reset-onboarding", response_model=AdminUser)
+def admin_reset_onboarding_by_id(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin-only: force a user back through the onboarding wizard.
+
+    Clears ``onboarded_at`` so ``needs_onboarding`` becomes true on their
+    next ``/auth/me``. Non-destructive: the user's saved preferences,
+    interest profiles, and follows are untouched — the wizard re-opens
+    pre-filled from them (``OnboardingFlow`` loads the active interest
+    profile) and updates rather than replaces on completion.
+    """
+    user = _resolve_admin_user_id(session, user_id)
+    user.onboarded_at = None
+    session.add(user)
+    session.commit()
+    session.refresh(user)
     return _to_admin_user(session, user)
 
 

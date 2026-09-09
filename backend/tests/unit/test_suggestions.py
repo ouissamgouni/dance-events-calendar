@@ -722,7 +722,19 @@ class TestPublicGeocodeEndpoint:
                 "boundingbox": ["41.263", "51.269", "-5.453", "9.868"],
                 "address": {"country": "France"},
             }
-            mock_geocoder.geocode.return_value = [paris, france]
+            europe = MagicMock()
+            europe.address = "Europe"
+            europe.latitude = 51.0
+            europe.longitude = 10.0
+            europe.raw = {
+                "name": "Europe",
+                "class": "place",
+                "type": "continent",
+                "addresstype": "continent",
+                "boundingbox": ["34.5", "81.9", "-31.3", "69.1"],
+                "address": {},
+            }
+            mock_geocoder.geocode.return_value = [paris, france, europe]
 
             response = TestClient(app).get("/api/suggestions/geocode?q=france")
 
@@ -736,6 +748,9 @@ class TestPublicGeocodeEndpoint:
             assert data[1]["name"] == "France"
             assert data[1]["context"] is None
             assert data[1]["place_kind"] == "country"
+            assert data[2]["name"] == "Europe"
+            assert data[2]["place_kind"] == "continent"
+            assert data[2]["type_label"] == "Continent"
 
     def test_suggestion_geocode_forwards_language_preference(self):
         """Public /api/suggestions/geocode should forward Accept-Language header to Nominatim."""

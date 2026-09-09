@@ -433,7 +433,7 @@ body {
 }
 
 .filter-sheet-panel {
-  height: min(75dvh, calc(100dvh - 2.75rem));
+  height: min(90dvh, calc(100dvh - 2.75rem));
   padding-bottom: env(safe-area-inset-bottom);
 }
 

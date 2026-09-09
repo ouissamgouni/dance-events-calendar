@@ -10,6 +10,7 @@ from geopy.geocoders import Nominatim
 logger = logging.getLogger(__name__)
 
 _PLACE_KIND_LABELS = {
+    "continent": "Continent",
     "country": "Country",
     "region": "Region",
     "county": "County",
@@ -23,6 +24,7 @@ _PLACE_KIND_LABELS = {
 }
 
 _PLACE_KIND_BY_TYPE = {
+    "continent": "continent",
     "country": "country",
     "state": "region",
     "region": "region",

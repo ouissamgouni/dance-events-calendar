@@ -33,7 +33,7 @@ export interface RadiusSearchArea extends SearchAreaBase {
 
 export type SearchArea = BboxSearchArea | RadiusSearchArea;
 
-const LARGE_GEOGRAPHY_KINDS = new Set(['country', 'region', 'county']);
+const LARGE_GEOGRAPHY_KINDS = new Set(['continent', 'country', 'region', 'county']);
 
 export function radiusAreaLabel(placeName: string, radiusKm: number): string {
     return `${placeName} · ${radiusKm} km`;

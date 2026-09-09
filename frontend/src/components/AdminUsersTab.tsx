@@ -8,6 +8,7 @@ import {
     adminSetAdminManaged,
     adminSetForceInstallPrompt,
     adminSetForceEnablePush,
+    adminResetOnboarding,
     adminSendInstallEmail,
     adminMergeUsers,
 } from '../api';
@@ -140,6 +141,19 @@ export default function AdminUsersTab() {
         setBusyUserId(row.user_id);
         try {
             await adminSetForceEnablePush(row.user_id, !row.force_enable_push_prompt);
+            await load();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to update');
+        } finally {
+            setBusyUserId(null);
+        }
+    };
+
+    const onResetOnboarding = async (row: AdminUserRow) => {
+        setBusyUserId(row.user_id);
+        try {
+            await adminResetOnboarding(row.user_id);
+            setNotice(`${row.handle ? '@' + row.handle : row.email} will see onboarding again on next visit`);
             await load();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to update');
@@ -360,6 +374,7 @@ export default function AdminUsersTab() {
                             <th className="px-3 py-2">Digest</th>
                             {sortableTh('has_push_subscription', 'Push')}
                             {sortableTh('installed_at', 'Installed app')}
+                            <th className="px-3 py-2">Onboarding</th>
                             <th className="px-3 py-2">Created</th>
                             <th className="px-3 py-2">Status</th>
                             <th className="px-3 py-2">Actions</th>
@@ -491,6 +506,31 @@ export default function AdminUsersTab() {
                                                     Send install email
                                                 </button>
                                             )}
+                                        </div>
+                                    </td>
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                        <div className="flex items-center gap-2">
+                                            {row.needs_onboarding ? (
+                                                <span className="text-ink-soft" title="Will be sent through onboarding on next visit">
+                                                    {row.onboarded_at ? 'Pending (v↑)' : 'Never'}
+                                                </span>
+                                            ) : (
+                                                <span
+                                                    className="text-success"
+                                                    title={`Onboarded ${fmtDate(row.onboarded_at)} (v${row.onboarding_version})`}
+                                                >
+                                                    ✓ Done
+                                                </span>
+                                            )}
+                                            <button
+                                                type="button"
+                                                disabled={isDeleted || busyUserId === row.user_id || row.needs_onboarding}
+                                                onClick={() => onResetOnboarding(row)}
+                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                title="Force this user back through the onboarding wizard on their next visit. Non-destructive: their saved preferences and follows are kept and the wizard re-opens pre-filled."
+                                            >
+                                                Retrigger
+                                            </button>
                                         </div>
                                     </td>
                                     <td className="px-3 py-2 text-ink-soft whitespace-nowrap">

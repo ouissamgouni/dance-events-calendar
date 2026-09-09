@@ -2005,6 +2005,12 @@ export interface AdminUserRow {
     force_install_prompt: boolean;
     installed_at: string | null;
     force_enable_push_prompt: boolean;
+    // Onboarding status. ``onboarded_at`` is null until the wizard is
+    // completed/skipped; ``needs_onboarding`` mirrors the /auth/me flag
+    // (never onboarded OR stored version below the current server version).
+    onboarded_at: string | null;
+    onboarding_version: number;
+    needs_onboarding: boolean;
     deleted_at: string | null;
     created_at: string;
     // Most recent visit timestamp + the raw ``User-Agent`` header captured
@@ -2190,6 +2196,17 @@ export async function adminSetForceEnablePush(
         },
     );
     return parseJsonResponse<AdminUserRow>(res, 'Failed to update force-enable-push flag');
+}
+
+export async function adminResetOnboarding(userId: string): Promise<AdminUserRow> {
+    const res = await fetch(
+        `${BASE}/social/admin/users/id/${encodeURIComponent(userId)}/reset-onboarding`,
+        {
+            method: 'PATCH',
+            credentials: 'include',
+        },
+    );
+    return parseJsonResponse<AdminUserRow>(res, 'Failed to reset onboarding');
 }
 
 export async function adminSetAdminManaged(
@@ -2949,7 +2966,7 @@ export interface GeocodeSuggestion {
     context?: string | null;
     country?: string | null;
     region?: string | null;
-    place_kind?: 'country' | 'region' | 'county' | 'city' | 'town' | 'district' | 'locality' | 'address' | 'poi' | 'unknown';
+    place_kind?: 'continent' | 'country' | 'region' | 'county' | 'city' | 'town' | 'district' | 'locality' | 'address' | 'poi' | 'unknown';
     type_label?: string;
     bounding_box?: {
         min_lat: number;

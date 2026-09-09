@@ -79,6 +79,26 @@ describe('search area inference', () => {
         const area = searchAreaFromSuggestion({ ...baseSuggestion, place_kind: 'unknown' });
         expect(area.kind).toBe('radius');
     });
+
+    it('infers a continent as a bbox from its returned extent', () => {
+        const source = { min_lat: 34.5, min_lng: -31.3, max_lat: 81.9, max_lng: 69.1 };
+        const area = searchAreaFromSuggestion({
+            ...baseSuggestion,
+            display_name: 'Europe',
+            name: 'Europe',
+            latitude: 51,
+            longitude: 10,
+            country: null,
+            region: null,
+            place_kind: 'continent',
+            type_label: 'Continent',
+            bounding_box: source,
+        });
+        expect(area.kind).toBe('bbox');
+        expect(area.label).toBe('Europe');
+        expect(area.min_lat).toBeLessThanOrEqual(source.min_lat);
+        expect(area.max_lat).toBeGreaterThanOrEqual(source.max_lat);
+    });
 });
 
 describe('search area geometry', () => {

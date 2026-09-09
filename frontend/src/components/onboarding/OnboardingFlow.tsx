@@ -27,7 +27,6 @@ type InternationalView = 'presets' | 'editor';
 type HomeView = 'choice' | 'editor';
 
 const STEPS: Step[] = ['dances', 'international', 'home', 'review'];
-const PRIMARY_DANCE_SLUGS = ['salsa', 'bachata', 'kizomba', 'zouk', 'mambo-on2', 'cha-cha', 'semba', 'rueda', 'son'];
 const LATIN_AMERICA: PreferredAreaPayload = { label: 'Latin America', min_lat: -56, min_lng: -118, max_lat: 33, max_lng: -34 };
 const CUSTOM_AREA: PreferredAreaPayload = { label: 'Custom', min_lat: -55, min_lng: -70, max_lat: 55, max_lng: 70 };
 const ONBOARDING_PRESETS: PreferredAreaPayload[] = [
@@ -256,8 +255,7 @@ function DanceStep({ loading, group, selectedIds, onChange }: { loading: boolean
     const [expanded, setExpanded] = useState(false);
     if (loading) return <p className="text-sm text-muted">Loading dance styles…</p>;
     if (!group) return <p className="text-sm text-ink-soft">No dance styles are available.</p>;
-    const primary = PRIMARY_DANCE_SLUGS.map((slug) => group.tags.find((tag) => tag.slug === slug)).filter((tag): tag is Tag => Boolean(tag));
-    const ordered = [...primary, ...group.tags.filter((tag) => !primary.some((item) => item.id === tag.id))];
+    const ordered = group.tags;
     const visible = expanded ? ordered : ordered.slice(0, 4);
     const hasMore = ordered.length > 4;
     return <div className="grid grid-cols-2 gap-3">{visible.map((tag) => <DanceButton key={tag.id} tag={tag} selected={selectedIds.includes(tag.id)} onToggle={() => onChange(toggleId(selectedIds, tag.id))} />)}{hasMore && !expanded && <button type="button" onClick={() => setExpanded(true)} className="min-h-12 border border-line bg-surface px-3 text-sm font-semibold text-action">+ More styles</button>}</div>;

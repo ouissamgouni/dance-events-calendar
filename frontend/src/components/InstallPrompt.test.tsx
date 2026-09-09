@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
+import { MemoryRouter } from 'react-router-dom'
 import InstallPrompt from './InstallPrompt'
 import { AuthProvider } from '../context/AuthContext'
 import { PwaInstallProvider } from '../context/PwaInstallContext'
@@ -25,11 +26,13 @@ const PUSH_SNOOZE_KEY = 'movida:push-optin-snooze-until'
 function renderPrompt(userOverrides: Parameters<typeof makeUser>[0] = {}) {
   server.use(http.get('*/api/auth/me', () => HttpResponse.json(makeUser(userOverrides))))
   return render(
-    <AuthProvider>
-      <PwaInstallProvider>
-        <InstallPrompt />
-      </PwaInstallProvider>
-    </AuthProvider>,
+    <MemoryRouter>
+      <AuthProvider>
+        <PwaInstallProvider>
+          <InstallPrompt />
+        </PwaInstallProvider>
+      </AuthProvider>
+    </MemoryRouter>,
   )
 }
 
@@ -157,6 +160,35 @@ describe('InstallPrompt', () => {
 
     expect(await screen.findByText(/install movida/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /not now/i })).not.toBeInTheDocument()
+  })
+
+  it('stays hidden on onboarding routes', async () => {
+    server.use(http.get('*/api/auth/me', () => HttpResponse.json(makeUser())))
+    render(
+      <MemoryRouter initialEntries={['/onboarding/preferences']}>
+        <AuthProvider>
+          <PwaInstallProvider>
+            <InstallPrompt />
+          </PwaInstallProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    await act(async () => {
+      window.dispatchEvent(new FakeBeforeInstallPromptEvent('accepted'))
+    })
+
+    expect(screen.queryByText(/install movida/i)).not.toBeInTheDocument()
+  })
+
+  it('stays hidden while the user still needs onboarding', async () => {
+    renderPrompt({ needs_onboarding: true, onboarded_at: null })
+
+    await act(async () => {
+      window.dispatchEvent(new FakeBeforeInstallPromptEvent('accepted'))
+    })
+
+    expect(screen.queryByText(/install movida/i)).not.toBeInTheDocument()
   })
 
   describe('push opt-in force override', () => {
