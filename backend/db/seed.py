@@ -159,7 +159,71 @@ class DatabaseSeeder:
         )
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
+        self._seed_event_images(scenario_dir)
         logger.info("Seeding complete")
+
+    def _seed_event_images(self, scenario_dir: Path):
+        """Push ``image:`` source files from a scenario into object storage.
+
+        Runs the same pipeline as an admin upload, so a scenario exercises the
+        real cropping code. Keys are deterministic and skipped when already
+        present, so restarts don't re-upload.
+        """
+        path = scenario_dir / "db-events.yaml"
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        entries = [
+            (e["id"], e["image"])
+            for e in data.get("events", []) or []
+            if e.get("image")
+        ]
+        if not entries:
+            return
+
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        from backend.services import event_images, object_storage
+
+        try:
+            client = object_storage.get_client()
+            object_storage.ensure_buckets(client)
+        except (
+            object_storage.ObjectStorageError,
+            BotoCoreError,
+            ClientError,
+        ) as exc:
+            logger.warning(
+                "Object storage unavailable (%s) — skipping event image seed", exc
+            )
+            return
+
+        for event_id, filename in entries:
+            event = self.session.get(CachedEvent, event_id)
+            if not event:
+                logger.warning("Image seed: unknown event %s", event_id)
+                continue
+
+            source = scenario_dir / "images" / filename
+            if not source.exists():
+                source = SCENARIOS_DIR / "default" / "images" / filename
+            if not source.exists():
+                logger.warning("Image seed: %s not found for %s", filename, event_id)
+                continue
+
+            key = f"events/{event_id}/seed"
+            if not object_storage.object_exists(f"{key}/thumb.webp", client=client):
+                event_images.store_event_image(
+                    event_id, source.read_bytes(), base_key=key, client=client
+                )
+                logger.info("Seeded image %s for %s", filename, event_id)
+
+            event.image_key = key
+            self.session.add(event)
+
+        self.session.commit()
 
     def _seed_tags(self, path: Path):
         """Seed tag groups and tags from scenario tags.yaml.

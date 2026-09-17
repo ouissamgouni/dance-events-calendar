@@ -265,6 +265,12 @@ export interface SiteSettings {
     /** When true, the explorer list renders the shared My Events card style.
      * Client default: false. */
     explorer_event_card_card_style_enabled?: boolean;
+    /** When true, event pictures are displayed across cards and detail views.
+     * Admins can always manage pictures regardless of this flag.
+     * Client default: false. */
+    event_images_enabled?: boolean;
+    /** What to render on a card when an event has no picture. */
+    event_card_placeholder_style?: 'gradient' | 'initial';
     /** Global notification / re-engagement gates (admin-configurable).
      * Each flag mirrors an env-var in ``backend/config/loader.py``; when
      * set here it overrides that default without requiring a redeploy. */
@@ -2954,6 +2960,40 @@ export async function updateEvent(
     });
     if (!res.ok) throw new Error('Failed to update event');
     return res.json();
+}
+
+// --- Event images (admin only) ---
+
+/** Upload a picture file for an event. The backend crops/encodes the variants. */
+export async function uploadEventImage(eventId: string, file: File): Promise<CalendarEvent> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/admin/events/${eventId}/image`, {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+    });
+    return parseJsonResponse<CalendarEvent>(res, 'Failed to upload image');
+}
+
+/** Import a picture for an event from a public https URL. */
+export async function setEventImageFromUrl(eventId: string, url: string): Promise<CalendarEvent> {
+    const res = await fetch(`${BASE}/admin/events/${eventId}/image/from-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<CalendarEvent>(res, 'Failed to import image');
+}
+
+/** Remove an event's picture and delete the stored objects. */
+export async function deleteEventImage(eventId: string): Promise<CalendarEvent> {
+    const res = await fetch(`${BASE}/admin/events/${eventId}/image`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    return parseJsonResponse<CalendarEvent>(res, 'Failed to remove image');
 }
 
 // --- Geocode Search ---

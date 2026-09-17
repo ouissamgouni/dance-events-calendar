@@ -94,6 +94,9 @@ export interface CalendarEvent {
     title: string;
     description: string | null;
     image_url?: string | null;
+    /** Cropped 16:9 variant, present only when the picture is managed by
+     * object storage. Cards should prefer this over ``image_url``. */
+    image_thumb_url?: string | null;
     location: string | null;
     city?: string | null;
     country?: string | null;

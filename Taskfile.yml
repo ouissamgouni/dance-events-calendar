@@ -51,6 +51,11 @@ includes:
     vars:
       ROOT_DIR: "{{.ROOT_DIR}}"
       BACKEND_DIR: "{{.BACKEND_DIR}}"
+  objects:
+    taskfile: .taskfiles/objects.yml
+    vars:
+      ROOT_DIR: "{{.ROOT_DIR}}"
+      SCENARIO_PORTS_SH: "{{.SCENARIO_PORTS_SH}}"
   test:
     taskfile: .taskfiles/test.yml
     dir: "{{.ROOT_DIR}}"

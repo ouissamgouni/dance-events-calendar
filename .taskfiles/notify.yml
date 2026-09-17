@@ -61,7 +61,7 @@ tasks:
   trigger:dev:
     desc: "Trigger dispatch against dev DB. Flags via CLI_ARGS (e.g. --reset-scan --user nora@example.com --json)."
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     cmds:
       - |
         ARGS="${CLI_ARGS:-}{{.CLI_ARGS}}"

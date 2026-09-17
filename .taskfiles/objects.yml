@@ -1,0 +1,68 @@
+version: "3"
+
+# Object-storage bucket lifecycle (MinIO emulator locally, Cloudflare R2 remote).
+# Buckets are ephemeral for dev/scenario envs; prod/staging buckets are protected
+# in backend/services/object_storage.py and cannot be deleted by these tasks.
+#
+# The SCENARIO branch mirrors how `task start:scenario` resolves storage: the
+# scenario's own config.env wins (it can flip OBJECT_STORAGE_PROVIDER to r2),
+# and the MinIO endpoint is only forced when the provider really is minio.
+
+tasks:
+  ensure:
+    desc: "Create the object-storage buckets for an env. ENV=dev|scenario
+      SCENARIO=name"
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/base.env",
+        "{{.ROOT_DIR}}/scenarios/dev/config.env",
+        "{{.ROOT_DIR}}/config/secrets.env",
+      ]
+    vars:
+      SCENARIO: '{{.SCENARIO | default ""}}'
+    cmds:
+      - |
+        if [ -n "{{.SCENARIO}}" ]; then
+          source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+          source {{.ROOT_DIR}}/.taskfiles/scenario_objects_env.sh "{{.SCENARIO}}" "{{.ROOT_DIR}}"
+        fi
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.objects ensure
+
+  reset:
+    desc: "Delete and recreate the object-storage buckets. SCENARIO=name for a
+      scenario env."
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/base.env",
+        "{{.ROOT_DIR}}/scenarios/dev/config.env",
+        "{{.ROOT_DIR}}/config/secrets.env",
+      ]
+    vars:
+      SCENARIO: '{{.SCENARIO | default ""}}'
+    prompt: "Delete ALL objects in the target buckets and recreate them?"
+    cmds:
+      - |
+        if [ -n "{{.SCENARIO}}" ]; then
+          source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+          source {{.ROOT_DIR}}/.taskfiles/scenario_objects_env.sh "{{.SCENARIO}}" "{{.ROOT_DIR}}"
+        fi
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.objects reset
+
+  destroy:
+    desc: "Delete the object-storage buckets for an ephemeral env. SCENARIO=name."
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/base.env",
+        "{{.ROOT_DIR}}/scenarios/dev/config.env",
+        "{{.ROOT_DIR}}/config/secrets.env",
+      ]
+    vars:
+      SCENARIO: '{{.SCENARIO | default ""}}'
+    prompt: "Permanently DELETE the target buckets and everything in them?"
+    cmds:
+      - |
+        if [ -n "{{.SCENARIO}}" ]; then
+          source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+          source {{.ROOT_DIR}}/.taskfiles/scenario_objects_env.sh "{{.SCENARIO}}" "{{.ROOT_DIR}}"
+        fi
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.objects destroy

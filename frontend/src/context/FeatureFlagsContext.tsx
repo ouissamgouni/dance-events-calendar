@@ -3,7 +3,7 @@ import { fetchSettings } from '../api';
 
 export const DEFAULT_EVENT_COLOR_BAR_COLOR = '#64748b';
 
-interface FeatureFlags {
+export interface FeatureFlags {
     showPrices: boolean;
     showPopularity: boolean;
     showRatings: boolean;
@@ -60,6 +60,11 @@ interface FeatureFlags {
     eventCardShowTimeLocationIconsEnabled: boolean;
     /** When true, the explorer list renders the shared My Events card style. */
     explorerEventCardCardStyleEnabled: boolean;
+    /** When true, event pictures are displayed. Admin picture management is
+     * always available regardless of this flag. */
+    eventImagesEnabled: boolean;
+    /** What a card renders when an event has no picture. */
+    eventCardPlaceholderStyle: 'gradient' | 'initial';
 }
 
 const defaultFlags: FeatureFlags = {
@@ -93,6 +98,8 @@ const defaultFlags: FeatureFlags = {
     eventCardShowPeopleIconEnabled: false,
     eventCardShowTimeLocationIconsEnabled: false,
     explorerEventCardCardStyleEnabled: false,
+    eventImagesEnabled: false,
+    eventCardPlaceholderStyle: 'gradient',
 };
 
 const FeatureFlagsContext = createContext<{
@@ -101,6 +108,9 @@ const FeatureFlagsContext = createContext<{
 } | null>(null);
 
 export { FeatureFlagsContext };
+
+/** Exported so tests can build a flag set without stubbing the settings fetch. */
+export { defaultFlags };
 
 export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
@@ -143,6 +153,8 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     eventCardShowPeopleIconEnabled: s.event_card_show_people_icon_enabled ?? false,
                     eventCardShowTimeLocationIconsEnabled: s.event_card_show_time_location_icons_enabled ?? false,
                     explorerEventCardCardStyleEnabled: s.explorer_event_card_card_style_enabled ?? false,
+                    eventImagesEnabled: s.event_images_enabled ?? false,
+                    eventCardPlaceholderStyle: s.event_card_placeholder_style ?? 'gradient',
                 });
             })
             .catch(() => {

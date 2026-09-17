@@ -8,6 +8,7 @@ import { getDeviceId } from '../utils/deviceId';
 import { useReferralAttribution } from '../hooks/useReferralAttribution';
 import AdminEventDetailContent from '../components/AdminEventDetailContent';
 import SuggestTagsButton from '../components/SuggestTagsButton';
+import EventImageEditor from '../components/EventImageEditor';
 import GoingButton from '../components/GoingButton';
 import SaveEventButton from '../components/SaveEventButton';
 import ShareButton from '../components/ShareButton';
@@ -306,6 +307,7 @@ export default function EventDetailPage() {
                     {editMode && user?.is_admin ? (
                         <>
                             {/* Admin inline editing keeps the legacy detail editor. */}
+                            <EventImageEditor event={event} onChange={setEvent} />
                             {editingTitle ? (
                                 <div className="mb-4">
                                     <input

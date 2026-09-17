@@ -38,6 +38,7 @@ from backend.db.models import (
     UserInterestProfileTag,
     UserSavedEvent,
 )
+from backend.services.event_images import event_image_fields
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
 from backend.services.profile_geography import profile_contains_point
 
@@ -842,7 +843,7 @@ def get_events(
             calendar_id=e.calendar_id,
             title=e.title,
             description=e.description,
-            image_url=e.image_url,
+            **event_image_fields(e),
             location=e.location,
             city=e.city,
             country=e.country,
@@ -1177,7 +1178,7 @@ def get_events_by_ids(
             calendar_id=e.calendar_id,
             title=e.title,
             description=e.description,
-            image_url=e.image_url,
+            **event_image_fields(e),
             location=e.location,
             city=e.city,
             country=e.country,
@@ -1294,7 +1295,7 @@ def get_event(
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
-        image_url=event.image_url,
+        **event_image_fields(event),
         location=event.location,
         city=event.city,
         country=event.country,

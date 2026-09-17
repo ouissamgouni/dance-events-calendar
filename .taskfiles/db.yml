@@ -16,7 +16,7 @@ tasks:
   migrate:dev:
     desc: Run Alembic migrations (dev)
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     cmds:
       - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c
         {{.BACKEND_DIR}}/alembic.ini upgrade head
@@ -31,7 +31,7 @@ tasks:
     desc: "Seed dev database. SCENARIO=<name> to override (default: 'default').
       Extra flags via CLI_ARGS."
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     vars:
       SCENARIO: '{{.SCENARIO | default "default"}}'
     cmds:
@@ -46,7 +46,7 @@ tasks:
   reset:dev:
     desc: "Drop all tables, re-migrate, re-seed (DESTRUCTIVE). DRY_RUN=1 to preview."
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     vars:
       DRY_RUN: '{{.DRY_RUN | default "0"}}'
     cmds:
@@ -71,7 +71,7 @@ tasks:
   _reset:dev:exec:
     internal: true
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     cmds:
       - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m
         backend.scripts.reset
@@ -548,7 +548,7 @@ tasks:
   status:dev:
     desc: Show migration status for dev database
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     cmds:
       - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c
         {{.BACKEND_DIR}}/alembic.ini current
@@ -582,7 +582,7 @@ tasks:
   check:dev:
     desc: Validate migration health for dev database
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     cmds:
       - |
         echo "Checking migration status..."
@@ -601,7 +601,7 @@ tasks:
       "Diff DB tag_groups/tags vs scenarios/default/tags.yaml. SCENARIO=<name>
       to override."
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     vars:
       SCENARIO: '{{.SCENARIO | default "default"}}'
     cmds:
@@ -672,7 +672,7 @@ tasks:
   merge:dev:
     desc: Merge multiple Alembic migration heads
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     cmds:
       - |
         HEAD_COUNT=$(PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini heads 2>/dev/null | grep -c "(head)" || echo "0")
@@ -689,7 +689,7 @@ tasks:
   stamp:dev:
     desc: "⚠️ Stamp database to a revision (recovery tool)"
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     prompt: "This will update alembic_version without running migrations. Continue?"
     cmds:
       - |
@@ -704,7 +704,7 @@ tasks:
   downgrade:dev:
     desc: "⚠️ Rollback migrations (use with caution)"
     dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     prompt: "This will rollback migrations. Continue?"
     cmds:
       - |
@@ -722,7 +722,7 @@ tasks:
 
   copy:dev-to-staging:
     desc: "🔄 Copy dev database → staging. DRY_RUN=1 to preview."
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/scenarios/dev/config.env"]
     prompt: "This will REPLACE the staging database with dev data. Continue?"
     vars:
       DRY_RUN: '{{.DRY_RUN | default "0"}}'
@@ -733,7 +733,7 @@ tasks:
         DST_PORT=${POSTGRES_PORT}
         DST_DB=${POSTGRES_DB}
         # Reload dev env
-        set -a; source {{.ROOT_DIR}}/config/dev.env; set +a
+        set -a; source {{.ROOT_DIR}}/scenarios/dev/config.env; set +a
         SRC_PORT=${POSTGRES_PORT}
         SRC_DB=${POSTGRES_DB}
 
@@ -766,7 +766,7 @@ tasks:
     cmds:
       - |
         # Load dev env
-        set -a; source {{.ROOT_DIR}}/config/dev.env; set +a
+        set -a; source {{.ROOT_DIR}}/scenarios/dev/config.env; set +a
         DST_PORT=${POSTGRES_PORT}
         DST_DB=${POSTGRES_DB}
         # Reload staging env
@@ -789,7 +789,7 @@ tasks:
 
         # Run migrations to align schema if dev has newer migrations
         echo "Running migrations to align schema..."
-        set -a; source {{.ROOT_DIR}}/config/dev.env; set +a
+        set -a; source {{.ROOT_DIR}}/scenarios/dev/config.env; set +a
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
 
         rm -f /tmp/calendar_db_dump.sql

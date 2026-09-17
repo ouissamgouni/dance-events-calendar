@@ -427,7 +427,7 @@ test_plan:
 
     # ── Group 8: Umami Page & Event Analytics ──────────────────
     # Note: In scenario mode, Umami starts automatically with the scenario
-    # (docker-compose.scenario-umami.yml) and the website is auto-bootstrapped.
+    # (docker-compose.umami.yml) and the website is auto-bootstrapped.
     # No manual setup required. Umami URL and WEBSITE_ID are passed to the
     # dev server automatically. Dashboard at http://localhost:<SC_UMAMI_PORT>.
     - id: 38

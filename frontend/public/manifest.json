@@ -1,7 +1,7 @@
 {
     "name": "Movida",
     "short_name": "Movida",
-    "description": "Discover upcoming salsa classes, socials, and workshops near you.",
+    "description": "Explore . Dance . Connect - discover social dance events and connect with dancers.",
     "id": "/",
     "start_url": "/",
     "scope": "/",
@@ -9,14 +9,9 @@
     "launch_handler": {
         "client_mode": "navigate-existing"
     },
-    "background_color": "#0f172a",
-    "theme_color": "#a12d42",
+    "background_color": "#FAF9F7",
+    "theme_color": "#7E121D",
     "icons": [
-        {
-            "src": "/favicon.svg",
-            "sizes": "any",
-            "type": "image/svg+xml"
-        },
         {
             "src": "/icons/icon-192.png",
             "sizes": "192x192",

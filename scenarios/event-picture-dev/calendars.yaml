@@ -1,0 +1,4 @@
+calendars:
+  - id: "picture-cal-001"
+    name: "Event Picture Test Calendar"
+    color: "#e11d48"

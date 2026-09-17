@@ -1,13 +1,13 @@
 services:
   postgres_umami:
     image: postgres:16-alpine
-    container_name: umami_db_${SC_PROJECT_NAME}
+    container_name: umami_db_${ENV_NAME}
     environment:
       POSTGRES_DB: umami
       POSTGRES_USER: umami
       POSTGRES_PASSWORD: umami
-    tmpfs:
-      - /var/lib/postgresql/data
+    volumes:
+      - umamidata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U umami -d umami"]
       interval: 3s
@@ -17,7 +17,7 @@ services:
 
   umami:
     image: ghcr.io/umami-software/umami:postgresql-latest
-    container_name: umami_${SC_PROJECT_NAME}
+    container_name: umami_${ENV_NAME}
     environment:
       DATABASE_URL: postgresql://umami:umami@postgres_umami:5432/umami
       APP_SECRET: scenario-umami-secret
@@ -27,3 +27,9 @@ services:
       postgres_umami:
         condition: service_healthy
     restart: unless-stopped
+
+# Named volume rather than tmpfs so PERSIST=1 keeps analytics across restarts.
+# Non-persisting envs get it wiped by `docker compose down -v` on stop.
+volumes:
+  umamidata:
+    name: umami_${ENV_NAME}_data

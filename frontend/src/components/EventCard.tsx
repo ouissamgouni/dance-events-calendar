@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Clock, MapPin } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import EventCardPlaceholder from './EventCardPlaceholder';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
 import { shortLocation } from '../utils/locationShort';
 import EventDateRail from './EventDateRail';
@@ -122,6 +123,8 @@ export default function EventCard({
         eventCardImgoingShowStatsEnabled,
         eventCardSaveShowStatsEnabled,
         eventCardShowTimeLocationIconsEnabled,
+        eventImagesEnabled,
+        eventCardPlaceholderStyle,
     } = useFeatureFlags();
     const [imageFailed, setImageFailed] = useState(false);
 
@@ -161,7 +164,29 @@ export default function EventCard({
         : 'border border-card-line shadow-sm hover:border-line';
     const rounding = 'rounded-card';
     const width = widthClass ? `${widthClass} shrink-0` : 'w-full';
-    const imageVisible = showImage && !isPast && !!event.image_url && !imageFailed;
+    // Prefer the cropped variant when the picture is object-storage managed;
+    // ``image_url`` is the legacy/plain URL fallback.
+    const imageSrc = event.image_thumb_url ?? event.image_url ?? null;
+    const imageAllowed = showImage && eventImagesEnabled && !isPast;
+    const imageVisible = imageAllowed && !!imageSrc && !imageFailed;
+    // Keep the layout identical when a picture is missing or failed to load.
+    const placeholderVisible = imageAllowed && !imageVisible;
+    const imageSlot = imageVisible ? (
+        <img
+            src={imageSrc ?? undefined}
+            alt=""
+            className="mr-3 aspect-video w-28 shrink-0 rounded-none object-cover"
+            onError={() => setImageFailed(true)}
+            data-testid="event-card-image"
+        />
+    ) : placeholderVisible ? (
+        <EventCardPlaceholder
+            seed={event.event_id}
+            title={event.title}
+            style={eventCardPlaceholderStyle}
+            className="mr-3 aspect-video w-28 shrink-0 rounded-none"
+        />
+    ) : null;
 
     // Shared building blocks so the two header layouts (left rail vs. two-row)
     // compose the same content without duplication.
@@ -323,15 +348,7 @@ export default function EventCard({
                     </div>
                     <div className="pointer-events-none relative z-[1] flex min-w-0 flex-col px-4 pb-3">
                         <div className="flex min-w-0 flex-row">
-                            {imageVisible && (
-                                <img
-                                    src={event.image_url ?? undefined}
-                                    alt=""
-                                    className="mr-3 h-20 w-20 shrink-0 rounded-none object-cover"
-                                    onError={() => setImageFailed(true)}
-                                    data-testid="event-card-image"
-                                />
-                            )}
+                            {imageSlot}
                             <div className="flex min-w-0 flex-1 flex-col">
                                 {popularityBadgesInner && (
                                     <div className="flex items-center gap-1">{popularityBadgesInner}</div>
@@ -379,16 +396,8 @@ export default function EventCard({
                         )}
                         {/* Top row: image + core details (title, time, location, price). */}
                         <div className="flex min-w-0 flex-row">
-                            {imageVisible && (
-                                <img
-                                    src={event.image_url ?? undefined}
-                                    alt=""
-                                    className="mr-3 h-20 w-20 shrink-0 rounded-none object-cover"
-                                    onError={() => setImageFailed(true)}
-                                    data-testid="event-card-image"
-                                />
-                            )}
-                            <div className={`flex min-w-0 flex-1 flex-col ${imageVisible ? 'min-h-[5rem] justify-between' : ''}`}>
+                            {imageSlot}
+                            <div className={`flex min-w-0 flex-1 flex-col ${imageSlot ? 'min-h-[5rem] justify-between' : ''}`}>
                                 <div className="min-w-0">
                                     <h3
                                         className={`min-w-0 ${twoLineTitle ? 'line-clamp-2' : 'truncate'} text-sm font-semibold leading-snug text-ink group-hover:text-action ${topActions.length > 0 ? 'pr-14' : ''}`}

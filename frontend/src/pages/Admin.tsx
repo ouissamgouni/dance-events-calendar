@@ -241,6 +241,8 @@ export default function Admin() {
     const [eventCardShowPeopleIconEnabled, setEventCardShowPeopleIconEnabled] = useState(false);
     const [eventCardShowTimeLocationIconsEnabled, setEventCardShowTimeLocationIconsEnabled] = useState(false);
     const [explorerEventCardCardStyleEnabled, setExplorerEventCardCardStyleEnabled] = useState(false);
+    const [eventImagesEnabled, setEventImagesEnabled] = useState(false);
+    const [eventCardPlaceholderStyle, setEventCardPlaceholderStyle] = useState<'gradient' | 'initial'>('gradient');
     // Notification / re-engagement gates. Booleans are master switches
     // that override the corresponding env vars in ``config/loader.py``;
     // ``digestSchedule`` follows the ``dow[,dow] @ HH:MM`` grammar the
@@ -423,6 +425,8 @@ export default function Admin() {
             setEventCardShowPeopleIconEnabled(s.event_card_show_people_icon_enabled ?? false);
             setEventCardShowTimeLocationIconsEnabled(s.event_card_show_time_location_icons_enabled ?? false);
             setExplorerEventCardCardStyleEnabled(s.explorer_event_card_card_style_enabled ?? false);
+            setEventImagesEnabled(s.event_images_enabled ?? false);
+            setEventCardPlaceholderStyle(s.event_card_placeholder_style === 'initial' ? 'initial' : 'gradient');
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
             setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
             setDigestV2Enabled(s.digest_v2_enabled ?? true);
@@ -873,6 +877,30 @@ export default function Admin() {
         } catch {
             setExplorerEventCardCardStyleEnabled(!newVal);
             setMessage('Failed to update explorer card style toggle.');
+        }
+    };
+
+    const handleToggleEventImages = async () => {
+        const newVal = !eventImagesEnabled;
+        setEventImagesEnabled(newVal);
+        try {
+            await updateSettings({ event_images_enabled: newVal });
+            setMessage(`Event pictures ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventImagesEnabled(!newVal);
+            setMessage('Failed to update event pictures toggle.');
+        }
+    };
+
+    const handleChangePlaceholderStyle = async (style: 'gradient' | 'initial') => {
+        const previous = eventCardPlaceholderStyle;
+        setEventCardPlaceholderStyle(style);
+        try {
+            await updateSettings({ event_card_placeholder_style: style });
+            setMessage(`Picture placeholder set to ${style}.`);
+        } catch {
+            setEventCardPlaceholderStyle(previous);
+            setMessage('Failed to update picture placeholder style.');
         }
     };
 
@@ -2246,6 +2274,38 @@ export default function Admin() {
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${explorerEventCardCardStyleEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
+                                </div>
+
+                                {/* Event pictures */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Event pictures</span>
+                                        <p className="text-[10px] text-muted">Show event pictures on cards and detail views (admins can always manage them)</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleEventImages}
+                                        aria-label="Toggle event pictures"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventImagesEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventImagesEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Placeholder style for events without a picture */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Picture placeholder</span>
+                                        <p className="text-[10px] text-muted">What a card shows when an event has no picture</p>
+                                    </div>
+                                    <select
+                                        value={eventCardPlaceholderStyle}
+                                        onChange={(e) => handleChangePlaceholderStyle(e.target.value as 'gradient' | 'initial')}
+                                        aria-label="Event picture placeholder style"
+                                        className="rounded-card border border-card-line bg-surface px-2 py-1 text-[11px] text-ink"
+                                    >
+                                        <option value="gradient">Gradient</option>
+                                        <option value="initial">Initial letter</option>
+                                    </select>
                                 </div>
 
                                 {/* Tribe > Calendars "Your Network" going snapshot */}

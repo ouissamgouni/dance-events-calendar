@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 # My Events context view type: mirrors frontend MyEventsTab
 MyEventsView = Literal["upcoming", "saved", "past"]
@@ -47,6 +47,9 @@ class EventResponse(BaseModel):
     title: str
     description: Optional[str] = None
     image_url: Optional[str] = None
+    # 16:9 card variant of an admin-managed picture; None when the event only
+    # has a plain ``image_url``.
+    image_thumb_url: Optional[str] = None
     location: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
@@ -873,6 +876,11 @@ class SiteSettingsResponse(BaseModel):
     event_card_show_time_location_icons_enabled: bool = False
     # When True, the explorer list renders the shared My Events card style.
     explorer_event_card_card_style_enabled: bool = False
+    # When True, event pictures render on cards and detail pages. Admin upload
+    # stays available regardless so images can be prepared before going live.
+    event_images_enabled: bool = False
+    # What fills a card's picture slot when the event has no picture.
+    event_card_placeholder_style: str = "gradient"
 
 
 # ---------------------------------------------------------------------------
@@ -1112,6 +1120,14 @@ class SiteSettingsUpdateRequest(BaseModel):
     event_card_show_people_icon_enabled: Optional[bool] = None
     event_card_show_time_location_icons_enabled: Optional[bool] = None
     explorer_event_card_card_style_enabled: Optional[bool] = None
+    event_images_enabled: Optional[bool] = None
+    event_card_placeholder_style: Optional[str] = Field(
+        default=None, pattern="^(gradient|initial)$"
+    )
+
+
+class EventImageFromUrlRequest(BaseModel):
+    url: HttpUrl
 
 
 class EventUpdateRequest(BaseModel):

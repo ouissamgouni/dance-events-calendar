@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy import or_
 from sqlmodel import Session, col, func, select
 
@@ -29,6 +29,7 @@ from backend.api.schemas import (
     DigestSendNowResponse,
     EventFilterOptionsResponse,
     EventIdsResponse,
+    EventImageFromUrlRequest,
     EventResponse,
     EventUpdateRequest,
     FilterOption,
@@ -77,6 +78,13 @@ from backend.db.models import (
     UserEventAttendance,
 )
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
+from backend.services.event_images import (
+    ImageValidationError,
+    delete_event_image,
+    event_image_fields,
+    fetch_remote_image,
+    store_event_image,
+)
 from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.geocoding import (
     geocode_location,
@@ -1753,6 +1761,7 @@ def list_admin_events(
             calendar_id=e.calendar_id,
             title=e.title,
             description=e.description,
+            **event_image_fields(e),
             location=e.location,
             start=e.start,
             end=e.end,
@@ -1866,6 +1875,7 @@ def update_event(
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
+        **event_image_fields(event),
         location=event.location,
         start=event.start,
         end=event.end,
@@ -1885,6 +1895,109 @@ def update_event(
         show_price_override=event.show_price_override,
         show_promo_override=event.show_promo_override,
     )
+
+
+def _event_image_response(session: Session, event: CachedEvent) -> EventResponse:
+    cal = session.get(CalendarSetting, event.calendar_id)
+    event_tags = get_event_tags(session, [event.event_id])
+    return EventResponse(
+        event_id=event.event_id,
+        calendar_id=event.calendar_id,
+        title=event.title,
+        description=event.description,
+        **event_image_fields(event),
+        location=event.location,
+        start=event.start,
+        end=event.end,
+        all_day=event.all_day,
+        latitude=event.latitude,
+        longitude=event.longitude,
+        color=cal.color if cal else None,
+        price_min=event.price_min,
+        price_max=event.price_max,
+        price_currency=event.price_currency,
+        price_is_free=event.price_is_free,
+        review_status=event.review_status,
+        links=event.links,
+        tags=event_tags.get(event.event_id, []),
+        is_hidden=event.is_hidden,
+        is_blocked=_is_event_blocked(session, event.event_id),
+        show_price_override=event.show_price_override,
+        show_promo_override=event.show_promo_override,
+    )
+
+
+def _apply_event_image(
+    session: Session, event: CachedEvent, data: bytes, content_type: Optional[str]
+) -> EventResponse:
+    from datetime import datetime as dt
+
+    previous_key = event.image_key
+    try:
+        event.image_key = store_event_image(event.event_id, data, content_type)
+    except ImageValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    delete_event_image(previous_key)
+    event.updated_at = dt.utcnow()
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+    return _event_image_response(session, event)
+
+
+@router.post("/events/{event_id}/image", response_model=EventResponse)
+async def upload_event_image(
+    event_id: str,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Replace an event's picture with an uploaded file."""
+    event = session.get(CachedEvent, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return _apply_event_image(session, event, await file.read(), file.content_type)
+
+
+@router.post("/events/{event_id}/image/from-url", response_model=EventResponse)
+def set_event_image_from_url(
+    event_id: str,
+    body: EventImageFromUrlRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Import an event picture from a public https URL and store it ourselves."""
+    event = session.get(CachedEvent, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    try:
+        data, content_type = fetch_remote_image(str(body.url))
+    except ImageValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _apply_event_image(session, event, data, content_type)
+
+
+@router.delete("/events/{event_id}/image", response_model=EventResponse)
+def remove_event_image(
+    event_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Remove an event's managed picture and its stored variants."""
+    event = session.get(CachedEvent, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    from datetime import datetime as dt
+
+    delete_event_image(event.image_key)
+    event.image_key = None
+    event.updated_at = dt.utcnow()
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+    return _event_image_response(session, event)
 
 
 @router.get("/geocode", response_model=list[GeocodeSuggestion])

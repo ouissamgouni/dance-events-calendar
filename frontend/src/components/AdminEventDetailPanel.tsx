@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { blockEvent, dismissDuplicateGroup, fetchAdminEvent, fetchEventDuplicateCandidates, keepDuplicateEvent, unblockEvent, updateEvent, fetchEventSeriesCandidates, splitSeriesMember, addEventsToSeries, fetchSeriesGroups } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import AdminEventDetailContent from './AdminEventDetailContent';
+import EventImageEditor from './EventImageEditor';
 import EventReviewsSection from './EventReviewsSection';
 import EventMessagesSection from './EventMessagesSection';
 import EventMap from './EventMap';
@@ -115,6 +116,11 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
             .then((e) => { setEvent(e); setTitleValue(e.title); })
             .catch(() => { });
         notifyAdminDataChanged();
+    };
+
+    const handleImageChange = (updated: CalendarEvent) => {
+        setEvent(updated);
+        onEventUpdated?.(updated.event_id);
     };
 
     const handleManualRefresh = () => {
@@ -347,6 +353,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                     )}
                     {event && (
                         <>
+                            <EventImageEditor event={event} onChange={handleImageChange} />
                             <AdminEventDetailContent
                                 event={event}
                                 onFieldSave={handleFieldSave}

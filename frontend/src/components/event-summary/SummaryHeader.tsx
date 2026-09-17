@@ -1,6 +1,7 @@
 import { Clock, MapPin } from 'lucide-react';
 import type { CalendarEvent } from '../../types';
 import DateBlock from './DateBlock';
+import { useFeatureFlags } from '../../context/FeatureFlagsContext';
 
 interface Props {
     event: CalendarEvent;
@@ -14,6 +15,9 @@ interface Props {
  * title, time line, and location.
  */
 export default function SummaryHeader({ event, variant }: Props) {
+    const { eventImagesEnabled } = useFeatureFlags();
+    // Full-width hero: prefer the uncropped variant over the 16:9 thumb.
+    const heroSrc = event.image_url ?? event.image_thumb_url ?? null;
     const start = new Date(event.start);
     const end = new Date(event.end);
     const timeFmt = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -29,11 +33,14 @@ export default function SummaryHeader({ event, variant }: Props) {
 
     return (
         <div className="space-y-3">
-            {event.image_url && (
+            {/* No placeholder here: a missing picture simply collapses the hero
+                rather than padding the summary with empty artwork. */}
+            {eventImagesEnabled && heroSrc && (
                 <img
-                    src={event.image_url}
+                    src={heroSrc}
                     alt=""
                     className="h-[140px] w-full object-cover"
+                    data-testid="event-summary-image"
                 />
             )}
 

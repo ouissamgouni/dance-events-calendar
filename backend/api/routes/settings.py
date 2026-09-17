@@ -321,6 +321,10 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         explorer_event_card_card_style_enabled=_get_bool_setting(
             session, "explorer_event_card_card_style_enabled"
         ),
+        event_images_enabled=_get_bool_setting(session, "event_images_enabled"),
+        event_card_placeholder_style=_get_str_setting(
+            session, "event_card_placeholder_style", "gradient"
+        ),
     )
 
 
@@ -552,6 +556,20 @@ def update_settings(
             "explorer_event_card_card_style_enabled",
             body.explorer_event_card_card_style_enabled,
         )
+
+    if body.event_images_enabled is not None:
+        _set_bool_setting(session, "event_images_enabled", body.event_images_enabled)
+
+    if body.event_card_placeholder_style is not None:
+        row = session.get(SiteSetting, "event_card_placeholder_style")
+        if row:
+            row.value = body.event_card_placeholder_style
+        else:
+            row = SiteSetting(
+                key="event_card_placeholder_style",
+                value=body.event_card_placeholder_style,
+            )
+        session.add(row)
 
     if body.network_going_snapshot_enabled is not None:
         _set_bool_setting(

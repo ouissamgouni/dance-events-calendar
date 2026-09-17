@@ -9,8 +9,8 @@ events:
     location: "Skybar, Lisbon, Portugal"
     latitude: 38.7139
     longitude: -9.1394
-    start: w+1 Fri 20:00
-    end: w+1 Fri 23:00
+    start: w1 Fri 20:00
+    end: w1 Fri 23:00
     tags:
       - format:social
       - dance-style:salsa

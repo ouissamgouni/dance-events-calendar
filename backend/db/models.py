@@ -389,6 +389,10 @@ class CachedEvent(SQLModel, table=True):
     title: str = Field(default="")
     description: Optional[str] = Field(default=None, sa_column=Column(Text))
     image_url: Optional[str] = Field(default=None)
+    # Base key of an admin-managed picture in object storage (variants live at
+    # ``{image_key}/thumb.webp`` / ``/full.webp``). Takes precedence over the
+    # plain ``image_url`` when set.
+    image_key: Optional[str] = Field(default=None)
     location: Optional[str] = Field(default=None)
     start: datetime
     end: datetime

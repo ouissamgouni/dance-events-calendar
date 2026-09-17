@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { FeatureFlagsProvider } from '../context/FeatureFlagsContext';
+import { FeatureFlagsContext, defaultFlags } from '../context/FeatureFlagsContext';
 import { MyRatingsProvider } from '../context/MyRatingsContext';
 import { renderWithProviders } from '../test/render';
 import { makeUser } from '../test/handlers';
@@ -36,12 +36,15 @@ function event(id: string, imageUrl: string | null): CalendarEvent {
 }
 
 function renderList(tab: 'upcoming' | 'saved' | 'past', events: CalendarEvent[], onEventClick = vi.fn()) {
+    // Pictures are behind a site setting; turn it on so the image assertions
+    // below exercise the picture slot rather than the placeholder-free layout.
+    const flags = { ...defaultFlags, eventImagesEnabled: true };
     return renderWithProviders(
-        <FeatureFlagsProvider>
+        <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
             <MyRatingsProvider>
                 <MyEventsList events={events} tab={tab} onEventClick={onEventClick} />
             </MyRatingsProvider>
-        </FeatureFlagsProvider>,
+        </FeatureFlagsContext.Provider>,
         { routerEntries: ['/mine/calendar'] },
     );
 }
