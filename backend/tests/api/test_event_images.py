@@ -287,3 +287,30 @@ def test_delete_event_image_clears_key_and_removes_objects(admin_client):
     assert res.json()["image_thumb_url"] is None
     with Session(engine) as session:
         assert session.get(CachedEvent, "evt-1").image_key is None
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("get", "/api/admin/events/evt-1"),
+        ("post", "/api/admin/events/evt-1/block"),
+        ("delete", "/api/admin/events/evt-1/block"),
+        ("post", "/api/admin/events/evt-1/review"),
+    ],
+)
+def test_admin_event_responses_carry_the_picture(admin_client, method, path):
+    """The admin panel builds its editor state from these — losing the
+    picture URLs there made the editor claim the event had no picture."""
+    client, engine = admin_client
+    with Session(engine) as session:
+        event = session.get(CachedEvent, "evt-1")
+        event.image_key = "events/evt-1/abc"
+        session.add(event)
+        session.commit()
+
+    res = getattr(client, method)(path)
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["image_url"] == "https://cdn.test/events/evt-1/abc/full.webp"
+    assert body["image_thumb_url"] == "https://cdn.test/events/evt-1/abc/thumb.webp"
