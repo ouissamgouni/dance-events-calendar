@@ -13,6 +13,7 @@ import { PriceBadge, DiscountBadge } from './CardPriceBadges';
 import CardActionCluster from './CardActionCluster';
 import CardReviewsLine from './CardReviewsLine';
 import EventCard from './EventCard';
+import { useEventCardImage } from '../hooks/useEventCardImage';
 
 interface MapBounds {
     north: number;
@@ -202,6 +203,10 @@ export function EventListCard({
     tribeLayout = false,
 }: EventListCardProps) {
     const { tagsPerCard, eventCardImgoingLocationBottomEnabled, eventCardImgoingShowStatsEnabled, eventCardSaveShowStatsEnabled, explorerEventCardCardStyleEnabled } = useFeatureFlags();
+    const { node: imageSlot } = useEventCardImage(event, {
+        show: !isPast,
+        className: 'event-card-image',
+    });
     const priceVisible = isPriceSectionVisible(event, showPrices);
     const start = new Date(event.start);
     const end = new Date(event.end);
@@ -281,6 +286,7 @@ export function EventListCard({
                         </div>
                     </div>
                 )}
+                {imageSlot}
                 <div className="event-card-content relative">
                     {tribeLayout && (
                         <div className="mb-2 pr-14">

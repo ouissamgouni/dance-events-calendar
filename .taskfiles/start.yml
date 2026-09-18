@@ -21,34 +21,19 @@ tasks:
         # Dev is just a scenario named "dev" with pinned ports — same compose
         # files and naming rules as every other scenario.
         source {{.SCENARIO_PORTS_SH}} dev
+        source {{.ROOT_DIR}}/.taskfiles/scenario_compose.sh {{.ROOT_DIR}}
 
-        DB_COMPOSE="{{.ROOT_DIR}}/infra/docker/docker-compose.db.yml"
-        OBJ_COMPOSE="{{.ROOT_DIR}}/infra/docker/docker-compose.objects.yml"
-        UMAMI_COMPOSE="{{.ROOT_DIR}}/infra/docker/docker-compose.umami.yml"
-
-        # One-time migration: dev used to run under the implicit "docker" compose
-        # project from infra/docker/docker-compose.dev.yml. Those containers hold
-        # the same explicit names we want, so remove the stale ones. The data
-        # volumes (calendar_dev_data / umami_dev_data / minio_dev_data) are
-        # externally named and are NOT touched here.
-        for c in calendar_db_dev umami_dev umami_db_dev minio_dev postgres_umami_dev; do
-          legacy=$(docker inspect -f '{{`{{ index .Config.Labels "com.docker.compose.project" }}`}}' "$c" 2>/dev/null || true)
-          if [ "$legacy" = "docker" ]; then
-            echo "↪️  Migrating legacy dev container $c to compose project $SC_PROJECT_NAME (data volume kept)"
-            docker rm -f "$c" >/dev/null 2>&1 || true
-          fi
-        done
+        # Containers from a previous layout (the implicit "docker" project, or
+        # the old per-service projects) hold the names we need. Data volumes
+        # are externally named and are NOT touched here.
+        sc_compose_adopt_containers
 
         if [ "{{.RESET}}" = "1" ]; then
           echo "🔄 RESET: tearing down dev stack (including volumes)..."
-          docker compose -f "$DB_COMPOSE" -p $SC_PROJECT_NAME down -v 2>/dev/null || true
-          docker compose -f "$OBJ_COMPOSE" -p $SC_OBJECTS_PROJECT down -v 2>/dev/null || true
-          docker compose -f "$UMAMI_COMPOSE" -p $SC_UMAMI_PROJECT down -v 2>/dev/null || true
+          docker compose -p $SC_PROJECT_NAME down -v 2>/dev/null || true
         fi
 
-        POSTGRES_DB=$SC_DB_NAME docker compose -f "$DB_COMPOSE" -p $SC_PROJECT_NAME up -d
-        docker compose -f "$OBJ_COMPOSE" -p $SC_OBJECTS_PROJECT up -d
-        docker compose -f "$UMAMI_COMPOSE" -p $SC_UMAMI_PROJECT up -d
+        POSTGRES_DB=$SC_DB_NAME docker compose -p $SC_PROJECT_NAME up -d
       - |
         source {{.SCENARIO_PORTS_SH}} dev
         # Wait for MinIO, then make sure the dev buckets exist (and are readable)
@@ -63,7 +48,8 @@ tasks:
         echo "✅ Dev stack started"
         echo "   Database: localhost:${SC_DB_PORT}"
         echo "   Umami:    http://localhost:${SC_UMAMI_PORT}"
-        echo "   MinIO:    http://localhost:${SC_S3_PORT} (console ${SC_S3_CONSOLE_PORT})"
+        echo "   MinIO:    http://localhost:${SC_S3_PORT}"
+        echo "   MinIO UI: http://localhost:${SC_S3_CONSOLE_PORT}"
 
   open:umami:
     desc: "Open Umami analytics dashboard. BROWSER=none|shared|isolated (default
@@ -263,6 +249,7 @@ tasks:
     cmds:
       - |
         source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        source {{.ROOT_DIR}}/.taskfiles/scenario_compose.sh {{.ROOT_DIR}}
         [ -n "{{.WEB_PORT}}" ] && SC_WEB_PORT="{{.WEB_PORT}}"
         [ -n "{{.API_PORT}}" ] && SC_API_PORT="{{.API_PORT}}"
 
@@ -290,7 +277,7 @@ tasks:
 
         if [ "$DO_RESET_DB" = "1" ]; then
           echo "🔄 Restarting: stopping existing scenario environment ($ENV_NAME) first..."
-          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.db.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
+          docker compose -p $SC_PROJECT_NAME down -v 2>/dev/null || true
           pkill -f "uvicorn.*--port $SC_API_PORT" 2>/dev/null || true
           pkill -f "vite.*--port $SC_WEB_PORT" 2>/dev/null || true
           echo "✅ Previous environment cleaned"
@@ -298,7 +285,8 @@ tasks:
 
         if [ "$DO_RESET_OBJECTS" = "1" ]; then
           echo "🔄 RESET_OBJECTS: wiping scenario object storage..."
-          ENV_NAME=$ENV_NAME docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.objects.yml -p $SC_OBJECTS_PROJECT down -v 2>/dev/null || true
+          docker compose -p $SC_PROJECT_NAME rm -fsv minio 2>/dev/null || true
+          docker volume rm "minio_${ENV_NAME}_data" >/dev/null 2>&1 || true
         fi
 
         # Load scenario-specific config.env (CALENDAR_SERVICE, AUTO_SYNC_ENABLED, etc.)
@@ -335,12 +323,13 @@ tasks:
         echo ""
 
         # Start scenario database
+        sc_compose_adopt_containers
         POSTGRES_USER=${POSTGRES_USER} \
         POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
         POSTGRES_DB=$SC_DB_NAME \
         ENV_NAME=$ENV_NAME \
         SC_DB_PORT=$SC_DB_PORT \
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.db.yml -p $SC_PROJECT_NAME up -d
+        docker compose -p $SC_PROJECT_NAME up -d postgres
 
         echo "Waiting for database..."
         for i in $(seq 1 30); do
@@ -370,13 +359,13 @@ tasks:
 
         if [ "$OBJ_PROVIDER" = "minio" ]; then
           export OBJECT_STORAGE_ENDPOINT="http://127.0.0.1:${SC_S3_PORT}"
-          echo "Starting object storage (MinIO) on :$SC_S3_PORT (console :$SC_S3_CONSOLE_PORT)..."
+          echo "Starting object storage (MinIO) at http://localhost:${SC_S3_PORT} (console http://localhost:${SC_S3_CONSOLE_PORT})..."
           ENV_NAME=$ENV_NAME \
           SC_S3_PORT=$SC_S3_PORT \
           SC_S3_CONSOLE_PORT=$SC_S3_CONSOLE_PORT \
           OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID:-minioadmin} \
           OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:-minioadmin} \
-          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.objects.yml -p $SC_OBJECTS_PROJECT up -d
+          docker compose -p $SC_PROJECT_NAME up -d minio
 
           for i in $(seq 1 30); do
             if curl -sf "http://127.0.0.1:${SC_S3_PORT}/minio/health/live" >/dev/null 2>&1; then
@@ -402,12 +391,12 @@ tasks:
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.objects ensure
 
         # The R2 S3 endpoint needs a signature, so public reads go through the
-        # bucket's managed r2.dev domain.
-        if [ "$OBJ_PROVIDER" != "minio" ] && [ -z "${OBJECT_STORAGE_PUBLIC_BASE_URL:-}" ]; then
+        # bucket's managed r2.dev domain. MinIO resolves to its own endpoint.
+        if [ -z "${OBJECT_STORAGE_PUBLIC_BASE_URL:-}" ]; then
           OBJECT_STORAGE_PUBLIC_BASE_URL=$(PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.objects domain) || exit 1
           export OBJECT_STORAGE_PUBLIC_BASE_URL
-          echo "Public objects served at $OBJECT_STORAGE_PUBLIC_BASE_URL"
         fi
+        echo "Public objects served at $OBJECT_STORAGE_PUBLIC_BASE_URL"
 
         # Seed data
         SEED_ARG=""
@@ -436,7 +425,7 @@ tasks:
           echo "Starting Umami analytics..."
           SC_UMAMI_PORT=$SC_UMAMI_PORT \
           SC_PROJECT_NAME=$SC_PROJECT_NAME \
-          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.umami.yml -p $SC_UMAMI_PROJECT up -d
+          docker compose -p $SC_PROJECT_NAME up -d umami
 
           # Wait for Umami HTTP to be ready (up to 60s)
           UMAMI_URL="http://localhost:${SC_UMAMI_PORT}"

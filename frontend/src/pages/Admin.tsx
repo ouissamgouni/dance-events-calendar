@@ -242,7 +242,7 @@ export default function Admin() {
     const [eventCardShowTimeLocationIconsEnabled, setEventCardShowTimeLocationIconsEnabled] = useState(false);
     const [explorerEventCardCardStyleEnabled, setExplorerEventCardCardStyleEnabled] = useState(false);
     const [eventImagesEnabled, setEventImagesEnabled] = useState(false);
-    const [eventCardPlaceholderStyle, setEventCardPlaceholderStyle] = useState<'gradient' | 'initial'>('gradient');
+    const [eventCardPlaceholderStyle, setEventCardPlaceholderStyle] = useState<'gradient' | 'initial' | 'none'>('gradient');
     // Notification / re-engagement gates. Booleans are master switches
     // that override the corresponding env vars in ``config/loader.py``;
     // ``digestSchedule`` follows the ``dow[,dow] @ HH:MM`` grammar the
@@ -426,7 +426,7 @@ export default function Admin() {
             setEventCardShowTimeLocationIconsEnabled(s.event_card_show_time_location_icons_enabled ?? false);
             setExplorerEventCardCardStyleEnabled(s.explorer_event_card_card_style_enabled ?? false);
             setEventImagesEnabled(s.event_images_enabled ?? false);
-            setEventCardPlaceholderStyle(s.event_card_placeholder_style === 'initial' ? 'initial' : 'gradient');
+            setEventCardPlaceholderStyle(s.event_card_placeholder_style ?? 'gradient');
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
             setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
             setDigestV2Enabled(s.digest_v2_enabled ?? true);
@@ -892,7 +892,7 @@ export default function Admin() {
         }
     };
 
-    const handleChangePlaceholderStyle = async (style: 'gradient' | 'initial') => {
+    const handleChangePlaceholderStyle = async (style: 'gradient' | 'initial' | 'none') => {
         const previous = eventCardPlaceholderStyle;
         setEventCardPlaceholderStyle(style);
         try {
@@ -2299,12 +2299,13 @@ export default function Admin() {
                                     </div>
                                     <select
                                         value={eventCardPlaceholderStyle}
-                                        onChange={(e) => handleChangePlaceholderStyle(e.target.value as 'gradient' | 'initial')}
+                                        onChange={(e) => handleChangePlaceholderStyle(e.target.value as 'gradient' | 'initial' | 'none')}
                                         aria-label="Event picture placeholder style"
                                         className="rounded-card border border-card-line bg-surface px-2 py-1 text-[11px] text-ink"
                                     >
                                         <option value="gradient">Gradient</option>
                                         <option value="initial">Initial letter</option>
+                                        <option value="none">None</option>
                                     </select>
                                 </div>
 

@@ -218,7 +218,13 @@ class DatabaseSeeder:
                 event_images.store_event_image(
                     event_id, source.read_bytes(), base_key=key, client=client
                 )
-                logger.info("Seeded image %s for %s", filename, event_id)
+                logger.info(
+                    "Seeded image %s for %s → bucket %s, key %s/{thumb,full}.webp",
+                    filename,
+                    event_id,
+                    object_storage.get_public_bucket(),
+                    key,
+                )
 
             event.image_key = key
             self.session.add(event)

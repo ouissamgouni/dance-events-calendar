@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
 import { Clock, MapPin } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import EventCardPlaceholder from './EventCardPlaceholder';
+import { useEventCardImage } from '../hooks/useEventCardImage';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
 import { shortLocation } from '../utils/locationShort';
 import EventDateRail from './EventDateRail';
@@ -123,10 +122,7 @@ export default function EventCard({
         eventCardImgoingShowStatsEnabled,
         eventCardSaveShowStatsEnabled,
         eventCardShowTimeLocationIconsEnabled,
-        eventImagesEnabled,
-        eventCardPlaceholderStyle,
     } = useFeatureFlags();
-    const [imageFailed, setImageFailed] = useState(false);
 
     const start = new Date(event.start);
     const end = new Date(event.end);
@@ -164,29 +160,10 @@ export default function EventCard({
         : 'border border-card-line shadow-sm hover:border-line';
     const rounding = 'rounded-card';
     const width = widthClass ? `${widthClass} shrink-0` : 'w-full';
-    // Prefer the cropped variant when the picture is object-storage managed;
-    // ``image_url`` is the legacy/plain URL fallback.
-    const imageSrc = event.image_thumb_url ?? event.image_url ?? null;
-    const imageAllowed = showImage && eventImagesEnabled && !isPast;
-    const imageVisible = imageAllowed && !!imageSrc && !imageFailed;
-    // Keep the layout identical when a picture is missing or failed to load.
-    const placeholderVisible = imageAllowed && !imageVisible;
-    const imageSlot = imageVisible ? (
-        <img
-            src={imageSrc ?? undefined}
-            alt=""
-            className="mr-3 aspect-video w-28 shrink-0 rounded-none object-cover"
-            onError={() => setImageFailed(true)}
-            data-testid="event-card-image"
-        />
-    ) : placeholderVisible ? (
-        <EventCardPlaceholder
-            seed={event.event_id}
-            title={event.title}
-            style={eventCardPlaceholderStyle}
-            className="mr-3 aspect-video w-28 shrink-0 rounded-none"
-        />
-    ) : null;
+    const { imageVisible, node: imageSlot } = useEventCardImage(event, {
+        show: showImage && !isPast,
+        className: 'mr-3 aspect-video w-28 shrink-0 rounded-none',
+    });
 
     // Shared building blocks so the two header layouts (left rail vs. two-row)
     // compose the same content without duplication.

@@ -1122,7 +1122,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     explorer_event_card_card_style_enabled: Optional[bool] = None
     event_images_enabled: Optional[bool] = None
     event_card_placeholder_style: Optional[str] = Field(
-        default=None, pattern="^(gradient|initial)$"
+        default=None, pattern="^(gradient|initial|none)$"
     )
 
 

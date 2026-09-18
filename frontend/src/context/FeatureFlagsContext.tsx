@@ -64,7 +64,7 @@ export interface FeatureFlags {
      * always available regardless of this flag. */
     eventImagesEnabled: boolean;
     /** What a card renders when an event has no picture. */
-    eventCardPlaceholderStyle: 'gradient' | 'initial';
+    eventCardPlaceholderStyle: 'gradient' | 'initial' | 'none';
 }
 
 const defaultFlags: FeatureFlags = {

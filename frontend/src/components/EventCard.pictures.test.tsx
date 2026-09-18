@@ -118,6 +118,28 @@ describe('EventCard pictures', () => {
         expect(screen.getByTestId('event-card-placeholder')).toHaveTextContent('B')
     })
 
+    it('renders no placeholder at all when the style is "none"', () => {
+        renderCard(makeEvent(), {
+            eventImagesEnabled: true,
+            eventCardPlaceholderStyle: 'none',
+        })
+
+        expect(screen.queryByTestId('event-card-image')).not.toBeInTheDocument()
+        expect(screen.queryByTestId('event-card-placeholder')).not.toBeInTheDocument()
+    })
+
+    it('still shows the picture when the placeholder style is "none"', () => {
+        renderCard(makeEvent({ image_thumb_url: 'https://cdn.test/thumb.webp' }), {
+            eventImagesEnabled: true,
+            eventCardPlaceholderStyle: 'none',
+        })
+
+        expect(screen.getByTestId('event-card-image')).toHaveAttribute(
+            'src',
+            'https://cdn.test/thumb.webp',
+        )
+    })
+
     it('shows neither picture nor placeholder for past events', () => {
         renderCard(
             makeEvent({ image_thumb_url: 'https://cdn.test/thumb.webp' }),

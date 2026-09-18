@@ -70,7 +70,10 @@ task start:dev        # DB + backend (--reload) + frontend (vite)
 > its ports (they are baked into `vite.config.ts`, `playwright.config.ts`,
 > `config/test.env` and CI) and it uses the same
 > `infra/docker/docker-compose.{db,objects,umami}.yml` files as every other
-> scenario. Its data volumes are `calendar_dev_data`, `minio_dev_data` and
+> scenario. All of them run in a single compose project per environment
+> (`$SC_PROJECT_NAME`, e.g. `movida-dev`), so Docker Desktop shows one stack
+> holding the database, MinIO and Umami. Its data volumes are
+> `calendar_dev_data`, `minio_dev_data` and
 > `umami_dev_data`; `task stop:dev:db` keeps them, `task stop:dev:volumes`
 > destroys them.
 

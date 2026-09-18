@@ -270,7 +270,7 @@ export interface SiteSettings {
      * Client default: false. */
     event_images_enabled?: boolean;
     /** What to render on a card when an event has no picture. */
-    event_card_placeholder_style?: 'gradient' | 'initial';
+    event_card_placeholder_style?: 'gradient' | 'initial' | 'none';
     /** Global notification / re-engagement gates (admin-configurable).
      * Each flag mirrors an env-var in ``backend/config/loader.py``; when
      * set here it overrides that default without requiring a redeploy. */

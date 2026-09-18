@@ -53,6 +53,29 @@ test_plan:
         "Gradient" before continuing.
 
     - id: 4
+      title: "Placeholder style switch — none"
+      description: |
+        In /admin, set "Picture placeholder" to "None". Return to the home
+        page and reload.
+      expected: |
+        The two picture-less cards show no placeholder at all — the picture
+        slot collapses and the card is text-only. The three seeded events
+        still show their real pictures. Set the setting back to "Gradient"
+        before continuing.
+
+    - id: 5
+      title: "Pictures render with the explorer card style OFF"
+      description: |
+        In /admin, turn OFF the "Explorer card style" toggle, then return to
+        the home page and reload.
+      expected: |
+        The legacy explorer list rows now show the picture thumbnail too, in a
+        column between the timeline rail and the event text. Thumbnails are
+        16:9, cropped (not distorted) and aligned across rows. Picture-less
+        events show the gradient placeholder in the same column. Turn the
+        toggle back ON before continuing.
+
+    - id: 6
       title: "Feature flag hides all picture display"
       description: |
         In /admin, turn OFF the "Event pictures" toggle. Return to the home
@@ -62,7 +85,7 @@ test_plan:
         picture slot is gone entirely and cards fall back to their text-only
         layout. Turn the toggle back ON before continuing.
 
-    - id: 5
+    - id: 7
       title: "Detail page hero uses the uncropped variant"
       description: |
         Open the "Portrait Source — Bachata Night" event detail page.
@@ -71,7 +94,7 @@ test_plan:
         variant (taller / less aggressively cropped than the card thumbnail),
         not the 16:9 thumb.
 
-    - id: 6
+    - id: 8
       title: "Detail page of a picture-less event shows no empty banner"
       description: |
         Open the "Zouk Practica Without Picture" event detail page.
@@ -79,7 +102,7 @@ test_plan:
         No picture and no placeholder banner appears in the header — the
         layout simply collapses. Placeholders exist on cards only.
 
-    - id: 7
+    - id: 9
       title: "Admin upload — happy path"
       description: |
         Still signed in as "Dev Admin", open "Zouk Practica Without Picture",
@@ -91,7 +114,7 @@ test_plan:
         home page, that event's card now shows the picture instead of a
         placeholder.
 
-    - id: 8
+    - id: 10
       title: "Admin upload — rejected file type"
       description: |
         In the same "Picture" section, try uploading a non-image file (for
@@ -102,7 +125,7 @@ test_plan:
         existing picture (if any) is unchanged. No browser alert dialog is
         used.
 
-    - id: 9
+    - id: 11
       title: "Admin import from an existing public URL"
       description: |
         Open "Afro Dance Lab Without Picture" in edit mode. Paste a public
@@ -111,7 +134,7 @@ test_plan:
         The picture is fetched, processed and shown in the preview. Reload to
         confirm it persisted.
 
-    - id: 10
+    - id: 12
       title: "Import rejects unsafe URLs"
       description: |
         In the same field, try each of these in turn and press "Import":
@@ -122,7 +145,7 @@ test_plan:
         All three are rejected with an inline error message. Nothing is
         uploaded and the current picture is unchanged.
 
-    - id: 11
+    - id: 13
       title: "Replacing a picture cleans up the old one"
       description: |
         Open "Landscape Source — Salsa Social" in edit mode and upload a
@@ -131,7 +154,7 @@ test_plan:
         The preview updates to the new picture. Reload — the new picture
         persists. The card on the home page shows the new picture too.
 
-    - id: 12
+    - id: 14
       title: "Removing a picture"
       description: |
         In the same "Picture" section, press "Remove".
@@ -140,7 +163,7 @@ test_plan:
         disappears. On the home page, the event's card falls back to the
         placeholder.
 
-    - id: 13
+    - id: 15
       title: "Admin controls are available with the flag off"
       description: |
         In /admin turn the "Event pictures" toggle OFF, then open any event
@@ -150,7 +173,7 @@ test_plan:
         import, remove all work) even though no picture is displayed to
         regular users anywhere. Turn the toggle back ON when done.
 
-    - id: 14
+    - id: 16
       title: "Re-seeding does not duplicate uploads"
       description: |
         Restart the scenario WITHOUT resetting object storage:
@@ -160,7 +183,7 @@ test_plan:
         pictures. The seeder skips re-uploading them because the objects
         already exist.
 
-    - id: 15
+    - id: 17
       title: "Resetting object storage re-seeds from source"
       description: |
         Restart with ``task start:scenario SCENARIO=event-picture-dev RESET=1``.

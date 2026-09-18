@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import type { CalendarEvent } from '../types';
 import TagBadges from './TagBadges';
 import SaveEventButton from './SaveEventButton';
@@ -7,7 +7,7 @@ import AttendeeAvatarStack from './AttendeeAvatarStack';
 import EventDateRail from './EventDateRail';
 import { shortLocation } from '../utils/locationShort';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import EventCardPlaceholder from './EventCardPlaceholder';
+import { useEventCardImage } from '../hooks/useEventCardImage';
 
 interface RailEventCardProps {
     event: CalendarEvent;
@@ -99,9 +99,12 @@ export default function RailEventCard({
     pastPresentation = false,
     supplementalContent,
 }: RailEventCardProps) {
-    const { tagsPerCard, eventImagesEnabled, eventCardPlaceholderStyle } = useFeatureFlags();
-    const [imageFailed, setImageFailed] = useState(false);
-    const imageSrc = event.image_thumb_url ?? event.image_url ?? null;
+    const { tagsPerCard } = useFeatureFlags();
+    const { node: imageSlot } = useEventCardImage(event, {
+        show: !pastPresentation,
+        className: 'my-3 ml-3 aspect-video w-32 shrink-0 rounded-card',
+        imageTestId: 'my-events-row-image',
+    });
     const start = new Date(event.start);
     const startLabel = formatRailDate(event.start);
     const label = `Open ${event.title}, ${contextLabel} on ${startLabel}`;
@@ -134,24 +137,7 @@ export default function RailEventCard({
                 <div className="pointer-events-none relative z-[1] flex shrink-0 self-stretch">
                     <EventDateRail start={start} tone={pastPresentation ? 'neutral' : 'default'} />
                 </div>
-                {!pastPresentation && eventImagesEnabled && (
-                    imageSrc && !imageFailed ? (
-                        <img
-                            src={imageSrc}
-                            alt=""
-                            className="my-3 ml-3 aspect-video w-32 shrink-0 rounded-card object-cover"
-                            onError={() => setImageFailed(true)}
-                            data-testid="my-events-row-image"
-                        />
-                    ) : (
-                        <EventCardPlaceholder
-                            seed={event.event_id}
-                            title={event.title}
-                            style={eventCardPlaceholderStyle}
-                            className="my-3 ml-3 aspect-video w-32 shrink-0 rounded-card"
-                        />
-                    )
-                )}
+                {imageSlot}
                 <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 flex-col justify-center px-3 py-3">
                     <h3 className="line-clamp-2 text-sm font-semibold text-ink group-hover:text-action sm:text-base" title={event.title}>{event.title}</h3>
                     <p className="mt-1 truncate text-sm text-ink-soft">{[time, location].filter(Boolean).join(' · ')}</p>

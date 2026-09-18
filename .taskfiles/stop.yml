@@ -19,9 +19,8 @@ tasks:
     cmds:
       - |
         source {{.SCENARIO_PORTS_SH}} dev
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.db.yml -p $SC_PROJECT_NAME down 2>/dev/null || true
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.objects.yml -p $SC_OBJECTS_PROJECT down 2>/dev/null || true
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.umami.yml -p $SC_UMAMI_PROJECT down 2>/dev/null || true
+        source {{.ROOT_DIR}}/.taskfiles/scenario_compose.sh {{.ROOT_DIR}}
+        docker compose -p $SC_PROJECT_NAME down 2>/dev/null || true
         echo "✅ Dev database, object storage and analytics stopped (data kept)"
 
   dev:backend:
@@ -71,9 +70,8 @@ tasks:
     cmds:
       - |
         source {{.SCENARIO_PORTS_SH}} dev
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.db.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.objects.yml -p $SC_OBJECTS_PROJECT down -v 2>/dev/null || true
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.umami.yml -p $SC_UMAMI_PROJECT down -v 2>/dev/null || true
+        source {{.ROOT_DIR}}/.taskfiles/scenario_compose.sh {{.ROOT_DIR}}
+        docker compose -p $SC_PROJECT_NAME down -v 2>/dev/null || true
       - echo "✅ Dev containers and volumes removed"
 
   # ════════════════════════════════════════════════════════════════
@@ -149,6 +147,7 @@ tasks:
     cmds:
       - |
         source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        source {{.ROOT_DIR}}/.taskfiles/scenario_compose.sh {{.ROOT_DIR}}
 
         # Use persisted ports if available (overrides may have been used at start time)
         STATE_FILE="{{.ROOT_DIR}}/.taskfiles/.scenario-state/{{.SCENARIO}}.env"
@@ -158,14 +157,9 @@ tasks:
 
         echo "Stopping scenario: $SCENARIO_NAME..."
 
-        # Stop Docker DB
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.db.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
-
-        # Stop Umami (always started with scenario)
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.umami.yml -p $SC_UMAMI_PROJECT down -v 2>/dev/null || true
-
-        # Stop object storage emulator (volume removed: buckets are ephemeral)
-        ENV_NAME=$ENV_NAME docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.objects.yml -p $SC_OBJECTS_PROJECT down -v 2>/dev/null || true
+        # Stop the scenario stack (db + object storage + analytics). Volumes go
+        # too: scenario data and buckets are ephemeral.
+        docker compose -p $SC_PROJECT_NAME down -v 2>/dev/null || true
 
         # Also try unified compose (for :ref mode)
         docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
@@ -196,6 +190,7 @@ tasks:
         _stop_scenario() {
           local SCENARIO_NAME=$1
           source {{.ROOT_DIR}}/.taskfiles/scenario_ports.sh "$SCENARIO_NAME"
+          source {{.ROOT_DIR}}/.taskfiles/scenario_compose.sh {{.ROOT_DIR}}
 
           # Use persisted ports if available (overrides may have been used at start time)
           local STATE_FILE="{{.ROOT_DIR}}/.taskfiles/.scenario-state/${SCENARIO_NAME}.env"
@@ -203,14 +198,8 @@ tasks:
             source "$STATE_FILE"
           fi
 
-          # Stop Docker DB
-          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.db.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
-
-          # Stop Umami
-          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.umami.yml -p $SC_UMAMI_PROJECT down -v 2>/dev/null || true
-
-          # Stop object storage emulator
-          ENV_NAME=$ENV_NAME docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.objects.yml -p $SC_OBJECTS_PROJECT down -v 2>/dev/null || true
+          # Stop the scenario stack (db + object storage + analytics)
+          docker compose -p $SC_PROJECT_NAME down -v 2>/dev/null || true
 
           docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
 

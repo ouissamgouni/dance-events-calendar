@@ -838,6 +838,22 @@ body {
   min-width: 0;
 }
 
+/* Artwork column, between the optional timeline rail and the text. Matches
+   the 16:9 thumb of the shared card so both explorer styles line up. */
+.event-card-image {
+  width: 7rem;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  align-self: flex-start;
+  object-fit: cover;
+}
+
+/* The timeline row has no gap (the rail owns its gutter), so the thumb
+   supplies its own spacing and matches the content column's padding. */
+.event-card-timeline .event-card-image {
+  margin: 0.7rem 0.5rem 0.7rem 0.25rem;
+}
+
 .event-card-title {
   font-size: 0.875rem;
   font-weight: 600;
