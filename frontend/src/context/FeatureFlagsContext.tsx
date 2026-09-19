@@ -99,7 +99,7 @@ const defaultFlags: FeatureFlags = {
     eventCardShowTimeLocationIconsEnabled: false,
     explorerEventCardCardStyleEnabled: true,
     eventImagesEnabled: false,
-    eventCardPlaceholderStyle: 'none',
+    eventCardPlaceholderStyle: 'gradient',
 };
 
 const FeatureFlagsContext = createContext<{
