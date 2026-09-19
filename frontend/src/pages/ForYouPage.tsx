@@ -1,23 +1,34 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { CalendarEvent, PendingReview } from '../types';
 import { fetchEventsByIds, fetchMyPendingReviews } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { usePreferences } from '../context/PreferencesContext';
-import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useForYouLens } from '../hooks/useForYouLens';
 import { useSeenEvents } from '../hooks/useSeenEvents';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
+import { firstNameOf } from '../utils/displayName';
 import { trackView } from '../utils/tracking';
 import { isTrendingScore } from '../utils/trending';
 import YourNextEventsRail from '../components/YourNextEventsRail';
 import RailEventCard from '../components/RailEventCard';
+import EventCard from '../components/EventCard';
+import FriendsAreGoingCard from '../components/FriendsAreGoingCard';
 import ShareExperienceCard from '../components/ShareExperienceCard';
 import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
+import SectionHeading, { type SectionHeadingAction } from '../components/SectionHeading';
+import ScrollDotsIndicator from '../components/ScrollDots';
+import { useScrollDots } from '../hooks/useScrollDots';
 
 const DISPLAY_CAP = 5;
+
+export function timeOfDayGreeting(hour: number): string {
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+}
 
 function toApiDate(date: Date): string {
     const y = date.getFullYear();
@@ -45,21 +56,30 @@ interface LensTrailProps {
     emptyContent?: ReactNode;
     contextLabel: string;
     testId: string;
-    headerRight?: ReactNode;
+    headerAction?: SectionHeadingAction;
+    cardVariant?: 'default' | 'friends-going';
+    /** Opt this trail into the date-first EventCard layout when the flag is on. */
+    dateFirstEligible?: boolean;
 }
 
-function LensTrail(props: LensTrailProps) {
+export function LensTrail(props: LensTrailProps) {
     const {
         title, events, hasMore, loading, onLoadMore, onEventClick,
         hoveredEventId, onEventHover, trendingEnabled, popularityThreshold,
         trendingTopN, trendingTopPercent, newEventIds, unseenStateEnabled,
-        followingBadgeEnabled, emptyContent, contextLabel, testId, headerRight,
+        followingBadgeEnabled, emptyContent, contextLabel, testId, headerAction,
+        cardVariant = 'default', dateFirstEligible = false,
     } = props;
+    const { showRatings } = useFeatureFlags();
+    const friendsGoing = cardVariant === 'friends-going';
+    const dateFirst = dateFirstEligible && !friendsGoing;
     const [displayCap, setDisplayCap] = useState(DISPLAY_CAP);
     const visibleEvents = events.slice(0, displayCap);
     const hasLocalMore = events.length > visibleEvents.length;
     const showMoreTile = hasLocalMore || hasMore;
     const allScores = visibleEvents.map((event) => event.popularity_score ?? 0);
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [displayCap, events.length]);
 
     const handleMore = () => {
         if (hasLocalMore) {
@@ -71,20 +91,50 @@ function LensTrail(props: LensTrailProps) {
 
     return (
         <section data-testid={testId}>
-            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
-                <span>{title}</span>
-                {headerRight}
-            </div>
+            <SectionHeading title={title} action={headerAction} />
             {events.length === 0 ? (
-                <div className="px-2.5 py-3 text-xs text-slate-500">
+                <div className="px-2.5 py-3 text-xs text-ink-soft">
                     {emptyContent ?? 'Nothing here yet.'}
                 </div>
             ) : (
-                <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label={title}>
+                <div
+                    ref={scrollerRef}
+                    className={`flex overflow-x-auto scrollbar-hide py-2 ${friendsGoing ? 'snap-x snap-mandatory gap-3' : 'gap-2'}`}
+                    aria-label={title}
+                >
                     {visibleEvents.map((event) => {
+                        if (friendsGoing) {
+                            return (
+                                <FriendsAreGoingCard
+                                    key={event.event_id}
+                                    event={event}
+                                    onClick={onEventClick}
+                                />
+                            );
+                        }
                         const isNew = unseenStateEnabled && newEventIds.has(event.event_id);
                         const isTrending = trendingEnabled
                             && isTrendingScore(event.popularity_score ?? 0, allScores, popularityThreshold, trendingTopN, trendingTopPercent);
+                        if (dateFirst) {
+                            return (
+                                <EventCard
+                                    key={event.event_id}
+                                    event={event}
+                                    onOpen={onEventClick}
+                                    onHover={onEventHover}
+                                    highlighted={hoveredEventId === event.event_id}
+                                    isNew={isNew}
+                                    isTrending={isTrending}
+                                    followingBadgeEnabled={followingBadgeEnabled}
+                                    showRatings={showRatings}
+                                    showReviews={false}
+                                    widthClass="w-[300px]"
+                                    dateHeaderRow
+                                    twoLineTitle
+                                    goingIconVariant="hand"
+                                />
+                            );
+                        }
                         return (
                             <RailEventCard
                                 key={event.event_id}
@@ -104,12 +154,20 @@ function LensTrail(props: LensTrailProps) {
                             type="button"
                             onClick={handleMore}
                             disabled={loading && !hasLocalMore}
-                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch bg-slate-50 text-center text-[11px] font-semibold text-blue-600 transition hover:bg-slate-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
+                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch bg-canvas text-center text-[11px] font-semibold text-action transition hover:bg-canvas hover:text-action focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
                         >
                             {loading && !hasLocalMore ? 'Loading…' : '+ more'}
                         </button>
                     )}
                 </div>
+            )}
+            {events.length > 0 && (
+                <ScrollDotsIndicator
+                    count={dotCount}
+                    activeIndex={activeIndex}
+                    onSelect={scrollToIndex}
+                    label={`${title} scroll position`}
+                />
             )}
         </section>
     );
@@ -118,15 +176,14 @@ function LensTrail(props: LensTrailProps) {
 /**
  * "For you" surface: personalised event shortcuts for a signed-in viewer.
  * Renders five horizontal trails — Your next events, You might like,
- * Following & friends going, Build your tribe, New — each independently
+ * Friends are going, Build your tribe, New — each independently
  * paginated / scoped so a slow lens never blocks the others.
  */
 export default function ForYouPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { prefs } = usePreferences();
-    const { savedEventIds } = useSavedEvents();
-    const { attendingEventIds } = useAttendingEvents();
+    const { attendingEventIds, loading: attendingEventsLoading } = useAttendingEvents();
     const {
         unseenStateEnabled,
         trendingEnabled,
@@ -160,13 +217,13 @@ export default function ForYouPage() {
         fetchArgs: { startDate: forYouStartDate, profiles: 'me' },
         resetKey: forYouResetKey,
     });
-    const followingLens = useForYouLens({
+    const friendsGoingLens = useForYouLens({
         enabled: !!user,
         fetchArgs: {
             startDate: forYouStartDate,
             area: forYouArea,
-            interestSource: 'follows',
-            interestKind: 'any',
+            interestSource: 'friends',
+            interestKind: 'going',
         },
         resetKey: forYouResetKey,
     });
@@ -185,22 +242,23 @@ export default function ForYouPage() {
             .filter((event) => new Date(event.end).getTime() >= now)
             .sort((a, b) => (b.popularity_score ?? 0) - (a.popularity_score ?? 0));
     }, [youMightLikeLens.events]);
-    const followingGoingEvents = useMemo(() => {
+    const friendsGoingEvents = useMemo(() => {
         // eslint-disable-next-line react-hooks/purity -- render-time clock snapshot for past-event filter
         const now = Date.now();
-        return followingLens.events
+        return friendsGoingLens.events
             .filter((event) => new Date(event.end).getTime() >= now)
             .sort(
-                (a, b) => (b.going_count ?? 0) + (b.saved_count ?? 0) - ((a.going_count ?? 0) + (a.saved_count ?? 0)),
+                (a, b) => (b.friends_going_count ?? 0) - (a.friends_going_count ?? 0)
+                    || new Date(a.start).getTime() - new Date(b.start).getTime(),
             );
-    }, [followingLens.events]);
+    }, [friendsGoingLens.events]);
 
     const seenScopeIds = useMemo(
         () => [
             ...youMightLikeLens.events.map((event) => event.event_id),
-            ...followingLens.events.map((event) => event.event_id),
+            ...friendsGoingLens.events.map((event) => event.event_id),
         ],
-        [youMightLikeLens.events, followingLens.events],
+        [youMightLikeLens.events, friendsGoingLens.events],
     );
     const { newEventIds, markSeen } = useSeenEvents(seenScopeIds);
     const newEvents = useMemo(
@@ -208,15 +266,26 @@ export default function ForYouPage() {
         [youMightLikeEvents, newEventIds],
     );
 
-    const yourNextEventIds = useMemo(
-        () => [...new Set([...savedEventIds, ...attendingEventIds])],
-        [savedEventIds, attendingEventIds],
-    );
     const [rawYourNextEvents, setRawYourNextEvents] = useState<CalendarEvent[]>([]);
+    const [yourNextEventsLoading, setYourNextEventsLoading] = useState(true);
     useEffect(() => {
-        if (!user || yourNextEventIds.length === 0) return;
+        if (!user) {
+            setRawYourNextEvents([]);
+            setYourNextEventsLoading(false);
+            return;
+        }
+        if (attendingEventsLoading) {
+            setYourNextEventsLoading(true);
+            return;
+        }
+        if (attendingEventIds.length === 0) {
+            setRawYourNextEvents([]);
+            setYourNextEventsLoading(false);
+            return;
+        }
         let cancelled = false;
-        fetchEventsByIds(yourNextEventIds)
+        setYourNextEventsLoading(true);
+        fetchEventsByIds(attendingEventIds)
             .then((evts) => {
                 if (cancelled) return;
                 const now = Date.now();
@@ -225,30 +294,23 @@ export default function ForYouPage() {
                         .filter((e) => new Date(e.end).getTime() >= now)
                         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
                 );
+                setYourNextEventsLoading(false);
             })
             .catch(() => {
-                /* keep previous list on fetch error */
+                if (!cancelled) setYourNextEventsLoading(false);
             });
         return () => {
             cancelled = true;
         };
-    }, [user, yourNextEventIds]);
-    // Derive the visible list from the current id set so it collapses instantly
-    // when the user unsaves/removes going, without a stale-state reset in the effect.
+    }, [user, attendingEventIds, attendingEventsLoading]);
+    // Derive from the live Going IDs so removing an RSVP updates immediately.
     const yourNextEvents = useMemo(() => {
-        if (!user || yourNextEventIds.length === 0) return [];
-        const ids = new Set(yourNextEventIds);
-        const attendingSet = new Set(attendingEventIds);
+        if (!user || attendingEventIds.length === 0) return [];
+        const ids = new Set(attendingEventIds);
         return rawYourNextEvents
             .filter((e) => ids.has(e.event_id))
-            // Events the viewer is going to lead the rail; saved-only trail after.
-            .sort((a, b) => {
-                const aGoing = attendingSet.has(a.event_id);
-                const bGoing = attendingSet.has(b.event_id);
-                if (aGoing !== bGoing) return aGoing ? -1 : 1;
-                return new Date(a.start).getTime() - new Date(b.start).getTime();
-            });
-    }, [user, yourNextEventIds, rawYourNextEvents, attendingEventIds]);
+            .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    }, [user, attendingEventIds, rawYourNextEvents]);
 
     // "Share your experience": past events the viewer attended but hasn't
     // reviewed yet (server applies the admin-configurable recency window).
@@ -271,6 +333,9 @@ export default function ForYouPage() {
         setPendingReviews((prev) => prev.filter((r) => r.event_id !== eventId));
     }, []);
 
+    const shareScrollerRef = useRef<HTMLDivElement>(null);
+    const shareDots = useScrollDots(shareScrollerRef, [pendingReviews.length]);
+
     const handleEventClick = useCallback((evt: CalendarEvent) => {
         markSeen(evt.event_id);
         trackView(evt.event_id, 'for-you');
@@ -278,18 +343,25 @@ export default function ForYouPage() {
     }, [markSeen, navigate]);
 
     const trendingDecoration = trendingEnabled && showPopularity;
+    const firstName = firstNameOf(user?.name, user?.handle);
+    const greeting = timeOfDayGreeting(new Date().getHours());
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-4 sm:py-6">
-                <h1 className="mb-3 text-xl font-semibold text-slate-900">For You</h1>
+                <header className="mb-4">
+                    <h1 className="text-2xl font-bold text-ink">
+                        {greeting}{firstName ? `, ${firstName}` : ''} 👋
+                    </h1>
+                    <p className="mt-1 text-[12px] text-ink-soft">Your picks for today.</p>
+                </header>
                 {!user ? (
-                    <div className="bg-blue-50 border border-blue-100 p-4 text-sm text-slate-700">
-                        <p className="mb-2 font-medium text-slate-800">Personalised events for you</p>
-                        <p className="mb-3 text-slate-600">Sign in to see events tailored to your saved area, dance styles and friends.</p>
+                    <div className="bg-blue-50 border border-blue-100 p-4 text-sm text-ink">
+                        <p className="mb-2 font-medium text-ink">Personalised events for you</p>
+                        <p className="mb-3 text-ink-soft">Sign in to see events tailored to your saved area, dance styles and friends.</p>
                         <Link
                             to={`/login?next=${encodeURIComponent('/for-you')}`}
-                            className="inline-flex items-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
                         >
                             Sign in
                         </Link>
@@ -299,19 +371,17 @@ export default function ForYouPage() {
                         <YourNextEventsRail
                             events={yourNextEvents}
                             onEventClick={handleEventClick}
-                            hoveredEventId={hoveredEventId}
-                            onEventHover={onEventHover}
-                            newEventIds={newEventIds}
-                            unseenStateEnabled={unseenStateEnabled}
+                            loading={attendingEventsLoading || yourNextEventsLoading}
                         />
                         <LensTrail
                             title="You might like"
                             testId="for-you-you-might-like"
                             contextLabel="you might like event"
+                            dateFirstEligible
                             emptyContent={(
                                 <>
                                     Save a few dance styles in your profile to see recommendations here.{' '}
-                                    <Link to="/account#preferences" className="font-semibold text-blue-600 hover:text-blue-700">
+                                    <Link to="/account#preferences" className="font-semibold text-action hover:text-action">
                                         Update your preferences
                                     </Link>
                                 </>
@@ -332,34 +402,31 @@ export default function ForYouPage() {
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
                         <LensTrail
-                            title="Following & Friends going"
+                            title="Friends are going"
                             testId="for-you-following-friends-going"
-                            contextLabel="following & friends going event"
-                            headerRight={(
-                                <Link
-                                    to="/tribe/calendars"
-                                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
-                                >
-                                    See in explorer
-                                </Link>
-                            )}
+                            contextLabel="friends going event"
+                            cardVariant="friends-going"
+                            headerAction={{
+                                label: 'See all',
+                                to: '/tribe/calendars?interest_source=friends&interest_kind=going',
+                            }}
                             emptyContent={(
                                 (user?.following_count ?? 0) === 0 ? (
                                     <>
                                         <p className="mb-2">You&apos;re not following anyone yet.</p>
                                         <Link
                                             to="/tribe/discover"
-                                            className="inline-flex items-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                            className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
                                         >
                                             Build your tribe
                                         </Link>
                                     </>
-                                ) : 'No one you follow is going to anything upcoming yet.'
+                                ) : 'No friends are going to anything upcoming yet.'
                             )}
-                            events={followingGoingEvents}
-                            hasMore={followingLens.hasMore}
-                            loading={followingLens.loading}
-                            onLoadMore={followingLens.loadMore}
+                            events={friendsGoingEvents}
+                            hasMore={friendsGoingLens.hasMore}
+                            loading={friendsGoingLens.loading}
+                            onLoadMore={friendsGoingLens.loadMore}
                             onEventClick={handleEventClick}
                             hoveredEventId={hoveredEventId}
                             onEventHover={onEventHover}
@@ -373,10 +440,8 @@ export default function ForYouPage() {
                         />
                         {pendingReviews.length > 0 && (
                             <section data-testid="for-you-share-your-experience">
-                                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
-                                    <span>Share your experience</span>
-                                </div>
-                                <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Share your experience">
+                                <SectionHeading title="Share your experience" />
+                                <div ref={shareScrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Share your experience">
                                     {pendingReviews.map((review) => (
                                         <ShareExperienceCard
                                             key={review.event_id}
@@ -385,12 +450,19 @@ export default function ForYouPage() {
                                         />
                                     ))}
                                 </div>
+                                <ScrollDotsIndicator
+                                    count={shareDots.dotCount}
+                                    activeIndex={shareDots.activeIndex}
+                                    onSelect={shareDots.scrollToIndex}
+                                    label="Share your experience scroll position"
+                                />
                             </section>
                         )}
                         <LensTrail
                             title="New"
                             testId="for-you-new"
                             contextLabel="new event"
+                            dateFirstEligible
                             emptyContent="No new matches since your last visit."
                             events={newEvents}
                             hasMore={youMightLikeLens.hasMore}

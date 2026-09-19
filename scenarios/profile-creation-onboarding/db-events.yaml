@@ -61,14 +61,13 @@ events:
       - dance-style:salsa
       - reach:local
 
-  # (D) Paris event tagged BOTH international AND local — matches BOTH
-  #     the wide INTL profile AND the Paris LOCAL profile. Existing
-  #     Notification unique constraint => exactly ONE notification, whose
-  #     message names BOTH matched profiles (plural-safe rendering).
+  # (D) International Paris event — matches the wide INTL profile. The
+  #     near-home profile uses Any, so geography independently makes it match
+  #     there too. Notification dedup still yields exactly one notification.
   - id: ev-dual-paris
     calendar_id: salsa-cal-001
-    title: Paris International + Local Weekender
-    description: "Multi-scale event — dedup probe for multi-profile match."
+    title: Paris International Weekender
+    description: "International event used as a multi-profile dedup probe."
     location: "Grand Salon, Paris, France"
     latitude: 48.8600
     longitude: 2.3500
@@ -77,7 +76,6 @@ events:
     tags:
       - format:festival
       - dance-style:salsa
-      - reach:local
       - reach:international
 
   # (E) Untagged-reach salsa event in Berlin (WITHIN the wide EUR area,

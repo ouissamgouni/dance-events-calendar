@@ -12,7 +12,7 @@ export default function LocationBadge({ location, latitude, longitude, size = 'm
     if (latitude != null && longitude != null) {
         return (
             <span
-                className={`inline-flex items-center justify-center ${sizeClass} rounded-full bg-emerald-50 text-emerald-600 cursor-default shrink-0`}
+                className={`inline-flex items-center justify-center ${sizeClass} rounded-full bg-emerald-50 text-success cursor-default shrink-0`}
                 title="Location resolved"
             >
                 <svg width={iconSize} height={iconSize} viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -36,7 +36,7 @@ export default function LocationBadge({ location, latitude, longitude, size = 'm
     }
     return (
         <span
-            className={`inline-flex items-center justify-center ${sizeClass} rounded-full bg-slate-100 text-slate-400 cursor-default shrink-0`}
+            className={`inline-flex items-center justify-center ${sizeClass} rounded-full bg-slate-100 text-muted cursor-default shrink-0`}
             title="No location"
         >
             <svg width={iconSize} height={iconSize} viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">

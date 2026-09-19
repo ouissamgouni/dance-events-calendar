@@ -13,19 +13,19 @@ function ReviewCard({ review }: { review: EventReviewPublic }) {
         ...review.aspect_tags.map((t) => ({
             key: `a-${t.id}`,
             label: t.label,
-            cls: t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-green-800',
+            cls: t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-success',
         })),
-        ...review.audience_tags.map((t) => ({ key: `u-${t.id}`, label: t.label, cls: 'bg-slate-100 text-slate-600' })),
+        ...review.audience_tags.map((t) => ({ key: `u-${t.id}`, label: t.label, cls: 'bg-slate-100 text-ink-soft' })),
     ];
     return (
-        <li className="border border-slate-200 bg-white p-3">
+        <li className="border border-line bg-surface p-3">
             <div className="flex items-center gap-2 min-w-0">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-ink-soft">
                     {initials}
                 </span>
                 <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-900">{review.reviewer_label}</div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <div className="truncate text-sm font-semibold text-ink">{review.reviewer_label}</div>
+                    <div className="flex items-center gap-1.5 text-xs text-ink-soft">
                         {meta && <span>{meta.emoji} {meta.label}</span>}
                         {meta && <span className="text-slate-300">·</span>}
                         <span>{new Date(review.created_at).toLocaleDateString()}</span>
@@ -33,7 +33,7 @@ function ReviewCard({ review }: { review: EventReviewPublic }) {
                 </div>
             </div>
             {review.comment && (
-                <p className="mt-2 text-sm text-slate-700 whitespace-pre-wrap break-words line-clamp-4">{review.comment}</p>
+                <p className="mt-2 text-sm text-ink whitespace-pre-wrap break-words line-clamp-4">{review.comment}</p>
             )}
             {tags.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -72,19 +72,19 @@ export default function FollowingReviewsPage() {
 
     if (!user) {
         return (
-            <div className="mx-auto max-w-xl px-4 py-6 text-xs text-slate-600">
-                <Link to="/login" className="text-blue-600 hover:underline">Sign in</Link> to see reviews from people you follow.
+            <div className="mx-auto max-w-xl px-4 py-6 text-xs text-ink-soft">
+                <Link to="/login" className="text-action hover:underline">Sign in</Link> to see reviews from people you follow.
             </div>
         );
     }
 
     return (
         <div className="mx-auto max-w-xl px-4 py-4">
-            <h1 className="mb-3 text-sm font-semibold text-slate-900">Reviews from people you follow</h1>
+            <h1 className="mb-3 text-sm font-semibold text-ink">Reviews from people you follow</h1>
             {items === null ? (
-                <p className="text-sm text-slate-400">Loading…</p>
+                <p className="text-sm text-muted">Loading…</p>
             ) : items.length === 0 ? (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-ink-soft">
                     No reviews yet. When people you follow review events, they'll show up here.
                 </p>
             ) : (

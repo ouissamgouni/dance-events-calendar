@@ -294,6 +294,8 @@ def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(
     _subscribe(session, bob, alice)
 
     _login(client, "alice@example.com")
+    start = (datetime.utcnow() + timedelta(days=1)).replace(microsecond=0)
+    end = start + timedelta(hours=3)
     r = client.post(
         "/api/suggestions",
         json={
@@ -301,8 +303,8 @@ def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(
             "location": "Berlin Center",
             "latitude": 52.52,
             "longitude": 13.405,
-            "start": "2026-09-01T20:00:00",
-            "end": "2026-09-01T23:00:00",
+            "start": start.isoformat(),
+            "end": end.isoformat(),
             "going": True,
             "going_audience": "friends",
         },
@@ -616,6 +618,151 @@ def test_mark_all_read(client, session):
         .where(Notification.read_at.is_(None))
     ).all()
     assert remaining_unread == []
+
+
+# --- subscription_saved fan-out ---------------------------------------------
+
+
+def test_saved_public_fans_out_to_subscribers(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-1")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+
+    _login(client, "alice@example.com")
+    r = client.post(
+        "/api/track/event-save",
+        json={
+            "event_id": "ev-1",
+            "device_id": "dev-alice",
+            "action": "save",
+            "audience": "public",
+        },
+    )
+    assert r.status_code == 201, r.text
+
+    notifs = session.exec(
+        select(Notification).where(Notification.recipient_user_id == bob.id)
+    ).all()
+    assert len(notifs) == 1
+    assert notifs[0].kind == "subscription_saved"
+    assert notifs[0].event_id == "ev-1"
+    assert notifs[0].actor_user_id == alice.id
+
+
+def test_saved_private_does_not_fan_out(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-1")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+
+    _login(client, "alice@example.com")
+    r = client.post(
+        "/api/track/event-save",
+        json={
+            "event_id": "ev-1",
+            "device_id": "dev-alice",
+            "action": "save",
+            "audience": "private",
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert _count_notifs(session, bob) == 0
+
+
+def test_unsave_withdraws_saved_notifications(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-1")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+
+    _login(client, "alice@example.com")
+    client.post(
+        "/api/track/event-save",
+        json={
+            "event_id": "ev-1",
+            "device_id": "dev-alice",
+            "action": "save",
+            "audience": "public",
+        },
+    )
+    assert _count_notifs(session, bob) == 1
+
+    r = client.post(
+        "/api/track/event-save",
+        json={"event_id": "ev-1", "device_id": "dev-alice", "action": "unsave"},
+    )
+    assert r.status_code == 201, r.text
+    assert _count_notifs(session, bob) == 0
+
+
+# --- Aggregation + event image ----------------------------------------------
+
+
+def test_list_aggregates_multi_actor_going(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-1")
+    alice = _make_user(session, "alice@example.com", "alice")
+    carol = _make_user(session, "carol@example.com", "carol")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _seed_one_notif(session, bob, alice, kind="subscription_going", event_id="ev-1")
+    _seed_one_notif(session, bob, carol, kind="subscription_going", event_id="ev-1")
+
+    _login(client, "bob@example.com")
+    r = client.get("/api/notifications")
+    assert r.status_code == 200
+    data = r.json()
+    # Two raw rows collapse into a single multi-actor group.
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["actor_count"] == 2
+    assert len(item["actors"]) == 2
+    assert len(item["member_ids"]) == 2
+
+
+def test_list_includes_event_image_url(client, session):
+    _make_calendar(session)
+    e = _make_event(session, "ev-1")
+    e.image_url = "/cover.jpg"
+    session.add(e)
+    session.commit()
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _seed_one_notif(session, bob, alice, kind="subscription_going", event_id="ev-1")
+
+    _login(client, "bob@example.com")
+    r = client.get("/api/notifications")
+    assert r.status_code == 200
+    assert r.json()["items"][0]["event_image_url"] == "/cover.jpg"
+
+
+def test_mark_read_clears_aggregated_group(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-1")
+    alice = _make_user(session, "alice@example.com", "alice")
+    carol = _make_user(session, "carol@example.com", "carol")
+    bob = _make_user(session, "bob@example.com", "bob")
+    n1 = _seed_one_notif(
+        session, bob, alice, kind="subscription_going", event_id="ev-1"
+    )
+    _seed_one_notif(session, bob, carol, kind="subscription_going", event_id="ev-1")
+
+    _login(client, "bob@example.com")
+    # Marking the representative read clears every sibling in the group.
+    r = client.post(f"/api/notifications/{n1.id}/read")
+    assert r.status_code == 200
+    assert r.json()["read_at"] is not None
+
+    unread = session.exec(
+        select(Notification)
+        .where(Notification.recipient_user_id == bob.id)
+        .where(Notification.read_at.is_(None))
+    ).all()
+    assert unread == []
 
 
 # --- /api/social/me/subscribed-events ---------------------------------------

@@ -1,0 +1,91 @@
+base_week: 0
+events:
+  # Each seeded picture exercises a different source aspect ratio through the
+  # real crop pipeline (16:9 thumb + width-capped full variant).
+  - id: evt-picture-landscape
+    calendar_id: picture-cal-001
+    title: Landscape Source — Salsa Social
+    description: |
+      Seeded from a 3:2 landscape source. The card thumb should be a centred
+      16:9 crop; the detail hero keeps the original aspect ratio.
+    location: Sala Grande, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    image: landscape.jpg
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: evt-picture-portrait
+    calendar_id: picture-cal-001
+    title: Portrait Source — Bachata Night
+    description: |
+      Seeded from a tall portrait source. The 16:9 thumb must crop vertically
+      without distorting the image.
+    location: Club Vertical, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 22:00
+    end: w0 Sun 03:00
+    price_is_free: true
+    image: portrait.jpg
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: evt-picture-ultrawide
+    calendar_id: picture-cal-001
+    title: Ultra-wide Source — Kizomba Festival
+    description: |
+      Seeded from a very wide source. Nothing should be letterboxed: the thumb
+      crops horizontally, the full variant is width-capped at 1200px.
+    location: Panorama Hall, Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w1 Fri 20:00
+    end: w1 Sat 02:00
+    price_is_free: true
+    image: ultrawide.jpg
+    tags:
+      - format:festival
+      - dance-style:kizomba
+      - reach:international
+
+  # No picture: exercises the card placeholder in both styles.
+  - id: evt-picture-none-a
+    calendar_id: picture-cal-001
+    title: Zouk Practica Without Picture
+    description: |
+      Deliberately has no picture so the placeholder can be checked.
+    location: Studio Nord, Amsterdam, Netherlands
+    latitude: 52.3676
+    longitude: 4.9041
+    start: w1 Tue 19:30
+    end: w1 Tue 22:00
+    price_is_free: true
+    tags:
+      - format:practice
+      - dance-style:zouk
+      - reach:local
+
+  - id: evt-picture-none-b
+    calendar_id: picture-cal-001
+    title: Afro Dance Lab Without Picture
+    description: |
+      Second picture-less event — its placeholder must differ in colour from
+      the other one (the gradient is derived from the event id).
+    location: Warehouse 9, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w1 Thu 20:00
+    end: w1 Thu 23:00
+    price_is_free: true
+    tags:
+      - format:workshop
+      - dance-style:semba
+      - reach:local

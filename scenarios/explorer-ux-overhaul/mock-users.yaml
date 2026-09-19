@@ -1,156 +1,264 @@
 # Explorer UX overhaul scenario — richer cast for the Explorer social
-# surfaces. Bob is the signed-in viewer used to exercise following / friends
-# filters, attendance overlays, save counts, and popularity alongside the
-# mobile-first Explorer UI.
+# surfaces. `viewer` is the signed-in user used to exercise following /
+# friends filters, attendance overlays, save counts, and popularity
+# alongside the mobile-first Explorer UI. `bob` is an out-of-graph control.
 users:
   - email: viewer@example.com
     name: Viewer Explorer
     handle: viewer
     account_visibility: public
+    avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Viewer%20Explorer"
+    # Notification preferences: all channels enabled (heavy engagement)
+    email_social_activity_enabled: true
+    push_social_activity_enabled: true
+    email_event_reminders_enabled: true
+    push_event_reminders_enabled: true
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: true
+    email_friend_milestones_enabled: true
+    push_friend_milestones_enabled: true
+    email_review_prompt_enabled: true
+    push_review_prompt_enabled: true
   - email: bob@example.com
     name: Bob Martin
     handle: bob
     account_visibility: public
+    avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Bob%20Martin"
+    # Notification preferences: email only, push disabled (opt-in control)
+    email_social_activity_enabled: true
+    push_social_activity_enabled: false
+    email_event_reminders_enabled: true
+    push_event_reminders_enabled: false
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: false
+    email_friend_milestones_enabled: true
+    push_friend_milestones_enabled: false
+    email_review_prompt_enabled: true
+    push_review_prompt_enabled: false
   - email: admin@example.com
     name: Admin
     handle: admin
     role: admin
     account_visibility: public
+    avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Admin"
   - {
       email: alice@example.com,
       name: Alice Rivera,
       handle: alice,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Alice%20Rivera",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: true,
     }
   - {
       email: emma@example.com,
       name: Emma Larsen,
       handle: emma,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Emma%20Larsen",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: false,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: false,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: false,
     }
   - {
       email: frank@example.com,
       name: Frank Dubois,
       handle: frank,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Frank%20Dubois",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: false,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: false,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: true,
     }
   - {
       email: gina@example.com,
       name: Gina Costa,
       handle: gina,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Gina%20Costa",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: true,
     }
   - {
       email: hugo@example.com,
       name: Hugo Schmidt,
       handle: hugo,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Hugo%20Schmidt",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: false,
+      push_review_prompt_enabled: false,
     }
   - {
       email: nia@example.com,
       name: Nia Okafor,
       handle: nia,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Nia%20Okafor",
+      email_social_activity_enabled: true,
+      push_social_activity_enabled: true,
+      email_event_reminders_enabled: true,
+      push_event_reminders_enabled: true,
+      email_interest_matches_enabled: true,
+      push_interest_matches_enabled: true,
+      email_friend_milestones_enabled: true,
+      push_friend_milestones_enabled: true,
+      email_review_prompt_enabled: true,
+      push_review_prompt_enabled: true,
     }
   - {
       email: omar@example.com,
       name: Omar Haddad,
       handle: omar,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Omar%20Haddad",
     }
   - {
       email: pablo@example.com,
       name: Pablo Ortega,
       handle: pablo,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Pablo%20Ortega",
     }
   - {
       email: quinn@example.com,
       name: Quinn Walsh,
       handle: quinn,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Quinn%20Walsh",
     }
   - {
       email: rita@example.com,
       name: Rita Falk,
       handle: rita,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Rita%20Falk",
     }
   - {
       email: samir@example.com,
       name: Samir Patel,
       handle: samir,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Samir%20Patel",
     }
   - {
       email: tara@example.com,
       name: Tara Lindqvist,
       handle: tara,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Tara%20Lindqvist",
     }
   - {
       email: ulysses@example.com,
       name: Ulysses Moreau,
       handle: ulysses,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Ulysses%20Moreau",
     }
   - {
       email: s01@example.com,
       name: Stranger 01,
       handle: s01,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Stranger%2001",
     }
   - {
       email: s02@example.com,
       name: Stranger 02,
       handle: s02,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Stranger%2002",
     }
   - {
       email: s03@example.com,
       name: Stranger 03,
       handle: s03,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Stranger%2003",
     }
   - {
       email: s04@example.com,
       name: Stranger 04,
       handle: s04,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Stranger%2004",
     }
   - {
       email: s05@example.com,
       name: Stranger 05,
       handle: s05,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Stranger%2005",
     }
   - {
       email: t01@example.com,
       name: Saver 01,
       handle: t01,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Saver%2001",
     }
   - {
       email: t02@example.com,
       name: Saver 02,
       handle: t02,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Saver%2002",
     }
   - {
       email: t03@example.com,
       name: Saver 03,
       handle: t03,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Saver%2003",
     }
   - {
       email: t04@example.com,
       name: Saver 04,
       handle: t04,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Saver%2004",
     }
   - {
       email: t05@example.com,
       name: Saver 05,
       handle: t05,
       account_visibility: public,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Saver%2005",
     }

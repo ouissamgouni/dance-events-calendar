@@ -136,9 +136,9 @@ def _resolve_audience(target_user: User, audience: Optional[str]) -> str:
     if audience is not None:
         return audience
     # Mirror the self-serve handlers' fallback chain: explicit per-row
-    # audience > user's share_attendance_default_audience > "friends"
-    # (GDPR privacy-by-default).
-    return target_user.share_attendance_default_audience or "friends"
+    # audience > user's share_attendance_default_audience > "public"
+    # (the account default; disclosed + reversible at the point of action).
+    return target_user.share_attendance_default_audience or "public"
 
 
 def _add(

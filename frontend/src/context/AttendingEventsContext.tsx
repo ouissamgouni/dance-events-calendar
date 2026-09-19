@@ -22,6 +22,7 @@ function audienceKeyFor(idKey: string): string { return `${AUDIENCE_PREFIX}:${id
 interface AttendingEventsContextValue {
     attendingEventIds: string[];
     attendingCount: number;
+    loading: boolean;
     isAttending: (eventId: string) => boolean;
     /**
      * Toggle the going state for an event.
@@ -124,6 +125,7 @@ export function AttendingEventsProvider({ children }: { children: ReactNode }) {
         cleanupLegacyStorageOnce();
         return readIdsFromStorage(idKey);
     });
+    const [loading, setLoading] = useState(true);
     const [shareMap, setShareMap] = useState<Record<string, boolean>>(() => readShareMapFromStorage(idKey));
     const [audienceMap, setAudienceMap] = useState<Record<string, ShareAudience>>(() => readAudienceMapFromStorage(idKey));
     const lastIdentity = useRef<string>(idKey);
@@ -135,6 +137,7 @@ export function AttendingEventsProvider({ children }: { children: ReactNode }) {
     // Identity-change reconciliation. REPLACE local state with server truth
     // (no union). See SavedEventsContext for the same rationale.
     useEffect(() => {
+        setLoading(true);
         if (lastIdentity.current !== idKey) {
             lastIdentity.current = idKey;
             setAttendingIds(readIdsFromStorage(idKey));
@@ -155,8 +158,11 @@ export function AttendingEventsProvider({ children }: { children: ReactNode }) {
                 }
                 setShareMap(nextShare);
                 setAudienceMap(nextAudience);
+                setLoading(false);
             })
-            .catch(() => { /* offline — keep cached state */ });
+            .catch(() => {
+                if (!cancelled) setLoading(false);
+            });
         return () => { cancelled = true; };
     }, [idKey]);
 
@@ -245,12 +251,13 @@ export function AttendingEventsProvider({ children }: { children: ReactNode }) {
     const value = useMemo<AttendingEventsContextValue>(() => ({
         attendingEventIds: [...attendingIds],
         attendingCount: attendingIds.size,
+        loading,
         isAttending,
         toggleAttending,
         setAudience,
         getAudience,
         isSharingPublicly,
-    }), [attendingIds, isAttending, toggleAttending, setAudience, getAudience, isSharingPublicly]);
+    }), [attendingIds, loading, isAttending, toggleAttending, setAudience, getAudience, isSharingPublicly]);
 
     return (
         <AttendingEventsContext.Provider value={value}>

@@ -154,6 +154,10 @@ class TestScheduler:
                 "backend.services.activity_email.run_once",
                 return_value={"digests": 3, "pushed": 2},
             ),
+            patch(
+                "backend.services.recurrence_extension.run_once",
+                return_value={"series_extended": 1, "occurrences_created": 4},
+            ),
         ):
             stats = run_notification_dispatch_once()
 
@@ -163,6 +167,7 @@ class TestScheduler:
             "milestone": {"milestones": 1, "emailed": 1, "pushed": 0},
             "interest": {"candidates": 4, "created": 1},
             "activity": {"digests": 3, "pushed": 2},
+            "recurrence": {"series_extended": 1, "occurrences_created": 4},
         }
 
     def test_notification_dispatch_is_resilient_when_subtask_raises(self):
@@ -186,6 +191,10 @@ class TestScheduler:
             patch(
                 "backend.services.activity_email.run_once",
                 return_value={"digests": 1},
+            ),
+            patch(
+                "backend.services.recurrence_extension.run_once",
+                return_value={"series_extended": 0, "occurrences_created": 0},
             ),
         ):
             stats = run_notification_dispatch_once()

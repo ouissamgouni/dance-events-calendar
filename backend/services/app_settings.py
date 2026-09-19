@@ -147,6 +147,18 @@ def get_review_prompt_enabled(session: Optional[Session] = None) -> bool:
     return loader.get_review_prompt_enabled()
 
 
+def get_event_review_size_step_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "event_review_size_step_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return loader.get_event_review_size_step_enabled()
+
+
 def get_review_prompt_delay_hours(session: Optional[Session] = None) -> int:
     s, opened = _open_session(session)
     try:

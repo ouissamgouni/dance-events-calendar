@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { NAV_DESTINATIONS } from './navDestinations';
+import { useNavDestinations } from './navDestinations';
 import { useForYouHasNew } from '../hooks/useForYouHasNew';
 
 /**
@@ -10,10 +10,11 @@ export default function DesktopNav({ className = '' }: { className?: string }) {
     const { pathname } = useLocation();
     const forYouActive = pathname === '/for-you';
     const hasNewForYou = useForYouHasNew(forYouActive);
+    const navDestinations = useNavDestinations();
 
     return (
         <nav aria-label="Primary" className={`hidden md:flex items-center gap-1 ${className}`}>
-            {NAV_DESTINATIONS.map((dest) => {
+            {navDestinations.map((dest) => {
                 const active = dest.isActive(pathname);
                 const showDot = dest.id === 'for-you' && hasNewForYou;
                 return (
@@ -21,18 +22,18 @@ export default function DesktopNav({ className = '' }: { className?: string }) {
                         key={dest.id}
                         to={dest.path}
                         aria-current={active ? 'page' : undefined}
-                        className={`relative inline-flex items-center gap-1.5 px-2.5 py-1 text-sm transition ${active ? 'text-white font-semibold' : 'text-gray-300 hover:text-white'
+                        className={`relative inline-flex items-center gap-1.5 px-2.5 py-1 text-sm transition ${active ? 'text-action font-semibold' : 'text-ink-soft hover:text-ink'
                             }`}
                     >
-                        <img src={dest.icon} alt="" aria-hidden="true" className="h-4 w-4 brightness-0 invert" />
+                        <img src={dest.icon} alt="" aria-hidden="true" className="h-4 w-4" />
                         {dest.label}
                         {active && (
-                            <span aria-hidden="true" className="absolute -bottom-0.5 left-2.5 right-2.5 h-0.5 bg-blue-500" />
+                            <span aria-hidden="true" className="absolute -bottom-0.5 left-2.5 right-2.5 h-0.5 bg-action" />
                         )}
                         {showDot && (
                             <span
                                 // eslint-disable-next-line no-restricted-syntax -- small status dot (new indicator) — allowed exception per frontend rules
-                                className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-blue-500"
+                                className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-action"
                                 aria-label="New items available"
                                 data-testid="for-you-desktop-new-dot"
                             />

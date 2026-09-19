@@ -259,6 +259,57 @@ def test_admin_force_enable_push_toggle(client, session):
 
 
 @pytest.mark.unit
+def test_admin_reset_onboarding_retriggers_without_touching_data(client, session):
+    from datetime import datetime
+
+    from backend.config.loader import get_current_onboarding_version
+
+    users = _seed_users(session)
+    alice = users["alice"]
+    alice.onboarded_at = datetime.utcnow()
+    alice.onboarding_version = get_current_onboarding_version()
+    alice.preferred_area_label = "Europe"
+    session.add(alice)
+    # A follow edge that must survive the reset.
+    session.add(UserFollow(follower_id=alice.id, followee_id=users["bob"].id))
+    session.commit()
+    session.refresh(alice)
+
+    _login(client, "admin@example.com")
+    # Onboarded user at the current version is not flagged.
+    listing = client.get("/api/social/admin/users?q=alice")
+    assert listing.status_code == 200, listing.text
+    row = next(u for u in listing.json()["items"] if u["handle"] == "alice")
+    assert row["onboarded_at"] is not None
+    assert row["needs_onboarding"] is False
+
+    r = client.patch(f"/api/social/admin/users/id/{alice.id}/reset-onboarding")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["onboarded_at"] is None
+    assert body["needs_onboarding"] is True
+
+    session.expire_all()
+    refreshed = session.exec(select(User).where(User.handle == "alice")).first()
+    assert refreshed is not None
+    assert refreshed.onboarded_at is None
+    # Non-destructive: preferences and follows are preserved.
+    assert refreshed.preferred_area_label == "Europe"
+    follow = session.exec(
+        select(UserFollow).where(UserFollow.follower_id == alice.id)
+    ).first()
+    assert follow is not None
+
+
+@pytest.mark.unit
+def test_admin_reset_onboarding_requires_admin(client, session):
+    users = _seed_users(session)
+    _login(client, "alice@example.com")  # not admin
+    r = client.patch(f"/api/social/admin/users/id/{users['bob'].id}/reset-onboarding")
+    assert r.status_code == 403
+
+
+@pytest.mark.unit
 def test_admin_send_install_email_requires_admin(client, session):
     users = _seed_users(session)
     _login(client, "alice@example.com")  # not admin

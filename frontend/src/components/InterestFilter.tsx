@@ -107,7 +107,7 @@ export function FollowingPersonRail({
                             'inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border px-2 py-1 text-xs transition ' +
                             (checked
                                 ? 'bg-blue-400 border-blue-400 text-white'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500') +
+                                : 'bg-surface border-line text-ink-soft hover:border-action hover:text-action') +
                             hideOnMobile
                         }
                     >
@@ -122,14 +122,14 @@ export function FollowingPersonRail({
                             <span
                                 className={
                                     'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold ' +
-                                    (checked ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-600')
+                                    (checked ? 'bg-surface/25 text-white' : 'bg-slate-200 text-ink-soft')
                                 }
                             >
                                 {label.replace(/^@/, '').slice(0, 1).toUpperCase()}
                             </span>
                         )}
                         <span className="max-w-[7rem] truncate">{label}</span>
-                        <span className={checked ? 'text-white/80' : 'text-slate-400'}>({count})</span>
+                        <span className={checked ? 'text-white/80' : 'text-muted'}>({count})</span>
                     </button>
                 );
             })}
@@ -217,14 +217,14 @@ export function FollowingPersonSearch({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search people you follow…"
                 aria-label="Search people you follow"
-                className="w-full border border-slate-200 px-2 py-1 pr-7 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
+                className="w-full border border-line px-2 py-1 pr-7 text-xs text-ink placeholder:text-muted focus:border-action focus:outline-none"
             />
             {/* max-h caps the list at ~5 rows; the rest scrolls. */}
             <div className="mt-2 flex max-h-48 flex-col overflow-y-auto">
                 {loading ? (
-                    <p className="px-1 py-2 text-xs text-slate-400">Loading…</p>
+                    <p className="px-1 py-2 text-xs text-muted">Loading…</p>
                 ) : filtered.length === 0 ? (
-                    <p className="px-1 py-2 text-xs text-slate-400">No people found.</p>
+                    <p className="px-1 py-2 text-xs text-muted">No people found.</p>
                 ) : (
                     filtered.map(({ user, count }) => {
                         const checked = selectedHandles.includes(user.handle);
@@ -238,7 +238,7 @@ export function FollowingPersonSearch({
                                 aria-label={`Toggle ${label}`}
                                 className={
                                     'flex items-center gap-2 px-1 py-1.5 text-left text-xs transition ' +
-                                    (checked ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50')
+                                    (checked ? 'bg-blue-50 text-action' : 'text-ink hover:bg-canvas')
                                 }
                             >
                                 {user.avatar_url ? (
@@ -249,7 +249,7 @@ export function FollowingPersonSearch({
                                         loading="lazy"
                                     />
                                 ) : (
-                                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600">
+                                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-ink-soft">
                                         {label.replace(/^@/, '').slice(0, 1).toUpperCase()}
                                     </span>
                                 )}
@@ -258,7 +258,7 @@ export function FollowingPersonSearch({
                                     <svg
                                         aria-hidden="true"
                                         viewBox="0 0 20 20"
-                                        className="h-3.5 w-3.5 shrink-0 text-blue-600"
+                                        className="h-3.5 w-3.5 shrink-0 text-action"
                                         fill="none"
                                         stroke="currentColor"
                                         strokeWidth="2"
@@ -268,7 +268,7 @@ export function FollowingPersonSearch({
                                         <path d="M4 10.5l4 4 8-8" />
                                     </svg>
                                 )}
-                                <span className="shrink-0 text-[11px] text-slate-400">({count})</span>
+                                <span className="shrink-0 text-[11px] text-muted">({count})</span>
                             </button>
                         );
                     })
@@ -327,7 +327,7 @@ export function InterestFilterChips({
     if (signedIn && followingCount === 0) {
         return (
             <div
-                className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 sm:gap-2"
+                className="flex flex-wrap items-center gap-1.5 text-xs text-ink-soft sm:gap-2"
                 data-testid="following-filter-empty"
             >
                 <span className="inline-flex shrink-0 items-center gap-1">
@@ -349,7 +349,7 @@ export function InterestFilterChips({
                     <span className="hidden sm:inline">Filter by following</span>
                 </span>
                 <span>You're not following anyone yet.</span>
-                <Link to="/tribe/discover" className="text-blue-600 hover:underline">
+                <Link to="/tribe/discover" className="text-action hover:underline">
                     Build your tribe →
                 </Link>
             </div>
@@ -421,7 +421,7 @@ export function InterestFilterChips({
             data-testid="follows-shortcut"
             aria-label="Open the calendar from people I follow"
             title="Open the calendar from people I follow"
-            className="hidden sm:inline-flex items-center px-2 py-1 text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500 transition"
+            className="hidden sm:inline-flex items-center px-2 py-1 text-xs border border-line bg-surface text-ink-soft hover:border-action hover:text-action transition"
         >
             {/* Heroicons calendar outline */}
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-3.5 h-3.5" aria-hidden="true">
@@ -432,8 +432,8 @@ export function InterestFilterChips({
     );
 
     const anonHint = !signedIn && showAnonHint && (
-        <span className="text-xs text-slate-500">
-            <Link to="/login" className="text-blue-600 hover:underline">
+        <span className="text-xs text-ink-soft">
+            <Link to="/login" className="text-action hover:underline">
                 Sign in
             </Link>{' '}
             to see picks from people you follow.
@@ -454,7 +454,7 @@ export function InterestFilterChips({
     // Inline scope toggle (All = everyone you follow, Friends = mutuals).
     const scopeToggle = signedIn && (
         <div
-            className="inline-flex shrink-0 border border-slate-200 bg-white"
+            className="inline-flex shrink-0 border border-line bg-surface"
             role="group"
             aria-label="Scope"
             data-testid="interest-scope-toggle"
@@ -467,7 +467,7 @@ export function InterestFilterChips({
                     aria-pressed={interestSource === scope}
                     className={
                         'px-2 py-1 text-xs transition ' +
-                        (interestSource === scope ? 'bg-blue-400 text-white' : 'text-slate-600 hover:text-blue-500')
+                        (interestSource === scope ? 'bg-blue-400 text-white' : 'text-ink-soft hover:text-action')
                     }
                     title={scope === 'follows' ? 'Everyone you follow (one-way OK)' : 'Mutual followers only'}
                 >
@@ -480,7 +480,7 @@ export function InterestFilterChips({
     // Inline kind toggle (Going / Saved; at least one always stays on).
     const kindToggle = signedIn && (
         <div
-            className="inline-flex shrink-0 border border-slate-200 bg-white"
+            className="inline-flex shrink-0 border border-line bg-surface"
             role="group"
             aria-label="Activity type"
             data-testid="interest-kind-toggle"
@@ -493,7 +493,7 @@ export function InterestFilterChips({
                     aria-pressed={on}
                     className={
                         'px-2 py-1 text-xs transition ' +
-                        (on ? 'bg-blue-400 text-white' : 'text-slate-600 hover:text-blue-500')
+                        (on ? 'bg-blue-400 text-white' : 'text-ink-soft hover:text-action')
                     }
                     title={k === 'going' ? 'Going activity' : 'Saved activity'}
                 >
@@ -516,11 +516,11 @@ export function InterestFilterChips({
             data-testid="following-search-open"
             className={
                 'inline-flex shrink-0 items-center gap-0.5 border px-1.5 py-1 transition ' +
-                (overlayOpen ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-500')
+                (overlayOpen ? 'border-action bg-blue-50' : 'border-line bg-surface hover:border-action')
             }
         >
             <img src="/find-user.png" alt="" className="h-4 w-4" />
-            <span className="text-xs font-semibold leading-none text-slate-600">+</span>
+            <span className="text-xs font-semibold leading-none text-ink-soft">+</span>
         </button>
     );
 
@@ -528,7 +528,7 @@ export function InterestFilterChips({
     // are selected (the operator is meaningless for a single person).
     const matchSelector = signedIn && interestUserHandles.length > 1 && (
         <div
-            className="inline-flex shrink-0 border border-slate-200 bg-white"
+            className="inline-flex shrink-0 border border-line bg-surface"
             role="group"
             aria-label="Match any or all of the selected people"
             data-testid="interest-match-selector"
@@ -541,7 +541,7 @@ export function InterestFilterChips({
                     aria-pressed={interestMatch === op}
                     className={
                         'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
-                        (interestMatch === op ? 'bg-blue-400 text-white' : 'text-slate-600 hover:text-blue-500')
+                        (interestMatch === op ? 'bg-blue-400 text-white' : 'text-ink-soft hover:text-action')
                     }
                     title={op === 'any' ? 'Match any selected person (or)' : 'Match all selected people (and)'}
                 >
@@ -557,7 +557,7 @@ export function InterestFilterChips({
         <>
             <div className="fixed inset-0 z-20" onClick={closeOverlay} aria-hidden="true" />
             <div
-                className="absolute left-0 bottom-full z-30 mb-1 w-72 max-w-[calc(100vw-2rem)] border border-slate-200 bg-white p-2 shadow-lg"
+                className="absolute left-0 bottom-full z-30 mb-1 w-72 max-w-[calc(100vw-2rem)] border border-line bg-surface p-2 shadow-lg"
                 role="dialog"
                 aria-label="Filter by people you follow"
                 data-testid="following-person-overlay"
@@ -566,7 +566,7 @@ export function InterestFilterChips({
                     type="button"
                     onClick={closeOverlay}
                     aria-label="Close"
-                    className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center text-slate-400 hover:text-slate-700"
+                    className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center text-muted hover:text-ink"
                 >
                     <svg
                         aria-hidden="true"
@@ -590,7 +590,7 @@ export function InterestFilterChips({
                 <div className="mt-2 flex items-center justify-between gap-1.5">
                     <Link
                         to="/tribe/discover"
-                        className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-700"
+                        className="shrink-0 text-xs font-medium text-action hover:text-action"
                     >
                         Discover people
                     </Link>
@@ -599,7 +599,7 @@ export function InterestFilterChips({
                             <button
                                 type="button"
                                 onClick={() => commitOverlay('any')}
-                                className="border border-blue-500 bg-blue-500 px-2 py-1 text-xs text-white hover:bg-blue-600"
+                                className="border border-action bg-action px-2 py-1 text-xs text-white hover:bg-action"
                                 title="Apply the selected person"
                                 data-testid="following-apply"
                             >
@@ -610,7 +610,7 @@ export function InterestFilterChips({
                                 <button
                                     type="button"
                                     onClick={() => commitOverlay('all')}
-                                    className="border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:border-blue-500 hover:text-blue-600"
+                                    className="border border-line bg-surface px-2 py-1 text-xs text-ink hover:border-action hover:text-action"
                                     title="Match all of the selected people (and)"
                                     data-testid="following-apply-everyone"
                                 >
@@ -619,7 +619,7 @@ export function InterestFilterChips({
                                 <button
                                     type="button"
                                     onClick={() => commitOverlay('any')}
-                                    className="border border-blue-500 bg-blue-500 px-2 py-1 text-xs text-white hover:bg-blue-600"
+                                    className="border border-action bg-action px-2 py-1 text-xs text-white hover:bg-action"
                                     title="Match any of the selected people (or)"
                                     data-testid="following-apply-anyone"
                                 >
@@ -639,7 +639,7 @@ export function InterestFilterChips({
     // commits a selection from the overlay.
     return (
         <div className="relative flex flex-wrap items-center gap-1 sm:gap-2">
-            <span className="inline-flex shrink-0 items-center gap-1 text-slate-500">
+            <span className="inline-flex shrink-0 items-center gap-1 text-ink-soft">
                 <svg
                     aria-hidden="true"
                     viewBox="0 0 20 20"
@@ -665,7 +665,7 @@ export function InterestFilterChips({
                 <button
                     type="button"
                     onClick={handleClear}
-                    className="inline-flex shrink-0 items-center px-2 py-0.5 text-xs text-slate-500 hover:text-blue-500 sm:py-1"
+                    className="inline-flex shrink-0 items-center px-2 py-0.5 text-xs text-ink-soft hover:text-action sm:py-1"
                     aria-label="Clear the following filter"
                     title="Clear the following filter"
                 >

@@ -51,10 +51,12 @@ def ensure_default_interest_profile(
     profile = UserInterestProfile(
         user_id=user.id,
         label="Default",
+        area_label=DEFAULT_AREA_BBOX["label"],
         min_lat=DEFAULT_AREA_BBOX["min_lat"],
         min_lng=DEFAULT_AREA_BBOX["min_lng"],
         max_lat=DEFAULT_AREA_BBOX["max_lat"],
         max_lng=DEFAULT_AREA_BBOX["max_lng"],
+        reach_filter="international",
         matches_enabled=False,
         is_active=True,
     )

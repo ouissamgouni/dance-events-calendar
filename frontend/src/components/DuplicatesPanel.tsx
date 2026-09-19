@@ -107,34 +107,34 @@ export default function DuplicatesPanel({ isOpen, onClose, onOpenEvent }: Props)
                 onClick={onClose}
                 aria-hidden="true"
             />
-            <div className="w-full max-w-2xl bg-white shadow-xl flex flex-col">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                    <h2 className="text-sm font-semibold text-slate-800">Duplicate events</h2>
+            <div className="w-full max-w-2xl bg-surface shadow-xl flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+                    <h2 className="text-sm font-semibold text-ink">Duplicate events</h2>
                     <div className="flex items-center gap-2">
                         <button
                             disabled={scanning}
                             onClick={scanNow}
-                            className="text-[11px] bg-blue-500 text-white px-2.5 py-1 hover:bg-blue-600 disabled:opacity-50"
+                            className="text-[11px] bg-action text-white px-2.5 py-1 hover:bg-action disabled:opacity-50"
                         >
                             {scanning ? 'Scanning…' : 'Scan now'}
                         </button>
                         <button
                             onClick={onClose}
-                            className="text-slate-400 hover:text-slate-700 text-sm px-2"
+                            className="text-muted hover:text-ink text-sm px-2"
                         >
                             ✕
                         </button>
                     </div>
                 </div>
 
-                <div className="flex border-b border-slate-200">
+                <div className="flex border-b border-line">
                     {TABS.map((t) => (
                         <button
                             key={t}
                             onClick={() => setActiveTab(t)}
                             className={`px-3 py-2 text-xs font-medium capitalize ${activeTab === t
-                                ? 'text-blue-600 border-b-2 border-blue-500'
-                                : 'text-slate-500 hover:text-slate-700'
+                                ? 'text-action border-b-2 border-action'
+                                : 'text-ink-soft hover:text-ink'
                                 }`}
                         >
                             {t}
@@ -143,30 +143,30 @@ export default function DuplicatesPanel({ isOpen, onClose, onOpenEvent }: Props)
                 </div>
 
                 {error && (
-                    <div className="px-4 py-2 text-xs text-red-600 border-b border-red-200 bg-red-50">
+                    <div className="px-4 py-2 text-xs text-danger border-b border-red-200 bg-red-50">
                         {error}
                     </div>
                 )}
 
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
-                        <div className="p-6 text-center text-xs text-slate-400">Loading…</div>
+                        <div className="p-6 text-center text-xs text-muted">Loading…</div>
                     ) : activeTab === 'history' ? (
                         history.length === 0 ? (
-                            <div className="p-6 text-center text-xs text-slate-400">No scan history</div>
+                            <div className="p-6 text-center text-xs text-muted">No scan history</div>
                         ) : (
                             <ul className="divide-y divide-slate-100">
                                 {history.map((h) => (
                                     <li key={h.id} className="p-3 text-xs">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-medium text-slate-800 capitalize">{h.scan_type.replace('_', ' ')}</span>
-                                            <span className="text-[10px] uppercase font-semibold text-slate-500">{h.status}</span>
+                                            <span className="font-medium text-ink capitalize">{h.scan_type.replace('_', ' ')}</span>
+                                            <span className="text-[10px] uppercase font-semibold text-ink-soft">{h.status}</span>
                                         </div>
-                                        <div className="mt-1 text-[11px] text-slate-500">
+                                        <div className="mt-1 text-[11px] text-ink-soft">
                                             {h.candidates_found} candidate{h.candidates_found === 1 ? '' : 's'} found,{' '}
                                             {h.groups_created} group{h.groups_created === 1 ? '' : 's'} created
                                         </div>
-                                        <div className="mt-1 text-[10px] text-slate-400">
+                                        <div className="mt-1 text-[10px] text-muted">
                                             Started {new Date(h.started_at).toLocaleString()}
                                             {h.finished_at && ` · finished ${new Date(h.finished_at).toLocaleString()}`}
                                         </div>
@@ -175,7 +175,7 @@ export default function DuplicatesPanel({ isOpen, onClose, onOpenEvent }: Props)
                             </ul>
                         )
                     ) : groups.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-slate-400">No duplicate groups</div>
+                        <div className="p-6 text-center text-xs text-muted">No duplicate groups</div>
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {groups.map((g) => (

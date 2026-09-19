@@ -1,206 +1,553 @@
 # Event Suggestions — QA Test Plan
 # ===================================
-# Validates the full event suggestion workflow: the stepped collapsible
-# public submission form (with required tags, non-blocking geocode
-# warning, price/promo split, Going toggle), signed-in vs. anonymous
-# visibility, admin review, approve/reject, and notification fan-out to
-# friends.
+# Validates the full event suggestion workflow: the full-screen 3-step
+# "Suggest an Event" wizard (Event → Details → Publish), native date/time
+# selection, the recurrence editors (weekly/monthly/yearly/chosen dates),
+# signed-in vs. anonymous visibility, recurring-occurrence visibility
+# before and after approval, admin review with the occurrence list,
+# approve/reject, and notification fan-out to friends.
 
 test_plan:
   name: "Event Suggestions — Full Workflow QA"
   description: >
-    End-to-end test of the event suggestion feature: the stepped "Suggest an
-    Event" form, immediate visibility for signed-in submitters (pending
-    review) vs. anonymous submitters (invisible until approved), admin
-    review/approve/reject, rejection hard-block, and social_activity
-    notification fan-out to friends when a signed-in submitter's event goes
-    live with them marked "going".
+    End-to-end test of the event suggestion feature: the three-step
+    "Suggest an Event" wizard, recurrence entry, immediate visibility for
+    signed-in submitters (pending review) vs. anonymous submitters
+    (invisible until approved), the occurrence preview shown before
+    approval, admin review/approve/reject, rejection hard-block, and
+    social_activity notification fan-out to friends when a signed-in
+    submitter's event goes live with them marked "going".
 
   steps:
+    # ---------------------------------------------------------------- shell
     - id: 1
       title: "Home page loads with Suggest button"
       description: >
-        Open the home page. Verify events load and the "Suggest an Event" button
-        is visible in the toolbar area.
+        Open the home page. Verify events load and the "Suggest an Event"
+        button is visible in the toolbar area.
       expected: >
-        Calendar/explorer view renders with seed events. A rose-coloured
-        "Suggest an Event" button appears near the view mode toggle.
+        Calendar/explorer view renders with seed events and a "Suggest an
+        Event" button appears near the view mode toggle.
       verification: "Button is visible and clickable"
 
     - id: 2
-      title: "Suggest modal opens as a stepped, collapsible form"
+      title: "Wizard opens full-screen at /suggest with a 3-step header"
       description: >
-        Click "Suggest an Event" while signed out. Verify the modal opens with
-        collapsible sections: Name/dates/location, Description, Links, Tags,
-        Price, Promo code, RSVP and contact. Only the active section is
-        expanded; there are no numbered steps, no "Back" buttons, and no
-        "Edit" buttons — clicking a collapsed section's header opens it.
+        Click "Suggest an Event" while signed out on a 390px-wide viewport.
       expected: >
-        Sections render collapsed except the first ("Name, dates, location").
-        Clicking any collapsed section header expands it; clicking it again
-        (or another section) collapses/expands accordingly.
-      verification: "Sections toggle open on header click; no Back/Edit buttons present"
+        The URL becomes /suggest and a full-screen page covers the app (not a
+        centered modal). The header shows a Close button on the left (a Back
+        chevron from step 2 onwards), the centered title "Suggest an event",
+        the caption "Step 1 of 3" and a three-dot progress indicator
+        with the first dot active. There are no collapsible sections and no
+        "Edit" buttons.
+      verification: "Full-screen page; header shows Step 1 of 3 with 3 progress dots"
 
     - id: 3
-      title: "Submit empty basics section shows a warning, not a hard block"
+      title: "Step 1 field order and empty states"
       description: >
-        Click Next on the Name/dates/location section without filling anything.
+        Inspect the Step 1 form without entering anything.
       expected: >
-        A warning message (amber background/text) appears at the bottom of the
-        section explaining title/dates/location are required. The section
-        stays open.
-      verification: "Warning renders in the section's own footer, not a modal-wide banner"
+        Rows appear in this exact order — "Event name", "Location / Add
+        location", the "All day" toggle, "Start / Select date", "End / Select
+        date", "Repeat / Does not repeat" — followed by a single "Next"
+        button. No field labels are rendered above the inputs; each row
+        communicates its purpose through its inline label, icon and
+        placeholder. Location appears BEFORE the dates and All day appears
+        BEFORE start/end.
+      verification: "Order is name → location → all-day → start → end → repeat; no labels above inputs"
 
     - id: 4
-      title: "Location without a validated geocode is a warning, not a blocker"
+      title: "Next with an empty form shows an inline error"
       description: >
-        Fill title/dates. Type a location but do NOT select a suggestion from
-        the autocomplete dropdown. Click Next.
+        Tap Next on Step 1 without filling anything.
       expected: >
-        A non-blocking amber warning appears ("We couldn't verify this
-        address…"), but clicking Next still advances to the Description
-        section since the address text itself is non-empty.
-      verification: "Section advances despite unresolved geocode; warning is advisory only"
+        An inline error message appears in the form (not a toast, not a
+        browser alert) asking for the missing field, and the wizard stays on
+        Step 1. The order in which fields are reported follows the on-screen
+        order: title, then location, then start, then end.
+      verification: "Inline error rendered in-page; step does not advance"
 
+    # ------------------------------------------------------------- location
     - id: 5
-      title: "Collapsed basics section shows name + location + dates preview"
+      title: "Location row opens a dedicated search page"
       description: >
-        After advancing past the basics section, inspect its collapsed header.
+        Tap the "Add location" row and type "La Clave".
       expected: >
-        The collapsed header shows the event title, plus a single line with a
-        truncated location preview (city/country if identifiable) and the
-        formatted date/time range, and a green checkmark to the left of the
-        title (since the section is valid).
-      verification: "Collapsed summary line shows location + dates together; checkmark icon visible"
+        A full-screen Location page opens with a search field labelled
+        "Search for a place or address". Fewer than three characters shows
+        "Keep typing to search."; from three characters the search runs after a
+        short debounce. Results appear as tappable rows; a
+        "Use “…” as typed" row is also offered for the raw text. Choosing a
+        result returns to Step 1 and the row now shows the picked address
+        instead of the placeholder.
+      verification: "Location page opens, selection returns to Step 1 with the address displayed"
 
     - id: 6
-      title: "Description section preview truncates to 2 lines"
+      title: "Unverified address is a warning, not a blocker"
       description: >
-        Enter a long, multi-paragraph description and advance to Links.
+        Re-open the Location page, type a location that returns no results and
+        confirm the raw text, then tap Next.
       expected: >
-        The collapsed Description section shows only a 2-line clamped preview
-        of the text (no scrollbar, ellipsis-style overflow).
-      verification: "Description preview never exceeds 2 visual lines"
+        A short advisory note appears under the location row ("We couldn't
+        verify this address on the map…"), but Next still advances once the
+        other required fields are filled.
+      verification: "Advisory note shown; navigation not blocked"
 
+    # ------------------------------------------------------------ date/time
     - id: 7
-      title: "Link URL field is pre-filled with https://"
+      title: "Native date/time pickers are used"
       description: >
-        Open the Links section.
+        Tap the "Start" row.
       expected: >
-        The URL input already contains "https://" so the user only needs to
-        type the rest of the address.
-      verification: "Input default value is 'https://'"
+        The platform's own date/time selector opens (iOS/Android/browser
+        native) — the row is a real `<input type="datetime-local">` stretched
+        transparently over it. No custom in-app calendar grid or scroll-wheel
+        time picker is rendered by the application.
+      verification: "Native picker opens; no custom calendar component in the DOM"
 
     - id: 8
-      title: "Required tags block Next; collapsed tags show pill previews"
+      title: "End date defaults two hours after the start"
       description: >
-        Advance to Tags without selecting a dance-style or reach tag, click
-        Next (warning shown), then select "Salsa" and "Local" and advance.
+        Pick a start of 12 Apr 2026, 20:00 while the end row is still empty.
       expected: >
-        A warning appears until both required tag groups have a selection.
-        Once advanced, the collapsed Tags section shows colored pill previews
-        reusing the same pill style as the tag picker.
-      verification: "Warning clears once required tags selected; collapsed pills render"
+        The end row is filled in automatically two hours later
+        ("Sun, 12 Apr 2026, 22:00"). The value is never earlier than the
+        start, and the rows display the formatted value rather than a raw
+        ISO string.
+      verification: "End auto-populates two hours after the start"
 
     - id: 9
-      title: "Price section is compact and inputs sit on one line"
+      title: "Explicitly edited end is not overwritten"
       description: >
-        Open the Price section, uncheck "Free event".
+        Set the end to 12 Apr 2026, 23:00, then change the start to
+        13 Apr 2026, 20:00.
       expected: >
-        Min, Max, and Currency inputs are narrow and sit side-by-side on one
-        row (including on mobile viewport widths).
-      verification: "Min/Max/Currency inputs share a single flex row at 375px width"
+        Once the user has explicitly edited the end, later start edits no
+        longer drag it along — the app keeps the chosen end and relies on
+        validation if it is now invalid. It is never silently reset to blank.
+      verification: "User-edited end is preserved, never reset to blank"
 
     - id: 10
-      title: "Promo code has its own section"
+      title: "End before start is rejected inline"
       description: >
-        Advance past Price.
+        Set an end that is earlier than the start and tap Next.
       expected: >
-        A separate "Promo code" section appears (distinct from Price) with
-        promo code, promo URL, and promo description fields.
-      verification: "Promo code section exists independently of Price"
+        An inline error explains the end must come after the start; the step
+        does not advance.
+      verification: "Inline error; no advance"
 
     - id: 11
-      title: "Going audience selector is compact on mobile"
+      title: "All day removes time and restores it when switched back"
       description: >
-        Sign in as Dev User (dev-user@example.com). Open the RSVP section.
+        With start 20:00 and end 23:00 entered, turn ON the "All day" toggle,
+        then turn it OFF again.
       expected: >
-        The "Mark me going by default" checkbox and the audience selector
-        (Friends/Public/Private) sit on one row; the selector is narrow enough
-        to avoid wrapping at mobile widths (375px).
-      verification: "Going checkbox + audience select share one row without overflow"
+        While ON, the start/end rows show dates only ("Sun, 12 Apr 2026") and
+        the underlying inputs switch to `type="date"`, so the native picker
+        offers no time. After turning it OFF, the previously entered
+        20:00/23:00 times are restored (an event that never had times falls
+        back to 19:00/23:00).
+      verification: "Times hidden when ON; the same times come back when OFF"
 
+    # ----------------------------------------------------------- recurrence
     - id: 12
-      title: "Signed-in submission is immediately live (pending review)"
+      title: "Recurrence row reads 'Does not repeat' and has no extra label"
       description: >
-        As Dev User, fill out the whole form for "Salsa Open Air" with Going
-        checked (audience: Friends) and submit.
+        Inspect the last row of Step 1.
       expected: >
-        Success screen reads "Your event is live and under review." Navigating
-        back to Home shows the event immediately in the calendar/explorer view,
-        even though it is still pending admin approval.
-      verification: "Event appears on Home immediately for the signed-in submitter's own submission"
+        The row reads "Repeat" on the left and "Does not repeat" on the right,
+        with a chevron. There is no separate "Dates & recurrence" heading
+        above it.
+      verification: "Row summary is 'Does not repeat'; no redundant section label"
 
     - id: 13
+      title: "Repeat page lists the five options"
+      description: >
+        Tap the recurrence row.
+      expected: >
+        A full-screen "Repeat" page opens (the step itself is replaced, it is
+        not a bottom sheet) listing, vertically: Does not repeat, Weekly,
+        Monthly, Yearly, Choose dates. The currently active option is
+        highlighted with a check mark. No existing-series matching or
+        suggestions are offered.
+      verification: "Exactly five options in that order; active one check-marked"
+
+    - id: 14
+      title: "Weekly recurrence: weekday, interval and all three end modes"
+      description: >
+        Choose "Weekly". Verify the "Repeat every [−][1][+] week" stepper, the
+        "On these days" chips (Mon…Sun) with the start's weekday preselected,
+        and the "Ends" options Never / On / After. Set every 2 weeks on Fri,
+        Ends = Never, and tap Done.
+      expected: >
+        A human-readable summary is shown at the bottom of the editor (e.g.
+        "Every 2 weeks on Fri · starting 12 Apr 2026 · no end date"). "Done"
+        is the only primary action — "Submit Event" is NOT present, and the
+        wizard header and footer are unmounted while the page is open.
+        Returning to Step 1, the recurrence row now reads "Every 2 weeks"
+        instead of "Does not repeat". Backing out with the Back chevron
+        returns to the mode list WITHOUT writing the draft.
+      verification: "All weekly controls present; Done (not Submit Event); Step 1 row shows the summary"
+
+    - id: 15
+      title: "Monthly recurrence: day-of-month and nth-weekday"
+      description: >
+        Re-open the recurrence row, choose "Monthly".
+      expected: >
+        A "Repeats on" group offers two radios: "On day N" (N defaulting to
+        the start's day of month) and "On the <nth> <weekday>" (e.g. "On the
+        second Friday"), alongside the every-N-months stepper. All three end
+        conditions are available, with a summary line and a Done action.
+      verification: "Both monthly modes work with interval + end conditions"
+
+    - id: 16
+      title: "Yearly recurrence"
+      description: >
+        Choose "Yearly".
+      expected: >
+        An "On date" group with a Month selector and a Day selector (both
+        defaulting to the start's month/day), an every-N-years stepper,
+        Never / On / After, a summary line and Done — using the same visual
+        language as weekly and monthly.
+      verification: "Yearly editor matches the shared recurrence pattern"
+
+    - id: 17
+      title: "Choose dates: explicit occurrence list"
+      description: >
+        Choose "Choose dates". Add three occurrences, edit the time of one,
+        and delete one.
+      expected: >
+        Each occurrence renders as a "Date N" card with its own Start and End
+        rows and a trash button to remove it. "+ Add date" stays available up
+        to the 52-date cap and defaults each new date to a week after the
+        previous one. The date/time rows use the SAME native selection as the
+        main event — no second custom calendar. Two dates sharing a start time
+        raise the inline message "Two dates have the same start time." and
+        block Next.
+      verification: "Per-occurrence edit/delete/times; native pickers; duplicates blocked"
+
+    - id: 18
+      title: "Step 1 recurrence row summarises chosen dates"
+      description: >
+        Leave three dates selected and return to Step 1.
+      expected: >
+        The recurrence row reads "3 dates".
+      verification: "Row shows the occurrence count"
+
+    # --------------------------------------------------------------- step 2
+    - id: 19
+      title: "Step 2 ordering"
+      description: >
+        Switch the recurrence back to "Weekly" (Fridays), fill the rest of
+        Step 1 for "Salsa Night" and tap Next.
+      expected: >
+        Step 2 of 3 renders in this order: description, a "Links" section with
+        any existing links plus "+ Add link", "Dance style *", "Event reach *",
+        the more-tags entry, then the Back / Next actions. The description is a
+        textarea with the placeholder "What should people know about this
+        event?" and no label above it. Price is NOT on this step.
+      verification: "Order matches; no price field on Step 2"
+
+    - id: 20
+      title: "Links are URL + label and can be added repeatedly"
+      description: >
+        Tap "+ Add link", save https://laclavebarcelona.com labelled "Event
+        page", then tap "+ Add link" again and save https://shotgun.live
+        labelled "Tickets".
+      expected: >
+        The Add link page contains a URL field and a "Label (optional)" field
+        with a "Save" action (never "Submit Event"); Save stays disabled until
+        a valid http(s) URL is entered, and anything else shows "Enter a valid
+        http(s) link.". After the first save "+ Add link" is STILL available
+        (up to 3 links, after which it is hidden). Both links are listed with
+        label + URL and a trash button to remove; tapping a link reopens it
+        for editing.
+      verification: "Add link remains after saving; links editable and removable; capped at 3"
+
+    - id: 21
+      title: "Dance style is one horizontally scrollable row"
+      description: >
+        At a 320px viewport, inspect the "Dance style *" row (8 styles are
+        seeded: Salsa, Bachata, Kizomba, Zouk, Semba, Rueda, Cha-Cha, Son).
+      expected: >
+        Chips stay on a SINGLE row that scrolls horizontally with touch, and
+        visually suggest more options exist offscreen. They never wrap to a
+        second row, and the page itself never scrolls horizontally. There is
+        no "More styles" action. Multiple styles can be selected and selected
+        chips are clearly distinguishable (blue fill).
+      verification: "Chip row scrolls horizontally; document has no horizontal overflow; no More styles"
+
+    - id: 22
+      title: "Dance style and Event reach are mandatory"
+      description: >
+        Tap Next with neither selected, then select only a dance style and tap
+        Next again.
+      expected: >
+        An inline error names the missing classification each time; the step
+        only advances once both a dance style and an event reach are chosen.
+      verification: "Both groups block Next independently"
+
+    - id: 23
+      title: "Event reach is a single-choice row"
+      description: >
+        Tap Local, then Regional.
+      expected: >
+        Local, Regional and International are wrapping chips (they fit on one
+        row at 320px); selecting Regional deselects Local (the seeded reach
+        group is allow_multiple: false). The selected option is blue.
+      verification: "Single selection enforced; all three visible"
+
+    - id: 24
+      title: "More tags appears after Event reach and opens a categorized page"
+      description: >
+        Tap the "Add more tags" row.
+      expected: >
+        The row sits AFTER Event reach. It opens a full-screen "More tags"
+        page with a search field ("Search tags") and categorized, wrapping
+        chip rows — Event type, Level, Venue, Music / format, Audience /
+        access — and a "Done" action. Groups whose `allow_multiple` is false
+        enforce single selection. Dance style and Event reach are NOT repeated
+        inside it.
+      verification: "More tags after reach; categories present; dance/reach excluded"
+
+    - id: 25
+      title: "Tag search filters across categories"
+      description: >
+        Type "live" into the More tags search field.
+      expected: >
+        Only matching chips remain visible, and groups with no match are
+        hidden entirely.
+      verification: "Search filters the whole page"
+
+    - id: 26
+      title: "Selected-tag preview replaces the 'Add more tags' row"
+      description: >
+        Select Social, DJ and All Levels, then Done.
+      expected: >
+        Step 2 shows ONE clickable preview row (accessible name "Edit more
+        tags") listing the selected tags. The separate "Add more tags" row is
+        gone — the two are never displayed at the same time. Tapping the
+        preview reopens the same More tags page for adding/removing.
+      verification: "Exactly one tags row; preview reopens the editor"
+
+    # --------------------------------------------------------------- step 3
+    - id: 27
+      title: "Step 3 structure"
+      description: >
+        Tap Next.
+      expected: >
+        Step 3 of 3 renders: a "Pricing / No pricing" row, a "Promo code /
+        Add a promo code" row, an "I'm going" toggle, "Your name", "Your
+        email", then Back / Submit Event. Pricing and Promo code are two
+        independent rows, never merged into one surface.
+      verification: "Order matches; pricing and promo are separate rows"
+
+    - id: 28
+      title: "Pricing defaults to No pricing"
+      description: >
+        Tap the Pricing row.
+      expected: >
+        Three radio options are offered with short hints: No pricing
+        (preselected), Free event, Paid event. No price inputs are shown for
+        No pricing or Free event. The only action is "Done" — never "Submit
+        Event". Leaving it on No pricing and tapping Done leaves the Step 3
+        row showing the muted "No pricing" placeholder, i.e. no price is sent
+        to the backend.
+      verification: "No pricing is the default; no price fields shown; payload omits price"
+
+    - id: 29
+      title: "Free and Paid pricing summaries"
+      description: >
+        Re-open pricing, choose Free event, Done; then re-open, choose Paid
+        event, enter Minimum 10 / Maximum 20 / Currency EUR, Done.
+      expected: >
+        After Free the row reads "Free event". Minimum/Maximum/Currency
+        controls appear ONLY for Paid. After Paid the row reads "10–20 EUR".
+        The row stays clickable and reopens the pricing page.
+      verification: "Summaries update; range controls exposed only in Paid"
+
+    - id: 30
+      title: "Impossible price range is rejected"
+      description: >
+        Set Minimum 30 and Maximum 10; then clear both and tap Done.
+      expected: >
+        "The maximum price must be at least the minimum." appears inline and
+        Done is disabled. With both cleared, Done reports "Enter at least one
+        price, or choose Free event." and does not close the page.
+      verification: "max < min blocked inline; empty Paid pricing blocked"
+
+    - id: 31
+      title: "Promo code editor is independent and uses Done"
+      description: >
+        Tap the Promo code row, enter SALSA20 plus an optional link and
+        details, then Done.
+      expected: >
+        The promo page contains only promo fields (code, optional link,
+        optional details) and exposes "Done" — "Submit Event" is NOT rendered
+        anywhere inside it. Done returns to Step 3, where the row now reads
+        "SALSA20" and remains clickable. Promo works regardless of the pricing
+        state.
+      verification: "No Submit Event inside the promo editor; summary shows the code"
+
+    - id: 32
+      title: "Submit Event is never reachable from a sub-page"
+      description: >
+        Open, in turn: Location, the recurrence mode list, each recurrence
+        editor, Choose dates, Add link, More tags, Pricing and Promo code.
+      expected: >
+        On every one of these pages the wizard header and the sticky footer
+        are unmounted, so the "Submit Event" button is absent from the DOM. It
+        is only available from the main Step 3 context.
+      verification: "Submit Event count is 0 on all sub-pages"
+
+    - id: 33
+      title: "I'm going visibility options are hidden while the toggle is off"
+      description: >
+        Sign in as Dev User (dev-user@example.com) and return to Step 3.
+        Toggle "I'm going" off, then on, then off again.
+      expected: >
+        While OFF, the "Who can see it" selector is not displayed at all.
+        Turning it ON reveals the Friends / Everyone / Only me chips (selected
+        chip in blue). Turning it OFF again hides them, and the previously
+        chosen audience is restored when it is switched back ON.
+      verification: "Audience control only present when the toggle is ON; last value preserved"
+
+    - id: 34
+      title: "Data is preserved when moving between steps"
+      description: >
+        From Step 3 tap Back to Step 2, then Back to Step 1, then Next twice.
+      expected: >
+        Every value entered on every step — including the recurrence, links,
+        tags, pricing and promo — is still present.
+      verification: "No data loss navigating between steps"
+
+    # ------------------------------------------------------- submit/success
+    - id: 35
+      title: "Signed-in submission succeeds and shows the success screen"
+      description: >
+        As Dev User, submit "Salsa Night" (weekly on Fridays, no end date,
+        Going = on, audience Friends).
+      expected: >
+        The wizard is replaced by a centered success state: a green circular
+        check badge, the heading "Event submitted", the body "Your event is
+        live and under review. All of its dates are already on your calendar."
+        and a single "Done" action that closes the flow and returns to the
+        page behind it. There is no "View event" and no "Create another
+        event" action.
+      verification: "Check badge + 'Event submitted' + single Done; flow closes on Done"
+
+    - id: 36
+      title: "Submitter sees several preview occurrences before approval"
+      description: >
+        Navigate to Home / My events as Dev User and look for "Salsa Night".
+      expected: >
+        Multiple Friday occurrences of the pending series are listed — not
+        just the first one — so the submitter can confirm their recurrence was
+        understood. Submission materialises a bounded preview only (at most 10
+        occurrences, within a 90-day horizon), each pending review and each
+        carrying the submitted tags, all grouped under one event series. The
+        success copy already tells the submitter their dates are on their
+        calendar.
+      verification: "More than one occurrence visible pre-approval, capped at the 10/90-day preview"
+
+    - id: 37
       title: "Friend fan-out notification on signed-in Going submission"
       description: >
         Jamie (who follows Dev User) checks their in-app notifications after
-        Dev User's step-12 submission goes live with Going=friends.
+        the step-35 submission goes live with Going = friends.
       expected: >
         Jamie receives a social_activity in-app notification referencing Dev
-        User going to "Salsa Open Air", the same fan-out mechanism used for
+        User going to "Salsa Night", via the same fan-out mechanism used for
         regular attendance toggles.
       verification: "Notification row created for follower Jamie via the notification scheduler"
 
-    - id: 14
+    - id: 38
       title: "Anonymous submission is NOT visible until approved"
       description: >
-        Sign out. Submit a second suggestion ("Bachata Night") anonymously,
-        leaving Going unavailable (no RSVP section audience for anon users).
+        Sign out. Submit a second suggestion ("Bachata Night") anonymously
+        (no recurrence). The I'm going toggle is replaced by a "Sign in to
+        mark yourself as going…" note for anonymous submitters.
       expected: >
-        Success screen reads "Thank you! Your suggestion is under review."
-        (not the "is live" message). Navigating Home does NOT show "Bachata
-        Night" anywhere, since anonymous submissions never create a live
-        event before admin approval.
-      verification: "No CachedEvent/UI entry exists for the anonymous suggestion pre-approval"
+        The success screen reads "Your suggestion is under review. We will
+        publish it once a curator approves it." (different copy from the
+        signed-in case) with the same single Done action. Navigating Home does
+        NOT show "Bachata Night" anywhere.
+      verification: "Anonymous success copy differs; no event entry pre-approval"
 
-    - id: 15
+    # ---------------------------------------------------------------- admin
+    - id: 39
       title: "Admin login"
       description: >
-        Use the /login dev sign-in to access the admin panel ("Sign in as Admin"
-        button if seeded, otherwise type ADMIN_EMAIL in the input).
+        Use the /login dev sign-in to access the admin panel ("Sign in as
+        Admin" button if seeded, otherwise type ADMIN_EMAIL in the input).
       expected: >
         Admin page loads with calendar sources, settings, feature flags.
       verification: "Admin page renders with action bar"
 
-    - id: 16
+    - id: 40
       title: "Suggestions panel shows pending items"
       description: >
         Click the "Suggestions" button in the admin action bar.
       expected: >
-        Slide-out panel opens. Both pending suggestions ("Salsa Open Air" and
+        Slide-out panel opens. Both pending suggestions ("Salsa Night" and
         "Bachata Night") are listed with amber pending badges.
       verification: "Panel shows 2 suggestions with amber pending badges"
 
-    - id: 17
+    - id: 41
       title: "Review modal shows details, tags, price/promo, and metadata"
       description: >
-        Click "Salsa Open Air" in the panel.
+        Click "Salsa Night" in the panel.
       expected: >
         Review modal shows all event fields, the selected tags, price/promo
         details, and submitter metadata (IP, timezone, screen size, etc.).
       verification: "All fields, tags, price/promo, and metadata section visible"
 
-    - id: 18
+    - id: 42
+      title: "Review modal lists the recurrence occurrences"
+      description: >
+        In the "Salsa Night" review modal, inspect the section following the
+        All-day line.
+      expected: >
+        An "Occurrences (N)" section lists every date approval would create —
+        the FULL expansion, not just the preview the submitter can see. Rows
+        already live are shown plainly; rows that do not exist yet are
+        annotated "created on approval". A long series scrolls inside the
+        section rather than stretching the modal. The data comes from
+        GET /api/admin/suggestions/{id}/occurrences.
+      verification: "Occurrence list rendered for the recurring suggestion, with per-row materialised state"
+
+    - id: 43
+      title: "Non-recurring suggestion shows no occurrence section"
+      description: >
+        Open the "Bachata Night" review modal.
+      expected: >
+        No occurrences section is rendered — it only appears when the
+        suggestion expands to more than one occurrence.
+      verification: "Section hidden when the expansion yields a single occurrence"
+
+    - id: 44
       title: "Approve signed-in submission to Movida calendar"
       description: >
         Select "Movida" from the calendar dropdown. Click "Approve".
       expected: >
-        Status badge changes to green "approved". The already-live CachedEvent
-        is confirmed/kept associated with the approved suggestion.
-      verification: "Status approved; event remains visible on Home"
+        Status badge changes to green "approved". The already-live occurrences
+        remain associated with the approved suggestion.
+      verification: "Status approved; existing occurrences remain visible on Home"
 
-    - id: 19
+    - id: 45
+      title: "Approval expands the full recurring series"
+      description: >
+        Re-open the approved "Salsa Night" suggestion and inspect the
+        occurrence list, then check Home.
+      expected: >
+        Every row in the occurrence list is now marked as live (no "created on
+        approval" hints remain), and Home lists more Friday occurrences than
+        the 10-item preview showed before approval. All occurrences stay
+        grouped under one event series.
+      verification: "All occurrences materialised after approval; more events on Home than the preview"
+
+    - id: 46
       title: "Approve anonymous submission — event becomes visible"
       description: >
         Click "Bachata Night" (the anonymous suggestion). Approve it to the
@@ -210,7 +557,7 @@ test_plan:
         "Bachata Night" for the first time (it was invisible before approval).
       verification: "Anonymous event appears on Home only after approval"
 
-    - id: 20
+    - id: 47
       title: "Reject hard-blocks re-import"
       description: >
         Submit a third anonymous suggestion duplicating an existing event
@@ -220,11 +567,27 @@ test_plan:
         hidden and is blocked from being recreated by a later sync/import.
       verification: "Status rejected; BlockedEvent-style suppression prevents reimport"
 
-    - id: 21
+    - id: 48
       title: "Status filter tabs work"
       description: >
         Use the filter tabs at the top of the Suggestions panel.
       expected: >
-        All: 3 suggestions. Pending: 0. Approved: 2. Rejected: 1. Counts in tab
-        labels match.
+        All: 3 suggestions. Pending: 0. Approved: 2. Rejected: 1. Counts in
+        tab labels match.
       verification: "Filter tabs correctly filter and show counts"
+
+    # ----------------------------------------------------------- responsive
+    - id: 49
+      title: "No horizontal page scrolling at 320px"
+      description: >
+        Repeat the whole flow at a 320px-wide viewport, visiting every screen:
+        the three steps, Location, the Repeat mode list, all four recurrence
+        editors, Choose dates, Add link, More tags, Pricing, Promo code and
+        the success screen.
+      expected: >
+        No screen scrolls horizontally — only the dance-style chip row
+        scrolls, inside its own container. Long URLs truncate or wrap
+        without breaking the layout, inputs fill the available width, buttons
+        stay usable, the bottom actions never cover content, and the on-screen
+        keyboard never hides the focused input.
+      verification: "document.scrollWidth <= clientWidth on every screen at 320px"

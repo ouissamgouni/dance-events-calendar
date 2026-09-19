@@ -12,6 +12,13 @@ import type { CalendarEvent, PromoCode } from '../types';
 
 interface Props {
     event: CalendarEvent;
+    /**
+     * 'compact' (default) keeps the legacy collapsible chip list. 'rows'
+     * renders an always-expanded list where each promo is a full row with an
+     * inline Copy button — used inside the Details tab's "Price & promo codes"
+     * section, which supplies its own heading.
+     */
+    variant?: 'compact' | 'rows';
 }
 
 interface FormState {
@@ -32,7 +39,7 @@ function formatExpiry(iso: string | null): string {
     }
 }
 
-export function EventPromoCodes({ event }: Props) {
+export function EventPromoCodes({ event, variant = 'compact' }: Props) {
     const eventId = event.event_id;
     const { promoCodesEnabled } = useFeatureFlags();
     const visible = isPromoSectionVisible(event, promoCodesEnabled);
@@ -160,13 +167,158 @@ export function EventPromoCodes({ event }: Props) {
     const openPromo = openPromoId ? codes.find((p) => p.id === openPromoId) ?? null : null;
     const isOwnPromo = openPromo && user?.user_id === openPromo.submitter.user_id;
 
+    const promoForm = showForm ? (
+        <div className="border border-line bg-surface p-3 flex flex-col gap-2 rounded-md">
+            <div className="text-[11px] font-medium text-ink">
+                {editingId ? 'Edit promo code' : 'New promo code'}
+            </div>
+            <input
+                type="text"
+                placeholder="Code (e.g. SALSA20)"
+                aria-label="Promo code"
+                value={form.code}
+                maxLength={64}
+                onChange={(e) => setForm({ ...form, code: e.target.value })}
+                className="border border-line px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-blue-400"
+            />
+            <input
+                type="text"
+                placeholder="Short description (optional)"
+                aria-label="Description"
+                value={form.description}
+                maxLength={200}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+            />
+            <input
+                type="url"
+                placeholder="Source URL (https://…) — optional"
+                aria-label="Source URL"
+                value={form.source_url}
+                maxLength={500}
+                onChange={(e) => setForm({ ...form, source_url: e.target.value })}
+                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+            />
+            <label className="text-[10px] text-ink-soft flex items-center gap-2">
+                Expires
+                <input
+                    type="date"
+                    value={form.expires_at}
+                    onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
+                    className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+                />
+            </label>
+            {formError && <div className="text-[10px] text-danger">{formError}</div>}
+            <div className="flex gap-2 pt-1">
+                <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={submit}
+                    className="text-[11px] bg-action text-white px-3 py-1 rounded hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Submit'}
+                </button>
+                <button
+                    type="button"
+                    onClick={resetForm}
+                    className="text-[11px] text-ink-soft hover:text-ink px-2"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    ) : null;
+
+    const toast = toastMsg ? (
+        <div
+            role="status"
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-canvas border border-line text-ink text-xs px-4 py-2 shadow-lg cursor-pointer rounded-md"
+            onClick={() => setToastMsg(null)}
+        >
+            {toastMsg}
+        </div>
+    ) : null;
+
+    if (variant === 'rows') {
+        return (
+            <div className="flex flex-col gap-2 text-sm" data-testid="promo-codes-section">
+                {codes.map((promo) => {
+                    const own = user?.user_id === promo.submitter.user_id;
+                    return (
+                        <div
+                            key={promo.id}
+                            className="flex items-center gap-3 rounded-md border border-line bg-surface px-3 py-2"
+                        >
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-mono text-sm font-semibold text-ink break-all">
+                                        {promo.code}
+                                    </span>
+                                    {promo.status === 'pending' && (
+                                        <span className="text-[9px] uppercase tracking-wide text-amber-700 bg-amber-50 px-1 rounded">
+                                            pending
+                                        </span>
+                                    )}
+                                </div>
+                                {promo.description && (
+                                    <div className="mt-0.5 text-xs text-ink-soft truncate">
+                                        {promo.description}
+                                    </div>
+                                )}
+                                <div className="mt-0.5 text-[11px] text-muted">
+                                    {formatExpiry(promo.expires_at)}
+                                </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                {own && (
+                                    <button
+                                        type="button"
+                                        onClick={() => openEdit(promo)}
+                                        className="text-xs text-ink-soft hover:text-ink"
+                                    >
+                                        Edit
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => copy(promo.code)}
+                                    className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-action hover:bg-blue-100"
+                                >
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {isAuthed && !showForm && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowForm(true);
+                            setEditingId(null);
+                            setForm(emptyForm);
+                            setFormError(null);
+                        }}
+                        className="self-start rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-ink-soft hover:text-action hover:border-blue-400"
+                    >
+                        + Add a promo code
+                    </button>
+                )}
+
+                {promoForm}
+                {toast}
+            </div>
+        );
+    }
+
     return (
-        <section className="border-t border-slate-100 pt-3 text-xs" data-testid="promo-codes-section">
+        <section className="border-t border-card-line pt-3 text-xs" data-testid="promo-codes-section">
             <button
                 type="button"
                 onClick={() => setCollapsed((v) => !v)}
                 aria-expanded={!collapsed}
-                className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
+                className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-ink-soft hover:text-ink"
             >
                 <span
                     aria-hidden="true"
@@ -181,7 +333,7 @@ export function EventPromoCodes({ event }: Props) {
                     className="w-4 h-4 object-contain"
                 />
                 Promo codes
-                <span className="ml-1 text-slate-400 font-normal normal-case tracking-normal">({codes.length})</span>
+                <span className="ml-1 text-muted font-normal normal-case tracking-normal">({codes.length})</span>
             </button>
 
             {!collapsed && (
@@ -193,7 +345,7 @@ export function EventPromoCodes({ event }: Props) {
                                 type="button"
                                 onClick={() => setOpenPromoId(promo.id)}
                                 title={promo.description ?? promo.code}
-                                className="inline-flex items-center gap-1 border border-slate-300 bg-white px-2 py-0.5 font-mono text-[11px] text-slate-700 hover:border-blue-400 hover:bg-blue-50"
+                                className="inline-flex items-center gap-1 border border-line bg-surface px-2 py-0.5 font-mono text-[11px] text-ink hover:border-blue-400 hover:bg-blue-50"
                             >
                                 {promo.code}
                                 {promo.status === 'pending' && (
@@ -212,7 +364,7 @@ export function EventPromoCodes({ event }: Props) {
                                     setForm(emptyForm);
                                     setFormError(null);
                                 }}
-                                className="border border-dashed border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 hover:text-blue-600 hover:border-blue-400"
+                                className="border border-dashed border-line px-2 py-0.5 text-[11px] text-ink-soft hover:text-action hover:border-blue-400"
                             >
                                 + Add a promo code
                             </button>
@@ -220,8 +372,8 @@ export function EventPromoCodes({ event }: Props) {
                     </div>
 
                     {showForm && (
-                        <div className="border border-slate-200 bg-white p-3 flex flex-col gap-2">
-                            <div className="text-[11px] font-medium text-slate-700">
+                        <div className="border border-line bg-surface p-3 flex flex-col gap-2">
+                            <div className="text-[11px] font-medium text-ink">
                                 {editingId ? 'Edit promo code' : 'New promo code'}
                             </div>
                             <input
@@ -231,7 +383,7 @@ export function EventPromoCodes({ event }: Props) {
                                 value={form.code}
                                 maxLength={64}
                                 onChange={(e) => setForm({ ...form, code: e.target.value })}
-                                className="border border-slate-300 px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-blue-400"
+                                className="border border-line px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-blue-400"
                             />
                             <input
                                 type="text"
@@ -240,7 +392,7 @@ export function EventPromoCodes({ event }: Props) {
                                 value={form.description}
                                 maxLength={200}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                className="border border-slate-300 px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+                                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
                             />
                             <input
                                 type="url"
@@ -249,33 +401,33 @@ export function EventPromoCodes({ event }: Props) {
                                 value={form.source_url}
                                 maxLength={500}
                                 onChange={(e) => setForm({ ...form, source_url: e.target.value })}
-                                className="border border-slate-300 px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+                                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
                             />
-                            <label className="text-[10px] text-slate-500 flex items-center gap-2">
+                            <label className="text-[10px] text-ink-soft flex items-center gap-2">
                                 Expires
                                 <input
                                     type="date"
                                     value={form.expires_at}
                                     onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                                    className="border border-slate-300 px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+                                    className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
                                 />
                             </label>
                             {formError && (
-                                <div className="text-[10px] text-red-600">{formError}</div>
+                                <div className="text-[10px] text-danger">{formError}</div>
                             )}
                             <div className="flex gap-2 pt-1">
                                 <button
                                     type="button"
                                     disabled={submitting}
                                     onClick={submit}
-                                    className="text-[11px] bg-blue-500 text-white px-3 py-1 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="text-[11px] bg-action text-white px-3 py-1 hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Submit'}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={resetForm}
-                                    className="text-[11px] text-slate-500 hover:text-slate-700 px-2"
+                                    className="text-[11px] text-ink-soft hover:text-ink px-2"
                                 >
                                     Cancel
                                 </button>
@@ -294,18 +446,18 @@ export function EventPromoCodes({ event }: Props) {
                     onClick={() => setOpenPromoId(null)}
                 >
                     <div
-                        className="bg-white border border-slate-200 shadow-xl w-full max-w-sm p-4 text-[12px] text-slate-700"
+                        className="bg-surface border border-line shadow-xl w-full max-w-sm p-4 text-[12px] text-ink"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-start justify-between gap-3 mb-2">
-                            <div className="font-mono text-sm font-semibold text-slate-900 break-all">
+                            <div className="font-mono text-sm font-semibold text-ink break-all">
                                 {openPromo.code}
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setOpenPromoId(null)}
                                 aria-label="Close"
-                                className="text-slate-400 hover:text-slate-700 text-sm leading-none"
+                                className="text-muted hover:text-ink text-sm leading-none"
                             >
                                 ✕
                             </button>
@@ -313,10 +465,10 @@ export function EventPromoCodes({ event }: Props) {
                         {openPromo.description && (
                             <div className="mb-2">{openPromo.description}</div>
                         )}
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-ink-soft">
                             {formatExpiry(openPromo.expires_at)}
                         </div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-ink-soft">
                             Submitted by{' '}
                             {openPromo.submitter.handle
                                 ? `@${openPromo.submitter.handle}`
@@ -328,7 +480,7 @@ export function EventPromoCodes({ event }: Props) {
                                 href={openPromo.source_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="mt-2 inline-block text-blue-600 hover:underline break-all"
+                                className="mt-2 inline-block text-action hover:underline break-all"
                             >
                                 Where to use →
                             </a>
@@ -337,7 +489,7 @@ export function EventPromoCodes({ event }: Props) {
                             <button
                                 type="button"
                                 onClick={() => copy(openPromo.code)}
-                                className="text-[11px] bg-blue-500 text-white px-3 py-1 hover:bg-blue-600"
+                                className="text-[11px] bg-action text-white px-3 py-1 hover:bg-action"
                             >
                                 Copy code
                             </button>
@@ -346,7 +498,7 @@ export function EventPromoCodes({ event }: Props) {
                                     <button
                                         type="button"
                                         onClick={() => openEdit(openPromo)}
-                                        className="text-[11px] border border-slate-200 bg-white text-slate-700 px-3 py-1 hover:bg-slate-50"
+                                        className="text-[11px] border border-line bg-surface text-ink px-3 py-1 hover:bg-canvas"
                                     >
                                         Edit
                                     </button>
@@ -354,7 +506,7 @@ export function EventPromoCodes({ event }: Props) {
                                         type="button"
                                         disabled={submitting}
                                         onClick={() => remove(openPromo)}
-                                        className="text-[11px] bg-red-600 text-white px-3 py-1 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="text-[11px] bg-danger text-white px-3 py-1 hover:bg-danger/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Delete
                                     </button>
@@ -368,7 +520,7 @@ export function EventPromoCodes({ event }: Props) {
             {toastMsg && (
                 <div
                     role="status"
-                    className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-50 border border-slate-200 text-slate-700 text-xs px-4 py-2 shadow-lg cursor-pointer"
+                    className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-canvas border border-line text-ink text-xs px-4 py-2 shadow-lg cursor-pointer"
                     onClick={() => setToastMsg(null)}
                 >
                     {toastMsg}

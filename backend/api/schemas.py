@@ -2,7 +2,12 @@ from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+
+from backend.services.recurrence import MAX_OCCURRENCES, validate_rule
+
+# My Events context view type: mirrors frontend MyEventsTab
+MyEventsView = Literal["upcoming", "saved", "past"]
 
 
 class LinkItem(BaseModel):
@@ -27,12 +32,29 @@ class TagResponse(BaseModel):
     hero_ordinal: Optional[int] = None
 
 
+class EventSearchResponse(BaseModel):
+    event_id: str
+    title: str
+    start: Optional[datetime] = None
+    location: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    matched_fields: list[Literal["title", "city", "country", "tag"]] = []
+    matched_tags: list[str] = []
+
+
 class EventResponse(BaseModel):
     event_id: str
     calendar_id: str
     title: str
     description: Optional[str] = None
+    image_url: Optional[str] = None
+    # 16:9 card variant of an admin-managed picture; None when the event only
+    # has a plain ``image_url``.
+    image_thumb_url: Optional[str] = None
     location: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     start: datetime
     end: datetime
     all_day: bool = False
@@ -61,10 +83,12 @@ class EventResponse(BaseModel):
     # the rest of the going set. Empty when the feature flag is off or
     # the viewer is anonymous.
     following_friends_preview: list["FriendMini"] = []
+    friends_going_count: int = 0
+    friends_going_preview: list["FriendMini"] = []
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
-    price_is_free: bool = False
+    price_is_free: Optional[bool] = None
     review_status: str = "reviewed"
     links: Optional[list[LinkItem]] = None
     tags: list[TagResponse] = []
@@ -95,6 +119,7 @@ class EventOrganizerMini(BaseModel):
 
 class FriendMini(BaseModel):
     user_id: UUID
+    handle: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
 
@@ -169,6 +194,16 @@ class AttendeeResponse(BaseModel):
     # can render the correct "Follow" / "Following" / "Requested" state on
     # first paint (no per-attendee status fetch needed).
     viewer_follow_status: Optional[str] = None
+    # Event detail "People" tab: whether the attendee is a mutual friend of
+    # the viewer, and how many of the viewer's friends also follow them
+    # (follows-in-common). Both default to the safe "no relationship" values
+    # so anonymous/relationship-less callers render a plain row.
+    is_friend: bool = False
+    mutual_friend_count: int = 0
+    # "going" (RSVP'd via UserEventAttendance) or "interested" (saved via
+    # UserSavedEvent). Defaults to "going" so existing callers (wedge,
+    # summary preview) keep their prior meaning.
+    attendance_status: str = "going"
 
 
 class AttendanceSummaryResponse(BaseModel):
@@ -359,26 +394,36 @@ class HandleAvailabilityResponse(BaseModel):
     reason: Optional[str] = None
 
 
+ReachFilter = Literal["any", "regional_plus", "international"]
+
+
 class InterestProfileRequest(BaseModel):
     """Create/replace payload for a ``UserInterestProfile``.
 
-    Geography is always a bounding box (``min_lat``/``min_lng``/
-    ``max_lat``/``max_lng``). ``dance_tag_ids``/``reach_tag_ids`` are full
-    replacements; empty ``reach_tag_ids`` means "match any scale" (no
-    reach filter).
+    Area geography uses the supplied bounding box. Radius geography uses
+    ``center_lat``/``center_lng``/``radius_km`` and has its bounding box
+    computed by the server. ``reach_filter`` is the canonical event reach
+    restriction; ``reach_tag_ids`` is a temporary compatibility input.
 
     Legacy ``notify_enabled`` is accepted as an alias for
     ``matches_enabled`` for one release (Phase G rollout).
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
     label: str = Field(..., min_length=1, max_length=120)
-    min_lat: float = Field(..., ge=-90, le=90)
-    min_lng: float = Field(..., ge=-180, le=180)
-    max_lat: float = Field(..., ge=-90, le=90)
-    max_lng: float = Field(..., ge=-180, le=180)
+    area_label: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    geo_kind: str = Field(default="area", pattern="^(area|radius)$")
+    min_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    min_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    max_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    max_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    center_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    center_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    radius_km: Optional[float] = Field(default=None, gt=0, le=5000)
     dance_tag_ids: list[int] = []
+    reach_filter: Optional[ReachFilter] = None
+    # Legacy input accepted while existing clients migrate to ``reach_filter``.
     reach_tag_ids: list[int] = []
     matches_enabled: bool = Field(default=True, validation_alias="matches_enabled")
     # Legacy alias — remove in the cleanup PR (see PHASE_G §G.9 step 5).
@@ -396,14 +441,21 @@ class InterestProfileUpdateRequest(BaseModel):
     ``matches_enabled`` for one release.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
     label: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    area_label: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    geo_kind: Optional[str] = Field(default=None, pattern="^(area|radius)$")
     min_lat: Optional[float] = Field(default=None, ge=-90, le=90)
     min_lng: Optional[float] = Field(default=None, ge=-180, le=180)
     max_lat: Optional[float] = Field(default=None, ge=-90, le=90)
     max_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    center_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    center_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    radius_km: Optional[float] = Field(default=None, gt=0, le=5000)
     dance_tag_ids: Optional[list[int]] = None
+    reach_filter: Optional[ReachFilter] = None
+    # Legacy input accepted while existing clients migrate to ``reach_filter``.
     reach_tag_ids: Optional[list[int]] = None
     matches_enabled: Optional[bool] = None
     # Legacy alias — remove in the cleanup PR.
@@ -419,11 +471,18 @@ class InterestProfileUpdateRequest(BaseModel):
 class InterestProfileResponse(BaseModel):
     id: int
     label: str
+    area_label: str
+    geo_kind: str = "area"
     min_lat: float
     min_lng: float
     max_lat: float
     max_lng: float
+    center_lat: Optional[float] = None
+    center_lng: Optional[float] = None
+    radius_km: Optional[float] = None
     dance_tag_ids: list[int] = []
+    reach_filter: ReachFilter = "any"
+    # Legacy mirror derived from ``reach_filter``.
     reach_tag_ids: list[int] = []
     matches_enabled: bool = True
     # Legacy mirror — remove in the cleanup PR. Always equal to
@@ -467,6 +526,9 @@ class EventBatchRequest(BaseModel):
 
 class ExportRequest(BaseModel):
     event_ids: list[str] = Field(..., min_length=1, max_length=100)
+    view: Optional[MyEventsView] = Field(
+        default=None, description="Optional context: upcoming, saved, or past"
+    )
 
 
 class HealthResponse(BaseModel):
@@ -661,6 +723,8 @@ DefaultExplorerPeriod = Literal[
     "next_season_3",
 ]
 
+GoingButtonIconVariant = Literal["hand", "person"]
+
 
 class SiteSettingsResponse(BaseModel):
     since_date: str
@@ -701,6 +765,7 @@ class SiteSettingsResponse(BaseModel):
     event_color_bar_color: str = "#64748b"
     tag_sort_mode: str = "group"  # "group" | "event_count"
     default_explorer_period: DefaultExplorerPeriod = "next_3_months"
+    going_button_icon_variant: GoingButtonIconVariant = "hand"
     # User-submitted promo codes per event (admin-moderated). When False,
     # public + user-facing promo endpoints return 404 and the event
     # section / card badge are hidden.
@@ -709,15 +774,13 @@ class SiteSettingsResponse(BaseModel):
     # admin-moderated). When False, the Account application section
     # and event "Organized by" pill are hidden.
     organizer_claims_enabled: bool = False
-    # Explorer "For you" discovery rail (You might like/Friends going/New lenses).
-    # When False, the rail is hidden entirely.
-    for_you_rail_enabled: bool = False
-    # Explorer "Your next events" rail (viewer's own saved/going events).
-    # When False, the rail is hidden entirely.
-    your_next_events_rail_enabled: bool = True
     # Tribe > Calendars "Your Network" snapshot of upcoming events people
     # you follow are going to. When False, the snapshot is hidden.
-    network_going_snapshot_enabled: bool = True
+    network_going_snapshot_enabled: bool = False
+    # My Events map journey arrows and per-tab Route control.
+    my_events_route_enabled: bool = False
+    # Show 'My Events' as a top-level navigation entry (admin feature).
+    my_events_nav_enabled: bool = True
     # Required tag-group ids used by the event suggestion form.
     suggest_event_required_dance_group_id: Optional[int] = None
     suggest_event_required_reach_group_id: Optional[int] = None
@@ -775,6 +838,8 @@ class SiteSettingsResponse(BaseModel):
     # Master switch for post-event "how was it?" review-prompt notifications
     # (Event Quality Layer Phase 3).
     review_prompt_enabled: bool = True
+    # Show the optional event-size question in the review wizard.
+    event_review_size_step_enabled: bool = True
     # Hours after an event's end before the review prompt fires.
     review_prompt_delay_hours: int = 3
     # How far past the delay window review_prompt_service scans for newly
@@ -800,6 +865,24 @@ class SiteSettingsResponse(BaseModel):
     # The admin Series panel and manual "Scan now"/"Group as series" actions
     # are always available regardless of this flag.
     series_auto_detect_enabled: bool = False
+    # When True, the saved count renders next to the Save action on cards.
+    event_card_save_show_stats_enabled: bool = False
+    # When True, the going count renders next to the "I'm going" action.
+    event_card_imgoing_show_stats_enabled: bool = False
+    # When True, the "I'm going" action sits bottom-right on the tags row;
+    # when False it sits in the top-right cluster next to Save.
+    event_card_imgoing_location_bottom_enabled: bool = True
+    # When True, event cards show the people icon prefixing the avatar stack.
+    event_card_show_people_icon_enabled: bool = False
+    # When True, event cards show clock (time) and pin (location) icons.
+    event_card_show_time_location_icons_enabled: bool = False
+    # When True, the explorer list renders the shared My Events card style.
+    explorer_event_card_card_style_enabled: bool = False
+    # When True, event pictures render on cards and detail pages. Admin upload
+    # stays available regardless so images can be prepared before going live.
+    event_images_enabled: bool = False
+    # What fills a card's picture slot when the event has no picture.
+    event_card_placeholder_style: str = "gradient"
 
 
 # ---------------------------------------------------------------------------
@@ -978,11 +1061,12 @@ class SiteSettingsUpdateRequest(BaseModel):
     )
     tag_sort_mode: Optional[str] = Field(default=None, pattern="^(group|event_count)$")
     default_explorer_period: Optional[DefaultExplorerPeriod] = None
+    going_button_icon_variant: Optional[GoingButtonIconVariant] = None
     promo_codes_enabled: Optional[bool] = None
     organizer_claims_enabled: Optional[bool] = None
-    for_you_rail_enabled: Optional[bool] = None
-    your_next_events_rail_enabled: Optional[bool] = None
     network_going_snapshot_enabled: Optional[bool] = None
+    my_events_route_enabled: Optional[bool] = None
+    my_events_nav_enabled: Optional[bool] = None
     suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
     suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)
     # Notification / re-engagement global gates.
@@ -1024,6 +1108,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     milestone_unlocked_email_instant: Optional[bool] = None
     milestone_unlocked_email_digest: Optional[bool] = None
     review_prompt_enabled: Optional[bool] = None
+    event_review_size_step_enabled: Optional[bool] = None
     review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
     review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
     for_you_review_window_days: Optional[int] = Field(default=None, ge=1, le=3650)
@@ -1031,6 +1116,20 @@ class SiteSettingsUpdateRequest(BaseModel):
     event_message_cta_min_going: Optional[int] = Field(default=None, ge=1, le=10000)
     duplicate_auto_detect_enabled: Optional[bool] = None
     series_auto_detect_enabled: Optional[bool] = None
+    event_card_save_show_stats_enabled: Optional[bool] = None
+    event_card_imgoing_show_stats_enabled: Optional[bool] = None
+    event_card_imgoing_location_bottom_enabled: Optional[bool] = None
+    event_card_show_people_icon_enabled: Optional[bool] = None
+    event_card_show_time_location_icons_enabled: Optional[bool] = None
+    explorer_event_card_card_style_enabled: Optional[bool] = None
+    event_images_enabled: Optional[bool] = None
+    event_card_placeholder_style: Optional[str] = Field(
+        default=None, pattern="^(gradient|initial|none)$"
+    )
+
+
+class EventImageFromUrlRequest(BaseModel):
+    url: HttpUrl
 
 
 class EventUpdateRequest(BaseModel):
@@ -1055,10 +1154,36 @@ class EventUpdateRequest(BaseModel):
     show_promo_override: Optional[bool] = None
 
 
+class GeocodeBoundingBox(BaseModel):
+    min_lat: float
+    min_lng: float
+    max_lat: float
+    max_lng: float
+
+
 class GeocodeSuggestion(BaseModel):
     display_name: str
     latitude: float
     longitude: float
+    name: Optional[str] = None
+    context: Optional[str] = None
+    country: Optional[str] = None
+    region: Optional[str] = None
+    place_kind: Literal[
+        "continent",
+        "country",
+        "region",
+        "county",
+        "city",
+        "town",
+        "district",
+        "locality",
+        "address",
+        "poi",
+        "unknown",
+    ] = "unknown"
+    type_label: str = "Place"
+    bounding_box: Optional[GeocodeBoundingBox] = None
 
 
 class AppInfoResponse(BaseModel):
@@ -1078,6 +1203,13 @@ class NewTagSuggestionItem(BaseModel):
     group_slug: Optional[str] = Field(default=None, max_length=100)
 
 
+class RecurrenceDateItem(BaseModel):
+    """One explicitly chosen occurrence, free to carry its own duration."""
+
+    start: datetime
+    end: datetime
+
+
 class EventSuggestionCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
@@ -1088,6 +1220,10 @@ class EventSuggestionCreate(BaseModel):
     start: datetime
     end: datetime
     all_day: bool = False
+    recurrence_rule: Optional[str] = Field(default=None, max_length=500)
+    recurrence_dates: Optional[list[RecurrenceDateItem]] = Field(
+        default=None, max_length=MAX_OCCURRENCES
+    )
     submitter_name: Optional[str] = Field(default=None, max_length=100)
     submitter_email: Optional[str] = Field(default=None, max_length=200)
     website: str = ""  # honeypot
@@ -1105,11 +1241,29 @@ class EventSuggestionCreate(BaseModel):
     price_min: Optional[float] = Field(default=None, ge=0)
     price_max: Optional[float] = Field(default=None, ge=0)
     price_currency: Optional[str] = Field(default=None, max_length=8)
-    price_is_free: bool = False
+    price_is_free: Optional[bool] = None
     # When True (default), an approved suggestion is auto-saved to the
     # authenticated submitter's Calendar tab via UserSavedEvent. Has no
     # effect for anonymous submissions.
     auto_save: bool = True
+
+    @model_validator(mode="after")
+    def _check_recurrence(self) -> "EventSuggestionCreate":
+        if self.recurrence_rule and self.recurrence_dates:
+            raise ValueError(
+                "Provide either recurrence_rule or recurrence_dates, not both"
+            )
+        if self.recurrence_rule:
+            self.recurrence_rule = validate_rule(self.recurrence_rule)
+        if self.recurrence_dates:
+            seen: set[datetime] = set()
+            for item in self.recurrence_dates:
+                if item.end <= item.start:
+                    raise ValueError("Each recurrence date must end after it starts")
+                if item.start in seen:
+                    raise ValueError("Recurrence dates must be unique")
+                seen.add(item.start)
+        return self
 
 
 class EventSuggestionResponse(BaseModel):
@@ -1123,6 +1277,8 @@ class EventSuggestionResponse(BaseModel):
     start: datetime
     end: datetime
     all_day: bool = False
+    recurrence_rule: Optional[str] = None
+    recurrence_dates: Optional[list[RecurrenceDateItem]] = None
     submitter_name: Optional[str] = None
     submitter_email: Optional[str] = None
     submitter_ip: Optional[str] = None
@@ -1149,7 +1305,7 @@ class EventSuggestionResponse(BaseModel):
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
-    price_is_free: bool = False
+    price_is_free: Optional[bool] = None
     created_at: datetime
     reviewed_at: Optional[datetime] = None
     reviewed_by: Optional[str] = None
@@ -1158,6 +1314,23 @@ class EventSuggestionResponse(BaseModel):
 class EventSuggestionPublicResponse(BaseModel):
     id: UUID
     message: str
+
+
+class SuggestionOccurrence(BaseModel):
+    """One expanded date of a suggestion's recurrence, for admin review."""
+
+    index: int
+    start: datetime
+    end: datetime
+    event_id: Optional[str] = None
+    """Set once the occurrence has been materialised as a cached event."""
+    materialised: bool = False
+
+
+class SuggestionOccurrencesResponse(BaseModel):
+    total: int
+    """How many occurrences approval would create, capped by the expander."""
+    occurrences: list[SuggestionOccurrence]
 
 
 class SuggestionApproveRequest(BaseModel):
@@ -1230,7 +1403,9 @@ class TagCreate(BaseModel):
     label: str = Field(..., min_length=1, max_length=100)
     slug: Optional[str] = Field(default=None, max_length=100)
     color: Optional[str] = None
-    polarity: Optional[str] = Field(default=None, pattern="^(positive|negative)$")
+    polarity: Optional[str] = Field(
+        default=None, pattern="^(positive|negative|neutral)$"
+    )
 
 
 class TagUpdate(BaseModel):
@@ -1241,7 +1416,9 @@ class TagUpdate(BaseModel):
     is_hero_filter: Optional[bool] = None
     hero_ordinal: Optional[int] = None
     group_id: Optional[int] = None
-    polarity: Optional[str] = Field(default=None, pattern="^(positive|negative)$")
+    polarity: Optional[str] = Field(
+        default=None, pattern="^(positive|negative|neutral)$"
+    )
 
 
 class EventTagAssignment(BaseModel):
@@ -1617,6 +1794,7 @@ class EventRatingAggregate(BaseModel):
     sentiment_distribution: dict[str, int] = Field(default_factory=dict)
     aspects: list[AspectAggregate] = Field(default_factory=list)
     top_positive_tags: list[TopReviewTag] = Field(default_factory=list)
+    top_neutral_tags: list[TopReviewTag] = Field(default_factory=list)
     top_negative_tags: list[TopReviewTag] = Field(default_factory=list)
     top_audience_tags: list[TopReviewTag] = Field(default_factory=list)
     # Overall-mood figures (see services/experience_aspects.compute_mood_metrics).
@@ -1667,6 +1845,7 @@ class SeriesRatingRollup(BaseModel):
     sentiment_distribution: dict[str, int] = Field(default_factory=dict)
     aspects: list[AspectAggregate] = Field(default_factory=list)
     top_positive_tags: list[TopReviewTag] = Field(default_factory=list)
+    top_neutral_tags: list[TopReviewTag] = Field(default_factory=list)
     top_negative_tags: list[TopReviewTag] = Field(default_factory=list)
     top_audience_tags: list[TopReviewTag] = Field(default_factory=list)
     editions: list[SeriesEditionSummary] = Field(default_factory=list)
@@ -1980,6 +2159,13 @@ class FriendsLeaderboardResponse(BaseModel):
     items: list[FriendsLeaderboardEntry]
 
 
+class FollowingMostActiveResponse(BaseModel):
+    """People the viewer follows, ranked by Going count over a window."""
+
+    period: str  # "90d" | "180d" | "365d"
+    items: list[FriendsLeaderboardEntry]
+
+
 class FollowActionResponse(BaseModel):
     handle: str
     is_following: bool
@@ -2141,8 +2327,21 @@ class NotificationItem(BaseModel):
     event_id: Optional[str] = None
     event_title: Optional[str] = None
     event_start: Optional[datetime] = None
+    # Optional event cover image, when the linked event has one. Rendered as
+    # a small thumbnail on the feed row (no placeholder when absent).
+    event_image_url: Optional[str] = None
     actor: NotificationActor
+    # Aggregation (multi-person rows): ``actors`` lists the distinct actors
+    # collapsed into this row (most-recent first, capped), ``actor_count`` is
+    # the total distinct actor count, and ``member_ids`` are all the raw
+    # notification ids folded into this group (so a single mark-read clears
+    # them all). For non-aggregated rows ``actors == [actor]`` and
+    # ``actor_count == 1``.
+    actors: list[NotificationActor] = []
+    actor_count: int = 1
+    member_ids: list[int] = []
     context: Optional[str] = None
+
     subject_key: Optional[str] = None
     # Optional narrative field for kinds that benefit from additional context
     # beyond name/context. Used in milestone notifications.
@@ -2224,6 +2423,13 @@ class AdminUser(BaseModel):
     # Admin override: bypasses InstallPrompt's 24h push opt-in dismiss
     # snooze for this user (see force_enable_push_prompt on the User model).
     force_enable_push_prompt: bool = False
+    # Onboarding status surfaced in the Admin Users tab. ``onboarded_at``
+    # is null until the user completes/skips the wizard; ``needs_onboarding``
+    # is computed the same way as ``/auth/me`` (never onboarded OR stored
+    # version below the current server version).
+    onboarded_at: Optional[datetime] = None
+    onboarding_version: int = 0
+    needs_onboarding: bool = False
     deleted_at: Optional[datetime] = None
     created_at: datetime
     # Most recent visit timestamp + the raw ``User-Agent`` header captured
@@ -2784,6 +2990,7 @@ class PassportTimelineItem(BaseModel):
     location: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
+    tags: list[str] = []
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
@@ -2792,7 +2999,9 @@ class PassportTimelineMarker(BaseModel):
     key: str
     name: str
     icon: str
+    description: Optional[str] = None
     date: datetime
+    event_id: Optional[str] = None
     # Optional secondary line (used by recurring consistency markers to state
     # the reach, e.g. "8/12 active months").
     label: Optional[str] = None
@@ -2813,6 +3022,7 @@ class SharedPassportResponse(BaseModel):
     """
 
     display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     stats: PassportStats
     collections: PassportCollections
     milestones: list[PassportMilestone] = []

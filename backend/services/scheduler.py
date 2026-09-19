@@ -239,6 +239,7 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
         activity_email,
         interest_notification_service,
         milestone_notification_service,
+        recurrence_extension,
         reminder_service,
         review_prompt_service,
     )
@@ -280,6 +281,11 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
         except Exception:
             logger.exception("Activity digest failed")
             stats["activity"] = {"error": True}
+        try:
+            stats["recurrence"] = recurrence_extension.run_once()
+        except Exception:
+            logger.exception("Recurring series extension failed")
+            stats["recurrence"] = {"error": True}
         return stats
     finally:
         _release_dispatch_lock(lock_conn)

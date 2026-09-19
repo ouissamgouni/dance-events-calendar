@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { usePwaInstall } from '../context/PwaInstallContext';
 import { useAuth } from '../context/AuthContext';
 import { useConsent } from '../context/ConsentContext';
@@ -76,6 +77,7 @@ export default function InstallPrompt() {
     const { canInstall, isStandalone, promptInstall } = usePwaInstall();
     const { user } = useAuth();
     const { consentResolved } = useConsent();
+    const location = useLocation();
     const push = usePush(user?.user_id);
     const [snoozed, setSnoozed] = useState(isSnoozed());
     const [justInstalled, setJustInstalled] = useState(false);
@@ -150,6 +152,11 @@ export default function InstallPrompt() {
     // the comment on `consentResolved` in ConsentContext for why.
     if (!consentResolved) return null;
 
+    // Keep both banners out of the onboarding flow: a user still completing
+    // onboarding (or on any /onboarding route) shouldn't be nudged to
+    // install/enable push — those prompts belong on the explorer afterwards.
+    if (location.pathname.startsWith('/onboarding') || user?.needs_onboarding) return null;
+
     if (showPushOptIn) {
         return (
             <div
@@ -165,7 +172,7 @@ export default function InstallPrompt() {
                         <button
                             type="button"
                             onClick={dismissPush}
-                            className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
+                            className="text-xs font-medium text-orange-700 bg-surface/30 hover:bg-surface/50 px-3 py-2 rounded transition"
                         >
                             Not now
                         </button>
@@ -246,7 +253,7 @@ export function InstallPromptCard({
                     <button
                         type="button"
                         onClick={onDismiss}
-                        className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
+                        className="text-xs font-medium text-orange-700 bg-surface/30 hover:bg-surface/50 px-3 py-2 rounded transition"
                     >
                         Not now
                     </button>

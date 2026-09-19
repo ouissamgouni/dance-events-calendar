@@ -39,6 +39,9 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 SUBSCRIPTION_GOING = "subscription_going"
+# A followee saved (marked interested in) an event; fanned out to their
+# subscribers. Same 3-tier audience gating as ``subscription_going``.
+SUBSCRIPTION_SAVED = "subscription_saved"
 SUBSCRIPTION_SUGGESTED = "subscription_suggested"
 # A followee dropped a review; fanned out to their subscribers. Reviews
 # only exist on past events, so this bypasses the past-event fan-out guard.
@@ -187,6 +190,21 @@ def fan_out_going(
     return _fan_out(session, actor, event_id, SUBSCRIPTION_GOING, audience=audience)
 
 
+def fan_out_saved(
+    session: Session,
+    actor: User,
+    event_id: str,
+    *,
+    audience: str = "public",
+) -> int:
+    """Notify subscribers that ``actor`` saved ``event_id``.
+
+    ``audience`` is the per-save audience tier (``public`` | ``friends``
+    | ``private``). Caller ensures ``UserSavedEvent.audience`` matches.
+    """
+    return _fan_out(session, actor, event_id, SUBSCRIPTION_SAVED, audience=audience)
+
+
 def fan_out_review(
     session: Session,
     actor: User,
@@ -268,6 +286,30 @@ def withdraw_going(
     rows = session.exec(
         select(Notification)
         .where(Notification.kind == SUBSCRIPTION_GOING)
+        .where(Notification.actor_user_id == actor.id)
+        .where(Notification.event_id == event_id)
+    ).all()
+    for row in rows:
+        session.delete(row)
+    if rows:
+        session.flush()
+    return len(rows)
+
+
+def withdraw_saved(
+    session: Session,
+    actor: User,
+    event_id: str,
+) -> int:
+    """Delete previously fanned-out subscription_saved notifications for
+    ``(actor, event_id)``.
+
+    Called when a user unsaves an event so the (now-withdrawn) save does
+    not linger in subscribers' feeds. Returns the number of rows removed.
+    """
+    rows = session.exec(
+        select(Notification)
+        .where(Notification.kind == SUBSCRIPTION_SAVED)
         .where(Notification.actor_user_id == actor.id)
         .where(Notification.event_id == event_id)
     ).all()

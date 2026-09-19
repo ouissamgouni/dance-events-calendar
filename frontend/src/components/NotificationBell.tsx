@@ -37,20 +37,20 @@ export default function NotificationBell({ className }: { className?: string }) 
                 }
                 className={
                     className ??
-                    'relative inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition'
+                    'relative inline-flex items-center justify-center w-11 h-11 text-ink-soft hover:text-ink transition'
                 }
             >
                 <svg
                     viewBox="0 0 20 20"
                     fill="currentColor"
-                    className="w-4 h-4"
+                    className="w-6 h-6"
                     aria-hidden="true"
                 >
                     <path d="M10 2a5 5 0 0 0-5 5v3.586l-1.207 1.207A1 1 0 0 0 4.5 13.5h11a1 1 0 0 0 .707-1.707L15 10.586V7a5 5 0 0 0-5-5Zm-2 13a2 2 0 1 0 4 0H8Z" />
                 </svg>
                 {badge && (
                     <span
-                        className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center leading-none"
+                        className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-white text-[10px] font-semibold flex items-center justify-center leading-none"
                         aria-hidden="true"
                     >
                         {badge}

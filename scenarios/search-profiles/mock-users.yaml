@@ -1,0 +1,13 @@
+# Mock users for the search-profiles scenario.
+#   * viewer — the POV account. Seeded with a "Default" (is_active) search
+#     profile plus one saved "Barcelona salsa" profile so the Filters sheet
+#     profile picker has both a default and a named preset from first sign-in
+#     (see db-interest-profiles.yaml).
+#   * admin — matches ADMIN_EMAIL; runs Sync Now when needed.
+users:
+  - email: viewer@example.com
+    name: Scenario Viewer
+    handle: viewer
+  - email: admin@example.com
+    name: Scenario Admin
+    handle: admin

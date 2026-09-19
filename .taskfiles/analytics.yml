@@ -24,7 +24,7 @@ tasks:
     dotenv:
       [
         "{{.ROOT_DIR}}/config/base.env",
-        "{{.ROOT_DIR}}/config/dev.env",
+        "{{.ROOT_DIR}}/scenarios/dev/config.env",
         "{{.ROOT_DIR}}/config/secrets.env",
         "{{.ROOT_DIR}}/config/secrets.dev.env",
       ]

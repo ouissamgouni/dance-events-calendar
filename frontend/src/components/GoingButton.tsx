@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { UserRoundCheck, UserRoundPlus } from 'lucide-react';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { updateMyVisibility, type ShareAudience } from '../api';
 import { trackShareConversion } from '../utils/tracking';
 import { getActiveReferral } from '../hooks/useReferralAttribution';
@@ -27,22 +29,57 @@ interface Props {
     className?: string;
     /** When true, the event has already ended — labels use past tense ("Attended"). */
     isPast?: boolean;
+    iconVariant?: 'hand' | 'person';
 }
 
-/** Heroicons hand-raised — outline when not going, solid when going */
 function RaisedHandIcon({ solid, className }: { solid: boolean; className: string }) {
-    if (solid) {
-        return (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
-                <path d="M10.5 1.875C10.5 1.25368 11.0037 0.75 11.625 0.75C12.2463 0.75 12.75 1.25368 12.75 1.875V10.0938C13.2674 10.2561 13.7708 10.4757 14.25 10.7527V3.375C14.25 2.75368 14.7537 2.25 15.375 2.25C15.9963 2.25 16.5 2.75368 16.5 3.375V14.3122C15.0821 14.5501 13.8891 15.451 13.2506 16.6852C14.4554 16.0866 15.8134 15.75 17.25 15.75C17.6642 15.75 18 15.4142 18 15V12.75L18 12.7336C18.0042 11.8771 18.3339 11.0181 18.9885 10.3635C19.4278 9.92417 20.1402 9.92417 20.5795 10.3635C21.0188 10.8028 21.0188 11.5152 20.5795 11.9545C20.361 12.173 20.2514 12.4567 20.25 12.7445L20.25 12.75L20.25 15.75H20.2454C20.1863 17.2558 19.5623 18.6877 18.4926 19.7574L16.7574 21.4926C15.6321 22.6179 14.106 23.25 12.5147 23.25H10.5C6.35786 23.25 3 19.8921 3 15.75V6.375C3 5.75368 3.50368 5.25 4.125 5.25C4.74632 5.25 5.25 5.75368 5.25 6.375V11.8939C5.71078 11.4421 6.2154 11.0617 6.75 10.7527V3.375C6.75 2.75368 7.25368 2.25 7.875 2.25C8.49632 2.25 9 2.75368 9 3.375V9.90069C9.49455 9.80023 9.99728 9.75 10.5 9.75V1.875Z" />
-            </svg>
-        );
-    }
     return (
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className={className}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m0 0a4.49 4.49 0 0 1 .437-1.997" />
-        </svg>
+        <span className={`flex h-[22px] w-[22px] items-center justify-center ${className}`.trim()} aria-hidden="true">
+            <svg
+                data-icon-family="hand"
+                data-icon-state={solid ? 'going' : 'default'}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.7}
+                className="h-[17px] w-[17px]"
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m0 0a4.49 4.49 0 0 1 .437-1.997"
+                />
+            </svg>
+        </span>
     );
+}
+
+function PersonAttendanceIcon({ solid, className }: { solid: boolean; className: string }) {
+    const PersonIcon = solid ? UserRoundCheck : UserRoundPlus;
+    return (
+        <span className={`flex h-[22px] w-[22px] items-center justify-center ${className}`.trim()} aria-hidden="true">
+            <PersonIcon
+                data-icon-family="person"
+                data-icon-state={solid ? 'going' : 'default'}
+                className="h-3.5 w-3.5"
+                strokeWidth={1.9}
+            />
+        </span>
+    );
+}
+
+function AttendanceIcon({
+    variant,
+    solid,
+    className,
+}: {
+    variant: 'hand' | 'person';
+    solid: boolean;
+    className: string;
+}) {
+    return variant === 'person'
+        ? <PersonAttendanceIcon solid={solid} className={className} />
+        : <RaisedHandIcon solid={solid} className={className} />;
 }
 
 /** Heroicons globe / users / lock—current per-event audience tier on the
@@ -105,14 +142,15 @@ const POPOVER_WIDTH = 272; // Tailwind w-68 equiv (matches className below).
 export default function GoingButton({
     eventId,
     appearance = 'icon',
-    size = 'md',
-    prominent = false,
     stopPropagation = false,
     className = '',
     isPast = false,
+    iconVariant,
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user, refreshUser } = useAuth();
+    const { goingButtonIconVariant } = useOptionalFeatureFlags();
+    const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
     const going = isAttending(eventId);
 
     const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -186,11 +224,11 @@ export default function GoingButton({
         if (user) {
             // Resolve default audience for this RSVP. Priority order:
             //   1. ``user.share_attendance_default_audience`` (the
-            //      account-level default; defaults to ``friends`` per
-            //      privacy-by-default — see User model). When the user
-            //      explicitly set this in /account it MUST win over any
-            //      stale ``audience.lastUsed`` localStorage hint from
-            //      a previous one-off choice.
+            //      account-level default; defaults to ``public`` so
+            //      attendee lists populate by default — see User model).
+            //      When the user explicitly set this in /account it MUST
+            //      win over any stale ``audience.lastUsed`` localStorage
+            //      hint from a previous one-off choice.
             //   2. ``audience.lastUsed.<user_id>`` localStorage hint
             //      (Phase C — last explicit per-event choice; only used
             //      when the account-level default is unset).
@@ -198,7 +236,7 @@ export default function GoingButton({
             const defaultAudience: ShareAudience =
                 user.share_attendance_default_audience
                 ?? getLastUsedAudience(user.user_id)
-                ?? (user.share_attendance_default === false ? 'private' : 'friends');
+                ?? (user.share_attendance_default === false ? 'private' : 'public');
             // Always RSVP immediately with the default audience — no extra
             // confirmation click. The post-RSVP popover surfaces an inline
             // picker so the user can change visibility on the fly.
@@ -265,7 +303,6 @@ export default function GoingButton({
         setPopoverKind('edit');
     };
 
-    const iconSizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
     const goingLabel = isPast ? 'Attended' : 'Going';
     const markLabel = isPast ? 'I attended' : "I'm going";
     const unmarkLabel = isPast ? "Didn't attend" : 'Not going';
@@ -368,12 +405,12 @@ export default function GoingButton({
             role="dialog"
             aria-label="Attendance visibility"
             style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
-            className="z-[12000] border border-slate-200 bg-white p-3 shadow-xl text-left"
+            className="z-[12000] border border-line bg-surface p-3 shadow-xl text-left"
         >
-            <p className="text-xs font-medium text-slate-800 mb-2">
+            <p className="text-xs font-medium text-ink mb-2">
                 {popoverKind === 'confirm' ? "You're going!" : 'Edit visibility'}
             </p>
-            <p className="text-[11px] text-slate-600 mb-2">
+            <p className="text-[11px] text-ink-soft mb-2">
                 Who can see you in the attendee list?
             </p>
             <AudiencePicker
@@ -382,7 +419,7 @@ export default function GoingButton({
                 size="full"
                 ariaLabel="Attendance visibility"
             />
-            <p className="text-[11px] text-slate-500 mt-1.5">
+            <p className="text-[11px] text-ink-soft mt-1.5">
                 {pendingAudience === 'public'
                     ? 'You will appear in the attendee list to anyone who can view this event.'
                     : pendingAudience === 'friends'
@@ -395,7 +432,7 @@ export default function GoingButton({
                  ON also persists the current selection as the new default
                  immediately, so the user doesn't have to re-pick. */}
             {popoverKind === 'edit' && (
-                <label className="mt-2 flex items-start gap-2 text-[11px] text-slate-600 cursor-pointer">
+                <label className="mt-2 flex items-start gap-2 text-[11px] text-ink-soft cursor-pointer">
                     <input
                         type="checkbox"
                         checked={rememberDefault}
@@ -442,14 +479,14 @@ export default function GoingButton({
                             <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
-                                className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
+                                className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={confirmGoing}
-                                className="text-xs px-3 py-1 bg-blue-500 text-white hover:bg-blue-600"
+                                className="text-xs px-3 py-1 bg-action text-white hover:bg-action"
                             >
                                 {markLabel}
                             </button>
@@ -458,7 +495,7 @@ export default function GoingButton({
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
-                            className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
+                            className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
                         >
                             Close
                         </button>
@@ -477,7 +514,7 @@ export default function GoingButton({
         if (going && user) {
             return (
                 <div
-                    className={`relative inline-flex items-stretch rounded-full overflow-hidden bg-emerald-100 text-emerald-800 ${className}`.trim()}
+                    className={`relative inline-flex h-10 items-stretch overflow-hidden rounded-xl bg-action/10 text-action ${className}`.trim()}
                 >
                     <button
                         ref={triggerRef}
@@ -485,9 +522,9 @@ export default function GoingButton({
                         onClick={handleClick}
                         title={tooltip}
                         aria-label={tooltip}
-                        className="text-xs px-3 py-1 transition flex items-center gap-1.5 hover:bg-emerald-200"
+                        className="flex items-center gap-2 px-3 text-sm transition-colors hover:bg-action/10 focus-visible:outline-none"
                     >
-                        <RaisedHandIcon solid className="w-3.5 h-3.5" />
+                        <AttendanceIcon variant={resolvedIconVariant} solid className="shrink-0" />
                         {goingLabel}
                     </button>
                     <button
@@ -495,7 +532,7 @@ export default function GoingButton({
                         onClick={openEditShare}
                         title={`Visibility: ${getAudience(eventId)} \u2014 click to edit`}
                         aria-label={`Visibility: ${getAudience(eventId)} \u2014 edit`}
-                        className="px-2 transition flex items-center hover:bg-emerald-200 border-l border-emerald-200 text-emerald-700"
+                        className="flex items-center border-l border-action/20 px-2 text-action transition-colors hover:bg-action/10 focus-visible:outline-none"
                     >
                         <AudienceTierIcon audience={getAudience(eventId)} className="w-3.5 h-3.5" />
                     </button>
@@ -512,15 +549,12 @@ export default function GoingButton({
                     onClick={handleClick}
                     title={tooltip}
                     aria-label={tooltip}
-                    className={
-                        prominent && !going
-                            ? `rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition flex items-center gap-2 bg-rose-600 text-white hover:bg-rose-700 ${className}`.trim()
-                            : `text-xs rounded-full px-3 py-1 transition flex items-center gap-1.5 ${going ? 'text-emerald-800 bg-emerald-100 hover:bg-emerald-200' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'} ${className}`.trim()
-                    }
+                    className={`flex h-10 items-center gap-2 rounded-xl px-3 text-sm transition-colors focus-visible:outline-none ${className} ${going ? 'bg-action/10 text-action hover:bg-action/10' : 'bg-action-tile text-ink-soft hover:text-ink'}`.trim()}
                 >
-                    <RaisedHandIcon
+                    <AttendanceIcon
+                        variant={resolvedIconVariant}
                         solid={going}
-                        className={prominent && !going ? 'w-4 h-4' : 'w-3.5 h-3.5'}
+                        className="shrink-0"
                     />
                     {going ? goingLabel : markLabel}
                 </button>
@@ -538,9 +572,9 @@ export default function GoingButton({
                 onClick={handleClick}
                 aria-label={tooltip}
                 title={tooltip}
-                className={`relative rounded-full transition-colors ${size === 'sm' ? 'p-0.5' : 'p-1.5'} ${going ? 'text-emerald-400 hover:text-emerald-500' : 'text-slate-400 hover:text-slate-600'} ${className}`.trim()}
+                className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none ${className} ${going ? 'bg-action/10 text-action hover:bg-action/10' : 'bg-action-tile text-ink-soft hover:text-ink'}`.trim()}
             >
-                <RaisedHandIcon solid={going} className={iconSizeClass} />
+                <AttendanceIcon variant={resolvedIconVariant} solid={going} className="shrink-0" />
             </button>
 
             {popover}

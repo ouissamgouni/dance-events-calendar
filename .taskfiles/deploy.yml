@@ -608,6 +608,7 @@ tasks:
         cat "$HOST_ABS/config/secrets.env" "$HOST_ABS/config/secrets.staging.env" \
           | grep -v '^[[:space:]]*$' \
           | grep -v '^CLOUDFLARE_' \
+          | grep -v '^R2_' \
           | grep -v '^VITE_' \
           | fly secrets import -c config/fly.staging.toml --stage
         if [ -f "$HOST_ABS/backend/credentials/service-account.json" ]; then
@@ -747,6 +748,7 @@ tasks:
         cat "$HOST_ABS/config/secrets.env" "$HOST_ABS/config/secrets.prod.env" \
           | grep -v '^[[:space:]]*$' \
           | grep -v '^CLOUDFLARE_' \
+          | grep -v '^R2_' \
           | grep -v '^VITE_' \
           | fly secrets import -c config/fly.prod.toml --stage
         if [ -f "$HOST_ABS/backend/credentials/service-account.json" ]; then

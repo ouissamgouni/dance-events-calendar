@@ -59,6 +59,7 @@ from backend.api.schemas import (
     FollowRequestItem,
     FollowRequestListResponse,
     FollowUserResponse,
+    FollowingMostActiveResponse,
     FriendsLeaderboardEntry,
     FriendsLeaderboardResponse,
     InterestSummaryItem,
@@ -237,6 +238,12 @@ def _to_admin_user(session: Session, user: User) -> AdminUser:
         force_install_prompt=bool(user.force_install_prompt),
         installed_at=user.installed_at,
         force_enable_push_prompt=bool(user.force_enable_push_prompt),
+        onboarded_at=user.onboarded_at,
+        onboarding_version=user.onboarding_version or 0,
+        needs_onboarding=(
+            user.onboarded_at is None
+            or (user.onboarding_version or 0) < get_current_onboarding_version()
+        ),
         deleted_at=user.deleted_at,
         created_at=user.created_at,
         last_visit_at=user.last_visit_at,
@@ -835,7 +842,9 @@ def follow_user(
             sub, _ = ensure_calendar_subscription(session, viewer.id, target.id)
             notify_follow_request(session, target=target, requester=viewer)
             session.commit()
-            _dispatch_social_instant(session, kind="follow_request", recipient_ids={target.id})
+            _dispatch_social_instant(
+                session, kind="follow_request", recipient_ids={target.id}
+            )
             return FollowActionResponse(
                 handle=target.handle or "",
                 is_following=False,
@@ -1496,6 +1505,100 @@ def friends_leaderboard(
             )
         )
     return FriendsLeaderboardResponse(period=period, items=items)
+
+
+# Following "Most active": everyone the viewer follows ranked by Going count.
+_FOLLOWING_ACTIVITY_PERIODS = {"90d": 90, "180d": 180, "365d": 365}
+
+
+@router.get(
+    "/me/following/most-active",
+    response_model=FollowingMostActiveResponse,
+)
+def following_most_active(
+    period: str = Query(default="365d", description="90d | 180d | 365d"),
+    limit: int = Query(default=50, ge=1, le=100),
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """People the viewer follows, ranked by Going count over ``period``.
+
+    Ranks everyone the viewer follows (not just mutuals). A followed
+    user's ``friends``-audience attendances therefore only count when the
+    viewer is actually a mutual friend; ``public`` rows always count and
+    ``private`` rows never do. Ties broken by handle ASC for stability.
+    """
+    days = _FOLLOWING_ACTIVITY_PERIODS.get(period)
+    if days is None:
+        raise HTTPException(
+            status_code=400, detail="period must be one of 90d, 180d, 365d"
+        )
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    # Everyone the viewer follows (approved edges only).
+    following_sub = (
+        select(UserFollow.followee_id)
+        .where(UserFollow.follower_id == viewer.id)
+        .where(UserFollow.status == "approved")
+    ).subquery()
+
+    # Mutual-friend set, used to admit ``friends``-audience attendances
+    # only for followed users who also follow the viewer back.
+    f1 = aliased(UserFollow)
+    f2 = aliased(UserFollow)
+    friends_sub = (
+        select(f1.followee_id)
+        .join(
+            f2,
+            (f2.follower_id == f1.followee_id) & (f2.followee_id == f1.follower_id),
+        )
+        .where(f1.follower_id == viewer.id)
+        .where(f1.status == "approved")
+        .where(f2.status == "approved")
+    ).scalar_subquery()
+
+    going_count_col = func.count(UserEventAttendance.id).label("going_count")
+    rows = session.exec(
+        select(User, going_count_col)
+        .join(following_sub, following_sub.c.followee_id == User.id)
+        .join(
+            UserEventAttendance,
+            UserEventAttendance.user_id == User.id,
+        )
+        .join(
+            CachedEvent,
+            CachedEvent.event_id == UserEventAttendance.event_id,
+        )
+        .where(User.deleted_at.is_(None))
+        .where(
+            or_(
+                UserEventAttendance.share_audience == "public",
+                (UserEventAttendance.share_audience == "friends")
+                & User.id.in_(friends_sub),
+            )
+        )
+        .where(CachedEvent.start >= cutoff)
+        .where(CachedEvent.deleted_at.is_(None))
+        .where(CachedEvent.is_hidden == False)  # noqa: E712
+        .group_by(User.id)
+        .order_by(going_count_col.desc(), User.handle.asc())
+        .limit(limit)
+    ).all()
+
+    items: list[FriendsLeaderboardEntry] = []
+    for idx, row in enumerate(rows, start=1):
+        u, count = row  # type: ignore[misc]
+        items.append(
+            FriendsLeaderboardEntry(
+                rank=idx,
+                handle=u.handle or "",
+                display_name=u.display_name,
+                avatar_url=u.avatar_url,
+                is_verified_organizer=bool(u.is_verified_organizer),
+                going_count=int(count),
+            )
+        )
+    return FollowingMostActiveResponse(period=period, items=items)
 
 
 # --- Account: visibility + social links --------------------------------------
@@ -2812,6 +2915,31 @@ def admin_set_force_enable_push_prompt_by_id(
     """
     user = _resolve_admin_user_id(session, user_id)
     _set_force_enable_push_prompt(session, user, payload.force_enable_push_prompt)
+    return _to_admin_user(session, user)
+
+
+# --- Admin: reset onboarding (force re-trigger) -----------------------------
+
+
+@router.patch("/admin/users/id/{user_id}/reset-onboarding", response_model=AdminUser)
+def admin_reset_onboarding_by_id(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin-only: force a user back through the onboarding wizard.
+
+    Clears ``onboarded_at`` so ``needs_onboarding`` becomes true on their
+    next ``/auth/me``. Non-destructive: the user's saved preferences,
+    interest profiles, and follows are untouched — the wizard re-opens
+    pre-filled from them (``OnboardingFlow`` loads the active interest
+    profile) and updates rather than replaces on completion.
+    """
+    user = _resolve_admin_user_id(session, user_id)
+    user.onboarded_at = None
+    session.add(user)
+    session.commit()
+    session.refresh(user)
     return _to_admin_user(session, user)
 
 

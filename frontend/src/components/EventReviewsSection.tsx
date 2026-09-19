@@ -8,7 +8,9 @@ import type { EventRatingAggregate, EventReviewPublic, SeriesRatingRollup, TagGr
 import ExperienceBreakdown from './ExperienceBreakdown';
 import TypicalExperienceCard from './TypicalExperienceCard';
 import { seriesToAggregate } from '../hooks/useCommunityExperience';
+import { useScrollDots } from '../hooks/useScrollDots';
 import { SENTIMENT_META } from '../utils/reviewSentiment';
+import ScrollDotsIndicator from './ScrollDots';
 
 /** Max tags shown on a compact review card before the rest collapse into "+N more". */
 const CARD_TAGS_SHOWN = 5;
@@ -21,12 +23,16 @@ function cardTags(r: EventReviewPublic): CardTag[] {
     const aspect = r.aspect_tags.map((t) => ({
         key: `a-${t.id}`,
         label: t.label,
-        cls: t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-green-800',
+        cls: t.polarity === 'negative'
+            ? 'bg-orange-50 text-orange-800'
+            : t.polarity === 'positive'
+                ? 'bg-green-50 text-success'
+                : 'bg-slate-100 text-ink-soft',
     }));
     const audience = r.audience_tags.map((t) => ({
         key: `u-${t.id}`,
         label: t.label,
-        cls: 'bg-slate-100 text-slate-600',
+        cls: 'bg-slate-100 text-ink-soft',
     }));
     return [...aspect, ...audience];
 }
@@ -43,7 +49,7 @@ function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onC
             onClick={onClose}
         >
             <div
-                className="bg-white shadow-lg w-full max-w-sm max-h-[85vh] overflow-y-auto border border-slate-200 p-4 space-y-3"
+                className="bg-surface shadow-lg w-full max-w-sm max-h-[85vh] overflow-y-auto border border-line p-4 space-y-3"
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
@@ -51,12 +57,12 @@ function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onC
             >
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-ink-soft">
                             {initials}
                         </span>
                         <div className="min-w-0">
-                            <div className="text-sm font-semibold text-slate-900 truncate">{review.reviewer_label}</div>
-                            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <div className="text-sm font-semibold text-ink truncate">{review.reviewer_label}</div>
+                            <div className="flex items-center gap-1.5 text-xs text-ink-soft">
                                 {meta && <span>{meta.emoji} {meta.label}</span>}
                                 {meta && <span className="text-slate-300">·</span>}
                                 <span>{new Date(review.created_at).toLocaleDateString()}</span>
@@ -66,13 +72,13 @@ function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onC
                     <button
                         onClick={onClose}
                         aria-label="Close"
-                        className="shrink-0 text-slate-400 hover:text-slate-600 text-xl leading-none"
+                        className="shrink-0 text-muted hover:text-ink-soft text-xl leading-none"
                     >
                         ×
                     </button>
                 </div>
                 {review.comment && (
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">{review.comment}</p>
+                    <p className="text-sm text-ink whitespace-pre-wrap break-words">{review.comment}</p>
                 )}
                 {tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
@@ -130,6 +136,8 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
     const [aspectGroups, setAspectGroups] = useState<TagGroup[]>([]);
     const [series, setSeries] = useState<SeriesRatingRollup | null>(null);
     const [expandedReview, setExpandedReview] = useState<EventReviewPublic | null>(null);
+    const reviewsScrollerRef = useRef<HTMLDivElement>(null);
+    const reviewDots = useScrollDots(reviewsScrollerRef, [reviews.length]);
 
     const loadAggregate = useCallback(() => {
         if (!user) return;
@@ -232,7 +240,7 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
             onClick={() => setCollapsed((v) => !v)}
             aria-expanded={!collapsed}
             aria-label={collapsed ? 'Expand community experience' : 'Collapse community experience'}
-            className="mr-1 align-middle text-slate-400 hover:text-slate-600"
+            className="mr-1 align-middle text-muted hover:text-ink-soft"
         >
             <span
                 aria-hidden="true"
@@ -248,16 +256,10 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
         // Nothing to gate behind sign-in when the event has no reviews yet.
         if (count === 0) return null;
         return (
-            <section className="mt-4 border-t border-slate-200 pt-3 space-y-2">
-                <h3 className="text-base font-bold text-slate-900">
-                    {collapseChevron}
-                    Community Experience{' '}
-                    <span className="text-sm font-normal tabular-nums text-slate-500">
-                        · {count} review{count === 1 ? '' : 's'}
-                    </span>
-                </h3>
+            <section className="mt-4 border-t border-line px-1 pt-3 space-y-2">
+                {collapseChevron}
                 {!collapsed && (
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-ink-soft">
                         <Link
                             to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}#community`)}`}
                             className="text-sky-600 hover:text-sky-700 font-medium"
@@ -273,13 +275,13 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
 
     if (!effectiveAggregate || effectiveAggregate.count === 0) {
         return (
-            <section className="mt-4 border-t border-slate-200 pt-3 space-y-2">
-                <h3 className="text-base font-bold text-slate-900">{collapseChevron}Community Experience</h3>
+            <section className="mt-4 border-t border-line px-1 pt-3 space-y-2">
+                {collapseChevron}
                 {!collapsed && (
                     <>
                         {typicalCard}
                         {isPast ? (
-                            <p className="text-[11px] text-slate-500">
+                            <p className="text-[11px] text-ink-soft">
                                 No reviews for this edition yet.{' '}
                                 {onOpenReviewForm ? (
                                     <button
@@ -293,7 +295,7 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                                 )}
                             </p>
                         ) : (
-                            <p className="text-[11px] text-slate-500">
+                            <p className="text-[11px] text-ink-soft">
                                 Reviews open after the event takes place.
                             </p>
                         )}
@@ -304,11 +306,8 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
     }
 
     return (
-        <section className="mt-4 border-t border-slate-200 pt-3 space-y-4 max-w-full overflow-hidden">
-            <h3 className="text-base font-bold text-slate-900">
-                {collapseChevron}
-                Community Experience <span className="font-medium text-slate-400">({effectiveAggregate.count})</span>
-            </h3>
+        <section className="mt-4 border-t border-line px-1 pt-3 space-y-4 max-w-full overflow-hidden">
+            {collapseChevron}
 
             {!collapsed && (
                 <>
@@ -320,12 +319,12 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                         moodHeadline={crossEdition ? typicalCard : undefined}
                     />
 
-                    <div className="flex items-center gap-2 text-[11px] border-t border-slate-200 pt-4">
-                        <label className="text-slate-500">Sort:</label>
+                    <div className="flex items-center gap-2 text-[11px] border-t border-line pt-4">
+                        <label className="text-ink-soft">Sort:</label>
                         <select
                             value={sort}
                             onChange={(e) => setSort(e.target.value as 'recent' | 'positive' | 'critical')}
-                            className="border border-slate-300 px-1.5 py-0.5 text-[11px] bg-white"
+                            className="border border-line px-1.5 py-0.5 text-[11px] bg-surface"
                         >
                             <option value="recent">Most recent</option>
                             <option value="positive">Most positive</option>
@@ -333,8 +332,8 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                         </select>
                     </div>
 
-                    <div className="max-w-full overflow-x-auto pb-2 -mx-1 px-1">
-                        <div className="flex gap-4 divide-x divide-slate-200">
+                    <div ref={reviewsScrollerRef} className="max-w-full overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1">
+                        <div className="flex gap-4">
                             {reviews.map((r) => {
                                 const meta = r.overall_sentiment ? SENTIMENT_META[r.overall_sentiment] : null;
                                 const initials =
@@ -349,20 +348,20 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                                 const shown = tags.slice(0, CARD_TAGS_SHOWN);
                                 const extra = tags.length - shown.length;
                                 return (
-                                    <div key={r.id} className="w-56 shrink-0 space-y-1.5 pl-4 first:pl-0">
+                                    <div key={r.id} className="w-56 shrink-0 space-y-1.5 rounded-lg border border-line bg-white p-3">
                                         <div className="flex items-center gap-2">
-                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-600">
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-ink-soft">
                                                 {initials}
                                             </span>
-                                            <span className="text-sm font-medium text-slate-800 truncate">{r.reviewer_label}</span>
+                                            <span className="text-sm font-medium text-ink truncate">{r.reviewer_label}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                        <div className="flex items-center gap-1.5 text-xs text-ink-soft">
                                             {meta && <span title={meta.label}>{meta.emoji} {meta.label}</span>}
                                             {meta && <span className="text-slate-300">·</span>}
                                             <span>{new Date(r.created_at).toLocaleDateString()}</span>
                                         </div>
                                         {r.comment && (
-                                            <p className="text-xs text-slate-700 whitespace-pre-wrap break-words">{r.comment}</p>
+                                            <p className="text-xs text-ink whitespace-pre-wrap break-words">{r.comment}</p>
                                         )}
                                         {tags.length > 0 && (
                                             <div className="flex flex-wrap gap-1.5">
@@ -375,7 +374,7 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                                                     <button
                                                         type="button"
                                                         onClick={() => setExpandedReview(r)}
-                                                        className="rounded-full bg-slate-100 text-slate-500 px-2 py-0.5 text-[11px] hover:bg-slate-200"
+                                                        className="rounded-full bg-slate-100 text-ink-soft px-2 py-0.5 text-[11px] hover:bg-canvas"
                                                     >
                                                         +{extra} more
                                                     </button>
@@ -394,7 +393,7 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                                 );
                             })}
                             {reviews.length === 0 && !loading && (
-                                <div className="text-xs text-slate-500">No reviews to show.</div>
+                                <div className="text-xs text-ink-soft">No reviews to show.</div>
                             )}
                             {hasMore && (
                                 <button
@@ -407,6 +406,12 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                             )}
                         </div>
                     </div>
+                    <ScrollDotsIndicator
+                        count={reviewDots.dotCount}
+                        activeIndex={reviewDots.activeIndex}
+                        onSelect={reviewDots.scrollToIndex}
+                        label="Reviews scroll position"
+                    />
 
                     {expandedReview && (
                         <ReviewDetailModal review={expandedReview} onClose={() => setExpandedReview(null)} />

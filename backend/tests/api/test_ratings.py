@@ -446,6 +446,16 @@ def test_aggregate_includes_experience_breakdown(
 ):
     _, pos, neg = aspect_group
     _, aud1, aud2 = audience_group
+    neutral = Tag(
+        group_id=pos.group_id,
+        slug="international-crowd",
+        label="International crowd",
+        ordinal=2,
+        polarity="neutral",
+    )
+    session.add(neutral)
+    session.commit()
+    session.refresh(neutral)
 
     assert _login(client, email="alice@example.com").status_code == 200
     client.post(
@@ -464,7 +474,7 @@ def test_aggregate_includes_experience_breakdown(
         json={
             "overall_sentiment": "okay",
             "aspect_scores": {"music": 3},
-            "aspect_tag_ids": [pos.id, neg.id],
+            "aspect_tag_ids": [pos.id, neutral.id, neg.id],
             "audience_tag_ids": [aud1.id, aud2.id],
             "tag_suggestions": [],
         },
@@ -478,8 +488,10 @@ def test_aggregate_includes_experience_breakdown(
     assert aspects["music"]["average"] == 4.0
     assert aspects["music"]["count"] == 2
     pos_slugs = {t["slug"]: t["count"] for t in agg["top_positive_tags"]}
+    neutral_slugs = {t["slug"]: t["count"] for t in agg["top_neutral_tags"]}
     neg_slugs = {t["slug"]: t["count"] for t in agg["top_negative_tags"]}
     assert pos_slugs == {"great-dj": 2}
+    assert neutral_slugs == {"international-crowd": 1}
     assert neg_slugs == {"too-loud": 1}
     aud_slugs = {t["slug"]: t["count"] for t in agg["top_audience_tags"]}
     assert aud_slugs == {"beginners": 2, "advanced": 1}

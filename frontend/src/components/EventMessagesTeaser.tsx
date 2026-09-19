@@ -45,15 +45,15 @@ export default function EventMessagesTeaser({ eventId, detailLinkSource }: Props
 
     return (
         <div className="space-y-1.5">
-            <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-ink">
                 💬{' '}
                 <Link to={boardHref} className="hover:underline">
                     Messages{' '}
-                    <span className="font-normal tabular-nums text-slate-500">· {total}</span>
+                    <span className="font-normal tabular-nums text-ink-soft">· {total}</span>
                 </Link>
             </h3>
             {latest && (
-                <p className="flex items-center gap-1.5 text-[11px] text-slate-600 min-w-0">
+                <p className="flex items-center gap-1.5 text-[11px] text-ink-soft min-w-0">
                     {avatarUrl ? (
                         <img
                             src={avatarUrl}
@@ -61,13 +61,13 @@ export default function EventMessagesTeaser({ eventId, detailLinkSource }: Props
                             className="h-5 w-5 shrink-0 rounded-full object-cover"
                         />
                     ) : (
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-ink-soft">
                             {initial}
                         </span>
                     )}
                     <span className="min-w-0 flex-1 truncate">
-                        <span className="font-semibold text-slate-700">{authorName}</span>{' '}
-                        <span className="text-slate-600">{latest.body}</span>
+                        <span className="font-semibold text-ink">{authorName}</span>{' '}
+                        <span className="text-ink-soft">{latest.body}</span>
                     </span>
                     {total > 1 && (
                         <Link

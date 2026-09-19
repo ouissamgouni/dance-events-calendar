@@ -19,14 +19,14 @@ export default function RatingDistribution({ distribution, total, onFilterStars,
                         key={stars}
                         type={clickable ? 'button' : undefined}
                         onClick={clickable ? () => onFilterStars?.(active ? null : stars) : undefined}
-                        className={`w-full flex items-center gap-2 text-xs ${clickable ? 'hover:bg-slate-50 rounded px-1 py-0.5 transition' : ''} ${active ? 'bg-amber-50' : ''}`.trim()}
+                        className={`w-full flex items-center gap-2 text-xs ${clickable ? 'hover:bg-canvas rounded px-1 py-0.5 transition' : ''} ${active ? 'bg-amber-50' : ''}`.trim()}
                         aria-label={clickable ? `Filter by ${stars}-star reviews` : undefined}
                     >
-                        <span className="w-6 text-right text-slate-600">{stars}★</span>
+                        <span className="w-6 text-right text-ink-soft">{stars}★</span>
                         <div className="flex-1 h-2 bg-slate-100 rounded overflow-hidden">
                             <div className="h-full bg-amber-400 transition-all" style={{ width: `${pct}%` }} />
                         </div>
-                        <span className="w-10 text-right text-slate-500 tabular-nums">{count}</span>
+                        <span className="w-10 text-right text-ink-soft tabular-nums">{count}</span>
                     </Component>
                 );
             })}

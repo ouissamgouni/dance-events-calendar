@@ -20,11 +20,11 @@ type Tab = typeof TABS[number];
 function statusBadge(status: string) {
     const colors: Record<string, string> = {
         pending: 'bg-amber-100 text-amber-700',
-        approved: 'bg-emerald-100 text-emerald-700',
-        rejected: 'bg-slate-200 text-slate-700',
+        approved: 'bg-emerald-100 text-success',
+        rejected: 'bg-slate-200 text-ink',
     };
     return (
-        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
+        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-ink-soft'}`}>
             {status}
         </span>
     );
@@ -98,25 +98,25 @@ export default function PromoCodesAdminPanel({ isOpen, onClose, onOpenEvent }: P
                 onClick={onClose}
                 aria-hidden="true"
             />
-            <div className="w-full max-w-2xl bg-white shadow-xl flex flex-col">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                    <h2 className="text-sm font-semibold text-slate-800">Promo codes</h2>
+            <div className="w-full max-w-2xl bg-surface shadow-xl flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+                    <h2 className="text-sm font-semibold text-ink">Promo codes</h2>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-slate-700 text-sm px-2"
+                        className="text-muted hover:text-ink text-sm px-2"
                     >
                         ✕
                     </button>
                 </div>
 
-                <div className="flex border-b border-slate-200">
+                <div className="flex border-b border-line">
                     {TABS.map((t) => (
                         <button
                             key={t}
                             onClick={() => setActiveTab(t)}
                             className={`px-3 py-2 text-xs font-medium capitalize ${activeTab === t
-                                ? 'text-blue-600 border-b-2 border-blue-500'
-                                : 'text-slate-500 hover:text-slate-700'
+                                ? 'text-action border-b-2 border-action'
+                                : 'text-ink-soft hover:text-ink'
                                 }`}
                         >
                             {t}
@@ -125,16 +125,16 @@ export default function PromoCodesAdminPanel({ isOpen, onClose, onOpenEvent }: P
                 </div>
 
                 {error && (
-                    <div className="px-4 py-2 text-xs text-red-600 border-b border-red-200 bg-red-50">
+                    <div className="px-4 py-2 text-xs text-danger border-b border-red-200 bg-red-50">
                         {error}
                     </div>
                 )}
 
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
-                        <div className="p-6 text-center text-xs text-slate-400">Loading…</div>
+                        <div className="p-6 text-center text-xs text-muted">Loading…</div>
                     ) : rows.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-slate-400">No promo codes</div>
+                        <div className="p-6 text-center text-xs text-muted">No promo codes</div>
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {rows.map((p) => (
@@ -142,22 +142,22 @@ export default function PromoCodesAdminPanel({ isOpen, onClose, onOpenEvent }: P
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-mono text-sm text-slate-900">{p.code}</span>
+                                                <span className="font-mono text-sm text-ink">{p.code}</span>
                                                 {statusBadge(p.status)}
                                                 {p.expires_at && (
-                                                    <span className="text-[10px] text-slate-500">
+                                                    <span className="text-[10px] text-ink-soft">
                                                         expires {new Date(p.expires_at).toLocaleDateString()}
                                                     </span>
                                                 )}
                                             </div>
                                             {p.event_title && (
-                                                <div className="mt-1 text-xs text-slate-600">
+                                                <div className="mt-1 text-xs text-ink-soft">
                                                     Event:{' '}
                                                     {onOpenEvent ? (
                                                         <button
                                                             type="button"
                                                             onClick={() => onOpenEvent(p.event_id)}
-                                                            className="font-medium text-blue-600 hover:underline text-left"
+                                                            className="font-medium text-action hover:underline text-left"
                                                         >
                                                             {p.event_title}
                                                         </button>
@@ -167,26 +167,26 @@ export default function PromoCodesAdminPanel({ isOpen, onClose, onOpenEvent }: P
                                                 </div>
                                             )}
                                             {p.description && (
-                                                <div className="mt-1 text-xs text-slate-600">{p.description}</div>
+                                                <div className="mt-1 text-xs text-ink-soft">{p.description}</div>
                                             )}
                                             {p.source_url && (
                                                 <a
                                                     href={p.source_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="mt-1 inline-block text-[11px] text-blue-600 hover:underline break-all"
+                                                    className="mt-1 inline-block text-[11px] text-action hover:underline break-all"
                                                 >
                                                     {p.source_url}
                                                 </a>
                                             )}
-                                            <div className="mt-1 text-[10px] text-slate-400">
+                                            <div className="mt-1 text-[10px] text-muted">
                                                 Submitted by{' '}
                                                 {p.submitter.handle ? (
                                                     <Link
                                                         to={`/u/${p.submitter.handle}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:underline"
+                                                        className="text-action hover:underline"
                                                     >
                                                         @{p.submitter.handle}
                                                     </Link>
@@ -196,7 +196,7 @@ export default function PromoCodesAdminPanel({ isOpen, onClose, onOpenEvent }: P
                                                 on {new Date(p.created_at).toLocaleString()}
                                             </div>
                                             {p.admin_notes && (
-                                                <div className="mt-1 text-[11px] text-slate-500 italic">
+                                                <div className="mt-1 text-[11px] text-ink-soft italic">
                                                     Notes: {p.admin_notes}
                                                 </div>
                                             )}
@@ -206,7 +206,7 @@ export default function PromoCodesAdminPanel({ isOpen, onClose, onOpenEvent }: P
                                                 <button
                                                     disabled={acting === p.id}
                                                     onClick={() => approve(p.id)}
-                                                    className="text-[11px] bg-blue-500 text-white px-2 py-1 hover:bg-blue-600 disabled:opacity-50"
+                                                    className="text-[11px] bg-action text-white px-2 py-1 hover:bg-action disabled:opacity-50"
                                                 >
                                                     Approve
                                                 </button>
@@ -216,7 +216,7 @@ export default function PromoCodesAdminPanel({ isOpen, onClose, onOpenEvent }: P
                                                         setRejectingId(p.id);
                                                         setRejectNotes('');
                                                     }}
-                                                    className="text-[11px] bg-red-600 text-white px-2 py-1 hover:bg-red-700 disabled:opacity-50"
+                                                    className="text-[11px] bg-danger text-white px-2 py-1 hover:bg-danger/90 disabled:opacity-50"
                                                 >
                                                     Reject
                                                 </button>
@@ -224,26 +224,26 @@ export default function PromoCodesAdminPanel({ isOpen, onClose, onOpenEvent }: P
                                         )}
                                     </div>
                                     {rejectingId === p.id && (
-                                        <div className="mt-2 border border-slate-200 bg-slate-50 p-2 flex flex-col gap-2">
+                                        <div className="mt-2 border border-line bg-canvas p-2 flex flex-col gap-2">
                                             <textarea
                                                 value={rejectNotes}
                                                 onChange={(e) => setRejectNotes(e.target.value)}
                                                 placeholder="Reason (optional, shown to submitter)"
                                                 rows={2}
                                                 maxLength={500}
-                                                className="text-xs border border-slate-300 px-2 py-1 focus:outline-none focus:border-blue-400"
+                                                className="text-xs border border-line px-2 py-1 focus:outline-none focus:border-blue-400"
                                             />
                                             <div className="flex gap-2">
                                                 <button
                                                     disabled={acting === p.id}
                                                     onClick={() => reject(p.id)}
-                                                    className="text-[11px] bg-red-600 text-white px-2 py-1 hover:bg-red-700 disabled:opacity-50"
+                                                    className="text-[11px] bg-danger text-white px-2 py-1 hover:bg-danger/90 disabled:opacity-50"
                                                 >
                                                     Confirm reject
                                                 </button>
                                                 <button
                                                     onClick={() => setRejectingId(null)}
-                                                    className="text-[11px] text-slate-500 px-2"
+                                                    className="text-[11px] text-ink-soft px-2"
                                                 >
                                                     Cancel
                                                 </button>

@@ -114,6 +114,11 @@ interface PreferencesContextValue {
     buildAnonPayload: () => { preferred_area: PreferredAreaPayload | null; preferred_tag_ids: number[]; home_location: HomeLocationPayload | null } | null;
     /** Hydrate the context from the server payload after sign-in. */
     hydrateFromServer: (prefs: UserPreferences | undefined) => void;
+    /** Mirror the canonical active interest profile into the local prefs
+     * cache WITHOUT a server write. Explore reads ``prefs.area``/``prefs.tagIds``
+     * as its default filters; the active profile is the source of truth, so
+     * this keeps the cache aligned on load. No-ops when nothing changes. */
+    applyLocalMirror: (next: { area?: PreferredAreaPayload | null; tagIds?: number[] }) => void;
 }
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
@@ -145,6 +150,31 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
     const hydrateFromServer = useCallback((prefs: UserPreferences | undefined) => {
         setState(fromServer(prefs));
+    }, []);
+
+    const applyLocalMirror = useCallback((next: { area?: PreferredAreaPayload | null; tagIds?: number[] }) => {
+        setState((prev) => {
+            const nextArea = 'area' in next ? next.area ?? null : prev.area;
+            const nextTags = 'tagIds' in next ? next.tagIds ?? [] : prev.tagIds;
+            const areaSame =
+                (nextArea === null && prev.area === null) ||
+                (nextArea !== null && prev.area !== null &&
+                    nextArea.min_lat === prev.area.min_lat &&
+                    nextArea.min_lng === prev.area.min_lng &&
+                    nextArea.max_lat === prev.area.max_lat &&
+                    nextArea.max_lng === prev.area.max_lng &&
+                    nextArea.label === prev.area.label);
+            const tagsSame =
+                nextTags.length === prev.tagIds.length &&
+                nextTags.every((id, i) => id === prev.tagIds[i]);
+            if (areaSame && tagsSame) return prev;
+            return {
+                area: nextArea,
+                tagIds: nextTags,
+                homeLocation: prev.homeLocation,
+                setAt: prev.setAt ?? new Date().toISOString(),
+            };
+        });
     }, []);
 
     const setPrefs = useCallback(
@@ -194,8 +224,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
             clearPrefs,
             buildAnonPayload,
             hydrateFromServer,
+            applyLocalMirror,
         }),
-        [state, setPrefs, clearPrefs, buildAnonPayload, hydrateFromServer],
+        [state, setPrefs, clearPrefs, buildAnonPayload, hydrateFromServer, applyLocalMirror],
     );
 
     return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

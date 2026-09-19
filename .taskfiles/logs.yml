@@ -5,9 +5,11 @@ vars:
 
 tasks:
   dev:
-    desc: View dev container logs
+    desc: View dev database container logs
     cmds:
-      - docker compose -f infra/docker/docker-compose.dev.yml logs -f
+      - |
+        source .taskfiles/scenario_ports.sh dev
+        docker compose -f infra/docker/docker-compose.db.yml -p $SC_PROJECT_NAME logs -f
 
   staging:local:
     desc: View local staging container logs (docker-compose)
@@ -29,7 +31,7 @@ tasks:
   scenario:
     desc: "View scenario container logs (SCENARIO=name)"
     vars:
-      SCENARIO: "{{.SCENARIO | default \"default\"}}"
+      SCENARIO: '{{.SCENARIO | default "default"}}'
     cmds:
       - |
         source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
@@ -38,7 +40,7 @@ tasks:
 
         # Check if running in Docker mode
         if docker ps --filter "name=$SC_DB_CONTAINER" --format '{{`{{.Names}}`}}' 2>/dev/null | grep -q "$SC_DB_CONTAINER"; then
-          ENV_NAME=$ENV_NAME docker compose -f infra/docker/docker-compose.scenario-db.yml -p $SC_PROJECT_NAME logs -f
+          ENV_NAME=$ENV_NAME docker compose -f infra/docker/docker-compose.db.yml -p $SC_PROJECT_NAME logs -f
         else
           echo "No Docker containers found for scenario: {{.SCENARIO}}"
           echo "Is the scenario running? Try: task start:scenario SCENARIO={{.SCENARIO}}"

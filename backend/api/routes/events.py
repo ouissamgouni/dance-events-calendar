@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter
-from sqlalchemy import func
+from sqlalchemy import case, exists, func, or_
 from sqlmodel import Session, col, select
 
 from backend.api.deps import (
@@ -19,6 +19,7 @@ from backend.api.schemas import (
     EventBatchRequest,
     EventOrganizerMini,
     EventResponse,
+    EventSearchResponse,
 )
 from backend.api.routes.tags import get_event_tags
 from backend.db.database import get_session
@@ -37,7 +38,9 @@ from backend.db.models import (
     UserInterestProfileTag,
     UserSavedEvent,
 )
+from backend.services.event_images import event_image_fields
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
+from backend.services.profile_geography import profile_contains_point
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -133,13 +136,14 @@ def _following_friend_signals(
     event_ids: list[str],
     *,
     preview_limit: int = 5,
+    include_saved: bool = True,
 ) -> tuple[dict[str, int], dict[str, list[dict]]]:
     """Return ``(counts, previews)`` for the viewer's mutual friends who
-    are going to or have saved each event.
+    are going to, and optionally have saved, each event.
 
     ``counts`` maps event_id → total friend count.
     ``previews`` maps event_id → up to ``preview_limit`` friend mini
-    dicts ``{user_id, display_name, avatar_url}``, sorted alphabetically
+    dicts ``{user_id, handle, display_name, avatar_url}``, sorted alphabetically
     by display_name for stable rendering. Audience-gated via
     ``_audience_passes`` and deduplicated per (event, friend) so a
     friend who both saved and is going still counts once.
@@ -171,21 +175,22 @@ def _following_friend_signals(
         if _audience_passes(session, viewer, owner, share_audience or "private"):
             pairs.add((event_id, owner_id))
 
-    saved_rows = session.exec(
-        select(
-            UserSavedEvent.event_id,
-            UserSavedEvent.user_id,
-            UserSavedEvent.audience,
-        )
-        .where(UserSavedEvent.user_id.in_(friend_ids))
-        .where(UserSavedEvent.event_id.in_(event_ids))
-    ).all()
-    for event_id, owner_id, audience in saved_rows:
-        owner = friend_by_id.get(owner_id)
-        if owner is None or not event_id:
-            continue
-        if _audience_passes(session, viewer, owner, audience or "private"):
-            pairs.add((event_id, owner_id))
+    if include_saved:
+        saved_rows = session.exec(
+            select(
+                UserSavedEvent.event_id,
+                UserSavedEvent.user_id,
+                UserSavedEvent.audience,
+            )
+            .where(UserSavedEvent.user_id.in_(friend_ids))
+            .where(UserSavedEvent.event_id.in_(event_ids))
+        ).all()
+        for event_id, owner_id, audience in saved_rows:
+            owner = friend_by_id.get(owner_id)
+            if owner is None or not event_id:
+                continue
+            if _audience_passes(session, viewer, owner, audience or "private"):
+                pairs.add((event_id, owner_id))
 
     by_event: dict[str, list] = {}
     for event_id, owner_id in pairs:
@@ -199,6 +204,7 @@ def _following_friend_signals(
         previews[eid] = [
             {
                 "user_id": u.id,
+                "handle": u.handle,
                 "display_name": u.display_name,
                 "avatar_url": u.avatar_url,
             }
@@ -307,7 +313,11 @@ def _profiles_filtered_event_ids(
     matched: set[str] = set()
     for profile in profiles:
         dance_ids, reach_ids = per_profile_tags[profile.id]
-        q = select(CachedEvent.event_id).where(
+        q = select(
+            CachedEvent.event_id,
+            CachedEvent.latitude,
+            CachedEvent.longitude,
+        ).where(
             CachedEvent.latitude.is_not(None),
             CachedEvent.longitude.is_not(None),
             CachedEvent.latitude >= profile.min_lat,
@@ -321,15 +331,13 @@ def _profiles_filtered_event_ids(
                     select(EventTag.event_id).where(EventTag.tag_id.in_(dance_ids))
                 )
             )
-        if reach_ids:
-            q = q.where(
-                CachedEvent.event_id.in_(
-                    select(EventTag.event_id).where(EventTag.tag_id.in_(reach_ids))
-                )
-            )
-        for row in session.exec(q).all():
-            if row:
-                matched.add(row)
+        if profile.reach_filter == "regional_plus":
+            q = q.where(CachedEvent.reach.in_(("regional", "international")))
+        elif profile.reach_filter == "international":
+            q = q.where(CachedEvent.reach == "international")
+        for event_id, latitude, longitude in session.exec(q).all():
+            if profile_contains_point(profile, latitude, longitude):
+                matched.add(event_id)
 
     return list(matched)
 
@@ -790,10 +798,21 @@ def get_events(
     # bounded by the page's event_ids and the viewer's friend set.
     following_counts: dict[str, int] = {}
     following_previews: dict[str, list[dict]] = {}
+    friends_going_counts: dict[str, int] = {}
+    friends_going_previews: dict[str, list[dict]] = {}
     following_on = feature_settings.get("following_badge_enabled", "").lower() == "true"
     if event_ids and current_user is not None and following_on:
         following_counts, following_previews = _following_friend_signals(
             session, current_user, event_ids
+        )
+    if (
+        event_ids
+        and current_user is not None
+        and interest_source == "friends"
+        and interest_kind == "going"
+    ):
+        friends_going_counts, friends_going_previews = _following_friend_signals(
+            session, current_user, event_ids, include_saved=False
         )
     # Batch-fetch tags
     tags_map = get_event_tags(session, event_ids)
@@ -824,7 +843,10 @@ def get_events(
             calendar_id=e.calendar_id,
             title=e.title,
             description=e.description,
+            **event_image_fields(e),
             location=e.location,
+            city=e.city,
+            country=e.country,
             start=e.start,
             end=e.end,
             all_day=e.all_day,
@@ -837,6 +859,8 @@ def get_events(
             popularity_score=scores.get(e.event_id, 0.0),
             following_friend_count=following_counts.get(e.event_id, 0),
             following_friends_preview=following_previews.get(e.event_id, []),
+            friends_going_count=friends_going_counts.get(e.event_id, 0),
+            friends_going_preview=friends_going_previews.get(e.event_id, []),
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -862,7 +886,7 @@ def get_events(
     return response
 
 
-@router.get("/search", response_model=list[dict])
+@router.get("/search", response_model=list[EventSearchResponse])
 @limiter.limit("60/minute")
 def search_events(
     request: Request,
@@ -873,31 +897,71 @@ def search_events(
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
-    """Lightweight public title typeahead for events.
+    """Lightweight public event typeahead.
 
-    Returns up to ``limit`` (non-deleted, non-hidden) events matching ``q``
-    against ``title`` (case-insensitive substring). By default only
+    Returns up to ``limit`` (non-deleted, non-hidden) events matching every
+    query token against the title, city, country, or an enabled tag. By default only
     *upcoming* events are returned (the public explorer + organizer
     event-claim picker); pass ``include_past=true`` to also match events
     that have already started (used by the admin review-prompt force-send,
-    which targets events that have ended). Payload is intentionally minimal:
-    ``{event_id, title, start, location}``.
+    which targets events that have ended). Payload is intentionally minimal
+    and includes match context for the finder.
 
     When ``exclude_attended`` is set for an authenticated caller (the passport
     "add a past event" picker), events the user has already logged as attended
     are filtered out *before* the limit is applied, so a non-attended match is
     never hidden behind the caller's already-attended events.
     """
-    needle = q.strip()
+    needle = " ".join(q.split())
     if not needle:
         return []
-    like = f"%{needle}%"
+    tokens = needle.split()
+
+    def tag_matches(pattern: str):
+        return exists(
+            select(EventTag.event_id)
+            .join(Tag, EventTag.tag_id == Tag.id)
+            .join(TagGroup, Tag.group_id == TagGroup.id)
+            .where(EventTag.event_id == CachedEvent.event_id)
+            .where(Tag.enabled.is_(True))  # type: ignore[union-attr]
+            .where(TagGroup.enabled.is_(True))  # type: ignore[union-attr]
+            .where(col(Tag.label).ilike(pattern))
+        )
+
+    token_predicates = []
+    for token in tokens:
+        pattern = f"%{token}%"
+        token_predicates.append(
+            or_(
+                col(CachedEvent.title).ilike(pattern),
+                col(CachedEvent.city).ilike(pattern),
+                col(CachedEvent.country).ilike(pattern),
+                tag_matches(pattern),
+            )
+        )
+
+    whole_pattern = f"%{needle}%"
+    title_exact_rank = case(
+        (func.lower(col(CachedEvent.title)) == needle.lower(), 0), else_=1
+    )
+    title_prefix_rank = case((col(CachedEvent.title).ilike(f"{needle}%"), 0), else_=1)
+    title_match_rank = case((col(CachedEvent.title).ilike(whole_pattern), 0), else_=1)
+    place_match_rank = case(
+        (
+            or_(
+                col(CachedEvent.city).ilike(whole_pattern),
+                col(CachedEvent.country).ilike(whole_pattern),
+            ),
+            0,
+        ),
+        else_=1,
+    )
     now = datetime.now(UTC).replace(tzinfo=None)
     stmt = (
         select(CachedEvent)
         .where(CachedEvent.deleted_at.is_(None))  # type: ignore[union-attr]
         .where(CachedEvent.is_hidden.is_(False))  # type: ignore[union-attr]
-        .where(col(CachedEvent.title).ilike(like))
+        .where(*token_predicates)
     )
     if exclude_attended and current_user is not None:
         attended_ids = session.exec(
@@ -910,20 +974,63 @@ def search_events(
     if include_past:
         # Most-recent-first so recently-ended events (the review-prompt
         # targets) surface at the top of the typeahead.
-        stmt = stmt.order_by(col(CachedEvent.start).desc())
+        stmt = stmt.order_by(
+            title_exact_rank,
+            title_prefix_rank,
+            title_match_rank,
+            place_match_rank,
+            col(CachedEvent.start).desc(),
+            col(CachedEvent.event_id),
+        )
     else:
         stmt = stmt.where(CachedEvent.start >= now).order_by(
-            col(CachedEvent.start).asc()
+            title_exact_rank,
+            title_prefix_rank,
+            title_match_rank,
+            place_match_rank,
+            col(CachedEvent.start).asc(),
+            col(CachedEvent.event_id),
         )
     rows = session.exec(stmt.limit(limit)).all()
+
+    tags_by_event = get_event_tags(session, [event.event_id for event in rows])
+    lowered_tokens = [token.casefold() for token in tokens]
+
+    def text_matches(value: Optional[str]) -> bool:
+        lowered = (value or "").casefold()
+        return any(token in lowered for token in lowered_tokens)
+
     return [
-        {
-            "event_id": e.event_id,
-            "title": e.title,
-            "start": e.start.isoformat() if e.start else None,
-            "location": e.location,
-        }
-        for e in rows
+        EventSearchResponse(
+            event_id=event.event_id,
+            title=event.title,
+            start=event.start,
+            location=event.location,
+            city=event.city,
+            country=event.country,
+            matched_fields=[
+                field
+                for field, matched in (
+                    ("title", text_matches(event.title)),
+                    ("city", text_matches(event.city)),
+                    ("country", text_matches(event.country)),
+                    (
+                        "tag",
+                        any(
+                            text_matches(tag.label)
+                            for tag in tags_by_event.get(event.event_id, [])
+                        ),
+                    ),
+                )
+                if matched
+            ],
+            matched_tags=[
+                tag.label
+                for tag in tags_by_event.get(event.event_id, [])
+                if text_matches(tag.label)
+            ],
+        )
+        for event in rows
     ]
 
 
@@ -1032,9 +1139,15 @@ def get_events_by_ids(
 
     following_counts: dict[str, int] = {}
     following_previews: dict[str, list[dict]] = {}
+    friends_going_counts: dict[str, int] = {}
+    friends_going_previews: dict[str, list[dict]] = {}
     if event_ids and current_user is not None and _following_badge_enabled(session):
         following_counts, following_previews = _following_friend_signals(
             session, current_user, event_ids
+        )
+    if event_ids and current_user is not None:
+        friends_going_counts, friends_going_previews = _following_friend_signals(
+            session, current_user, event_ids, include_saved=False
         )
 
     tags_map = get_event_tags(session, event_ids)
@@ -1065,7 +1178,10 @@ def get_events_by_ids(
             calendar_id=e.calendar_id,
             title=e.title,
             description=e.description,
+            **event_image_fields(e),
             location=e.location,
+            city=e.city,
+            country=e.country,
             start=e.start,
             end=e.end,
             all_day=e.all_day,
@@ -1078,6 +1194,8 @@ def get_events_by_ids(
             popularity_score=scores.get(e.event_id, 0.0),
             following_friend_count=following_counts.get(e.event_id, 0),
             following_friends_preview=following_previews.get(e.event_id, []),
+            friends_going_count=friends_going_counts.get(e.event_id, 0),
+            friends_going_preview=friends_going_previews.get(e.event_id, []),
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -1152,12 +1270,35 @@ def get_event(
                     is_verified_organizer=u.is_verified_organizer,
                 )
 
+    promo_eligible = (
+        event.show_promo_override
+        if event.show_promo_override is not None
+        else _promo_codes_enabled(session)
+    )
+    has_active_promo_codes = False
+    if promo_eligible:
+        has_active_promo_codes = (
+            session.exec(
+                select(EventPromoCode.event_id)
+                .where(EventPromoCode.event_id == event_id)
+                .where(EventPromoCode.status == "approved")
+                .where(
+                    (EventPromoCode.expires_at.is_(None))
+                    | (EventPromoCode.expires_at > datetime.utcnow())
+                )
+            ).first()
+            is not None
+        )
+
     data = EventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
+        **event_image_fields(event),
         location=event.location,
+        city=event.city,
+        country=event.country,
         start=event.start,
         end=event.end,
         all_day=event.all_day,
@@ -1176,6 +1317,7 @@ def get_event(
         organizer=organizer_mini,
         show_price_override=event.show_price_override,
         show_promo_override=event.show_promo_override,
+        has_active_promo_codes=has_active_promo_codes,
     )
     response = JSONResponse(content=data.model_dump(mode="json"))
     response.headers["Cache-Control"] = "public, max-age=60"

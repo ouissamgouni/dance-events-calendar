@@ -122,11 +122,11 @@ export default function PostRsvpPopover({
             role="dialog"
             aria-label="You're going"
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
-            className="z-[12000] border border-slate-200 bg-white p-2 shadow-xl text-left"
+            className="z-[12000] border border-line bg-surface p-2 shadow-xl text-left"
         >
             <div className="flex items-center gap-1.5 pr-4">
                 <span aria-hidden className="text-sm leading-none">🎉</span>
-                <p className="text-xs font-semibold text-slate-800 truncate flex-1">
+                <p className="text-xs font-semibold text-ink truncate flex-1">
                     {headline}
                 </p>
             </div>
@@ -134,12 +134,12 @@ export default function PostRsvpPopover({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onClose(); }}
                 aria-label="Dismiss"
-                className="absolute top-0.5 right-1 text-slate-400 hover:text-slate-700 text-base leading-none p-1"
+                className="absolute top-0.5 right-1 text-muted hover:text-ink text-base leading-none p-1"
             >
                 ×
             </button>
             {variant === 'anon' && (
-                <p className="mt-1 text-[11px] text-slate-600 leading-snug">
+                <p className="mt-1 text-[11px] text-ink-soft leading-snug">
                     Sign in to keep this across devices.
                 </p>
             )}
@@ -155,7 +155,7 @@ export default function PostRsvpPopover({
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onShare(); }}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-2 py-1.5 transition whitespace-nowrap"
+                    className="flex-1 bg-action hover:bg-action text-white text-xs font-semibold px-2 py-1.5 transition whitespace-nowrap"
                 >
                     Share
                 </button>
@@ -163,7 +163,7 @@ export default function PostRsvpPopover({
                     <Link
                         to={`/login?next=${next}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-xs px-2 py-1.5 bg-blue-500 text-white hover:bg-blue-600 font-semibold whitespace-nowrap"
+                        className="text-xs px-2 py-1.5 bg-action text-white hover:bg-action font-semibold whitespace-nowrap"
                     >
                         Sign in
                     </Link>

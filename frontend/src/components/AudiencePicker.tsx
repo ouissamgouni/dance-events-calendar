@@ -57,7 +57,7 @@ export default function AudiencePicker({
             <div
                 role="radiogroup"
                 aria-label={ariaLabel}
-                className="inline-flex border border-slate-200"
+                className="inline-flex border border-line"
             >
                 {tiers.map((opt) => {
                     const active = value === opt.value;
@@ -74,10 +74,10 @@ export default function AudiencePicker({
                                 if (!active) onClick(onChange, opt.value);
                             }}
                             className={
-                                'px-2.5 py-1.5 text-xs font-medium transition border-l first:border-l-0 border-slate-200 ' +
+                                'px-2.5 py-1.5 text-xs font-medium transition border-l first:border-l-0 border-line ' +
                                 (active
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-white text-slate-600 hover:bg-slate-50') +
+                                    ? 'bg-action text-white'
+                                    : 'bg-surface text-ink-soft hover:bg-canvas') +
                                 (disabled ? ' opacity-60 cursor-not-allowed' : '')
                             }
                         >
@@ -91,13 +91,13 @@ export default function AudiencePicker({
             </div>
             {showZeroFriendsHint && (
                 <p
-                    className="mt-1 text-[11px] text-slate-500"
+                    className="mt-1 text-[11px] text-ink-soft"
                     data-testid="audience-zero-friends-hint"
                 >
                     Visible to 0 people — you have no friends yet.{' '}
                     <a
                         href="/account#network"
-                        className="text-blue-600 hover:text-blue-700 underline"
+                        className="text-action hover:text-action underline"
                     >
                         Find people to follow →
                     </a>

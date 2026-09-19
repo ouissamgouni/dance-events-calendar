@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -42,6 +43,7 @@ from backend.config.loader import (
 )
 from backend.config.logging_config import configure_logging
 from backend.db.database import init_db
+from backend.services import object_storage
 from backend.services.scheduler import run_notification_dispatch_loop, run_sync_loop
 
 configure_logging()
@@ -63,9 +65,27 @@ def _create_calendar_service():
         return MockCalendarService()
 
 
+_CLOUD_ENV_NAMES = ("staging", "production")
+
+
+def _assert_object_storage_provider() -> None:
+    """Catch a cloud deploy that silently fell back to the local emulator."""
+    env_name = os.getenv("ENV_NAME", "").strip().lower()
+    provider = object_storage.get_provider()
+    if env_name in _CLOUD_ENV_NAMES and provider != object_storage.PROVIDER_R2:
+        raise RuntimeError(
+            f"ENV_NAME={env_name} requires OBJECT_STORAGE_PROVIDER=r2, got "
+            f"'{provider}'. Set it in the fly.toml [env] block."
+        )
+    if provider == object_storage.PROVIDER_R2:
+        # Fail at boot rather than serving unreachable image URLs.
+        object_storage.get_public_base_url()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    _assert_object_storage_provider()
     calendar_service = _create_calendar_service()
     app.state.calendar_service = calendar_service
 

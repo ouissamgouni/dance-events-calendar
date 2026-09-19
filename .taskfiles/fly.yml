@@ -13,10 +13,11 @@ tasks:
           exit 1
         fi
       - |
-        echo "Pushing secrets to Fly.io (excluding CLOUDFLARE_* vars)..."
+        echo "Pushing secrets to Fly.io (excluding CLOUDFLARE_*/R2_* vars)..."
         cat config/secrets.env config/secrets.prod.env \
           | grep -v '^[[:space:]]*$' \
           | grep -v '^CLOUDFLARE_' \
+          | grep -v '^R2_' \
           | grep -v '^VITE_' \
           | fly secrets import -c config/fly.prod.toml
         echo "✅ Core secrets imported"
@@ -83,7 +84,8 @@ tasks:
   # ════════════════════════════════════════════════════════════════
 
   staging:secrets:
-    desc: "Push secrets from config/secrets.env + config/secrets.staging.env to the
+    desc:
+      "Push secrets from config/secrets.env + config/secrets.staging.env to the
       staging Fly.io app"
     cmds:
       - |

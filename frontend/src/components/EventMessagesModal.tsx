@@ -32,7 +32,7 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
     return (
         <div
             // eslint-disable-next-line no-restricted-syntax -- avatar placeholder (allowed exception per frontend rules)
-            className="h-8 w-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold shrink-0"
+            className="h-8 w-8 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-xs font-semibold shrink-0"
         >
             {initial}
         </div>
@@ -63,7 +63,7 @@ interface CardCallbacks {
 
 function MessageActions({ msg, cb }: { msg: EventMessage; cb: CardCallbacks }) {
     return (
-        <div className="flex items-center gap-2 text-[11px] text-slate-400">
+        <div className="flex items-center gap-2 text-[11px] text-muted">
             {cb.signedIn && !cb.isPast ? (
                 <button
                     type="button"
@@ -71,7 +71,7 @@ function MessageActions({ msg, cb }: { msg: EventMessage; cb: CardCallbacks }) {
                         cb.setReplyTo(cb.replyTo === msg.id ? null : msg.id);
                         cb.setReplyBody('');
                     }}
-                    className="hover:text-slate-700"
+                    className="hover:text-ink"
                 >
                     Reply
                 </button>
@@ -108,7 +108,7 @@ function MessageCard({ msg, isReply, cb }: { msg: EventMessage; isReply?: boolea
             <Avatar url={msg.author?.avatar_url ?? null} name={name} />
             <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs font-semibold text-slate-900 truncate">{name}</span>
+                    <span className="text-xs font-semibold text-ink truncate">{name}</span>
                     {msg.author?.is_verified_organizer && (
                         <img
                             src="/orga.png"
@@ -122,10 +122,10 @@ function MessageCard({ msg, isReply, cb }: { msg: EventMessage; isReply?: boolea
                             {meta.emoji} {meta.label}
                         </span>
                     )}
-                    <span className="text-xs text-slate-400">· {timeAgo(msg.created_at)}</span>
+                    <span className="text-xs text-muted">· {timeAgo(msg.created_at)}</span>
                 </div>
-                <p className="text-xs text-slate-700 whitespace-pre-wrap break-words">
-                    {mention && <span className="font-semibold text-blue-600">@{mention} </span>}
+                <p className="text-xs text-ink whitespace-pre-wrap break-words">
+                    {mention && <span className="font-semibold text-action">@{mention} </span>}
                     {msg.body}
                 </p>
                 <MessageActions msg={msg} cb={cb} />
@@ -137,14 +137,14 @@ function MessageCard({ msg, isReply, cb }: { msg: EventMessage; isReply?: boolea
                             rows={2}
                             maxLength={2000}
                             placeholder="Write a reply…"
-                            className="w-full border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+                            className="w-full border border-line px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400"
                         />
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
                                 disabled={cb.posting || !cb.replyBody.trim()}
                                 onClick={() => cb.onReply(msg)}
-                                className="bg-blue-500 px-3 py-1 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                                className="bg-action px-3 py-1 text-xs font-medium text-white hover:bg-action disabled:opacity-50"
                             >
                                 {cb.posting ? 'Posting…' : 'Reply'}
                             </button>
@@ -154,7 +154,7 @@ function MessageCard({ msg, isReply, cb }: { msg: EventMessage; isReply?: boolea
                                     cb.setReplyTo(null);
                                     cb.setReplyBody('');
                                 }}
-                                className="text-xs text-slate-500 hover:text-slate-700"
+                                className="text-xs text-ink-soft hover:text-ink"
                             >
                                 Cancel
                             </button>
@@ -169,7 +169,7 @@ function MessageCard({ msg, isReply, cb }: { msg: EventMessage; isReply?: boolea
                             rows={2}
                             maxLength={280}
                             placeholder="Report to moderators — add an optional reason"
-                            className="w-full border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:border-rose-400"
+                            className="w-full border border-line px-2 py-1.5 text-sm focus:outline-none focus:border-rose-400"
                         />
                         <div className="flex items-center gap-2">
                             <button
@@ -186,7 +186,7 @@ function MessageCard({ msg, isReply, cb }: { msg: EventMessage; isReply?: boolea
                                     cb.setReportTo(null);
                                     cb.setReportReason('');
                                 }}
-                                className="text-xs text-slate-500 hover:text-slate-700"
+                                className="text-xs text-ink-soft hover:text-ink"
                             >
                                 Cancel
                             </button>
@@ -194,7 +194,7 @@ function MessageCard({ msg, isReply, cb }: { msg: EventMessage; isReply?: boolea
                     </div>
                 )}
                 {!isReply && msg.replies?.length > 0 && (
-                    <div className="mt-2 space-y-2 border-l-2 border-slate-100 pl-3">
+                    <div className="mt-2 space-y-2 border-l-2 border-card-line pl-3">
                         {msg.replies.map((r) => (
                             <MessageCard key={r.id} msg={r} isReply cb={cb} />
                         ))}
@@ -407,17 +407,17 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
             onClick={onClose}
         >
             <div
-                className="bg-white shadow-lg w-full max-w-lg my-8 border border-slate-200"
+                className="bg-surface shadow-lg w-full max-w-lg my-8 border border-line"
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Event messages"
             >
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                    <h2 className="text-base font-bold text-slate-900">
+                <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                    <h2 className="text-base font-bold text-ink">
                         Messages{' '}
-                        <span className="font-normal tabular-nums text-slate-400">· {total}</span>
+                        <span className="font-normal tabular-nums text-muted">· {total}</span>
                     </h2>
                     <div className="flex items-center gap-3">
                         {user && (
@@ -426,7 +426,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                                 onClick={handleToggleMute}
                                 aria-pressed={muted}
                                 title={muted ? 'Unmute this event' : 'Mute this event'}
-                                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+                                className="text-muted hover:text-ink-soft text-lg leading-none"
                             >
                                 {muted ? '🔕' : '🔔'}
                             </button>
@@ -434,7 +434,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                         <button
                             onClick={onClose}
                             aria-label="Close"
-                            className="text-slate-400 hover:text-slate-600 text-xl leading-none"
+                            className="text-muted hover:text-ink-soft text-xl leading-none"
                         >
                             ×
                         </button>
@@ -442,9 +442,9 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                 </div>
 
                 {/* Compose */}
-                <div className="border-b border-slate-100 px-4 py-3">
+                <div className="border-b border-card-line px-4 py-3">
                     {isPast ? (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-ink-soft">
                             This event has ended — the message board is now read-only.
                         </p>
                     ) : user ? (
@@ -459,8 +459,8 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                                             type="button"
                                             onClick={() => setComposeCategory(c)}
                                             className={`px-2 py-0.5 text-[11px] font-medium border ${active
-                                                ? 'border-blue-400 bg-blue-50 text-blue-700'
-                                                : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                                                ? 'border-blue-400 bg-blue-50 text-action'
+                                                : 'border-line bg-surface text-ink-soft hover:border-line'
                                                 }`}
                                         >
                                             {meta.emoji} {meta.label}
@@ -475,23 +475,23 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                                 rows={2}
                                 maxLength={2000}
                                 placeholder="Ask a question or share a request (accommodation, ride, tickets…)"
-                                className="w-full border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+                                className="w-full border border-line px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400"
                             />
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] text-slate-400">{composeBody.length}/2000</span>
+                                <span className="text-[11px] text-muted">{composeBody.length}/2000</span>
                                 <button
                                     type="button"
                                     disabled={posting || !composeBody.trim()}
                                     onClick={handlePost}
-                                    className="bg-blue-500 px-3 py-1 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                                    className="bg-action px-3 py-1 text-xs font-medium text-white hover:bg-action disabled:opacity-50"
                                 >
                                     {posting ? 'Posting…' : 'Post'}
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <p className="text-xs text-slate-500">
-                            <Link to={loginNext} className="font-medium text-blue-600 hover:text-blue-700">
+                        <p className="text-xs text-ink-soft">
+                            <Link to={loginNext} className="font-medium text-action hover:text-action">
                                 Sign in
                             </Link>{' '}
                             to post a message or reply.
@@ -501,13 +501,13 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                 </div>
 
                 {/* Category filter */}
-                <div className="flex flex-wrap gap-1.5 border-b border-slate-100 px-4 py-2">
+                <div className="flex flex-wrap gap-1.5 border-b border-card-line px-4 py-2">
                     <button
                         type="button"
                         onClick={() => setFilter('all')}
                         className={`px-2 py-0.5 text-[11px] font-medium border ${filter === 'all'
-                            ? 'border-slate-400 bg-slate-100 text-slate-700'
-                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                            ? 'border-line bg-slate-100 text-ink'
+                            : 'border-line bg-surface text-ink-soft hover:border-line'
                             }`}
                     >
                         All
@@ -521,8 +521,8 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                                 type="button"
                                 onClick={() => setFilter(c)}
                                 className={`px-2 py-0.5 text-[11px] font-medium border ${active
-                                    ? 'border-slate-400 bg-slate-100 text-slate-700'
-                                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                                    ? 'border-line bg-slate-100 text-ink'
+                                    : 'border-line bg-surface text-ink-soft hover:border-line'
                                     }`}
                             >
                                 {meta.emoji} {meta.label}
@@ -534,7 +534,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                 {/* List */}
                 <div className="max-h-[50vh] overflow-y-auto px-4 py-3 space-y-4">
                     {items.length === 0 && !loading && (
-                        <p className="text-xs text-slate-500 py-6 text-center">
+                        <p className="text-xs text-ink-soft py-6 text-center">
                             {isPast ? 'No messages were posted for this event.' : 'No messages yet. Be the first to ask!'}
                         </p>
                     )}
@@ -546,7 +546,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                             type="button"
                             disabled={loading}
                             onClick={() => load(items.length, false)}
-                            className="w-full border border-slate-200 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                            className="w-full border border-line py-1.5 text-xs font-medium text-ink-soft hover:bg-canvas disabled:opacity-50"
                         >
                             {loading ? 'Loading…' : 'Load more'}
                         </button>

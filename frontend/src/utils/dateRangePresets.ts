@@ -102,11 +102,12 @@ export function getDateRangePresetOptions(today = new Date()): DateRangePresetOp
         const range = seasonRange(seasonIdx, seasonBaseYear);
         const season = seasons[seasonIdx];
         const key = offset === 0 ? 'this_season' : `next_season_${offset}` as DateRangePresetKey;
+        const labelPrefix = offset === 0 ? 'This' : 'Next';
 
         return {
             key,
-            label: season.name,
-            mobileLabel: `${season.icon} ${season.name}`,
+            label: `${labelPrefix} ${season.name}`,
+            mobileLabel: `${season.icon} ${labelPrefix} ${season.name}`,
             icon: season.icon,
             start: formatDate(offset === 0 ? thisSeasonStart : range.start),
             end: formatDate(range.end),

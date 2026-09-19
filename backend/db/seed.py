@@ -159,7 +159,77 @@ class DatabaseSeeder:
         )
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
+        self._seed_event_images(scenario_dir)
         logger.info("Seeding complete")
+
+    def _seed_event_images(self, scenario_dir: Path):
+        """Push ``image:`` source files from a scenario into object storage.
+
+        Runs the same pipeline as an admin upload, so a scenario exercises the
+        real cropping code. Keys are deterministic and skipped when already
+        present, so restarts don't re-upload.
+        """
+        path = scenario_dir / "db-events.yaml"
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        entries = [
+            (e["id"], e["image"])
+            for e in data.get("events", []) or []
+            if e.get("image")
+        ]
+        if not entries:
+            return
+
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        from backend.services import event_images, object_storage
+
+        try:
+            client = object_storage.get_client()
+            object_storage.ensure_buckets(client)
+        except (
+            object_storage.ObjectStorageError,
+            BotoCoreError,
+            ClientError,
+        ) as exc:
+            logger.warning(
+                "Object storage unavailable (%s) — skipping event image seed", exc
+            )
+            return
+
+        for event_id, filename in entries:
+            event = self.session.get(CachedEvent, event_id)
+            if not event:
+                logger.warning("Image seed: unknown event %s", event_id)
+                continue
+
+            source = scenario_dir / "images" / filename
+            if not source.exists():
+                source = SCENARIOS_DIR / "default" / "images" / filename
+            if not source.exists():
+                logger.warning("Image seed: %s not found for %s", filename, event_id)
+                continue
+
+            key = f"events/{event_id}/seed"
+            if not object_storage.object_exists(f"{key}/thumb.webp", client=client):
+                event_images.store_event_image(
+                    event_id, source.read_bytes(), base_key=key, client=client
+                )
+                logger.info(
+                    "Seeded image %s for %s → bucket %s, key %s/{thumb,full}.webp",
+                    filename,
+                    event_id,
+                    object_storage.get_public_bucket(),
+                    key,
+                )
+
+            event.image_key = key
+            self.session.add(event)
+
+        self.session.commit()
 
     def _seed_tags(self, path: Path):
         """Seed tag groups and tags from scenario tags.yaml.
@@ -273,7 +343,7 @@ class DatabaseSeeder:
                 tag_is_hero = tag_data.get("is_hero_filter", False)
                 tag_hero_ordinal = tag_data.get("hero_ordinal", None)
                 tag_polarity = tag_data.get("polarity")
-                if tag_polarity not in (None, "positive", "negative"):
+                if tag_polarity not in (None, "positive", "negative", "neutral"):
                     logger.warning(
                         "Tag %s/%s has invalid polarity %r; ignoring",
                         slug,
@@ -571,6 +641,7 @@ class DatabaseSeeder:
             if existing:
                 existing.title = evt_data["title"]
                 existing.description = evt_data.get("description")
+                existing.image_url = evt_data.get("image_url", existing.image_url)
                 existing.location = evt_data.get("location")
                 existing.latitude = evt_data.get("latitude", existing.latitude)
                 existing.longitude = evt_data.get("longitude", existing.longitude)
@@ -609,6 +680,7 @@ class DatabaseSeeder:
                         calendar_id=evt_data["calendar_id"],
                         title=evt_data["title"],
                         description=evt_data.get("description"),
+                        image_url=evt_data.get("image_url"),
                         location=evt_data.get("location"),
                         latitude=evt_data.get("latitude"),
                         longitude=evt_data.get("longitude"),
@@ -622,7 +694,7 @@ class DatabaseSeeder:
                         price_min=evt_data.get("price_min"),
                         price_max=evt_data.get("price_max"),
                         price_currency=evt_data.get("price_currency"),
-                        price_is_free=evt_data.get("price_is_free", False),
+                        price_is_free=evt_data.get("price_is_free"),
                         review_status="reviewed",
                         is_hidden=evt_data.get("is_hidden", False),
                         show_price_override=evt_data.get("show_price_override"),
@@ -737,6 +809,18 @@ class DatabaseSeeder:
             if not tag_slugs:
                 continue
             evt_id = evt_data["id"]
+            reach_slugs = {
+                slug.split(":", 1)[1] for slug in tag_slugs if slug.startswith("reach:")
+            }
+            if len(reach_slugs) > 1:
+                raise ValueError(
+                    f"Event {evt_id} has multiple reach classifications: "
+                    f"{sorted(reach_slugs)}"
+                )
+            event = self.session.get(CachedEvent, evt_id)
+            if event is not None:
+                event.reach = next(iter(reach_slugs), None)
+                self.session.add(event)
             for slug in tag_slugs:
                 tag_id = tag_lookup.get(slug)
                 if not tag_id:
@@ -1445,7 +1529,7 @@ class DatabaseSeeder:
         """Seed UserInterestProfile rows from db-interest-profiles.yaml.
 
         Lets scenarios pre-build the notification matcher's inputs
-        (geography bbox + dance/reach tags + per-profile notify toggle)
+        (geography + dance tags + scalar reach + per-profile notify toggle)
         without having to walk each user through the onboarding UI.
         Idempotent on (user_id, label).
 
@@ -1505,6 +1589,11 @@ class DatabaseSeeder:
             if not label:
                 logger.warning("Skipping interest profile (missing label): %r", entry)
                 continue
+            area_name = (
+                entry.get("area_name") or entry.get("area_label") or label
+            ).strip()
+            if not area_name:
+                area_name = label
             try:
                 min_lat = float(entry["min_lat"])
                 min_lng = float(entry["min_lng"])
@@ -1534,12 +1623,25 @@ class DatabaseSeeder:
             if matches_enabled is None:
                 matches_enabled = True
             matches_enabled = bool(matches_enabled)
+            reach_filter = entry.get("reach_filter")
+            if reach_filter not in {"any", "regional_plus", "international"}:
+                reach_refs = {str(ref) for ref in entry.get("reach_tags") or []}
+                if any(ref.endswith(":local") for ref in reach_refs):
+                    reach_filter = "any"
+                elif any(ref.endswith(":regional") for ref in reach_refs):
+                    reach_filter = "regional_plus"
+                elif any(ref.endswith(":international") for ref in reach_refs):
+                    reach_filter = "international"
+                else:
+                    reach_filter = "any"
             if existing:
                 profile = existing
+                profile.area_label = area_name[:120]
                 profile.min_lat = min_lat
                 profile.min_lng = min_lng
                 profile.max_lat = max_lat
                 profile.max_lng = max_lng
+                profile.reach_filter = reach_filter
                 profile.matches_enabled = matches_enabled
                 profile.is_active = bool(entry.get("is_active", False))
                 self.session.add(profile)
@@ -1553,10 +1655,12 @@ class DatabaseSeeder:
                 profile = UserInterestProfile(
                     user_id=user.id,
                     label=label[:120],
+                    area_label=area_name[:120],
                     min_lat=min_lat,
                     min_lng=min_lng,
                     max_lat=max_lat,
                     max_lng=max_lng,
+                    reach_filter=reach_filter,
                     matches_enabled=matches_enabled,
                     is_active=bool(entry.get("is_active", False)),
                 )

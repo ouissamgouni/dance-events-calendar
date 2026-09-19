@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 DEFAULT_SINCE_DAYS = 183  # ~6 months
 DEFAULT_EXPLORER_PERIOD = "next_3_months"
+DEFAULT_GOING_BUTTON_ICON_VARIANT = "hand"
 ALLOWED_DEFAULT_EXPLORER_PERIODS = {
     "this_weekend",
     "next_weekend",
@@ -26,6 +27,7 @@ ALLOWED_DEFAULT_EXPLORER_PERIODS = {
     "next_season_2",
     "next_season_3",
 }
+ALLOWED_GOING_BUTTON_ICON_VARIANTS = {"hand", "person"}
 
 
 def _default_since_date() -> str:
@@ -143,6 +145,15 @@ def _get_default_explorer_period(session: Session) -> str:
     return DEFAULT_EXPLORER_PERIOD
 
 
+def _get_going_button_icon_variant(session: Session) -> str:
+    value = _get_str_setting(
+        session, "going_button_icon_variant", DEFAULT_GOING_BUTTON_ICON_VARIANT
+    )
+    if value in ALLOWED_GOING_BUTTON_ICON_VARIANTS:
+        return value
+    return DEFAULT_GOING_BUTTON_ICON_VARIANT
+
+
 def _set_bool_setting(session: Session, key: str, value: bool) -> None:
     """Set a boolean setting in the DB."""
     row = session.get(SiteSetting, key)
@@ -180,14 +191,15 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         ),
         tag_sort_mode=_get_str_setting(session, "tag_sort_mode", "group"),
         default_explorer_period=_get_default_explorer_period(session),
+        going_button_icon_variant=_get_going_button_icon_variant(session),
         promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
         organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
-        for_you_rail_enabled=_get_bool_setting(session, "for_you_rail_enabled"),
-        your_next_events_rail_enabled=_get_bool_setting(
-            session, "your_next_events_rail_enabled", default=True
-        ),
         network_going_snapshot_enabled=_get_bool_setting(
-            session, "network_going_snapshot_enabled", default=True
+            session, "network_going_snapshot_enabled", default=False
+        ),
+        my_events_route_enabled=_get_bool_setting(session, "my_events_route_enabled"),
+        my_events_nav_enabled=_get_bool_setting(
+            session, "my_events_nav_enabled", default=True
         ),
         suggest_event_required_dance_group_id=_get_optional_int_setting(
             session, "suggest_event_required_dance_group_id"
@@ -271,6 +283,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
             "milestone_unlocked", session
         ),
         review_prompt_enabled=app_settings.get_review_prompt_enabled(session),
+        event_review_size_step_enabled=app_settings.get_event_review_size_step_enabled(
+            session
+        ),
         review_prompt_delay_hours=app_settings.get_review_prompt_delay_hours(session),
         review_prompt_lookback_hours=app_settings.get_review_prompt_lookback_hours(
             session
@@ -287,6 +302,28 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         ),
         series_auto_detect_enabled=_get_bool_setting(
             session, "series_auto_detect_enabled"
+        ),
+        event_card_save_show_stats_enabled=_get_bool_setting(
+            session, "event_card_save_show_stats_enabled"
+        ),
+        event_card_imgoing_show_stats_enabled=_get_bool_setting(
+            session, "event_card_imgoing_show_stats_enabled"
+        ),
+        event_card_imgoing_location_bottom_enabled=_get_bool_setting(
+            session, "event_card_imgoing_location_bottom_enabled", default=True
+        ),
+        event_card_show_people_icon_enabled=_get_bool_setting(
+            session, "event_card_show_people_icon_enabled"
+        ),
+        event_card_show_time_location_icons_enabled=_get_bool_setting(
+            session, "event_card_show_time_location_icons_enabled"
+        ),
+        explorer_event_card_card_style_enabled=_get_bool_setting(
+            session, "explorer_event_card_card_style_enabled"
+        ),
+        event_images_enabled=_get_bool_setting(session, "event_images_enabled"),
+        event_card_placeholder_style=_get_str_setting(
+            session, "event_card_placeholder_style", "gradient"
         ),
     )
 
@@ -445,6 +482,17 @@ def update_settings(
             )
         session.add(row)
 
+    if body.going_button_icon_variant is not None:
+        row = session.get(SiteSetting, "going_button_icon_variant")
+        if row:
+            row.value = body.going_button_icon_variant
+        else:
+            row = SiteSetting(
+                key="going_button_icon_variant",
+                value=body.going_button_icon_variant,
+            )
+        session.add(row)
+
     if body.promo_codes_enabled is not None:
         _set_bool_setting(session, "promo_codes_enabled", body.promo_codes_enabled)
 
@@ -467,15 +515,61 @@ def update_settings(
             body.series_auto_detect_enabled,
         )
 
-    if body.for_you_rail_enabled is not None:
-        _set_bool_setting(session, "for_you_rail_enabled", body.for_you_rail_enabled)
-
-    if body.your_next_events_rail_enabled is not None:
+    if body.event_card_save_show_stats_enabled is not None:
         _set_bool_setting(
             session,
-            "your_next_events_rail_enabled",
-            body.your_next_events_rail_enabled,
+            "event_card_save_show_stats_enabled",
+            body.event_card_save_show_stats_enabled,
         )
+
+    if body.event_card_imgoing_show_stats_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_card_imgoing_show_stats_enabled",
+            body.event_card_imgoing_show_stats_enabled,
+        )
+
+    if body.event_card_imgoing_location_bottom_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_card_imgoing_location_bottom_enabled",
+            body.event_card_imgoing_location_bottom_enabled,
+        )
+
+    if body.event_card_show_people_icon_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_card_show_people_icon_enabled",
+            body.event_card_show_people_icon_enabled,
+        )
+
+    if body.event_card_show_time_location_icons_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_card_show_time_location_icons_enabled",
+            body.event_card_show_time_location_icons_enabled,
+        )
+
+    if body.explorer_event_card_card_style_enabled is not None:
+        _set_bool_setting(
+            session,
+            "explorer_event_card_card_style_enabled",
+            body.explorer_event_card_card_style_enabled,
+        )
+
+    if body.event_images_enabled is not None:
+        _set_bool_setting(session, "event_images_enabled", body.event_images_enabled)
+
+    if body.event_card_placeholder_style is not None:
+        row = session.get(SiteSetting, "event_card_placeholder_style")
+        if row:
+            row.value = body.event_card_placeholder_style
+        else:
+            row = SiteSetting(
+                key="event_card_placeholder_style",
+                value=body.event_card_placeholder_style,
+            )
+        session.add(row)
 
     if body.network_going_snapshot_enabled is not None:
         _set_bool_setting(
@@ -483,6 +577,14 @@ def update_settings(
             "network_going_snapshot_enabled",
             body.network_going_snapshot_enabled,
         )
+
+    if body.my_events_route_enabled is not None:
+        _set_bool_setting(
+            session, "my_events_route_enabled", body.my_events_route_enabled
+        )
+
+    if body.my_events_nav_enabled is not None:
+        _set_bool_setting(session, "my_events_nav_enabled", body.my_events_nav_enabled)
 
     if body.suggest_event_required_dance_group_id is not None:
         row = session.get(SiteSetting, "suggest_event_required_dance_group_id")
@@ -595,6 +697,13 @@ def update_settings(
 
     if body.review_prompt_enabled is not None:
         _set_bool_setting(session, "review_prompt_enabled", body.review_prompt_enabled)
+
+    if body.event_review_size_step_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_review_size_step_enabled",
+            body.event_review_size_step_enabled,
+        )
 
     if body.review_prompt_delay_hours is not None:
         row = session.get(SiteSetting, "review_prompt_delay_hours")

@@ -24,6 +24,7 @@ from backend.db.models import (
     User,
     UserEventAttendance,
 )
+from backend.services.event_images import event_image_fields
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
 
 
@@ -172,7 +173,10 @@ def serialize_events(
             calendar_id=e.calendar_id,
             title=e.title,
             description=e.description,
+            **event_image_fields(e),
             location=e.location,
+            city=e.city,
+            country=e.country,
             start=e.start,
             end=e.end,
             all_day=e.all_day,

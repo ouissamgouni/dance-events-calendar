@@ -1,4 +1,14 @@
 import { Link } from 'react-router-dom';
+import type { ReviewSentiment } from '../types';
+
+/** Subtle background tint per overall mood (only applied in the 'full' state). */
+const MOOD_BG: Record<ReviewSentiment, string> = {
+    amazing: 'bg-green-50',
+    great: 'bg-green-50',
+    okay: 'bg-amber-50',
+    disappointing: 'bg-orange-50',
+    bad: 'bg-red-50',
+};
 
 interface Props {
     /** Section header, e.g. "Overall experience" or "Typical experience". */
@@ -7,6 +17,8 @@ interface Props {
     displayState: 'none' | 'early' | 'full';
     /** Mood emoji (from ``aspectMood(average).emoji``). */
     emoji: string;
+    /** Overall mood sentiment; drives the background tint in the 'full' state. */
+    mood?: ReviewSentiment;
     /** Public mood label ("Well received"); null below the review threshold. */
     moodLabel?: string | null;
     /** When true, render "Usually {mood}" (lower-cased) — used for pooled series. */
@@ -30,6 +42,7 @@ export default function ExperienceMoodBox({
     label,
     displayState,
     emoji,
+    mood,
     moodLabel,
     usually = false,
     positivePercentage,
@@ -39,27 +52,28 @@ export default function ExperienceMoodBox({
     if (displayState === 'none') return null;
 
     const positivePct = Math.round(positivePercentage ?? 0);
+    const bg = displayState === 'full' && mood ? MOOD_BG[mood] : 'bg-canvas';
 
     return (
-        <div className="border border-slate-200 bg-slate-50 px-3 py-2.5 space-y-1">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className={`border border-line ${bg} px-3 py-2.5 space-y-1`}>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
                 {label}
             </div>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 {displayState === 'full' && moodLabel ? (
-                    <span className="text-sm font-bold text-slate-900">
+                    <span className="text-sm font-bold text-ink">
                         {emoji} {usually ? `Usually ${moodLabel.toLowerCase()}` : moodLabel}
                     </span>
                 ) : (
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                         Early feedback
                     </span>
                 )}
-                <span className="text-xs text-slate-600">
-                    <span className="font-semibold text-slate-800 tabular-nums">{positivePct}%</span> rated it Great or Amazing
+                <span className="text-xs text-ink-soft">
+                    <span className="font-semibold text-ink tabular-nums">{positivePct}%</span> rated it Great or Amazing
                 </span>
             </div>
-            <div className="text-[11px] text-slate-400">{subline}</div>
+            <div className="text-[11px] text-muted">{subline}</div>
             {link && (
                 <Link
                     to={link.to}

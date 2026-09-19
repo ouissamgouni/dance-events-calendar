@@ -1,11 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+    Calendar,
+    Inbox,
+    type LucideIcon,
+    MessageSquare,
+    MoreHorizontal,
+    Trophy,
+    Users,
+} from 'lucide-react';
+import {
     fetchNotifications,
     type NotificationItem,
     type NotificationKind,
 } from '../api';
 import { useNotifications } from '../context/NotificationsContext';
 import NotificationRow from '../components/NotificationRow';
+import {
+    notificationCategory,
+    type NotificationCategory,
+} from '../utils/notificationRender';
+
+/** Category filter pills shown above the feed (page + Tribe > Activity). The
+ * bell dropdown panel stays pill-free. */
+const CATEGORY_PILLS: { key: 'all' | NotificationCategory; label: string; Icon: LucideIcon }[] = [
+    { key: 'all', label: 'All', Icon: Inbox },
+    { key: 'events', label: 'Events', Icon: Calendar },
+    { key: 'network', label: 'Network', Icon: Users },
+    { key: 'reviews', label: 'Reviews', Icon: MessageSquare },
+    { key: 'milestones', label: 'Milestones', Icon: Trophy },
+    { key: 'others', label: 'Others', Icon: MoreHorizontal },
+];
 
 /** The friend/follow-triggered notification kinds shown on the Tribe >
  * Activity feed. System kinds (reminders, alerts, promos, personal
@@ -34,33 +58,24 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
     const { markRead, markAllRead, markSeen } = useNotifications();
     const [items, setItems] = useState<NotificationItem[] | null>(null);
     const [unreadCount, setUnreadCount] = useState<number>(0);
-    const [filterKind, setFilterKind] = useState<'all' | NotificationKind>('all');
+    const [filterCategory, setFilterCategory] = useState<'all' | NotificationCategory>('all');
     const [error, setError] = useState<string | null>(null);
     const [busyId, setBusyId] = useState<number | null>(null);
     const [busyAll, setBusyAll] = useState(false);
 
     const load = useCallback(async () => {
         try {
-            const res = await fetchNotifications({
-                kind: filterKind === 'all' ? undefined : filterKind,
-                limit: 50,
-            });
+            const res = await fetchNotifications({ limit: 50 });
             const now = new Date().toISOString();
-            // On the social Activity feed, hide system kinds (reminders,
-            // alerts, promos, milestones) when no specific kind is selected.
-            const filtered =
-                socialOnly && filterKind === 'all'
-                    ? res.items.filter((n) => SOCIAL_KINDS.includes(n.kind))
-                    : res.items;
             // Visiting the page acknowledges the queue: rows render as
             // already read, mirroring how Instagram/Facebook treat
             // "viewed" as "read" (mark-all-read is fired alongside below).
-            setItems(filtered.map((n) => (n.read_at ? n : { ...n, read_at: now })));
+            setItems(res.items.map((n) => (n.read_at ? n : { ...n, read_at: now })));
             setUnreadCount(0);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load notifications');
         }
-    }, [filterKind, socialOnly]);
+    }, []);
 
     useEffect(() => {
         load();
@@ -107,14 +122,20 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
         }
     };
 
+    const visibleItems = (items ?? []).filter(
+        (n) =>
+            (!socialOnly || SOCIAL_KINDS.includes(n.kind)) &&
+            (filterCategory === 'all' || notificationCategory(n.kind) === filterCategory),
+    );
+
     return (
         <div className="max-w-2xl mx-auto px-4 py-6">
             {!socialOnly && (
                 <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-lg font-semibold text-slate-900">
-                        Notifications
+                    <h1 className="text-2xl font-bold text-ink">
+                        Activity
                         {unreadCount > 0 && (
-                            <span className="ml-2 text-xs text-slate-500 font-normal">
+                            <span className="ml-2 text-xs text-ink-soft font-normal">
                                 ({unreadCount} unread)
                             </span>
                         )}
@@ -123,85 +144,40 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
                         type="button"
                         onClick={handleMarkAll}
                         disabled={busyAll || unreadCount === 0}
-                        className="text-xs text-blue-600 hover:text-blue-700 disabled:text-slate-400 disabled:cursor-not-allowed"
+                        className="text-xs text-action hover:text-action disabled:text-muted disabled:cursor-not-allowed"
                     >
                         {busyAll ? 'Marking…' : 'Mark all read'}
                     </button>
                 </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
-                <KindChip
-                    label="All"
-                    active={filterKind === 'all'}
-                    onClick={() => setFilterKind('all')}
-                />
-                <KindChip
-                    label="Going"
-                    active={filterKind === 'subscription_going'}
-                    onClick={() => setFilterKind('subscription_going')}
-                />
-                <KindChip
-                    label="Suggested"
-                    active={filterKind === 'subscription_suggested'}
-                    onClick={() => setFilterKind('subscription_suggested')}
-                />
-                <KindChip
-                    label="Followers"
-                    active={filterKind === 'new_follower'}
-                    onClick={() => setFilterKind('new_follower')}
-                />
-                <KindChip
-                    label="Friends"
-                    active={filterKind === 'new_friend'}
-                    onClick={() => setFilterKind('new_friend')}
-                />
-                <KindChip
-                    label="Requests"
-                    active={filterKind === 'follow_request'}
-                    onClick={() => setFilterKind('follow_request')}
-                />
-                {!socialOnly && (
-                    <>
-                        <KindChip
-                            label="Reminders"
-                            active={filterKind === 'event_reminder'}
-                            onClick={() => setFilterKind('event_reminder')}
-                        />
-                        <KindChip
-                            label="Alerts"
-                            active={filterKind === 'interest_event'}
-                            onClick={() => setFilterKind('interest_event')}
-                        />
-                        <KindChip
-                            label="Reviews"
-                            active={filterKind === 'event_review_prompt'}
-                            onClick={() => setFilterKind('event_review_prompt')}
-                        />
-                        <KindChip
-                            label="Milestones"
-                            active={filterKind === 'milestone_unlocked'}
-                            onClick={() => setFilterKind('milestone_unlocked')}
-                        />
-                    </>
-                )}
+            <div className="flex items-center gap-2 mb-3 overflow-x-auto">
+                {CATEGORY_PILLS.filter((p) => !(socialOnly && p.key === 'others')).map((p) => (
+                    <CategoryPill
+                        key={p.key}
+                        label={p.label}
+                        Icon={p.Icon}
+                        active={filterCategory === p.key}
+                        onClick={() => setFilterCategory(p.key)}
+                    />
+                ))}
             </div>
 
             {error && (
-                <div className="mb-3 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <div className="mb-3 border border-red-200 bg-red-50 px-3 py-2 text-sm text-danger">
                     {error}
                 </div>
             )}
 
             {items === null ? (
-                <p className="text-sm text-slate-400">Loading…</p>
-            ) : items.length === 0 ? (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted">Loading…</p>
+            ) : visibleItems.length === 0 ? (
+                <p className="text-sm text-ink-soft">
                     No notifications yet.
                 </p>
             ) : (
-                <ul className="divide-y divide-slate-100 border border-slate-200 bg-white">
-                    {items.map((n) => (
+                <ul className="divide-y divide-slate-100 border border-line bg-surface">
+                    {visibleItems.map((n) => (
                         <NotificationRow
                             key={n.id}
                             item={n}
@@ -216,12 +192,14 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
     );
 }
 
-function KindChip({
+function CategoryPill({
     label,
+    Icon,
     active,
     onClick,
 }: {
     label: string;
+    Icon: LucideIcon;
     active: boolean;
     onClick: () => void;
 }) {
@@ -231,11 +209,12 @@ function KindChip({
             onClick={onClick}
             className={
                 active
-                    ? 'px-3 py-1.5 border border-blue-500 bg-blue-500 text-white'
-                    : 'px-3 py-1.5 border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500'
+                    ? 'flex items-center gap-1.5 px-3 py-2 border border-action/40 bg-action/10 text-action whitespace-nowrap shrink-0'
+                    : 'flex items-center gap-1.5 px-3 py-2 border border-line bg-surface text-ink-soft hover:border-action hover:text-action whitespace-nowrap shrink-0'
             }
         >
-            {label}
+            <Icon size={16} strokeWidth={2} aria-hidden="true" />
+            <span className="text-sm font-medium">{label}</span>
         </button>
     );
 }

@@ -30,23 +30,23 @@ interface SyncProgressCardProps {
 // ---------------------------------------------------------------------------
 
 const STATUS_DOT: Record<string, string> = {
-    running: 'bg-blue-500 animate-pulse',
+    running: 'bg-action animate-pulse',
     processing: 'bg-violet-500 animate-pulse',
     abort_requested: 'bg-amber-400 animate-pulse',
-    completed: 'bg-emerald-500',
+    completed: 'bg-success',
     warning: 'bg-amber-500',
-    failed: 'bg-red-500',
+    failed: 'bg-danger',
     aborted: 'bg-gray-400',
     idle: 'bg-gray-300',
 };
 
 const STATUS_BADGE_CAL: Record<string, string> = {
-    queued: 'bg-gray-100 text-gray-500',
-    running: 'bg-blue-50 text-blue-700',
+    queued: 'bg-gray-100 text-ink-soft',
+    running: 'bg-blue-50 text-action',
     processing: 'bg-violet-50 text-violet-700',
-    completed: 'bg-emerald-50 text-emerald-700',
+    completed: 'bg-emerald-50 text-success',
     warning: 'bg-amber-50 text-amber-700',
-    failed: 'bg-red-50 text-red-700',
+    failed: 'bg-red-50 text-danger',
 };
 
 const STATUS_LABEL_CAL: Record<string, string> = {
@@ -59,17 +59,17 @@ const STATUS_LABEL_CAL: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<string, string> = {
-    running: 'bg-blue-100 text-blue-700',
+    running: 'bg-blue-100 text-action',
     abort_requested: 'bg-amber-100 text-amber-700',
-    completed: 'bg-emerald-100 text-emerald-700',
+    completed: 'bg-emerald-100 text-success',
     warning: 'bg-amber-100 text-amber-700',
-    failed: 'bg-red-100 text-red-700',
-    aborted: 'bg-gray-100 text-gray-500',
+    failed: 'bg-red-100 text-danger',
+    aborted: 'bg-gray-100 text-ink-soft',
 };
 
 const LOG_LEVEL_BADGE: Record<string, string> = {
     WARNING: 'text-amber-600',
-    ERROR: 'text-red-600',
+    ERROR: 'text-danger',
 };
 
 function isActive(status: string): boolean {
@@ -83,10 +83,10 @@ function isActive(status: string): boolean {
 function Counter({ label, value, highlight }: { label: string; value: number; highlight?: string }) {
     return (
         <div className="inline-flex items-baseline gap-1">
-            <span className={`text-sm font-semibold ${highlight && value > 0 ? highlight : 'text-gray-700'}`}>
+            <span className={`text-sm font-semibold ${highlight && value > 0 ? highlight : 'text-ink'}`}>
                 {value}
             </span>
-            <span className="text-[10px] text-gray-400">{label}</span>
+            <span className="text-[10px] text-muted">{label}</span>
         </div>
     );
 }
@@ -109,9 +109,9 @@ function LogsStrip({ logs, errorCount }: { logs: LogLine[]; errorCount: number }
     };
 
     return (
-        <div className="border border-gray-100 rounded bg-white">
-            <div className="flex items-center justify-between px-2 py-1 border-b border-gray-100">
-                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+        <div className="border border-card-line rounded bg-surface">
+            <div className="flex items-center justify-between px-2 py-1 border-b border-card-line">
+                <p className="text-[10px] font-medium text-ink-soft uppercase tracking-wide">
                     Recent logs {errorCount > 0 && (
                         <span className="text-amber-600 normal-case">({errorCount} alerts)</span>
                     )}
@@ -121,7 +121,7 @@ function LogsStrip({ logs, errorCount }: { logs: LogLine[]; errorCount: number }
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
-                            className={`text-[10px] px-1.5 py-0.5 rounded ${filter === f ? 'bg-gray-200 text-gray-700' : 'text-gray-400 hover:text-gray-600'
+                            className={`text-[10px] px-1.5 py-0.5 rounded ${filter === f ? 'bg-gray-200 text-ink' : 'text-muted hover:text-ink-soft'
                                 }`}
                         >
                             {f === 'all' ? 'All' : 'Alerts'}
@@ -131,16 +131,16 @@ function LogsStrip({ logs, errorCount }: { logs: LogLine[]; errorCount: number }
             </div>
             <div className="max-h-32 overflow-y-auto px-2 py-1 font-mono text-[10px] space-y-0.5">
                 {visible.length === 0 && (
-                    <div className="text-gray-400 italic py-1">No log entries</div>
+                    <div className="text-muted italic py-1">No log entries</div>
                 )}
                 {visible.map((log, i) => (
                     <div key={i} className="flex items-start gap-1.5">
-                        <span className="text-gray-400 flex-shrink-0">{fmtTime(log.timestamp)}</span>
-                        <span className={`font-semibold flex-shrink-0 w-12 ${LOG_LEVEL_BADGE[log.level] ?? 'text-gray-400'}`}>
+                        <span className="text-muted flex-shrink-0">{fmtTime(log.timestamp)}</span>
+                        <span className={`font-semibold flex-shrink-0 w-12 ${LOG_LEVEL_BADGE[log.level] ?? 'text-muted'}`}>
                             {log.level}
                         </span>
-                        <span className="text-gray-400 truncate flex-shrink-0 max-w-[100px]">[{log.calendar}]</span>
-                        <span className="text-gray-700 break-words">{log.message}</span>
+                        <span className="text-muted truncate flex-shrink-0 max-w-[100px]">[{log.calendar}]</span>
+                        <span className="text-ink break-words">{log.message}</span>
                     </div>
                 ))}
             </div>
@@ -178,13 +178,13 @@ function CalendarRow({
     // Per-stage chip color for the failed sub-counter
     const failTone: Record<string, string> = {
         geocoding: 'text-amber-600',
-        link_extraction: 'text-gray-500',
-        price_extraction: 'text-gray-500',
-        persistence: 'text-red-500',
+        link_extraction: 'text-ink-soft',
+        price_extraction: 'text-ink-soft',
+        persistence: 'text-danger',
     };
 
     return (
-        <div className="flex flex-col gap-1 px-3 py-2 bg-white border border-gray-100 rounded-lg hover:border-gray-200 transition group">
+        <div className="flex flex-col gap-1 px-3 py-2 bg-surface border border-card-line rounded-lg hover:border-line transition group">
             {/* Mini progress bar */}
             {(calActive || calProgressPct > 0) && (
                 <div className="h-0.5 -mx-3 -mt-2 mb-1 bg-gray-100 overflow-hidden rounded-t-lg">
@@ -206,29 +206,29 @@ function CalendarRow({
                         className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${STATUS_DOT[cal.status] ?? 'bg-gray-300'}`}
                     />
                     {/* Name + badge */}
-                    <span className="text-xs font-medium text-gray-700 truncate max-w-[180px]">
+                    <span className="text-xs font-medium text-ink truncate max-w-[180px]">
                         {cal.calendar_name}
                     </span>
-                    <span className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_BADGE_CAL[cal.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_BADGE_CAL[cal.status] ?? 'bg-gray-100 text-ink-soft'}`}>
                         {STATUS_LABEL_CAL[cal.status] ?? cal.status}
                     </span>
                 </div>
 
                 {/* Mini counters */}
                 <div className="flex items-center gap-3 ml-2">
-                    <span className="text-[10px] text-gray-400">
-                        <span className="font-medium text-gray-600">{cal.fetched}</span> fetched
+                    <span className="text-[10px] text-muted">
+                        <span className="font-medium text-ink-soft">{cal.fetched}</span> fetched
                     </span>
-                    <span className="text-[10px] text-gray-400">
-                        <span className="font-medium text-gray-600">{cal.upserted}</span> new
+                    <span className="text-[10px] text-muted">
+                        <span className="font-medium text-ink-soft">{cal.upserted}</span> new
                     </span>
                     {cal.deduped > 0 && (
-                        <span className="text-[10px] text-gray-400">
-                            <span className="font-medium text-gray-500">{cal.deduped}</span> dedup
+                        <span className="text-[10px] text-muted">
+                            <span className="font-medium text-ink-soft">{cal.deduped}</span> dedup
                         </span>
                     )}
-                    <span className="text-[10px] text-gray-400">
-                        <span className={`font-medium ${cal.enriched_ok > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>{cal.enriched_ok}</span> enriched
+                    <span className="text-[10px] text-muted">
+                        <span className={`font-medium ${cal.enriched_ok > 0 ? 'text-success' : 'text-muted'}`}>{cal.enriched_ok}</span> enriched
                     </span>
                     {calWarnings > 0 && (
                         <span className="text-[10px] font-medium text-amber-600">
@@ -236,7 +236,7 @@ function CalendarRow({
                         </span>
                     )}
                     {calRealErrors > 0 && (
-                        <span className="text-[10px] font-medium text-red-500">
+                        <span className="text-[10px] font-medium text-danger">
                             {calRealErrors} err
                         </span>
                     )}
@@ -265,15 +265,15 @@ function CalendarRow({
                                 <span
                                     key={s}
                                     className={`inline-flex items-center gap-1 text-[9.5px] px-1.5 py-0.5 rounded ${cal.pipeline_stage === s
-                                        ? 'bg-blue-50 border border-blue-200 text-blue-700'
-                                        : 'bg-gray-50 border border-gray-100 text-gray-500'
+                                        ? 'bg-blue-50 border border-blue-200 text-action'
+                                        : 'bg-canvas border border-card-line text-ink-soft'
                                         }`}
                                 >
                                     <span className="font-medium">{stageLabel[s] ?? s}</span>
-                                    {ok > 0 && <span className="text-emerald-600">{ok} ✓</span>}
+                                    {ok > 0 && <span className="text-success">{ok} ✓</span>}
                                     {isOptional ? (
                                         (skip + fail) > 0 && (
-                                            <span className="text-gray-400">{skip + fail} N/A</span>
+                                            <span className="text-muted">{skip + fail} N/A</span>
                                         )
                                     ) : isGeo ? (
                                         fail > 0 && (
@@ -281,7 +281,7 @@ function CalendarRow({
                                         )
                                     ) : (
                                         fail > 0 && (
-                                            <span className={failTone[s] ?? 'text-red-500'}>/{fail}</span>
+                                            <span className={failTone[s] ?? 'text-danger'}>/{fail}</span>
                                         )
                                     )}
                                 </span>
@@ -412,18 +412,18 @@ export default function SyncProgressCard({ visible, jobId, onDismiss, onJobCompl
 
     return (
         <>
-            <div className="mt-3 border border-gray-200 rounded-xl bg-gray-50 shadow-sm overflow-hidden">
+            <div className="mt-3 border border-line rounded-card bg-canvas shadow-sm overflow-hidden">
                 {/* ── Progress bar ── */}
                 {(active || progressPct > 0) && (
                     <div className="h-1 bg-gray-100 relative overflow-hidden">
                         <div
                             className={`h-full transition-all duration-500 ease-out ${active
-                                ? 'bg-blue-500'
+                                ? 'bg-action'
                                 : job.status === 'completed'
-                                    ? 'bg-emerald-500'
+                                    ? 'bg-success'
                                     : job.status === 'warning'
                                         ? 'bg-amber-500'
-                                        : 'bg-red-500'
+                                        : 'bg-danger'
                                 }`}
                             style={{ width: `${progressPct}%` }}
                         />
@@ -434,38 +434,38 @@ export default function SyncProgressCard({ visible, jobId, onDismiss, onJobCompl
                 )}
 
                 {/* ── Top bar (vertical layout for narrow column) ── */}
-                <div className="flex flex-col gap-2 px-4 py-2.5 bg-white border-b border-gray-100">
+                <div className="flex flex-col gap-2 px-4 py-2.5 bg-surface border-b border-card-line">
                     <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0 flex-wrap">
                             <span className={`w-2 h-2 rounded-full ${STATUS_DOT[job.status] ?? 'bg-gray-300'}`} />
-                            <span className="text-xs font-semibold text-gray-700">
+                            <span className="text-xs font-semibold text-ink">
                                 {active ? 'Sync in progress' : job.status === 'completed' ? 'Sync complete' : `Sync ${job.status}`}
                             </span>
-                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-ink-soft'}`}>
                                 {job.mode}
                             </span>
-                            <span className="text-[10px] text-gray-400">{durationLabel}</span>
+                            <span className="text-[10px] text-muted">{durationLabel}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                             {active && (
                                 <button
                                     onClick={handleAbort}
                                     disabled={aborting || job.status === 'abort_requested'}
-                                    className="text-[10px] text-red-500 hover:text-red-700 font-medium px-2 py-1 border border-red-200 hover:border-red-400 rounded transition disabled:opacity-50"
+                                    className="text-[10px] text-danger hover:text-danger font-medium px-2 py-1 border border-red-200 hover:border-red-400 rounded transition disabled:opacity-50"
                                 >
                                     {job.status === 'abort_requested' ? 'Aborting…' : aborting ? 'Aborting…' : 'Abort'}
                                 </button>
                             )}
                             <button
                                 onClick={() => setExpanded((e) => !e)}
-                                className="text-[10px] text-gray-400 hover:text-gray-600 px-1"
+                                className="text-[10px] text-muted hover:text-ink-soft px-1"
                                 title={expanded ? 'Collapse' : 'Expand'}
                             >
                                 {expanded ? '▲' : '▼'}
                             </button>
                             <button
                                 onClick={handleDismiss}
-                                className="text-gray-400 hover:text-gray-600 text-base leading-none px-1"
+                                className="text-muted hover:text-ink-soft text-base leading-none px-1"
                                 title="Dismiss"
                             >
                                 ×
@@ -483,7 +483,7 @@ export default function SyncProgressCard({ visible, jobId, onDismiss, onJobCompl
                             <Counter label="warnings" value={totalWarnings} highlight="text-amber-600" />
                         )}
                         {totalErrors > 0 && (
-                            <Counter label="errors" value={totalErrors} highlight="text-red-500" />
+                            <Counter label="errors" value={totalErrors} highlight="text-danger" />
                         )}
                     </div>
                 </div>
@@ -512,7 +512,7 @@ export default function SyncProgressCard({ visible, jobId, onDismiss, onJobCompl
                         {/* Job-level errors */}
                         {job.error_message && (
                             <div className="bg-red-50 border border-red-100 rounded p-2">
-                                <p className="text-[10px] text-red-700 break-words">{job.error_message}</p>
+                                <p className="text-[10px] text-danger break-words">{job.error_message}</p>
                             </div>
                         )}
                         {job.warning_message && (
@@ -523,7 +523,7 @@ export default function SyncProgressCard({ visible, jobId, onDismiss, onJobCompl
 
                         {/* No calendars yet (job just started) */}
                         {calEntries.length === 0 && active && (
-                            <p className="text-xs text-gray-400 text-center py-2 animate-pulse">
+                            <p className="text-xs text-muted text-center py-2 animate-pulse">
                                 Starting calendar fetch…
                             </p>
                         )}

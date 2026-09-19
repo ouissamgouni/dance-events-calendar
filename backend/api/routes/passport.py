@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from backend.api.deps import get_current_user_optional, require_user
 from backend.api.event_serializer import serialize_events
+from backend.api.routes.tags import get_event_tags
 from backend.api.schemas import (
     AckMilestonesRequest,
     AckMilestonesResponse,
@@ -29,6 +30,14 @@ from backend.db.models import PassportShareToken, User, UserFollow
 from backend.services import passport as passport_service
 
 router = APIRouter(prefix="/api/passport", tags=["passport"])
+
+
+def _timeline_tag_labels(session: Session, events) -> dict[str, list[str]]:
+    tags = get_event_tags(session, [event.event_id for event in events])
+    return {
+        event_id: [tag.label for tag in event_tags]
+        for event_id, event_tags in tags.items()
+    }
 
 
 def _public_display_name(user: User) -> str | None:
@@ -135,14 +144,14 @@ def build_shared_passport(
         place_by_id = {e.event_id: (e.city, e.country) for e in attended}
         for ev in serialize_events(session, attended):
             city, country = place_by_id.get(ev.event_id, (None, None))
-            events.append(
-                PassportMapEvent(**ev.model_dump(), city=city, country=country)
-            )
+            data = ev.model_dump(exclude={"city", "country"})
+            events.append(PassportMapEvent(**data, city=city, country=country))
 
     timeline_items: list[PassportTimelineItem] = []
     timeline_markers: list[PassportTimelineMarker] = []
     monthly = []
     if show_timeline:
+        tag_labels = _timeline_tag_labels(session, attended)
         monthly = [
             MonthlyActivity(**m) for m in passport_service.monthly_activity(attended)
         ]
@@ -156,6 +165,7 @@ def build_shared_passport(
                 location=_soft_location(e.city, e.country),
                 city=e.city,
                 country=e.country,
+                tags=tag_labels.get(e.event_id, []),
                 latitude=None,
                 longitude=None,
             )
@@ -168,6 +178,10 @@ def build_shared_passport(
         timeline_markers += [
             PassportTimelineMarker(**m)
             for m in passport_service.consistency_timeline_markers(attended)
+        ]
+        timeline_markers += [
+            PassportTimelineMarker(**m)
+            for m in passport_service.review_timeline_markers(session, owner.id)
         ]
 
     is_self = viewer is not None and viewer.id == owner.id
@@ -185,6 +199,7 @@ def build_shared_passport(
 
     return SharedPassportResponse(
         display_name=display_name,
+        avatar_url=owner.avatar_url,
         stats=stats,
         collections=PassportCollections(**collections),
         milestones=milestones,
@@ -256,7 +271,8 @@ def get_passport_events(
     result: list[PassportMapEvent] = []
     for ev in serialize_events(session, events):
         city, country = place_by_id.get(ev.event_id, (None, None))
-        result.append(PassportMapEvent(**ev.model_dump(), city=city, country=country))
+        data = ev.model_dump(exclude={"city", "country"})
+        result.append(PassportMapEvent(**data, city=city, country=country))
     return result
 
 
@@ -277,10 +293,24 @@ def ack_milestones(
 def get_passport_timeline(
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
+    q: str | None = Query(None, max_length=120),
     user: User = Depends(require_user),
     session: Session = Depends(get_session),
 ) -> PassportTimelineResponse:
-    events = passport_service.attended_events(session, user.id)
+    all_events = passport_service.attended_events(session, user.id)
+    tag_labels = _timeline_tag_labels(session, all_events)
+    query = (q or "").strip().casefold()
+    events = all_events
+    if query:
+        events = [
+            event
+            for event in events
+            if query in event.title.casefold()
+            or query in (event.city or "").casefold()
+            or any(
+                query in tag.casefold() for tag in tag_labels.get(event.event_id, [])
+            )
+        ]
     page = events[offset : offset + limit]
     items = [
         PassportTimelineItem(
@@ -290,19 +320,25 @@ def get_passport_timeline(
             location=e.location,
             city=e.city,
             country=e.country,
+            tags=tag_labels.get(e.event_id, []),
             latitude=e.latitude,
             longitude=e.longitude,
         )
         for e in page
     ]
-    markers = [
-        PassportTimelineMarker(**m)
-        for m in passport_service.timeline_milestone_markers(events)
-    ]
-    markers += [
-        PassportTimelineMarker(**m)
-        for m in passport_service.consistency_timeline_markers(events)
-    ]
+    marker_data = passport_service.timeline_milestone_markers(all_events)
+    marker_data += passport_service.consistency_timeline_markers(all_events)
+    if query:
+        matched_ids = {event.event_id for event in events}
+        marker_data = [
+            marker for marker in marker_data if marker.get("event_id") in matched_ids
+        ]
+    markers = [PassportTimelineMarker(**m) for m in marker_data]
+    if not query:
+        markers += [
+            PassportTimelineMarker(**m)
+            for m in passport_service.review_timeline_markers(session, user.id)
+        ]
     return PassportTimelineResponse(items=items, markers=markers, total=len(events))
 
 

@@ -1,0 +1,3 @@
+settings:
+  event_images_enabled: true
+  event_card_placeholder_style: gradient

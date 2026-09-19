@@ -11,11 +11,11 @@ interface Props {
 function statusBadge(status: string) {
     const colors: Record<string, string> = {
         pending: 'bg-amber-100 text-amber-700',
-        resolved: 'bg-emerald-100 text-emerald-700',
-        dismissed: 'bg-slate-200 text-slate-700',
+        resolved: 'bg-emerald-100 text-success',
+        dismissed: 'bg-slate-200 text-ink',
     };
     return (
-        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
+        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-ink-soft'}`}>
             {status}
         </span>
     );
@@ -26,8 +26,8 @@ export default function DuplicateGroupCard({ group, acting, onKeep, onDismiss, o
         <div>
             <div className="flex items-center gap-2 flex-wrap mb-2">
                 {statusBadge(group.status)}
-                <span className="text-[10px] uppercase text-slate-400">{group.source}</span>
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] uppercase text-muted">{group.source}</span>
+                <span className="text-[10px] text-muted">
                     {new Date(group.created_at).toLocaleString()}
                 </span>
             </div>
@@ -35,7 +35,7 @@ export default function DuplicateGroupCard({ group, acting, onKeep, onDismiss, o
                 {group.events.map((ev) => (
                     <li
                         key={ev.event_id}
-                        className="flex items-start justify-between gap-3 border border-slate-100 bg-slate-50 px-2 py-1.5"
+                        className="flex items-start justify-between gap-3 border border-card-line bg-canvas px-2 py-1.5"
                     >
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -43,7 +43,7 @@ export default function DuplicateGroupCard({ group, acting, onKeep, onDismiss, o
                                     <button
                                         type="button"
                                         onClick={() => onOpenEvent(ev.event_id)}
-                                        className="font-medium text-blue-600 hover:underline text-left text-xs"
+                                        className="font-medium text-action hover:underline text-left text-xs"
                                     >
                                         {ev.title}
                                     </button>
@@ -51,21 +51,21 @@ export default function DuplicateGroupCard({ group, acting, onKeep, onDismiss, o
                                     <span className="font-medium text-xs">{ev.title}</span>
                                 )}
                                 {group.kept_event_id === ev.event_id && (
-                                    <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-emerald-100 text-emerald-700">
+                                    <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-emerald-100 text-success">
                                         kept
                                     </span>
                                 )}
                                 {ev.rejected_duplicate_reason && (
-                                    <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-slate-200 text-slate-600">
+                                    <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-slate-200 text-ink-soft">
                                         rejected
                                     </span>
                                 )}
                             </div>
-                            <div className="mt-0.5 text-[10px] text-slate-500">
+                            <div className="mt-0.5 text-[10px] text-ink-soft">
                                 {new Date(ev.start).toLocaleString()} — {ev.event_id}
                             </div>
                             {ev.rejected_duplicate_reason && (
-                                <div className="mt-0.5 text-[10px] text-slate-500 italic">
+                                <div className="mt-0.5 text-[10px] text-ink-soft italic">
                                     {ev.rejected_duplicate_reason}
                                 </div>
                             )}
@@ -74,7 +74,7 @@ export default function DuplicateGroupCard({ group, acting, onKeep, onDismiss, o
                             <button
                                 disabled={acting}
                                 onClick={() => onKeep(ev.event_id)}
-                                className="text-[11px] bg-blue-500 text-white px-2 py-1 hover:bg-blue-600 disabled:opacity-50 shrink-0"
+                                className="text-[11px] bg-action text-white px-2 py-1 hover:bg-action disabled:opacity-50 shrink-0"
                             >
                                 Keep
                             </button>
@@ -87,7 +87,7 @@ export default function DuplicateGroupCard({ group, acting, onKeep, onDismiss, o
                     <button
                         disabled={acting}
                         onClick={onDismiss}
-                        className="text-[11px] text-slate-500 hover:text-slate-700 px-2 py-1 disabled:opacity-50"
+                        className="text-[11px] text-ink-soft hover:text-ink px-2 py-1 disabled:opacity-50"
                     >
                         Not duplicates — dismiss group
                     </button>

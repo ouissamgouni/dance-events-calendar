@@ -54,7 +54,15 @@ def _mock_session_with_suggestions(*suggestions):
 
     def mock_exec(stmt):
         result = MagicMock()
-        result.all.return_value = list(store.values())
+        # Only answer with suggestions when the statement actually selects
+        # them — the routes also query CachedEvent/EventSeriesMember.
+        try:
+            entity = stmt.column_descriptions[0]["entity"]
+        except Exception:
+            entity = None
+        result.all.return_value = (
+            list(store.values()) if entity is EventSuggestion else []
+        )
         result.first.return_value = None
         return result
 
@@ -178,6 +186,8 @@ class TestSubmitSuggestion:
                 return None
             if model is CachedEvent:
                 return None
+            if model is User:
+                return current_user
             return None
 
         def mock_exec(stmt):
@@ -250,6 +260,45 @@ class TestSubmitSuggestion:
             assert resp.status_code == 422
         finally:
             app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.mark.unit
+class TestSuggestionOccurrences:
+    def test_lists_every_date_approval_would_create(self):
+        suggestion = _make_suggestion(recurrence_rule="RRULE:FREQ=WEEKLY;COUNT=4")
+        mock_session = _mock_session_with_suggestions(suggestion)
+
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            resp = TestClient(app).get(
+                f"/api/admin/suggestions/{suggestion.id}/occurrences"
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["total"] == 4
+        assert [o["index"] for o in data["occurrences"]] == [0, 1, 2, 3]
+        # Nothing is materialised yet, so no occurrence claims an event id.
+        assert all(o["materialised"] is False for o in data["occurrences"])
+
+    def test_single_date_suggestion_has_one_occurrence(self):
+        suggestion = _make_suggestion()
+        mock_session = _mock_session_with_suggestions(suggestion)
+
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            resp = TestClient(app).get(
+                f"/api/admin/suggestions/{suggestion.id}/occurrences"
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["total"] == 1
 
 
 @pytest.mark.unit
@@ -685,3 +734,122 @@ class TestGeolocatePrivateIp:
 
         result = await geolocate_ip("192.168.1.1")
         assert result is None
+
+
+@pytest.mark.unit
+class TestPublicGeocodeEndpoint:
+    def test_suggestion_geocode_returns_structured_city_and_country_kinds(self):
+        with patch("geopy.geocoders.Nominatim") as MockNominatim:
+            mock_geocoder = MagicMock()
+            MockNominatim.return_value = mock_geocoder
+
+            paris = MagicMock()
+            paris.address = "Paris, Ile-de-France, France"
+            paris.latitude = 48.8566
+            paris.longitude = 2.3522
+            paris.raw = {
+                "name": "Paris",
+                "class": "boundary",
+                "type": "administrative",
+                "addresstype": "city",
+                "boundingbox": ["48.815", "48.902", "2.224", "2.470"],
+                "address": {
+                    "city": "Paris",
+                    "state": "Ile-de-France",
+                    "country": "France",
+                },
+            }
+            france = MagicMock()
+            france.address = "France"
+            france.latitude = 46.6034
+            france.longitude = 1.8883
+            france.raw = {
+                "name": "France",
+                "class": "boundary",
+                "type": "administrative",
+                "addresstype": "country",
+                "boundingbox": ["41.263", "51.269", "-5.453", "9.868"],
+                "address": {"country": "France"},
+            }
+            europe = MagicMock()
+            europe.address = "Europe"
+            europe.latitude = 51.0
+            europe.longitude = 10.0
+            europe.raw = {
+                "name": "Europe",
+                "class": "place",
+                "type": "continent",
+                "addresstype": "continent",
+                "boundingbox": ["34.5", "81.9", "-31.3", "69.1"],
+                "address": {},
+            }
+            mock_geocoder.geocode.return_value = [paris, france, europe]
+
+            response = TestClient(app).get("/api/suggestions/geocode?q=france")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data[0]["name"] == "Paris"
+            assert data[0]["context"] == "Ile-de-France, France"
+            assert data[0]["place_kind"] == "city"
+            assert data[0]["type_label"] == "City"
+            assert data[0]["bounding_box"]["min_lat"] == 48.815
+            assert data[1]["name"] == "France"
+            assert data[1]["context"] is None
+            assert data[1]["place_kind"] == "country"
+            assert data[2]["name"] == "Europe"
+            assert data[2]["place_kind"] == "continent"
+            assert data[2]["type_label"] == "Continent"
+
+    def test_suggestion_geocode_forwards_language_preference(self):
+        """Public /api/suggestions/geocode should forward Accept-Language header to Nominatim."""
+        with patch("geopy.geocoders.Nominatim") as MockNominatim:
+            mock_geocoder = MagicMock()
+            MockNominatim.return_value = mock_geocoder
+
+            result = MagicMock()
+            result.address = "Athina, Ellada"
+            result.latitude = 37.9838
+            result.longitude = 23.7275
+            mock_geocoder.geocode.return_value = [result]
+
+            client = TestClient(app)
+            resp = client.get(
+                "/api/suggestions/geocode?q=athens",
+                headers={"Accept-Language": "el-GR,el;q=0.9"},
+            )
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data) == 1
+            assert data[0]["display_name"] == "Athina, Ellada"
+
+            # Verify language preference was forwarded to geocode
+            mock_geocoder.geocode.assert_called_once()
+            call_kwargs = mock_geocoder.geocode.call_args[1]
+            assert "language" in call_kwargs
+            # Should have Greek with English fallback
+            assert "el-GR" in call_kwargs["language"] or "el" in call_kwargs["language"]
+            assert "en" in call_kwargs["language"]
+
+    def test_suggestion_geocode_defaults_to_english_when_no_header(self):
+        """Public geocode should default to English when Accept-Language is missing."""
+        with patch("geopy.geocoders.Nominatim") as MockNominatim:
+            mock_geocoder = MagicMock()
+            MockNominatim.return_value = mock_geocoder
+
+            result = MagicMock()
+            result.address = "Paris, France"
+            result.latitude = 48.86
+            result.longitude = 2.35
+            mock_geocoder.geocode.return_value = [result]
+
+            client = TestClient(app)
+            resp = client.get("/api/suggestions/geocode?q=paris")
+
+            assert resp.status_code == 200
+
+            # Verify default 'en' language was used
+            mock_geocoder.geocode.assert_called_once()
+            call_kwargs = mock_geocoder.geocode.call_args[1]
+            assert call_kwargs["language"] == "en"

@@ -65,21 +65,21 @@ export default function SubscribedEventsPanel() {
     if (items === null && error === null) return null;
 
     return (
-        <section className="border border-slate-200 bg-white">
-            <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        <section className="border border-line bg-surface">
+            <div className="px-3 py-2 border-b border-card-line flex items-center justify-between">
+                <span className="text-xs font-medium uppercase tracking-wide text-ink-soft">
                     From your subscriptions
                 </span>
                 <Link
                     to="/notifications"
-                    className="text-[11px] text-slate-500 hover:text-blue-600"
+                    className="text-[11px] text-ink-soft hover:text-action"
                 >
                     See all updates →
                 </Link>
             </div>
 
             {subs && subs.length > 1 && (
-                <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-slate-100">
+                <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-card-line">
                     <FilterChip
                         label="All"
                         active={filterHandle === null}
@@ -97,9 +97,9 @@ export default function SubscribedEventsPanel() {
             )}
 
             {error ? (
-                <div className="px-3 py-2 text-xs text-red-600">{error}</div>
+                <div className="px-3 py-2 text-xs text-danger">{error}</div>
             ) : items && items.length === 0 ? (
-                <p className="px-3 py-3 text-xs text-slate-500">
+                <p className="px-3 py-3 text-xs text-ink-soft">
                     Nothing new from your subscriptions yet.
                 </p>
             ) : (
@@ -129,7 +129,7 @@ function FilterChip({
             className={
                 active
                     ? 'px-2 py-0.5 text-[11px] rounded-full bg-slate-900 text-white'
-                    : 'px-2 py-0.5 text-[11px] rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    : 'px-2 py-0.5 text-[11px] rounded-full bg-slate-100 text-ink-soft hover:bg-canvas'
             }
         >
             {label}
@@ -150,11 +150,11 @@ function SubscribedEventRow({ item }: { item: SubscribedEventItem }) {
         <li className="px-3 py-2">
             <Link
                 to={`/event/${item.event_id}`}
-                className="block text-sm font-medium text-slate-900 hover:text-blue-600 truncate"
+                className="block text-sm font-medium text-ink hover:text-action truncate"
             >
                 {item.title}
             </Link>
-            <p className="text-xs text-slate-500">{dateLabel}</p>
+            <p className="text-xs text-ink-soft">{dateLabel}</p>
             <ViaList via={item.via} />
         </li>
     );
@@ -163,7 +163,7 @@ function SubscribedEventRow({ item }: { item: SubscribedEventItem }) {
 function ViaList({ via }: { via: SubscribedEventItem['via'] }) {
     if (!via || via.length === 0) return null;
     return (
-        <p className="mt-0.5 text-[11px] text-slate-400 truncate">
+        <p className="mt-0.5 text-[11px] text-muted truncate">
             {via.map((v, i) => {
                 const verb =
                     v.kind === 'subscription_going' ? 'is going' : 'added';
@@ -173,7 +173,7 @@ function ViaList({ via }: { via: SubscribedEventItem['via'] }) {
                         {i > 0 ? ' · ' : ''}
                         <Link
                             to={`/u/${v.actor.handle}`}
-                            className="hover:text-blue-600"
+                            className="hover:text-action"
                         >
                             {name}
                         </Link>{' '}

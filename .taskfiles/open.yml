@@ -60,7 +60,7 @@ tasks:
   shared:dev:
     desc: "Focus or open a tab on dev (http://localhost:5173) in your default
       Chrome profile (shared cookies)."
-    dotenv: ["config/base.env", "config/dev.env"]
+    dotenv: ["config/base.env", "scenarios/dev/config.env"]
     cmds:
       - task: _open
         vars:
@@ -121,7 +121,7 @@ tasks:
   isolated:dev:
     desc: "Open COUNT=N (default 1) isolated Chrome sessions on dev. Idempotent
       (focuses existing window). RESET_BROWSER=1 to wipe profile first."
-    dotenv: ["config/base.env", "config/dev.env"]
+    dotenv: ["config/base.env", "scenarios/dev/config.env"]
     cmds:
       - task: _open
         vars:

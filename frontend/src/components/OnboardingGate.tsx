@@ -6,7 +6,7 @@
  * which covers both "never onboarded" and "server bumped the wizard
  * version"), redirects to ``/onboarding/preferences?next=<current>``
  * exactly once per app load. Preferences is the first onboarding leg
- * (dance styles + reach); the local step follows so users pin a home
+ * (dance styles + international area); the optional local step follows
  * area after selecting tags.
  *
  * Bypassed when:

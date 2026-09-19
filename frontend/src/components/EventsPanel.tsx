@@ -531,14 +531,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             )}
 
             <div
-                className={`fixed top-0 right-0 h-full w-[720px] max-w-full bg-white shadow-lg border-l border-gray-200 z-50 transform transition-transform duration-200 ease-in-out flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-[720px] max-w-full bg-surface shadow-lg border-l border-line z-50 transform transition-transform duration-200 ease-in-out flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50 shrink-0">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas shrink-0">
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => loadEvents()}
-                            className={`text-gray-400 hover:text-gray-600 p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
+                            className={`text-muted hover:text-ink-soft p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
                             title="Refresh"
                             aria-label="Refresh"
                         >
@@ -547,10 +547,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                             </svg>
                         </button>
-                        <h2 className="text-xs font-semibold text-gray-800 uppercase tracking-wide">
+                        <h2 className="text-xs font-semibold text-ink uppercase tracking-wide">
                             {PRESET_TITLES[preset]}
                             {!loading && (
-                                <span className="ml-2 text-[10px] font-normal text-gray-400 normal-case">
+                                <span className="ml-2 text-[10px] font-normal text-muted normal-case">
                                     {total} event{total !== 1 ? 's' : ''}
                                 </span>
                             )}
@@ -558,7 +558,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1"
+                        className="text-muted hover:text-ink-soft text-sm leading-none p-1"
                         aria-label="Close"
                     >
                         ✕
@@ -566,14 +566,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 </div>
 
                 {/* Filter Bar */}
-                <div className="px-4 py-2 border-b border-gray-100 space-y-2 shrink-0">
+                <div className="px-4 py-2 border-b border-card-line space-y-2 shrink-0">
                     {/* Search */}
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search title, description, location…"
-                        className="w-full border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-700 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full border border-line px-2.5 py-1.5 text-[11px] text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                     />
 
                     {/* Filter Chips */}
@@ -584,7 +584,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 <select
                                     value={selectedCalendar}
                                     onChange={(e) => { setSelectedCalendar(e.target.value); setPage(0); }}
-                                    className="border border-gray-200 text-[10px] text-gray-600 px-1.5 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="border border-line text-[10px] text-ink-soft px-1.5 py-1 bg-surface focus:outline-none focus:ring-1 focus:ring-action"
                                 >
                                     <option value="">All calendars</option>
                                     {filterOptions.calendars.map((c) => (
@@ -604,8 +604,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                         setPage(0);
                                     }}
                                     className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedReviewStatus === rs.value
-                                        ? 'bg-blue-50 border-blue-300 text-blue-700'
-                                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                        ? 'bg-blue-50 border-blue-300 text-action'
+                                        : 'bg-surface border-line text-ink-soft hover:bg-canvas'
                                         }`}
                                 >
                                     {rs.label} ({rs.count})
@@ -621,8 +621,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                         setPage(0);
                                     }}
                                     className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedGeoStatus === gs.value
-                                        ? 'bg-blue-50 border-blue-300 text-blue-700'
-                                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                        ? 'bg-blue-50 border-blue-300 text-action'
+                                        : 'bg-surface border-line text-ink-soft hover:bg-canvas'
                                         }`}
                                 >
                                     {gs.label} ({gs.count})
@@ -634,7 +634,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 <select
                                     value={selectedTagIds}
                                     onChange={(e) => { setSelectedTagIds(e.target.value); setPage(0); }}
-                                    className="border border-gray-200 text-[10px] text-gray-600 px-1.5 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="border border-line text-[10px] text-ink-soft px-1.5 py-1 bg-surface focus:outline-none focus:ring-1 focus:ring-action"
                                 >
                                     <option value="">All tags</option>
                                     {filterOptions.tags.map((t) => (
@@ -649,8 +649,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             <button
                                 onClick={() => { setHidePast((v) => !v); setPage(0); }}
                                 className={`text-[10px] font-medium px-2 py-0.5 border transition ${!hidePast
-                                    ? 'bg-blue-50 border-blue-300 text-blue-700'
-                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    ? 'bg-blue-50 border-blue-300 text-action'
+                                    : 'bg-surface border-line text-ink-soft hover:bg-canvas'
                                     }`}
                                 title={hidePast ? 'Past events hidden. Click to show them.' : 'Including past events. Click to hide them.'}
                             >
@@ -665,8 +665,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedVisibility === v
                                         ? v === 'hidden'
                                             ? 'bg-amber-100 border-amber-400 text-amber-800'
-                                            : 'bg-slate-200 border-slate-400 text-slate-800'
-                                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                            : 'bg-slate-200 border-line text-ink'
+                                        : 'bg-surface border-line text-ink-soft hover:bg-canvas'
                                         }`}
                                 >
                                     {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -678,25 +678,25 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
 
                 {/* Message */}
                 {message && (
-                    <div className="px-4 py-1.5 bg-blue-50 border-b border-blue-100 text-[11px] text-blue-700 shrink-0 flex items-center justify-between">
+                    <div className="px-4 py-1.5 bg-blue-50 border-b border-blue-100 text-[11px] text-action shrink-0 flex items-center justify-between">
                         <span>{message}</span>
-                        <button onClick={() => setMessage('')} className="text-blue-400 hover:text-blue-600 ml-2">✕</button>
+                        <button onClick={() => setMessage('')} className="text-blue-400 hover:text-action ml-2">✕</button>
                     </div>
                 )}
 
                 {/* Table */}
                 <div className="flex-1 overflow-y-auto">
                     {loading && events.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-gray-400">
+                        <div className="flex items-center justify-center h-full text-muted">
                             <p className="text-xs">Loading…</p>
                         </div>
                     ) : events.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-gray-400">
+                        <div className="flex items-center justify-center h-full text-muted">
                             <p className="text-xs">No events match your filters.</p>
                         </div>
                     ) : (
                         <table className="w-full text-[11px]">
-                            <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
+                            <thead className="sticky top-0 bg-canvas border-b border-line z-10">
                                 <tr>
                                     <th className="w-8 px-2 py-2 text-left">
                                         <input
@@ -706,11 +706,11 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                             className="h-3 w-3"
                                         />
                                     </th>
-                                    <th className="px-2 py-2 text-left font-semibold text-gray-600 uppercase tracking-wide">Title</th>
-                                    <th className="px-2 py-2 text-left font-semibold text-gray-600 uppercase tracking-wide w-24">Date</th>
-                                    <th className="px-2 py-2 text-left font-semibold text-gray-600 uppercase tracking-wide w-20">Status</th>
-                                    <th className="px-2 py-2 text-center font-semibold text-gray-600 uppercase tracking-wide w-10">Geo</th>
-                                    <th className="px-2 py-2 text-left font-semibold text-gray-600 uppercase tracking-wide w-24">Tags</th>
+                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide">Title</th>
+                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Date</th>
+                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-20">Status</th>
+                                    <th className="px-2 py-2 text-center font-semibold text-ink-soft uppercase tracking-wide w-10">Geo</th>
+                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Tags</th>
                                     <th className="px-2 py-2 w-16"></th>
                                 </tr>
                             </thead>
@@ -719,12 +719,12 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     <tr
                                         key={event.event_id}
                                         className={`hover:bg-opacity-80 transition cursor-pointer ${event.is_blocked
-                                            ? 'bg-slate-100 hover:bg-slate-200/70'
+                                            ? 'bg-slate-100 hover:bg-canvas/70'
                                             : event.is_hidden
                                                 ? 'bg-amber-50 hover:bg-amber-100/70'
                                                 : selectedIds.has(event.event_id)
                                                     ? 'bg-blue-50/30'
-                                                    : 'hover:bg-gray-50/50'
+                                                    : 'hover:bg-canvas/50'
                                             }`}
                                         onClick={() => setAdminDetailEventId(event.event_id)}
                                     >
@@ -744,17 +744,17 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                                         style={{ backgroundColor: event.color }}
                                                     />
                                                 )}
-                                                <span className="truncate font-medium text-gray-800 max-w-[260px]">
+                                                <span className="truncate font-medium text-ink max-w-[260px]">
                                                     {event.title}
                                                 </span>
                                             </div>
                                             {event.location && (
-                                                <p className="text-[10px] text-gray-400 truncate max-w-[260px] mt-0.5">
+                                                <p className="text-[10px] text-muted truncate max-w-[260px] mt-0.5">
                                                     {event.location}
                                                 </p>
                                             )}
                                         </td>
-                                        <td className="px-2 py-1.5 text-gray-500 whitespace-nowrap">
+                                        <td className="px-2 py-1.5 text-ink-soft whitespace-nowrap">
                                             {formatDate(event.start)}
                                         </td>
                                         <td className="px-2 py-1.5">
@@ -762,13 +762,13 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                                 <span
                                                     className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${event.review_status === 'pending'
                                                         ? 'bg-amber-50 text-amber-700'
-                                                        : 'bg-emerald-50 text-emerald-700'
+                                                        : 'bg-emerald-50 text-success'
                                                         }`}
                                                 >
                                                     {event.review_status ?? 'reviewed'}
                                                 </span>
                                                 {event.is_blocked && (
-                                                    <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-slate-200 text-slate-700">Blocked</span>
+                                                    <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-slate-200 text-ink">Blocked</span>
                                                 )}
                                                 {event.is_hidden && !event.is_blocked && (
                                                     <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700">Hidden</span>
@@ -788,13 +788,13 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                                 {event.tags.slice(0, 2).map((t) => (
                                                     <span
                                                         key={t.id}
-                                                        className="text-[9px] px-1 py-0 bg-gray-100 text-gray-500 truncate max-w-[60px]"
+                                                        className="text-[9px] px-1 py-0 bg-gray-100 text-ink-soft truncate max-w-[60px]"
                                                     >
                                                         {t.label}
                                                     </span>
                                                 ))}
                                                 {event.tags.length > 2 && (
-                                                    <span className="text-[9px] text-gray-400">+{event.tags.length - 2}</span>
+                                                    <span className="text-[9px] text-muted">+{event.tags.length - 2}</span>
                                                 )}
                                             </div>
                                         </td>
@@ -802,7 +802,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                             {event.review_status === 'pending' && (
                                                 <button
                                                     onClick={() => handleSingleReview(event.event_id)}
-                                                    className="text-[10px] text-blue-600 hover:text-blue-800 font-medium"
+                                                    className="text-[10px] text-action hover:text-blue-800 font-medium"
                                                     title="Mark reviewed"
                                                 >
                                                     ✓
@@ -818,22 +818,22 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-2 border-t border-gray-200 bg-gray-50 shrink-0">
-                        <span className="text-[10px] text-gray-400">
+                    <div className="flex items-center justify-between px-4 py-2 border-t border-line bg-canvas shrink-0">
+                        <span className="text-[10px] text-muted">
                             {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
                         </span>
                         <div className="flex gap-1">
                             <button
                                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                                 disabled={page === 0}
-                                className="text-[10px] px-2 py-1 border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 transition"
+                                className="text-[10px] px-2 py-1 border border-line text-ink-soft hover:bg-canvas disabled:opacity-40 transition"
                             >
                                 ← Prev
                             </button>
                             <button
                                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                                 disabled={page >= totalPages - 1}
-                                className="text-[10px] px-2 py-1 border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 transition"
+                                className="text-[10px] px-2 py-1 border border-line text-ink-soft hover:bg-canvas disabled:opacity-40 transition"
                             >
                                 Next →
                             </button>
@@ -868,8 +868,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
 
                 {/* Bulk Tag Picker */}
                 {bulkTagPickerOpen && (
-                    <div className="px-4 py-2.5 border-t border-blue-200 bg-white shrink-0">
-                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Assign tags to {selectedIds.size} event(s)</p>
+                    <div className="px-4 py-2.5 border-t border-blue-200 bg-surface shrink-0">
+                        <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide mb-2">Assign tags to {selectedIds.size} event(s)</p>
                         <div className="mb-2 max-h-64 overflow-y-auto">
                             <TagsPicker
                                 tagGroups={tagGroups}
@@ -883,13 +883,13 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             <button
                                 onClick={handleBulkAssignTags}
                                 disabled={bulkTagIds.length === 0 || !!busy}
-                                className="text-[10px] font-medium px-2.5 py-1 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition"
+                                className="text-[10px] font-medium px-2.5 py-1 bg-action text-white hover:bg-action-strong disabled:opacity-50 transition"
                             >
                                 {busy === 'bulk-tags' ? 'Applying…' : `Apply ${bulkTagIds.length > 0 ? `(${bulkTagIds.length})` : ''}`}
                             </button>
                             <button
                                 onClick={() => { setBulkTagPickerOpen(false); setBulkTagIds([]); }}
-                                className="text-[10px] text-gray-500 hover:text-gray-700"
+                                className="text-[10px] text-ink-soft hover:text-ink"
                             >
                                 Cancel
                             </button>
@@ -899,8 +899,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
 
                 {/* Group-as-series title entry */}
                 {seriesTitlePickerOpen && (
-                    <div className="px-4 py-2.5 border-t border-teal-200 bg-white shrink-0 space-y-2">
-                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="px-4 py-2.5 border-t border-teal-200 bg-surface shrink-0 space-y-2">
+                        <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">
                             Group {selectedIds.size} event(s) into a series
                         </p>
                         <input
@@ -909,7 +909,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             onChange={(e) => setSeriesTitleDraft(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmGroupAsSeries(); }}
                             placeholder="Series title"
-                            className="w-full text-[11px] border border-gray-300 px-2 py-1"
+                            className="w-full text-[11px] border border-line px-2 py-1"
                         />
                         <div className="flex gap-2">
                             <button
@@ -921,7 +921,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             </button>
                             <button
                                 onClick={() => { setSeriesTitlePickerOpen(false); setSeriesTitleDraft(''); }}
-                                className="text-[10px] text-gray-500 hover:text-gray-700"
+                                className="text-[10px] text-ink-soft hover:text-ink"
                             >
                                 Cancel
                             </button>
@@ -931,8 +931,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
 
                 {/* Add-to-series picker */}
                 {addSeriesPickerOpen && (
-                    <div className="px-4 py-2.5 border-t border-purple-200 bg-white shrink-0 space-y-2">
-                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="px-4 py-2.5 border-t border-purple-200 bg-surface shrink-0 space-y-2">
+                        <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">
                             Add {selectedIds.size} event(s) to an existing series
                         </p>
                         <input
@@ -940,30 +940,30 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             value={seriesSearch}
                             onChange={(e) => setSeriesSearch(e.target.value)}
                             placeholder="Search series by title…"
-                            className="w-full text-[11px] border border-gray-300 px-2 py-1"
+                            className="w-full text-[11px] border border-line px-2 py-1"
                         />
                         {seriesSearch.trim().length >= 3 && (
-                            <div className="max-h-40 overflow-y-auto border border-gray-200 bg-white">
+                            <div className="max-h-40 overflow-y-auto border border-line bg-surface">
                                 {seriesSearchLoading ? (
-                                    <p className="px-2 py-2 text-[10px] text-gray-500">Searching…</p>
+                                    <p className="px-2 py-2 text-[10px] text-ink-soft">Searching…</p>
                                 ) : seriesSearchResults.length === 0 ? (
-                                    <p className="px-2 py-2 text-[10px] text-gray-500">No series found.</p>
+                                    <p className="px-2 py-2 text-[10px] text-ink-soft">No series found.</p>
                                 ) : seriesSearchResults.map((s) => (
                                     <button
                                         key={s.id}
                                         onClick={() => handleAddToSeries(s.id)}
                                         disabled={!!busy}
-                                        className="flex w-full items-center justify-between gap-2 border-b border-gray-100 px-2 py-1.5 text-left last:border-b-0 hover:bg-purple-50 disabled:opacity-50"
+                                        className="flex w-full items-center justify-between gap-2 border-b border-card-line px-2 py-1.5 text-left last:border-b-0 hover:bg-purple-50 disabled:opacity-50"
                                     >
-                                        <span className="min-w-0 flex-1 truncate text-[11px] text-gray-700">{s.canonical_title}</span>
-                                        <span className="text-[10px] text-gray-400">{s.events.length} event(s) · {s.status}</span>
+                                        <span className="min-w-0 flex-1 truncate text-[11px] text-ink">{s.canonical_title}</span>
+                                        <span className="text-[10px] text-muted">{s.events.length} event(s) · {s.status}</span>
                                     </button>
                                 ))}
                             </div>
                         )}
                         <button
                             onClick={() => { setAddSeriesPickerOpen(false); setSeriesSearch(''); setSeriesSearchResults([]); }}
-                            className="text-[10px] text-gray-500 hover:text-gray-700"
+                            className="text-[10px] text-ink-soft hover:text-ink"
                         >
                             Cancel
                         </button>
@@ -974,10 +974,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 {seriesGroupResult && (
                     <div className="px-4 py-2.5 border-t border-emerald-200 bg-emerald-50/40 shrink-0">
                         <div className="flex items-center justify-between mb-2">
-                            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">Series created</p>
+                            <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">Series created</p>
                             <button
                                 onClick={() => setSeriesGroupResult(null)}
-                                className="text-[10px] text-gray-400 hover:text-gray-600"
+                                className="text-[10px] text-muted hover:text-ink-soft"
                             >
                                 Hide
                             </button>
@@ -997,10 +997,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 {duplicateGroupResult && (
                     <div className="px-4 py-2.5 border-t border-orange-200 bg-orange-50/40 shrink-0">
                         <div className="flex items-center justify-between mb-2">
-                            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">Flagged as duplicates</p>
+                            <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">Flagged as duplicates</p>
                             <button
                                 onClick={() => setDuplicateGroupResult(null)}
-                                className="text-[10px] text-gray-400 hover:text-gray-600"
+                                className="text-[10px] text-muted hover:text-ink-soft"
                             >
                                 Hide
                             </button>
@@ -1017,28 +1017,28 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
 
                 {/* Curate-to-Lists Picker */}
                 {curatePickerOpen && (
-                    <div className="px-4 py-2.5 border-t border-indigo-200 bg-white shrink-0 space-y-2">
-                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="px-4 py-2.5 border-t border-indigo-200 bg-surface shrink-0 space-y-2">
+                        <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">
                             Curate {selectedIds.size} event(s) to admin-managed lists
                         </p>
                         <div className="flex flex-wrap items-center gap-2">
-                            <label className="text-[10px] text-gray-600 flex items-center gap-1">
+                            <label className="text-[10px] text-ink-soft flex items-center gap-1">
                                 List:
                                 <select
                                     value={curateKind}
                                     onChange={(e) => setCurateKind(e.target.value as AdminBulkEngagementKind)}
-                                    className="text-[10px] border border-gray-300 px-1 py-0.5"
+                                    className="text-[10px] border border-line px-1 py-0.5"
                                 >
                                     <option value="save">Saved</option>
                                     <option value="going">Going</option>
                                 </select>
                             </label>
-                            <label className="text-[10px] text-gray-600 flex items-center gap-1">
+                            <label className="text-[10px] text-ink-soft flex items-center gap-1">
                                 Audience:
                                 <select
                                     value={curateAudience}
                                     onChange={(e) => setCurateAudience(e.target.value as AdminBulkEngagementAudience | '')}
-                                    className="text-[10px] border border-gray-300 px-1 py-0.5"
+                                    className="text-[10px] border border-line px-1 py-0.5"
                                     title="Per-row audience. Defaults to each target's profile setting when blank."
                                 >
                                     <option value="">target default</option>
@@ -1048,41 +1048,41 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 </select>
                             </label>
                         </div>
-                        <div className="max-h-28 overflow-y-auto border border-gray-200 bg-white">
+                        <div className="max-h-28 overflow-y-auto border border-line bg-surface">
                             {managedUsers.length === 0 ? (
-                                <p className="px-2 py-2 text-[10px] text-gray-500">No admin-managed users yet.</p>
+                                <p className="px-2 py-2 text-[10px] text-ink-soft">No admin-managed users yet.</p>
                             ) : managedUsers.map((u) => {
                                 const handle = u.handle ?? '';
                                 const active = selectedCurateHandles.has(handle);
                                 return (
-                                    <label key={u.user_id} className="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-2 py-1.5 last:border-b-0 hover:bg-gray-50">
+                                    <label key={u.user_id} className="flex cursor-pointer items-center gap-2 border-b border-card-line px-2 py-1.5 last:border-b-0 hover:bg-canvas">
                                         <input
                                             type="checkbox"
                                             checked={active}
                                             onChange={() => handleToggleCurateHandle(handle)}
                                             className="h-3 w-3"
                                         />
-                                        <span className="min-w-0 flex-1 truncate text-[11px] text-gray-700">
+                                        <span className="min-w-0 flex-1 truncate text-[11px] text-ink">
                                             @{handle}{u.managed_label ? ` - ${u.managed_label}` : ''}
                                         </span>
                                     </label>
                                 );
                             })}
                         </div>
-                        <p className="text-[10px] text-gray-500">
+                        <p className="text-[10px] text-ink-soft">
                             Only admin-managed users are listed. No notifications are fanned out.
                         </p>
                         <div className="flex gap-2">
                             <button
                                 onClick={handleBulkCurate}
                                 disabled={!!busy || selectedCurateHandles.size === 0}
-                                className="text-[10px] font-medium px-2.5 py-1 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition"
+                                className="text-[10px] font-medium px-2.5 py-1 bg-action text-white hover:bg-action disabled:opacity-50 transition"
                             >
                                 {busy === 'bulk-curate' ? 'Curating…' : 'Apply'}
                             </button>
                             <button
                                 onClick={() => { setCuratePickerOpen(false); setSelectedCurateHandles(new Set()); }}
-                                className="text-[10px] text-gray-500 hover:text-gray-700"
+                                className="text-[10px] text-ink-soft hover:text-ink"
                             >
                                 Cancel
                             </button>
@@ -1093,7 +1093,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 {/* Bulk Action Bar */}
                 {selectedIds.size > 0 && (
                     <div className="flex items-center gap-2 px-4 py-2 border-t border-blue-200 bg-blue-50 shrink-0">
-                        <span className="text-[10px] font-medium text-blue-700">
+                        <span className="text-[10px] font-medium text-action">
                             {selectedIds.size} selected
                         </span>
                         <div className="flex-1" />
@@ -1115,7 +1115,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                         <button
                             onClick={handleBulkReview}
                             disabled={!!busy}
-                            className="text-[10px] font-medium px-2 py-1 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition"
+                            className="text-[10px] font-medium px-2 py-1 bg-action text-white hover:bg-action-strong disabled:opacity-50 transition"
                         >
                             {busy === 'bulk-review' ? 'Reviewing…' : 'Mark Reviewed'}
                         </button>
@@ -1129,7 +1129,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                         <button
                             onClick={handleBulkSuggestTags}
                             disabled={!!busy}
-                            className="text-[10px] font-medium px-2 py-1 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                            className="text-[10px] font-medium px-2 py-1 bg-success text-white hover:bg-success/90 disabled:opacity-50 transition"
                             title="Run the heuristic tag suggester on the selected events. Suggestions land as pending — review in the Tag Suggestions panel."
                         >
                             {busy === 'bulk-suggest-tags' ? 'Suggesting…' : 'Auto-suggest Tags'}
@@ -1160,7 +1160,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                         </button>
                         <button
                             onClick={() => { setSelectedIds(new Set()); setAllMatchingSelected(false); setBulkTagPickerOpen(false); }}
-                            className="text-[10px] text-gray-500 hover:text-gray-700 px-1"
+                            className="text-[10px] text-ink-soft hover:text-ink px-1"
                         >
                             Clear
                         </button>

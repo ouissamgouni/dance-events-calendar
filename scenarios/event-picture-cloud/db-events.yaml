@@ -1,0 +1,35 @@
+base_week: 0
+events:
+  # Reuses the raw sources from the dev scenario via the images/ fallback
+  # chain, so only one copy of each test picture lives in the repo.
+  - id: evt-picture-cloud-001
+    calendar_id: picture-cloud-cal-001
+    title: Cloud Upload Check — Salsa Social
+    description: |
+      Seeded through the real Cloudflare R2 bucket on first boot.
+    location: Sala Grande, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: evt-picture-cloud-002
+    calendar_id: picture-cloud-cal-001
+    title: Cloud Upload Check — Bachata Night
+    description: |
+      Second event for exercising replace/remove against R2.
+    location: Club Vertical, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 22:00
+    end: w0 Sun 03:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local

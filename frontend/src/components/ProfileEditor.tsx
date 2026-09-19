@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react';
+import { useRef } from 'react';
 import type { PreferredAreaPayload } from '../api';
 import type { TagGroup } from '../types';
 import { DEFAULT_AREA_BBOX, isWideArea } from '../constants/area';
 import { useAreaEventPreview } from '../hooks/useAreaEventPreview';
+import { useScrollDots } from '../hooks/useScrollDots';
+import { REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS } from '../utils/reach';
 import AreaMapPicker from './AreaMapPicker';
 import RailEventCard from './RailEventCard';
+import ScrollDotsIndicator from './ScrollDots';
 import TagsPicker, { type TagsPickerValue } from './TagsPicker';
 
 const GUARDRAIL_MESSAGE =
@@ -81,6 +85,22 @@ export default function ProfileEditor({
 }: Props) {
     const danceIds = danceValue.selectedTagIds;
     const reachIds = reachValue.selectedTagIds;
+    const regionalReachId = reachGroup?.tags.find((tag) => tag.slug === 'regional')?.id;
+    const internationalReachId = reachGroup?.tags.find((tag) => tag.slug === 'international')?.id;
+    const selectedReach = regionalReachId != null && reachIds.includes(regionalReachId)
+        ? 'regional_plus'
+        : internationalReachId != null && reachIds.includes(internationalReachId)
+            ? 'international'
+            : 'any';
+
+    const selectReach = (choice: 'any' | 'regional_plus' | 'international') => {
+        const selectedTagIds = choice === 'any'
+            ? []
+            : choice === 'international'
+                ? [internationalReachId].filter((id): id is number => id != null)
+                : [regionalReachId, internationalReachId].filter((id): id is number => id != null);
+        onReachChange({ selectedTagIds, freeTexts: {} });
+    };
 
     const { previewEvents, previewMarkers, areaTrail } = useAreaEventPreview({
         danceGroup,
@@ -97,18 +117,21 @@ export default function ProfileEditor({
         reachIds.length === 0 || (localTagId != null && reachIds.includes(localTagId));
     const showGuardrailHint = draftIsWide && draftReachIncludesLocalOrEmpty;
 
+    const areaScrollerRef = useRef<HTMLDivElement>(null);
+    const areaDots = useScrollDots(areaScrollerRef, [areaTrail.length]);
+
     return (
         <div className="space-y-3">
             {showTagPickers ? (
                 <>
                     <section>
-                        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                             Dance styles
                         </label>
                         {tagsLoading ? (
-                            <p className="text-sm text-slate-400">Loading tags…</p>
+                            <p className="text-sm text-muted">Loading tags…</p>
                         ) : !danceGroup ? (
-                            <p className="text-sm text-slate-500">No dance-style tags are available yet.</p>
+                            <p className="text-sm text-ink-soft">No dance-style tags are available yet.</p>
                         ) : (
                             <TagsPicker
                                 tagGroups={[danceGroup]}
@@ -121,22 +144,30 @@ export default function ProfileEditor({
                         )}
                     </section>
                     <section>
-                        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                            Event scale
+                        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                            Event reach
                         </label>
                         {tagsLoading ? (
-                            <p className="text-sm text-slate-400">Loading…</p>
+                            <p className="text-sm text-muted">Loading…</p>
                         ) : !reachGroup ? (
-                            <p className="text-sm text-slate-500">No reach tags are available yet.</p>
+                            <p className="text-sm text-ink-soft">No reach tags are available yet.</p>
                         ) : (
-                            <TagsPicker
-                                tagGroups={[reachGroup]}
-                                value={reachValue}
-                                onChange={onReachChange}
-                                allowFreeText={false}
-                                searchable={false}
-                                hideGroupLabels
-                            />
+                            <div role="group" aria-label="Event reach" className="grid grid-cols-3 border border-line">
+                                {(['any', 'regional_plus', 'international'] as const).map((choice) => (
+                                    <button
+                                        key={choice}
+                                        type="button"
+                                        aria-pressed={selectedReach === choice}
+                                        onClick={() => selectReach(choice)}
+                                        className={selectedReach === choice
+                                            ? 'flex min-h-14 flex-col items-center justify-center gap-1 bg-blue-50 px-2 text-xs font-semibold text-action'
+                                            : 'flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-semibold text-ink'}
+                                    >
+                                        <img src={REACH_FILTER_ICON_SRC[choice]} alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
+                                        {REACH_FILTER_LABELS[choice]}
+                                    </button>
+                                ))}
+                            </div>
                         )}
                     </section>
                 </>
@@ -153,7 +184,7 @@ export default function ProfileEditor({
                     markers={previewMarkers}
                     controlsStart={areaNameControl}
                 />
-                {saving && <p className="mt-1 text-[11px] text-slate-400">Saving…</p>}
+                {saving && <p className="mt-1 text-[11px] text-muted">Saving…</p>}
             </section>
 
             {showGuardrailHint && (
@@ -163,17 +194,17 @@ export default function ProfileEditor({
             )}
 
             <section>
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                     In your area
                 </span>
                 {previewEvents === null ? (
-                    danceIds.length > 0 ? <p className="text-xs text-slate-400">Finding events…</p> : null
+                    danceIds.length > 0 ? <p className="text-xs text-muted">Finding events…</p> : null
                 ) : areaTrail.length === 0 ? (
-                    <p className="border border-slate-200 bg-slate-50 px-3 py-4 text-xs text-slate-600">
+                    <p className="border border-line bg-canvas px-3 py-4 text-xs text-ink-soft">
                         No upcoming events in this area yet — turn on alerts below and we'll email you the moment one appears.
                     </p>
                 ) : (
-                    <div className="-mx-1 flex snap-x gap-2 overflow-x-auto scrollbar-hide px-1 pb-1">
+                    <div ref={areaScrollerRef} className="-mx-1 flex snap-x gap-2 overflow-x-auto scrollbar-hide px-1 pb-1">
                         {areaTrail.slice(0, AREA_SAMPLE_CARDS).map((ev) => (
                             <RailEventCard
                                 key={ev.event_id}
@@ -192,11 +223,17 @@ export default function ProfileEditor({
                         ))}
                     </div>
                 )}
+                <ScrollDotsIndicator
+                    count={areaDots.dotCount}
+                    activeIndex={areaDots.activeIndex}
+                    onSelect={areaDots.scrollToIndex}
+                    label="In your area scroll position"
+                />
             </section>
 
             {showMatchesToggle && (
-                <section className="border border-slate-200 bg-slate-50 p-3">
-                    <label className="flex items-start gap-2 text-sm text-slate-800">
+                <section className="border border-line bg-canvas p-3">
+                    <label className="flex items-start gap-2 text-sm text-ink">
                         <input
                             type="checkbox"
                             checked={matchesEnabled}
@@ -205,7 +242,7 @@ export default function ProfileEditor({
                         />
                         <span>
                             <span className="block font-medium text-sm">{matchesLabel}</span>
-                            <span className="mt-0.5 block text-xs text-slate-500">{matchesHint}</span>
+                            <span className="mt-0.5 block text-xs text-ink-soft">{matchesHint}</span>
                         </span>
                     </label>
                 </section>

@@ -5,6 +5,8 @@ interface Props {
     compact?: boolean;
     /** Tailwind line-clamp class. Defaults to line-clamp-6. */
     clampClass?: string;
+    /** When set, the whole preview opens another view instead of expanding inline. */
+    onOpen?: () => void;
 }
 
 /**
@@ -16,6 +18,7 @@ export default function ExpandableDescription({
     text,
     compact = false,
     clampClass = 'line-clamp-6',
+    onOpen,
 }: Props) {
     const [expanded, setExpanded] = useState(false);
     const [overflowing, setOverflowing] = useState(false);
@@ -39,14 +42,31 @@ export default function ExpandableDescription({
         return () => window.removeEventListener('resize', onResize);
     }, [expanded]);
 
+    const description = (
+        <div
+            ref={ref}
+            className={`whitespace-pre-line leading-relaxed text-ink-soft ${compact ? 'text-xs' : 'text-sm'} ${expanded ? '' : clampClass}`}
+        >
+            {text}
+        </div>
+    );
+
+    if (onOpen) {
+        return (
+            <button type="button" onClick={onOpen} className="block w-full text-left">
+                {description}
+                {overflowing && (
+                    <span className="mt-1 block text-sm font-medium text-action hover:underline">
+                        …more
+                    </span>
+                )}
+            </button>
+        );
+    }
+
     return (
         <div>
-            <div
-                ref={ref}
-                className={`whitespace-pre-line leading-relaxed text-slate-600 ${compact ? 'text-xs' : 'text-sm'} ${expanded ? '' : clampClass}`}
-            >
-                {text}
-            </div>
+            {description}
             {(overflowing || expanded) && (
                 <button
                     type="button"

@@ -42,7 +42,7 @@ export default function SubscribersPanel() {
     if (items === null && !error) return null;
     if (error) {
         return (
-            <div className="border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <div className="border border-line bg-canvas p-3 text-sm text-ink">
                 {error}
             </div>
         );
@@ -50,8 +50,8 @@ export default function SubscribersPanel() {
     if (!items || items.length === 0) return null;
 
     return (
-        <section className="border border-slate-200 bg-white">
-            <div className="px-3 py-2 border-b border-slate-100 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <section className="border border-line bg-surface">
+            <div className="px-3 py-2 border-b border-card-line text-xs font-medium uppercase tracking-wide text-ink-soft">
                 Subscribers to your calendar
             </div>
             <ul className="divide-y divide-slate-100">
@@ -67,14 +67,14 @@ export default function SubscribersPanel() {
                                     className="w-8 h-8 rounded-full object-cover bg-slate-100"
                                 />
                             ) : (
-                                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-semibold">
+                                <div className="w-8 h-8 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-sm font-semibold">
                                     {initial}
                                 </div>
                             )}
                             <div className="min-w-0 flex-1">
                                 <Link
                                     to={`/u/${s.handle}`}
-                                    className="block truncate text-sm font-medium text-slate-900 hover:text-blue-600"
+                                    className="block truncate text-sm font-medium text-ink hover:text-action"
                                 >
                                     {name}
                                     {s.is_verified_organizer && (
@@ -87,7 +87,7 @@ export default function SubscribersPanel() {
                                         />
                                     )}
                                 </Link>
-                                <div className="text-xs text-slate-500 truncate">
+                                <div className="text-xs text-ink-soft truncate">
                                     @{s.handle}
                                 </div>
                             </div>

@@ -10,13 +10,13 @@ export default function Privacy() {
             <Helmet>
                 <title>Politique de confidentialité – Movida</title>
             </Helmet>
-            <div className="max-w-3xl mx-auto px-4 py-8 text-slate-800">
-                <Link to="/" className="text-sm text-blue-600 hover:underline mb-4 inline-block">
+            <div className="max-w-3xl mx-auto px-4 py-8 text-ink">
+                <Link to="/" className="text-sm text-action hover:underline mb-4 inline-block">
                     ← Retour
                 </Link>
 
                 <h1 className="text-2xl font-bold mb-6">Politique de confidentialité</h1>
-                <p className="text-sm text-slate-500 mb-8">Dernière mise à jour : juillet 2025</p>
+                <p className="text-sm text-ink-soft mb-8">Dernière mise à jour : juillet 2025</p>
 
                 <section className="mb-8">
                     <h2 className="text-lg font-semibold mb-3">1. Qui sommes-nous ?</h2>
@@ -133,11 +133,11 @@ export default function Privacy() {
                     </p>
                 </section>
 
-                <hr className="my-8 border-slate-200" />
+                <hr className="my-8 border-line" />
 
                 {/* English version */}
                 <h1 className="text-2xl font-bold mb-6">Privacy Policy</h1>
-                <p className="text-sm text-slate-500 mb-8">Last updated: July 2025</p>
+                <p className="text-sm text-ink-soft mb-8">Last updated: July 2025</p>
 
                 <section className="mb-8">
                     <h2 className="text-lg font-semibold mb-3">1. Who are we?</h2>

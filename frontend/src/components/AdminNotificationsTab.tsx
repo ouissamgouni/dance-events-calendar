@@ -12,12 +12,12 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const CHANNEL_BADGE: Record<string, string> = {
-    app: 'inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700',
-    email: 'inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700',
+    app: 'inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-ink',
+    email: 'inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-action',
     push: 'inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700',
 };
 const CHANNEL_BADGE_FALLBACK =
-    'inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600';
+    'inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-ink-soft';
 const CHANNEL_LABELS: Record<string, string> = {
     app: 'App',
     email: 'Email',
@@ -39,13 +39,13 @@ function ChannelBadge({ channel }: { channel: string }) {
 function AboutCell({ row }: { row: NotificationLogEntry }) {
     return (
         <div className="max-w-[24rem]">
-            <p className="text-slate-700">{row.summary}</p>
+            <p className="text-ink">{row.summary}</p>
             {row.event_id && (
                 <Link
                     to={`/event/${row.event_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
+                    className="text-action hover:underline"
                 >
                     View event ↗
                 </Link>
@@ -116,7 +116,7 @@ export default function AdminNotificationsTab() {
         <section className="space-y-4">
             <header className="flex flex-wrap items-center gap-3">
                 <h2 className="text-lg font-semibold">Notifications</h2>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-ink-soft">
                     {loading ? 'Loading…' : `${total.toLocaleString()} total`}
                 </span>
             </header>
@@ -130,7 +130,7 @@ export default function AdminNotificationsTab() {
                         setOffset(0);
                     }}
                     placeholder="Search recipient handle, name, email"
-                    className="w-40 border border-slate-300 px-2 py-1 text-xs"
+                    className="w-40 border border-line px-2 py-1 text-xs"
                     aria-label="Search notifications by recipient"
                 />
                 <label className="flex items-center gap-1.5">
@@ -138,7 +138,7 @@ export default function AdminNotificationsTab() {
                     <select
                         value={type}
                         onChange={(e) => setType(e.target.value as NotificationLogType | '')}
-                        className="border border-slate-300 px-2 py-1 text-xs"
+                        className="border border-line px-2 py-1 text-xs"
                         aria-label="Filter by notification type"
                     >
                         <option value="">Any</option>
@@ -153,7 +153,7 @@ export default function AdminNotificationsTab() {
                     <select
                         value={channel}
                         onChange={(e) => setChannel(e.target.value as NotificationLogChannel | '')}
-                        className="border border-slate-300 px-2 py-1 text-xs"
+                        className="border border-line px-2 py-1 text-xs"
                         aria-label="Filter by delivery channel"
                     >
                         <option value="">Any</option>
@@ -165,14 +165,14 @@ export default function AdminNotificationsTab() {
             </div>
 
             {error && (
-                <div className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                <div className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-danger">
                     {error}
                 </div>
             )}
 
-            <div className="overflow-x-auto border border-slate-200">
+            <div className="overflow-x-auto border border-line">
                 <table className="w-full text-xs">
-                    <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                    <thead className="bg-canvas text-left text-xs uppercase text-ink-soft">
                         <tr>
                             <th className="px-3 py-2">Date/time</th>
                             <th className="px-3 py-2">User</th>
@@ -184,14 +184,14 @@ export default function AdminNotificationsTab() {
                     <tbody>
                         {!loading && rows.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
+                                <td colSpan={5} className="px-3 py-8 text-center text-ink-soft">
                                     No notifications match these filters.
                                 </td>
                             </tr>
                         )}
                         {rows.map((row) => (
-                            <tr key={row.id} className="border-t border-slate-200 hover:bg-slate-50">
-                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                            <tr key={row.id} className="border-t border-line hover:bg-canvas">
+                                <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
                                     {fmtDateTime(row.delivered_at)}
                                 </td>
                                 <td className="px-3 py-2 truncate max-w-[20rem]">
@@ -218,18 +218,18 @@ export default function AdminNotificationsTab() {
                         type="button"
                         disabled={offset === 0 || loading}
                         onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                        className="px-2 py-1 border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40"
+                        className="px-2 py-1 border border-line bg-surface hover:bg-canvas disabled:opacity-40"
                     >
                         ← Previous
                     </button>
-                    <span className="text-slate-600">
+                    <span className="text-ink-soft">
                         {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
                     </span>
                     <button
                         type="button"
                         disabled={offset + PAGE_SIZE >= total || loading}
                         onClick={() => setOffset(offset + PAGE_SIZE)}
-                        className="px-2 py-1 border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40"
+                        className="px-2 py-1 border border-line bg-surface hover:bg-canvas disabled:opacity-40"
                     >
                         Next →
                     </button>

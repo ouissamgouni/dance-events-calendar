@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { NotificationItem } from '../api';
-import { getNotificationVerb, resolveNotificationDestination } from './notificationRender';
+import {
+    getNotificationVerb,
+    notificationCategory,
+    resolveNotificationDestination,
+} from './notificationRender';
 
 /** Minimal NotificationItem factory — only the fields the pure render
  *  helpers read are set; the rest are cast away for brevity. */
@@ -44,5 +48,46 @@ describe('resolveNotificationDestination — reminder ask deep-link', () => {
     it('routes event messages to the #messages board', () => {
         const dest = resolveNotificationDestination(item({ kind: 'event_message' }));
         expect(dest).toBe('/event/evt-1#messages');
+    });
+});
+
+describe('subscription_saved', () => {
+    it('reads as "is interested in"', () => {
+        expect(getNotificationVerb(item({ kind: 'subscription_saved' }))).toBe('is interested in');
+    });
+
+    it('routes to the event page', () => {
+        expect(resolveNotificationDestination(item({ kind: 'subscription_saved' }))).toBe(
+            '/event/evt-1',
+        );
+    });
+});
+
+describe('notificationCategory', () => {
+    it('maps event kinds to "events"', () => {
+        expect(notificationCategory('subscription_going')).toBe('events');
+        expect(notificationCategory('subscription_saved')).toBe('events');
+        expect(notificationCategory('event_reminder')).toBe('events');
+    });
+
+    it('maps follow/friend kinds to "network"', () => {
+        expect(notificationCategory('new_follower')).toBe('network');
+        expect(notificationCategory('new_friend')).toBe('network');
+        expect(notificationCategory('follow_request')).toBe('network');
+    });
+
+    it('maps review kinds to "reviews"', () => {
+        expect(notificationCategory('subscription_review')).toBe('reviews');
+        expect(notificationCategory('event_review_prompt')).toBe('reviews');
+    });
+
+    it('maps milestone kinds to "milestones"', () => {
+        expect(notificationCategory('subscription_milestone')).toBe('milestones');
+        expect(notificationCategory('milestone_unlocked')).toBe('milestones');
+    });
+
+    it('maps promo/claim kinds to "others"', () => {
+        expect(notificationCategory('promo_code_added')).toBe('others');
+        expect(notificationCategory('organizer_claim_decided')).toBe('others');
     });
 });

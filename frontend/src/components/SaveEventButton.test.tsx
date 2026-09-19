@@ -15,13 +15,16 @@ describe('SaveEventButton (anonymous)', () => {
         const { user } = renderWithProviders(<SaveEventButton eventId="evt-1" />)
 
         const button = await screen.findByRole('button', { name: 'Save event' })
+        expect(button).toHaveClass('h-8', 'w-8', 'rounded-lg', 'bg-action-tile')
+        expect(button).not.toHaveClass('shadow-sm', 'border')
+        expect(button.querySelector('[data-icon-family="bookmark"][data-icon-state="default"]')).toHaveAttribute('fill', 'none')
         await user.click(button)
 
-        await waitFor(() =>
-            expect(
-                screen.getByRole('button', { name: 'Edit saved visibility' }),
-            ).toBeInTheDocument(),
-        )
+        await waitFor(() => {
+            const savedButton = screen.getByRole('button', { name: 'Edit saved visibility' })
+            expect(savedButton).toHaveClass('text-saved', 'bg-action-tile')
+            expect(savedButton.querySelector('[data-icon-family="bookmark"][data-icon-state="saved"]')).toHaveAttribute('fill', 'currentColor')
+        })
     })
 
     it('rolls back the optimistic save when the write fails', async () => {

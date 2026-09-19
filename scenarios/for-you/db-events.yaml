@@ -177,13 +177,21 @@ events:
     start: w1 Fri 21:00
     end: w1 Sat 01:00
     price_is_free: true
-    tags: [dance-style:salsa, format:practice, level:all-levels, venue:indoor, reach:international]
+    tags:
+      [
+        dance-style:salsa,
+        format:practice,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-02
     calendar_id: salsa-cal-001
-    title: Boulogne Bachata Rooftop
+    title: Boulogne Bachata Rooftop Summer Closing Celebration
     description: |
       Sensual bachata under the fairy lights. Free welcome class at 20:00.
+    image_url: /friends-going-dance-floor.jpg
     location: Le Roof, 12 Av. Édouard Vaillant, Boulogne-Billancourt, France
     latitude: 48.8380
     longitude: 2.2410
@@ -192,7 +200,14 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
-    tags: [dance-style:bachata, format:social, level:all-levels, venue:rooftop, reach:international]
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:rooftop,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-03
     calendar_id: salsa-cal-001
@@ -205,7 +220,14 @@ events:
     start: w1 Sun 17:00
     end: w1 Sun 21:00
     price_is_free: true
-    tags: [dance-style:salsa, format:social, level:beginner-friendly, venue:indoor, reach:international]
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:beginner-friendly,
+        venue:indoor,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-04
     calendar_id: salsa-cal-001
@@ -221,7 +243,14 @@ events:
     price_is_free: false
     price_min: 8
     price_currency: EUR
-    tags: [dance-style:salsa, format:social, level:all-levels, venue:indoor, reach:regional]
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
 
   - id: evt-fy-bulk-05
     calendar_id: salsa-cal-001
@@ -236,7 +265,14 @@ events:
     price_is_free: false
     price_min: 5
     price_currency: EUR
-    tags: [dance-style:bachata, format:social, level:all-levels, venue:indoor, reach:regional]
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
 
   - id: evt-fy-bulk-06
     calendar_id: salsa-cal-001
@@ -250,7 +286,14 @@ events:
     start: w2 Sun 19:00
     end: w2 Sun 23:00
     price_is_free: true
-    tags: [dance-style:salsa, format:practice, level:all-levels, venue:indoor, reach:local]
+    tags:
+      [
+        dance-style:salsa,
+        format:practice,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
 
   - id: evt-fy-bulk-07
     calendar_id: salsa-cal-001
@@ -263,7 +306,14 @@ events:
     start: w3 Fri 21:00
     end: w3 Sat 01:00
     price_is_free: true
-    tags: [dance-style:salsa, format:practice, level:intermediate, venue:indoor, reach:local]
+    tags:
+      [
+        dance-style:salsa,
+        format:practice,
+        level:intermediate,
+        venue:indoor,
+        reach:local,
+      ]
 
   - id: evt-fy-bulk-08
     calendar_id: salsa-cal-001
@@ -279,7 +329,15 @@ events:
     price_is_free: false
     price_min: 12
     price_currency: EUR
-    tags: [dance-style:bachata, format:social, level:all-levels, venue:indoor, vibe:good-music, reach:local]
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        vibe:good-music,
+        reach:local,
+      ]
 
   - id: evt-fy-bulk-09
     calendar_id: salsa-cal-001
@@ -293,7 +351,14 @@ events:
     start: w3 Sun 15:00
     end: w3 Sun 19:00
     price_is_free: true
-    tags: [dance-style:salsa, format:social, level:beginner-friendly, venue:outdoor, reach:international]
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:beginner-friendly,
+        venue:outdoor,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-10
     calendar_id: salsa-cal-001
@@ -309,7 +374,15 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
-    tags: [dance-style:salsa, format:social, level:all-levels, venue:indoor, vibe:social-atmosphere, reach:international]
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        vibe:social-atmosphere,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-11
     calendar_id: salsa-cal-001
@@ -325,7 +398,14 @@ events:
     price_is_free: false
     price_min: 15
     price_currency: EUR
-    tags: [dance-style:bachata, format:social, level:all-levels, venue:rooftop, reach:local]
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:rooftop,
+        reach:local,
+      ]
 
   - id: evt-fy-bulk-12
     calendar_id: salsa-cal-001
@@ -339,7 +419,14 @@ events:
     start: w4 Sun 18:00
     end: w4 Sun 22:00
     price_is_free: true
-    tags: [dance-style:salsa, format:practice, level:all-levels, venue:indoor, reach:international]
+    tags:
+      [
+        dance-style:salsa,
+        format:practice,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-13
     calendar_id: salsa-cal-001
@@ -355,7 +442,15 @@ events:
     price_is_free: false
     price_min: 12
     price_currency: EUR
-    tags: [dance-style:salsa, dance-style:bachata, format:social, level:all-levels, venue:indoor, reach:international]
+    tags:
+      [
+        dance-style:salsa,
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-14
     calendar_id: salsa-cal-001
@@ -371,7 +466,14 @@ events:
     price_is_free: false
     price_min: 14
     price_currency: EUR
-    tags: [dance-style:bachata, format:social, level:all-levels, venue:rooftop, reach:international]
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:rooftop,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-15
     calendar_id: salsa-cal-001
@@ -389,7 +491,15 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
-    tags: [dance-style:salsa, format:social, level:all-levels, venue:indoor, vibe:social-atmosphere, reach:international]
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        vibe:social-atmosphere,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-16
     calendar_id: salsa-cal-001
@@ -404,7 +514,14 @@ events:
     price_is_free: false
     price_min: 18
     price_currency: EUR
-    tags: [dance-style:bachata, format:social, level:intermediate, venue:indoor, reach:regional]
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:intermediate,
+        venue:indoor,
+        reach:regional,
+      ]
 
   - id: evt-fy-bulk-17
     calendar_id: salsa-cal-001
@@ -420,7 +537,15 @@ events:
     price_is_free: false
     price_min: 22
     price_currency: EUR
-    tags: [dance-style:salsa, format:festival, level:all-levels, venue:indoor, vibe:good-music, reach:local]
+    tags:
+      [
+        dance-style:salsa,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        vibe:good-music,
+        reach:local,
+      ]
 
   - id: evt-fy-bulk-18
     calendar_id: salsa-cal-001
@@ -436,7 +561,14 @@ events:
     price_is_free: false
     price_min: 8
     price_currency: EUR
-    tags: [dance-style:bachata, format:social, level:all-levels, venue:outdoor, reach:international]
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:outdoor,
+        reach:international,
+      ]
 
   - id: evt-fy-bulk-19
     calendar_id: salsa-cal-001
@@ -452,4 +584,12 @@ events:
     price_is_free: false
     price_min: 12
     price_currency: EUR
-    tags: [dance-style:salsa, format:social, level:all-levels, venue:rooftop, vibe:social-atmosphere, reach:local]
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:rooftop,
+        vibe:social-atmosphere,
+        reach:local,
+      ]

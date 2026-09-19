@@ -36,13 +36,13 @@ export function StatusBar() {
 
   return (
     <div
-      className="shrink-0 bg-gray-100 text-gray-600 border-t border-gray-200 relative flex items-center select-none"
+      className="shrink-0 bg-gray-100 text-ink-soft border-t border-line relative flex items-center select-none"
       style={{ height: collapsed ? STATUS_BAR_COLLAPSED_HEIGHT : STATUS_BAR_HEIGHT, fontFamily: 'system-ui, -apple-system, sans-serif' }}
     >
       {/* Toggle chevron */}
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="flex items-center justify-center px-1.5 h-full text-[9px] cursor-pointer hover:bg-black/[0.06] transition-colors text-gray-400 hover:text-gray-600"
+        className="flex items-center justify-center px-1.5 h-full text-[9px] cursor-pointer hover:bg-black/[0.06] transition-colors text-muted hover:text-ink-soft"
         aria-label={collapsed ? 'Expand status bar' : 'Collapse status bar'}
       >
         {collapsed ? '▲' : '▼'}

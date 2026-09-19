@@ -1,232 +1,224 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchEventsByIds, fetchPassport, fetchMyPendingReviews } from '../api';
-import type { CalendarEvent, PassportResponse, PassportMilestone, PendingReview } from '../types';
-import { useAuth } from '../context/AuthContext';
-import { useSavedEvents } from '../context/SavedEventsContext';
-import { useAttendingEvents } from '../context/AttendingEventsContext';
+import {
+    CalendarDays,
+    ChevronRight,
+    Globe2,
+    Search,
+    Star,
+} from 'lucide-react';
+import {
+    fetchEventsByIds,
+    fetchInterestProfiles,
+    fetchMyPendingReviews,
+    fetchPassport,
+    fetchPassportEvents,
+} from '../api';
+import type {
+    CalendarEvent,
+    PassportMapEvent,
+    PassportMilestone,
+    PassportResponse,
+} from '../types';
+import MilestoneCarousel from '../components/MilestoneCarousel';
+import PassportSummaryCard from '../components/PassportSummaryCard';
 import YourNextEventsRail from '../components/YourNextEventsRail';
-import ShareExperienceCard from '../components/ShareExperienceCard';
-import EventModal from '../components/EventModal';
-import { trackView } from '../utils/tracking';
+import { useAuth } from '../context/AuthContext';
+import { useAttendingEvents } from '../context/AttendingEventsContext';
+import { firstNameOf } from '../utils/displayName';
 
-/** Short "in …" label for an upcoming event start. */
-function nextInLabel(startIso: string): string {
-    const days = Math.ceil((new Date(startIso).getTime() - Date.now()) / 86_400_000);
-    if (days <= 0) return 'today';
-    if (days === 1) return 'tomorrow';
-    if (days < 14) return `in ${days} days`;
-    return `in ${Math.round(days / 7)} weeks`;
+export function closestMilestone(milestones: PassportMilestone[]): PassportMilestone | null {
+    const locked = milestones.filter((milestone) => !milestone.unlocked && milestone.threshold > 0);
+    if (locked.length === 0) return null;
+    return locked.reduce((best, milestone) =>
+        milestone.progress / milestone.threshold > best.progress / best.threshold
+            ? milestone
+            : best,
+    );
 }
 
-/** Milestone the viewer is closest to unlocking (highest progress ratio among
- * locked ones), or null when everything is unlocked / none exist. */
-function nextMilestone(milestones: PassportMilestone[]): PassportMilestone | null {
-    const locked = milestones.filter((m) => !m.unlocked && m.threshold > 0);
-    if (locked.length === 0) return null;
-    return locked.reduce((best, m) =>
-        m.progress / m.threshold > best.progress / best.threshold ? m : best,
+export function inProgressMilestones(milestones: PassportMilestone[]): PassportMilestone[] {
+    const inProgress = milestones.filter((m) => !m.unlocked && m.threshold > 0);
+    // Surface only the single "next" milestone per category (the one closest
+    // to being unlocked) so the carousel reads as one goal per area rather
+    // than every locked tier at once.
+    const nextByCategory = new Map<string, PassportMilestone>();
+    for (const m of inProgress) {
+        const current = nextByCategory.get(m.category);
+        if (!current || m.progress / m.threshold > current.progress / current.threshold) {
+            nextByCategory.set(m.category, m);
+        }
+    }
+    return [...nextByCategory.values()].sort((a, b) => (b.progress / b.threshold) - (a.progress / a.threshold));
+}
+
+interface ShortcutProps {
+    title: string;
+    status: string;
+    to: string;
+    icon: ReactNode;
+}
+
+function Shortcut({ title, status, to, icon }: ShortcutProps) {
+    return (
+        <Link
+            to={to}
+            className="flex min-h-24 items-center rounded-card border border-card-line bg-surface px-4 py-3 shadow-sm transition hover:border-action focus:outline-none focus:ring-2 focus:ring-action"
+            aria-label={`${title}, ${status}`}
+        >
+            <span className="mr-3 shrink-0" aria-hidden="true">{icon}</span>
+            <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-ink">{title}</span>
+                <span className="mt-1 block text-sm text-ink-soft">{status}</span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft" aria-hidden="true" />
+        </Link>
     );
+}
+
+function plural(value: number, singular: string, pluralForm = `${singular}s`) {
+    return `${value} ${value === 1 ? singular : pluralForm}`;
 }
 
 export default function MineHub() {
     const { user } = useAuth();
-    const { savedEventIds } = useSavedEvents();
-    const { attendingEventIds } = useAttendingEvents();
-    const [myEvents, setMyEvents] = useState<CalendarEvent[]>([]);
+    const { attendingEventIds, loading: attendingLoading } = useAttendingEvents();
+    const [goingEvents, setGoingEvents] = useState<CalendarEvent[]>([]);
     const [passport, setPassport] = useState<PassportResponse | null>(null);
-    const [pending, setPending] = useState<PendingReview[]>([]);
-    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-
-    const allEventIds = useMemo(
-        () => [...new Set([...savedEventIds, ...attendingEventIds])],
-        [savedEventIds, attendingEventIds],
-    );
-
-    useEffect(() => {
-        if (allEventIds.length === 0) {
-            setMyEvents([]);
-            return;
-        }
-        let cancelled = false;
-        fetchEventsByIds(allEventIds)
-            .then((evts) => {
-                if (cancelled) return;
-                const now = Date.now();
-                const attendingSet = new Set(attendingEventIds);
-                setMyEvents(
-                    evts
-                        .filter((e) => new Date(e.end).getTime() >= now)
-                        .sort((a, b) => {
-                            // Events the viewer is going to lead the rail; saved-only trail after.
-                            const aGoing = attendingSet.has(a.event_id);
-                            const bGoing = attendingSet.has(b.event_id);
-                            if (aGoing !== bGoing) return aGoing ? -1 : 1;
-                            return new Date(a.start).getTime() - new Date(b.start).getTime();
-                        }),
-                );
-            })
-            .catch(() => { if (!cancelled) setMyEvents([]); });
-        return () => { cancelled = true; };
-    }, [allEventIds, attendingEventIds]);
+    const [mapEvents, setMapEvents] = useState<PassportMapEvent[]>([]);
+    const [pendingReviewCount, setPendingReviewCount] = useState(0);
+    const [savedSearchCount, setSavedSearchCount] = useState(0);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!user) {
             setPassport(null);
-            setPending([]);
+            setMapEvents([]);
+            setPendingReviewCount(0);
+            setSavedSearchCount(0);
+            setLoading(false);
             return;
         }
+
         let cancelled = false;
-        fetchPassport().then((p) => { if (!cancelled) setPassport(p); }).catch(() => { });
-        fetchMyPendingReviews().then((r) => { if (!cancelled) setPending(r); }).catch(() => { });
+        setLoading(true);
+        Promise.all([
+            fetchPassport(),
+            fetchPassportEvents().catch(() => []),
+            fetchMyPendingReviews().catch(() => []),
+            fetchInterestProfiles().catch(() => []),
+        ])
+            .then(([passportData, attendedEvents, pendingReviews, profiles]) => {
+                if (cancelled) return;
+                setPassport(passportData);
+                setMapEvents(attendedEvents);
+                setPendingReviewCount(pendingReviews.length);
+                setSavedSearchCount(profiles.length);
+            })
+            .catch(() => {
+                if (!cancelled) setPassport(null);
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
         return () => { cancelled = true; };
     }, [user]);
 
-    const handleEventClick = useCallback((evt: CalendarEvent) => {
-        trackView(evt.event_id, 'mine-hub');
-        setSelectedEvent(evt);
-    }, []);
+    useEffect(() => {
+        if (attendingEventIds.length === 0) {
+            setGoingEvents([]);
+            return;
+        }
 
-    const handleReviewed = useCallback((eventId: string) => {
-        setPending((prev) => prev.filter((p) => p.event_id !== eventId));
-    }, []);
+        let cancelled = false;
+        fetchEventsByIds(attendingEventIds)
+            .then((events) => {
+                if (cancelled) return;
+                const now = Date.now();
+                setGoingEvents(events
+                    .filter((event) => new Date(event.start).getTime() > now)
+                    .sort((left, right) => new Date(left.start).getTime() - new Date(right.start).getTime()));
+            })
+            .catch(() => { if (!cancelled) setGoingEvents([]); });
+        return () => { cancelled = true; };
+    }, [attendingEventIds]);
 
     const stats = passport?.stats;
-    const milestone = passport ? nextMilestone(passport.milestones) : null;
-    const upcomingCount = myEvents.length;
-    const nextGoingStart = useMemo(() => {
-        const attendingSet = new Set(attendingEventIds);
-        return myEvents
-            .filter((e) => attendingSet.has(e.event_id))
-            .reduce<string | null>(
-                (soonest, e) => (!soonest || new Date(e.start) < new Date(soonest) ? e.start : soonest),
-                null,
-            );
-    }, [myEvents, attendingEventIds]);
+    const displayName = firstNameOf(user?.name, user?.handle) || 'MyDance';
+    const coords = useMemo(() => mapEvents.flatMap((event) =>
+        event.latitude != null && event.longitude != null
+            ? [{ lat: event.latitude, lng: event.longitude }]
+            : [],
+    ), [mapEvents]);
 
     return (
-        <div className="min-h-full bg-[#f8fafc]">
-            <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">
-                {/* Profile / stats header */}
-                <header className="border border-slate-200 bg-slate-900 p-5 text-white">
-                    <div className="flex items-center gap-3">
-                        {user?.avatar_url ? (
-                            <img src={user.avatar_url} alt="" className="h-11 w-11 rounded-full" referrerPolicy="no-referrer" />
-                        ) : (
-                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-700 text-base font-semibold">
-                                {user?.name?.[0]?.toUpperCase() ?? '?'}
-                            </div>
-                        )}
-                        <div className="min-w-0">
-                            <h1 className="truncate text-lg font-semibold">{user?.name ?? 'You'}</h1>
-                            {user?.handle && <p className="truncate text-xs text-slate-300">@{user.handle}</p>}
-                        </div>
-                    </div>
-                    {stats && (
-                        <p className="mt-3 tabular-nums">
-                            <span className="text-2xl font-semibold">
-                                {stats.total_events_attended} {stats.total_events_attended === 1 ? 'event' : 'events'}
-                            </span>
-                            <span className="text-sm font-semibold text-slate-100">
-                                {' · '}{stats.cities_visited} {stats.cities_visited === 1 ? 'city' : 'cities'}
-                                {' · '}{stats.countries_visited} {stats.countries_visited === 1 ? 'country' : 'countries'}
-                            </span>
-                        </p>
-                    )}
-                    {upcomingCount > 0 && (
-                        <p className="mt-1 text-xs text-slate-300">
-                            {upcomingCount} {upcomingCount === 1 ? 'event' : 'events'} planned
-                            {nextGoingStart && (
-                                <> · Next {nextInLabel(nextGoingStart)}</>
-                            )}
-                        </p>
-                    )}
-                </header>
-
-                {/* Your next events */}
-                <YourNextEventsRail
-                    events={myEvents}
-                    onEventClick={handleEventClick}
-                    emptyState={(
-                        <>
-                            No upcoming events yet.{' '}
-                            <Link to="/" className="font-semibold text-blue-600 hover:text-blue-700">Browse events</Link>{' '}
-                            and save or mark “I’m going” to build your calendar.
-                        </>
-                    )}
+        <div className="min-h-full bg-canvas">
+            <div className="mx-auto max-w-3xl space-y-4 px-4 py-4">
+                <PassportSummaryCard
+                    displayName={displayName}
+                    handle={user?.handle ?? null}
+                    avatarUrl={user?.avatar_url ?? null}
+                    eventsCount={stats?.total_events_attended ?? 0}
+                    citiesCount={stats?.cities_visited ?? 0}
+                    countriesCount={stats?.countries_visited ?? 0}
+                    coords={coords}
+                    monthlyActivity={passport?.monthly_activity ?? []}
+                    mapOverlay={
+                        <Link
+                            to="/mine/passport"
+                            className="flex flex-col items-center gap-0.5 text-white hover:text-white/80 transition focus:outline-none focus:ring-2 focus:ring-white rounded p-1"
+                            aria-label="View passport"
+                        >
+                            <img
+                                src="/passport.png"
+                                alt=""
+                                className="h-5 w-5"
+                                style={{ filter: 'invert(1)' }}
+                                aria-hidden="true"
+                            />
+                            <span className="h-0.5 w-2 bg-white/80 rounded-full" aria-hidden="true" />
+                        </Link>
+                    }
                 />
 
-                {/* Your dancer passport */}
-                {milestone && (
-                    <section>
-                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-base font-semibold text-slate-700">
-                            <span>Your dancer passport</span>
-                        </div>
-                        <Link to="/mine/passport" className="mt-2 block border border-slate-200 bg-white p-4 hover:border-blue-300 transition">
-                            <div className="flex items-center gap-3">
-                                <span className="text-2xl" aria-hidden>{milestone.icon || '🏅'}</span>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next milestone</p>
-                                    <p className="truncate text-sm font-semibold text-slate-900">{milestone.name}</p>
-                                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                                        <div
-                                            className="h-full rounded-full bg-blue-500"
-                                            style={{ width: `${Math.min(100, Math.round((milestone.progress / milestone.threshold) * 100))}%` }}
-                                        />
-                                    </div>
-                                    <p className="mt-1 text-xs text-slate-500 tabular-nums">
-                                        {milestone.progress} / {milestone.threshold} {milestone.unit}
-                                    </p>
-                                </div>
-                            </div>
-                        </Link>
-                    </section>
-                )}
+                <YourNextEventsRail
+                    events={goingEvents}
+                    loading={attendingLoading || loading}
+                />
 
-                {/* Share your experience */}
-                {pending.length > 0 && (
-                    <section data-testid="mine-share-your-experience">
-                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-base font-semibold text-slate-700">
-                            <span>Share your experience</span>
-                        </div>
-                        <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Share your experience">
-                            {pending.map((review) => (
-                                <ShareExperienceCard
-                                    key={review.event_id}
-                                    review={review}
-                                    onReviewed={handleReviewed}
-                                />
-                            ))}
-                        </div>
-                    </section>
-                )}
+                <MilestoneCarousel milestones={inProgressMilestones(passport?.milestones ?? [])} />
 
-                {/* Quick links */}
-                <section className="border border-slate-200 bg-white p-4">
-                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Quick links</h2>
-                    <div className="flex flex-wrap gap-2">
-                        {[
-                            { label: 'My Events', to: '/mine/calendar' },
-                            { label: 'Passport', to: '/mine/passport' },
-                            { label: 'Discovery Profiles', to: '/mine/profiles' },
-                            { label: 'Reviews', to: '/mine/reviews' },
-                            { label: 'Settings', to: '/account' },
-                        ].map((l) => (
-                            <Link
-                                key={l.to}
-                                to={l.to}
-                                className="border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:border-blue-500 hover:text-blue-600 transition"
-                            >
-                                {l.label}
-                            </Link>
-                        ))}
+                <section aria-labelledby="my-dance-title">
+                    <h2 id="my-dance-title" className="mb-2 text-lg font-bold text-ink">My Dance</h2>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Shortcut
+                            title="My Events"
+                            status={`${goingEvents.length} upcoming`}
+                            to="/mine/calendar?filter=going"
+                            icon={<CalendarDays className="h-9 w-9 text-brand" strokeWidth={1.8} />}
+                        />
+                        <Shortcut
+                            title="Passport"
+                            status={plural(stats?.total_events_attended ?? 0, 'event')}
+                            to="/mine/passport"
+                            icon={<Globe2 className="h-9 w-9 text-action" strokeWidth={1.8} />}
+                        />
+                        <Shortcut
+                            title="Saved searches"
+                            status={plural(savedSearchCount, 'search', 'searches')}
+                            to="/mine/profiles"
+                            icon={<Search className="h-9 w-9 text-brand" strokeWidth={1.8} />}
+                        />
+                        <Shortcut
+                            title="Reviews"
+                            status={`${pendingReviewCount} to review`}
+                            to="/mine/reviews"
+                            icon={<Star className="h-9 w-9 text-action" strokeWidth={1.8} />}
+                        />
                     </div>
                 </section>
             </div>
-
-            {selectedEvent && (
-                <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
-            )}
         </div>
     );
 }

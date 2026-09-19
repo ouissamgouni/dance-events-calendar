@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { CalendarEvent } from '../types';
-import RailEventCard from './RailEventCard';
-import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import EventCard from './EventCard';
+import ScrollDotsIndicator from './ScrollDots';
+import { useScrollDots } from '../hooks/useScrollDots';
 
 interface TrendingEventsBannerProps {
     events: CalendarEvent[];
@@ -30,7 +31,7 @@ export default function TrendingEventsBanner({
     className = '',
 }: TrendingEventsBannerProps) {
     const [collapsed, setCollapsed] = useState(false);
-    const { trendingTrailRichEnabled } = useFeatureFlags();
+    const scrollerRef = useRef<HTMLDivElement>(null);
     const trendingEvents = useMemo(() => {
         if (!showPopularity || events.length === 0) return [];
         const candidates = events
@@ -45,40 +46,52 @@ export default function TrendingEventsBanner({
         return candidates.slice(0, effectiveCap);
     }, [events, popularityThreshold, showPopularity, trendingTopN, trendingTopPercent]);
 
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [collapsed, trendingEvents.length]);
+
     if (trendingEvents.length === 0) return null;
 
     return (
         <section className={className} data-testid="trending-events-banner">
             <button
                 type="button"
-                className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-left text-sm font-semibold text-slate-700 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="flex w-full items-center justify-between border-b border-line px-2.5 py-1 text-left text-sm font-semibold text-ink hover:text-ink focus:outline-none focus:ring-2 focus:ring-blue-300"
                 aria-expanded={!collapsed}
                 onClick={() => setCollapsed((value) => !value)}
             >
-                <span className="inline-flex items-center gap-1 text-slate-800">
-                    Trending
+                <span className="inline-flex items-center gap-1 text-ink">
+                    <img src="/trending-0.png" alt="" aria-hidden="true" className="w-4 h-4 object-contain" />
+                    Trending <span className="text-[10px] font-normal text-muted">for this search</span>
                 </span>
-                <span aria-hidden="true" className="text-xs text-slate-400">{collapsed ? '+' : '-'}</span>
+                <span aria-hidden="true" className="text-xs text-muted">{collapsed ? '+' : '-'}</span>
             </button>
             {!collapsed && (
-                <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Trending events">
-                    {trendingEvents.map((event) => {
-                        return (
-                            <RailEventCard
-                                key={event.event_id}
-                                event={event}
-                                onClick={onEventClick}
-                                onHover={onEventHover}
-                                highlighted={hoveredEventId === event.event_id}
-                                variant="compact"
-                                compactShowExtras={trendingTrailRichEnabled}
-                                followingBadgeEnabled={followingBadgeEnabled}
-                                contextLabel="trending event"
-                                extraBadge={undefined}
-                            />
-                        );
-                    })}
+                <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Trending events">
+                    {trendingEvents.map((event) => (
+                        <EventCard
+                            key={event.event_id}
+                            event={event}
+                            onOpen={onEventClick}
+                            onHover={onEventHover}
+                            highlighted={hoveredEventId === event.event_id}
+                            followingBadgeEnabled={followingBadgeEnabled}
+                            showReviews={false}
+                            showTags={false}
+                            showActions={false}
+                            widthClass="w-[300px]"
+                            dateHeaderRow
+                            twoLineTitle
+                            goingIconVariant="hand"
+                        />
+                    ))}
                 </div>
+            )}
+            {!collapsed && (
+                <ScrollDotsIndicator
+                    count={dotCount}
+                    activeIndex={activeIndex}
+                    onSelect={scrollToIndex}
+                    label="Trending events scroll position"
+                />
             )}
         </section>
     );

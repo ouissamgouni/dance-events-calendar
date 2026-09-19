@@ -84,7 +84,7 @@ export default function CalendarDetailDrawer({
 
             {/* Drawer */}
             <div
-                className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-white shadow-2xl border-l border-gray-200"
+                className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-surface shadow-2xl border-l border-line"
                 style={{ width: drawerWidth }}
             >
                 {/* Resize handle */}
@@ -94,10 +94,10 @@ export default function CalendarDetailDrawer({
                 />
 
                 {/* Header */}
-                <div className="flex-shrink-0 flex items-center justify-end px-4 py-2 border-b border-gray-100">
+                <div className="flex-shrink-0 flex items-center justify-end px-4 py-2 border-b border-card-line">
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1"
+                        className="text-muted hover:text-ink-soft text-xl leading-none px-1"
                         aria-label="Close"
                     >
                         ×
@@ -107,22 +107,22 @@ export default function CalendarDetailDrawer({
                 {/* Live control bar (running only) */}
                 {isRunning && (
                     <div className="flex-shrink-0 flex items-center gap-2 px-4 py-1.5 bg-blue-50 border-b border-blue-100">
-                        <span className="text-[10px] text-blue-600">Live</span>
+                        <span className="text-[10px] text-action">Live</span>
                         <button
                             onClick={() => setIsPaused((p) => !p)}
-                            className="text-[10px] font-medium text-blue-700 hover:text-blue-900 px-1.5 py-0.5 border border-blue-200 rounded transition"
+                            className="text-[10px] font-medium text-action hover:text-blue-900 px-1.5 py-0.5 border border-blue-200 rounded transition"
                         >
                             {isPaused ? 'Resume' : 'Pause'}
                         </button>
                         {isPaused && (
                             <button
                                 onClick={() => { onRefresh(); setLastUpdated(new Date()); }}
-                                className="text-[10px] font-medium text-blue-700 hover:text-blue-900 px-1.5 py-0.5 border border-blue-200 rounded transition"
+                                className="text-[10px] font-medium text-action hover:text-blue-900 px-1.5 py-0.5 border border-blue-200 rounded transition"
                             >
                                 Refresh
                             </button>
                         )}
-                        <span className="ml-auto text-[10px] text-blue-500">
+                        <span className="ml-auto text-[10px] text-action">
                             Updated {lastUpdated.toLocaleTimeString()}
                         </span>
                     </div>

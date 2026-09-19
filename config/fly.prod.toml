@@ -26,10 +26,18 @@ primary_region = "cdg"
   WEB_PUSH_ENABLED="true"
   ACTIVITY_DIGEST_EMAIL_ENABLED="true"
   INTEREST_MATCH_NOTIFICATIONS_ENABLED="true"
+  # Object storage. Endpoint + keys arrive as fly secrets from
+  # config/secrets.prod.env; everything non-secret is pinned here so a
+  # missing secret fails loudly instead of falling back to the local emulator.
+  OBJECT_STORAGE_PROVIDER = "r2"
+  OBJECT_STORAGE_BUCKET_PUBLIC = "movida-prod-public"
+  OBJECT_STORAGE_BUCKET_PRIVATE = "movida-prod-private"
+  OBJECT_STORAGE_PUBLIC_BASE_URL = "https://cdn.joinmovida.com"
   # SMTP host/port/from (credentials are fly secrets)
   SMTP_HOST = "smtp-relay.brevo.com"
   SMTP_PORT = "587"
   SMTP_FROM = "noreply@joinmovida.com"
+  OBJECT_STORAGE_PUBLIC_BASE_URL= "cdn.joinmovida.com"
 
 [http_service]
   internal_port = 8000

@@ -28,18 +28,18 @@ export function activityLevel(count: number): 0 | 1 | 2 | 3 | 4 {
 // scanner only picks up complete class strings). Light ramp sits on the app's
 // white/slate surfaces; the dark ramp sits on the slate-900 share card.
 export const LEVEL_RAMP_LIGHT: Record<0 | 1 | 2 | 3 | 4, string> = {
-    0: 'bg-slate-100',
-    1: 'bg-emerald-200',
-    2: 'bg-emerald-400',
-    3: 'bg-emerald-500',
-    4: 'bg-emerald-700',
+    0: 'bg-brand/5',
+    1: 'bg-brand/15',
+    2: 'bg-brand/30',
+    3: 'bg-brand/55',
+    4: 'bg-brand',
 };
 
 export const LEVEL_RAMP_DARK: Record<0 | 1 | 2 | 3 | 4, string> = {
-    0: 'bg-white/5',
+    0: 'bg-surface/5',
     1: 'bg-emerald-900',
     2: 'bg-emerald-700',
-    3: 'bg-emerald-500',
+    3: 'bg-success',
     4: 'bg-emerald-300',
 };
 
@@ -47,6 +47,34 @@ export interface YearRow {
     year: number;
     /** 12 counts, index 0 = January. */
     cells: number[];
+}
+
+export interface RollingMonth {
+    month: string;
+    initial: string;
+    count: number;
+}
+
+/** Current calendar month plus the previous 11, oldest first. */
+export function rollingTwelveMonths(
+    months: MonthlyActivity[],
+    now = new Date(),
+): RollingMonth[] {
+    const counts = new Map<string, number>();
+    for (const entry of months) {
+        counts.set(entry.month, (counts.get(entry.month) ?? 0) + entry.count);
+    }
+
+    return Array.from({ length: 12 }, (_, index) => {
+        const date = new Date(now.getFullYear(), now.getMonth() - (11 - index), 1);
+        const monthNumber = date.getMonth();
+        const month = `${date.getFullYear()}-${String(monthNumber + 1).padStart(2, '0')}`;
+        return {
+            month,
+            initial: MONTH_INITIALS[monthNumber],
+            count: counts.get(month) ?? 0,
+        };
+    });
 }
 
 /**
@@ -72,7 +100,7 @@ export function buildYearGrid(months: MonthlyActivity[]): YearRow[] {
     }
     if (!Number.isFinite(minYear)) return [];
     const rows: YearRow[] = [];
-    for (let year = maxYear; year >= minYear; year -= 1) {
+    for (let year = minYear; year <= maxYear; year += 1) {
         rows.push({ year, cells: counts.get(year) ?? new Array(12).fill(0) });
     }
     return rows;

@@ -41,8 +41,8 @@ export default function PushNotificationSettings() {
     };
 
     return (
-        <section className="border border-slate-200 bg-white p-4 mb-3">
-            <h2 className="text-sm font-semibold text-slate-900 mb-3">Push notifications</h2>
+        <section className="border border-line bg-surface p-4 mb-3">
+            <h2 className="text-sm font-semibold text-ink mb-3">Push notifications</h2>
             <ToggleRow
                 label="Push notifications"
                 description={
@@ -55,7 +55,7 @@ export default function PushNotificationSettings() {
                 disabled={denied}
                 onChange={toggle}
             />
-            {push.error && <p className="mt-2 text-xs text-red-600">{push.error}</p>}
+            {push.error && <p className="mt-2 text-xs text-danger">{push.error}</p>}
         </section>
     );
 }

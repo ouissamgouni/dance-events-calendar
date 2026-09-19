@@ -164,7 +164,7 @@ export default function AdminAutoTagSuggestions({ eventId, onApproved, onChanged
         // Compact "no suggestions" footer with a re-run affordance, so admins
         // can still trigger the engine on events where it produced nothing.
         return (
-            <div className="flex items-center justify-between text-[11px] text-slate-400 border border-dashed border-slate-200 rounded px-3 py-1.5">
+            <div className="flex items-center justify-between text-[11px] text-muted border border-dashed border-line rounded px-3 py-1.5">
                 <span>No tag suggestions for this event.</span>
                 <button
                     type="button"
@@ -178,13 +178,13 @@ export default function AdminAutoTagSuggestions({ eventId, onApproved, onChanged
     }
 
     return (
-        <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-white">
+        <div className="border border-line rounded-lg bg-canvas overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-line bg-surface">
                 <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
                         Suggested tags
                     </span>
-                    {busy && <span className="text-[10px] text-slate-400">Working…</span>}
+                    {busy && <span className="text-[10px] text-muted">Working…</span>}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                     <button
@@ -209,7 +209,7 @@ export default function AdminAutoTagSuggestions({ eventId, onApproved, onChanged
                         type="button"
                         onClick={handleRejectAll}
                         disabled={busy || actionInFlight !== null}
-                        className="px-2 py-0.5 text-[11px] bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-40"
+                        className="px-2 py-0.5 text-[11px] bg-slate-200 text-ink hover:bg-slate-300 disabled:opacity-40"
                         aria-label="Reject all suggestions"
                         title="Reject all"
                     >
@@ -218,7 +218,7 @@ export default function AdminAutoTagSuggestions({ eventId, onApproved, onChanged
 
                 </div>
             </div>
-            {error && <p className="px-3 py-1.5 text-[11px] text-slate-600">{error}</p>}
+            {error && <p className="px-3 py-1.5 text-[11px] text-ink-soft">{error}</p>}
             <ul className="divide-y divide-slate-200">
                 {suggestions.map((s) => (
                     <SuggestionRow
@@ -264,12 +264,12 @@ function SuggestionRow({
             <div className="flex items-center gap-2 min-w-0">
                 <ConfidenceDot confidence={suggestion.confidence ?? 0} />
                 <span
-                    className="text-xs font-medium text-slate-700 truncate"
+                    className="text-xs font-medium text-ink truncate"
                     title={matchedTitle}
                 >
                     {tag ? (
                         <>
-                            <span className="text-slate-400">{tag.group_label}:</span>{' '}
+                            <span className="text-muted">{tag.group_label}:</span>{' '}
                             <span style={tag.color ? { color: tag.color } : undefined}>{tag.label}</span>
                         </>
                     ) : (
@@ -278,7 +278,7 @@ function SuggestionRow({
                 </span>
                 <SourceBadge source={suggestion.source} />
                 {confidencePct != null && (
-                    <span className="text-[10px] text-slate-400 tabular-nums">{confidencePct}%</span>
+                    <span className="text-[10px] text-muted tabular-nums">{confidencePct}%</span>
                 )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
@@ -295,7 +295,7 @@ function SuggestionRow({
                     type="button"
                     onClick={onReject}
                     disabled={disabled || loading}
-                    className="px-2 py-0.5 text-[11px] bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-40"
+                    className="px-2 py-0.5 text-[11px] bg-slate-200 text-ink hover:bg-slate-300 disabled:opacity-40"
                     aria-label="Reject suggestion"
                 >
                     ✗
@@ -309,7 +309,7 @@ function ConfidenceDot({ confidence }: { confidence: number }) {
     // Colour-codes the dot so admins can visually triage high-confidence rows
     // without reading the percentage.
     let cls = 'bg-slate-300';
-    if (confidence >= 0.9) cls = 'bg-emerald-500';
+    if (confidence >= 0.9) cls = 'bg-success';
     else if (confidence >= 0.75) cls = 'bg-emerald-400';
     else if (confidence >= 0.6) cls = 'bg-amber-400';
     else if (confidence > 0) cls = 'bg-slate-400';
@@ -341,7 +341,7 @@ function SourceBadge({ source }: { source?: string }) {
     }
     if (!source) return null;
     return (
-        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-600">
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-slate-100 text-ink-soft">
             {source}
         </span>
     );

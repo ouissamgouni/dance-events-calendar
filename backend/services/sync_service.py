@@ -31,6 +31,7 @@ def compute_content_hash(title: str, start: datetime, location: str | None) -> s
 from backend.services.calendar.base import BaseCalendarService
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.series_detection import maybe_detect_series_for_event
+from backend.services.reach import assign_event_tag, sync_event_reach
 from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.pipeline.stages.geocoding import GeocodingStage
 from backend.services.pipeline.stages.link_extraction import LinkExtractionStage
@@ -515,6 +516,7 @@ class SyncService:
                         content_hash=content_hash,
                     )
                     session.add(new_event)
+                    sync_event_reach(session, new_event, default_tag_ids)
                     for tag_id in default_tag_ids:
                         session.add(EventTag(event_id=event.event_id, tag_id=tag_id))
                     _upsert_calendar_source(session, event.event_id, cal.calendar_id)
@@ -581,11 +583,7 @@ def _upsert_calendar_source(session: Session, event_id: str, calendar_id: str) -
 
 def _upsert_event_tag(session: Session, event_id: str, tag_id: int) -> None:
     """Insert an EventTag row if it doesn't already exist."""
-    existing = session.exec(
-        select(EventTag).where(
-            EventTag.event_id == event_id,
-            EventTag.tag_id == tag_id,
-        )
-    ).first()
-    if not existing:
-        session.add(EventTag(event_id=event_id, tag_id=tag_id))
+    event = session.get(CachedEvent, event_id)
+    tag = session.get(Tag, tag_id)
+    if event and tag:
+        assign_event_tag(session, event, tag)

@@ -174,7 +174,7 @@ export default function PreferencesSection() {
 
     return (
         <section
-            className="border border-slate-200 bg-white p-4 mb-6"
+            className="border border-line bg-surface p-4 mb-6"
             data-testid="preferences-section"
         >
             <button
@@ -185,12 +185,12 @@ export default function PreferencesSection() {
                 data-testid="preferences-toggle"
             >
                 <span className="flex items-center gap-2">
-                    <span className="text-slate-400 text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
-                    <h2 className="text-sm font-semibold text-slate-900">
+                    <span className="text-muted text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+                    <h2 className="text-sm font-semibold text-ink">
                         {user ? 'Discovery Profiles' : 'Preferences'}
                     </h2>
                 </span>
-                <span className="text-[11px] text-slate-400" role="status" aria-live="polite">
+                <span className="text-[11px] text-muted" role="status" aria-live="polite">
                     {saving ? 'Saving…' : savedToast ? 'Saved.' : hasSetPrefs ? 'Saved' : ''}
                 </span>
             </button>
@@ -205,12 +205,12 @@ export default function PreferencesSection() {
                         <InterestProfilesManager />
                     ) : (
                         <>
-                            <p className="text-xs text-slate-600 mb-3">
+                            <p className="text-xs text-ink-soft mb-3">
                                 These tags and map area are used as your starting event filters.
                             </p>
 
                             {loading ? (
-                                <p className="text-xs text-slate-400">Loading…</p>
+                                <p className="text-xs text-muted">Loading…</p>
                             ) : (
                                 <ProfileEditor
                                     danceGroup={danceGroup}
@@ -236,7 +236,7 @@ export default function PreferencesSection() {
                                     showMatchesToggle={false}
                                     areaNameControl={(
                                         <div className="flex shrink-0 items-center gap-2">
-                                            <label htmlFor="pref-area-name" className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                            <label htmlFor="pref-area-name" className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                                                 Name
                                             </label>
                                             <input
@@ -255,11 +255,11 @@ export default function PreferencesSection() {
                                                 maxLength={10}
                                                 placeholder="Area name"
                                                 size={12}
-                                                className="w-28 border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                className="w-28 border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                                                 data-testid="preferences-area-name"
                                             />
                                             <span
-                                                className={`text-[11px] transition-opacity ${areaSavedFlash ? 'text-emerald-600 opacity-100' : 'opacity-0'}`}
+                                                className={`text-[11px] transition-opacity ${areaSavedFlash ? 'text-success opacity-100' : 'opacity-0'}`}
                                                 role="status"
                                                 aria-live="polite"
                                             >
@@ -270,7 +270,7 @@ export default function PreferencesSection() {
                                 />
                             )}
 
-                            {error && <p className="text-xs text-red-700 mb-2">{error}</p>}
+                            {error && <p className="text-xs text-danger mb-2">{error}</p>}
 
                             {hasSetPrefs && (
                                 <div className="flex justify-end">
@@ -278,7 +278,7 @@ export default function PreferencesSection() {
                                         type="button"
                                         onClick={handleClearAll}
                                         disabled={saving}
-                                        className="border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                        className="border border-line bg-surface px-3 py-1 text-xs font-medium text-ink hover:bg-canvas disabled:opacity-50"
                                         data-testid="preferences-clear"
                                     >
                                         Clear all preferences

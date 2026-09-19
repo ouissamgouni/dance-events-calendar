@@ -26,11 +26,11 @@ interface EditForm {
 function statusBadge(status: string) {
     const colors: Record<string, string> = {
         pending: 'bg-amber-100 text-amber-700',
-        approved: 'bg-emerald-100 text-emerald-700',
-        rejected: 'bg-slate-200 text-slate-700',
+        approved: 'bg-emerald-100 text-success',
+        rejected: 'bg-slate-200 text-ink',
     };
     return (
-        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
+        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-ink-soft'}`}>
             {status}
         </span>
     );
@@ -139,17 +139,17 @@ export default function AdminEventPromoCodes({
     };
 
     return (
-        <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+        <div className="border border-line rounded-lg bg-canvas overflow-hidden">
             <div className="w-full flex items-center gap-2 px-3 py-1.5">
                 <button
                     type="button"
                     onClick={() => setExpanded((v) => !v)}
                     className="flex flex-1 min-w-0 items-center gap-2 text-left hover:opacity-80 transition"
                 >
-                    <span className="text-slate-400 text-[10px]">{expanded ? '▾' : '▸'}</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Promo codes</span>
+                    <span className="text-muted text-[10px]">{expanded ? '▾' : '▸'}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">Promo codes</span>
                     {loaded && rows.length > 0 && (
-                        <span className="text-[10px] text-slate-400">({rows.length})</span>
+                        <span className="text-[10px] text-muted">({rows.length})</span>
                     )}
                 </button>
                 <VisibilityOverrideControl
@@ -159,12 +159,12 @@ export default function AdminEventPromoCodes({
                 />
             </div>
             {expanded && (
-                <div className="border-t border-slate-200 bg-white p-3 space-y-2">
-                    {error && <p className="text-[11px] text-red-500">{error}</p>}
+                <div className="border-t border-line bg-surface p-3 space-y-2">
+                    {error && <p className="text-[11px] text-danger">{error}</p>}
                     {loading ? (
-                        <p className="text-[11px] text-slate-400">Loading…</p>
+                        <p className="text-[11px] text-muted">Loading…</p>
                     ) : rows.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 italic">No promo codes submitted for this event</p>
+                        <p className="text-[11px] text-muted italic">No promo codes submitted for this event</p>
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {rows.map((p) => (
@@ -176,7 +176,7 @@ export default function AdminEventPromoCodes({
                                                 value={editForm.code}
                                                 maxLength={64}
                                                 onChange={(e) => setEditForm({ ...editForm, code: e.target.value })}
-                                                className="border border-slate-300 px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-blue-400"
+                                                className="border border-line px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-blue-400"
                                             />
                                             <input
                                                 type="text"
@@ -184,7 +184,7 @@ export default function AdminEventPromoCodes({
                                                 value={editForm.description}
                                                 maxLength={200}
                                                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                                className="border border-slate-300 px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+                                                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
                                             />
                                             <input
                                                 type="url"
@@ -192,15 +192,15 @@ export default function AdminEventPromoCodes({
                                                 value={editForm.source_url}
                                                 maxLength={500}
                                                 onChange={(e) => setEditForm({ ...editForm, source_url: e.target.value })}
-                                                className="border border-slate-300 px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+                                                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
                                             />
-                                            <label className="text-[10px] text-slate-500 flex items-center gap-2">
+                                            <label className="text-[10px] text-ink-soft flex items-center gap-2">
                                                 Expires
                                                 <input
                                                     type="date"
                                                     value={editForm.expires_at}
                                                     onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })}
-                                                    className="border border-slate-300 px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+                                                    className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
                                                 />
                                             </label>
                                             <div className="flex gap-2 pt-0.5">
@@ -208,14 +208,14 @@ export default function AdminEventPromoCodes({
                                                     type="button"
                                                     disabled={acting === p.id}
                                                     onClick={() => saveEdit(p.id)}
-                                                    className="text-[11px] bg-blue-500 text-white px-2 py-1 hover:bg-blue-600 disabled:opacity-50"
+                                                    className="text-[11px] bg-action text-white px-2 py-1 hover:bg-action disabled:opacity-50"
                                                 >
                                                     Save
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => { setEditingId(null); setEditForm(null); }}
-                                                    className="text-[11px] text-slate-500 hover:text-slate-700 px-2"
+                                                    className="text-[11px] text-ink-soft hover:text-ink px-2"
                                                 >
                                                     Cancel
                                                 </button>
@@ -225,19 +225,19 @@ export default function AdminEventPromoCodes({
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="font-mono text-xs text-slate-900">{p.code}</span>
+                                                    <span className="font-mono text-xs text-ink">{p.code}</span>
                                                     {statusBadge(p.status)}
                                                     {p.expires_at && (
-                                                        <span className="text-[10px] text-slate-500">
+                                                        <span className="text-[10px] text-ink-soft">
                                                             expires {new Date(p.expires_at).toLocaleDateString()}
                                                         </span>
                                                     )}
                                                 </div>
                                                 {p.description && (
-                                                    <div className="mt-1 text-[11px] text-slate-600">{p.description}</div>
+                                                    <div className="mt-1 text-[11px] text-ink-soft">{p.description}</div>
                                                 )}
                                                 {p.admin_notes && (
-                                                    <div className="mt-1 text-[11px] text-slate-500 italic">Notes: {p.admin_notes}</div>
+                                                    <div className="mt-1 text-[11px] text-ink-soft italic">Notes: {p.admin_notes}</div>
                                                 )}
                                             </div>
                                             <div className="flex flex-col gap-1 shrink-0">
@@ -245,7 +245,7 @@ export default function AdminEventPromoCodes({
                                                     type="button"
                                                     disabled={acting === p.id}
                                                     onClick={() => { setEditingId(p.id); setEditForm(toEditForm(p)); }}
-                                                    className="text-[11px] border border-slate-200 bg-white text-slate-600 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
+                                                    className="text-[11px] border border-line bg-surface text-ink-soft px-2 py-1 hover:bg-canvas disabled:opacity-50"
                                                 >
                                                     Edit
                                                 </button>
@@ -254,7 +254,7 @@ export default function AdminEventPromoCodes({
                                                         type="button"
                                                         disabled={acting === p.id}
                                                         onClick={() => approve(p.id)}
-                                                        className="text-[11px] bg-blue-500 text-white px-2 py-1 hover:bg-blue-600 disabled:opacity-50"
+                                                        className="text-[11px] bg-action text-white px-2 py-1 hover:bg-action disabled:opacity-50"
                                                     >
                                                         Approve
                                                     </button>
@@ -264,7 +264,7 @@ export default function AdminEventPromoCodes({
                                                         type="button"
                                                         disabled={acting === p.id}
                                                         onClick={() => { setRejectingId(p.id); setRejectNotes(''); }}
-                                                        className="text-[11px] bg-red-600 text-white px-2 py-1 hover:bg-red-700 disabled:opacity-50"
+                                                        className="text-[11px] bg-danger text-white px-2 py-1 hover:bg-danger/90 disabled:opacity-50"
                                                     >
                                                         Reject
                                                     </button>
@@ -273,28 +273,28 @@ export default function AdminEventPromoCodes({
                                         </div>
                                     )}
                                     {rejectingId === p.id && (
-                                        <div className="mt-2 border border-slate-200 bg-slate-50 p-2 flex flex-col gap-2">
+                                        <div className="mt-2 border border-line bg-canvas p-2 flex flex-col gap-2">
                                             <textarea
                                                 value={rejectNotes}
                                                 onChange={(e) => setRejectNotes(e.target.value)}
                                                 placeholder="Reason (optional, shown to submitter)"
                                                 rows={2}
                                                 maxLength={500}
-                                                className="text-[11px] border border-slate-300 px-2 py-1 focus:outline-none focus:border-blue-400"
+                                                className="text-[11px] border border-line px-2 py-1 focus:outline-none focus:border-blue-400"
                                             />
                                             <div className="flex gap-2">
                                                 <button
                                                     type="button"
                                                     disabled={acting === p.id}
                                                     onClick={() => reject(p.id)}
-                                                    className="text-[11px] bg-red-600 text-white px-2 py-1 hover:bg-red-700 disabled:opacity-50"
+                                                    className="text-[11px] bg-danger text-white px-2 py-1 hover:bg-danger/90 disabled:opacity-50"
                                                 >
                                                     Confirm reject
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setRejectingId(null)}
-                                                    className="text-[11px] text-slate-500 px-2"
+                                                    className="text-[11px] text-ink-soft px-2"
                                                 >
                                                     Cancel
                                                 </button>

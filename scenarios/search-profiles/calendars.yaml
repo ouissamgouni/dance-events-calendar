@@ -1,0 +1,7 @@
+calendars:
+  - id: "salsa-cal-sp-001"
+    name: "Salsa"
+    color: "#e11d48"
+    default_tags:
+      - dance-style:salsa
+      - reach:regional

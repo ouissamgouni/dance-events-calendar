@@ -5,7 +5,9 @@ test_plan:
     correctly, that mobile/tablet marker taps use a selected-event card over the
     bottom of the map instead of unstable Leaflet popups, and that admin
     location edits or sync geocoding make missing-coordinate events appear on
-    the map. Scenario uses mock calendar data with 31 events across 3 calendars.
+    the map. On mobile/tablet the Explorer is timeline-first: a short map
+    miniature sits below the filter chips and taps into a fullscreen map. Scenario
+    uses mock calendar data with 31 events across 3 calendars.
   steps:
     # ── Explorer Map ────────────────────────────────────────────
     - id: 1
@@ -32,38 +34,72 @@ test_plan:
         original map popup does not leave stale UI behind.
 
     - id: 3
-      title: "Mobile marker tap shows selected event card over map"
+      title: "Mobile Explorer is list-first with a map miniature"
       description: >
-        Resize to a phone width. In Explorer, tap a map marker. Do not tap the
-        event card yet.
+        Resize to a phone width and open Explorer. Look at the area directly
+        below the filter chips, above the results list.
       expected: >
-        No Leaflet popup appears on top of the small map. The page does not jump
-        sharply up or down. A white selected-event card appears over the bottom
-        of the map, like a compact popup replacement. The same event remains in
-        the mobile event list and is highlighted there when the user scrolls
-        down.
+        A short horizontal map miniature (~120px tall) appears below the filter
+        chips and above the timeline/list. The list is the default view. The
+        miniature is non-interactive for panning; it is only the entry point to
+        the full map. There are no List/Map tabs.
+
+    - id: 3b
+      title: "Tap miniature (or Map toggle) opens the fullscreen map"
+      description: >
+        On phone width, tap the map miniature. Alternatively, tap the Map icon
+        toggle in the filter summary bar.
+      expected: >
+        The map opens fullscreen with a compact sticky header showing a back
+        arrow, a Filters button, and the current area label. No event preview or
+        toast is shown initially. A bottom floating CTA reads "View list · N"
+        with N matching the result count.
 
     - id: 4
-      title: "Tablet stacked layout stays stable on marker taps"
+      title: "Fullscreen marker tap shows a compact bottom event preview"
       description: >
-        Resize to a tablet width below the desktop breakpoint where the list is
-        stacked under the map. Tap several different map markers and pan the map
-        slightly between taps.
+        In the fullscreen map, tap a map marker such as "Salsa Social Night –
+        Paris". Then tap a different marker (Madrid or Barcelona).
       expected: >
-        Each tap replaces the selected-event card over the map. The map remains
-        visible and clipped to its container, the page does not auto-scroll into
-        the event list, and the list may reorder by on-map/off-map status without
-        forcing the viewport to jump.
+        No Leaflet popup appears. A compact bottom preview shows the event name,
+        date, location, tags, people going, and Save + Details actions. Tapping
+        another pin replaces the current preview (no carousel/swiping). Tapping
+        or panning the map dismisses the preview.
+
+    - id: 4b
+      title: "Cluster tap zooms in; pan/zoom surfaces Search this area"
+      description: >
+        In the fullscreen map, tap a marker cluster, then pan/zoom the map a
+        meaningful amount.
+      expected: >
+        Tapping a cluster zooms in. After a meaningful viewport movement a
+        floating "Search this area" CTA appears. Tapping it uses the current
+        viewport/bbox, refreshes pins, updates the result count, and the bottom
+        CTA returns to "View list · N".
 
     - id: 5
-      title: "Selected mobile map card opens event details"
+      title: "Preview Details opens the event; Back/View list returns to the list"
       description: >
-        With a selected-event card visible over the map on phone or tablet,
-        click the card.
+        With a bottom preview visible, tap Details. Return to Explorer, reopen
+        the fullscreen map, then tap the back arrow (or the View list CTA).
       expected: >
-        The app opens the event detail page for that event with the
-        explorer-map source in the URL. Returning to Explorer should not restore
-        a stale Leaflet popup.
+        Details opens the event detail page with the explorer-map source in the
+        URL. The back arrow and View list CTA return directly to the previous
+        Explorer list state with filters, search area, sorting, and scroll
+        state preserved. No stale Leaflet popup is restored.
+
+    - id: 5b
+      title: "Area chip opens the area picker sheet"
+      description: >
+        In the mobile Explorer list (or the fullscreen map header), tap the area
+        chip/label. Choose "My area", "Anywhere", or drag the mini-map to a
+        custom area, then Apply. Optionally tap "Set as my default area".
+      expected: >
+        A bottom sheet opens with My area / Anywhere presets and a mini-map bbox
+        selector. "My area" reflects the area saved in the active profile.
+        Apply updates the search area for this session (and the URL) without
+        changing the saved profile. "Set as my default area" persists the chosen
+        area to the profile.
 
     - id: 6
       title: "Explorer filters refit beyond current map viewport"

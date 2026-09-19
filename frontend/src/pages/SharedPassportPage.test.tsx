@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import SharedPassportPage from './SharedPassportPage'
@@ -8,6 +8,7 @@ import { server } from '../test/server'
 
 const PUBLIC_PASSPORT = {
     display_name: 'Alba',
+    avatar_url: '/alba.jpg',
     stats: {
         total_events_attended: 12,
         cities_visited: 3,
@@ -46,6 +47,7 @@ const PUBLIC_PASSPORT = {
     sections: ['milestones', 'cities', 'countries'],
     timeline_items: [],
     timeline_markers: [],
+    monthly_activity: [],
     handle: 'alba',
     is_self: false,
     is_following: false,
@@ -74,10 +76,14 @@ describe('SharedPassportPage', () => {
 
         renderShared()
 
-        expect(await screen.findByText(/12 events · 3 cities · 2 countries/)).toBeInTheDocument()
-        expect(screen.getByText(/Alba.*Dance Passport/)).toBeInTheDocument()
-        expect(screen.getByText('First Steps')).toBeInTheDocument()
-        expect(screen.getByText(/1\/1 unlocked/)).toBeInTheDocument()
+        expect(await screen.findByText('Alba')).toBeInTheDocument()
+        expect(screen.getByText('@alba')).toBeInTheDocument()
+        expect(screen.getByText('Your stats')).toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: 'Milestones' })).toHaveAttribute('aria-selected', 'true')
+        expect(screen.getByRole('tab', { name: 'Journey' })).toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: 'Places' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: /Events.*1 \/ 1 unlocked/ }))
+        expect(await screen.findByText('First Steps')).toBeInTheDocument()
     })
 
     it('shows a graceful message for an unknown token', async () => {

@@ -1,14 +1,14 @@
 """Interest-profile match notifications.
 
 Run periodically by the notification dispatch loop. For every enabled
-``UserInterestProfile`` (geography + dance-style/reach tags), scans recently
+``UserInterestProfile`` (geography + dance styles + event reach), scans recently
 ingested ``CachedEvent`` rows and creates a single in-app ``interest_event``
 notification for each (user, event) match.
 
 Matching (PRD section 7, group-aware):
   - >=1 overlap between the event's tags and the profile's dance-style tags.
-  - reach: empty profile reach selection = "match any scale"; otherwise
-    >=1 overlap between the event's tags and the profile's reach tags.
+    - reach: Any imposes no restriction; Regional+ matches Regional or
+        International; International matches International only.
   - geography: event lat/lng inside the profile's bbox
     (``min_lat``/``min_lng``/``max_lat``/``max_lng``).
   - Events without lat/lng are excluded entirely (can't test geography).
@@ -41,6 +41,8 @@ from sqlmodel import Session, select
 
 from backend.services.app_settings import get_interest_match_notifications_enabled
 from backend.services.notification_delivery import record_delivery
+from backend.services.profile_geography import profile_contains_point
+from backend.services.reach import reach_matches
 from backend.db.database import get_engine
 from backend.db.models import (
     CachedEvent,
@@ -72,10 +74,7 @@ def _utcnow_naive() -> datetime:
 def _geo_match(profile: UserInterestProfile, lat: float, lng: float) -> bool:
     if None in (profile.min_lat, profile.min_lng, profile.max_lat, profile.max_lng):
         return False
-    return (
-        profile.min_lat <= lat <= profile.max_lat
-        and profile.min_lng <= lng <= profile.max_lng
-    )
+    return profile_contains_point(profile, lat, lng)
 
 
 def _get_last_scan(session: Session) -> datetime:
@@ -199,14 +198,14 @@ def _find_matches(
 
     matches: dict[tuple, list[str]] = {}
     for profile, user in profiles:
-        dance_ids, reach_ids = profile_tags.get(profile.id, (set(), set()))
+        dance_ids, _reach_ids = profile_tags.get(profile.id, (set(), set()))
         if not dance_ids:
             continue
         for event in events:
             tags = event_tags.get(event.event_id, set())
             if not (dance_ids & tags):
                 continue
-            if reach_ids and not (reach_ids & tags):
+            if not reach_matches(profile.reach_filter, event.reach):
                 continue
             if not _geo_match(profile, event.latitude, event.longitude):
                 continue

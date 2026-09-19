@@ -11,22 +11,22 @@ interface SyncJobPanelProps {
 }
 
 const STATUS_DOT: Record<string, string> = {
-    running: 'bg-blue-500 animate-pulse',
+    running: 'bg-action animate-pulse',
     abort_requested: 'bg-amber-400 animate-pulse',
-    completed: 'bg-emerald-500',
+    completed: 'bg-success',
     warning: 'bg-amber-500',
-    failed: 'bg-red-500',
+    failed: 'bg-danger',
     aborted: 'bg-gray-400',
     idle: 'bg-gray-300',
 };
 
 const STATUS_BADGE: Record<string, string> = {
-    running: 'bg-blue-50 text-blue-700',
+    running: 'bg-blue-50 text-action',
     abort_requested: 'bg-amber-50 text-amber-700',
-    completed: 'bg-emerald-50 text-emerald-700',
+    completed: 'bg-emerald-50 text-success',
     warning: 'bg-amber-50 text-amber-700',
-    failed: 'bg-red-50 text-red-700',
-    aborted: 'bg-gray-100 text-gray-500',
+    failed: 'bg-red-50 text-danger',
+    aborted: 'bg-gray-100 text-ink-soft',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -73,23 +73,23 @@ function JobCard({
     return (
         <div
             onClick={onOpen}
-            className={`px-4 py-3 transition cursor-pointer ${active ? 'bg-blue-50/40 hover:bg-blue-50/60' : 'hover:bg-gray-50/50'}`}
+            className={`px-4 py-3 transition cursor-pointer ${active ? 'bg-blue-50/40 hover:bg-blue-50/60' : 'hover:bg-canvas/50'}`}
         >
             {/* Header row */}
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                     <span className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[job.status] ?? 'bg-gray-300'}`} />
-                    <span className="text-xs font-medium text-gray-700 capitalize">{job.mode}</span>
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                    <span className="text-xs font-medium text-ink capitalize">{job.mode}</span>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-ink-soft'}`}>
                         {STATUS_LABEL[job.status] ?? job.status}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-gray-400">{duration}</span>
+                    <span className="text-[10px] text-muted">{duration}</span>
                     {job.status === 'running' && onAbort && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onAbort(); }}
-                            className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1.5 py-0.5 border border-red-200 hover:border-red-400 transition"
+                            className="text-[10px] text-danger hover:text-danger font-medium px-1.5 py-0.5 border border-red-200 hover:border-red-400 transition"
                         >
                             Abort
                         </button>
@@ -101,9 +101,9 @@ function JobCard({
             <div className="ml-3.5 grid grid-cols-3 gap-x-4 gap-y-0.5 mb-1">
                 {totals.map(([label, val]) => (
                     <div key={label} className="flex items-center gap-1">
-                        <span className="text-[10px] text-gray-400">{label}:</span>
+                        <span className="text-[10px] text-muted">{label}:</span>
                         <span
-                            className={`text-[10px] font-medium ${label === 'Failed' && val > 0 ? 'text-red-500' : 'text-gray-600'
+                            className={`text-[10px] font-medium ${label === 'Failed' && val > 0 ? 'text-danger' : 'text-ink-soft'
                                 }`}
                         >
                             {val}
@@ -116,11 +116,11 @@ function JobCard({
             {Object.keys(job.stage_totals).length > 0 && (
                 <div className="ml-3.5 flex flex-wrap gap-x-3 gap-y-0.5 mb-0.5">
                     {Object.entries(job.stage_totals).map(([stage, stats]) => (
-                        <span key={stage} className="text-[10px] text-gray-400">
+                        <span key={stage} className="text-[10px] text-muted">
                             {stage}:{' '}
-                            <span className="text-emerald-600">{stats.processed}</span>
+                            <span className="text-success">{stats.processed}</span>
                             {stats.failed > 0 && (
-                                <> / <span className="text-red-500">{stats.failed}f</span></>
+                                <> / <span className="text-danger">{stats.failed}f</span></>
                             )}
                         </span>
                     ))}
@@ -130,22 +130,22 @@ function JobCard({
             {/* since_date / enrichment running indicator */}
             <div className="ml-3.5 flex items-center gap-3">
                 {job.since_date && (
-                    <span className="text-[10px] text-gray-400">since {job.since_date}</span>
+                    <span className="text-[10px] text-muted">since {job.since_date}</span>
                 )}
                 {active && job.totals.events_fetched > job.totals.events_upserted + job.totals.events_deduped + job.totals.events_failed && (
-                    <span className="text-[10px] text-blue-500 animate-pulse">enriching…</span>
+                    <span className="text-[10px] text-action animate-pulse">enriching…</span>
                 )}
             </div>
 
             {/* Error / warning */}
             {job.error_message && (
-                <p className="ml-3.5 mt-1 text-[10px] text-red-600 break-words">{job.error_message}</p>
+                <p className="ml-3.5 mt-1 text-[10px] text-danger break-words">{job.error_message}</p>
             )}
             {job.warning_message && (
                 <p className="ml-3.5 mt-0.5 text-[10px] text-amber-600 break-words">{job.warning_message}</p>
             )}
 
-            <p className="ml-3.5 mt-0.5 text-[10px] text-gray-400">{started.toLocaleString()}</p>
+            <p className="ml-3.5 mt-0.5 text-[10px] text-muted">{started.toLocaleString()}</p>
         </div>
     );
 }
@@ -215,17 +215,17 @@ export default function SyncJobPanel({ isOpen, onClose, onJobComplete }: SyncJob
             {isOpen && <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />}
 
             <div
-                className={`fixed top-0 right-0 h-full w-[420px] bg-white shadow-lg border-l border-gray-200 z-50 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
+                className={`fixed top-0 right-0 h-full w-[420px] bg-surface shadow-lg border-l border-line z-50 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
                     }`}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50">
-                    <h2 className="text-xs font-semibold text-gray-800 uppercase tracking-wide">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas">
+                    <h2 className="text-xs font-semibold text-ink uppercase tracking-wide">
                         Sync Jobs
                     </h2>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1"
+                        className="text-muted hover:text-ink-soft text-sm leading-none p-1"
                         aria-label="Close"
                     >
                         ✕
@@ -235,7 +235,7 @@ export default function SyncJobPanel({ isOpen, onClose, onJobComplete }: SyncJob
                 <div className="overflow-y-auto h-[calc(100%-41px)] divide-y divide-gray-100">
                     {/* Empty state */}
                     {!currentIsNonIdle && historyWithoutCurrent.length === 0 && (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                        <div className="flex flex-col items-center justify-center h-full text-muted">
                             <p className="text-xs">No sync jobs yet</p>
                             <p className="text-[10px] mt-1 text-gray-300">Click "Sync Now" to start one</p>
                         </div>
@@ -244,8 +244,8 @@ export default function SyncJobPanel({ isOpen, onClose, onJobComplete }: SyncJob
                     {/* Current job */}
                     {currentIsNonIdle && (
                         <>
-                            <div className="px-4 py-1.5 bg-gray-50">
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                            <div className="px-4 py-1.5 bg-canvas">
+                                <span className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">
                                     Current
                                 </span>
                             </div>
@@ -260,8 +260,8 @@ export default function SyncJobPanel({ isOpen, onClose, onJobComplete }: SyncJob
                     {/* History */}
                     {historyWithoutCurrent.length > 0 && (
                         <>
-                            <div className="px-4 py-1.5 bg-gray-50">
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                            <div className="px-4 py-1.5 bg-canvas">
+                                <span className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">
                                     History
                                 </span>
                             </div>

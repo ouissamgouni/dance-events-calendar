@@ -15,9 +15,9 @@ export default function InstallAppSection() {
 
     if (isStandalone) {
         return (
-            <section className="border border-slate-200 bg-white p-4 mb-3">
-                <h2 className="text-sm font-semibold text-slate-900 mb-1">Install app</h2>
-                <p className="text-xs text-slate-500">Movida is installed on this device.</p>
+            <section className="border border-line bg-surface p-4 mb-3">
+                <h2 className="text-sm font-semibold text-ink mb-1">Install app</h2>
+                <p className="text-xs text-ink-soft">Movida is installed on this device.</p>
             </section>
         );
     }
@@ -34,16 +34,16 @@ export default function InstallAppSection() {
     };
 
     return (
-        <section className="border border-slate-200 bg-white p-4 mb-3">
-            <h2 className="text-sm font-semibold text-slate-900 mb-1">Install app</h2>
-            <p className="text-xs text-slate-500 mb-2">
+        <section className="border border-line bg-surface p-4 mb-3">
+            <h2 className="text-sm font-semibold text-ink mb-1">Install app</h2>
+            <p className="text-xs text-ink-soft mb-2">
                 Add Movida to your home screen for faster access.
             </p>
             <button
                 type="button"
                 disabled={installing}
                 onClick={install}
-                className="bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-60"
+                className="bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action disabled:opacity-60"
             >
                 {installing ? 'Installing…' : 'Install'}
             </button>

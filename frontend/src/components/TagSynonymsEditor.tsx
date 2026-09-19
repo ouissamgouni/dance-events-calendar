@@ -103,40 +103,40 @@ export default function TagSynonymsEditor({ tagId, tagLabel, onClose }: Props) {
                 <div
                     ref={popoverRef}
                     style={{ top: coords.top, left: coords.left }}
-                    className="fixed z-[200] w-72 bg-white border border-slate-200 rounded shadow-lg p-3"
+                    className="fixed z-[200] w-72 bg-surface border border-line rounded shadow-lg p-3"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex items-center justify-between mb-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
                             Synonyms · {tagLabel}
                         </p>
                         <button
                             onClick={onClose}
-                            className="text-slate-400 hover:text-slate-600 text-xs"
+                            className="text-muted hover:text-ink-soft text-xs"
                             aria-label="Close synonyms editor"
                         >
                             ✕
                         </button>
                     </div>
-                    <p className="text-[10px] text-slate-400 mb-2 leading-snug">
+                    <p className="text-[10px] text-muted mb-2 leading-snug">
                         Terms the auto-suggester matches against event title, description and location.
                     </p>
                     {loading ? (
-                        <p className="text-[11px] text-slate-400">Loading…</p>
+                        <p className="text-[11px] text-muted">Loading…</p>
                     ) : (
                         <div className="flex flex-wrap gap-1 mb-2 min-h-[24px]">
                             {synonyms.length === 0 ? (
-                                <span className="text-[10px] text-slate-400 italic">No synonyms</span>
+                                <span className="text-[10px] text-muted italic">No synonyms</span>
                             ) : (
                                 synonyms.map((s) => (
                                     <span
                                         key={s.id}
-                                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5"
+                                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-ink text-[10px] px-2 py-0.5"
                                     >
                                         {s.term}
                                         <button
                                             onClick={() => handleRemove(s.id)}
-                                            className="text-slate-400 hover:text-slate-600"
+                                            className="text-muted hover:text-ink-soft"
                                             aria-label={`Remove ${s.term}`}
                                         >
                                             ×
@@ -155,7 +155,7 @@ export default function TagSynonymsEditor({ tagId, tagLabel, onClose }: Props) {
                                 if (e.key === 'Enter') handleAdd();
                             }}
                             placeholder="Add term…"
-                            className="flex-1 border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                            className="flex-1 border border-line rounded px-2 py-1 text-[11px] text-ink placeholder:text-muted focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                         />
                         <button
                             onClick={handleAdd}
@@ -165,7 +165,7 @@ export default function TagSynonymsEditor({ tagId, tagLabel, onClose }: Props) {
                             Add
                         </button>
                     </div>
-                    {error && <p className="mt-1 text-[10px] text-slate-600">{error}</p>}
+                    {error && <p className="mt-1 text-[10px] text-ink-soft">{error}</p>}
                 </div>,
                 document.body,
             )}

@@ -91,6 +91,7 @@ export default function UserSearchBox() {
                 !containerRef.current.contains(e.target as Node)
             ) {
                 setOpen(false);
+                setMobileExpanded(false);
             }
         };
         document.addEventListener('mousedown', onDoc);
@@ -100,6 +101,7 @@ export default function UserSearchBox() {
     const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Escape') {
             setOpen(false);
+            setMobileExpanded(false);
             (e.target as HTMLInputElement).blur();
             return;
         }
@@ -137,8 +139,7 @@ export default function UserSearchBox() {
         setMobileExpanded(false);
     };
 
-    // Collapsed to a magnifier icon by default (all breakpoints); tap to expand
-    // into an inline input that replaces the icon (header logo stays visible).
+    // Below lg, the icon opens a fixed panel beneath the header.
     const [mobileExpanded, setMobileExpanded] = useState(false);
     const mobileInputRef = useRef<HTMLInputElement>(null);
     useEffect(() => {
@@ -156,136 +157,147 @@ export default function UserSearchBox() {
         onKeyDown,
         placeholder: 'Search people…',
         'aria-label': 'Search users',
+        role: 'combobox',
+        'aria-expanded': open,
     };
 
     const term = q.trim();
     const showDropdown = open && (term.length === 0 || term.length >= 2);
 
+    const renderDropdownContent = (idPrefix: string) => (
+        <div id={`${idPrefix}-listbox`} role="listbox">
+            {term.length === 0 && (
+                <Link
+                    to="/tribe/discover"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={reset}
+                    className="block px-3 py-2 hover:bg-canvas"
+                >
+                    <div className="text-xs font-medium text-ink">Find people</div>
+                    <div className="text-[11px] text-ink-soft">
+                        Browse suggestions and curated calendars
+                    </div>
+                </Link>
+            )}
+            {loading && <div className="p-3 text-xs text-ink-soft">Searching…</div>}
+            {!loading && term.length >= 2 && results.length === 0 && (
+                <div className="p-3 text-xs text-ink-soft">No users match “{term}”.</div>
+            )}
+            {!loading && results.map((user, index) => (
+                <UserRow
+                    key={user.handle}
+                    id={`${idPrefix}-option-${index}`}
+                    user={user}
+                    active={index === activeIdx}
+                    onClick={reset}
+                />
+            ))}
+            {!loading && results.length === 0 && (suggestionsLoading || suggestions.length > 0) && (
+                <>
+                    <div className="border-t border-card-line px-3 pb-1 pt-3">
+                        <div className="text-[11px] font-semibold uppercase text-ink">Suggestions</div>
+                    </div>
+                    {suggestionsLoading ? (
+                        <div className="p-3 text-xs text-ink-soft">Loading…</div>
+                    ) : (
+                        suggestions.map((user, index) => (
+                            <UserRow
+                                key={user.handle}
+                                id={`${idPrefix}-option-${index}`}
+                                user={user}
+                                active={index === activeIdx}
+                                onClick={reset}
+                            />
+                        ))
+                    )}
+                </>
+            )}
+            {term.length >= 2 && (
+                <Link
+                    to={`/tribe/discover?q=${encodeURIComponent(term)}`}
+                    onClick={reset}
+                    className="block border-t border-card-line px-3 py-2 text-xs text-action hover:bg-canvas"
+                >
+                    See more on Discover →
+                </Link>
+            )}
+            {!loading && term.length >= 2 && results.length === 0 && (
+                <Link
+                    to="/invite"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={reset}
+                    className="block border-t border-card-line px-3 py-2 text-xs text-action hover:bg-canvas"
+                >
+                    Can’t find them? Invite a friend →
+                </Link>
+            )}
+        </div>
+    );
+
     return (
         <div ref={containerRef} className="relative">
-            {/* Collapsed icon trigger (hidden when expanded) */}
+            <div className="hidden w-64 items-center gap-2 border border-line bg-canvas px-2 py-1 lg:flex">
+                <img src="/find-user.png" alt="" aria-hidden="true" className="h-4 w-4 shrink-0" />
+                <input
+                    {...inputCommonProps}
+                    aria-controls="people-search-desktop-listbox"
+                    aria-activedescendant={activeIdx >= 0 ? `people-search-desktop-option-${activeIdx}` : undefined}
+                    className="min-w-0 flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none"
+                />
+            </div>
+
             {!mobileExpanded && (
                 <button
                     type="button"
-                    onClick={() => setMobileExpanded(true)}
+                    onClick={() => {
+                        setMobileExpanded(true);
+                        setOpen(true);
+                    }}
                     aria-label="Search users"
                     title="Search users"
-                    className="inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition"
+                    className="inline-flex h-11 w-11 items-center justify-center text-ink-soft transition hover:text-ink lg:hidden"
                 >
                     <img
                         src="/find-user.png"
                         alt=""
                         aria-hidden="true"
-                        className="h-4 w-4 invert"
+                        className="h-6 w-6"
                     />
                 </button>
             )}
 
-            {/* Expanded: inline input replacing the icon */}
             {mobileExpanded && (
-                <div className="inline-flex items-center gap-1">
-                    <input
-                        {...inputCommonProps}
-                        ref={mobileInputRef}
-                        onBlur={() => {
-                            // Auto-collapse if user taps away with no query.
-                            if (q === '') setMobileExpanded(false);
-                        }}
-                        className="w-40 sm:w-48 text-xs px-2 py-1 bg-gray-700 text-white placeholder:text-gray-400 border border-gray-600 focus:outline-none focus:border-blue-400"
-                    />
-                    <button
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={reset}
-                        aria-label="Close search"
-                        title="Close search"
-                        className="inline-flex items-center justify-center w-6 h-6 text-white hover:text-gray-200 transition"
-                    >
-                        <svg
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            className="w-4 h-4"
-                            aria-hidden="true"
-                        >
-                            <path
-                                fillRule="evenodd"
-                                clipRule="evenodd"
-                                d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z"
+                <div
+                    className="fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg lg:hidden"
+                    style={{ top: 'calc(64px + env(safe-area-inset-top) + 6px)' }}
+                >
+                    <div className="flex items-center gap-2 border-b border-line p-2">
+                        <div className="flex flex-1 items-center gap-2 border border-line bg-surface px-2 py-1.5">
+                            <img src="/find-user.png" alt="" aria-hidden="true" className="h-4 w-4 shrink-0" />
+                            <input
+                                {...inputCommonProps}
+                                aria-controls="people-search-compact-listbox"
+                                aria-activedescendant={activeIdx >= 0 ? `people-search-compact-option-${activeIdx}` : undefined}
+                                ref={mobileInputRef}
+                                className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
                             />
-                        </svg>
-                    </button>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={reset}
+                            aria-label="Close people search"
+                            className="inline-flex h-9 w-9 items-center justify-center text-ink-soft hover:text-ink"
+                        >
+                            <span aria-hidden="true">×</span>
+                        </button>
+                    </div>
+                    {showDropdown && <div className="max-h-80 overflow-auto">{renderDropdownContent('people-search-compact')}</div>}
                 </div>
             )}
 
             {showDropdown && (
-                <div className="absolute right-0 mt-1 w-64 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 shadow-lg z-50 max-h-80 overflow-auto">
-                    {term.length === 0 && (
-                        <Link
-                            to="/tribe/discover"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={reset}
-                            className="block px-3 py-2 hover:bg-slate-50"
-                        >
-                            <div className="text-xs font-medium text-slate-900">
-                                Find people
-                            </div>
-                            <div className="text-[11px] text-slate-500">
-                                Browse suggestions and curated calendars
-                            </div>
-                        </Link>
-                    )}
-                    {loading && (
-                        <div className="p-3 text-xs text-slate-500">Searching…</div>
-                    )}
-                    {!loading && term.length >= 2 && results.length === 0 && (
-                        <div className="p-3 text-xs text-slate-500">
-                            No users match “{term}”.
-                        </div>
-                    )}
-                    {!loading &&
-                        results.map((u, i) => (
-                            <UserRow key={u.handle} user={u} active={i === activeIdx} onClick={reset} />
-                        ))}
-                    {!loading && results.length === 0 && (suggestionsLoading || suggestions.length > 0) && (
-                        <>
-                            <div className="px-3 pt-3 pb-1 border-t border-slate-100">
-                                <div className="text-[11px] font-semibold text-slate-700 uppercase">
-                                    Suggestions
-                                </div>
-                            </div>
-                            {suggestionsLoading ? (
-                                <div className="p-3 text-xs text-slate-500">Loading…</div>
-                            ) : (
-                                suggestions.map((u, i) => (
-                                    <UserRow
-                                        key={u.handle}
-                                        user={u}
-                                        active={i === activeIdx}
-                                        onClick={reset}
-                                    />
-                                ))
-                            )}
-                        </>
-                    )}
-                    {term.length >= 2 && (
-                        <Link
-                            to={`/tribe/discover?q=${encodeURIComponent(term)}`}
-                            onClick={reset}
-                            className="block px-3 py-2 text-xs text-blue-600 hover:bg-slate-50 border-t border-slate-100"
-                        >
-                            See more on Discover →
-                        </Link>
-                    )}
-                    {!loading && term.length >= 2 && results.length === 0 && (
-                        <Link
-                            to="/invite"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={reset}
-                            className="block px-3 py-2 text-xs text-blue-600 hover:bg-slate-50 border-t border-slate-100"
-                        >
-                            Can’t find them? Invite a friend →
-                        </Link>
-                    )}
+                <div className="absolute right-0 z-[8600] mt-1 hidden max-h-80 w-64 overflow-auto border border-line bg-surface shadow-lg lg:block">
+                    {renderDropdownContent('people-search-desktop')}
                 </div>
             )}
         </div>
@@ -293,26 +305,31 @@ export default function UserSearchBox() {
 }
 
 function UserRow({
+    id,
     user,
     active,
     onClick,
 }: {
+    id: string;
     user: UserSearchResult;
     active: boolean;
     onClick: () => void;
 }) {
     return (
         <Link
+            id={id}
+            role="option"
+            aria-selected={active}
             to={`/u/${user.handle}`}
             onClick={onClick}
             className={
-                'flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-slate-50 ' +
-                (active ? 'bg-slate-50' : '')
+                'flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-canvas ' +
+                (active ? 'bg-canvas' : '')
             }
         >
             <Avatar url={user.avatar_url} name={user.display_name || user.handle} />
             <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 text-slate-900 truncate">
+                <div className="flex items-center gap-1 text-ink truncate">
                     <span className="truncate">
                         {user.display_name || `@${user.handle}`}
                     </span>
@@ -335,7 +352,7 @@ function UserRow({
                         />
                     )}
                 </div>
-                <div className="text-[11px] text-slate-500 truncate">
+                <div className="text-[11px] text-ink-soft truncate">
                     @{user.handle} · {user.subscribers_count} subscriber
                     {user.subscribers_count === 1 ? '' : 's'}
                 </div>
@@ -356,7 +373,7 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
     }
     const initial = (name || '?').trim().charAt(0).toUpperCase();
     return (
-        <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold shrink-0">  {/* eslint-disable-line no-restricted-syntax -- avatar */}
+        <div className="w-7 h-7 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-xs font-semibold shrink-0">  {/* eslint-disable-line no-restricted-syntax -- avatar */}
             {initial}
         </div>
     );

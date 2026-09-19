@@ -71,7 +71,7 @@ export default function SignUpBanner() {
         <div
             role="region"
             aria-label="Sign in promotion"
-            className="flex items-center justify-between gap-3 bg-blue-50 border-b border-blue-100 px-4 py-1.5 text-xs text-slate-700"
+            className="flex items-center justify-between gap-3 bg-blue-50 border-b border-blue-100 px-4 py-1.5 text-xs text-ink"
         >
             <p className="min-w-0 sm:truncate truncate sm:whitespace-normal">
                 <span className="hidden sm:inline">
@@ -84,7 +84,7 @@ export default function SignUpBanner() {
             <div className="flex items-center gap-2 shrink-0">
                 <Link
                     to="/login"
-                    className="bg-blue-500 px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-blue-600 transition"
+                    className="bg-action px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-action transition"
                 >
                     Sign in
                 </Link>
@@ -92,7 +92,7 @@ export default function SignUpBanner() {
                     type="button"
                     onClick={handleDismiss}
                     aria-label="Dismiss sign-in banner"
-                    className="text-slate-400 hover:text-slate-600 text-base leading-none px-1"
+                    className="text-muted hover:text-ink-soft text-base leading-none px-1"
                 >
                     ×
                 </button>

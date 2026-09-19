@@ -9,8 +9,7 @@ export interface SectionTab {
 export const TRIBE_TABS: SectionTab[] = [
     { label: 'Calendars', path: '/tribe/calendars' },
     { label: 'Activity', path: '/tribe/activity' },
-    { label: 'Discover', path: '/tribe/discover' },
-    { label: 'Network', path: '/tribe/network' },
+    { label: 'People', path: '/tribe/network' },
     { label: 'Reviews', path: '/tribe/reviews' },
 ];
 
@@ -40,11 +39,20 @@ const SECTION_GATE: Record<SectionKey, { title: string; body: string }> = {
     },
 };
 
+function getTitleForMinePath(pathname: string): string | null {
+    // Map /mine sub-paths to their display titles
+    if (pathname === '/mine/calendar') return 'My Events';
+    if (pathname === '/mine/passport') return 'Passport';
+    if (pathname === '/mine/profiles' || pathname.startsWith('/mine/profiles/')) return 'Profiles';
+    if (pathname === '/mine/reviews') return 'Reviews';
+    return null;
+}
+
 function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: string; hub: string }) {
     return (
         <nav
             aria-label="Section"
-            className="flex items-center gap-1 overflow-x-auto border-b border-slate-200 px-4 scrollbar-none"
+            className="flex items-center gap-1 overflow-x-auto border-b border-line px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
             {tabs.map((t) => {
                 // The hub tab (e.g. /mine) matches its own path exactly so it
@@ -58,8 +66,8 @@ function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: st
                         to={t.path}
                         aria-current={active ? 'page' : undefined}
                         className={`shrink-0 -mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition ${active
-                            ? 'border-blue-500 text-blue-600'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
+                            ? 'border-action text-action'
+                            : 'border-transparent text-ink-soft hover:text-ink'
                             }`}
                     >
                         {t.label}
@@ -79,6 +87,8 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
     const { user, loading } = useAuth();
     const { hub, tabs } = SECTION_CONFIG[section];
     const title = section === 'tribe' ? 'Your Tribe' : null;
+    const minePageTitle = section === 'mine' ? getTitleForMinePath(pathname) : null;
+    const isMyEvents = pathname === '/mine/calendar';
 
     // Whole-section login gate (soft in-page callout). Every /tribe/* and
     // /mine/* route is signed-in only.
@@ -87,12 +97,12 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
         return (
             <div className="min-h-full bg-[#f8fafc]">
                 <div className="mx-auto max-w-3xl px-4 py-4">
-                    <div className="border border-blue-100 bg-blue-50 p-4 text-sm text-slate-700">
-                        <p className="mb-2 font-medium text-slate-800">{gate.title}</p>
-                        <p className="mb-3 text-slate-600">{gate.body}</p>
+                    <div className="border border-blue-100 bg-blue-50 p-4 text-sm text-ink">
+                        <p className="mb-2 font-medium text-ink">{gate.title}</p>
+                        <p className="mb-3 text-ink-soft">{gate.body}</p>
                         <Link
                             to={`/login?next=${encodeURIComponent(pathname)}`}
-                            className="inline-flex items-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
                         >
                             Sign in
                         </Link>
@@ -103,11 +113,31 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
     }
 
     return (
-        <div className="min-h-full bg-[#f8fafc]">
-            <div className="border-b border-slate-200 bg-white px-4 pt-1">
-                {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-slate-900">{title}</h1>}
-                <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
-            </div>
+        <div className={isMyEvents ? 'flex h-full min-h-0 flex-col overflow-hidden bg-canvas' : 'min-h-full bg-[#f8fafc]'}>
+            {section !== 'mine' && (
+                <div className="bg-surface px-4 pt-1">
+                    {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-ink">{title}</h1>}
+                    <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
+                </div>
+            )}
+            {section === 'mine' && pathname !== hub && minePageTitle && !isMyEvents && (
+                <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
+                    {pathname === '/mine/calendar' ? (
+                        <h1 className="text-2xl font-bold text-ink">My Events</h1>
+                    ) : (
+                        <div className="flex items-center gap-2 text-xl font-semibold text-ink">
+                            <Link
+                                to="/mine"
+                                className="text-action hover:text-action focus:outline-none"
+                            >
+                                MyDance
+                            </Link>
+                            <span className="text-ink-soft">&gt;</span>
+                            <span>{minePageTitle}</span>
+                        </div>
+                    )}
+                </div>
+            )}
             <Outlet />
         </div>
     );

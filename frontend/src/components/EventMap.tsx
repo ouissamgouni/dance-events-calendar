@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { MapContainer, Polygon, Rectangle, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Polygon, Polyline, Rectangle, TileLayer, useMap } from 'react-leaflet';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet.markercluster';
+import 'leaflet-gesture-handling';
+import 'leaflet-gesture-handling/dist/leaflet-gesture-handling.css';
 import type { CalendarEvent } from '../types';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
@@ -14,6 +16,7 @@ import TagBadges from './TagBadges';
 import AttendeeAvatarStack, { PEOPLE_ICON_PATH } from './AttendeeAvatarStack';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
+import { buildJourneyLegs } from '../utils/myEvents';
 
 export interface MapBounds {
     north: number;
@@ -28,6 +31,12 @@ const DEFAULT_AREA_CENTER: [number, number] = [
 ];
 const DEFAULT_ZOOM = 5;
 const CITY_ZOOM = 13;
+const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const CARTO_BASEMAP_KEY = (import.meta.env.VITE_CARTO_BASEMAP_KEY as string | undefined)?.trim();
+const BASEMAP_URL = CARTO_BASEMAP_KEY
+    ? `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(CARTO_BASEMAP_KEY)}`
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /**
  * Pick a fitBounds padding that won't cause Leaflet to fall back to a much
@@ -84,7 +93,7 @@ function followingChip(count: number): string {
 }
 
 /** Build the HTML for the new-event dot (top-right). Blue dot matches the
- * new-event affordance on the cards (`bg-blue-500`). */
+ * new-event affordance on the cards (`bg-action`). */
 function newEventDot(): string {
     return `<span style="position:absolute;right:-2px;top:-2px;width:8px;height:8px;border-radius:9999px;background:#3b82f6;border:1.5px solid white;box-sizing:content-box;"></span>`;
 }
@@ -143,6 +152,29 @@ function makeClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
         html: `<div style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;background:#3b82f6;color:white;border:3px solid white;box-shadow:0 2px 10px rgba(15,23,42,0.22);font:800 13px/1 system-ui,sans-serif;box-sizing:border-box;">${count}</div>`,
+    });
+}
+
+function escapeMarkerText(value: string): string {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function makeJourneyIcon(sequence: number, label: string, selected: boolean): L.DivIcon {
+    const circleSize = selected ? 30 : 24;
+    const circleLeft = (100 - circleSize) / 2;
+    return L.divIcon({
+        className: '',
+        iconSize: [100, 48],
+        iconAnchor: [50, circleSize / 2],
+        html: `<div style="position:relative;width:100px;height:48px;pointer-events:none;font-family:inherit;">
+            <span style="position:absolute;left:${circleLeft}px;top:0;width:${circleSize}px;height:${circleSize}px;border-radius:9999px;background:#2563eb;color:white;border:${selected ? '3px' : '2px'} solid white;box-shadow:${selected ? '0 0 0 4px rgba(37,99,235,.2),0 2px 8px rgba(15,23,42,.25)' : '0 2px 6px rgba(15,23,42,.2)'};display:flex;align-items:center;justify-content:center;box-sizing:border-box;font-size:${sequence >= 10 ? '9px' : '11px'};font-weight:800;line-height:1;">${sequence}</span>
+            <span style="position:absolute;left:0;right:0;top:${circleSize + 2}px;text-align:center;color:#172033;font-size:10px;font-weight:700;line-height:12px;text-shadow:0 1px 2px white,0 -1px 2px white,1px 0 2px white,-1px 0 2px white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeMarkerText(label)}</span>
+        </div>`,
     });
 }
 
@@ -214,6 +246,21 @@ interface Props {
      * buttons) that snaps the map back to these coordinates. Used on the
      * event detail page to return to the event's own location after panning. */
     recenterTo?: [number, number] | null;
+    /** Compact preview mode: hides the zoom buttons and the tile
+     * attribution so the map reads as a small, non-chrome miniature. */
+    compact?: boolean;
+    /** Require two-finger touch gestures so one finger can scroll the page. */
+    cooperativeGestures?: boolean;
+    /** Show a control below zoom that fits every currently rendered marker. */
+    fitMarkersControl?: boolean;
+    /** Chronological sequence labels for the My Events journey map. */
+    journeySequence?: Record<string, number>;
+    /** Draw curved sequence arrows between journey pins. */
+    journeyRouteOn?: boolean;
+    /** Toggle the journey route lines from a map control. */
+    onJourneyRouteToggle?: () => void;
+    /** Selected journey event, emphasized without changing zoom. */
+    journeySelectedEventId?: string | null;
 }
 
 interface PopupPortal {
@@ -245,14 +292,14 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
     return (
         <div className="space-y-1.5 text-xs min-w-[180px]">
             <p
-                className="font-semibold text-sm cursor-pointer hover:text-slate-600"
+                className="font-semibold text-sm cursor-pointer hover:text-ink-soft"
                 onClick={() => { onMarkSeen?.(event.event_id); onEventClick?.(event); }}
             >
                 {event.title}
             </p>
-            <p className="text-slate-500">{formatDate(event)}</p>
+            <p className="text-ink-soft">{formatDate(event)}</p>
             {event.location && (
-                <p className="text-slate-600">📍 {event.location}</p>
+                <p className="text-ink-soft">📍 {event.location}</p>
             )}
             {!minimalPopup && followingCount > 0 && (
                 <AttendeeAvatarStack
@@ -264,7 +311,7 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                 <TagBadges tags={event.tags} maxVisible={3} />
             )}
             {!minimalPopup && showRatings && hasReviews && (
-                <div className="text-slate-700">
+                <div className="text-ink">
                     {aggregate.display_state === 'full' && aggregate.mood_label ? (
                         <span>
                             {aspectMood(aggregate.average_mood).emoji}{' '}
@@ -272,11 +319,11 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                             ({aggregate.count})
                         </span>
                     ) : (
-                        <span className="text-slate-500">Early feedback ({aggregate.count})</span>
+                        <span className="text-ink-soft">Early feedback ({aggregate.count})</span>
                     )}
                 </div>
             )}
-            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-1 border-t border-card-line">
                 {minimalPopup ? (
                     <span />
                 ) : (
@@ -287,7 +334,7 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                 )}
                 <Link
                     to={`/event/${event.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
-                    className="text-[10px] font-medium text-blue-500 hover:text-blue-600"
+                    className="text-[10px] font-medium text-action hover:text-action"
                 >
                     Details →
                 </Link>
@@ -385,6 +432,69 @@ function MapResizeController() {
         };
     }, [map]);
 
+    return null;
+}
+
+function JourneyRouteLayer({ events }: { events: CalendarEvent[] }) {
+    const legs = useMemo(() => buildJourneyLegs(events), [events]);
+    return (
+        <>
+            {legs.map((leg, index) => (
+                <Fragment key={index}>
+                    <Polyline
+                        positions={leg.path}
+                        pathOptions={{ color: '#2563eb', weight: 1.5, opacity: 0.7, interactive: false }}
+                    />
+                    <Polyline
+                        positions={leg.arrow}
+                        pathOptions={{ color: '#2563eb', weight: 1.5, opacity: 0.8, interactive: false }}
+                    />
+                </Fragment>
+            ))}
+        </>
+    );
+}
+
+function JourneyViewportController({
+    events,
+    event,
+}: {
+    events: CalendarEvent[];
+    event: CalendarEvent | null;
+}) {
+    const map = useMap();
+    const positions = useMemo<[number, number][]>(
+        () => events
+            .filter((item) => item.latitude != null && item.longitude != null)
+            .map((item) => [item.latitude!, item.longitude!]),
+        [events],
+    );
+
+    useEffect(() => {
+        if (positions.length === 0) return;
+        const frame = window.requestAnimationFrame(() => {
+            map.invalidateSize({ pan: false });
+            if (positions.length === 1) {
+                map.setView(positions[0], CITY_ZOOM, { animate: false });
+                return;
+            }
+            const padding = adaptiveMarkerPadding(map);
+            map.fitBounds(L.latLngBounds(positions), {
+                padding: padding,
+                animate: false,
+            });
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [map, positions]);
+
+    useEffect(() => {
+        if (event?.latitude == null || event.longitude == null) return;
+        const padding = adaptiveMarkerPadding(map);
+        map.panInside(L.latLng(event.latitude, event.longitude), {
+            padding: padding,
+            animate: true,
+        });
+    }, [event, map]);
     return null;
 }
 
@@ -669,6 +779,116 @@ function RecenterControl({ recenterTo }: { recenterTo: [number, number] }) {
     return null;
 }
 
+function FitMarkersControl({ positions }: { positions: [number, number][] }) {
+    const map = useMap();
+    useEffect(() => {
+        if (positions.length === 0) return;
+        const control = new L.Control({ position: 'topleft' });
+        control.onAdd = () => {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            const link = L.DomUtil.create('a', '', container) as HTMLAnchorElement;
+            link.href = '#';
+            link.title = 'Fit current events';
+            link.setAttribute('role', 'button');
+            link.setAttribute('aria-label', 'Fit current events');
+            link.style.display = 'flex';
+            link.style.alignItems = 'center';
+            link.style.justifyContent = 'center';
+            link.innerHTML =
+                '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" ' +
+                'viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>' +
+                '<circle cx="12" cy="12" r="2"/></svg>';
+            L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.on(link, 'click', (event) => {
+                L.DomEvent.stop(event);
+                map.invalidateSize();
+                if (positions.length === 1) {
+                    map.setView(positions[0], CITY_ZOOM, { animate: true });
+                    return;
+                }
+                map.fitBounds(L.latLngBounds(positions), { padding: adaptiveMarkerPadding(map), animate: true });
+            });
+            return container;
+        };
+        control.addTo(map);
+        return () => {
+            control.remove();
+        };
+    }, [map, positions]);
+    return null;
+}
+
+function JourneyRouteControl({ routeOn, onToggle }: { routeOn: boolean; onToggle: () => void }) {
+    const map = useMap();
+    const buttonRef = useRef<HTMLButtonElement | null>(null);
+    const onToggleRef = useRef(onToggle);
+
+    useEffect(() => {
+        onToggleRef.current = onToggle;
+    }, [onToggle]);
+
+    useEffect(() => {
+        const control = new L.Control({ position: 'topright' });
+        control.onAdd = () => {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            const button = L.DomUtil.create('button', '', container) as HTMLButtonElement;
+            button.type = 'button';
+            button.style.width = '30px';
+            button.style.height = '30px';
+            button.style.display = 'flex';
+            button.style.alignItems = 'center';
+            button.style.justifyContent = 'center';
+            button.style.padding = '0';
+            button.style.background = 'var(--color-surface, #fff)';
+            button.style.border = '0';
+            button.style.borderRadius = '2px';
+            button.style.cursor = 'pointer';
+            button.innerHTML =
+                '<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="26" height="26" ' +
+                'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+                'stroke-linecap="round" stroke-linejoin="round">' +
+                '<path data-route-pin d="M8.25 3.25a3.5 3.5 0 0 0-3.5 3.5c0 2.65 3.5 6.75 3.5 6.75s3.5-4.1 3.5-6.75a3.5 3.5 0 0 0-3.5-3.5Z"/>' +
+                '<circle cx="8.25" cy="6.75" r="1.15" fill="var(--color-surface, #fff)"/>' +
+                '<path d="m9.4 14.45 5.2-2.9"/>' +
+                '<path data-route-pin d="M16.25 6.75a3.5 3.5 0 0 0-3.5 3.5c0 2.65 3.5 6.75 3.5 6.75s3.5-4.1 3.5-6.75a3.5 3.5 0 0 0-3.5-3.5Z"/>' +
+                '<circle cx="16.25" cy="10.25" r="1.15" fill="var(--color-surface, #fff)"/>' +
+                '</svg>';
+            L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.disableScrollPropagation(container);
+            L.DomEvent.on(button, 'click', (event) => {
+                L.DomEvent.stop(event);
+                onToggleRef.current();
+            });
+            buttonRef.current = button;
+            return container;
+        };
+        control.addTo(map);
+        return () => {
+            buttonRef.current = null;
+            control.remove();
+        };
+    }, [map]);
+
+    useEffect(() => {
+        const button = buttonRef.current;
+        if (!button) return;
+        const label = routeOn ? 'Hide route' : 'Show route';
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', String(routeOn));
+        button.style.color = routeOn
+            ? 'var(--color-action, #2563eb)'
+            : 'var(--color-text-ink-soft, #667085)';
+        button.querySelectorAll<SVGPathElement>('[data-route-pin]').forEach((pin) => {
+            pin.setAttribute('fill', routeOn ? 'currentColor' : 'none');
+        });
+    }, [routeOn]);
+
+    return null;
+}
+
 function MarkerClusterLayer({
     events,
     hoveredEventId,
@@ -692,6 +912,8 @@ function MarkerClusterLayer({
     onMarkSeen,
     disablePopups,
     minimalPopup,
+    journeySequence,
+    journeySelectedEventId,
 }: {
     events: CalendarEvent[];
     hoveredEventId?: string | null;
@@ -715,6 +937,8 @@ function MarkerClusterLayer({
     onMarkSeen?: (eventId: string) => void;
     disablePopups?: boolean;
     minimalPopup?: boolean;
+    journeySequence?: Record<string, number>;
+    journeySelectedEventId?: string | null;
 }) {
     const map = useMap();
     const [popupPortals, setPopupPortals] = useState<PopupPortal[]>([]);
@@ -762,8 +986,12 @@ function MarkerClusterLayer({
             const decorations: PinDecorations = minimalPopup
                 ? {}
                 : { trending, followingCount, newEvent, totalGoing };
+            const journeyNumber = journeySequence?.[event.event_id];
+            const journeyLabel = event.city || event.location?.split(',')[0]?.trim() || event.title;
             const marker = L.marker([event.latitude!, event.longitude!], {
-                icon: makeColoredIcon(eventColorBarColor, decorations),
+                icon: journeyNumber
+                    ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelectedEventId === event.event_id)
+                    : makeColoredIcon(eventColorBarColor, decorations),
             });
             let popupHost: HTMLDivElement | null = null;
             if (!disablePopups) {
@@ -799,7 +1027,7 @@ function MarkerClusterLayer({
             markerRefs.current.clear();
             setPopupPortals([]);
         };
-    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, journeySelectedEventId, journeySequence, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
 
     // Swap the hovered marker's icon in place (highlighted vs normal) without
     // rebuilding the whole layer. Rebuilding on every hover change (as the
@@ -823,9 +1051,13 @@ function MarkerClusterLayer({
                 ? {}
                 : { trending, followingCount, newEvent, totalGoing };
             const isHovered = hoveredEventId === event.event_id;
-            marker.setIcon(isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations));
+            const journeyNumber = journeySequence?.[event.event_id];
+            const journeyLabel = event.city || event.location?.split(',')[0]?.trim() || event.title;
+            marker.setIcon(journeyNumber
+                ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelectedEventId === event.event_id || isHovered)
+                : isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations));
         });
-    }, [hoveredEventId, events, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs]);
+    }, [hoveredEventId, events, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs, journeySelectedEventId, journeySequence]);
 
 
 
@@ -851,7 +1083,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -887,36 +1119,53 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
     }, [focusedEvent]);
 
     const focusedEventId = focusedEvent?.event_id ?? null;
+    const journeySelectedEvent = useMemo(
+        () => geoEvents.find((event) => event.event_id === journeySelectedEventId) ?? null,
+        [geoEvents, journeySelectedEventId],
+    );
+    const cooperativeGestureOptions = cooperativeGestures ? { gestureHandling: true } : {};
 
     const formatDate = useCallback((e: CalendarEvent) => {
         const start = new Date(e.start);
-        const date = start.toLocaleDateString(undefined, {
+        const end = new Date(e.end);
+        const dateStr = (d: Date) => d.toLocaleDateString(undefined, {
             weekday: 'short',
             month: 'short',
             day: 'numeric',
         });
-        if (e.all_day) return date;
-        const time = start.toLocaleTimeString(undefined, {
+        const timeStr = (d: Date) => d.toLocaleTimeString(undefined, {
             hour: 'numeric',
             minute: '2-digit',
         });
-        return `${date} · ${time}`;
+        // Multi-day events show the end date so the span reads correctly.
+        const sameDay = start.toDateString() === end.toDateString();
+        if (e.all_day) {
+            return sameDay ? dateStr(start) : `${dateStr(start)} – ${dateStr(new Date(end.getTime() - 1))}`;
+        }
+        const base = `${dateStr(start)} · ${timeStr(start)}`;
+        return sameDay ? base : `${base} – ${dateStr(end)}, ${timeStr(end)}`;
     }, []);
 
     return (
         <MapContainer
+            {...cooperativeGestureOptions}
             {...(initialArea
                 ? { bounds: [[initialArea.min_lat, initialArea.min_lng], [initialArea.max_lat, initialArea.max_lng]] as L.LatLngBoundsExpression }
                 : { center: DEFAULT_AREA_CENTER, zoom: DEFAULT_ZOOM })}
             className="h-full w-full shadow-sm"
             scrollWheelZoom={true}
+            maxZoom={20}
             zoomSnap={0.5}
             zoomDelta={0.5}
             wheelPxPerZoomLevel={120}
+            zoomControl={!compact}
+            attributionControl={!compact}
         >
             <TileLayer
-                attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                attribution={CARTO_BASEMAP_KEY ? CARTO_ATTRIBUTION : OSM_ATTRIBUTION}
+                url={BASEMAP_URL}
+                subdomains={CARTO_BASEMAP_KEY ? 'abcd' : 'abc'}
+                maxZoom={20}
             />
             {areaOverlay && (
                 <>
@@ -963,6 +1212,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                     />
                 </>
             )}
+            {journeyRouteOn && <JourneyRouteLayer events={geoEvents} />}
             <MapController
                 positions={positions}
                 focusedEventId={focusedEventId}
@@ -975,8 +1225,11 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 preserveViewport={preserveViewport ?? false}
             />
             <MapResizeController />
+            {journeySequence && <JourneyViewportController events={geoEvents} event={journeySelectedEvent} />}
             <FlyToAreaController flyToArea={flyToArea} flyToAreaToken={flyToAreaToken} />
             {recenterTo && <RecenterControl recenterTo={recenterTo} />}
+            {fitMarkersControl && <FitMarkersControl positions={positions} />}
+            {onJourneyRouteToggle && <JourneyRouteControl routeOn={journeyRouteOn} onToggle={onJourneyRouteToggle} />}
             <BoundsReporter onBoundsChange={onBoundsChange} />
             <MarkerClusterLayer
                 events={geoEvents}
@@ -1001,6 +1254,8 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 onMarkSeen={onMarkSeen}
                 disablePopups={disablePopups}
                 minimalPopup={minimalPopup}
+                journeySequence={journeySequence}
+                journeySelectedEventId={journeySelectedEventId}
             />
         </MapContainer>
     );

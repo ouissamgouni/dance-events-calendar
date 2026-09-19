@@ -50,8 +50,9 @@ task start:dev        # DB + backend (--reload) + frontend (vite)
 ```
 
 - Frontend: <http://localhost:5173\>
-- Backend: <http://localhost:8001/docs\>
+- Backend: <http://localhost:8000/docs\>
 - Umami: <http://localhost:3100\>
+- MinIO console: <http://localhost:9001\> (object storage for event pictures)
 
 ---
 
@@ -59,11 +60,22 @@ task start:dev        # DB + backend (--reload) + frontend (vite)
 
 | Environment | Purpose | DB | Backend | Frontend |
 |-------------|---------|------|---------|----------|
-| **dev** | Local development, hot-reload | localhost:5434 | localhost:8001 | localhost:5173 |
+| **dev** | Local development, hot-reload | localhost:5434 | localhost:8000 | localhost:5173 |
 | **staging:local** | Docker-compose integration test | localhost:5436 | localhost:8002 | localhost:3001 |
 | **staging:remote** | Cloud staging (Fly.io + Neon + Cloudflare) | Neon develop | movida-staging.fly.dev | develop.joinmovida.com (alias: develop.movida.pages.dev) |
 | **prod:remote** | Cloud production | Neon main | movida.fly.dev | joinmovida.com (alias: movida.pages.dev) |
 | **scenario** | Isolated manual QA with seeded data | localhost:5437+ | localhost:8003+ | localhost:3002+ |
+
+> Dev is itself a scenario named `dev` — `.taskfiles/scenario_ports.sh dev` pins
+> its ports (they are baked into `vite.config.ts`, `playwright.config.ts`,
+> `config/test.env` and CI) and it uses the same
+> `infra/docker/docker-compose.{db,objects,umami}.yml` files as every other
+> scenario. All of them run in a single compose project per environment
+> (`$SC_PROJECT_NAME`, e.g. `movida-dev`), so Docker Desktop shows one stack
+> holding the database, MinIO and Umami. Its data volumes are
+> `calendar_dev_data`, `minio_dev_data` and
+> `umami_dev_data`; `task stop:dev:db` keeps them, `task stop:dev:volumes`
+> destroys them.
 
 ---
 
@@ -73,9 +85,9 @@ Each environment tier loads exactly its own files — no file appears in two tie
 
 | File | Committed | Loaded by |
 |------|-----------|-----------|
-| `secrets.env` | no | all tasks (shared base: Cloudflare creds, Google SA file) |
+| `secrets.env` | no | all tasks (shared base: Cloudflare API token, R2_* for r2-backed scenarios, Google SA file) |
 | `secrets.dev.env` | no | dev tasks |
-| `dev.env` | yes | dev tasks (non-secret: ports, DB name) |
+| `scenarios/dev/config.env` | yes | dev tasks (non-secret: ports, DB name, MinIO wiring) |
 | `staging.local.env` | yes | `staging:local` tasks only — app config for localhost Docker |
 | `staging.remote.frontend.env` | yes | `staging:remote` frontend build — VITE_API_URL, analytics |
 | `secrets.staging.env` | no | `staging:remote` tasks — `DATABASE_URL` → Neon develop |
@@ -970,12 +982,31 @@ Scenario stop tasks (`stop:scenario`, `stop:scenario:all`) close their isolated 
 | Service | dev | staging:local | scenario (default) | prod (local) |
 |---------|-----|--------------|---------------------|--------------|
 | PostgreSQL | 5434 | 5436 | 5437 | 5438 |
-| Backend | 8001 | 8002 | 8003 | 8080 |
+| Backend | 8000 | 8002 | 8003 | 8080 |
 | Frontend | 5173 | 3001 | 3002 | 3000 |
 | Debugger | 5678 | — | — | — |
-| Umami | 3100 | — | — | — |
+| Umami | 3100 | — | 3101 | — |
+| MinIO (S3 API) | 9000 | — | 9100 | — |
+| MinIO (console) | 9001 | — | 9200 | — |
 
 > Scenario ports are deterministic per scenario name (hash-based offset). Run `task scenarios` to see all current assignments.
+
+### Object storage
+
+Event pictures are stored in an S3-compatible bucket pair
+(`movida-<env>-public` / `movida-<env>-private`). Dev and scenarios use a local
+MinIO container; staging and prod use Cloudflare R2 (configured in the
+`[env]` block of `config/fly.staging.toml` / `config/fly.prod.toml`, with the
+credentials as Fly secrets from `config/secrets.staging.env` /
+`config/secrets.prod.env`).
+
+| Command | What it does |
+|---------|--------------|
+| `task objects:ensure` | Create the buckets if missing and grant anonymous read on the public one |
+| `task objects:reset` | Empty and recreate the buckets |
+| `task objects:destroy` | Delete the buckets (refuses `movida-prod-*` / `movida-staging-*`) |
+
+All three accept `SCENARIO=name` to target a scenario's buckets.
 
 ---
 
@@ -991,7 +1022,7 @@ Copy the `.example` file and fill in the Neon connection string from the dashboa
 
 ### Cloudflare authentication failed
 
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` live in `secrets.env` (shared). The token needs **Account → Cloudflare Pages → Edit** permission.
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` live in `secrets.env` (shared). The token needs **Account → Cloudflare Pages → Edit** permission, plus **Account → Workers R2 Storage → Edit** if you run `task objects:*` against R2 (R2 S3 credentials are object-scoped and cannot create or delete buckets, so bucket lifecycle goes through the Cloudflare REST API).
 
 ### Database connection failed
 

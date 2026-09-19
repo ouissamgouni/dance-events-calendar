@@ -1,0 +1,115 @@
+test_plan:
+  name: "Event pictures — Cloudflare R2 integration"
+  description: |
+    Verifies the object-storage layer against REAL Cloudflare R2 rather than
+    the local MinIO emulator. The application code path is identical (single
+    boto3 S3 client); only ``OBJECT_STORAGE_PROVIDER=r2`` and the credentials
+    differ. This scenario therefore focuses on the things the emulator cannot
+    prove: bucket creation, public r2.dev serving, cache headers, and the
+    private bucket staying private.
+
+    Prerequisites — ``config/secrets.env`` must contain:
+      CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN,
+      R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+    CLOUDFLARE_API_TOKEN needs the account permission
+    "Workers R2 Storage: Edit" — buckets are created and deleted through the
+    Cloudflare REST API because R2 S3 tokens are object-scoped.
+
+    Start with: ``task start:scenario SCENARIO=event-picture-cloud``
+    Tear the buckets down afterwards with:
+    ``task objects:destroy SCENARIO=event-picture-cloud``
+
+  steps:
+    - id: 1
+      title: "Buckets are created on first boot"
+      description: |
+        Start the scenario and watch the startup output. Then open the
+        Cloudflare dashboard → R2.
+      expected: |
+        Two new buckets exist: ``movida-scenario-event-picture-cloud-public``
+        and ``movida-scenario-event-picture-cloud-private``. The startup log
+        reports the r2.dev domain that now serves the public bucket.
+
+    - id: 2
+      title: "Upload writes to R2 and serves over r2.dev"
+      description: |
+        Sign in as "Dev Admin", open "Cloud Upload Check — Salsa Social",
+        enter edit mode, and upload a picture.
+      expected: |
+        The preview appears. Right-click the picture → "Open image in new tab":
+        the URL host is the r2.dev (or configured custom) domain, NOT the
+        backend host, and the image loads. In the Cloudflare dashboard the
+        public bucket now contains ``events/evt-picture-cloud-001/<id>/thumb.webp``
+        and ``.../full.webp``.
+
+    - id: 3
+      title: "Original is kept private and is not publicly reachable"
+      description: |
+        In the Cloudflare dashboard, open the PRIVATE bucket and find the
+        matching ``events/evt-picture-cloud-001/<id>/original`` object. Then
+        try to fetch that same key path from the public r2.dev domain.
+      expected: |
+        The original exists in the private bucket. Requesting it through the
+        public domain fails (404/403). The original is never linked from the
+        application.
+
+    - id: 4
+      title: "Cache headers are set for immutable public assets"
+      description: |
+        Open browser dev tools → Network, reload the event page, and inspect
+        the response headers of the picture request.
+      expected: |
+        ``Cache-Control: public, max-age=31536000, immutable`` is present.
+        Reloading the page serves the picture from cache rather than
+        re-downloading it.
+
+    - id: 5
+      title: "Import from URL works against R2"
+      description: |
+        Open "Cloud Upload Check — Bachata Night" in edit mode, paste a public
+        https image URL and press "Import".
+      expected: |
+        The picture is fetched by the backend, processed, stored in R2, and
+        displayed. Its served URL is on the r2.dev/custom domain — the remote
+        site's URL is NOT used directly.
+
+    - id: 6
+      title: "Replace removes the superseded objects"
+      description: |
+        Note the current picture URL, then upload a different picture over it.
+        Afterwards inspect the public bucket in the Cloudflare dashboard.
+      expected: |
+        A new key directory exists for the new picture and the previous key
+        directory is gone — replacing does not leak orphaned objects.
+
+    - id: 7
+      title: "Remove deletes from R2"
+      description: |
+        Press "Remove" on that event, then check the public and private
+        buckets.
+      expected: |
+        Both the thumb/full objects and the private original for that event
+        are gone. The card falls back to the placeholder.
+
+    - id: 8
+      title: "Missing credentials degrade gracefully"
+      description: |
+        Stop the scenario. Temporarily blank out ``R2_ACCESS_KEY_ID``
+        in ``config/secrets.env`` and start the scenario again.
+      expected: |
+        Startup reports a clear configuration error rather than a stack trace.
+        If the API does come up, event pages still render — they just show no
+        pictures — instead of returning 500s. Restore the credential
+        afterwards.
+
+    - id: 9
+      title: "Production buckets are protected from deletion"
+      description: |
+        Run ``task objects:destroy SCENARIO=event-picture-cloud`` and confirm.
+        Then separately confirm (by reading
+        ``backend/services/object_storage.py``) that buckets prefixed
+        ``movida-prod-`` and ``movida-staging-`` are refused.
+      expected: |
+        The scenario buckets are deleted from Cloudflare. The protection list
+        covers the prod and staging bucket prefixes, so no task in this repo
+        can delete them.

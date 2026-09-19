@@ -14,8 +14,8 @@ export interface Tag {
     group_label: string;
     group_color: string | null;
     group_scope?: TagScope;
-    /** For aspect-scoped tags: whether the tag reads as positive or negative. */
-    polarity?: 'positive' | 'negative' | null;
+    /** For aspect-scoped tags: whether the tag reads as positive, negative, or factual. */
+    polarity?: 'positive' | 'negative' | 'neutral' | null;
     event_count?: number;
     enabled: boolean;
     is_hero_filter: boolean;
@@ -93,7 +93,13 @@ export interface CalendarEvent {
     calendar_id: string;
     title: string;
     description: string | null;
+    image_url?: string | null;
+    /** Cropped 16:9 variant, present only when the picture is managed by
+     * object storage. Cards should prefer this over ``image_url``. */
+    image_thumb_url?: string | null;
     location: string | null;
+    city?: string | null;
+    country?: string | null;
     latitude: number | null;
     longitude: number | null;
     start: string;
@@ -122,10 +128,12 @@ export interface CalendarEvent {
      * the card's combined avatar track to render *who* — friends first.
      */
     following_friends_preview?: FriendMini[];
+    friends_going_count?: number;
+    friends_going_preview?: FriendMini[];
     price_min: number | null;
     price_max: number | null;
     price_currency: string | null;
-    price_is_free: boolean;
+    price_is_free: boolean | null;
     review_status?: string;
     is_hidden?: boolean;
     is_blocked?: boolean;
@@ -341,10 +349,17 @@ export interface Attendee {
     avatar_url: string | null;
     handle: string | null;
     viewer_follow_status?: 'pending' | 'approved';
+    /** Event "People" tab: attendee is a mutual friend of the viewer. */
+    is_friend?: boolean;
+    /** Event "People" tab: count of the viewer's friends who follow this attendee. */
+    mutual_friend_count?: number;
+    /** "going" (RSVP'd) or "interested" (saved). Defaults to "going". */
+    attendance_status?: 'going' | 'interested';
 }
 
 export interface FriendMini {
     user_id: string;
+    handle?: string | null;
     display_name: string | null;
     avatar_url: string | null;
 }
@@ -411,6 +426,12 @@ export interface EventSuggestionCreate {
     start: string;
     end: string;
     all_day?: boolean;
+    /** RFC 5545 RRULE line (weekly/monthly/yearly). Mutually exclusive with
+     * `recurrence_dates`. */
+    recurrence_rule?: string | null;
+    /** Explicit occurrences for manually picked dates. Mutually exclusive with
+     * `recurrence_rule`. */
+    recurrence_dates?: { start: string; end: string }[] | null;
     submitter_name?: string;
     submitter_email?: string;
     suggested_tag_ids?: number[];
@@ -469,7 +490,7 @@ export interface EventSuggestion {
     price_min?: number | null;
     price_max?: number | null;
     price_currency?: string | null;
-    price_is_free?: boolean;
+    price_is_free?: boolean | null;
     created_at: string;
     reviewed_at: string | null;
     reviewed_by: string | null;
@@ -541,6 +562,7 @@ export interface EventRatingAggregate {
     sentiment_distribution: Partial<Record<ReviewSentiment, number>>;
     aspects: AspectAggregate[];
     top_positive_tags: TopReviewTag[];
+    top_neutral_tags: TopReviewTag[];
     top_negative_tags: TopReviewTag[];
     top_audience_tags: TopReviewTag[];
     /** Overall-mood figures. Percentages are unrounded 0-100 (round for display). */
@@ -579,6 +601,7 @@ export interface SeriesRatingRollup {
     sentiment_distribution: Partial<Record<ReviewSentiment, number>>;
     aspects: AspectAggregate[];
     top_positive_tags: TopReviewTag[];
+    top_neutral_tags: TopReviewTag[];
     top_negative_tags: TopReviewTag[];
     top_audience_tags: TopReviewTag[];
     editions: SeriesEditionSummary[];
@@ -798,6 +821,7 @@ export type PassportSection = 'milestones' | 'timeline' | 'cities' | 'countries'
 
 export interface SharedPassportResponse {
     display_name: string | null;
+    avatar_url: string | null;
     stats: PassportStats;
     collections: PassportCollections;
     milestones: PassportMilestone[];
@@ -824,6 +848,7 @@ export interface PassportTimelineItem {
     location: string | null;
     city: string | null;
     country: string | null;
+    tags: string[];
     latitude: number | null;
     longitude: number | null;
 }
@@ -832,7 +857,9 @@ export interface PassportTimelineMarker {
     key: string;
     name: string;
     icon: string;
+    description?: string | null;
     date: string;
+    event_id?: string | null;
     /** Optional secondary line (recurring consistency reaches use it). */
     label?: string | null;
     /** Displayed period range ("YYYY-MM") for consistency reaches; null for

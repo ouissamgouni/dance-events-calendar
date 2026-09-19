@@ -41,19 +41,19 @@ function AvatarPill({
                     className="h-5 w-5 rounded-full object-cover"
                 />
             ) : (
-                <span className="h-5 w-5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-semibold flex items-center justify-center">
+                <span className="h-5 w-5 rounded-full bg-slate-200 text-ink-soft text-[10px] font-semibold flex items-center justify-center">
                     {fallback}
                 </span>
             )}
             {handle ? (
                 <Link
                     to={`/u/${handle}`}
-                    className="text-slate-700 hover:text-rose-600 hover:underline"
+                    className="text-ink hover:text-rose-600 hover:underline"
                 >
                     {display_name || `@${handle}`}
                 </Link>
             ) : (
-                <span className="text-slate-700">{display_name}</span>
+                <span className="text-ink">{display_name}</span>
             )}
         </span>
     );
@@ -70,7 +70,7 @@ function FofRow({ attendee }: { attendee: FofGoingAttendee }) {
                     avatar_url={attendee.avatar_url}
                 />
                 {attendee.via_friend_handle && (
-                    <div className="text-[11px] text-slate-500 mt-0.5 ml-7">
+                    <div className="text-[11px] text-ink-soft mt-0.5 ml-7">
                         Followed by{' '}
                         <Link
                             to={`/u/${attendee.via_friend_handle}`}
@@ -124,16 +124,16 @@ export default function GoingWedge({ eventId }: Props) {
 
     return (
         <div
-            className="border-t border-slate-100 pt-3"
+            className="border-t border-card-line pt-3"
             data-testid="going-wedge"
         >
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">
                 Who you know going
             </h3>
 
             {wedge.friends_going.length > 0 && (
                 <div className="mb-2" data-testid="wedge-friends">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">
+                    <div className="text-[11px] uppercase tracking-wide text-muted mb-1">
                         Your friends
                     </div>
                     <ul className="flex flex-wrap gap-x-3 gap-y-1">
@@ -148,7 +148,7 @@ export default function GoingWedge({ eventId }: Props) {
 
             {wedge.fof_going.length > 0 && (
                 <div className="mb-2" data-testid="wedge-fof">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">
+                    <div className="text-[11px] uppercase tracking-wide text-muted mb-1">
                         Friends of friends
                     </div>
                     <ul>
@@ -161,7 +161,7 @@ export default function GoingWedge({ eventId }: Props) {
 
             {wedge.public_going_count > 0 && (
                 <div
-                    className="text-xs text-slate-500"
+                    className="text-xs text-ink-soft"
                     data-testid="wedge-public-count"
                 >
                     +{wedge.public_going_count} more public

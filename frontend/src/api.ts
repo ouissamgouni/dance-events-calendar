@@ -224,12 +224,15 @@ export interface SiteSettings {
     event_color_bar_color: string;
     tag_sort_mode: 'group' | 'event_count';
     default_explorer_period?: DateRangePresetKey;
+    going_button_icon_variant?: 'hand' | 'person';
     promo_codes_enabled?: boolean;
     organizer_claims_enabled?: boolean;
     duplicate_auto_detect_enabled?: boolean;
-    for_you_rail_enabled?: boolean;
-    your_next_events_rail_enabled?: boolean;
     network_going_snapshot_enabled?: boolean;
+    my_events_route_enabled?: boolean;
+    my_events_nav_enabled?: boolean;
+    /** Experiment: two-line, icon-prefixed filter summary bar with the
+     * Map/Calendar controls pinned to its right. */
     suggest_event_required_dance_group_id?: number | null;
     suggest_event_required_reach_group_id?: number | null;
     tag_as_badge_enabled?: boolean;
@@ -243,6 +246,31 @@ export interface SiteSettings {
     /** Maximum number of tags rendered inline on an event card. Client
      * default: 3. */
     tags_per_card?: number;
+    /** When true, the saved count renders next to the Save action on event
+     * cards. Client default: false. */
+    event_card_save_show_stats_enabled?: boolean;
+    /** When true, the going count renders next to the "I'm going" action.
+     * Client default: false. */
+    event_card_imgoing_show_stats_enabled?: boolean;
+    /** When true, the "I'm going" action sits bottom-right on the tags row;
+     * when false it sits in the top-right cluster next to Save. Client
+     * default: true. */
+    event_card_imgoing_location_bottom_enabled?: boolean;
+    /** When true, event cards show the people icon prefixing the avatar
+     * stack. Client default: false. */
+    event_card_show_people_icon_enabled?: boolean;
+    /** When true, event cards show clock (time) and pin (location) icons.
+     * Client default: false. */
+    event_card_show_time_location_icons_enabled?: boolean;
+    /** When true, the explorer list renders the shared My Events card style.
+     * Client default: false. */
+    explorer_event_card_card_style_enabled?: boolean;
+    /** When true, event pictures are displayed across cards and detail views.
+     * Admins can always manage pictures regardless of this flag.
+     * Client default: false. */
+    event_images_enabled?: boolean;
+    /** What to render on a card when an event has no picture. */
+    event_card_placeholder_style?: 'gradient' | 'initial' | 'none';
     /** Global notification / re-engagement gates (admin-configurable).
      * Each flag mirrors an env-var in ``backend/config/loader.py``; when
      * set here it overrides that default without requiring a redeploy. */
@@ -298,6 +326,8 @@ export interface SiteSettings {
     /** Master switch for post-event "how was it?" review-prompt
      * notifications (Event Quality Layer Phase 3). */
     review_prompt_enabled?: boolean;
+    /** Show the optional event-size question in the review wizard. */
+    event_review_size_step_enabled?: boolean;
     /** Hours after an event's end before the review prompt fires. 1-720,
      * client default 3. */
     review_prompt_delay_hours?: number;
@@ -975,14 +1005,23 @@ export async function geolocateFromIP(): Promise<HomeLocationPayload | null> {
     }
 }
 
+export type ReachFilter = 'any' | 'regional_plus' | 'international';
+
 export interface InterestProfile {
     id: number;
     label: string;
+    area_label: string;
+    geo_kind: 'area' | 'radius';
     min_lat: number;
     min_lng: number;
     max_lat: number;
     max_lng: number;
+    center_lat: number | null;
+    center_lng: number | null;
+    radius_km: number | null;
     dance_tag_ids: number[];
+    reach_filter: ReachFilter;
+    /** Legacy mirror derived from `reach_filter`. */
     reach_tag_ids: number[];
     matches_enabled: boolean;
     /** Legacy alias mirror, removed in cleanup PR. Always equal to
@@ -994,11 +1033,18 @@ export interface InterestProfile {
 
 export interface InterestProfilePayload {
     label: string;
-    min_lat: number;
-    min_lng: number;
-    max_lat: number;
-    max_lng: number;
+    area_label: string;
+    geo_kind?: 'area' | 'radius';
+    min_lat?: number;
+    min_lng?: number;
+    max_lat?: number;
+    max_lng?: number;
+    center_lat?: number | null;
+    center_lng?: number | null;
+    radius_km?: number | null;
     dance_tag_ids?: number[];
+    reach_filter?: ReachFilter;
+    /** Legacy compatibility input. */
     reach_tag_ids?: number[];
     matches_enabled?: boolean;
     /** Legacy alias — accepted for one release. */
@@ -1008,11 +1054,18 @@ export interface InterestProfilePayload {
 
 export interface InterestProfileUpdatePayload {
     label?: string;
+    area_label?: string;
+    geo_kind?: 'area' | 'radius';
     min_lat?: number;
     min_lng?: number;
     max_lat?: number;
     max_lng?: number;
+    center_lat?: number | null;
+    center_lng?: number | null;
+    radius_km?: number | null;
     dance_tag_ids?: number[];
+    reach_filter?: ReachFilter;
+    /** Legacy compatibility input. */
     reach_tag_ids?: number[];
     matches_enabled?: boolean;
     /** Legacy alias — accepted for one release. */
@@ -1403,6 +1456,30 @@ export async function fetchFriendsLeaderboard(
     );
 }
 
+// Following "Most active": everyone you follow ranked by Going count.
+export type FollowingActivityPeriod = '365d' | '180d' | '90d';
+
+export interface FollowingMostActiveResponse {
+    period: FollowingActivityPeriod;
+    items: FriendsLeaderboardEntry[];
+}
+
+export async function fetchFollowingMostActive(
+    opts?: { period?: FollowingActivityPeriod; limit?: number },
+): Promise<FollowingMostActiveResponse> {
+    const sp = new URLSearchParams();
+    if (opts?.period) sp.set('period', opts.period);
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/following/most-active${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FollowingMostActiveResponse>(
+        res, 'Failed to fetch most active following',
+    );
+}
+
 // --- Phase E (E3) — onboarding -----------------------------------------
 
 export interface OnboardingSuggestionsResponse {
@@ -1750,6 +1827,7 @@ export async function removeMySubscriber(handle: string): Promise<void> {
 
 export type NotificationKind =
     | 'subscription_going'
+    | 'subscription_saved'
     | 'subscription_suggested'
     | 'subscription_review'
     | 'subscription_milestone'
@@ -1785,7 +1863,19 @@ export interface NotificationItem {
     event_id: string | null;
     event_title: string | null;
     event_start: string | null;
+    /** Optional event cover image; rendered as a small thumbnail on the row
+     *  (no placeholder is shown when null). */
+    event_image_url?: string | null;
     actor: NotificationActor;
+    /** Distinct actors folded into an aggregated row (most-recent first,
+     *  capped). Equals `[actor]` for non-aggregated rows. */
+    actors?: NotificationActor[];
+    /** Total distinct actors in the group (drives the "+N others" preview).
+     *  1 for non-aggregated rows. */
+    actor_count?: number;
+    /** All raw notification ids folded into this group, so a single
+     *  mark-read clears every sibling. */
+    member_ids?: number[];
     /** Extra rendering context, e.g. the matched interest profile label(s)
      *  for `interest_event` rows (comma-joined when multiple profiles
      *  matched). Null for kinds that don't use it. */
@@ -1921,6 +2011,12 @@ export interface AdminUserRow {
     force_install_prompt: boolean;
     installed_at: string | null;
     force_enable_push_prompt: boolean;
+    // Onboarding status. ``onboarded_at`` is null until the wizard is
+    // completed/skipped; ``needs_onboarding`` mirrors the /auth/me flag
+    // (never onboarded OR stored version below the current server version).
+    onboarded_at: string | null;
+    onboarding_version: number;
+    needs_onboarding: boolean;
     deleted_at: string | null;
     created_at: string;
     // Most recent visit timestamp + the raw ``User-Agent`` header captured
@@ -2106,6 +2202,17 @@ export async function adminSetForceEnablePush(
         },
     );
     return parseJsonResponse<AdminUserRow>(res, 'Failed to update force-enable-push flag');
+}
+
+export async function adminResetOnboarding(userId: string): Promise<AdminUserRow> {
+    const res = await fetch(
+        `${BASE}/social/admin/users/id/${encodeURIComponent(userId)}/reset-onboarding`,
+        {
+            method: 'PATCH',
+            credentials: 'include',
+        },
+    );
+    return parseJsonResponse<AdminUserRow>(res, 'Failed to reset onboarding');
 }
 
 export async function adminSetAdminManaged(
@@ -2855,12 +2962,58 @@ export async function updateEvent(
     return res.json();
 }
 
+// --- Event images (admin only) ---
+
+/** Upload a picture file for an event. The backend crops/encodes the variants. */
+export async function uploadEventImage(eventId: string, file: File): Promise<CalendarEvent> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/admin/events/${eventId}/image`, {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+    });
+    return parseJsonResponse<CalendarEvent>(res, 'Failed to upload image');
+}
+
+/** Import a picture for an event from a public https URL. */
+export async function setEventImageFromUrl(eventId: string, url: string): Promise<CalendarEvent> {
+    const res = await fetch(`${BASE}/admin/events/${eventId}/image/from-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<CalendarEvent>(res, 'Failed to import image');
+}
+
+/** Remove an event's picture and delete the stored objects. */
+export async function deleteEventImage(eventId: string): Promise<CalendarEvent> {
+    const res = await fetch(`${BASE}/admin/events/${eventId}/image`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    return parseJsonResponse<CalendarEvent>(res, 'Failed to remove image');
+}
+
 // --- Geocode Search ---
 
 export interface GeocodeSuggestion {
     display_name: string;
     latitude: number;
     longitude: number;
+    name?: string | null;
+    context?: string | null;
+    country?: string | null;
+    region?: string | null;
+    place_kind?: 'continent' | 'country' | 'region' | 'county' | 'city' | 'town' | 'district' | 'locality' | 'address' | 'poi' | 'unknown';
+    type_label?: string;
+    bounding_box?: {
+        min_lat: number;
+        min_lng: number;
+        max_lat: number;
+        max_lng: number;
+    } | null;
 }
 
 export async function searchAddress(query: string): Promise<GeocodeSuggestion[]> {
@@ -2922,6 +3075,26 @@ export async function fetchSuggestions(status?: string): Promise<EventSuggestion
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';
     const res = await fetch(`${BASE}/admin/suggestions${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch suggestions');
+    return res.json();
+}
+
+export interface SuggestionOccurrence {
+    index: number;
+    start: string;
+    end: string;
+    event_id: string | null;
+    materialised: boolean;
+}
+
+export interface SuggestionOccurrences {
+    total: number;
+    occurrences: SuggestionOccurrence[];
+}
+
+/** Every date a suggestion expands to — what approval would create. */
+export async function fetchSuggestionOccurrences(id: string): Promise<SuggestionOccurrences> {
+    const res = await fetch(`${BASE}/admin/suggestions/${id}/occurrences`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch suggestion occurrences');
     return res.json();
 }
 
@@ -3048,21 +3221,21 @@ export async function fetchEventsByIds(eventIds: string[]): Promise<CalendarEven
 
 // --- Export ---
 
-export async function exportIcs(eventIds: string[]): Promise<Blob> {
+export async function exportIcs(eventIds: string[], view?: string): Promise<Blob> {
     const res = await fetch(`${BASE}/events/export/ics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_ids: eventIds }),
+        body: JSON.stringify({ event_ids: eventIds, view: view || undefined }),
     });
     if (!res.ok) throw new Error('Failed to export ICS');
     return res.blob();
 }
 
-export async function exportXlsx(eventIds: string[]): Promise<Blob> {
+export async function exportXlsx(eventIds: string[], view?: string): Promise<Blob> {
     const res = await fetch(`${BASE}/events/export/xlsx`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_ids: eventIds }),
+        body: JSON.stringify({ event_ids: eventIds, view: view || undefined }),
     });
     if (!res.ok) throw new Error('Failed to export XLSX');
     return res.blob();
@@ -3081,18 +3254,50 @@ export async function createShareToken(deviceId: string): Promise<{ token: strin
 }
 
 /**
+ * Fetch existing share token for current user without creating a new one.
+ * Returns 404 if no token exists (caller can then create one).
+ */
+export async function getShareToken(): Promise<{ token: string }> {
+    const res = await fetch(`${BASE}/share/calendar/token`, {
+        credentials: 'include',
+    });
+    if (res.status === 404) throw new Error('not_found');
+    if (!res.ok) throw new Error('Failed to fetch share token');
+    return res.json();
+}
+
+/**
+ * App share URL for a token with optional view context.
+ */
+export function getAppShareUrl(
+    token: string,
+    view?: 'upcoming' | 'saved' | 'past',
+): string {
+    const params = view ? `?view=${view}` : '';
+    return `${window.location.origin}/shared/${encodeURIComponent(token)}${params}`;
+}
+
+/**
  * Absolute, subscribable iCalendar feed URL for a share token. Calendar
  * clients (Apple/Google) poll this directly, so it must be fully-qualified
  * even when ``BASE`` is the relative ``/api`` used by the Vite dev proxy.
+ *
+ * Supports scope for legacy compatibility (saved/going/all) or view for
+ * My Events context (upcoming/saved/past).
  */
 export function getCalendarFeedUrl(
     token: string,
-    scope: 'all' | 'saved' | 'going' = 'all',
+    view?: string | ('all' | 'saved' | 'going'),
 ): string {
     const base = BASE.startsWith('http')
         ? BASE
         : `${window.location.origin}${BASE}`;
-    return `${base}/share/calendar/${encodeURIComponent(token)}.ics?scope=${scope}`;
+
+    // Map MyEventsTab to appropriate query param
+    const isMyEventsView = ['upcoming', 'saved', 'past'].includes(view as string);
+    const param = isMyEventsView ? `view=${view}` : `scope=${view || 'all'}`;
+
+    return `${base}/share/calendar/${encodeURIComponent(token)}.ics?${param}`;
 }
 
 export interface SharedCalendarPayload {
@@ -3100,8 +3305,9 @@ export interface SharedCalendarPayload {
     owner_display_name: string | null;
 }
 
-export async function fetchSharedCalendar(token: string): Promise<SharedCalendarPayload> {
-    const res = await fetch(`${BASE}/share/calendar/${encodeURIComponent(token)}`);
+export async function fetchSharedCalendar(token: string, view?: string | null): Promise<SharedCalendarPayload> {
+    const params = view && ['upcoming', 'saved', 'past'].includes(view) ? `?view=${view}` : '';
+    const res = await fetch(`${BASE}/share/calendar/${encodeURIComponent(token)}${params}`);
     if (res.status === 404) throw new Error('not_found');
     if (!res.ok) throw new Error('Failed to fetch shared calendar');
     const data = await res.json();
@@ -3462,7 +3668,7 @@ export async function updateTagGroup(groupId: number, data: { label?: string; co
     return res.json();
 }
 
-export async function createTag(data: { group_id: number; label: string; color?: string; polarity?: 'positive' | 'negative' | null }): Promise<Tag> {
+export async function createTag(data: { group_id: number; label: string; color?: string; polarity?: 'positive' | 'negative' | 'neutral' | null }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags`, {
         method: 'POST',
         headers: adminJsonHeaders,
@@ -3473,7 +3679,7 @@ export async function createTag(data: { group_id: number; label: string; color?:
     return res.json();
 }
 
-export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number; polarity?: 'positive' | 'negative' | null }): Promise<Tag> {
+export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number; polarity?: 'positive' | 'negative' | 'neutral' | null }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
         method: 'PATCH',
         headers: adminJsonHeaders,
@@ -3633,6 +3839,7 @@ export async function fetchRatingAggregate(eventId: string): Promise<EventRating
             sentiment_distribution: {},
             aspects: [],
             top_positive_tags: [],
+            top_neutral_tags: [],
             top_negative_tags: [],
             top_audience_tags: [],
             average_mood: 0,
@@ -3881,11 +4088,13 @@ export async function fetchPassportEvents(): Promise<PassportMapEvent[]> {
 export async function fetchPassportTimeline(
     offset = 0,
     limit = 20,
+    query = '',
 ): Promise<PassportTimelineResponse> {
     const params = new URLSearchParams([
         ['offset', String(offset)],
         ['limit', String(limit)],
     ]);
+    if (query.trim()) params.set('q', query.trim());
     const res = await fetch(`${BASE}/passport/timeline?${params}`, {
         credentials: 'include',
     });
@@ -4109,6 +4318,10 @@ export interface EventSearchResult {
     title: string;
     start: string | null;
     location: string | null;
+    city: string | null;
+    country: string | null;
+    matched_fields: Array<'title' | 'city' | 'country' | 'tag'>;
+    matched_tags: string[];
 }
 
 export async function searchEvents(

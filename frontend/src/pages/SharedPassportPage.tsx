@@ -36,35 +36,33 @@ export default function SharedPassportPage() {
     }, [token]);
 
     const name = data?.display_name ?? 'A dancer';
-    const title = `${name}${name.endsWith('s') ? "'" : "'s"} Dance Passport`;
-
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-3xl px-4 py-6">
-                <Link to="/" className="text-sm text-blue-600 hover:underline">
+                <Link to="/" className="text-sm text-action hover:underline">
                     ← Browse events
                 </Link>
 
                 {loading && (
-                    <div className="mt-4 border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                    <div className="mt-4 border border-line bg-surface p-6 text-center text-sm text-ink-soft">
                         Loading passport…
                     </div>
                 )}
 
                 {!loading && notFound && (
-                    <div className="mt-4 border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                    <div className="mt-4 border border-line bg-surface p-6 text-center text-sm text-ink-soft">
                         This passport link is no longer available.
                     </div>
                 )}
 
                 {!loading && signinRequired && (
-                    <div className="mt-4 border border-slate-200 bg-white p-6 text-center">
-                        <p className="text-sm text-slate-600">
+                    <div className="mt-4 border border-line bg-surface p-6 text-center">
+                        <p className="text-sm text-ink-soft">
                             This passport is shared with signed-in dancers only.
                         </p>
                         <Link
                             to="/login"
-                            className="mt-4 inline-block bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                            className="mt-4 inline-block bg-action px-4 py-2 text-sm font-medium text-white hover:bg-action"
                         >
                             Sign in to view
                         </Link>
@@ -75,22 +73,22 @@ export default function SharedPassportPage() {
                     <div className="mt-4">
                         <PassportView
                             data={data}
-                            title={title}
+                            displayName={name}
+                            handle={data.handle}
+                            avatarUrl={data.avatar_url}
                             sections={data.sections}
-                            headerActions={
-                                <div className="flex justify-end">
-                                    <PassportFollowCta
-                                        handle={data.handle}
-                                        isSelf={data.is_self}
-                                        isFollowing={data.is_following}
-                                        displayName={data.display_name}
-                                    />
-                                </div>
-                            }
                             timelineItems={data.timeline_items}
                             timelineMarkers={data.timeline_markers}
                             mapEvents={data.events}
                         />
+                        <div className="mt-3 flex justify-end">
+                            <PassportFollowCta
+                                handle={data.handle}
+                                isSelf={data.is_self}
+                                isFollowing={data.is_following}
+                                displayName={data.display_name}
+                            />
+                        </div>
                     </div>
                 )}
             </main>

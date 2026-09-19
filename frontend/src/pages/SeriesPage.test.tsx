@@ -22,6 +22,7 @@ const rollup: SeriesRatingRollup = {
     sentiment_distribution: { amazing: 2, great: 1, okay: 0, disappointing: 0, bad: 0 },
     aspects: [{ aspect_slug: 'music', average: 4.5, count: 3 }],
     top_positive_tags: [{ tag_id: 1, slug: 'great-dj', label: 'Great DJ', count: 2, aspect_slug: 'music' }],
+    top_neutral_tags: [],
     top_negative_tags: [],
     top_audience_tags: [],
     editions: [

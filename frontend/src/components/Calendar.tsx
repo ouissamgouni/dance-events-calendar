@@ -1,29 +1,39 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import type { DateClickArg } from '@fullcalendar/interaction';
+import timeGridPlugin from '@fullcalendar/timegrid';
 import type { EventClickArg, EventContentArg, EventInput, EventHoveringArg } from '@fullcalendar/core';
 import type { CalendarEvent } from '../types';
 import { trackView } from '../utils/tracking';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { getTagColors } from '../utils/eventColor';
 
-export type CalendarViewMode = 'month' | '3week';
+export type CalendarViewMode = 'month' | '3week' | 'week' | 'day';
 
 interface Props {
     events: CalendarEvent[];
     sinceDate?: string;
+    initialDate?: string;
     onDatesChange?: (start: Date, end: Date) => void;
     onEventClick?: (event: CalendarEvent, clickRect?: DOMRect) => void;
     hoveredEventId?: string | null;
     onEventHover?: (eventId: string | null) => void;
     offMapEventIds?: Set<string>;
     viewMode?: CalendarViewMode;
+    onDateClick?: (date: Date) => void;
 }
 
-const viewToFcView = (v: CalendarViewMode) => (v === '3week' ? 'dayGrid3Week' : 'dayGridMonth');
+const viewToFcView = (view: CalendarViewMode) => {
+    if (view === '3week') return 'dayGrid3Week';
+    if (view === 'week') return 'timeGridWeek';
+    if (view === 'day') return 'timeGridDay';
+    return 'dayGridMonth';
+};
 
 const Calendar = forwardRef<FullCalendar, Props>(
-    ({ events, sinceDate, onDatesChange, onEventClick, hoveredEventId, onEventHover, offMapEventIds, viewMode = 'month' }, ref) => {
+    ({ events, sinceDate, initialDate, onDatesChange, onEventClick, hoveredEventId, onEventHover, offMapEventIds, viewMode = 'month', onDateClick }, ref) => {
         const { eventColorBarColor } = useFeatureFlags();
         const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
         useEffect(() => {
@@ -114,11 +124,16 @@ const Calendar = forwardRef<FullCalendar, Props>(
             onEventHover?.(null);
         }, [onEventHover]);
 
+        const handleDateClick = useCallback((info: DateClickArg) => {
+            onDateClick?.(info.date);
+        }, [onDateClick]);
+
         return (
             <FullCalendar
                 ref={innerRef}
-                plugins={[dayGridPlugin]}
+                plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin]}
                 initialView={viewToFcView(viewMode)}
+                initialDate={initialDate}
                 views={{
                     dayGrid3Week: {
                         type: 'dayGrid',
@@ -128,12 +143,14 @@ const Calendar = forwardRef<FullCalendar, Props>(
                 headerToolbar={false}
                 events={fcEvents}
                 eventClick={handleClick}
+                dateClick={handleDateClick}
                 eventMouseEnter={handleMouseEnter}
                 eventMouseLeave={handleMouseLeave}
                 eventContent={renderEventContent}
                 eventDisplay="block"
                 displayEventTime={false}
                 height="auto"
+                dayCellContent={(arg) => isMobile ? String(arg.date.getDate()) : arg.dayNumberText}
                 dayMaxEvents={isMobile ? 2 : 3}
                 validRange={sinceDate ? { start: sinceDate } : undefined}
                 datesSet={(arg) => onDatesChange?.(arg.start, arg.end)}

@@ -124,9 +124,9 @@ export default function VisibilitySection({ handle }: { handle: string | null })
 
     if (!handle) {
         return (
-            <section className="border border-slate-200 bg-white p-4 mb-3">
-                <h2 className="text-sm font-semibold text-slate-900 mb-2">Privacy &amp; visibility</h2>
-                <p className="text-xs text-slate-600">
+            <section className="border border-line bg-surface p-4 mb-3">
+                <h2 className="text-sm font-semibold text-ink mb-2">Privacy &amp; visibility</h2>
+                <p className="text-xs text-ink-soft">
                     Pick a handle above to enable your public profile and visibility settings.
                 </p>
             </section>
@@ -134,18 +134,18 @@ export default function VisibilitySection({ handle }: { handle: string | null })
     }
 
     return (
-        <section className="border border-slate-200 bg-white p-4 mb-3">
+        <section className="border border-line bg-surface p-4 mb-3">
             <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Privacy &amp; visibility</h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <h2 className="text-sm font-semibold text-ink">Privacy &amp; visibility</h2>
+                    <p className="text-xs text-ink-soft mt-0.5">
                         Control who can see your activity at <span className="font-mono">/u/{handle}</span>.
                         Your email is never shown publicly.
                     </p>
                 </div>
                 <a
                     href={`/u/${handle}`}
-                    className="shrink-0 text-xs text-blue-600 hover:underline"
+                    className="shrink-0 text-xs text-action hover:underline"
                     target="_blank"
                     rel="noreferrer"
                 >
@@ -154,17 +154,17 @@ export default function VisibilitySection({ handle }: { handle: string | null })
             </div>
 
             {loading ? (
-                <p className="text-xs text-slate-500">Loading…</p>
+                <p className="text-xs text-ink-soft">Loading…</p>
             ) : !profile ? (
-                <p className="text-xs text-slate-500">{error || 'Unavailable.'}</p>
+                <p className="text-xs text-ink-soft">{error || 'Unavailable.'}</p>
             ) : (
                 <div className="space-y-5">
                     <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-2">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2 flex items-center gap-2">
                             <span>Account visibility</span>
                             <MySubscribersBadge />
                         </div>
-                        <p className="text-xs text-slate-500 mb-3">
+                        <p className="text-xs text-ink-soft mb-3">
                             One gate covers your profile, calendar, attendance,
                             and saved events. Per-event audience (public /
                             friends / only me) still applies independently.
@@ -181,31 +181,31 @@ export default function VisibilitySection({ handle }: { handle: string | null })
                                         className={
                                             'w-full text-left border px-4 py-3 transition ' +
                                             (active
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-slate-200 bg-white hover:bg-slate-50')
+                                                ? 'border-action bg-blue-50'
+                                                : 'border-line bg-surface hover:bg-canvas')
                                         }
                                     >
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs font-medium text-slate-900">
+                                            <span className="text-xs font-medium text-ink">
                                                 {opt.label}
                                             </span>
                                             {active && (
-                                                <span className="text-xs font-semibold text-blue-600">
+                                                <span className="text-xs font-semibold text-action">
                                                     Current
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="text-xs text-slate-500 mt-1">{opt.help}</div>
+                                        <div className="text-xs text-ink-soft mt-1">{opt.help}</div>
                                     </button>
                                 );
                             })}
                         </div>
                     </div>
-                    <div className="border-t border-slate-100 pt-4">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                    <div className="border-t border-card-line pt-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">
                             Dance Passport
                         </div>
-                        <p className="text-xs text-slate-500 mb-3">
+                        <p className="text-xs text-ink-soft mb-3">
                             Who can see your Dance Passport on your profile. Which
                             sections are shared is chosen when you share it.
                         </p>
@@ -221,43 +221,43 @@ export default function VisibilitySection({ handle }: { handle: string | null })
                                         className={
                                             'w-full text-left border px-4 py-3 transition ' +
                                             (active
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-slate-200 bg-white hover:bg-slate-50')
+                                                ? 'border-action bg-blue-50'
+                                                : 'border-line bg-surface hover:bg-canvas')
                                         }
                                     >
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs font-medium text-slate-900">
+                                            <span className="text-xs font-medium text-ink">
                                                 {opt.label}
                                             </span>
                                             {active && (
-                                                <span className="text-xs font-semibold text-blue-600">
+                                                <span className="text-xs font-semibold text-action">
                                                     Current
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="text-xs text-slate-500 mt-1">{opt.help}</div>
+                                        <div className="text-xs text-ink-soft mt-1">{opt.help}</div>
                                     </button>
                                 );
                             })}
                         </div>
                     </div>
-                    <div className="border-t border-slate-100 pt-4">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                    <div className="border-t border-card-line pt-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">
                             Discoverability
                         </div>
-                        <label className="flex items-start gap-3 border border-slate-200 bg-white px-4 py-3">
+                        <label className="flex items-start gap-3 border border-line bg-surface px-4 py-3">
                             <input
                                 type="checkbox"
                                 checked={profile.show_in_suggestions}
                                 disabled={savingScope === 'show_in_suggestions'}
                                 onChange={(e) => void setSuggestionVisibility(e.target.checked)}
-                                className="mt-0.5 h-4 w-4 border-slate-300 text-blue-500 focus:ring-blue-500 disabled:opacity-50"
+                                className="mt-0.5 h-4 w-4 border-line text-action focus:ring-action disabled:opacity-50"
                             />
                             <span>
-                                <span className="block text-xs font-medium text-slate-900">
+                                <span className="block text-xs font-medium text-ink">
                                     Suggest my profile to others
                                 </span>
-                                <span className="mt-1 block text-xs text-slate-500">
+                                <span className="mt-1 block text-xs text-ink-soft">
                                     When enabled, your profile can appear in onboarding, Discover,
                                     and network suggestions. Search by handle is controlled separately
                                     by account visibility.
@@ -265,8 +265,8 @@ export default function VisibilitySection({ handle }: { handle: string | null })
                             </span>
                         </label>
                     </div>
-                    <div className="border-t border-slate-100 pt-4">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                    <div className="border-t border-card-line pt-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">
                             When I RSVP
                         </div>
                         <ShareAttendanceDefaultPicker
@@ -276,7 +276,7 @@ export default function VisibilitySection({ handle }: { handle: string | null })
                         />
                     </div>
                     {error && (
-                        <p className="text-xs text-red-600">{error}</p>
+                        <p className="text-xs text-danger">{error}</p>
                     )}
                 </div>
             )}
@@ -340,13 +340,13 @@ export function ProfileLinksEditor({ handle }: { handle: string | null }) {
     useEffect(() => { load(); }, [load, user?.user_id]);
 
     return (
-        <div className="mt-3 border-t border-slate-100 pt-3">
+        <div className="mt-3 border-t border-card-line pt-3">
             {!handle ? (
-                <p className="text-xs text-slate-400">Set a handle above to add social links.</p>
+                <p className="text-xs text-muted">Set a handle above to add social links.</p>
             ) : loading ? (
-                <p className="text-xs text-slate-400">Loading…</p>
+                <p className="text-xs text-muted">Loading…</p>
             ) : !profile ? (
-                <p className="text-xs text-slate-400">{error || 'Unavailable.'}</p>
+                <p className="text-xs text-muted">{error || 'Unavailable.'}</p>
             ) : (
                 <SocialHandleRow
                     profile={profile}
@@ -354,7 +354,7 @@ export function ProfileLinksEditor({ handle }: { handle: string | null }) {
                     onError={(m) => setError(m)}
                 />
             )}
-            {error && profile && <p className="mt-1 text-xs text-red-600">{error}</p>}
+            {error && profile && <p className="mt-1 text-xs text-danger">{error}</p>}
         </div>
     );
 }
@@ -464,23 +464,23 @@ function SocialChip({
     const isEditing = editing === field;
     return (
         <div className="flex items-center gap-1 text-xs">
-            <span className="text-slate-400 shrink-0 flex items-center">{icon}</span>
+            <span className="text-muted shrink-0 flex items-center">{icon}</span>
             {isEditing ? (
                 <>
-                    <span className="text-slate-400">@</span>
+                    <span className="text-muted">@</span>
                     <input
                         type="text"
                         value={draft}
                         onChange={(e) => onDraftChange(e.target.value)}
                         placeholder="yourhandle"
                         autoFocus
-                        className="w-28 border-b border-slate-300 text-xs py-0.5 outline-none focus:border-blue-500 bg-transparent"
+                        className="w-28 border-b border-line text-xs py-0.5 outline-none focus:border-action bg-transparent"
                     />
                     <button
                         type="button"
                         onClick={onSave}
                         disabled={saving}
-                        className="ml-1 text-xs text-blue-500 hover:text-blue-600 font-medium disabled:opacity-50 shrink-0"
+                        className="ml-1 text-xs text-action hover:text-action font-medium disabled:opacity-50 shrink-0"
                     >
                         {saving ? '…' : 'Save'}
                     </button>
@@ -488,7 +488,7 @@ function SocialChip({
                         type="button"
                         onClick={onCancel}
                         disabled={saving}
-                        className="text-xs text-slate-400 hover:text-slate-600 shrink-0"
+                        className="text-xs text-muted hover:text-ink-soft shrink-0"
                     >
                         ✕
                     </button>
@@ -499,14 +499,14 @@ function SocialChip({
                         href={`${urlBase}${handle}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-xs text-blue-500 hover:underline"
+                        className="text-xs text-action hover:underline"
                     >
                         @{handle}
                     </a>
                     <button
                         type="button"
                         onClick={() => onEdit(field)}
-                        className="text-slate-400 hover:text-slate-600 leading-none"
+                        className="text-muted hover:text-ink-soft leading-none"
                         aria-label={`Edit ${label}`}
                         title={`Edit ${label}`}
                     >
@@ -517,7 +517,7 @@ function SocialChip({
                 <button
                     type="button"
                     onClick={() => onEdit(field)}
-                    className="text-slate-400 hover:text-slate-600 flex items-center gap-0.5"
+                    className="text-muted hover:text-ink-soft flex items-center gap-0.5"
                     aria-label={`Add ${label}`}
                     title={`Add ${label}`}
                 >
@@ -548,10 +548,10 @@ function ShareAttendanceDefaultPicker({
     return (
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-                <div className="text-sm font-medium text-slate-800">
+                <div className="text-sm font-medium text-ink">
                     Default audience for new RSVPs
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-ink-soft">
                     Pre-selected when you tap “I’m going”. You can override it
                     per event from the audience picker.
                 </div>

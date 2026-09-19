@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
@@ -15,6 +15,8 @@ from backend.api.schemas import (
     EventSuggestionResponse,
     GeocodeSuggestion,
     SuggestionApproveRequest,
+    SuggestionOccurrence,
+    SuggestionOccurrencesResponse,
     SuggestionRejectRequest,
     SuggestionUpdateRequest,
 )
@@ -25,6 +27,8 @@ from backend.db.models import (
     CachedEvent,
     CalendarSetting,
     EventPromoCode,
+    EventSeries,
+    EventSeriesMember,
     EventSuggestion,
     EventTag,
     Tag,
@@ -35,6 +39,8 @@ from backend.db.models import (
 from backend.services.email import send_suggestion_notification
 from backend.services.geocoding import geocode_location
 from backend.services.ip_geolocation import geolocate_ip
+from backend.services.reach import sync_event_reach
+from backend.services.recurrence import expand_occurrences
 from backend.services import activity_instant
 from backend.services.notifications import fan_out_going, fan_out_suggested
 
@@ -45,6 +51,13 @@ router = APIRouter(tags=["suggestions"])
 limiter = Limiter(key_func=client_ip)
 
 USER_SUBMISSION_CALENDAR_ID = "user-submissions"
+
+# A pending suggestion is already publicly visible, so the submitter should be
+# able to see the shape of their series straight away. Fanning out all 52
+# occurrences would put that many unreviewed rows into the listings, so submit
+# materialises a bounded preview and approval expands the rest.
+PREVIEW_OCCURRENCE_LIMIT = 10
+PREVIEW_HORIZON_DAYS = 90
 
 
 def _ensure_user_submission_calendar(session: Session) -> CalendarSetting:
@@ -60,7 +73,15 @@ def _ensure_user_submission_calendar(session: Session) -> CalendarSetting:
     return calendar
 
 
-def _upsert_live_event_from_suggestion(
+def _occurrence_event_id(suggestion: EventSuggestion, index: int) -> str:
+    # Occurrence 0 keeps the historical id so created_event_id, BlockedEvent
+    # rows and already-sent notifications keep resolving.
+    if index == 0:
+        return suggestion.created_event_id or f"suggestion-{suggestion.id}"
+    return f"suggestion-{suggestion.id}-{index}"
+
+
+def _upsert_occurrences_from_suggestion(
     session: Session,
     suggestion: EventSuggestion,
     *,
@@ -68,54 +89,134 @@ def _upsert_live_event_from_suggestion(
     calendar_id: str,
     latitude: float | None,
     longitude: float | None,
-) -> CachedEvent:
-    event_id = suggestion.created_event_id or f"suggestion-{suggestion.id}"
-    cached_event = session.get(CachedEvent, event_id)
-    if cached_event is None:
-        cached_event = CachedEvent(
-            event_id=event_id,
-            calendar_id=calendar_id,
-            title=suggestion.title,
-            description=suggestion.description,
-            location=suggestion.location,
-            start=suggestion.start,
-            end=suggestion.end,
-            all_day=suggestion.all_day,
-            latitude=latitude,
-            longitude=longitude,
-            links=suggestion.links,
-            price_min=suggestion.price_min,
-            price_max=suggestion.price_max,
-            price_currency=suggestion.price_currency,
-            price_is_free=suggestion.price_is_free,
-            review_status=review_status,
+    limit: int | None = None,
+    horizon_end: datetime | None = None,
+) -> list[CachedEvent]:
+    """Materialise one CachedEvent per recurrence occurrence.
+
+    Occurrences are always expanded from the suggestion's original start so an
+    occurrence's index — and therefore its event id — is stable across calls.
+    """
+    occurrences = expand_occurrences(
+        suggestion.start,
+        suggestion.end,
+        suggestion.recurrence_rule,
+        suggestion.recurrence_dates,
+        limit=limit,
+        horizon_end=horizon_end,
+    )
+
+    events: list[CachedEvent] = []
+    for index, (start, end) in enumerate(occurrences):
+        event_id = _occurrence_event_id(suggestion, index)
+        cached_event = session.get(CachedEvent, event_id)
+        if cached_event is None:
+            cached_event = CachedEvent(
+                event_id=event_id,
+                calendar_id=calendar_id,
+                title=suggestion.title,
+                description=suggestion.description,
+                location=suggestion.location,
+                start=start,
+                end=end,
+                all_day=suggestion.all_day,
+                latitude=latitude,
+                longitude=longitude,
+                links=suggestion.links,
+                price_min=suggestion.price_min,
+                price_max=suggestion.price_max,
+                price_currency=suggestion.price_currency,
+                price_is_free=suggestion.price_is_free,
+                review_status=review_status,
+            )
+        else:
+            cached_event.calendar_id = calendar_id
+            cached_event.title = suggestion.title
+            cached_event.description = suggestion.description
+            cached_event.location = suggestion.location
+            cached_event.start = start
+            cached_event.end = end
+            cached_event.all_day = suggestion.all_day
+            cached_event.latitude = latitude
+            cached_event.longitude = longitude
+            cached_event.links = suggestion.links
+            cached_event.price_min = suggestion.price_min
+            cached_event.price_max = suggestion.price_max
+            cached_event.price_currency = suggestion.price_currency
+            cached_event.price_is_free = suggestion.price_is_free
+            cached_event.review_status = review_status
+            cached_event.is_hidden = False
+            cached_event.deleted_at = None
+        cached_event.suggestion_id = suggestion.id
+        session.add(cached_event)
+        events.append(cached_event)
+
+    suggestion.created_event_id = events[0].event_id
+    _hide_orphaned_occurrences(session, suggestion, {e.event_id for e in events})
+    return events
+
+
+def _hide_orphaned_occurrences(
+    session: Session, suggestion: EventSuggestion, keep_event_ids: set[str]
+) -> None:
+    """Hide rows left behind when an admin edit shrinks the occurrence set."""
+    existing = session.exec(
+        select(CachedEvent).where(CachedEvent.suggestion_id == suggestion.id)
+    ).all()
+    for event in existing:
+        if event.event_id not in keep_event_ids and not event.is_hidden:
+            event.is_hidden = True
+            session.add(event)
+
+
+def _link_occurrences_to_series(
+    session: Session,
+    suggestion: EventSuggestion,
+    events: list[CachedEvent],
+    admin_email: str | None,
+) -> EventSeries | None:
+    """Group a declared recurrence's occurrences under one EventSeries.
+
+    Reuses the series that fuzzy detection populates, but pre-resolved: the
+    grouping is declared by the submitter, not inferred, so there is nothing
+    for an admin to confirm. Members already carry a series (``event_id`` is
+    globally unique in ``event_series_members``) are left alone.
+    """
+    if len(events) < 2:
+        return None
+
+    members = session.exec(
+        select(EventSeriesMember).where(
+            col(EventSeriesMember.event_id).in_([e.event_id for e in events])
         )
-    else:
-        cached_event.calendar_id = calendar_id
-        cached_event.title = suggestion.title
-        cached_event.description = suggestion.description
-        cached_event.location = suggestion.location
-        cached_event.start = suggestion.start
-        cached_event.end = suggestion.end
-        cached_event.all_day = suggestion.all_day
-        cached_event.latitude = latitude
-        cached_event.longitude = longitude
-        cached_event.links = suggestion.links
-        cached_event.price_min = suggestion.price_min
-        cached_event.price_max = suggestion.price_max
-        cached_event.price_currency = suggestion.price_currency
-        cached_event.price_is_free = suggestion.price_is_free
-        cached_event.review_status = review_status
-        cached_event.is_hidden = False
-        cached_event.deleted_at = None
-    suggestion.created_event_id = event_id
-    session.add(cached_event)
-    return cached_event
+    ).all()
+    series = None
+    if members:
+        series = session.get(EventSeries, members[0].series_id)
+    if series is None:
+        series = EventSeries(
+            status="resolved",
+            source="manual",
+            canonical_title=suggestion.title[:200],
+            resolved_at=datetime.utcnow(),
+            resolved_by_admin=admin_email,
+        )
+        session.add(series)
+        session.flush()
+
+    linked = {member.event_id for member in members}
+    for event in events:
+        if event.event_id not in linked:
+            session.add(EventSeriesMember(series_id=series.id, event_id=event.event_id))
+    return series
 
 
 def _apply_suggestion_tags(
     session: Session, event_id: str, suggested_tag_ids: list[int]
 ) -> None:
+    event = session.get(CachedEvent, event_id)
+    if event is not None:
+        sync_event_reach(session, event, suggested_tag_ids)
     for tag_id in suggested_tag_ids:
         tag = session.get(Tag, tag_id)
         if not tag:
@@ -155,6 +256,42 @@ def _upsert_creator_going(
     existing.share_publicly = audience == "public"
     existing.share_audience = audience
     session.add(existing)
+
+
+def _apply_creator_going(
+    session: Session,
+    suggestion: EventSuggestion,
+    events: list[CachedEvent],
+    *,
+    fan_out: bool,
+) -> None:
+    """Replay the submitter's "I'm going" onto ``events``.
+
+    Called from every wave that materialises occurrences (submit, approve, the
+    rolling extension job) so the RSVP covers the whole declared recurrence
+    rather than whichever occurrences happened to exist at submit time.
+
+    ``fan_out`` is True only on submit: notifications dedupe on ``event_id``,
+    so notifying per occurrence would send each follower one "is going" per
+    date. The series is announced once, anchored on the first occurrence.
+    """
+    if not suggestion.creator_going or suggestion.submitter_user_id is None:
+        return
+    if not events:
+        return
+    actor = session.get(User, suggestion.submitter_user_id)
+    if actor is None:
+        return
+
+    audience = (
+        suggestion.creator_going_audience
+        or actor.share_attendance_default_audience
+        or "friends"
+    )
+    for event in events:
+        _upsert_creator_going(session, actor, event.event_id, audience)
+    if fan_out:
+        fan_out_going(session, actor, events[0].event_id, audience=audience)
 
 
 # --- Background tasks ---
@@ -224,6 +361,12 @@ def submit_suggestion(
         start=body.start,
         end=body.end,
         all_day=body.all_day,
+        recurrence_rule=body.recurrence_rule,
+        recurrence_dates=[
+            item.model_dump(mode="json") for item in body.recurrence_dates
+        ]
+        if body.recurrence_dates
+        else None,
         submitter_name=body.submitter_name,
         submitter_email=body.submitter_email,
         submitter_user_id=current_user.id if current_user else None,
@@ -245,6 +388,8 @@ def submit_suggestion(
         price_currency=body.price_currency,
         price_is_free=body.price_is_free,
         auto_save=body.auto_save,
+        creator_going=bool(body.going) and current_user is not None,
+        creator_going_audience=body.going_audience if body.going else None,
     )
 
     session.add(suggestion)
@@ -253,29 +398,28 @@ def submit_suggestion(
 
     if current_user is not None:
         _ensure_user_submission_calendar(session)
-        cached_event = _upsert_live_event_from_suggestion(
+        # Materialise a bounded preview of the recurrence so the submitter sees
+        # every upcoming date rather than just the first one. Approval expands
+        # the series to the full horizon.
+        cached_events = _upsert_occurrences_from_suggestion(
             session,
             suggestion,
             review_status="pending",
             calendar_id=USER_SUBMISSION_CALENDAR_ID,
             latitude=body.latitude,
             longitude=body.longitude,
+            limit=PREVIEW_OCCURRENCE_LIMIT,
+            horizon_end=datetime.utcnow() + timedelta(days=PREVIEW_HORIZON_DAYS),
         )
-        _apply_suggestion_tags(
-            session, cached_event.event_id, suggestion.suggested_tag_ids or []
-        )
-        if body.going:
-            going_audience = (
-                body.going_audience
-                or current_user.share_attendance_default_audience
-                or "friends"
+        cached_event = cached_events[0]
+        for occurrence in cached_events:
+            _apply_suggestion_tags(
+                session, occurrence.event_id, suggestion.suggested_tag_ids or []
             )
-            _upsert_creator_going(
-                session, current_user, cached_event.event_id, going_audience
-            )
-            fan_out_going(
-                session, current_user, cached_event.event_id, audience=going_audience
-            )
+        # Group the preview occurrences so the listings collapse them into one
+        # series instead of showing the same event ten times.
+        _link_occurrences_to_series(session, suggestion, cached_events, None)
+        _apply_creator_going(session, suggestion, cached_events, fan_out=True)
         session.add(suggestion)
         session.commit()
         session.refresh(suggestion)
@@ -311,10 +455,23 @@ def suggestion_geocode(
     """Public geocode search for the suggestion form address autocomplete."""
     from geopy.exc import GeocoderServiceError, GeocoderTimedOut
     from geopy.geocoders import Nominatim
+    from backend.services.geocoding import (
+        _language_preference_from_header,
+        nominatim_suggestion,
+    )
 
     geocoder = Nominatim(user_agent="movida", timeout=5)
+    accept_language = request.headers.get("accept-language")
+    language_pref = _language_preference_from_header(accept_language)
     try:
-        results = geocoder.geocode(q, exactly_one=False, limit=5)
+        results = geocoder.geocode(
+            q,
+            exactly_one=False,
+            limit=5,
+            language=language_pref,
+            addressdetails=True,
+            namedetails=True,
+        )
     except (GeocoderTimedOut, GeocoderServiceError) as e:
         logger.warning("Geocode search failed: %s", e)
         return []
@@ -325,14 +482,7 @@ def suggestion_geocode(
     if not results:
         return []
 
-    return [
-        GeocodeSuggestion(
-            display_name=r.address,
-            latitude=r.latitude,
-            longitude=r.longitude,
-        )
-        for r in results
-    ]
+    return [GeocodeSuggestion(**nominatim_suggestion(result)) for result in results]
 
 
 # --- Admin endpoints ---
@@ -364,6 +514,56 @@ def get_suggestion(
     if not suggestion:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     return suggestion
+
+
+@router.get(
+    "/api/admin/suggestions/{suggestion_id}/occurrences",
+    response_model=SuggestionOccurrencesResponse,
+)
+def get_suggestion_occurrences(
+    suggestion_id: UUID,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Every date this suggestion expands to, for review before approval.
+
+    Expanded from the recurrence rather than read from ``cached_events``, so an
+    admin sees the full set approval would create — not just the bounded
+    preview materialised at submit time.
+    """
+    suggestion = session.get(EventSuggestion, suggestion_id)
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+
+    expanded = expand_occurrences(
+        suggestion.start,
+        suggestion.end,
+        suggestion.recurrence_rule,
+        suggestion.recurrence_dates,
+    )
+    materialised = {
+        event.event_id
+        for event in session.exec(
+            select(CachedEvent).where(CachedEvent.suggestion_id == suggestion.id)
+        ).all()
+        if not event.is_hidden
+    }
+
+    occurrences = []
+    for index, (start, end) in enumerate(expanded):
+        event_id = _occurrence_event_id(suggestion, index)
+        occurrences.append(
+            SuggestionOccurrence(
+                index=index,
+                start=start,
+                end=end,
+                event_id=event_id if event_id in materialised else None,
+                materialised=event_id in materialised,
+            )
+        )
+    return SuggestionOccurrencesResponse(
+        total=len(occurrences), occurrences=occurrences
+    )
 
 
 @router.patch(
@@ -425,8 +625,7 @@ def approve_suggestion(
         if coords:
             lat, lng = coords
 
-    event_id = suggestion.created_event_id or f"suggestion-{suggestion.id}"
-    cached_event = _upsert_live_event_from_suggestion(
+    events = _upsert_occurrences_from_suggestion(
         session,
         suggestion,
         review_status="reviewed",
@@ -434,10 +633,21 @@ def approve_suggestion(
         latitude=lat,
         longitude=lng,
     )
+    event_id = events[0].event_id
 
     # Create EventTags from suggested_tag_ids
     if suggestion.suggested_tag_ids:
-        _apply_suggestion_tags(session, event_id, suggestion.suggested_tag_ids)
+        for event in events:
+            _apply_suggestion_tags(
+                session, event.event_id, suggestion.suggested_tag_ids
+            )
+
+    _link_occurrences_to_series(session, suggestion, events, admin.get("email"))
+
+    # Approval expands the preview to the full horizon; the submitter's RSVP has
+    # to cover the occurrences that only exist now. Already announced at submit,
+    # so no fan-out here.
+    _apply_creator_going(session, suggestion, events, fan_out=False)
 
     # Promote inline new-tag suggestions to TagSuggestion rows for admin review
     if suggestion.suggested_new_tags:
@@ -556,14 +766,21 @@ def reject_suggestion(
     suggestion.admin_notes = body.admin_notes or suggestion.admin_notes
     suggestion.reviewed_at = datetime.utcnow()
     suggestion.reviewed_by = admin.get("email")
-    if suggestion.created_event_id:
-        event = session.get(CachedEvent, suggestion.created_event_id)
-        if event:
-            event.is_hidden = True
-            event.deleted_at = None
-            session.add(event)
-        if session.get(BlockedEvent, suggestion.created_event_id) is None:
-            session.add(BlockedEvent(event_id=suggestion.created_event_id))
+    events = list(
+        session.exec(
+            select(CachedEvent).where(CachedEvent.suggestion_id == suggestion.id)
+        ).all()
+    )
+    if not events and suggestion.created_event_id:
+        legacy = session.get(CachedEvent, suggestion.created_event_id)
+        if legacy is not None:
+            events = [legacy]
+    for event in events:
+        event.is_hidden = True
+        event.deleted_at = None
+        session.add(event)
+        if session.get(BlockedEvent, event.event_id) is None:
+            session.add(BlockedEvent(event_id=event.event_id))
     session.add(suggestion)
     session.commit()
     session.refresh(suggestion)

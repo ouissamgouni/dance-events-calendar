@@ -37,6 +37,7 @@ from backend.db.models import (
     TagSuggestion,
     TagSynonym,
 )
+from backend.services.reach import assign_event_tag
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +140,11 @@ def _assert_event_scope_tag(session: Session, tag_id: int) -> Tag:
             ),
         )
     return tag
+
+
+def _reach_slug(session: Session, tag: Tag) -> str | None:
+    group = session.get(TagGroup, tag.group_id)
+    return tag.slug if group and group.slug == "reach" else None
 
 
 def _apply_tag_suggestion_filters(
@@ -637,15 +643,25 @@ def set_event_tags(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
+    tags = [_assert_event_scope_tag(session, tag_id) for tag_id in body.tag_ids]
+    reach_slugs = [slug for tag in tags if (slug := _reach_slug(session, tag))]
+    if len(reach_slugs) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="An event can have at most one reach classification.",
+        )
+
+    event.reach = reach_slugs[0] if reach_slugs else None
+    session.add(event)
+
     # Delete existing
     existing = session.exec(select(EventTag).where(EventTag.event_id == event_id)).all()
     for et in existing:
         session.delete(et)
 
     # Add new
-    for tag_id in body.tag_ids:
-        _assert_event_scope_tag(session, tag_id)
-        session.add(EventTag(event_id=event_id, tag_id=tag_id))
+    for tag in tags:
+        session.add(EventTag(event_id=event_id, tag_id=tag.id))
 
     session.commit()
 
@@ -665,14 +681,9 @@ def add_event_tag(
     event = session.get(CachedEvent, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    _assert_event_scope_tag(session, tag_id)
-
-    existing = session.exec(
-        select(EventTag).where(EventTag.event_id == event_id, EventTag.tag_id == tag_id)
-    ).first()
-    if not existing:
-        session.add(EventTag(event_id=event_id, tag_id=tag_id))
-        session.commit()
+    tag = _assert_event_scope_tag(session, tag_id)
+    assign_event_tag(session, event, tag)
+    session.commit()
 
     return {"status": "ok"}
 
@@ -689,6 +700,12 @@ def remove_event_tag(
         select(EventTag).where(EventTag.event_id == event_id, EventTag.tag_id == tag_id)
     ).first()
     if et:
+        tag = session.get(Tag, tag_id)
+        if tag and _reach_slug(session, tag):
+            event = session.get(CachedEvent, event_id)
+            if event:
+                event.reach = None
+                session.add(event)
         session.delete(et)
         session.commit()
 
@@ -813,15 +830,10 @@ def approve_tag_suggestion(
 
     tag = _assert_event_scope_tag(session, tag_id)
 
-    # Create EventTag (idempotent)
-    existing_et = session.exec(
-        select(EventTag).where(
-            EventTag.event_id == suggestion.event_id,
-            EventTag.tag_id == tag_id,
-        )
-    ).first()
-    if not existing_et:
-        session.add(EventTag(event_id=suggestion.event_id, tag_id=tag_id))
+    event = session.get(CachedEvent, suggestion.event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    assign_event_tag(session, event, tag)
 
     suggestion.status = "approved"
     suggestion.reviewed_at = datetime.utcnow()
@@ -829,7 +841,6 @@ def approve_tag_suggestion(
     session.commit()
     session.refresh(suggestion)
 
-    event = session.get(CachedEvent, suggestion.event_id)
     return _suggestion_to_response(
         suggestion,
         tag=tag,
@@ -923,15 +934,11 @@ def bulk_review_tag_suggestions(
             if not tag:
                 skipped += 1
                 continue
-            # Create EventTag idempotently
-            existing = session.exec(
-                select(EventTag).where(
-                    EventTag.event_id == suggestion.event_id,
-                    EventTag.tag_id == tag_id,
-                )
-            ).first()
-            if not existing:
-                session.add(EventTag(event_id=suggestion.event_id, tag_id=tag_id))
+            event = session.get(CachedEvent, suggestion.event_id)
+            if not event:
+                skipped += 1
+                continue
+            assign_event_tag(session, event, tag)
             suggestion.status = "approved"
         else:
             suggestion.status = "rejected"

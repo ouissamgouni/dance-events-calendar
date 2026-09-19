@@ -172,10 +172,10 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
             role="dialog"
             aria-label="Sign in suggestion"
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
-            className="z-[12000] border border-slate-200 bg-white p-3 shadow-xl text-left"
+            className="z-[12000] border border-line bg-surface p-3 shadow-xl text-left"
         >
-            <p className="text-xs font-semibold text-slate-800">{HEADLINE[trigger]}</p>
-            <ul className="mt-1.5 space-y-0.5 text-[11px] text-slate-600 list-disc pl-4">
+            <p className="text-xs font-semibold text-ink">{HEADLINE[trigger]}</p>
+            <ul className="mt-1.5 space-y-0.5 text-[11px] text-ink-soft list-disc pl-4">
                 <li>See who else is going</li>
                 <li>Save events to your calendar and share it with others</li>
                 <li>Rate events and read reviews</li>
@@ -185,14 +185,14 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onClose(); }}
-                    className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
+                    className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
                 >
                     Not now
                 </button>
                 <Link
                     to={`/login?next=${next}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-xs px-3 py-1 bg-blue-500 text-white hover:bg-blue-600"
+                    className="text-xs px-3 py-1 bg-action text-white hover:bg-action"
                 >
                     Sign in
                 </Link>

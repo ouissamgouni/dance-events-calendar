@@ -22,6 +22,8 @@ export function getNotificationVerb(item: NotificationItem): string {
     switch (item.kind) {
         case 'subscription_going':
             return item.also_going ? 'are going to' : 'is going to';
+        case 'subscription_saved':
+            return 'is interested in';
         case 'subscription_review':
             return 'reviewed';
         case 'subscription_milestone':
@@ -113,4 +115,42 @@ export function formatRelative(iso: string): string {
     if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
     if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d ago`;
     return new Date(iso).toLocaleDateString();
+}
+
+/** The five activity-feed filter categories shown as pills. */
+export type NotificationCategory =
+    | 'events'
+    | 'network'
+    | 'reviews'
+    | 'milestones'
+    | 'others';
+
+const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> = {
+    subscription_going: 'events',
+    subscription_saved: 'events',
+    subscription_suggested: 'events',
+    interest_event: 'events',
+    event_reminder: 'events',
+    new_follower: 'network',
+    new_friend: 'network',
+    follow_request: 'network',
+    follow_request_approved: 'network',
+    subscription_review: 'reviews',
+    event_review_prompt: 'reviews',
+    subscription_milestone: 'milestones',
+    milestone_unlocked: 'milestones',
+    promo_code_approved: 'others',
+    promo_code_rejected: 'others',
+    promo_code_added: 'others',
+    organizer_claim_decided: 'others',
+    event_message: 'others',
+    event_message_reply: 'others',
+    event_message_reported: 'others',
+};
+
+/** Which filter-pill category a notification kind belongs to. */
+export function notificationCategory(
+    kind: NotificationItem['kind'],
+): NotificationCategory {
+    return CATEGORY_BY_KIND[kind] ?? 'others';
 }

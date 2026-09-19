@@ -4,7 +4,8 @@
  * shared read-only PassportView.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Image, Link2, Pencil, Share2, X } from 'lucide-react';
 import {
     ackPassportMilestones,
     createPassportShare,
@@ -24,7 +25,6 @@ import { useToast } from '../components/Toast';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
 import PassportView from '../components/PassportView';
 import PassportShareCard from '../components/PassportShareCard';
-import SuggestEventModal from '../components/SuggestEventModal';
 import { scopePassport, type ShareScope } from '../utils/passportScope';
 import { CARD_HEIGHT, CARD_WIDTH, downloadImage, renderCardToBlob, shareImage } from '../utils/passportShareImage';
 import type {
@@ -204,34 +204,34 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
 
     return (
         <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={onClose}
             role="dialog"
             aria-modal="true"
             aria-label="Share your Dance Passport"
         >
             <div
-                className="w-full max-w-md border border-slate-200 bg-white shadow-xl"
+                className="max-h-[92dvh] w-full max-w-md overflow-hidden rounded-t-card bg-surface shadow-xl sm:rounded-card sm:border sm:border-line"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                    <h2 className="text-sm font-semibold text-slate-900">Share my passport</h2>
+                <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                    <h2 className="text-sm font-semibold text-ink">Share my passport</h2>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="text-slate-400 hover:text-slate-600"
+                        className="text-muted hover:text-ink-soft"
                     >
-                        ✕
+                        <X className="h-5 w-5" aria-hidden="true" />
                     </button>
                 </div>
 
                 <div className="max-h-[70vh] space-y-4 overflow-y-auto px-4 py-4">
                     <fieldset>
-                        <legend className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <legend className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                             Sections to share
                         </legend>
-                        <p className="mt-1 text-xs text-slate-500">Your stats are always shown.</p>
+                        <p className="mt-1 text-xs text-ink-soft">Your stats are always shown.</p>
                         <div className="mt-2 space-y-2">
                             {PASSPORT_SECTION_TOGGLES.map((row) => (
                                 <label key={row.key} className="flex items-start gap-2 text-sm">
@@ -243,8 +243,8 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
                                         className="mt-0.5"
                                     />
                                     <span>
-                                        <span className="font-medium text-slate-800">{row.label}</span>
-                                        <span className="block text-xs text-slate-500">{row.hint}</span>
+                                        <span className="font-medium text-ink">{row.label}</span>
+                                        <span className="block text-xs text-ink-soft">{row.hint}</span>
                                     </span>
                                 </label>
                             ))}
@@ -252,7 +252,7 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
                     </fieldset>
 
                     <fieldset>
-                        <legend className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <legend className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                             Link access
                         </legend>
                         <div className="mt-2 space-y-2">
@@ -265,8 +265,8 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
                                     className="mt-0.5"
                                 />
                                 <span>
-                                    <span className="font-medium text-slate-800">Anyone with the link</span>
-                                    <span className="block text-xs text-slate-500">No sign-in required to open.</span>
+                                    <span className="font-medium text-ink">Anyone with the link</span>
+                                    <span className="block text-xs text-ink-soft">No sign-in required to open.</span>
                                 </span>
                             </label>
                             <label className="flex items-start gap-2 text-sm">
@@ -278,8 +278,8 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
                                     className="mt-0.5"
                                 />
                                 <span>
-                                    <span className="font-medium text-slate-800">Only signed-in dancers</span>
-                                    <span className="block text-xs text-slate-500">Viewers must sign in to open the link.</span>
+                                    <span className="font-medium text-ink">Only signed-in dancers</span>
+                                    <span className="block text-xs text-ink-soft">Viewers must sign in to open the link.</span>
                                 </span>
                             </label>
                         </div>
@@ -287,7 +287,7 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
 
                     {shareUrl && (
                         <fieldset>
-                            <legend className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <legend className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                                 Your share link
                             </legend>
                             <div className="mt-2 flex gap-2">
@@ -296,28 +296,28 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
                                     readOnly
                                     value={shareUrl}
                                     onFocus={(e) => e.currentTarget.select()}
-                                    className="min-w-0 flex-1 border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs text-slate-700"
+                                    className="min-w-0 flex-1 border border-line bg-canvas px-2 py-1.5 text-xs text-ink"
                                 />
                                 <button
                                     type="button"
                                     onClick={handleCopy}
-                                    className="whitespace-nowrap border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                    className="whitespace-nowrap border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas"
                                 >
                                     Copy
                                 </button>
                             </div>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="mt-1 text-xs text-ink-soft">
                                 Section and access changes apply to this link instantly.
                             </p>
                         </fieldset>
                     )}
                 </div>
 
-                <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">
+                <div className="flex justify-end gap-2 border-t border-line px-4 py-3">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className="border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas"
                     >
                         Close
                     </button>
@@ -326,7 +326,7 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
                             type="button"
                             onClick={handleRevoke}
                             disabled={busy}
-                            className="inline-flex items-center gap-1.5 border border-rose-600 bg-white px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                            className="inline-flex items-center gap-1.5 border border-rose-600 bg-surface px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-60"
                         >
                             {busy ? 'Stopping…' : 'Stop sharing'}
                         </button>
@@ -335,7 +335,7 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
                             type="button"
                             onClick={handleShare}
                             disabled={sharing}
-                            className="inline-flex items-center gap-1.5 border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                            className="inline-flex items-center gap-1.5 border border-action bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-strong disabled:opacity-60"
                         >
                             {sharing ? 'Preparing link…' : 'Share link'}
                         </button>
@@ -346,7 +346,7 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
     );
 }
 
-/** Single "Share" trigger opening a menu: share as link or as card. */
+/** Compact header trigger opening the two-option Passport share sheet. */
 function SharePassportMenu({
     handle,
     displayName,
@@ -366,6 +366,8 @@ function SharePassportMenu({
 
     useEffect(() => {
         if (!menuOpen) return;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
         const onDown = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
         };
@@ -375,50 +377,70 @@ function SharePassportMenu({
         document.addEventListener('mousedown', onDown);
         document.addEventListener('keydown', onKey);
         return () => {
+            document.body.style.overflow = previousOverflow;
             document.removeEventListener('mousedown', onDown);
             document.removeEventListener('keydown', onKey);
         };
     }, [menuOpen]);
 
     return (
-        <div ref={menuRef} className="relative">
+        <div className="relative">
             <button
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}
-                aria-haspopup="menu"
+                aria-label="Share passport"
+                aria-haspopup="dialog"
                 aria-expanded={menuOpen}
-                className="inline-flex items-center gap-1.5 border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-white hover:bg-white/10"
             >
-                Share
-                <span aria-hidden>▾</span>
+                <Share2 className="h-5 w-5" aria-hidden="true" />
             </button>
             {menuOpen && (
                 <div
-                    role="menu"
-                    className="absolute right-0 z-20 mt-1 w-40 border border-slate-200 bg-white shadow-lg"
+                    className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
+                    onClick={() => setMenuOpen(false)}
                 >
-                    <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                            setMenuOpen(false);
-                            setModal('link');
-                        }}
-                        className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    <div
+                        ref={menuRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Share my passport"
+                        className="w-full max-w-sm rounded-t-card bg-surface p-4 shadow-xl sm:rounded-card sm:border sm:border-line"
+                        onClick={(event) => event.stopPropagation()}
                     >
-                        As link
-                    </button>
-                    <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                            setMenuOpen(false);
-                            setModal('card');
-                        }}
-                        className="block w-full border-t border-slate-100 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        As card
-                    </button>
+                        <div className="mb-2 flex items-center justify-between">
+                            <h2 className="text-sm font-semibold text-ink">Share my passport</h2>
+                            <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close" className="flex h-9 w-9 items-center justify-center text-muted hover:text-ink">
+                                <X className="h-5 w-5" aria-hidden="true" />
+                            </button>
+                        </div>
+                        <div role="menu" className="divide-y divide-card-line">
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    setMenuOpen(false);
+                                    setModal('link');
+                                }}
+                                className="flex w-full items-center gap-3 px-1 py-4 text-left hover:bg-canvas"
+                            >
+                                <Link2 className="h-5 w-5 text-action" aria-hidden="true" />
+                                <span><span className="block text-sm font-semibold text-ink">As link</span><span className="block text-xs text-ink-soft">Control who can view your passport.</span></span>
+                            </button>
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    setMenuOpen(false);
+                                    setModal('card');
+                                }}
+                                className="flex w-full items-center gap-3 px-1 py-4 text-left hover:bg-canvas"
+                            >
+                                <Image className="h-5 w-5 text-brand" aria-hidden="true" />
+                                <span><span className="block text-sm font-semibold text-ink">As card</span><span className="block text-xs text-ink-soft">Create a shareable image.</span></span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
             {modal === 'link' && <SharePassportModal handle={handle} onClose={() => setModal(null)} />}
@@ -468,9 +490,6 @@ function SharePassportCardModal({
     const [sections, setSections] = useState({ badges: true, map: true, dancingSince: false, activity: true });
     const [busy, setBusy] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
-    const canNativeShare =
-        typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-
     // On open: build the profile link the QR resolves to (always available for a
     // valid handle, even when the passport is private — the profile shows the
     // dancer + a Follow gate), load the full event set for the scoped stats/map,
@@ -579,38 +598,38 @@ function SharePassportCardModal({
 
     return (
         <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={onClose}
             role="dialog"
             aria-modal="true"
             aria-label="Share your Dance Passport as a card"
         >
             <div
-                className="w-full max-w-sm border border-slate-200 bg-white shadow-xl"
+                className="max-h-[92dvh] w-full max-w-sm overflow-y-auto rounded-t-card bg-surface shadow-xl sm:rounded-card sm:border sm:border-line"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                    <h2 className="text-sm font-semibold text-slate-900">Share as card</h2>
+                <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                    <h2 className="text-sm font-semibold text-ink">Share as card</h2>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="text-slate-400 hover:text-slate-600"
+                        className="text-muted hover:text-ink-soft"
                     >
-                        ✕
+                        <X className="h-5 w-5" aria-hidden="true" />
                     </button>
                 </div>
 
                 <div className="space-y-4 px-4 py-4">
-                    <div className="inline-flex border border-slate-300">
+                    <div className="inline-flex border border-line">
                         <button
                             type="button"
                             aria-pressed={scope === 'all'}
                             onClick={() => setScope('all')}
                             className={
                                 scope === 'all'
-                                    ? 'bg-blue-500 px-3 py-1.5 text-sm font-medium text-white'
-                                    : 'bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50'
+                                    ? 'bg-action px-3 py-1.5 text-sm font-medium text-white'
+                                    : 'bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas'
                             }
                         >
                             All time
@@ -621,8 +640,8 @@ function SharePassportCardModal({
                             onClick={() => setScope(currentYear)}
                             className={
                                 scope === currentYear
-                                    ? 'border-l border-slate-300 bg-blue-500 px-3 py-1.5 text-sm font-medium text-white'
-                                    : 'border-l border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50'
+                                    ? 'border-l border-line bg-action px-3 py-1.5 text-sm font-medium text-white'
+                                    : 'border-l border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas'
                             }
                         >
                             {currentYear}
@@ -630,7 +649,7 @@ function SharePassportCardModal({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4">
-                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                        <label className="inline-flex items-center gap-2 text-sm text-ink">
                             <input
                                 type="checkbox"
                                 checked={sections.map}
@@ -638,7 +657,7 @@ function SharePassportCardModal({
                             />
                             Map
                         </label>
-                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                        <label className="inline-flex items-center gap-2 text-sm text-ink">
                             <input
                                 type="checkbox"
                                 checked={sections.badges}
@@ -646,7 +665,7 @@ function SharePassportCardModal({
                             />
                             Badges
                         </label>
-                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                        <label className="inline-flex items-center gap-2 text-sm text-ink">
                             <input
                                 type="checkbox"
                                 checked={sections.activity}
@@ -654,21 +673,11 @@ function SharePassportCardModal({
                             />
                             Activity
                         </label>
-                        {scope === 'all' && data.stats.dancing_since && (
-                            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                                <input
-                                    type="checkbox"
-                                    checked={sections.dancingSince}
-                                    onChange={(e) => setSections((s) => ({ ...s, dancingSince: e.target.checked }))}
-                                />
-                                Dancing since
-                            </label>
-                        )}
                     </div>
 
                     {ready ? (
                         <div
-                            className="mx-auto overflow-hidden border border-slate-200"
+                            className="mx-auto overflow-hidden border border-line"
                             style={{
                                 width: CARD_WIDTH * CARD_PREVIEW_SCALE,
                                 height: CARD_HEIGHT * CARD_PREVIEW_SCALE,
@@ -700,7 +709,7 @@ function SharePassportCardModal({
                         </div>
                     ) : (
                         <div
-                            className="mx-auto flex items-center justify-center border border-slate-200 bg-slate-50 text-xs text-slate-500"
+                            className="mx-auto flex items-center justify-center border border-line bg-canvas text-xs text-ink-soft"
                             style={{
                                 width: CARD_WIDTH * CARD_PREVIEW_SCALE,
                                 height: CARD_HEIGHT * CARD_PREVIEW_SCALE,
@@ -711,11 +720,11 @@ function SharePassportCardModal({
                     )}
                 </div>
 
-                <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">
+                <div className="flex justify-end gap-2 border-t border-line px-4 py-3">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className="border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas"
                     >
                         Close
                     </button>
@@ -723,20 +732,18 @@ function SharePassportCardModal({
                         type="button"
                         onClick={handleDownload}
                         disabled={!ready || busy}
-                        className="border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         Download
                     </button>
-                    {canNativeShare && (
-                        <button
-                            type="button"
-                            onClick={handleShare}
-                            disabled={!ready || busy}
-                            className="border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            Share
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        onClick={handleShare}
+                        disabled={!ready || busy}
+                        className="border border-action bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-strong disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Share
+                    </button>
                 </div>
             </div>
         </div>
@@ -815,7 +822,7 @@ function DancingSinceControl({
                         type="button"
                         onClick={save}
                         disabled={saving || !value}
-                        className="border border-blue-600 bg-blue-600 px-2 py-1 font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                        className="border border-action bg-action px-2 py-1 font-medium text-white hover:bg-action-strong disabled:opacity-60"
                     >
                         Save
                     </button>
@@ -828,19 +835,20 @@ function DancingSinceControl({
                     </button>
                 </div>
             ) : (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <span>Dancing since {formatJourneyDate(effective)}</span>
                     <button
                         type="button"
                         onClick={startEdit}
-                        className="underline underline-offset-2 hover:text-white"
+                        className="inline-flex items-center text-white/60 hover:text-white shrink-0"
+                        aria-label="Edit dancing since date"
                     >
-                        Edit
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                 </div>
             )}
             {firstEventDate && (
-                <p className="mt-0.5 text-slate-400">
+                <p className="mt-0.5 text-muted text-[10px]">
                     First event on Movida {formatJourneyDate(firstEventDate)}
                 </p>
             )}
@@ -953,16 +961,16 @@ function AttendedEventConfirmModal({
             aria-label="Confirm you attended this event"
         >
             <div
-                className="w-full max-w-md border border-slate-200 bg-white shadow-xl"
+                className="w-full max-w-md border border-line bg-surface shadow-xl"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                    <h2 className="text-sm font-semibold text-slate-900">Add a past event</h2>
+                <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                    <h2 className="text-sm font-semibold text-ink">Add a past event</h2>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="text-slate-400 hover:text-slate-600"
+                        className="text-muted hover:text-ink-soft"
                     >
                         ✕
                     </button>
@@ -970,26 +978,26 @@ function AttendedEventConfirmModal({
 
                 <div className="max-h-[70vh] space-y-3 overflow-y-auto px-4 py-4">
                     {loadError ? (
-                        <p className="text-sm text-red-600">Could not load this event. Please try again.</p>
+                        <p className="text-sm text-danger">Could not load this event. Please try again.</p>
                     ) : !event ? (
-                        <p className="text-sm text-slate-500">Loading event…</p>
+                        <p className="text-sm text-ink-soft">Loading event…</p>
                     ) : (
                         <>
                             <div>
-                                <h3 className="text-base font-semibold text-slate-900">{event.title}</h3>
-                                <p className="mt-1 text-sm text-slate-600">{formatEventDates(event)}</p>
+                                <h3 className="text-base font-semibold text-ink">{event.title}</h3>
+                                <p className="mt-1 text-sm text-ink-soft">{formatEventDates(event)}</p>
                                 {event.location && (
-                                    <p className="mt-0.5 text-sm text-slate-600">{event.location}</p>
+                                    <p className="mt-0.5 text-sm text-ink-soft">{event.location}</p>
                                 )}
                             </div>
                             {description && (
-                                <p className="whitespace-pre-line text-sm text-slate-700">
+                                <p className="whitespace-pre-line text-sm text-ink">
                                     {shownDescription}
                                     {isLong && (
                                         <button
                                             type="button"
                                             onClick={() => setExpanded((v) => !v)}
-                                            className="ml-1 font-medium text-blue-600 hover:underline"
+                                            className="ml-1 font-medium text-action hover:underline"
                                         >
                                             {expanded ? 'See less' : 'See more'}
                                         </button>
@@ -1000,22 +1008,22 @@ function AttendedEventConfirmModal({
                                 to={`/event/${eventId}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-block text-sm font-medium text-blue-600 hover:underline"
+                                className="inline-block text-sm font-medium text-action hover:underline"
                             >
                                 See details →
                             </Link>
-                            <p className="border-t border-slate-100 pt-3 text-sm font-medium text-slate-800">
+                            <p className="border-t border-card-line pt-3 text-sm font-medium text-ink">
                                 Did you really attend this event?
                             </p>
                         </>
                     )}
                 </div>
 
-                <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">
+                <div className="flex justify-end gap-2 border-t border-line px-4 py-3">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className="border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas"
                     >
                         Cancel
                     </button>
@@ -1023,7 +1031,7 @@ function AttendedEventConfirmModal({
                         type="button"
                         onClick={confirm}
                         disabled={saving || !event}
-                        className="inline-flex items-center gap-1.5 border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                        className="inline-flex items-center gap-1.5 border border-action bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-strong disabled:opacity-60"
                     >
                         {saving ? 'Adding…' : 'Yes, I attended'}
                     </button>
@@ -1045,7 +1053,8 @@ function AddPastEventControl({ onAdded, onOpenSubmitEvent }: { onAdded: () => vo
             <ExplorerEventSearch
                 includePast
                 small
-                triggerLabel="Add a past event"
+                triggerIcon="plus"
+                triggerLabel="Add past event"
                 onSelectEvent={(id) => setConfirmId(id)}
                 onOpenSubmitEvent={onOpenSubmitEvent}
             />
@@ -1074,7 +1083,15 @@ export default function PassportPage() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [mapEvents, setMapEvents] = useState<PassportMapEvent[] | null>(null);
-    const [showSuggestModal, setShowSuggestModal] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // `/suggest` renders over the passport so its timeline stays mounted.
+    const openSuggest = useCallback(() => {
+        navigate('/suggest', { state: { backgroundLocation: location } });
+    }, [navigate, location]);
+    const timelineQueryRef = useRef('');
+    const timelineRequestRef = useRef(0);
     const mapEventsRef = useRef(false);
     const celebratedRef = useRef(false);
 
@@ -1133,7 +1150,7 @@ export default function PassportPage() {
     const loadMore = useCallback(async () => {
         setLoadingMore(true);
         try {
-            const next = await fetchPassportTimeline(items.length, PAGE_SIZE);
+            const next = await fetchPassportTimeline(items.length, PAGE_SIZE, timelineQueryRef.current);
             setItems((prev) => [...prev, ...next.items]);
             setTotal(next.total);
         } catch (e: unknown) {
@@ -1142,6 +1159,24 @@ export default function PassportPage() {
             setLoadingMore(false);
         }
     }, [items.length]);
+
+    const searchTimeline = useCallback(async (query: string) => {
+        const normalized = query.trim();
+        if (normalized === timelineQueryRef.current) return;
+        timelineQueryRef.current = normalized;
+        const request = ++timelineRequestRef.current;
+        try {
+            const timeline = await fetchPassportTimeline(0, PAGE_SIZE, normalized);
+            if (request !== timelineRequestRef.current) return;
+            setItems(timeline.items);
+            setMarkers(timeline.markers);
+            setTotal(timeline.total);
+        } catch (e: unknown) {
+            if (request === timelineRequestRef.current) {
+                setError(e instanceof Error ? e.message : String(e));
+            }
+        }
+    }, []);
 
     const hasMore = useMemo(() => items.length < total, [items.length, total]);
 
@@ -1203,14 +1238,14 @@ export default function PassportPage() {
     if (!authLoading && !user) {
         return (
             <div className="mx-auto max-w-2xl p-6">
-                <div className="border border-slate-200 bg-white p-6 text-center">
-                    <h1 className="text-lg font-semibold text-slate-900">Your Dance Passport</h1>
-                    <p className="mt-2 text-sm text-slate-600">
+                <div className="border border-line bg-surface p-6 text-center">
+                    <h1 className="text-lg font-semibold text-ink">Your Dance Passport</h1>
+                    <p className="mt-2 text-sm text-ink-soft">
                         Sign in to track your dance journey.
                     </p>
                     <Link
                         to="/login"
-                        className="mt-4 inline-block bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                        className="mt-4 inline-block bg-action px-4 py-2 text-sm font-medium text-white hover:bg-action"
                     >
                         Sign in
                     </Link>
@@ -1220,21 +1255,24 @@ export default function PassportPage() {
     }
 
     return (
-        <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+        <div className="mx-auto max-w-4xl space-y-6 p-4">
             {error && (
-                <div className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <div className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-danger">
                     {error}
                 </div>
             )}
 
             {loading || !data ? (
-                <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
                     Loading your passport…
                 </div>
             ) : (
                 <>
                     <PassportView
                         data={data}
+                        displayName={(user?.name || '').trim().split(/\s+/)[0] || user?.handle || 'Dancer'}
+                        handle={user?.handle ?? null}
+                        avatarUrl={user?.avatar_url ?? null}
                         headerActions={
                             user?.handle ? (
                                 <SharePassportMenu
@@ -1258,7 +1296,7 @@ export default function PassportPage() {
                                 }
                             />
                         }
-                        timelineActions={<AddPastEventControl onAdded={handlePastEventAdded} onOpenSubmitEvent={() => setShowSuggestModal(true)} />}
+                        timelineActions={<AddPastEventControl onAdded={handlePastEventAdded} onOpenSubmitEvent={openSuggest} />}
                         timelineItems={items}
                         timelineMarkers={markers}
                         timelineHasMore={hasMore}
@@ -1266,11 +1304,9 @@ export default function PassportPage() {
                         loadingMoreTimeline={loadingMore}
                         mapEvents={mapEvents}
                         onNeedMapEvents={loadMapEvents}
+                        onTimelineSearch={searchTimeline}
                     />
                 </>
-            )}
-            {showSuggestModal && (
-                <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
             )}
         </div>
     );

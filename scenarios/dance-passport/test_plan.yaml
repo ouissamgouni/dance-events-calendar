@@ -65,11 +65,18 @@ test_plan:
         Passport.
       expected: >
         The passport is owner-only (signed-out visitors are prompted to sign
-        in). Alba sees her headline counts (13 events, 11 cities, 7 countries),
-        her cities and countries collections, a newest-first timeline of her
-        attended events, and her review count (10 — a rejected review is not
-        counted). Duplicate cities collapse to one entry with a count; the
-        null-geo event is counted as an event but shown in no city/country.
+        in). The burgundy header shows Alba's avatar, name, handle, journey
+        dates, compact share icon and decorative mini map, with no stats or
+        heatmap. Milestones is the default of exactly three tabs: Milestones,
+        Journey and Places. The light 2x3 stats panel shows 13 events, 11
+        cities, 7 countries and 10 reviews (a rejected review is not counted).
+        Places is map-first with Cities/Countries switching; Journey contains
+        the heatmap, newest-first history and Add past event. Duplicate cities
+        collapse to one entry with a count; the null-geo event is counted as an
+        event but shown in no city/country.
+        At 390-400px wide the identity header, mini map, 2x3 stats, category
+        rows and two-column detail cards do not clip or overlap; share sheets
+        remain scrollable above the existing bottom navigation.
       verification: "Passport aggregates only past personal attendance."
 
     - id: 2
@@ -94,10 +101,13 @@ test_plan:
         congratulated the first time each unlocks. Open Alba's passport on her
         first visit, then revisit; compare with Nadia (single event).
       expected: >
-        Unlocked milestones show as earned badges; still-locked ones show a
-        progress fraction toward their goal. Newly-unlocked milestones are
-        celebrated exactly once on first view and never again on revisit.
-        Alba lights up many badges; Nadia has only the first-event badge lit.
+        Five compact category rows show Events, Consistency, Cities, Countries
+        and Reviews with unlocked counts, state icons and chevrons. Opening a
+        row shows a compact summary and two-column card grid: unlocked cards
+        have success/check treatment and dates, the next attainable card is
+        highlighted with its progress fraction, and later cards remain muted
+        and locked. Newly-unlocked milestones are celebrated exactly once on
+        first view and never again on revisit.
       verification: "Celebration fires once per milestone."
 
     - id: 4
@@ -173,13 +183,14 @@ test_plan:
       description: >
         As a dancer I decide who can see my passport and what it includes at
         the moment I choose to share it. As Alba, open the Dance Passport and
-        choose "Share" to open the sharing dialog. Change the
+        tap the compact share icon, choose "As link" in the bottom sheet, and
+        open the link-sharing sheet. Change the
         audience (Anyone / Friends / Only me), toggle which sections are shared
         (badges, cities, countries, timeline), then reopen the dialog / a
         profile view to confirm.
       expected: >
-        The sharing controls are not shown on the passport page until the
-        dialog is opened. Audience and section changes are saved and take
+        The initial bottom sheet contains only As link and As card. Link
+        controls are not shown until As link is selected. Audience and section changes are saved and take
         effect for profile viewers and share links: hidden sections stop
         appearing; setting the audience to "Only me" removes the passport from
         the public profile while the owner still sees it privately.
@@ -237,8 +248,8 @@ test_plan:
       title: "Share as an image card — all-time story"
       description: >
         As a dancer I turn my passport into a shareable image for social
-        stories. Sign in as Alba, open the Dance Passport and choose "Share as
-        card" (the image/card option, distinct from the read-only link).
+        stories. Sign in as Alba, tap the Passport share icon and choose "As
+        card" in the bottom sheet (distinct from the read-only link).
       expected: >
         The generated card leads with the dancer's name and, to the RIGHT of it,
         an all-time headline anchored to when she joined ("Journey on Movida
@@ -286,16 +297,17 @@ test_plan:
       verification: "Top-style highlight always shows; active-months cell only when no consistency badge is shown."
 
     - id: 16
-      title: "'Dancing since' is opt-in on the card"
+      title: "Card controls stay compact and export mechanics stay intact"
       description: >
-        As a dancer I decide whether my dancing origin year is on the card.
-        On Alba's card toggle the "Dancing since" option in the card options.
+        As a dancer I configure a card without leaving the Passport share
+        sheet. Open Alba's As card flow and exercise each visible control.
       expected: >
-        By default the card shows no "Dancing since" line. Enabling the option
-        adds a small "Dancing since 2018" line (from her seeded origin) directly
-        under her name. It never replaces the "Journey on Movida since" headline
-        and never appears on the year card.
-      verification: "Dancing-since line is hidden by default, opt-in only."
+        The bottom sheet shows All time/current-year scope, Map, Badges and
+        Activity controls, preview, Download and Share. Toggling presentation
+        options updates only the preview; Download and Share retain the
+        existing PNG generation, filename and native-share/download fallback.
+        No extra Dancing since control appears in this compact flow.
+      verification: "Card sheet exposes only approved controls and preserves export/share mechanics."
 
     - id: 17
       title: "A year card tells the story of a single year"
@@ -347,16 +359,15 @@ test_plan:
 
     # ── Recurring consistency achievements ──────────────────────
     - id: 20
-      title: "Consistency is a chronological trail of what I've earned and what's next"
+      title: "Consistency keeps every earned period and what's next"
       description: >
         As a dancer who keeps showing up I earn recurring "Consistency"
         achievements for being active in N of the last 12 months, without
         needing consecutive months. Open the Dance Passport for each consistency
-        user and read the Consistency trail on the Milestones tab.
+        user, open the Consistency row on the Milestones tab and scan its grid.
       expected: >
-        Consistency renders as a horizontal milestone trail like the other
-        categories, headed "Consistency" with a "Current · N/12 active months"
-        summary. Each unlocked level is its own permanent earned card showing the
+        Consistency opens as a compact two-column milestone grid. Each unlocked
+        level is its own permanent earned card showing the
         level ("N/12 active months") and the period it was reached (first
         contributing active month → reach month), followed by the remaining
         locked levels showing progress from the current count. Cara (3 active
@@ -365,7 +376,7 @@ test_plan:
         locked Unstoppable (8/10) and Dance Lifestyle (8/12). Bo, with only 2
         active months and no open period, sees no earned cards — just locked
         progress toward Consistent (2/3), Committed (2/5) and so on.
-      verification: "Trail header shows current count; each unlock is a separate earned card with its period; locked levels show progress from the current count."
+      verification: "Each unlock is a separate grid card with its period; the next locked level shows current progress."
 
     - id: 21
       title: "Achievements recur as new cards and never regress or vanish"
@@ -410,10 +421,10 @@ test_plan:
 
     # ── Activity heatmap (activity over time) ───────────────────
     - id: 23
-      title: "The Timeline opens with an activity-over-time heatmap"
+      title: "Journey opens with an activity-over-time heatmap"
       description: >
         As a dancer I can see how my dancing has ebbed and flowed over the
-        months. Sign in as Hana and open the Timeline tab of her Dance Passport.
+        months. Sign in as Hana and open the Journey tab of her Dance Passport.
       expected: >
         Above the timeline list a compact "Activity over time" grid renders one
         row per calendar year (oldest first, with any gap years shown as empty
@@ -423,7 +434,7 @@ test_plan:
         the darkest cell, her "medium" month a mid tone, and her single-event
         months the lightest active tone. A "Less → More" legend explains the
         ramp. Dancers with no attended events show no heatmap.
-      verification: "Timeline tab shows a Year×Month grid with per-month intensity buckets and a legend; empty passports omit it."
+      verification: "Journey shows a Year x Month grid with per-month intensity buckets and a legend; empty passports omit it."
 
     - id: 24
       title: "Hovering and clicking a month connects the heatmap to the timeline"

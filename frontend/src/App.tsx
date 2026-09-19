@@ -1,4 +1,4 @@
-import { Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useLocation, useNavigate, type Location } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
@@ -36,7 +36,6 @@ const MyCalendar = lazy(() => import('./pages/MyCalendar'));
 const PassportPage = lazy(() => import('./pages/PassportPage'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const DiscoverPage = lazy(() => import('./pages/DiscoverPage'));
 const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
 const SharedPassportPage = lazy(() => import('./pages/SharedPassportPage'));
 const Privacy = lazy(() => import('./pages/Privacy'));
@@ -50,12 +49,37 @@ const NetworkPage = lazy(() => import('./pages/NetworkPage'));
 const FollowingReviewsPage = lazy(() => import('./pages/FollowingReviewsPage'));
 const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
 const DiscoveryProfilesPage = lazy(() => import('./pages/DiscoveryProfilesPage'));
+const SearchProfileEditorPage = lazy(() => import('./pages/SearchProfileEditorPage'));
 const SectionLayout = lazy(() => import('./components/SectionTabs'));
+const SuggestEventWizard = lazy(() => import('./components/suggest/SuggestEventWizard'));
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
 import ExplorerEventSearch from './components/ExplorerEventSearch';
+import MyDanceHeader from './components/MyDanceHeader';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
+
+/** Location state used to keep the origin page mounted behind `/suggest`. */
+interface ModalLocationState {
+  backgroundLocation?: Location;
+}
+
+/**
+ * `/suggest` is a real URL rendered over whatever page opened it, so the
+ * browser back button closes the wizard and the page underneath keeps its
+ * scroll position and data. Opened directly (deep link, refresh) there is no
+ * background location, so closing returns to the calendar.
+ */
+function SuggestEventRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hasBackground = Boolean((location.state as ModalLocationState | null)?.backgroundLocation);
+  return (
+    <SuggestEventWizard
+      onClose={() => (hasBackground ? navigate(-1) : navigate('/', { replace: true }))}
+    />
+  );
+}
 
 export default function App() {
   return (
@@ -67,15 +91,15 @@ export default function App() {
               <PreferencesProvider>
                 <RatingAggregatesProvider>
                   <MessageCountsProvider>
-                  <MyRatingsProvider>
-                    <AttendingEventsProvider>
-                      <PwaInstallProvider>
-                        <QaTestPlanProvider>
-                          <AppShell />
-                        </QaTestPlanProvider>
-                      </PwaInstallProvider>
-                    </AttendingEventsProvider>
-                  </MyRatingsProvider>
+                    <MyRatingsProvider>
+                      <AttendingEventsProvider>
+                        <PwaInstallProvider>
+                          <QaTestPlanProvider>
+                            <AppShell />
+                          </QaTestPlanProvider>
+                        </PwaInstallProvider>
+                      </AttendingEventsProvider>
+                    </MyRatingsProvider>
                   </MessageCountsProvider>
                 </RatingAggregatesProvider>
               </PreferencesProvider>
@@ -93,6 +117,9 @@ function AppShell() {
   const navigate = useNavigate();
   const qaPinnedWidth = useQaPinnedWidth();
   const mainRef = useRef<HTMLElement | null>(null);
+  const backgroundLocation = (location.state as ModalLocationState | null)?.backgroundLocation;
+  const isMineDashboard = location.pathname === '/mine';
+  const isMyEvents = location.pathname === '/mine/calendar';
 
   // Full-screen flows (auth, onboarding) and leaf detail pages (event/series,
   // admin, notifications, shared views) suppress the primary bottom nav.
@@ -111,9 +138,12 @@ function AppShell() {
   }, [location.pathname, analyticsConsent]);
 
   useLayoutEffect(() => {
+    // An overlay route leaves the page behind it mounted — resetting its scroll
+    // would silently lose the user's place when they close the overlay.
+    if (backgroundLocation) return;
     mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  }, [location.pathname]);
+  }, [location.pathname, backgroundLocation]);
 
   return (
     <NotificationsProvider>
@@ -122,48 +152,49 @@ function AppShell() {
           className="flex flex-col h-full"
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
-          <div
-            className="flex items-center justify-between bg-slate-900 px-4 py-1.5"
-            style={{ paddingTop: 'calc(0.375rem + env(safe-area-inset-top))' }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <Link to="/" reloadDocument>
-                  <img src="/movida.png" alt="Movida" className="h-6 w-6" />
+          {isMineDashboard ? (
+            <MyDanceHeader />
+          ) : (
+            <header
+              className="flex items-center justify-between gap-2 bg-surface border-b border-line px-3 sm:px-4"
+              style={{ height: 'calc(64px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <Link to="/" reloadDocument className="flex items-center gap-2 shrink-0">
+                  <img src="/movida.png" alt="Movida" className="h-9 w-9 object-contain shrink-0" />
+                  <span className="text-[21px] font-bold leading-none tracking-tight">Movida</span>
                 </Link>
-                <Link to="/" reloadDocument className="text-sm font-bold text-white tracking-tight hover:text-gray-200 transition">Movida</Link>
+                <DesktopNav />
               </div>
-              <DesktopNav />
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Desktop: inline event search, mirroring the people search box */}
-              <ExplorerEventSearch
-                className="hidden sm:block w-64"
-                pastToggle
-                headerInline
-                onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
-                triggerLabel="Search events"
-              />
-              {/* Mobile: compact icon trigger opening a panel */}
-              <ExplorerEventSearch
-                className="sm:hidden"
-                compact
-                onDark
-                pastToggle
-                onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
-                triggerLabel="Search events"
-              />
-              <UserSearchBox />
-              <NotificationBell />
-              <HeaderUserMenu />
-            </div>
-          </div>
+              <div className="flex items-center gap-1 sm:gap-2">
+                {/* Desktop: inline event search, mirroring the people search box */}
+                <ExplorerEventSearch
+                  className="hidden lg:block w-64"
+                  pastToggle
+                  headerInline
+                  onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
+                  triggerLabel="Search events"
+                />
+                {/* Mobile: compact icon trigger opening a panel */}
+                <ExplorerEventSearch
+                  className="lg:hidden"
+                  compact
+                  pastToggle
+                  onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
+                  triggerLabel="Search events"
+                />
+                <UserSearchBox />
+                <NotificationBell />
+                <HeaderUserMenu />
+              </div>
+            </header>
+          )}
           <SignUpBanner />
           <ShareReferralBanner />
           <OnboardingGate />
-          <main ref={mainRef} className="flex-1 overflow-auto">
+          <main ref={mainRef} className={`flex-1 ${isMyEvents ? 'min-h-0 overflow-hidden' : 'overflow-auto'}`}>
             <Suspense fallback={null}>
-              <Routes>
+              <Routes location={backgroundLocation ?? location}>
                 <Route path="/" element={<Home />} />
                 <Route path="/onboarding" element={<OnboardingWizard />} />
                 <Route path="/onboarding/preferences" element={<OnboardingWizard />} />
@@ -187,7 +218,7 @@ function AppShell() {
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="discover" element={<DiscoverPage />} />
+                  <Route path="discover" element={<Navigate to="/tribe/network" replace />} />
                   <Route path="network" element={<NetworkPage />} />
                   <Route path="reviews" element={<FollowingReviewsPage />} />
                 </Route>
@@ -204,6 +235,8 @@ function AppShell() {
                   />
                   <Route path="reviews" element={<MyReviewsPage />} />
                   <Route path="profiles" element={<DiscoveryProfilesPage />} />
+                  <Route path="profiles/new" element={<SearchProfileEditorPage />} />
+                  <Route path="profiles/:profileId/edit" element={<SearchProfileEditorPage />} />
                 </Route>
                 <Route path="/shared/:token" element={<SharedCalendarPage />} />
                 <Route path="/shared/passport/:token" element={<SharedPassportPage />} />
@@ -221,6 +254,7 @@ function AppShell() {
                   }
                 />
                 <Route path="/u/:handle" element={<ProfilePage />} />
+                <Route path="/suggest" element={<SuggestEventRoute />} />
                 <Route
                   path="/admin"
                   element={
@@ -238,19 +272,26 @@ function AppShell() {
                   }
                 />
               </Routes>
+              {backgroundLocation ? (
+                <Routes>
+                  <Route path="/suggest" element={<SuggestEventRoute />} />
+                </Routes>
+              ) : null}
             </Suspense>
-            <footer className="py-3 text-center flex items-center justify-center gap-3">
-              <Link to="/privacy" className="text-[11px] text-gray-400 hover:text-gray-600 transition">
-                Privacy Policy
-              </Link>
-              <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
-              <a
-                href="mailto:support@joinmovida.com?subject=Movida%20feedback"
-                className="text-[11px] text-gray-400 hover:text-gray-600 transition"
-              >
-                Send feedback
-              </a>
-            </footer>
+            {!isMineDashboard && !isMyEvents && (
+              <footer className="py-3 text-center flex items-center justify-center gap-3">
+                <Link to="/privacy" className="text-[11px] text-muted hover:text-ink-soft transition">
+                  Privacy Policy
+                </Link>
+                <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
+                <a
+                  href="mailto:support@joinmovida.com?subject=Movida%20feedback"
+                  className="text-[11px] text-muted hover:text-ink-soft transition"
+                >
+                  Send feedback
+                </a>
+              </footer>
+            )}
           </main>
           {!hideBottomNav && <BottomNav />}
           <StatusBar />

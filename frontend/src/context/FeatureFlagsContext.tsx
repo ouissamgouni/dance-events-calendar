@@ -3,7 +3,7 @@ import { fetchSettings } from '../api';
 
 export const DEFAULT_EVENT_COLOR_BAR_COLOR = '#64748b';
 
-interface FeatureFlags {
+export interface FeatureFlags {
     showPrices: boolean;
     showPopularity: boolean;
     showRatings: boolean;
@@ -22,13 +22,18 @@ interface FeatureFlags {
     trendingTopPercent: number;
     eventColorBarColor: string;
     tagSortMode: 'group' | 'event_count';
+    goingButtonIconVariant: 'hand' | 'person';
     promoCodesEnabled: boolean;
     organizerClaimsEnabled: boolean;
-    forYouRailEnabled: boolean;
-    yourNextEventsRailEnabled: boolean;
     /** Tribe > Calendars "Your Network" snapshot of upcoming events people
      * you follow are going to. When false, the snapshot is hidden. */
     networkGoingSnapshotEnabled: boolean;
+    /** Show Route controls and journey arrows on My Events maps. */
+    myEventsRouteEnabled: boolean;
+    /** Show 'My Events' as a top-level navigation entry (admin feature). */
+    myEventsNavEnabled: boolean;
+    /** Show the optional event-size question in the review wizard. */
+    eventReviewSizeStepEnabled: boolean;
     /** When true, tags on event cards render as colored badges (legacy
      * look). When false (default), tags render as inline "Practice · Indoor"
      * text so cards stay quieter. */
@@ -42,12 +47,30 @@ interface FeatureFlags {
     trendingTrailRichEnabled: boolean;
     /** Number of tags to render inline per event card. */
     tagsPerCard: number;
+    /** When true, the saved count renders next to the Save action on cards. */
+    eventCardSaveShowStatsEnabled: boolean;
+    /** When true, the going count renders next to the "I'm going" action. */
+    eventCardImgoingShowStatsEnabled: boolean;
+    /** When true, the "I'm going" action sits bottom-right on the tags row;
+     * when false it sits in the top-right cluster next to Save. */
+    eventCardImgoingLocationBottomEnabled: boolean;
+    /** When true, event cards show the people icon prefixing the avatar stack. */
+    eventCardShowPeopleIconEnabled: boolean;
+    /** When true, event cards show clock (time) and pin (location) icons. */
+    eventCardShowTimeLocationIconsEnabled: boolean;
+    /** When true, the explorer list renders the shared My Events card style. */
+    explorerEventCardCardStyleEnabled: boolean;
+    /** When true, event pictures are displayed. Admin picture management is
+     * always available regardless of this flag. */
+    eventImagesEnabled: boolean;
+    /** What a card renders when an event has no picture. */
+    eventCardPlaceholderStyle: 'gradient' | 'initial' | 'none';
 }
 
 const defaultFlags: FeatureFlags = {
     showPrices: false,
     showPopularity: false,
-    showRatings: false,
+    showRatings: true,
     popularityThreshold: 10,
     followingBadgeEnabled: false,
     unseenStateEnabled: false,
@@ -58,21 +81,43 @@ const defaultFlags: FeatureFlags = {
     trendingTopPercent: 100,
     eventColorBarColor: DEFAULT_EVENT_COLOR_BAR_COLOR,
     tagSortMode: 'group',
-    promoCodesEnabled: false,
-    organizerClaimsEnabled: false,
-    forYouRailEnabled: false,
-    yourNextEventsRailEnabled: false,
-    networkGoingSnapshotEnabled: true,
+    goingButtonIconVariant: 'hand',
+    promoCodesEnabled: true,
+    organizerClaimsEnabled: true,
+    networkGoingSnapshotEnabled: false,
+    myEventsRouteEnabled: true,
+    myEventsNavEnabled: true,
+    eventReviewSizeStepEnabled: true,
     tagAsBadge: false,
     tagBadgeColored: false,
     trendingTrailRichEnabled: false,
     tagsPerCard: 3,
+    eventCardSaveShowStatsEnabled: false,
+    eventCardImgoingShowStatsEnabled: false,
+    eventCardImgoingLocationBottomEnabled: true,
+    eventCardShowPeopleIconEnabled: false,
+    eventCardShowTimeLocationIconsEnabled: false,
+    explorerEventCardCardStyleEnabled: true,
+    eventImagesEnabled: false,
+    eventCardPlaceholderStyle: 'none',
 };
 
-const FeatureFlagsContext = createContext<FeatureFlags>(defaultFlags);
+const FeatureFlagsContext = createContext<{
+    flags: FeatureFlags;
+    updateFlag: (key: keyof FeatureFlags, value: any) => void;
+} | null>(null);
+
+export { FeatureFlagsContext };
+
+/** Exported so tests can build a flag set without stubbing the settings fetch. */
+export { defaultFlags };
 
 export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
+
+    const updateFlag = (key: keyof FeatureFlags, value: any) => {
+        setFlags((prev) => ({ ...prev, [key]: value }));
+    };
 
     useEffect(() => {
         fetchSettings()
@@ -91,15 +136,25 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     trendingTopPercent: s.trending_top_percent ?? 100,
                     eventColorBarColor: s.event_color_bar_color || DEFAULT_EVENT_COLOR_BAR_COLOR,
                     tagSortMode: s.tag_sort_mode === 'event_count' ? 'event_count' : 'group',
+                    goingButtonIconVariant: s.going_button_icon_variant === 'person' ? 'person' : 'hand',
                     promoCodesEnabled: s.promo_codes_enabled ?? false,
                     organizerClaimsEnabled: s.organizer_claims_enabled ?? false,
-                    forYouRailEnabled: s.for_you_rail_enabled ?? false,
-                    yourNextEventsRailEnabled: s.your_next_events_rail_enabled ?? false,
-                    networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? true,
+                    networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? false,
+                    myEventsRouteEnabled: s.my_events_route_enabled ?? false,
+                    myEventsNavEnabled: s.my_events_nav_enabled ?? true,
+                    eventReviewSizeStepEnabled: s.event_review_size_step_enabled ?? true,
                     tagAsBadge: s.tag_as_badge_enabled ?? false,
                     tagBadgeColored: s.tag_badge_colored ?? false,
                     trendingTrailRichEnabled: s.trending_trail_rich_enabled ?? false,
                     tagsPerCard: s.tags_per_card ?? 3,
+                    eventCardSaveShowStatsEnabled: s.event_card_save_show_stats_enabled ?? false,
+                    eventCardImgoingShowStatsEnabled: s.event_card_imgoing_show_stats_enabled ?? false,
+                    eventCardImgoingLocationBottomEnabled: s.event_card_imgoing_location_bottom_enabled ?? true,
+                    eventCardShowPeopleIconEnabled: s.event_card_show_people_icon_enabled ?? false,
+                    eventCardShowTimeLocationIconsEnabled: s.event_card_show_time_location_icons_enabled ?? false,
+                    explorerEventCardCardStyleEnabled: s.explorer_event_card_card_style_enabled ?? false,
+                    eventImagesEnabled: s.event_images_enabled ?? false,
+                    eventCardPlaceholderStyle: s.event_card_placeholder_style ?? 'gradient',
                 });
             })
             .catch(() => {
@@ -108,12 +163,30 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     }, []);
 
     return (
-        <FeatureFlagsContext.Provider value={flags}>
+        <FeatureFlagsContext.Provider value={{ flags, updateFlag }}>
             {children}
         </FeatureFlagsContext.Provider>
     );
 }
 
 export function useFeatureFlags(): FeatureFlags {
-    return useContext(FeatureFlagsContext);
+    const context = useContext(FeatureFlagsContext);
+    if (!context) throw new Error('useFeatureFlags must be used within FeatureFlagsProvider');
+    return context.flags;
+}
+
+/**
+ * Like {@link useFeatureFlags} but returns the built-in defaults instead of
+ * throwing when rendered outside a provider. Use in widely-reused low-level
+ * components (e.g. buttons) that may be mounted in isolation.
+ */
+export function useOptionalFeatureFlags(): FeatureFlags {
+    const context = useContext(FeatureFlagsContext);
+    return context?.flags ?? defaultFlags;
+}
+
+export function useUpdateFeatureFlag() {
+    const context = useContext(FeatureFlagsContext);
+    if (!context) throw new Error('useUpdateFeatureFlag must be used within FeatureFlagsProvider');
+    return context.updateFlag;
 }

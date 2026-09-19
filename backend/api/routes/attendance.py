@@ -224,9 +224,11 @@ def get_event_attendees(
     """Full attendee list for an event. Authenticated users only — anonymous
     callers get a 401 (parity with prior behavior).
 
-    Each row's ``share_audience`` decides whether the viewer sees that
-    user: ``public`` to anyone signed in, ``friends`` only to mutual
-    followers, ``private`` never named.
+    Returns both "going" attendees (``UserEventAttendance``) and "interested"
+    savers (``UserSavedEvent``), each tagged via ``attendance_status``. A user
+    who is both going and interested is reported once, as going. Each row's
+    audience decides visibility: ``public`` to anyone signed in, ``friends``
+    only to mutual followers, ``private`` never named.
     """
     if viewer is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -239,14 +241,43 @@ def get_event_attendees(
         )
         .order_by(UserEventAttendance.attending_since.asc())
     ).all()
-    if not rows:
+    saved_rows = session.exec(
+        select(UserSavedEvent)
+        .where(
+            UserSavedEvent.event_id == event_id,
+            UserSavedEvent.user_id.is_not(None),
+        )
+        .order_by(UserSavedEvent.saved_at.asc())
+    ).all()
+
+    visible_going = [r for r in rows if _row_visible_to(session, viewer, r)]
+    going_user_ids = {r.user_id for r in visible_going}
+
+    # Interested (saved) rows the viewer may see, excluding anyone already
+    # counted as going (going takes precedence). Saved rows carry ``audience``
+    # rather than ``share_audience`` so visibility is evaluated inline.
+    visible_saved: list[UserSavedEvent] = []
+    seen_saved: set = set()
+    for r in saved_rows:
+        if r.user_id in going_user_ids or r.user_id in seen_saved:
+            continue
+        audience = r.audience or "private"
+        if r.user_id == viewer.id:
+            visible = True
+        elif audience == "public":
+            visible = True
+        elif audience == "private":
+            visible = False
+        else:
+            visible = is_mutual_follow(session, viewer.id, r.user_id)
+        if visible:
+            visible_saved.append(r)
+            seen_saved.add(r.user_id)
+
+    if not visible_going and not visible_saved:
         return []
 
-    visible_rows = [r for r in rows if _row_visible_to(session, viewer, r)]
-    if not visible_rows:
-        return []
-
-    user_ids = [r.user_id for r in visible_rows]
+    user_ids = list(going_user_ids) + [r.user_id for r in visible_saved]
     users = session.exec(select(User).where(User.id.in_(user_ids))).all()
     users_by_id = {u.id: u for u in users if u.deleted_at is None}
 
@@ -261,20 +292,71 @@ def get_event_attendees(
         for followee_id, status in follow_rows:
             viewer_follow_statuses[followee_id] = status
 
-    out: list[AttendeeResponse] = []
-    for row in visible_rows:
-        u = users_by_id.get(row.user_id)
-        if u is None:
-            continue
-        out.append(
-            AttendeeResponse(
-                user_id=u.id,
-                display_name=u.display_name,
-                avatar_url=u.avatar_url,
-                handle=u.handle,
-                viewer_follow_status=viewer_follow_statuses.get(u.id),
+    # People tab: viewer's friend set (mutual follows) and, for non-friends,
+    # the count of the viewer's friends who also follow the attendee
+    # (follows-in-common). Both reuse the mutual-follow join pattern from the
+    # going-wedge below.
+    viewer_friends: set = set()
+    mutual_counts: dict = {}
+    if user_ids:
+        f1 = aliased(UserFollow)
+        f2 = aliased(UserFollow)
+        friend_rows = session.exec(
+            select(f1.followee_id)
+            .join(
+                f2,
+                (f2.follower_id == f1.followee_id) & (f2.followee_id == f1.follower_id),
             )
+            .where(f1.follower_id == viewer.id)
+            .where(f1.status == "approved")
+            .where(f2.status == "approved")
+        ).all()
+        viewer_friends = {
+            r if isinstance(r, UUID) else UUID(str(r)) for r in friend_rows
+        }
+        if viewer_friends:
+            g1 = aliased(UserFollow)
+            g2 = aliased(UserFollow)
+            pairs = session.exec(
+                select(g1.follower_id, g1.followee_id)
+                .join(
+                    g2,
+                    (g2.follower_id == g1.followee_id)
+                    & (g2.followee_id == g1.follower_id),
+                )
+                .where(col(g1.follower_id).in_(user_ids))
+                .where(col(g1.followee_id).in_(viewer_friends))
+                .where(g1.status == "approved")
+                .where(g2.status == "approved")
+            ).all()
+            for cand_id, _witness_id in pairs:
+                cand_uuid = cand_id if isinstance(cand_id, UUID) else UUID(str(cand_id))
+                mutual_counts[cand_uuid] = mutual_counts.get(cand_uuid, 0) + 1
+
+    def _build(user_id, status: str) -> Optional[AttendeeResponse]:
+        u = users_by_id.get(user_id)
+        if u is None:
+            return None
+        return AttendeeResponse(
+            user_id=u.id,
+            display_name=u.display_name,
+            avatar_url=u.avatar_url,
+            handle=u.handle,
+            viewer_follow_status=viewer_follow_statuses.get(u.id),
+            is_friend=u.id in viewer_friends,
+            mutual_friend_count=mutual_counts.get(u.id, 0),
+            attendance_status=status,
         )
+
+    out: list[AttendeeResponse] = []
+    for row in visible_going:
+        built = _build(row.user_id, "going")
+        if built is not None:
+            out.append(built)
+    for row in visible_saved:
+        built = _build(row.user_id, "interested")
+        if built is not None:
+            out.append(built)
     return out
 
 

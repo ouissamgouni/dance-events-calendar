@@ -297,6 +297,29 @@ class TestAdminEventTags:
         event_tags = [a for a in session._added if isinstance(a, EventTag)]
         assert len(event_tags) == 2
 
+    def test_replace_event_tags_rejects_multiple_reach_values(self, admin_client):
+        c, session = admin_client
+        event = _make_event()
+        reach_group = _make_tag_group(id=7, slug="reach", label="Event reach")
+        local = _make_tag(id=11, group_id=7, slug="local", label="Local")
+        regional = _make_tag(id=12, group_id=7, slug="regional", label="Regional")
+        session.get.side_effect = lambda model, id: {
+            (CachedEvent, "evt-001"): event,
+            (Tag, 11): local,
+            (Tag, 12): regional,
+            (TagGroup, 7): reach_group,
+        }.get((model, id))
+
+        resp = c.put(
+            "/api/admin/events/evt-001/tags",
+            json={"tag_ids": [11, 12]},
+        )
+
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == (
+            "An event can have at most one reach classification."
+        )
+
     def test_admin_updates_tag_group_ordinal(self, admin_client):
         c, session = admin_client
         group = _make_tag_group(id=1, ordinal=6)

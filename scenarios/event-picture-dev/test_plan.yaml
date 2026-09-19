@@ -1,0 +1,194 @@
+test_plan:
+  name: "Event pictures — admin management, cropping and display"
+  description: |
+    Covers the event picture feature end-to-end against the local MinIO
+    emulator. The scenario seeds three events whose pictures come from three
+    different source aspect ratios (landscape, portrait, ultra-wide) plus two
+    events with no picture at all.
+
+    Two variants exist per stored picture: a centre-cropped 16:9 ``thumb.webp``
+    used by cards, and a width-capped (max 1200px) ``full.webp`` that preserves
+    the original aspect ratio and is used by detail/summary heroes. The
+    untouched original is kept in the private bucket and is never served.
+
+    Display is gated by the ``event_images_enabled`` site setting. Admin
+    picture management is ALWAYS available regardless of that flag, so pictures
+    can be curated before the feature is switched on.
+
+    Sign-in tip: at /login, dev mode shows one button per mock user. Use
+    "Dev Admin" for every admin step.
+
+  steps:
+    - id: 1
+      title: "Seeded pictures render on cards"
+      description: |
+        Open the home page. The three seeded events ("Landscape Source",
+        "Portrait Source", "Ultra-wide Source") each show a picture thumbnail
+        on their card.
+      expected: |
+        Each of the three cards shows a picture. None of the pictures is
+        stretched or squashed — they are cropped, not distorted. The
+        ultra-wide and portrait sources both fill the thumbnail slot
+        completely with no empty bars.
+
+    - id: 2
+      title: "Placeholder for events without a picture"
+      description: |
+        On the same home page, look at "Zouk Practica Without Picture" and
+        "Afro Dance Lab Without Picture".
+      expected: |
+        Both cards show a coloured gradient placeholder in the same slot where
+        the other cards show a picture, so all card heights stay aligned. The
+        two placeholders use different colours from each other.
+
+    - id: 3
+      title: "Placeholder style switch — initial letter"
+      description: |
+        Sign in as "Dev Admin", go to /admin, find the "Picture placeholder"
+        setting and change it from "Gradient" to "Initial letter". Return to
+        the home page and reload.
+      expected: |
+        The two picture-less cards now show the first letter of their title
+        ("Z" and "A") on the coloured background. Set the setting back to
+        "Gradient" before continuing.
+
+    - id: 4
+      title: "Placeholder style switch — none"
+      description: |
+        In /admin, set "Picture placeholder" to "None". Return to the home
+        page and reload.
+      expected: |
+        The two picture-less cards show no placeholder at all — the picture
+        slot collapses and the card is text-only. The three seeded events
+        still show their real pictures. Set the setting back to "Gradient"
+        before continuing.
+
+    - id: 5
+      title: "Pictures render with the explorer card style OFF"
+      description: |
+        In /admin, turn OFF the "Explorer card style" toggle, then return to
+        the home page and reload.
+      expected: |
+        The legacy explorer list rows now show the picture thumbnail too, in a
+        column between the timeline rail and the event text. Thumbnails are
+        16:9, cropped (not distorted) and aligned across rows. Picture-less
+        events show the gradient placeholder in the same column. Turn the
+        toggle back ON before continuing.
+
+    - id: 6
+      title: "Feature flag hides all picture display"
+      description: |
+        In /admin, turn OFF the "Event pictures" toggle. Return to the home
+        page and reload.
+      expected: |
+        No event card shows a picture and no card shows a placeholder — the
+        picture slot is gone entirely and cards fall back to their text-only
+        layout. Turn the toggle back ON before continuing.
+
+    - id: 7
+      title: "Detail page hero uses the uncropped variant"
+      description: |
+        Open the "Portrait Source — Bachata Night" event detail page.
+      expected: |
+        The detail header shows the picture. It is the width-capped full
+        variant (taller / less aggressively cropped than the card thumbnail),
+        not the 16:9 thumb.
+
+    - id: 8
+      title: "Detail page of a picture-less event shows no empty banner"
+      description: |
+        Open the "Zouk Practica Without Picture" event detail page.
+      expected: |
+        No picture and no placeholder banner appears in the header — the
+        layout simply collapses. Placeholders exist on cards only.
+
+    - id: 9
+      title: "Admin upload — happy path"
+      description: |
+        Still signed in as "Dev Admin", open "Zouk Practica Without Picture",
+        enter edit mode, then use the "Picture" section's Upload button and
+        pick any JPEG or PNG from your machine.
+      expected: |
+        A preview thumbnail replaces the "No picture" box without a page
+        reload. Reload the page: the picture is still there. Going back to the
+        home page, that event's card now shows the picture instead of a
+        placeholder.
+
+    - id: 10
+      title: "Admin upload — rejected file type"
+      description: |
+        In the same "Picture" section, try uploading a non-image file (for
+        example a .txt or .pdf). You may need to switch the file picker's
+        filter to "All files".
+      expected: |
+        The upload is rejected with a readable inline error message. The
+        existing picture (if any) is unchanged. No browser alert dialog is
+        used.
+
+    - id: 11
+      title: "Admin import from an existing public URL"
+      description: |
+        Open "Afro Dance Lab Without Picture" in edit mode. Paste a public
+        https URL pointing at an image into the URL field and press "Import".
+      expected: |
+        The picture is fetched, processed and shown in the preview. Reload to
+        confirm it persisted.
+
+    - id: 12
+      title: "Import rejects unsafe URLs"
+      description: |
+        In the same field, try each of these in turn and press "Import":
+          a) an ``http://`` (non-https) URL
+          b) ``https://127.0.0.1/whatever.jpg``
+          c) an https URL that points at an HTML page rather than an image
+      expected: |
+        All three are rejected with an inline error message. Nothing is
+        uploaded and the current picture is unchanged.
+
+    - id: 13
+      title: "Replacing a picture cleans up the old one"
+      description: |
+        Open "Landscape Source — Salsa Social" in edit mode and upload a
+        different picture over the existing one.
+      expected: |
+        The preview updates to the new picture. Reload — the new picture
+        persists. The card on the home page shows the new picture too.
+
+    - id: 14
+      title: "Removing a picture"
+      description: |
+        In the same "Picture" section, press "Remove".
+      expected: |
+        The preview returns to the "No picture" box and the Remove button
+        disappears. On the home page, the event's card falls back to the
+        placeholder.
+
+    - id: 15
+      title: "Admin controls are available with the flag off"
+      description: |
+        In /admin turn the "Event pictures" toggle OFF, then open any event
+        detail page in edit mode.
+      expected: |
+        The "Picture" section is still fully present and usable (upload,
+        import, remove all work) even though no picture is displayed to
+        regular users anywhere. Turn the toggle back ON when done.
+
+    - id: 16
+      title: "Re-seeding does not duplicate uploads"
+      description: |
+        Restart the scenario WITHOUT resetting object storage:
+        ``task start:scenario SCENARIO=event-picture-dev RESET_DB=1``.
+      expected: |
+        The scenario boots and the three seeded events still show their
+        pictures. The seeder skips re-uploading them because the objects
+        already exist.
+
+    - id: 17
+      title: "Resetting object storage re-seeds from source"
+      description: |
+        Restart with ``task start:scenario SCENARIO=event-picture-dev RESET=1``.
+      expected: |
+        Object storage is wiped and the three seeded pictures are regenerated
+        from the raw files in ``scenarios/event-picture-dev/images/``. The
+        three seeded events show their pictures again; any picture you
+        uploaded manually during this run is gone.

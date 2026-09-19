@@ -2,7 +2,15 @@ from datetime import date, datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, Index, JSON, Text, UniqueConstraint, text
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Index,
+    JSON,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -54,12 +62,14 @@ class User(SQLModel, table=True):
     # / private). Backfilled from ``share_attendance_default`` in migration
     # ``ee50f6a7b8c9``. The boolean field is kept for one release for
     # backwards compatibility; new code should read this field instead.
-    # Default is ``friends`` (privacy-by-default per GDPR Art. 25): only
-    # mutual followers see RSVPs/saves unless the user opts up to ``public``
-    # via the per-event AudiencePicker. New users with no friends yet see
-    # the same effective behaviour as ``private``, failing closed.
+    # Default is ``public`` so attendee lists / the event Interest section
+    # are populated by default. The choice is disclosed and reversible at
+    # the point of action: the post-RSVP popover surfaces the AudiencePicker
+    # so users can drop to ``friends``/``private`` in one tap. Deliberate
+    # choices are protected by ``share_attendance_default_set_by_user``, so
+    # default flips only ever touch users who never set the preference.
     share_attendance_default_audience: str = Field(
-        default="friends", max_length=16, nullable=False
+        default="public", max_length=16, nullable=False
     )
     # Backed-up default for new RSVP/save audience values is computed
     # client-side from a localStorage "last used" hint; this column is
@@ -368,18 +378,28 @@ class CachedEvent(SQLModel, table=True):
         # active + upcoming events within a date window) to an index-only
         # scan before the Python-side fuzzy title match runs.
         Index("ix_cached_events_active_start", "deleted_at", "start"),
+        CheckConstraint(
+            "reach IS NULL OR reach IN ('local', 'regional', 'international')",
+            name="ck_cached_events_reach",
+        ),
     )
 
     event_id: str = Field(primary_key=True)
     calendar_id: str = Field(index=True)
     title: str = Field(default="")
     description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    image_url: Optional[str] = Field(default=None)
+    # Base key of an admin-managed picture in object storage (variants live at
+    # ``{image_key}/thumb.webp`` / ``/full.webp``). Takes precedence over the
+    # plain ``image_url`` when set.
+    image_key: Optional[str] = Field(default=None)
     location: Optional[str] = Field(default=None)
     start: datetime
     end: datetime
     all_day: bool = Field(default=False)
     latitude: Optional[float] = Field(default=None)
     longitude: Optional[float] = Field(default=None)
+    reach: Optional[str] = Field(default=None, max_length=16, index=True)
     geocode_query: Optional[str] = Field(default=None)
     geocode_provider: Optional[str] = Field(default=None)
     # Structured place, derived from reverse-geocoding lat/lng (see
@@ -391,7 +411,9 @@ class CachedEvent(SQLModel, table=True):
     price_min: Optional[float] = Field(default=None)
     price_max: Optional[float] = Field(default=None)
     price_currency: Optional[str] = Field(default=None)
-    price_is_free: bool = Field(default=False)
+    # Tri-state: ``True`` = free, ``False`` = has a price, ``None`` = unknown
+    # (not extracted yet). ``None`` renders as no price rather than "Free".
+    price_is_free: Optional[bool] = Field(default=None)
     review_status: str = Field(default="pending")
     links: Optional[list] = Field(default=None, sa_column=Column(JSON))
     content_hash: Optional[str] = Field(default=None, index=True)
@@ -416,6 +438,12 @@ class CachedEvent(SQLModel, table=True):
     # from ``is_hidden``/``BlockedEvent`` (the actual suppression
     # mechanism) — this field only exists to explain *why*.
     rejected_duplicate_reason: Optional[str] = Field(default=None)
+    # Non-NULL when this row was materialised from an EventSuggestion. A
+    # recurring suggestion fans out to one row per occurrence, so this is the
+    # only reliable way to reconcile them when an admin edits the recurrence.
+    suggestion_id: Optional[UUID] = Field(
+        default=None, foreign_key="event_suggestions.id", index=True
+    )
 
 
 class BlockedEvent(SQLModel, table=True):
@@ -719,6 +747,17 @@ class EventSuggestion(SQLModel, table=True):
     end: datetime
     all_day: bool = Field(default=False)
 
+    # User-declared recurrence. Mutually exclusive:
+    #   ``recurrence_rule``  -- an RFC 5545 RRULE line (weekly/monthly/yearly),
+    #                           DTSTART implied by ``start``. May be open-ended
+    #                           (no UNTIL/COUNT); occurrences are materialised
+    #                           over a rolling window, never all at once.
+    #   ``recurrence_dates`` -- explicit occurrences ``[{"start":..,"end":..}]``
+    #                           for the "choose dates" mode, where each one may
+    #                           carry its own duration (RDATE cannot express that).
+    recurrence_rule: Optional[str] = Field(default=None, max_length=500)
+    recurrence_dates: Optional[list] = Field(default=None, sa_column=Column(JSON))
+
     # Submitter info
     submitter_name: Optional[str] = Field(default=None)
     submitter_email: Optional[str] = Field(default=None)
@@ -756,6 +795,12 @@ class EventSuggestion(SQLModel, table=True):
     # Calendar tab without a separate save action. Defaults to True;
     # the suggest form exposes an opt-out checkbox.
     auto_save: bool = Field(default=True, nullable=False)
+    # The submitter's "I'm going" from the suggest wizard. Persisted rather than
+    # consumed at submit because occurrences are materialised in waves (preview
+    # on submit, full horizon on approval, rolling window for open-ended rules)
+    # and every wave has to replay the RSVP onto the occurrences it creates.
+    creator_going: bool = Field(default=False, nullable=False)
+    creator_going_audience: Optional[str] = Field(default=None, max_length=16)
     # User-entered new-tag suggestions submitted with the event. Each item:
     #   {"free_text": str, "group_slug": str | None}
     # On approval these become regular TagSuggestion rows tied to the new event.
@@ -768,7 +813,7 @@ class EventSuggestion(SQLModel, table=True):
     price_min: Optional[float] = Field(default=None)
     price_max: Optional[float] = Field(default=None)
     price_currency: Optional[str] = Field(default=None)
-    price_is_free: bool = Field(default=False)
+    price_is_free: Optional[bool] = Field(default=None)
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     reviewed_at: Optional[datetime] = Field(default=None)
@@ -995,19 +1040,31 @@ class UserInterestProfile(SQLModel, table=True):
     Users may define multiple profiles (e.g. "home city" + "upcoming trip").
     A newly-ingested event that matches an enabled profile's tags and
     geography triggers an ``interest_event`` notification (see
-    backend/services/interest_notification_service.py). Geography is a
-    bounding box (``min_lat``/``min_lng``/``max_lat``/``max_lng``).
+    backend/services/interest_notification_service.py). The bounding box is
+    retained for both geography modes as a common query envelope.
     """
 
     __tablename__ = "user_interest_profiles"
+    __table_args__ = (
+        CheckConstraint(
+            "reach_filter IN ('any', 'regional_plus', 'international')",
+            name="ck_interest_profiles_reach_filter",
+        ),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: UUID = Field(foreign_key="users.id", index=True)
     label: str = Field(max_length=120)
+    area_label: str = Field(max_length=120)
+    geo_kind: str = Field(default="area", max_length=16)
     min_lat: float = Field(...)
     min_lng: float = Field(...)
     max_lat: float = Field(...)
     max_lng: float = Field(...)
+    center_lat: Optional[float] = Field(default=None)
+    center_lng: Optional[float] = Field(default=None)
+    radius_km: Optional[float] = Field(default=None)
+    reach_filter: str = Field(default="any", max_length=16, nullable=False)
     matches_enabled: bool = Field(default=True, nullable=False)
     # Explorer/For-You default filters follow the single active profile per
     # user. Enforced by application code, not a DB constraint (SQLite-friendly).
@@ -1016,13 +1073,13 @@ class UserInterestProfile(SQLModel, table=True):
 
 
 class UserInterestProfileTag(SQLModel, table=True):
-    """Dance-style and reach tags attached to a ``UserInterestProfile``.
+    """Dance-style tags and legacy reach mirrors for a profile.
 
     Mirrors ``UserPreferredTag``/``EventTag``: composite primary key, no
     relationship navigation. Holds both dance-style and reach tag ids; the
-    tag's group (via ``Tag.group_id``) determines which PRD matching rule
-    applies (OR-within-group). ``ON DELETE CASCADE`` is enforced via the
-    migration so deleting a profile or a tag tidies up the join rows.
+    New reach matching uses ``UserInterestProfile.reach_filter``; reach rows
+    remain temporarily for older clients. ``ON DELETE CASCADE`` is enforced
+    via the migration so deleting a profile or a tag tidies up the join rows.
     """
 
     __tablename__ = "user_interest_profile_tags"

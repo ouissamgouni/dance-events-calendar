@@ -21,8 +21,8 @@ interface Props {
 
 const STATUS_COLORS: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
-    approved: 'bg-emerald-100 text-emerald-700',
-    rejected: 'bg-slate-200 text-slate-700',
+    approved: 'bg-emerald-100 text-success',
+    rejected: 'bg-slate-200 text-ink',
 };
 
 type FreeTextMode = 'assign' | 'create';
@@ -120,29 +120,29 @@ export default function TagSuggestionReviewModal({
     return (
         <>
             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-                <div className="mx-4 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+                <div className="mx-4 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-card bg-surface p-6 shadow-xl">
                     {/* Header */}
                     <div className="flex items-start justify-between mb-4">
                         <div>
-                            <h2 className="text-base font-semibold text-slate-800">Review Tag Suggestion</h2>
+                            <h2 className="text-base font-semibold text-ink">Review Tag Suggestion</h2>
                             <div className="mt-1 flex items-center gap-2">
-                                <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${STATUS_COLORS[suggestion.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${STATUS_COLORS[suggestion.status] ?? 'bg-gray-100 text-ink-soft'}`}>
                                     {suggestion.status}
                                 </span>
                             </div>
                         </div>
-                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg p-1">✕</button>
+                        <button onClick={onClose} className="text-muted hover:text-ink-soft text-lg p-1">✕</button>
                     </div>
 
                     {/* Event info */}
-                    <div className="mb-4 p-3 bg-slate-50 rounded-lg">
+                    <div className="mb-4 p-3 bg-canvas rounded-lg">
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Event</p>
-                                <p className="text-sm font-medium text-slate-800 truncate">
+                                <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-0.5">Event</p>
+                                <p className="text-sm font-medium text-ink truncate">
                                     {suggestion.event_title || suggestion.event_id}
                                 </p>
-                                <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{suggestion.event_id}</p>
+                                <p className="text-[10px] text-muted mt-0.5 font-mono">{suggestion.event_id}</p>
                             </div>
                             {onViewEvent && (
                                 <button
@@ -154,7 +154,7 @@ export default function TagSuggestionReviewModal({
                             )}
                         </div>
                         {suggestion.event_description && (
-                            <div className="mt-2 text-[12px] text-slate-600 leading-snug">
+                            <div className="mt-2 text-[12px] text-ink-soft leading-snug">
                                 <p className={descExpanded ? '' : 'line-clamp-3'}>
                                     {suggestion.event_description}
                                 </p>
@@ -162,7 +162,7 @@ export default function TagSuggestionReviewModal({
                                     <button
                                         type="button"
                                         onClick={() => setDescExpanded((v) => !v)}
-                                        className="mt-1 text-[10px] uppercase tracking-wide text-slate-400 hover:text-slate-600"
+                                        className="mt-1 text-[10px] uppercase tracking-wide text-muted hover:text-ink-soft"
                                     >
                                         {descExpanded ? 'See less' : 'See more'}
                                     </button>
@@ -170,7 +170,7 @@ export default function TagSuggestionReviewModal({
                             </div>
                         )}
                         {(suggestion.event_start || suggestion.event_location) && (
-                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-ink-soft">
                                 {suggestion.event_start && (
                                     <span>📅 {fmtDate(suggestion.event_start)}</span>
                                 )}
@@ -183,7 +183,7 @@ export default function TagSuggestionReviewModal({
 
                     {/* Tag suggestion */}
                     <div className="mb-4">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Suggested Tag</p>
+                        <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-2">Suggested Tag</p>
                         {suggestion.tag ? (
                             <span
                                 className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium"
@@ -197,10 +197,10 @@ export default function TagSuggestionReviewModal({
                             </span>
                         ) : suggestion.free_text ? (
                             <div className="space-y-3">
-                                <p className="text-sm text-slate-700 italic">
+                                <p className="text-sm text-ink italic">
                                     Free text: &ldquo;{suggestion.free_text}&rdquo;
                                     {suggestion.group_slug && (
-                                        <span className="ml-2 text-[10px] text-slate-400 not-italic">
+                                        <span className="ml-2 text-[10px] text-muted not-italic">
                                             (category hint: {suggestion.group_slug})
                                         </span>
                                     )}
@@ -212,13 +212,13 @@ export default function TagSuggestionReviewModal({
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => setFreeTextMode('assign')}
-                                                className={`text-[11px] px-2.5 py-1 rounded border transition ${freeTextMode === 'assign' ? 'bg-violet-500 text-white border-violet-500' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
+                                                className={`text-[11px] px-2.5 py-1 rounded border transition ${freeTextMode === 'assign' ? 'bg-violet-500 text-white border-violet-500' : 'bg-surface text-ink-soft border-line hover:bg-canvas'}`}
                                             >
                                                 Assign existing tag
                                             </button>
                                             <button
                                                 onClick={() => setFreeTextMode('create')}
-                                                className={`text-[11px] px-2.5 py-1 rounded border transition ${freeTextMode === 'create' ? 'bg-violet-500 text-white border-violet-500' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
+                                                className={`text-[11px] px-2.5 py-1 rounded border transition ${freeTextMode === 'create' ? 'bg-violet-500 text-white border-violet-500' : 'bg-surface text-ink-soft border-line hover:bg-canvas'}`}
                                             >
                                                 Create new tag
                                             </button>
@@ -228,7 +228,7 @@ export default function TagSuggestionReviewModal({
                                             <select
                                                 value={assignTagId}
                                                 onChange={(e) => setAssignTagId(Number(e.target.value) || '')}
-                                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                                className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
                                             >
                                                 <option value="">Assign existing tag…</option>
                                                 {allTags.map((t) => (
@@ -240,21 +240,21 @@ export default function TagSuggestionReviewModal({
                                         ) : (
                                             <div className="space-y-2">
                                                 <div>
-                                                    <label className="mb-1 block text-xs font-medium text-slate-600">New tag label</label>
+                                                    <label className="mb-1 block text-xs font-medium text-ink-soft">New tag label</label>
                                                     <input
                                                         type="text"
                                                         value={newTagLabel}
                                                         onChange={(e) => setNewTagLabel(e.target.value)}
                                                         placeholder="Tag label…"
-                                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                                        className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="mb-1 block text-xs font-medium text-slate-600">Tag group / category</label>
+                                                    <label className="mb-1 block text-xs font-medium text-ink-soft">Tag group / category</label>
                                                     <select
                                                         value={newTagGroupId}
                                                         onChange={(e) => setNewTagGroupId(Number(e.target.value) || '')}
-                                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                                        className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
                                                     >
                                                         <option value="">Select group…</option>
                                                         {tagGroups.filter((g) => g.enabled !== false).map((g) => (
@@ -271,45 +271,45 @@ export default function TagSuggestionReviewModal({
                                 )}
                             </div>
                         ) : (
-                            <p className="text-sm text-slate-400 italic">No tag information</p>
+                            <p className="text-sm text-muted italic">No tag information</p>
                         )}
                     </div>
 
                     {/* Admin notes (always shown for context on non-pending) */}
                     {(isPending || suggestion.admin_notes) && (
                         <div className="mb-4">
-                            <label className="mb-1 block text-xs font-medium text-slate-600">Admin Notes</label>
+                            <label className="mb-1 block text-xs font-medium text-ink-soft">Admin Notes</label>
                             {isPending ? (
                                 <textarea
                                     value={adminNotes}
                                     onChange={(e) => setAdminNotes(e.target.value)}
                                     rows={2}
                                     placeholder="Internal notes…"
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="w-full rounded-md border border-line px-3 py-2 text-sm focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                                 />
                             ) : (
-                                <p className="text-sm text-slate-600 italic">{suggestion.admin_notes}</p>
+                                <p className="text-sm text-ink-soft italic">{suggestion.admin_notes}</p>
                             )}
                         </div>
                     )}
 
                     {/* Metadata */}
-                    <div className="border-t border-slate-200 pt-3 mb-4">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Details</p>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-600">
-                            <div><span className="text-slate-400">Submitted:</span> {fmtDate(suggestion.created_at)}</div>
+                    <div className="border-t border-line pt-3 mb-4">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Details</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-ink-soft">
+                            <div><span className="text-muted">Submitted:</span> {fmtDate(suggestion.created_at)}</div>
                             {suggestion.reviewed_at && (
-                                <div><span className="text-slate-400">Reviewed:</span> {fmtDate(suggestion.reviewed_at)}</div>
+                                <div><span className="text-muted">Reviewed:</span> {fmtDate(suggestion.reviewed_at)}</div>
                             )}
                             {suggestion.submitter_device_id && (
                                 <div className="col-span-2 truncate">
-                                    <span className="text-slate-400">Device:</span> {suggestion.submitter_device_id}
+                                    <span className="text-muted">Device:</span> {suggestion.submitter_device_id}
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {error && <p className="mb-3 text-sm text-slate-600 bg-slate-100 px-2 py-1 rounded">{error}</p>}
+                    {error && <p className="mb-3 text-sm text-ink-soft bg-slate-100 px-2 py-1 rounded">{error}</p>}
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-wrap">
@@ -324,7 +324,7 @@ export default function TagSuggestionReviewModal({
                                 </button>
                                 <button
                                     onClick={() => setRejectMode(true)}
-                                    className="bg-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 rounded hover:bg-slate-300 transition"
+                                    className="bg-slate-200 text-ink text-xs font-medium px-3 py-1.5 rounded hover:bg-slate-300 transition"
                                 >
                                     Reject
                                 </button>
@@ -342,14 +342,14 @@ export default function TagSuggestionReviewModal({
                                 </button>
                                 <button
                                     onClick={() => setRejectMode(false)}
-                                    className="text-xs text-slate-500 hover:text-slate-700"
+                                    className="text-xs text-ink-soft hover:text-ink"
                                 >
                                     Cancel
                                 </button>
                             </>
                         )}
 
-                        <button onClick={onClose} className="ml-auto text-xs text-slate-500 hover:text-slate-700">
+                        <button onClick={onClose} className="ml-auto text-xs text-ink-soft hover:text-ink">
                             Close
                         </button>
                     </div>

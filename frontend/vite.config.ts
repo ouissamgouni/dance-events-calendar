@@ -66,7 +66,7 @@ export default defineConfig(({ mode }) => {
             if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) {
               return 'vendor-react'
             }
-            if (/[\\/]node_modules[\\/](leaflet|leaflet\.markercluster|react-leaflet|@react-leaflet)[\\/]/.test(id)) {
+            if (/[\\/]node_modules[\\/](leaflet|leaflet\.markercluster|react-leaflet|@react-leaflet|maplibre-gl|@maplibre)[\\/]/.test(id)) {
               return 'vendor-leaflet'
             }
             if (/[\\/]node_modules[\\/]@fullcalendar[\\/]/.test(id)) {

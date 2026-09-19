@@ -48,9 +48,9 @@ tag_groups:
         synonyms: ["showcase", "performance", "demo", "exhibition"]
 
   - slug: reach
-    label: Reach
+    label: Event reach
     ordinal: 15
-    allow_multiple: true
+    allow_multiple: false
     onboarding_eligible: true
     color: "#a78bfa"
     tags:

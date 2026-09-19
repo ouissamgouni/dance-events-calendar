@@ -14,7 +14,7 @@ describe('getCalendarFeedUrl', () => {
     });
 
     it('reflects the requested scope', () => {
-        expect(getCalendarFeedUrl('tok-123', 'saved')).toContain('scope=saved');
+        expect(getCalendarFeedUrl('tok-123', 'saved')).toContain('view=saved');
         expect(getCalendarFeedUrl('tok-123', 'going')).toContain('scope=going');
     });
 

@@ -31,22 +31,22 @@ export default function InstallPage() {
             <div className="max-w-md mx-auto px-4 py-10 flex flex-col items-center gap-6 text-center">
                 <img src="/icons/icon-192.png" alt="" className="h-16 w-16" />
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Install Movida</h1>
-                    <p className="mt-2 text-sm text-slate-600">
+                    <h1 className="text-2xl font-bold text-ink">Install Movida</h1>
+                    <p className="mt-2 text-sm text-ink-soft">
                         Get faster access, home screen shortcuts, and reminders for events you're going to — right on your device.
                     </p>
                 </div>
 
                 {loading ? null : isStandalone ? (
-                    <div className="w-full border border-slate-200 bg-slate-50 px-6 py-5 text-sm text-slate-700">
+                    <div className="w-full border border-line bg-canvas px-6 py-5 text-sm text-ink">
                         You already have Movida installed on this device 🎉
                     </div>
                 ) : !user ? (
-                    <div className="w-full border border-blue-100 bg-blue-50 px-6 py-5 text-sm text-blue-700">
+                    <div className="w-full border border-blue-100 bg-blue-50 px-6 py-5 text-sm text-action">
                         <p className="mb-3">Sign in first to install Movida.</p>
                         <Link
                             to="/login?next=/install"
-                            className="inline-block bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 text-sm font-medium transition"
+                            className="inline-block bg-action text-white hover:bg-action px-4 py-2 text-sm font-medium transition"
                         >
                             Sign in
                         </Link>
@@ -56,7 +56,7 @@ export default function InstallPage() {
                         <InstallPromptCard surface="page" onInstall={install} />
                     </div>
                 ) : (
-                    <div className="w-full border border-slate-200 bg-slate-50 px-6 py-5 text-sm text-slate-700 text-left space-y-2">
+                    <div className="w-full border border-line bg-canvas px-6 py-5 text-sm text-ink text-left space-y-2">
                         <p>Your browser can't install Movida directly here — but you can still add it manually:</p>
                         <p><strong>iPhone/iPad:</strong> In Safari, tap Share, then "Add to Home Screen".</p>
                         <p><strong>Android:</strong> In Chrome, tap the ⋮ menu, then "Install app" (or "Add to Home screen").</p>

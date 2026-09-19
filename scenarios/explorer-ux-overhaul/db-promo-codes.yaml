@@ -1,0 +1,27 @@
+# Pre-seeded promo codes for the Explorer UX overhaul scenario.
+#
+# A few UPCOMING events (week 0 cluster) carry approved promo codes so the
+# "Discount" badge renders on the redesigned event cards. Each submitter_email
+# must exist in mock-users.yaml.
+promo_codes:
+  - event_id: evt-ux-001
+    submitter_email: alice@example.com
+    code: SALSAFRIDAY
+    description: 15% off pre-sale tickets
+    source_url: https://example.com/salsa-friday
+    status: approved
+  - event_id: evt-ux-002
+    submitter_email: emma@example.com
+    code: BACHATA10
+    description: 10% off at the door with this code
+    status: approved
+  - event_id: evt-ux-003
+    submitter_email: bob@example.com
+    code: EARLYSPIN
+    description: Early-bird entry discount
+    status: approved
+  - event_id: evt-ux-005
+    submitter_email: viewer@example.com
+    code: WEEKENDPASS
+    description: Bundle discount for the weekend
+    status: approved

@@ -9,23 +9,23 @@ import { fetchSyncJobs } from '../api';
 import JobDetailDrawer from './JobDetailDrawer';
 
 const STATUS_DOT: Record<string, string> = {
-    running: 'bg-blue-500 animate-pulse',
+    running: 'bg-action animate-pulse',
     abort_requested: 'bg-amber-400 animate-pulse',
-    completed: 'bg-emerald-500',
+    completed: 'bg-success',
     warning: 'bg-amber-500',
-    failed: 'bg-red-500',
+    failed: 'bg-danger',
     aborted: 'bg-gray-400',
     idle: 'bg-gray-300',
 };
 
 const STATUS_BADGE: Record<string, string> = {
-    running: 'bg-blue-50 text-blue-700',
+    running: 'bg-blue-50 text-action',
     abort_requested: 'bg-amber-50 text-amber-700',
-    completed: 'bg-emerald-50 text-emerald-700',
+    completed: 'bg-emerald-50 text-success',
     warning: 'bg-amber-50 text-amber-700',
-    failed: 'bg-red-50 text-red-700',
-    aborted: 'bg-gray-100 text-gray-500',
-    idle: 'bg-gray-100 text-gray-500',
+    failed: 'bg-red-50 text-danger',
+    aborted: 'bg-gray-100 text-ink-soft',
+    idle: 'bg-gray-100 text-ink-soft',
 };
 
 type StatusFilter =
@@ -122,17 +122,17 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+        <div className="bg-surface border border-line rounded-lg shadow-sm">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-card-line">
                 <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-gray-700">Sync History</h3>
-                    <span className="text-[10px] text-gray-400">{total} total</span>
+                    <h3 className="text-sm font-semibold text-ink">Sync History</h3>
+                    <span className="text-[10px] text-muted">{total} total</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                        className="text-xs border border-gray-300 rounded px-2 py-1"
+                        className="text-xs border border-line rounded px-2 py-1"
                     >
                         <option value="all">All statuses</option>
                         <option value="running">Running</option>
@@ -144,14 +144,14 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
                     <button
                         onClick={refresh}
                         disabled={loading}
-                        className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                        className="text-xs text-ink-soft hover:text-ink disabled:opacity-50"
                     >
                         ↻
                     </button>
                     {onClose && (
                         <button
                             onClick={onClose}
-                            className="text-xs text-gray-400 hover:text-gray-600"
+                            className="text-xs text-muted hover:text-ink-soft"
                         >
                             ✕
                         </button>
@@ -159,12 +159,12 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
                 </div>
             </div>
 
-            {error && <div className="px-4 py-2 text-xs text-red-600">{error}</div>}
+            {error && <div className="px-4 py-2 text-xs text-danger">{error}</div>}
 
             <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                     <thead>
-                        <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400 border-b border-gray-100 bg-gray-50">
+                        <tr className="text-left text-[10px] uppercase tracking-wide text-muted border-b border-card-line bg-canvas">
                             <th className="px-3 py-2 font-medium">Job</th>
                             <th className="px-3 py-2 font-medium">Status</th>
                             <th className="px-3 py-2 font-medium">Started</th>
@@ -178,7 +178,7 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
                     <tbody>
                         {filtered.length === 0 && !loading && (
                             <tr>
-                                <td colSpan={8} className="px-3 py-6 text-center text-xs text-gray-400">
+                                <td colSpan={8} className="px-3 py-6 text-center text-xs text-muted">
                                     No jobs found.
                                 </td>
                             </tr>
@@ -197,9 +197,9 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
                                 <tr
                                     key={j.job_id}
                                     onClick={() => setOpenJobId(j.job_id)}
-                                    className="cursor-pointer hover:bg-gray-50 border-b border-gray-50"
+                                    className="cursor-pointer hover:bg-canvas border-b border-gray-50"
                                 >
-                                    <td className="px-3 py-2 font-mono text-[10px] text-gray-500" title={j.job_id}>
+                                    <td className="px-3 py-2 font-mono text-[10px] text-ink-soft" title={j.job_id}>
                                         {j.job_id.slice(0, 8)}
                                     </td>
                                     <td className="px-3 py-2">
@@ -209,7 +209,7 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
                                                     }`}
                                             />
                                             <span
-                                                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_BADGE[j.status] ?? 'bg-gray-100 text-gray-500'
+                                                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_BADGE[j.status] ?? 'bg-gray-100 text-ink-soft'
                                                     }`}
                                             >
                                                 {j.status}
@@ -224,19 +224,19 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                                    <td className="px-3 py-2 text-ink whitespace-nowrap">
                                         {formatTime(j.started_at)}
                                     </td>
-                                    <td className="px-3 py-2 text-gray-600">{durationLabel(j)}</td>
-                                    <td className="px-3 py-2 text-gray-600 capitalize">{j.mode}</td>
-                                    <td className="px-3 py-2 text-right text-gray-600">
+                                    <td className="px-3 py-2 text-ink-soft">{durationLabel(j)}</td>
+                                    <td className="px-3 py-2 text-ink-soft capitalize">{j.mode}</td>
+                                    <td className="px-3 py-2 text-right text-ink-soft">
                                         {j.totals.calendars_synced}
                                     </td>
-                                    <td className="px-3 py-2 text-right text-gray-600">
+                                    <td className="px-3 py-2 text-right text-ink-soft">
                                         {j.totals.events_upserted}
                                     </td>
                                     <td
-                                        className={`px-3 py-2 text-right ${issues > 0 ? 'text-amber-600' : 'text-gray-400'
+                                        className={`px-3 py-2 text-right ${issues > 0 ? 'text-amber-600' : 'text-muted'
                                             }`}
                                     >
                                         {issues}
@@ -249,21 +249,21 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
             </div>
 
             {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100 text-xs">
+                <div className="flex items-center justify-between px-4 py-2 border-t border-card-line text-xs">
                     <button
                         onClick={() => setPage((p) => Math.max(0, p - 1))}
                         disabled={page === 0}
-                        className="px-2 py-1 border border-gray-200 rounded disabled:opacity-50"
+                        className="px-2 py-1 border border-line rounded disabled:opacity-50"
                     >
                         Prev
                     </button>
-                    <span className="text-gray-500">
+                    <span className="text-ink-soft">
                         Page {page + 1} of {totalPages}
                     </span>
                     <button
                         onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                         disabled={page >= totalPages - 1}
-                        className="px-2 py-1 border border-gray-200 rounded disabled:opacity-50"
+                        className="px-2 py-1 border border-line rounded disabled:opacity-50"
                     >
                         Next
                     </button>
