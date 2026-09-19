@@ -14,6 +14,7 @@ import LinksRow from './event-summary/LinksRow';
 import SummaryMiniMap from './event-summary/SummaryMiniMap';
 import SeriesRow from './event-summary/SeriesRow';
 import EventActions from './event-summary/EventActions';
+import ExpandableDescription from './ExpandableDescription';
 
 /** Detail tabs the summary can deep-link into. */
 export type EventDetailTab = 'overview' | 'about' | 'location' | 'people' | 'reviews' | 'discussion';
@@ -32,6 +33,8 @@ interface Props {
     eventHasReviews?: boolean;
     onPostMessage: () => void;
     onSuggestEdit?: () => void;
+    /** Called when a direct series link is followed (e.g. close a modal). */
+    onSeriesNavigate?: () => void;
     /** Render the trailing inline action row. The full page hides it (a
      * persistent dock owns the actions); the modal keeps it. Defaults to true. */
     showActions?: boolean;
@@ -53,9 +56,9 @@ function priceCompact(event: CalendarEvent): string | null {
 /**
  * The single reusable event summary shared unchanged by the full event page and
  * the event modal. Renders — in order — an optional image, the event identity,
- * tags, social proof, a review overview, series, a one-line about preview,
- * external links, an optional mini-map, and the action row that marks the end
- * of the summary. Callers append either detail tabs (page) or a "See full
+ * tags, social proof, a review overview, an About preview, external links, an
+ * optional mini-map, series, and the action row that marks the end of the
+ * summary. Callers append either detail tabs (page) or a "See full
  * details" link (modal) after it; the summary itself never branches on surface.
  */
 export default function EventSummary({
@@ -68,6 +71,7 @@ export default function EventSummary({
     eventHasReviews,
     onPostMessage,
     onSuggestEdit,
+    onSeriesNavigate,
     showActions = true,
     omitHeader = false,
 }: Props) {
@@ -108,6 +112,7 @@ export default function EventSummary({
             <PeopleProofRow
                 event={event}
                 postsCount={postsCount}
+                onOpenPeople={() => onOpenTab('people')}
                 onOpenPosts={() => onOpenTab('discussion')}
             />
 
@@ -134,28 +139,16 @@ export default function EventSummary({
                 </div>
             )}
 
-            {/* Series */}
-            {series && (
-                <SeriesRow
-                    title={series.canonical_title}
-                    onClick={() => onOpenTab('about', { anchor: 'series' })}
-                />
-            )}
-
-            {/* About preview — label + a few lines with inline "…more" */}
+            {/* About preview — the whole entry opens Details; "…more" only
+                appears when the three-line preview actually overflows. */}
             {event.description && (
                 <div className="space-y-1">
                     <p className="text-sm font-semibold text-ink">About</p>
-                    <p className="text-sm leading-relaxed text-ink-soft">
-                        <span className="line-clamp-3">{event.description}</span>
-                    </p>
-                    <button
-                        type="button"
-                        onClick={() => onOpenTab('about')}
-                        className="text-sm font-medium text-action hover:underline"
-                    >
-                        …more
-                    </button>
+                    <ExpandableDescription
+                        text={event.description}
+                        clampClass="line-clamp-3"
+                        onOpen={() => onOpenTab('about')}
+                    />
                 </div>
             )}
 
@@ -164,6 +157,15 @@ export default function EventSummary({
 
             {/* Mini-map */}
             <SummaryMiniMap event={event} onOpen={() => onOpenTab('location')} />
+
+            {/* Series belongs with location context and opens the series itself. */}
+            {series && (
+                <SeriesRow
+                    title={series.canonical_title}
+                    to={`/series/${series.series_id}`}
+                    onClick={onSeriesNavigate}
+                />
+            )}
 
             {/* Actions — end of EventSummary (modal only; the page uses a dock) */}
             {showActions && (

@@ -5,16 +5,17 @@ import AttendeeAvatarStack from '../AttendeeAvatarStack';
 interface Props {
     event: CalendarEvent;
     postsCount: number;
+    /** Open the People tab (full page) or navigate there (modal). */
+    onOpenPeople: () => void;
     /** Open the Discussion tab (full page) or navigate there (modal). */
     onOpenPosts: () => void;
 }
 
 /**
- * Single-line social-proof row for EventSummary: an avatar stack on the left,
- * a friends/going/saved summary beside it, and a right-aligned Posts
- * affordance. The detailed friends-vs-other breakdown lives in the People tab.
+ * Social-proof row for EventSummary: the going summary opens People, while
+ * the independent right-aligned Posts affordance opens Discussion.
  */
-export default function PeopleProofRow({ event, postsCount, onOpenPosts }: Props) {
+export default function PeopleProofRow({ event, postsCount, onOpenPeople, onOpenPosts }: Props) {
     const summary = useAttendanceSummary(event.event_id);
     const totalGoing = summary?.total_going ?? event.going_count ?? 0;
     const totalSaved = summary?.total_saved ?? event.saved_count ?? 0;
@@ -30,35 +31,43 @@ export default function PeopleProofRow({ event, postsCount, onOpenPosts }: Props
             : '';
 
     return (
-        <div className="space-y-2">
+        <div className="flex items-end gap-2">
             {totalGoing > 0 && (
-                <div className="text-sm font-semibold leading-5 text-[#526078]">People going</div>
+                <button
+                    type="button"
+                    onClick={onOpenPeople}
+                    className="min-w-0 flex-1 space-y-2 text-left hover:text-action"
+                >
+                    <span className="block text-sm font-semibold leading-5 text-ink-soft">People going</span>
+                    <span className="flex items-center gap-2 text-xs text-ink-soft">
+                        <AttendeeAvatarStack
+                            eventId={event.event_id}
+                            max={3}
+                            friendsPreview={event.friends_going_preview}
+                            size="lg"
+                            layout="faces"
+                            hideIfOnlyCurrentUser
+                        />
+                        <span className="min-w-0 truncate">
+                            {goingText}
+                            {totalSaved > 0 && ` · ${totalSaved} saved`}
+                        </span>
+                    </span>
+                </button>
             )}
-            <div className="flex items-center gap-2 text-xs text-ink-soft">
-                <AttendeeAvatarStack
-                    eventId={event.event_id}
-                    max={3}
-                    friendsPreview={event.friends_going_preview}
-                    size="lg"
-                    layout="faces"
-                    hideIfOnlyCurrentUser
-                />
-                <span className="min-w-0 truncate">
-                    {goingText}
-                    {goingText && totalSaved > 0 && ' · '}
-                    {totalSaved > 0 && `${totalSaved} saved`}
-                </span>
-                {postsCount > 0 && (
-                    <button
-                        type="button"
-                        onClick={onOpenPosts}
-                        className="ml-auto inline-flex shrink-0 items-center gap-1 font-medium text-action hover:underline"
-                    >
-                        <img src="/question.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
-                        {postsCount} Post{postsCount === 1 ? '' : 's'}
-                    </button>
-                )}
-            </div>
+            {totalGoing === 0 && totalSaved > 0 && (
+                <span className="min-w-0 flex-1 truncate text-xs text-ink-soft">{totalSaved} saved</span>
+            )}
+            {postsCount > 0 && (
+                <button
+                    type="button"
+                    onClick={onOpenPosts}
+                    className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-medium text-action hover:underline"
+                >
+                    <img src="/question.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
+                    {postsCount} Post{postsCount === 1 ? '' : 's'}
+                </button>
+            )}
         </div>
     );
 }

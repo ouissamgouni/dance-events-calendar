@@ -56,8 +56,8 @@ export default function EventActions({
 
     return (
         <div className="flex items-center gap-2">
-            <SaveEventButton eventId={event.event_id} appearance="pill" />
-            <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} />
+            <SaveEventButton eventId={event.event_id} appearance="pill" className="border border-line" />
+            <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="border border-line" />
             <ShareButton
                 eventId={event.event_id}
                 title={event.title}

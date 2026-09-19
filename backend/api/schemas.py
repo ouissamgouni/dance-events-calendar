@@ -2,7 +2,9 @@ from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+
+from backend.services.recurrence import MAX_OCCURRENCES, validate_rule
 
 # My Events context view type: mirrors frontend MyEventsTab
 MyEventsView = Literal["upcoming", "saved", "past"]
@@ -1201,6 +1203,13 @@ class NewTagSuggestionItem(BaseModel):
     group_slug: Optional[str] = Field(default=None, max_length=100)
 
 
+class RecurrenceDateItem(BaseModel):
+    """One explicitly chosen occurrence, free to carry its own duration."""
+
+    start: datetime
+    end: datetime
+
+
 class EventSuggestionCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
@@ -1211,6 +1220,10 @@ class EventSuggestionCreate(BaseModel):
     start: datetime
     end: datetime
     all_day: bool = False
+    recurrence_rule: Optional[str] = Field(default=None, max_length=500)
+    recurrence_dates: Optional[list[RecurrenceDateItem]] = Field(
+        default=None, max_length=MAX_OCCURRENCES
+    )
     submitter_name: Optional[str] = Field(default=None, max_length=100)
     submitter_email: Optional[str] = Field(default=None, max_length=200)
     website: str = ""  # honeypot
@@ -1234,6 +1247,24 @@ class EventSuggestionCreate(BaseModel):
     # effect for anonymous submissions.
     auto_save: bool = True
 
+    @model_validator(mode="after")
+    def _check_recurrence(self) -> "EventSuggestionCreate":
+        if self.recurrence_rule and self.recurrence_dates:
+            raise ValueError(
+                "Provide either recurrence_rule or recurrence_dates, not both"
+            )
+        if self.recurrence_rule:
+            self.recurrence_rule = validate_rule(self.recurrence_rule)
+        if self.recurrence_dates:
+            seen: set[datetime] = set()
+            for item in self.recurrence_dates:
+                if item.end <= item.start:
+                    raise ValueError("Each recurrence date must end after it starts")
+                if item.start in seen:
+                    raise ValueError("Recurrence dates must be unique")
+                seen.add(item.start)
+        return self
+
 
 class EventSuggestionResponse(BaseModel):
     id: UUID
@@ -1246,6 +1277,8 @@ class EventSuggestionResponse(BaseModel):
     start: datetime
     end: datetime
     all_day: bool = False
+    recurrence_rule: Optional[str] = None
+    recurrence_dates: Optional[list[RecurrenceDateItem]] = None
     submitter_name: Optional[str] = None
     submitter_email: Optional[str] = None
     submitter_ip: Optional[str] = None
@@ -1281,6 +1314,23 @@ class EventSuggestionResponse(BaseModel):
 class EventSuggestionPublicResponse(BaseModel):
     id: UUID
     message: str
+
+
+class SuggestionOccurrence(BaseModel):
+    """One expanded date of a suggestion's recurrence, for admin review."""
+
+    index: int
+    start: datetime
+    end: datetime
+    event_id: Optional[str] = None
+    """Set once the occurrence has been materialised as a cached event."""
+    materialised: bool = False
+
+
+class SuggestionOccurrencesResponse(BaseModel):
+    total: int
+    """How many occurrences approval would create, capped by the expander."""
+    occurrences: list[SuggestionOccurrence]
 
 
 class SuggestionApproveRequest(BaseModel):

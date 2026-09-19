@@ -1,21 +1,34 @@
 tag_groups:
+  # Slugs are load-bearing: db-events.yaml references them as "<group>:<tag>",
+  # and a scenario tags.yaml replaces the default file rather than merging.
   - slug: format
-    label: Format
+    label: Event type
     ordinal: 10
     allow_multiple: true
     color: "#f472b6"
     tags:
       - slug: social
         label: Social
+      - slug: party
+        label: Party
       - slug: class
         label: Class
       - slug: workshop
         label: Workshop
       - slug: festival
         label: Festival
+      - slug: congress
+        label: Congress
+      - slug: bootcamp
+        label: Bootcamp
+      - slug: competition
+        label: Competition
+      - slug: performance
+        label: Performance
 
+  # Eight styles so the Step 2 chip row overflows and must scroll horizontally.
   - slug: dance-style
-    label: Dance Style
+    label: Dance style
     ordinal: 20
     allow_multiple: true
     onboarding_eligible: true
@@ -29,6 +42,14 @@ tag_groups:
         label: Kizomba
       - slug: zouk
         label: Zouk
+      - slug: semba
+        label: Semba
+      - slug: rueda
+        label: Rueda
+      - slug: cha-cha
+        label: Cha-Cha
+      - slug: son
+        label: Son
 
   - slug: reach
     label: Event reach
@@ -71,6 +92,34 @@ tag_groups:
         label: Outdoor
       - slug: rooftop
         label: Rooftop
+
+  - slug: music
+    label: Music / format
+    ordinal: 45
+    allow_multiple: true
+    color: "#f59e0b"
+    tags:
+      - slug: dj
+        label: DJ
+      - slug: live-music
+        label: Live music
+      - slug: practica
+        label: Practica
+
+  - slug: access
+    label: Audience / access
+    ordinal: 48
+    allow_multiple: true
+    color: "#38bdf8"
+    tags:
+      - slug: couples
+        label: Couples
+      - slug: singles-welcome
+        label: Singles welcome
+      - slug: lgbtq-friendly
+        label: LGBTQ+ friendly
+      - slug: wheelchair-accessible
+        label: Wheelchair accessible
 
   - slug: vibe
     label: Vibe

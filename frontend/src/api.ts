@@ -3078,6 +3078,26 @@ export async function fetchSuggestions(status?: string): Promise<EventSuggestion
     return res.json();
 }
 
+export interface SuggestionOccurrence {
+    index: number;
+    start: string;
+    end: string;
+    event_id: string | null;
+    materialised: boolean;
+}
+
+export interface SuggestionOccurrences {
+    total: number;
+    occurrences: SuggestionOccurrence[];
+}
+
+/** Every date a suggestion expands to — what approval would create. */
+export async function fetchSuggestionOccurrences(id: string): Promise<SuggestionOccurrences> {
+    const res = await fetch(`${BASE}/admin/suggestions/${id}/occurrences`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch suggestion occurrences');
+    return res.json();
+}
+
 export async function updateSuggestion(id: string, data: Record<string, unknown>): Promise<EventSuggestion> {
     const res = await fetch(`${BASE}/admin/suggestions/${id}`, {
         method: 'PATCH',

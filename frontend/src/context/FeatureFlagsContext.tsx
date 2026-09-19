@@ -70,7 +70,7 @@ export interface FeatureFlags {
 const defaultFlags: FeatureFlags = {
     showPrices: false,
     showPopularity: false,
-    showRatings: false,
+    showRatings: true,
     popularityThreshold: 10,
     followingBadgeEnabled: false,
     unseenStateEnabled: false,
@@ -82,10 +82,10 @@ const defaultFlags: FeatureFlags = {
     eventColorBarColor: DEFAULT_EVENT_COLOR_BAR_COLOR,
     tagSortMode: 'group',
     goingButtonIconVariant: 'hand',
-    promoCodesEnabled: false,
-    organizerClaimsEnabled: false,
+    promoCodesEnabled: true,
+    organizerClaimsEnabled: true,
     networkGoingSnapshotEnabled: false,
-    myEventsRouteEnabled: false,
+    myEventsRouteEnabled: true,
     myEventsNavEnabled: true,
     eventReviewSizeStepEnabled: true,
     tagAsBadge: false,
@@ -97,9 +97,9 @@ const defaultFlags: FeatureFlags = {
     eventCardImgoingLocationBottomEnabled: true,
     eventCardShowPeopleIconEnabled: false,
     eventCardShowTimeLocationIconsEnabled: false,
-    explorerEventCardCardStyleEnabled: false,
+    explorerEventCardCardStyleEnabled: true,
     eventImagesEnabled: false,
-    eventCardPlaceholderStyle: 'gradient',
+    eventCardPlaceholderStyle: 'none',
 };
 
 const FeatureFlagsContext = createContext<{

@@ -3,9 +3,9 @@ import { Repeat, ChevronRight } from 'lucide-react';
 
 interface Props {
     title: string;
-    /** Navigate to a route (Details tab usage). */
+    /** Navigate to a route. */
     to?: string;
-    /** Or run a handler (overview usage — scroll to the series section). */
+    /** Optional navigation callback, used to close an owning modal. */
     onClick?: () => void;
 }
 
@@ -18,18 +18,18 @@ export default function SeriesRow({ title, to, onClick }: Props) {
         <>
             <Repeat className="h-4 w-4 shrink-0 text-ink-soft" aria-hidden="true" />
             <span className="shrink-0 text-ink-soft">Series</span>
-            <span aria-hidden="true" className="shrink-0 text-muted">·</span>
-            <span className="min-w-0 flex-1 truncate font-medium text-action">{title}</span>
+            <span className="ml-auto min-w-0 truncate text-right font-medium text-action">{title}</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
         </>
     );
     const cls = 'flex w-full items-center gap-1.5 text-sm hover:underline';
+    const label = `Open series ${title}`;
 
     if (to) {
-        return <Link to={to} className={cls}>{inner}</Link>;
+        return <Link to={to} onClick={onClick} className={cls} aria-label={label}>{inner}</Link>;
     }
     return (
-        <button type="button" onClick={onClick} className={cls}>
+        <button type="button" onClick={onClick} className={cls} aria-label={label}>
             {inner}
         </button>
     );

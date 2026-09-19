@@ -21,11 +21,10 @@ interface Props {
 }
 
 /**
- * Persistent, prominent action dock pinned to the bottom of the event page in
- * both overview and section modes. The dock itself carries the emphasis (cool
- * surface, top separator, upward shadow) — Save and I'm going are always
- * present with equal weight to the rest; Review appears inline when the viewer
- * can review, and the remaining actions live in the ••• overflow menu.
+ * Persistent action dock pinned to the bottom on mobile and presented as a
+ * sticky side panel on desktop. Save and I'm going are always present with
+ * equal weight to the rest; Review appears inline when the viewer can review,
+ * and the remaining actions live in the ••• overflow menu.
  */
 export default function EventActionDock({
     event,
@@ -53,10 +52,10 @@ export default function EventActionDock({
     const reviewInline = showRatings && isPast;
 
     return (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-slate-50/95 backdrop-blur shadow-[0_-2px_10px_rgba(15,23,42,0.06)]">
-            <div className="mx-auto flex max-w-[480px] items-center gap-2 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-                <SaveEventButton eventId={event.event_id} appearance="pill" />
-                <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} />
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-slate-50/95 backdrop-blur shadow-[0_-2px_10px_rgba(15,23,42,0.06)] lg:sticky lg:inset-auto lg:top-6 lg:z-10 lg:rounded-card lg:border lg:bg-surface lg:p-4 lg:shadow-sm lg:backdrop-blur-none">
+            <div className="mx-auto flex max-w-[480px] items-center gap-2 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] lg:mx-0 lg:max-w-none lg:flex-wrap lg:px-0 lg:py-0 lg:pb-0">
+                <SaveEventButton eventId={event.event_id} appearance="pill" className="border border-line" />
+                <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="border border-line" />
                 {reviewInline && (
                     <RateEventButton
                         eventId={event.event_id}

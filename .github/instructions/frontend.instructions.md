@@ -24,13 +24,10 @@ Semantic Tailwind v4 tokens live in [frontend/src/index.css](frontend/src/index.
 - Borders: `border-line` (`#E4E7EC`), `border-card-line` (`#EAECF0` subtle card border).
 - Success/going: `success` (`#079455`). Error/destructive: `danger` (`#D92D20`).
 
-## Shape
-- **Rounded cards.** Cards/surfaces use `rounded-card` (~14px). Small controls (buttons, pills, inputs, chips) stay square unless a neighbouring pattern rounds them.
-- Allowed circular shapes: avatars (`rounded-full`), small status dots, genuinely circular icon toggles.
-
 ## Layout & spacing
 - 4px grid: `4 / 8 / 12 / 16 / 24 / 32 / 48`. Screen gutters 16px, section gap 24px, card padding 16px, card-to-card gap 12px, icon/text gap 8px.
 - **Reduce borders.** Prefer whitespace over enclosing every section in a rectangle. Cards sit on `bg-canvas`; use `border-card-line` only where a card genuinely needs separation. Avoid nested bordered rectangles.
+- **Shape.** Small controls are square by default — raw `rounded-*` utilities are flagged by eslint (`no-restricted-syntax`). Use the radius tokens instead: `rounded-card` (14px) for cards/dialogs, `rounded-field` (8px) for form fields, chips and buttons inside full-screen flows. Genuinely circular elements (avatars, status dots, toggle switches) need an `eslint-disable-next-line` with a reason.
 
 ## Typography
 - Screen title 24/700, section title 18/600–700, event title 16–18/600, body 14–16/400, metadata 14/400, caption/tag 12/500, bottom-nav label 12/500–600. Prefer typography over borders/colour for hierarchy.

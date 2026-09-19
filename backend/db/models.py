@@ -438,6 +438,12 @@ class CachedEvent(SQLModel, table=True):
     # from ``is_hidden``/``BlockedEvent`` (the actual suppression
     # mechanism) — this field only exists to explain *why*.
     rejected_duplicate_reason: Optional[str] = Field(default=None)
+    # Non-NULL when this row was materialised from an EventSuggestion. A
+    # recurring suggestion fans out to one row per occurrence, so this is the
+    # only reliable way to reconcile them when an admin edits the recurrence.
+    suggestion_id: Optional[UUID] = Field(
+        default=None, foreign_key="event_suggestions.id", index=True
+    )
 
 
 class BlockedEvent(SQLModel, table=True):
@@ -741,6 +747,17 @@ class EventSuggestion(SQLModel, table=True):
     end: datetime
     all_day: bool = Field(default=False)
 
+    # User-declared recurrence. Mutually exclusive:
+    #   ``recurrence_rule``  -- an RFC 5545 RRULE line (weekly/monthly/yearly),
+    #                           DTSTART implied by ``start``. May be open-ended
+    #                           (no UNTIL/COUNT); occurrences are materialised
+    #                           over a rolling window, never all at once.
+    #   ``recurrence_dates`` -- explicit occurrences ``[{"start":..,"end":..}]``
+    #                           for the "choose dates" mode, where each one may
+    #                           carry its own duration (RDATE cannot express that).
+    recurrence_rule: Optional[str] = Field(default=None, max_length=500)
+    recurrence_dates: Optional[list] = Field(default=None, sa_column=Column(JSON))
+
     # Submitter info
     submitter_name: Optional[str] = Field(default=None)
     submitter_email: Optional[str] = Field(default=None)
@@ -778,6 +795,12 @@ class EventSuggestion(SQLModel, table=True):
     # Calendar tab without a separate save action. Defaults to True;
     # the suggest form exposes an opt-out checkbox.
     auto_save: bool = Field(default=True, nullable=False)
+    # The submitter's "I'm going" from the suggest wizard. Persisted rather than
+    # consumed at submit because occurrences are materialised in waves (preview
+    # on submit, full horizon on approval, rolling window for open-ended rules)
+    # and every wave has to replay the RSVP onto the occurrences it creates.
+    creator_going: bool = Field(default=False, nullable=False)
+    creator_going_audience: Optional[str] = Field(default=None, max_length=16)
     # User-entered new-tag suggestions submitted with the event. Each item:
     #   {"free_text": str, "group_slug": str | None}
     # On approval these become regular TagSuggestion rows tied to the new event.

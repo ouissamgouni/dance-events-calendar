@@ -61,7 +61,7 @@ vi.mock('../components/FilterSheet', () => ({ default: () => <div /> }));
 vi.mock('../components/SummaryBar', () => ({ default: () => <div /> }));
 vi.mock('../pages/Calendar', () => ({ default: () => <div /> }));
 vi.mock('../components/EventDetail', () => ({ default: () => <div /> }));
-vi.mock('../components/SuggestEventModal', () => ({ default: () => <div /> }));
+vi.mock('../components/suggest/SuggestEventWizard', () => ({ default: () => <div /> }));
 
 describe('Home — mobile map mount with applied area', () => {
     beforeEach(() => {

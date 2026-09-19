@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchEventsByIds } from '../api';
 import type { CalendarEvent } from '../types';
@@ -72,7 +73,7 @@ vi.mock('../components/MyEventsList', () => ({ default: () => <div data-testid="
 vi.mock('../components/MyEventsMapPreview', () => ({ default: () => <div data-testid="map-preview" /> }));
 vi.mock('../components/MyEventsAddSearch', () => ({ default: () => <div /> }));
 vi.mock('../components/EventModal', () => ({ default: () => <div /> }));
-vi.mock('../components/SuggestEventModal', () => ({ default: () => <div /> }));
+vi.mock('../components/suggest/SuggestEventWizard', () => ({ default: () => <div /> }));
 
 function event(eventId: string, located: boolean, start = '2026-09-05T20:00:00Z'): CalendarEvent {
     return {
@@ -101,6 +102,13 @@ function event(eventId: string, located: boolean, start = '2026-09-05T20:00:00Z'
 }
 
 describe('MyEventsExperience view modes', () => {
+    const renderExperience = () =>
+        render(
+            <MemoryRouter>
+                <MyEventsExperience />
+            </MemoryRouter>,
+        );
+
     beforeEach(() => {
         // Freeze "now" before the fixture dates so the mapped/outside events stay
         // in the upcoming tab (restoreMocks resets the spy between tests).
@@ -115,7 +123,7 @@ describe('MyEventsExperience view modes', () => {
 
     it('renders a cooperative Calendar map scoped to the visible range', async () => {
         const user = userEvent.setup();
-        render(<MyEventsExperience />);
+        renderExperience();
 
         await waitFor(() => expect(screen.getByTestId('events-list')).toBeInTheDocument());
         await user.click(screen.getByRole('button', { name: 'Calendar view' }));
@@ -127,7 +135,7 @@ describe('MyEventsExperience view modes', () => {
 
     it('renders a standalone map with default one-finger gestures', async () => {
         const user = userEvent.setup();
-        render(<MyEventsExperience />);
+        renderExperience();
 
         await waitFor(() => expect(screen.getByTestId('events-list')).toBeInTheDocument());
         await user.click(screen.getByRole('button', { name: 'Map view' }));

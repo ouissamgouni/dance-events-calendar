@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { fetchEventsByIds } from '../api';
 import type { CalendarViewMode } from '../components/Calendar';
 import CalendarMapWorkspace from '../components/CalendarMapWorkspace';
@@ -9,7 +10,6 @@ import MyEventsList from '../components/MyEventsList';
 import MyEventsMapPreview from '../components/MyEventsMapPreview';
 import MyEventsUtilityMenu from '../components/MyEventsUtilityMenu';
 import MyEventsViewControls from '../components/MyEventsViewControls';
-import SuggestEventModal from '../components/SuggestEventModal';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
@@ -44,9 +44,15 @@ export default function MyEventsExperience() {
     const [selectedIds, setSelectedIds] = useState<Record<MyEventsTab, string | null>>({ upcoming: null, saved: null, past: null });
     const [modalEvent, setModalEvent] = useState<CalendarEvent | null>(null);
     const [searchOpen, setSearchOpen] = useState(false);
-    const [suggestOpen, setSuggestOpen] = useState(false);
     const [calendarRange, setCalendarRange] = useState<{ start: Date; end: Date } | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // `/suggest` renders over this page so the list underneath stays mounted.
+    const openSuggest = useCallback(() => {
+        navigate('/suggest', { state: { backgroundLocation: location } });
+    }, [navigate, location]);
 
     const allEventIds = useMemo(() => [...new Set([...savedEventIds, ...attendingEventIds])], [savedEventIds, attendingEventIds]);
     useEffect(() => {
@@ -114,7 +120,7 @@ export default function MyEventsExperience() {
                 <MyEventsViewControls view={view} searchOpen={searchOpen} onViewChange={changeView} onToggleSearch={() => setSearchOpen((open) => !open)} />
             </div>
             {activeLoading && <p className="py-20 text-center text-sm text-muted">Loading your events…</p>}
-            {!activeLoading && searchOpen && <div className="min-h-0 flex-1 overflow-y-auto"><MyEventsAddSearch tab={activeTab} onSuggest={() => setSuggestOpen(true)} onComplete={() => setSearchOpen(false)} /></div>}
+            {!activeLoading && searchOpen && <div className="min-h-0 flex-1 overflow-y-auto"><MyEventsAddSearch tab={activeTab} onSuggest={openSuggest} onComplete={() => setSearchOpen(false)} /></div>}
             {!activeLoading && !searchOpen && view === 'list' && <div className="min-h-0 flex-1 overflow-y-auto"><MyEventsList events={activeEvents} tab={activeTab} onEventClick={setModalEvent} /></div>}
             {!activeLoading && !searchOpen && view === 'calendar' && (
                 <CalendarMapWorkspace
@@ -179,7 +185,6 @@ export default function MyEventsExperience() {
                 </div>
             )}
             {modalEvent && <EventModal event={modalEvent} onClose={() => setModalEvent(null)} />}
-            {suggestOpen && <SuggestEventModal onClose={() => setSuggestOpen(false)} />}
         </div>
     );
 }

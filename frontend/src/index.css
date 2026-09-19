@@ -103,6 +103,8 @@
   --color-danger: #d92d20;
   /* error / destructive */
   --radius-card: 14px;
+  --radius-field: 8px;
+  /* form fields/chips inside full-screen flows */
 }
 
 :root {

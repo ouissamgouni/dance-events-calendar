@@ -296,7 +296,7 @@ export default function EventDetailPage() {
             </Helmet>
 
             <div className="min-h-screen bg-canvas overflow-x-hidden">
-                <div className="mx-auto max-w-[480px] px-3 py-5 sm:py-8">
+                <div className="mx-auto max-w-[1120px] px-3 py-5 sm:px-6 sm:py-8">
                     {/* Back link to the previous view. */}
                     <button
                         onClick={handleBack}
@@ -305,7 +305,7 @@ export default function EventDetailPage() {
                         ← Back
                     </button>
                     {editMode && user?.is_admin ? (
-                        <>
+                        <div className="mx-auto max-w-[480px]">
                             {/* Admin inline editing keeps the legacy detail editor. */}
                             <EventImageEditor event={event} onChange={setEvent} />
                             {editingTitle ? (
@@ -339,8 +339,8 @@ export default function EventDetailPage() {
                                     />
                                 </div>
                                 <div className="border-t border-card-line px-4 py-3 flex items-center gap-2 flex-wrap">
-                                    <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} />
-                                    <SaveEventButton eventId={event.event_id} appearance="pill" />
+                                    <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="border border-line" />
+                                    <SaveEventButton eventId={event.event_id} appearance="pill" className="border border-line" />
                                     <ShareButton eventId={event.event_id} title={event.title} url={shareUrl} />
                                     {user?.is_admin && (
                                         <button
@@ -352,60 +352,78 @@ export default function EventDetailPage() {
                                     )}
                                 </div>
                             </article>
-                        </>
+                        </div>
                     ) : (
                         <>
                             <SummaryHeader event={event} variant="page" />
 
-                            {/* Tabs pinned under the header; the active tab's
-                                content renders below. Overview is the shared
-                                summary body (the persistent dock owns actions). */}
-                            <div className="sticky top-0 z-20 -mx-3 mt-4">
-                                <EventDetailTabsBar
-                                    active={activeTab}
-                                    onSelect={(t) => goToTab(t)}
-                                />
-                            </div>
-
-                            <div className="mt-4">
-                                {activeTab === 'overview' && (
-                                    <EventSummary
-                                        event={event}
-                                        variant="page"
-                                        shareUrl={shareUrl}
-                                        onOpenTab={goToTab}
-                                        onPostMessage={() => { setAskComposeToken((t) => t + 1); goToTab('discussion'); }}
-                                        showActions={false}
-                                        omitHeader
-                                    />
-                                )}
-                                {activeTab === 'about' && <AboutTab event={event} />}
-                                {activeTab === 'location' && <LocationTab event={event} />}
-                                {activeTab === 'people' && <PeopleTab eventId={event.event_id} />}
-                                {activeTab === 'reviews' && (
-                                    showRatings ? (
-                                        <div id="community">
-                                            <ReviewsTab
-                                                eventId={event.event_id}
-                                                isPast={isPast}
-                                                onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)}
-                                                onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)}
-                                                refreshToken={reviewsRefreshToken}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-ink-soft">Reviews are not available for this event.</p>
-                                    )
-                                )}
-                                {activeTab === 'discussion' && (
-                                    <div id="messages">
-                                        <DiscussionTab
-                                            eventId={event.event_id}
-                                            isPast={isPast}
-                                            openComposeToken={askComposeToken}
+                            <div className="mt-4 lg:mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8">
+                                <div className="min-w-0">
+                                    {/* Tabs stay pinned while the active section scrolls. */}
+                                    <div className="sticky top-0 z-20 -mx-3 lg:mx-0">
+                                        <EventDetailTabsBar
+                                            active={activeTab}
+                                            onSelect={(t) => goToTab(t)}
                                         />
                                     </div>
-                                )}
+
+                                    <div className="mt-4 lg:mt-6">
+                                        {activeTab === 'overview' && (
+                                            <EventSummary
+                                                event={event}
+                                                variant="page"
+                                                shareUrl={shareUrl}
+                                                onOpenTab={goToTab}
+                                                onPostMessage={() => { setAskComposeToken((t) => t + 1); goToTab('discussion'); }}
+                                                showActions={false}
+                                                omitHeader
+                                            />
+                                        )}
+                                        {activeTab === 'about' && <AboutTab event={event} />}
+                                        {activeTab === 'location' && <LocationTab event={event} />}
+                                        {activeTab === 'people' && <PeopleTab eventId={event.event_id} />}
+                                        {activeTab === 'reviews' && (
+                                            showRatings ? (
+                                                <div id="community">
+                                                    <ReviewsTab
+                                                        eventId={event.event_id}
+                                                        isPast={isPast}
+                                                        onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)}
+                                                        onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)}
+                                                        refreshToken={reviewsRefreshToken}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-ink-soft">Reviews are not available for this event.</p>
+                                            )
+                                        )}
+                                        {activeTab === 'discussion' && (
+                                            <div id="messages">
+                                                <DiscussionTab
+                                                    eventId={event.event_id}
+                                                    isPast={isPast}
+                                                    openComposeToken={askComposeToken}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <aside>
+                                    <EventActionDock
+                                        event={event}
+                                        isPast={isPast}
+                                        shareUrl={shareUrl}
+                                        reviewOpenToken={reviewOpenToken}
+                                        onRatingChanged={() => setReviewsRefreshToken((t) => t + 1)}
+                                        eventHasReviews={reviewCount > 0}
+                                        onPostMessage={() => { setAskComposeToken((t) => t + 1); goToTab('discussion'); }}
+                                        onSuggestEdit={() => {
+                                            if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
+                                            setShowSuggestTags(true);
+                                        }}
+                                    />
+                                </aside>
                             </div>
                         </>
                     )}
@@ -422,27 +440,9 @@ export default function EventDetailPage() {
                     )}
                 </div>
 
-                {/* Persistent, prominent action dock — visible in both overview
-                    and section modes so Save / I'm going / Review / Share stay
-                    reachable without scrolling. */}
-                {!editMode && (
-                    <EventActionDock
-                        event={event}
-                        isPast={isPast}
-                        shareUrl={shareUrl}
-                        reviewOpenToken={reviewOpenToken}
-                        onRatingChanged={() => setReviewsRefreshToken((t) => t + 1)}
-                        eventHasReviews={reviewCount > 0}
-                        onPostMessage={() => { setAskComposeToken((t) => t + 1); goToTab('discussion'); }}
-                        onSuggestEdit={() => {
-                            if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
-                            setShowSuggestTags(true);
-                        }}
-                    />
-                )}
                 {/* Spacer so the dock never overlaps page content. Matches the
                     dock's vertical footprint. */}
-                <div className="h-20" aria-hidden="true" />
+                {!editMode && <div className="h-20 lg:hidden" aria-hidden="true" />}
             </div>
 
         </>

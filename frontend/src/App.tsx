@@ -1,4 +1,4 @@
-import { Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useLocation, useNavigate, type Location } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
@@ -51,12 +51,35 @@ const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
 const DiscoveryProfilesPage = lazy(() => import('./pages/DiscoveryProfilesPage'));
 const SearchProfileEditorPage = lazy(() => import('./pages/SearchProfileEditorPage'));
 const SectionLayout = lazy(() => import('./components/SectionTabs'));
+const SuggestEventWizard = lazy(() => import('./components/suggest/SuggestEventWizard'));
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
 import ExplorerEventSearch from './components/ExplorerEventSearch';
 import MyDanceHeader from './components/MyDanceHeader';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
+
+/** Location state used to keep the origin page mounted behind `/suggest`. */
+interface ModalLocationState {
+  backgroundLocation?: Location;
+}
+
+/**
+ * `/suggest` is a real URL rendered over whatever page opened it, so the
+ * browser back button closes the wizard and the page underneath keeps its
+ * scroll position and data. Opened directly (deep link, refresh) there is no
+ * background location, so closing returns to the calendar.
+ */
+function SuggestEventRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hasBackground = Boolean((location.state as ModalLocationState | null)?.backgroundLocation);
+  return (
+    <SuggestEventWizard
+      onClose={() => (hasBackground ? navigate(-1) : navigate('/', { replace: true }))}
+    />
+  );
+}
 
 export default function App() {
   return (
@@ -94,6 +117,7 @@ function AppShell() {
   const navigate = useNavigate();
   const qaPinnedWidth = useQaPinnedWidth();
   const mainRef = useRef<HTMLElement | null>(null);
+  const backgroundLocation = (location.state as ModalLocationState | null)?.backgroundLocation;
   const isMineDashboard = location.pathname === '/mine';
   const isMyEvents = location.pathname === '/mine/calendar';
 
@@ -114,9 +138,12 @@ function AppShell() {
   }, [location.pathname, analyticsConsent]);
 
   useLayoutEffect(() => {
+    // An overlay route leaves the page behind it mounted — resetting its scroll
+    // would silently lose the user's place when they close the overlay.
+    if (backgroundLocation) return;
     mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  }, [location.pathname]);
+  }, [location.pathname, backgroundLocation]);
 
   return (
     <NotificationsProvider>
@@ -167,7 +194,7 @@ function AppShell() {
           <OnboardingGate />
           <main ref={mainRef} className={`flex-1 ${isMyEvents ? 'min-h-0 overflow-hidden' : 'overflow-auto'}`}>
             <Suspense fallback={null}>
-              <Routes>
+              <Routes location={backgroundLocation ?? location}>
                 <Route path="/" element={<Home />} />
                 <Route path="/onboarding" element={<OnboardingWizard />} />
                 <Route path="/onboarding/preferences" element={<OnboardingWizard />} />
@@ -227,6 +254,7 @@ function AppShell() {
                   }
                 />
                 <Route path="/u/:handle" element={<ProfilePage />} />
+                <Route path="/suggest" element={<SuggestEventRoute />} />
                 <Route
                   path="/admin"
                   element={
@@ -244,6 +272,11 @@ function AppShell() {
                   }
                 />
               </Routes>
+              {backgroundLocation ? (
+                <Routes>
+                  <Route path="/suggest" element={<SuggestEventRoute />} />
+                </Routes>
+              ) : null}
             </Suspense>
             {!isMineDashboard && !isMyEvents && (
               <footer className="py-3 text-center flex items-center justify-center gap-3">

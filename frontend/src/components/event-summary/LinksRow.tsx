@@ -33,26 +33,23 @@ export default function LinksRow({ event }: Props) {
     if (links.length === 0) return null;
 
     return (
-        <div className="space-y-1.5">
-            <p className="text-sm font-semibold text-ink">Links</p>
-            <div className="-mx-1 flex flex-nowrap gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {links.map((link, i) => {
-                    const Icon = iconFor(link.label);
-                    return (
-                        <a
-                            key={`${link.url}-${i}`}
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => trackLink(event.event_id, link.url)}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-medium text-action transition hover:bg-blue-100"
-                        >
-                            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                            {link.label}
-                        </a>
-                    );
-                })}
-            </div>
+        <div className="-mx-1 flex flex-nowrap gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {links.map((link, i) => {
+                const Icon = iconFor(link.label);
+                return (
+                    <a
+                        key={`${link.url}-${i}`}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => trackLink(event.event_id, link.url)}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-medium text-action transition hover:bg-blue-100"
+                    >
+                        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        {link.label}
+                    </a>
+                );
+            })}
         </div>
     );
 }

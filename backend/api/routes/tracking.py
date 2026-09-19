@@ -20,6 +20,7 @@ from backend.db.database import get_session
 from backend.db.models import (
     EventAttendance,
     EventSave,
+    EventSuggestion,
     EventView,
     EventLinkClick,
     EventExport,
@@ -255,6 +256,27 @@ def track_event_save(
     return {"status": "tracked"}
 
 
+def _clear_creator_going_intent(
+    session: Session, current_user: User, event_id: str
+) -> None:
+    """Stop replaying the submitter's RSVP onto not-yet-materialised occurrences.
+
+    A recurring suggestion re-applies ``creator_going`` every time it grows
+    (approval, rolling extension). Removing Going from the anchor occurrence is
+    the only signal we get that the submitter no longer wants the whole series.
+    """
+    suggestion = session.exec(
+        select(EventSuggestion).where(
+            EventSuggestion.created_event_id == event_id,
+            EventSuggestion.submitter_user_id == current_user.id,
+            EventSuggestion.creator_going.is_(True),  # type: ignore[union-attr]
+        )
+    ).first()
+    if suggestion is not None:
+        suggestion.creator_going = False
+        session.add(suggestion)
+
+
 @router.post("/track/event-attendance", status_code=201)
 @limiter.limit("30/minute")
 def track_event_attendance(
@@ -436,6 +458,7 @@ def track_event_attendance(
         # authenticated owner toggles Going off entirely.
         if current_user is not None:
             withdraw_going(session, current_user, payload.event_id)
+            _clear_creator_going_intent(session, current_user, payload.event_id)
 
     session.commit()
     # A newly-logged attendance may unlock a Dance Passport milestone; fire its

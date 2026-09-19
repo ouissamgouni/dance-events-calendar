@@ -98,7 +98,12 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                                 Dance Passport
                             </Link>
                             {divider}
-                            <Link to="/?submit=1" onClick={onClose} className={rowClass}>
+                            <Link
+                                to="/suggest"
+                                state={{ backgroundLocation: location }}
+                                onClick={onClose}
+                                className={rowClass}
+                            >
                                 <img src="/schedule.png" alt="" aria-hidden="true" className={iconClass} />
                                 Submit Event
                             </Link>
@@ -128,7 +133,12 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                         </>
                     ) : (
                         <>
-                            <Link to="/?submit=1" onClick={onClose} className={rowClass}>
+                            <Link
+                                to="/suggest"
+                                state={{ backgroundLocation: location }}
+                                onClick={onClose}
+                                className={rowClass}
+                            >
                                 <img src="/schedule.png" alt="" aria-hidden="true" className={iconClass} />
                                 Submit Event
                             </Link>

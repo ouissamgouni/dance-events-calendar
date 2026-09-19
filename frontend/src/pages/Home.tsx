@@ -36,7 +36,6 @@ import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummaries
 
 import { AREA_PRESETS, DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL } from '../constants/area';
 import type { PreferredAreaPayload, InterestProfile, InterestProfileUpdatePayload } from '../api';
-import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 import { useSeenEvents } from '../hooks/useSeenEvents';
 import TrendingEventsBanner from '../components/TrendingEventsBanner';
@@ -247,23 +246,29 @@ function writeExplorerStateToSearchParams(
 export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerViewConfig }) {
     const { user, loading: authLoading } = useAuth();
     const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
-    const [showSuggestModal, setShowSuggestModal] = useState(false);
     const mapFollowingBadgeOverlay = true;
     const mapTrendingOverlay = true;
     const location = useLocation();
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [initialExplorerState] = useState(() => readInitialExplorerState(searchParams, config));
     const [initialUrlHadDateRange] = useState(() => searchParams.has('start_date') || searchParams.has('end_date'));
 
-    // Allow opening the suggest modal from anywhere via ?submit=1 (e.g. mobile header link).
+    // `/suggest` renders over this page, so the explorer keeps its results,
+    // scroll position and filters while the wizard is open.
+    const openSuggest = useCallback(() => {
+        navigate('/suggest', { state: { backgroundLocation: location } });
+    }, [navigate, location]);
+
+    // Allow opening the suggest flow from anywhere via ?submit=1 (e.g. mobile header link).
     useEffect(() => {
         if (searchParams.get('submit') === '1') {
-            setShowSuggestModal(true);
             const next = new URLSearchParams(searchParams);
             next.delete('submit');
             setSearchParams(next, { replace: true });
+            openSuggest();
         }
-    }, [searchParams, setSearchParams]);
+    }, [searchParams, setSearchParams, openSuggest]);
 
     const viewMode: ViewMode = location.pathname === '/calendar' ? 'calendar' : 'explorer';
     const invalidateAttendanceSummaries = useInvalidateAttendanceSummaries();
@@ -647,8 +652,6 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
     const [calMapBounds, setCalMapBounds] = useState<MapBounds | null>(null);
-
-    const navigate = useNavigate();
 
     // Auth-gated variants (Tribe) bounce signed-out visitors to sign-in.
     useEffect(() => {
@@ -1789,7 +1792,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                             hoveredEventId={hoveredEventId}
                                             onEventHover={handleExplorerListEventHover}
                                             onMarkSeen={markSeen}
-                                            onSuggestEvent={() => setShowSuggestModal(true)}
+                                            onSuggestEvent={openSuggest}
                                             newEnabled={unseenStateEnabled}
                                             newEventIds={newEventIds}
                                             onExtendPeriod={handleExtendPeriod}
@@ -1990,7 +1993,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                     hoveredEventId={hoveredEventId}
                                     onEventHover={handleExplorerListEventHover}
                                     onMarkSeen={markSeen}
-                                    onSuggestEvent={() => setShowSuggestModal(true)}
+                                    onSuggestEvent={openSuggest}
                                     newEnabled={unseenStateEnabled}
                                     newEventIds={newEventIds}
                                     scrollHighlightedIntoView={false}
@@ -2039,7 +2042,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 )}
             </main>
 
-            <ViewSwitcher currentView={activeView} onSelect={handleSelectView} mapPreviewVisible={mapFullscreen && !isDesktop && !!explorerPreviewEvent} previewOffsetPx={explorerPreviewHeight} onCreate={() => setShowSuggestModal(true)} />
+            <ViewSwitcher currentView={activeView} onSelect={handleSelectView} mapPreviewVisible={mapFullscreen && !isDesktop && !!explorerPreviewEvent} previewOffsetPx={explorerPreviewHeight} onCreate={openSuggest} />
 
             {/* Overlay modal — calendar mode mobile + explorer (both breakpoints) */}
             {selectedEvent && (viewMode === 'explorer' || (viewMode === 'calendar' && !isDesktop)) && (
@@ -2065,9 +2068,6 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 eventId={editingEventId}
                 onClose={handleCloseEdit}
             />
-            {showSuggestModal && (
-                <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
-            )}
             {viewMode === 'calendar' ? (
                 <FilterSheet
                     open={filterSheetOpen}

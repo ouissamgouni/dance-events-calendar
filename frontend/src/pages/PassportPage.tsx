@@ -4,7 +4,7 @@
  * shared read-only PassportView.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Image, Link2, Pencil, Share2, X } from 'lucide-react';
 import {
     ackPassportMilestones,
@@ -25,7 +25,6 @@ import { useToast } from '../components/Toast';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
 import PassportView from '../components/PassportView';
 import PassportShareCard from '../components/PassportShareCard';
-import SuggestEventModal from '../components/SuggestEventModal';
 import { scopePassport, type ShareScope } from '../utils/passportScope';
 import { CARD_HEIGHT, CARD_WIDTH, downloadImage, renderCardToBlob, shareImage } from '../utils/passportShareImage';
 import type {
@@ -1084,7 +1083,13 @@ export default function PassportPage() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [mapEvents, setMapEvents] = useState<PassportMapEvent[] | null>(null);
-    const [showSuggestModal, setShowSuggestModal] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // `/suggest` renders over the passport so its timeline stays mounted.
+    const openSuggest = useCallback(() => {
+        navigate('/suggest', { state: { backgroundLocation: location } });
+    }, [navigate, location]);
     const timelineQueryRef = useRef('');
     const timelineRequestRef = useRef(0);
     const mapEventsRef = useRef(false);
@@ -1291,7 +1296,7 @@ export default function PassportPage() {
                                 }
                             />
                         }
-                        timelineActions={<AddPastEventControl onAdded={handlePastEventAdded} onOpenSubmitEvent={() => setShowSuggestModal(true)} />}
+                        timelineActions={<AddPastEventControl onAdded={handlePastEventAdded} onOpenSubmitEvent={openSuggest} />}
                         timelineItems={items}
                         timelineMarkers={markers}
                         timelineHasMore={hasMore}
@@ -1302,9 +1307,6 @@ export default function PassportPage() {
                         onTimelineSearch={searchTimeline}
                     />
                 </>
-            )}
-            {showSuggestModal && (
-                <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
             )}
         </div>
     );

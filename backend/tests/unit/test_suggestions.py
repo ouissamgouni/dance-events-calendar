@@ -54,7 +54,15 @@ def _mock_session_with_suggestions(*suggestions):
 
     def mock_exec(stmt):
         result = MagicMock()
-        result.all.return_value = list(store.values())
+        # Only answer with suggestions when the statement actually selects
+        # them — the routes also query CachedEvent/EventSeriesMember.
+        try:
+            entity = stmt.column_descriptions[0]["entity"]
+        except Exception:
+            entity = None
+        result.all.return_value = (
+            list(store.values()) if entity is EventSuggestion else []
+        )
         result.first.return_value = None
         return result
 
@@ -178,6 +186,8 @@ class TestSubmitSuggestion:
                 return None
             if model is CachedEvent:
                 return None
+            if model is User:
+                return current_user
             return None
 
         def mock_exec(stmt):
@@ -250,6 +260,45 @@ class TestSubmitSuggestion:
             assert resp.status_code == 422
         finally:
             app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.mark.unit
+class TestSuggestionOccurrences:
+    def test_lists_every_date_approval_would_create(self):
+        suggestion = _make_suggestion(recurrence_rule="RRULE:FREQ=WEEKLY;COUNT=4")
+        mock_session = _mock_session_with_suggestions(suggestion)
+
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            resp = TestClient(app).get(
+                f"/api/admin/suggestions/{suggestion.id}/occurrences"
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["total"] == 4
+        assert [o["index"] for o in data["occurrences"]] == [0, 1, 2, 3]
+        # Nothing is materialised yet, so no occurrence claims an event id.
+        assert all(o["materialised"] is False for o in data["occurrences"])
+
+    def test_single_date_suggestion_has_one_occurrence(self):
+        suggestion = _make_suggestion()
+        mock_session = _mock_session_with_suggestions(suggestion)
+
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            resp = TestClient(app).get(
+                f"/api/admin/suggestions/{suggestion.id}/occurrences"
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["total"] == 1
 
 
 @pytest.mark.unit

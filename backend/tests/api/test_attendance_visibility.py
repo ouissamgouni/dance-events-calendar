@@ -9,6 +9,7 @@ These five tests pin the security/privacy invariants:
 """
 
 import os
+from datetime import datetime
 from uuid import uuid4
 
 import pytest
@@ -24,7 +25,12 @@ from backend.api.main import app  # noqa: E402
 from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.api.routes import tracking as tracking_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
-from backend.db.models import User, UserEventAttendance, UserSavedEvent  # noqa: E402
+from backend.db.models import (  # noqa: E402
+    EventSuggestion,
+    User,
+    UserEventAttendance,
+    UserSavedEvent,
+)
 
 
 @pytest.fixture
@@ -294,6 +300,36 @@ def test_track_event_attendance_persists_share_publicly(client, session):
     ).first()
     assert anon.user_id is None
     assert anon.share_publicly is False
+
+
+@pytest.mark.unit
+def test_un_rsvping_the_anchor_clears_the_series_going_intent(client, session):
+    """A recurring suggestion replays creator_going onto occurrences it
+    materialises later; removing Going from the anchor must stop that."""
+    alice = _make_user(session, "alice@example.com", "Alice")
+    event_id = "suggestion-anchor"
+    suggestion = EventSuggestion(
+        title="Salsa Tuesdays",
+        start=datetime(2026, 6, 16, 20, 0),
+        end=datetime(2026, 6, 16, 23, 0),
+        recurrence_rule="RRULE:FREQ=WEEKLY",
+        submitter_user_id=alice.id,
+        created_event_id=event_id,
+        creator_going=True,
+        creator_going_audience="friends",
+    )
+    session.add(suggestion)
+    session.commit()
+
+    _login(client, "alice@example.com", device_id="d-alice")
+    r = client.post(
+        "/api/track/event-attendance",
+        json={"event_id": event_id, "device_id": "d-alice", "action": "not_going"},
+    )
+    assert r.status_code == 201, r.text
+
+    session.expire_all()
+    assert session.get(EventSuggestion, suggestion.id).creator_going is False
 
 
 @pytest.mark.unit

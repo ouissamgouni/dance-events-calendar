@@ -426,6 +426,12 @@ export interface EventSuggestionCreate {
     start: string;
     end: string;
     all_day?: boolean;
+    /** RFC 5545 RRULE line (weekly/monthly/yearly). Mutually exclusive with
+     * `recurrence_dates`. */
+    recurrence_rule?: string | null;
+    /** Explicit occurrences for manually picked dates. Mutually exclusive with
+     * `recurrence_rule`. */
+    recurrence_dates?: { start: string; end: string }[] | null;
     submitter_name?: string;
     submitter_email?: string;
     suggested_tag_ids?: number[];

@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { EventSuggestion, CalendarSetting, Tag } from '../types';
-import { approveSuggestion, rejectSuggestion, syncSuggestionToGoogle } from '../api';
+import {
+    approveSuggestion,
+    fetchSuggestionOccurrences,
+    rejectSuggestion,
+    syncSuggestionToGoogle,
+    type SuggestionOccurrence,
+} from '../api';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 
 interface Props {
@@ -51,7 +57,24 @@ export default function SuggestionReviewModal({ suggestion, calendars, allTags =
     const [error, setError] = useState('');
     const [rejectMode, setRejectMode] = useState(false);
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
+    const [occurrences, setOccurrences] = useState<SuggestionOccurrence[]>([]);
     const tagsById = useMemo(() => new Map(allTags.map((t) => [t.id, t])), [allTags]);
+
+    useEffect(() => {
+        // Single-date suggestions have nothing extra to show, so the list is
+        // simply hidden when the expansion comes back with one occurrence.
+        let cancelled = false;
+        void fetchSuggestionOccurrences(suggestion.id)
+            .then((data) => {
+                if (!cancelled) setOccurrences(data.occurrences);
+            })
+            .catch(() => {
+                if (!cancelled) setOccurrences([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [suggestion.id]);
 
     const isPending = suggestion.status === 'pending';
     const isApproved = suggestion.status === 'approved';
@@ -194,6 +217,29 @@ export default function SuggestionReviewModal({ suggestion, calendars, allTags =
                                     </div>
                                     {suggestion.all_day && (
                                         <p className="text-[11px] text-ink-soft">All day event</p>
+                                    )}
+
+                                    {occurrences.length > 1 && (
+                                        <div>
+                                            <p className="text-[11px] uppercase tracking-wide text-muted mb-1">
+                                                Occurrences ({occurrences.length})
+                                            </p>
+                                            <ul className="max-h-40 overflow-y-auto border border-card-line divide-y divide-card-line">
+                                                {occurrences.map((o) => (
+                                                    <li
+                                                        key={o.index}
+                                                        className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs text-ink"
+                                                    >
+                                                        <span className="min-w-0 truncate">{fmtDate(o.start)}</span>
+                                                        {!o.materialised && (
+                                                            <span className="shrink-0 text-[11px] text-ink-soft">
+                                                                created on approval
+                                                            </span>
+                                                        )}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                     )}
 
                                     {price && <Field label="Price" value={price} />}

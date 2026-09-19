@@ -113,6 +113,7 @@ export default function EventDetailsPanel({
                     shareUrl={shareUrl}
                     onOpenTab={goToTab}
                     onPostMessage={() => goToTab('discussion')}
+                    onSeriesNavigate={() => onClose?.()}
                     showActions={false}
                 />
             </div>
