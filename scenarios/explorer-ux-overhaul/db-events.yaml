@@ -15,8 +15,8 @@
 #   • A handful of events all share the same day so day-grouping with
 #     count tail "(N)" can be eyeballed.
 #
-# All events are price-free and tagged with the default explorer tags
-# so the default landing (no tag filter applied) shows them all.
+# Events mix free and paid admission and use the default explorer tags so the
+# default landing (no tag filter applied) shows them all.
 base_week: 0
 emit_notifications: true
 events:

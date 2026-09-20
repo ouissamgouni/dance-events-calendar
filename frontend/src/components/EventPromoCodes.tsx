@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
     fetchEventPromoCodes,
-    submitEventPromoCode,
-    updateEventPromoCode,
     deleteEventPromoCode,
 } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -23,15 +21,6 @@ interface Props {
     refreshToken?: number;
 }
 
-interface FormState {
-    code: string;
-    description: string;
-    source_url: string;
-    expires_at: string; // yyyy-mm-dd
-}
-
-const emptyForm: FormState = { code: '', description: '', source_url: '', expires_at: '' };
-
 function formatExpiry(iso: string | null): string {
     if (!iso) return 'No expiry';
     try {
@@ -50,12 +39,9 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
     const [loaded, setLoaded] = useState(false);
     const [collapsed, setCollapsed] = useState(true);
     const [openPromoId, setOpenPromoId] = useState<string | null>(null);
-    const [showForm, setShowForm] = useState(false);
     const [showAddDialog, setShowAddDialog] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [form, setForm] = useState<FormState>(emptyForm);
+    const [editingPromo, setEditingPromo] = useState<PromoCode | null>(null);
     const [submitting, setSubmitting] = useState(false);
-    const [formError, setFormError] = useState<string | null>(null);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
     useEffect(() => {
@@ -80,62 +66,8 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
     const isAuthed = !!user;
 
     const openEdit = (promo: PromoCode) => {
-        setEditingId(promo.id);
-        setForm({
-            code: promo.code,
-            description: promo.description ?? '',
-            source_url: promo.source_url ?? '',
-            expires_at: promo.expires_at ? promo.expires_at.slice(0, 10) : '',
-        });
-        setShowForm(true);
+        setEditingPromo(promo);
         setOpenPromoId(null);
-        setFormError(null);
-    };
-
-    const resetForm = () => {
-        setShowForm(false);
-        setEditingId(null);
-        setForm(emptyForm);
-        setFormError(null);
-    };
-
-    const submit = async () => {
-        if (!form.code.trim()) {
-            setFormError('Code is required');
-            return;
-        }
-        if (form.source_url && !/^https?:\/\//i.test(form.source_url)) {
-            setFormError('Source URL must start with http:// or https://');
-            return;
-        }
-        setSubmitting(true);
-        setFormError(null);
-        try {
-            const body = {
-                code: form.code.trim(),
-                description: form.description.trim() || null,
-                source_url: form.source_url.trim() || null,
-                expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
-            };
-            const saved = editingId
-                ? await updateEventPromoCode(eventId, editingId, body)
-                : await submitEventPromoCode(eventId, body);
-            setCodes((prev) => {
-                const others = prev.filter((p) => p.id !== saved.id);
-                return [saved, ...others];
-            });
-            setToastMsg(
-                editingId
-                    ? 'Promo code updated — pending re-review.'
-                    : 'Promo code submitted — awaiting admin approval.',
-            );
-            resetForm();
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : 'Failed to save promo code';
-            setFormError(msg);
-        } finally {
-            setSubmitting(false);
-        }
     };
 
     const remove = async (promo: PromoCode) => {
@@ -148,7 +80,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
             setToastMsg('Promo code deleted.');
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : 'Failed to delete promo code';
-            setFormError(msg);
+            setToastMsg(msg);
         } finally {
             setSubmitting(false);
         }
@@ -170,68 +102,6 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
     const openPromo = openPromoId ? codes.find((p) => p.id === openPromoId) ?? null : null;
     const isOwnPromo = openPromo && user?.user_id === openPromo.submitter.user_id;
 
-    const promoForm = showForm ? (
-        <div className="border border-line bg-surface p-3 flex flex-col gap-2 rounded-md">
-            <div className="text-[11px] font-medium text-ink">
-                {editingId ? 'Edit promo code' : 'New promo code'}
-            </div>
-            <input
-                type="text"
-                placeholder="Code (e.g. SALSA20)"
-                aria-label="Promo code"
-                value={form.code}
-                maxLength={64}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                className="border border-line px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-blue-400"
-            />
-            <input
-                type="text"
-                placeholder="Short description (optional)"
-                aria-label="Description"
-                value={form.description}
-                maxLength={200}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
-            />
-            <input
-                type="url"
-                placeholder="Source URL (https://…) — optional"
-                aria-label="Source URL"
-                value={form.source_url}
-                maxLength={500}
-                onChange={(e) => setForm({ ...form, source_url: e.target.value })}
-                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
-            />
-            <label className="text-[10px] text-ink-soft flex items-center gap-2">
-                Expires
-                <input
-                    type="date"
-                    value={form.expires_at}
-                    onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                    className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
-                />
-            </label>
-            {formError && <div className="text-[10px] text-danger">{formError}</div>}
-            <div className="flex gap-2 pt-1">
-                <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={submit}
-                    className="text-[11px] bg-action text-white px-3 py-1 rounded hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Submit'}
-                </button>
-                <button
-                    type="button"
-                    onClick={resetForm}
-                    className="text-[11px] text-ink-soft hover:text-ink px-2"
-                >
-                    Cancel
-                </button>
-            </div>
-        </div>
-    ) : null;
-
     const toast = toastMsg ? (
         <div
             role="status"
@@ -242,10 +112,14 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
         </div>
     ) : null;
 
-    const addDialog = showAddDialog ? (
+    const promoDialog = showAddDialog || editingPromo ? (
         <EventPromoCodeDialog
             eventId={eventId}
-            onClose={() => setShowAddDialog(false)}
+            promo={editingPromo ?? undefined}
+            onClose={() => {
+                setShowAddDialog(false);
+                setEditingPromo(null);
+            }}
             onSubmitted={(saved) => {
                 setCodes((current) => [saved, ...current.filter((promo) => promo.id !== saved.id)]);
             }}
@@ -254,70 +128,78 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
 
     if (variant === 'rows') {
         return (
-            <div className="flex flex-col gap-2 text-sm" data-testid="promo-codes-section">
-                {codes.map((promo) => {
-                    const own = user?.user_id === promo.submitter.user_id;
-                    return (
-                        <div
-                            key={promo.id}
-                            className="flex items-center gap-3 rounded-md border border-line bg-surface px-3 py-2"
+            <section className="space-y-3 text-sm" data-testid="promo-codes-section">
+                <div className="flex min-h-10 items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-ink">Promo codes</h3>
+                    {isAuthed && (
+                        <button
+                            type="button"
+                            onClick={() => setShowAddDialog(true)}
+                            aria-label="Add promo code"
+                            className="shrink-0 text-xs font-medium text-action hover:underline"
                         >
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-mono text-sm font-semibold text-ink break-all">
-                                        {promo.code}
-                                    </span>
-                                    {promo.status === 'pending' && (
-                                        <span className="text-[9px] uppercase tracking-wide text-amber-700 bg-amber-50 px-1 rounded">
-                                            pending
-                                        </span>
-                                    )}
-                                </div>
-                                {promo.description && (
-                                    <div className="mt-0.5 text-xs text-ink-soft truncate">
-                                        {promo.description}
-                                    </div>
-                                )}
-                                <div className="mt-0.5 text-[11px] text-muted">
-                                    {formatExpiry(promo.expires_at)}
-                                </div>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                                {own && (
-                                    <button
-                                        type="button"
-                                        onClick={() => openEdit(promo)}
-                                        className="text-xs text-ink-soft hover:text-ink"
-                                    >
-                                        Edit
-                                    </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => copy(promo.code)}
-                                    className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-action hover:bg-blue-100"
-                                >
-                                    Copy
-                                </button>
-                            </div>
-                        </div>
-                    );
-                })}
+                            + Add promo code
+                        </button>
+                    )}
+                </div>
 
-                {isAuthed && !showForm && (
-                    <button
-                        type="button"
-                        onClick={() => setShowAddDialog(true)}
-                        className="self-start rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-ink-soft hover:text-action hover:border-blue-400"
-                    >
-                        + Add a promo code
-                    </button>
+                {codes.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {codes.map((promo) => {
+                            const own = user?.user_id === promo.submitter.user_id;
+                            return (
+                                <div
+                                    key={promo.id}
+                                    className="flex items-center gap-3 rounded-card border border-line bg-surface px-3 py-2"
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="break-all font-mono text-sm font-semibold text-ink">
+                                                {promo.code}
+                                            </span>
+                                            {promo.status === 'pending' && (
+                                                <span className="bg-amber-50 px-1 py-0 text-[9px] uppercase text-amber-700">
+                                                    pending
+                                                </span>
+                                            )}
+                                        </div>
+                                        {promo.description && (
+                                            <div className="mt-0.5 truncate text-xs text-ink-soft">
+                                                {promo.description}
+                                            </div>
+                                        )}
+                                        <div className="mt-0.5 text-[11px] text-muted">
+                                            {formatExpiry(promo.expires_at)}
+                                        </div>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        {own && (
+                                            <button
+                                                type="button"
+                                                onClick={() => openEdit(promo)}
+                                                className="text-xs text-ink-soft hover:text-ink"
+                                            >
+                                                Edit
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => copy(promo.code)}
+                                            aria-label={`Copy promo code ${promo.code}`}
+                                            className="rounded-field bg-blue-50 px-3 py-1 text-xs font-medium text-action hover:bg-blue-100"
+                                        >
+                                            Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 )}
 
-                {promoForm}
-                {addDialog}
+                {promoDialog}
                 {toast}
-            </div>
+            </section>
         );
     }
 
@@ -364,7 +246,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                                 )}
                             </button>
                         ))}
-                        {isAuthed && !showForm && (
+                        {isAuthed && (
                             <button
                                 type="button"
                                 onClick={() => setShowAddDialog(true)}
@@ -375,69 +257,6 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                         )}
                     </div>
 
-                    {showForm && (
-                        <div className="border border-line bg-surface p-3 flex flex-col gap-2">
-                            <div className="text-[11px] font-medium text-ink">
-                                {editingId ? 'Edit promo code' : 'New promo code'}
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Code (e.g. SALSA20)"
-                                aria-label="Promo code"
-                                value={form.code}
-                                maxLength={64}
-                                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                                className="border border-line px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-blue-400"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Short description (optional)"
-                                aria-label="Description"
-                                value={form.description}
-                                maxLength={200}
-                                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
-                            />
-                            <input
-                                type="url"
-                                placeholder="Source URL (https://…) — optional"
-                                aria-label="Source URL"
-                                value={form.source_url}
-                                maxLength={500}
-                                onChange={(e) => setForm({ ...form, source_url: e.target.value })}
-                                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
-                            />
-                            <label className="text-[10px] text-ink-soft flex items-center gap-2">
-                                Expires
-                                <input
-                                    type="date"
-                                    value={form.expires_at}
-                                    onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                                    className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
-                                />
-                            </label>
-                            {formError && (
-                                <div className="text-[10px] text-danger">{formError}</div>
-                            )}
-                            <div className="flex gap-2 pt-1">
-                                <button
-                                    type="button"
-                                    disabled={submitting}
-                                    onClick={submit}
-                                    className="text-[11px] bg-action text-white px-3 py-1 hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Submit'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={resetForm}
-                                    className="text-[11px] text-ink-soft hover:text-ink px-2"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -521,7 +340,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                 </div>
             )}
 
-            {addDialog}
+            {promoDialog}
 
             {toastMsg && (
                 <div

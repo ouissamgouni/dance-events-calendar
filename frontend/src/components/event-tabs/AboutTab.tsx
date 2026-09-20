@@ -14,7 +14,7 @@ interface Props {
     promoRefreshToken?: number;
 }
 
-function priceRange(event: CalendarEvent): string | null {
+export function priceRange(event: CalendarEvent): string | null {
     if (event.price_is_free) return 'Free';
     if (event.price_min == null || !event.price_currency) return null;
     const s = currencySymbol(event.price_currency);
@@ -52,25 +52,19 @@ export default function AboutTab({ event, promoRefreshToken }: Props) {
 
             <LinksRow event={event} />
 
-            {price ? (
-                <section id="discounts" className="scroll-mt-24 space-y-3">
-                    <h3 className="text-sm font-semibold text-ink">Price &amp; promo codes</h3>
-                    <div>
-                        <p className="text-lg font-bold text-ink">{price}</p>
-                        <p className="text-xs text-muted">Typical admission price</p>
-                    </div>
-                    <EventPromoCodes event={event} variant="rows" refreshToken={promoRefreshToken} />
+            {price && (
+                <section className="space-y-3">
+                    <h3 className="text-lg font-semibold text-ink">Price</h3>
+                    <dl className="flex items-center justify-between gap-4 border-y border-card-line py-3 text-sm">
+                        <dt className="text-ink-soft">Admission price</dt>
+                        <dd className="font-medium text-ink">{price}</dd>
+                    </dl>
                 </section>
-            ) : event.has_active_promo_codes ? (
-                <section id="discounts" className="scroll-mt-24 space-y-3">
-                    <h3 className="text-sm font-semibold text-ink">Promo codes</h3>
-                    <EventPromoCodes event={event} variant="rows" refreshToken={promoRefreshToken} />
-                </section>
-            ) : (
-                <div id="discounts" className="scroll-mt-24">
-                    <EventPromoCodes event={event} variant="rows" refreshToken={promoRefreshToken} />
-                </div>
             )}
+
+            <div id="discounts" className="scroll-mt-24">
+                <EventPromoCodes event={event} variant="rows" refreshToken={promoRefreshToken} />
+            </div>
         </div>
     );
 }

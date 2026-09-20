@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { submitEventPromoCode } from '../api';
+import { submitEventPromoCode, updateEventPromoCode } from '../api';
 import type { PromoCode } from '../types';
 import { useToast } from './Toast';
 import PromoCodeFields, {
@@ -12,6 +12,7 @@ import { btnPrimary, errorCls } from './suggest/formState';
 
 interface Props {
     eventId: string;
+    promo?: PromoCode;
     onClose: () => void;
     onSubmitted?: (promo: PromoCode) => void;
 }
@@ -23,9 +24,14 @@ const emptyValue: PromoCodeFormValue = {
     expiresAt: '',
 };
 
-export default function EventPromoCodeDialog({ eventId, onClose, onSubmitted }: Props) {
+export default function EventPromoCodeDialog({ eventId, promo, onClose, onSubmitted }: Props) {
     const toast = useToast();
-    const [value, setValue] = useState(emptyValue);
+    const [value, setValue] = useState<PromoCodeFormValue>(() => promo ? {
+        code: promo.code,
+        sourceUrl: promo.source_url ?? '',
+        description: promo.description ?? '',
+        expiresAt: promo.expires_at?.slice(0, 10) ?? '',
+    } : emptyValue);
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
@@ -53,15 +59,20 @@ export default function EventPromoCodeDialog({ eventId, onClose, onSubmitted }: 
         setSubmitting(true);
         setError(null);
         try {
-            const saved = await submitEventPromoCode(eventId, {
+            const body = {
                 code: value.code.trim(),
                 description: value.description.trim() || null,
                 source_url: value.sourceUrl.trim() || null,
                 expires_at: value.expiresAt ? new Date(value.expiresAt).toISOString() : null,
-            });
+            };
+            const saved = promo
+                ? await updateEventPromoCode(eventId, promo.id, body)
+                : await submitEventPromoCode(eventId, body);
             toast.push({
-                title: 'Promo code submitted',
-                message: 'It is awaiting admin approval.',
+                title: promo ? 'Promo code updated' : 'Promo code submitted',
+                message: promo
+                    ? 'Your changes are awaiting admin approval.'
+                    : 'It is awaiting admin approval.',
                 variant: 'success',
             });
             onSubmitted?.(saved);
@@ -89,7 +100,7 @@ export default function EventPromoCodeDialog({ eventId, onClose, onSubmitted }: 
             >
                 <header className="flex shrink-0 items-center gap-2 border-b border-card-line px-4 py-3">
                     <h2 id="event-promo-title" className="min-w-0 flex-1 text-base font-bold text-ink">
-                        Add promo code
+                        {promo ? 'Edit promo code' : 'Add promo code'}
                     </h2>
                     <button
                         type="button"
@@ -114,7 +125,9 @@ export default function EventPromoCodeDialog({ eventId, onClose, onSubmitted }: 
 
                 <footer className="shrink-0 border-t border-card-line bg-canvas px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3">
                     <button type="submit" disabled={submitting} className={btnPrimary}>
-                        {submitting ? 'Submitting…' : 'Submit promo code'}
+                        {submitting
+                            ? promo ? 'Saving…' : 'Submitting…'
+                            : promo ? 'Save changes' : 'Submit promo code'}
                     </button>
                 </footer>
             </form>
