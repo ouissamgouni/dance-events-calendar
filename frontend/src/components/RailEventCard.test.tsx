@@ -1,11 +1,19 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { FeatureFlagsProvider } from '../context/FeatureFlagsContext'
-import type { CalendarEvent } from '../types'
+import type { CalendarEvent, FriendMini } from '../types'
 import RailEventCard from './RailEventCard'
 
 vi.mock('./AttendeeAvatarStack', () => ({
-    default: ({ size }: { size?: string }) => <span data-testid="attendee-avatar-stack" data-size={size}>Attendees</span>,
+    default: ({ size, goingFriendsPreview }: { size?: string; goingFriendsPreview?: FriendMini[] }) => (
+        <span
+            data-testid="attendee-avatar-stack"
+            data-size={size}
+            data-going-friend-ids={goingFriendsPreview?.map((friend) => friend.user_id).join(',')}
+        >
+            Attendees
+        </span>
+    ),
 }))
 
 const event: CalendarEvent = {
@@ -82,5 +90,32 @@ describe('RailEventCard', () => {
         expect(button.parentElement).toHaveClass('w-[208px]', 'rounded-card')
         expect(screen.queryByTestId('rail-card-date-rail')).not.toBeInTheDocument()
         expect(screen.getByText(inlineDate)).toBeInTheDocument()
+    })
+
+    it('passes only going friends to the attendee avatar stack', () => {
+        render(
+            <FeatureFlagsProvider>
+                <RailEventCard
+                    event={{
+                        ...event,
+                        following_friends_preview: [
+                            { user_id: 'saved-only', display_name: 'Saved', avatar_url: null },
+                        ],
+                        friends_going_preview: [
+                            { user_id: 'going', display_name: 'Going', avatar_url: null },
+                        ],
+                    }}
+                    onClick={vi.fn()}
+                    variant="compact"
+                    dateRail
+                    followingBadgeEnabled
+                />
+            </FeatureFlagsProvider>,
+        )
+
+        expect(screen.getByTestId('attendee-avatar-stack')).toHaveAttribute(
+            'data-going-friend-ids',
+            'going',
+        )
     })
 })

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
 import EventSummary, { type EventDetailTab } from './EventSummary';
 import EventActions from './event-summary/EventActions';
+import EventPromoCodeDialog from './EventPromoCodeDialog';
 
 interface Props {
     event: CalendarEvent;
@@ -38,6 +39,7 @@ export default function EventDetailsPanel({
 }: Props) {
     const navigate = useNavigate();
     const [confirmRemove, setConfirmRemove] = useState(false);
+    const [showPromoDialog, setShowPromoDialog] = useState(false);
     const surfaceClassName = surface === 'card'
         ? 'rounded-card bg-surface shadow-2xl border border-line'
         : '';
@@ -117,7 +119,7 @@ export default function EventDetailsPanel({
                     showActions={false}
                 />
             </div>
-            <div className="border-t border-card-line bg-surface px-4 py-3 space-y-2">
+            <div className="space-y-3 border-t border-card-line bg-canvas px-4 py-4">
                 <div className="flex justify-end">
                     <Link
                         to={detailPath}
@@ -133,8 +135,15 @@ export default function EventDetailsPanel({
                     canReviewInline={isPast}
                     shareUrl={shareUrl}
                     onPostMessage={() => goToTab('discussion')}
+                    onAddPromoCode={() => setShowPromoDialog(true)}
                 />
             </div>
+            {showPromoDialog && (
+                <EventPromoCodeDialog
+                    eventId={event.event_id}
+                    onClose={() => setShowPromoDialog(false)}
+                />
+            )}
         </div>
     );
 }

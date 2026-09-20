@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { blockEvent, dismissDuplicateGroup, fetchAdminEvent, fetchEventDuplicateCandidates, keepDuplicateEvent, unblockEvent, updateEvent, fetchEventSeriesCandidates, splitSeriesMember, addEventsToSeries, fetchSeriesGroups } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
+import { useToast } from './Toast';
 import AdminEventDetailContent from './AdminEventDetailContent';
 import EventImageEditor from './EventImageEditor';
 import EventReviewsSection from './EventReviewsSection';
@@ -16,6 +18,7 @@ interface Props {
 }
 
 export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated }: Props) {
+    const toast = useToast();
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
@@ -256,6 +259,27 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
             titleCancelledRef.current = true;
             setTitleValue(event?.title ?? '');
             setEditingTitle(false);
+        }
+    };
+
+    const handleShareReviewLink = async () => {
+        if (!event) return;
+        const reviewUrl = `${window.location.origin}/event/${event.event_id}/review`;
+        try {
+            if (typeof navigator.share === 'function') {
+                await navigator.share({
+                    title: `Review ${event.title}`,
+                    text: `Share your experience at ${event.title}`,
+                    url: reviewUrl,
+                });
+                return;
+            }
+            await navigator.clipboard.writeText(reviewUrl);
+            toast.push({ title: 'Review link copied', variant: 'success', duration: 2000 });
+        } catch (error) {
+            if ((error as DOMException)?.name !== 'AbortError') {
+                toast.push({ title: 'Could not share review link', variant: 'error' });
+            }
         }
     };
 
@@ -546,7 +570,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                 {/* Footer */}
                 {event && (
                     <div className="shrink-0 border-t border-line bg-canvas px-5 py-2.5 flex flex-col gap-2">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                             <Link
                                 to={`/event/${event.event_id}`}
                                 target="_blank"
@@ -555,6 +579,18 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                             >
                                 See full details ↗
                             </Link>
+                            <button
+                                type="button"
+                                onClick={handleShareReviewLink}
+                                disabled={new Date(event.end).getTime() >= Date.now()}
+                                className="inline-flex items-center gap-1.5 border border-line bg-surface px-2 py-1 text-xs text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                Share review link
+                            </button>
+                            {new Date(event.end).getTime() >= Date.now() && (
+                                <span className="text-[10px] text-muted">Available after the event ends</span>
+                            )}
                         </div>
                         {/* Admin visibility actions */}
                         {event.is_blocked ? (

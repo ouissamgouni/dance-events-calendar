@@ -247,6 +247,29 @@ def test_events_by_ids_includes_going_friend_signal(client, world):
     ]
 
 
+def test_normal_event_list_separates_saved_from_going_friend_preview(
+    client, session, world
+):
+    session.add(SiteSetting(key="following_badge_enabled", value="true"))
+    session.commit()
+    _login(client, "alice@example.com")
+
+    r = client.get("/api/events")
+
+    assert r.status_code == 200
+    events = {event["event_id"]: event for event in r.json()}
+    bob = {
+        "user_id": str(world["bob"].id),
+        "handle": "bob",
+        "display_name": "Bob",
+        "avatar_url": None,
+    }
+    assert events["evt-going"]["following_friends_preview"] == [bob]
+    assert events["evt-going"]["friends_going_preview"] == [bob]
+    assert events["evt-saved"]["following_friends_preview"] == [bob]
+    assert events["evt-saved"]["friends_going_preview"] == []
+
+
 def test_friends_saved_returns_only_friend_saves(client, world):
     _login(client, "alice@example.com")
     r = client.get(

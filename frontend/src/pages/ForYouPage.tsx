@@ -438,26 +438,6 @@ export default function ForYouPage() {
                             unseenStateEnabled={unseenStateEnabled}
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
-                        {pendingReviews.length > 0 && (
-                            <section data-testid="for-you-share-your-experience">
-                                <SectionHeading title="Share your experience" />
-                                <div ref={shareScrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Share your experience">
-                                    {pendingReviews.map((review) => (
-                                        <ShareExperienceCard
-                                            key={review.event_id}
-                                            review={review}
-                                            onReviewed={handleReviewed}
-                                        />
-                                    ))}
-                                </div>
-                                <ScrollDotsIndicator
-                                    count={shareDots.dotCount}
-                                    activeIndex={shareDots.activeIndex}
-                                    onSelect={shareDots.scrollToIndex}
-                                    label="Share your experience scroll position"
-                                />
-                            </section>
-                        )}
                         <LensTrail
                             title="New"
                             testId="for-you-new"
@@ -479,6 +459,26 @@ export default function ForYouPage() {
                             unseenStateEnabled={unseenStateEnabled}
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
+                        {pendingReviews.length > 0 && (
+                            <section data-testid="for-you-share-your-experience">
+                                <SectionHeading title="Share your experience" />
+                                <div ref={shareScrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Share your experience">
+                                    {pendingReviews.map((review) => (
+                                        <ShareExperienceCard
+                                            key={review.event_id}
+                                            review={review}
+                                            onReviewed={handleReviewed}
+                                        />
+                                    ))}
+                                </div>
+                                <ScrollDotsIndicator
+                                    count={shareDots.dotCount}
+                                    activeIndex={shareDots.activeIndex}
+                                    onSelect={shareDots.scrollToIndex}
+                                    label="Share your experience scroll position"
+                                />
+                            </section>
+                        )}
                         <PeopleYouMayKnowCard variant="trail" />
                     </div>
                 )}

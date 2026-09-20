@@ -19,7 +19,7 @@ interface Props {
      * from the rest of the going set; the rest of the slots are filled
      * with public attendees deduplicated against the friends.
      */
-    friendsPreview?: FriendMini[];
+    goingFriendsPreview?: FriendMini[];
     /** Visual density. `md` (default) matches the explorer list; `sm`
      * is the compact variant used by Home-page rails; `lg` is the large
      * face-first variant used by the Tribe event card. */
@@ -183,14 +183,14 @@ function namesGoingSentence(names: string[], totalGoing: number, viewerGoing: bo
 /**
  * Compact avatar preview for event-card rows. Shows *who* (faces +
  * overflow), not *how many* — the count lives next to the going CTA
- * icon to avoid duplication. When ``friendsPreview`` is supplied,
+ * icon to avoid duplication. When ``goingFriendsPreview`` is supplied,
  * friends are rendered first with a blue ring; the rest of the slots
  * are filled with public attendees (deduplicated against friends).
  *
  * Anonymous viewers see only aggregate social proof, with identities
  * gated behind sign-in.
  */
-export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, size = 'md', hideIfOnlyCurrentUser = false, layout = 'inline' }: Props) {
+export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPreview, size = 'md', hideIfOnlyCurrentUser = false, layout = 'inline' }: Props) {
     const { user } = useAuth();
     const { isAttending } = useAttendingEvents();
     const { eventCardShowPeopleIconEnabled } = useOptionalFeatureFlags();
@@ -199,7 +199,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, 
     const styles = SIZE_STYLES[size];
     const viewerGoing = isAttending(eventId);
 
-    const friends = friendsPreview ?? [];
+    const friends = goingFriendsPreview ?? [];
     const friendIds = new Set(friends.map((f) => f.user_id));
     const previewAttendees: Attendee[] = summary?.preview_attendees ?? [];
     const others = previewAttendees.filter((a) => !friendIds.has(a.user_id));

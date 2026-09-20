@@ -1,9 +1,9 @@
 test_plan:
   name: "Following Badge — at-a-glance friends signal (Track 1)"
   description: >
-    Verify the new "Following" badge — a small avatar/dot on event cards
-    and map pins indicating that at least one user you follow (mutually)
-    is going or saved this event. The badge is the at-a-glance
+    Verify the new "Following" signal — going friends lead event-card
+    avatar stacks, while map pins indicate that at least one mutual friend
+    is going or saved this event. The signal is the at-a-glance
     complement to the explorer interest filter chip
     (?interest_source=friends): the chip is "show me ONLY those events",
     the badge is "I can still see all events, but the ones with friend
@@ -46,15 +46,15 @@ test_plan:
         rose Following chip + separate attendance avatars row).
 
     - id: 2
-      title: "Saved-only friends also lead the avatar track"
+      title: "Saved-only friends do not enter the going avatar track"
       description: >
         Still as Bob, locate evt-fb-002 (Bachata Workshop) in the list.
       expected: >
-        Alice's avatar appears with the same blue ring at the head of
-        the avatar track. Proves both going AND saved signals from
-        mutuals feed `following_friends_preview` and surface in the
-        unified track (server-side `_following_friend_signals` dedup
-        per user across the two signals).
+        Alice's avatar does not appear in the card's going avatar track,
+        because she saved the event but did not RSVP. The event still
+        exposes its saved count, and `following_friends_preview` retains
+        Alice for the broader map-pin signal, while
+        `friends_going_preview` remains empty.
 
     - id: 3
       title: "One-way follower attendance does NOT promote into the friend slot"
@@ -100,9 +100,9 @@ test_plan:
         `following_badge_enabled: false`. On the cards, Alice's
         avatar loses its blue ring and the PeopleIcon prefix on the
         track disappears (the server still includes
-        `following_friends_preview` in the response, but the frontend
-        only passes it into `AttendeeAvatarStack` when the flag is
-        ON). Generic attendee avatars continue to render as before.
+        `friends_going_preview` in the response, but the frontend only
+        passes it into `AttendeeAvatarStack` when the flag is ON).
+        Generic attendee avatars continue to render as before.
         The legacy "Friends → Interested" filter chip still works
         (separate feature, not gated by this toggle). Re-enable the
         toggle and the blue ring + PeopleIcon return on next reload.
@@ -122,17 +122,13 @@ test_plan:
         corners (no border-radius), matching the frontend square-
         corner rule. The pins for evt-fb-003 (one-way Carol) and
         evt-fb-004 (stranger) render the standard colored disc with
-        no chip. Clicking either decorated pin opens the popup which
-        renders an `AttendeeAvatarStack` (the same compact
-        avatars-and-overflow component used on event cards) above
-        the tag row — Alice's avatar appears first with a blue ring
-        and a small inline PeopleIcon prefix flagging the friend
-        signal. No standalone "<N> friend interested" text line is
-        rendered; the avatar stack is the single affordance for the
-        social signal in the popup. Proves the map and the card
-        consume the same `following_friend_count` /
-        `following_friends_preview` signals and that the popup body
-        is now unified with the card design.
+        no chip. Opening evt-fb-001's popup renders an
+        `AttendeeAvatarStack` above the tag row with Alice's avatar,
+        a blue ring, and the PeopleIcon prefix. Opening saved-only
+        evt-fb-002 renders no going avatar stack, despite retaining the
+        broader map-pin chip. Proves map indicators may represent going
+        or saved interest while card and popup avatar stacks consume only
+        `friends_going_preview` and always agree with their going wording.
 
     - id: 8
       title: "Hero event aggregates 5 friends + 6 followed-not-friends = 11"
@@ -146,7 +142,7 @@ test_plan:
         toward the chip number, and the 10 strangers + 10 stranger
         saves never count). The card's avatar stack shows 5 avatars
         with blue rings (alice, emma, frank, gina, hugo — the
-        going-friends populate `following_friends_preview` first),
+        going-friends populate `friends_going_preview`),
         a PeopleIcon prefix, and a "+N more" suffix that accounts
         for the remaining public attendees. Opening the map popup
         renders the same `AttendeeAvatarStack` (5 blue-ringed friend

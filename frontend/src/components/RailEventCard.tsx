@@ -145,7 +145,7 @@ export default function RailEventCard({
                         <AttendeeAvatarStack
                             eventId={event.event_id}
                             size="md"
-                            friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                            goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
                             hideIfOnlyCurrentUser={hideIfOnlyCurrentUser}
                         />
                         {actions && (
@@ -239,7 +239,7 @@ export default function RailEventCard({
                             <AttendeeAvatarStack
                                 eventId={event.event_id}
                                 size="md"
-                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                                goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
                                 hideIfOnlyCurrentUser={hideIfOnlyCurrentUser}
                             />
                         </div>

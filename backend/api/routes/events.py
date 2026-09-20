@@ -808,8 +808,9 @@ def get_events(
     if (
         event_ids
         and current_user is not None
-        and interest_source == "friends"
-        and interest_kind == "going"
+        and (
+            following_on or (interest_source == "friends" and interest_kind == "going")
+        )
     ):
         friends_going_counts, friends_going_previews = _following_friend_signals(
             session, current_user, event_ids, include_saved=False

@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react';
 import type { CalendarEvent } from '../../types';
 import { useAttendanceSummary } from '../../context/AttendanceSummariesContext';
 import AttendeeAvatarStack from '../AttendeeAvatarStack';
@@ -38,12 +39,15 @@ export default function PeopleProofRow({ event, postsCount, onOpenPeople, onOpen
                     onClick={onOpenPeople}
                     className="min-w-0 flex-1 space-y-2 text-left hover:text-action"
                 >
-                    <span className="block text-sm font-semibold leading-5 text-ink-soft">People going</span>
+                    <span className="flex items-center justify-between gap-2 text-sm font-semibold leading-5 text-ink-soft">
+                        People going
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                    </span>
                     <span className="flex items-center gap-2 text-xs text-ink-soft">
                         <AttendeeAvatarStack
                             eventId={event.event_id}
                             max={3}
-                            friendsPreview={event.friends_going_preview}
+                            goingFriendsPreview={event.friends_going_preview}
                             size="lg"
                             layout="faces"
                             hideIfOnlyCurrentUser

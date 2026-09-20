@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import { currencySymbol } from '../utils/currency';
 import { fetchEventMessages } from '../api';
@@ -142,11 +143,15 @@ export default function EventSummary({
             {/* About preview — the whole entry opens Details; "…more" only
                 appears when the three-line preview actually overflows. */}
             {event.description && (
-                <div className="space-y-1">
-                    <p className="text-sm font-semibold text-ink">About</p>
+                <div className="relative space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-ink">About</p>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                    </div>
                     <ExpandableDescription
                         text={event.description}
-                        clampClass="line-clamp-3"
+                        maxLines={3}
+                        moreBackgroundClassName={variant === 'modal' ? 'bg-surface' : 'bg-canvas'}
                         onOpen={() => onOpenTab('about')}
                     />
                 </div>

@@ -304,7 +304,7 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
             {!minimalPopup && followingCount > 0 && (
                 <AttendeeAvatarStack
                     eventId={event.event_id}
-                    friendsPreview={showFollowingOverlay ? event.following_friends_preview : undefined}
+                    goingFriendsPreview={showFollowingOverlay ? event.friends_going_preview : undefined}
                 />
             )}
             {!minimalPopup && event.tags?.length > 0 && (
