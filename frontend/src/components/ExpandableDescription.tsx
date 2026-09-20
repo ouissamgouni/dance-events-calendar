@@ -5,6 +5,10 @@ interface Props {
     compact?: boolean;
     /** Tailwind line-clamp class. Defaults to line-clamp-6. */
     clampClass?: string;
+    /** Numeric line limit used when a generated Tailwind class is unavailable. */
+    maxLines?: number;
+    /** Background applied behind the inline more control. */
+    moreBackgroundClassName?: string;
     /** When set, the whole preview opens another view instead of expanding inline. */
     onOpen?: () => void;
 }
@@ -18,6 +22,8 @@ export default function ExpandableDescription({
     text,
     compact = false,
     clampClass = 'line-clamp-6',
+    maxLines,
+    moreBackgroundClassName = 'bg-surface',
     onOpen,
 }: Props) {
     const [expanded, setExpanded] = useState(false);
@@ -45,7 +51,13 @@ export default function ExpandableDescription({
     const description = (
         <div
             ref={ref}
-            className={`whitespace-pre-line leading-relaxed text-ink-soft ${compact ? 'text-xs' : 'text-sm'} ${expanded ? '' : clampClass}`}
+            className={`whitespace-pre-line leading-relaxed text-ink-soft ${compact ? 'text-xs' : 'text-sm'} ${expanded || maxLines != null ? '' : clampClass}`}
+            style={!expanded && maxLines != null ? {
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: maxLines,
+                overflow: 'hidden',
+            } : undefined}
         >
             {text}
         </div>
@@ -66,14 +78,25 @@ export default function ExpandableDescription({
 
     return (
         <div>
-            {description}
-            {(overflowing || expanded) && (
+            <div className="relative">
+                {description}
+                {overflowing && !expanded && (
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
+                        className={`absolute bottom-0 right-0 pl-1 text-xs font-medium text-action hover:underline ${moreBackgroundClassName}`}
+                    >
+                        …more
+                    </button>
+                )}
+            </div>
+            {expanded && (
                 <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
-                    className="mt-1 text-xs font-medium text-rose-500 hover:text-rose-700 transition"
+                    onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
+                    className="mt-1 text-xs font-medium text-action hover:underline"
                 >
-                    {expanded ? 'Show less' : 'Show more'}
+                    Show less
                 </button>
             )}
         </div>
