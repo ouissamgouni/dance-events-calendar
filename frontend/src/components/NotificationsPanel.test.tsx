@@ -141,7 +141,7 @@ describe('NotificationsPanel (event reminders)', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('renders the milestone unlocked row copy and routes to the passport on click', async () => {
+  it('renders a grouped milestone row and routes to the passport on click', async () => {
     server.use(
       http.get('*/api/notifications', () =>
         HttpResponse.json({
@@ -154,6 +154,18 @@ describe('NotificationsPanel (event reminders)', () => {
               event_start: null,
               context: 'City Hopper',
               subject_key: 'cities_10',
+              milestones: [
+                {
+                  subject_key: 'cities_10',
+                  name: 'City Hopper',
+                  description: 'Attended events in 10 cities',
+                },
+                {
+                  subject_key: 'countries_3',
+                  name: 'Border Crosser',
+                  description: 'Attended events in 3 countries',
+                },
+              ],
               actor: {
                 handle: 'alice',
                 display_name: 'Alice',
@@ -181,10 +193,10 @@ describe('NotificationsPanel (event reminders)', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByText(/milestone unlocked/i)).toBeInTheDocument()
-    expect(screen.getByText(/city hopper/i)).toBeInTheDocument()
+    expect(await screen.findByText(/you unlocked 2 milestones/i)).toBeInTheDocument()
+    expect(screen.getByText(/city hopper, border crosser/i)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /milestone unlocked/i }))
+    await user.click(screen.getByRole('button', { name: /you unlocked 2 milestones/i }))
 
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/mine/passport'))
     expect(onClose).toHaveBeenCalled()

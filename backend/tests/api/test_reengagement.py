@@ -965,6 +965,74 @@ def test_activity_digest_batches_into_one_email(session, monkeypatch):
     assert len(calls[0][1]) == 2  # both notifications in one digest
 
 
+def test_activity_digest_groups_friend_milestone_batch(session, monkeypatch):
+    email_entries: list[str] = []
+    push_calls: list[dict] = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda _recipient, sections, **_: (
+            email_entries.extend(
+                entry["primary_html"]
+                for section in sections
+                for entry in section["entries"]
+            )
+            or True
+        ),
+    )
+    monkeypatch.setattr(
+        activity_email,
+        "send_push",
+        lambda *a, **k: push_calls.append(k) or 1,
+    )
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    alice = _make_user(session, "alice@example.com", "alice")
+    old = datetime.utcnow() - timedelta(minutes=5)
+    rows = (
+        Notification(
+            recipient_user_id=bob.id,
+            actor_user_id=alice.id,
+            kind="subscription_milestone",
+            subject_key="first_event",
+            group_key="friend-batch",
+            context="First Steps",
+            created_at=old,
+        ),
+        Notification(
+            recipient_user_id=bob.id,
+            actor_user_id=alice.id,
+            kind="subscription_milestone",
+            subject_key="events_5",
+            group_key="friend-batch",
+            context="Regular",
+            created_at=old + timedelta(seconds=1),
+        ),
+    )
+    session.add_all(rows)
+    session.commit()
+
+    stats = activity_email.run_once(
+        force=True,
+        kinds=("subscription_milestone",),
+        max_notifications_per_user=1,
+    )
+
+    assert stats["digests"] == 1
+    assert len(email_entries) == 1
+    assert "2 milestones" in email_entries[0]
+    assert "First Steps" in email_entries[0]
+    assert "Regular" in email_entries[0]
+    assert len(push_calls) == 1
+    assert "2 milestones" in push_calls[0]["body"]
+    assert "First Steps" in push_calls[0]["body"]
+    assert "Regular" in push_calls[0]["body"]
+    for row in rows:
+        session.refresh(row)
+        assert row.emailed_at is not None
+        assert row.pushed_at is not None
+
+
 def test_activity_digest_drops_past_event_but_stamps_it(session, monkeypatch):
     """Past-event guard: a ``subscription_going`` notice whose event has
     already ended is excluded from the digest email while the future one is

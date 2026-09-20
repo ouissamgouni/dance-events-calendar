@@ -26,13 +26,29 @@ describe('ViewSwitcher', () => {
         expect(onSelect).toHaveBeenCalledWith('calendar');
     });
 
+    it('shows destination labels by default', () => {
+        render(<ViewSwitcher currentView="list" onSelect={vi.fn()} />);
+
+        expect(screen.getByText('Map')).toBeVisible();
+        expect(screen.getByText('Calendar')).toBeVisible();
+    });
+
+    it('keeps labels desktop-only when mobile labels are disabled', () => {
+        render(<ViewSwitcher currentView="list" onSelect={vi.fn()} mobileLabelsEnabled={false} />);
+
+        expect(screen.getByText('Map')).toHaveClass('hidden', 'lg:inline');
+        expect(screen.getByTestId('view-switcher-map')).toHaveClass('w-11', 'lg:w-auto');
+    });
+
     it('renders the create (+) button only when onCreate is provided and fires it', async () => {
         const onCreate = vi.fn();
         const { rerender } = render(<ViewSwitcher currentView="map" onSelect={vi.fn()} />);
         expect(screen.queryByTestId('view-switcher-create')).toBeNull();
 
         rerender(<ViewSwitcher currentView="map" onSelect={vi.fn()} onCreate={onCreate} />);
-        await userEvent.click(screen.getByTestId('view-switcher-create'));
+    const createButton = screen.getByRole('button', { name: 'Add event' });
+    expect(createButton).toHaveTextContent('Add');
+    await userEvent.click(createButton);
         expect(onCreate).toHaveBeenCalledTimes(1);
     });
 });

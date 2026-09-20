@@ -245,7 +245,7 @@ function writeExplorerStateToSearchParams(
 
 export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerViewConfig }) {
     const { user, loading: authLoading } = useAuth();
-    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerViewControlLabelsEnabled } = useFeatureFlags();
     const mapFollowingBadgeOverlay = true;
     const mapTrendingOverlay = true;
     const location = useLocation();
@@ -685,12 +685,9 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     // this so their "New" affordances stay stable while the viewer is
     // still deciding whether to open a card.
 
-    // Map fullscreen toggle (mobile only — desktop layout already gives the
-    // map a tall column). The map container picks up ``fixed inset-0`` when
-    // active so users can scan markers without the URL bar / filters eating
-    // screen height. Initialised from ``?view=map`` so a shared / reloaded
-    // link opens straight into the fullscreen map.
-    const [mapFullscreen, setMapFullscreen] = useState(() => searchParams.get('view') === 'map');
+    // The URL is the source of truth for map-only mode so shared links and
+    // browser history restore the same view instead of stale local state.
+    const mapFullscreen = viewMode === 'explorer' && searchParams.get('view') === 'map';
 
     const activeView: ExploreView = viewMode === 'calendar'
         ? 'calendar'
@@ -701,14 +698,12 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         const nextParams = new URLSearchParams(searchParams);
         if (nextView === 'calendar') {
             nextParams.delete('view');
-            setMapFullscreen(false);
             navigate({ pathname: '/calendar', search: nextParams.toString() });
             return;
         }
         const openMap = nextView === 'map';
         if (openMap) nextParams.set('view', 'map');
         else nextParams.delete('view');
-        setMapFullscreen(openMap);
         navigate({ pathname: '/', search: nextParams.toString() });
     }, [navigate, searchParams]);
 
@@ -1776,7 +1771,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                             {/* Left column: mobile summary + desktop list. Hidden
                                 entirely on mobile (its only content is desktop-only)
                                 so it doesn't add an empty flex gap above the map column. */}
-                            <div className="hidden lg:order-1 lg:flex lg:w-[350px] lg:shrink-0 lg:flex-col lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                            <div className="hidden lg:order-1 lg:flex lg:w-[420px] lg:shrink-0 lg:flex-col lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
                                 {/* Event list: fills remaining height on desktop */}
                                 <div className="lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
                                     <div className="flex-1 min-h-0 overflow-hidden">
@@ -1865,7 +1860,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                             {isDesktop && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => setMapFullscreen((v) => !v)}
+                                                    onClick={() => handleSelectView(mapFullscreen ? 'list' : 'map')}
                                                     aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
                                                     title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
                                                     className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas shadow-sm transition"
@@ -2042,7 +2037,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 )}
             </main>
 
-            <ViewSwitcher currentView={activeView} onSelect={handleSelectView} mapPreviewVisible={mapFullscreen && !isDesktop && !!explorerPreviewEvent} previewOffsetPx={explorerPreviewHeight} onCreate={openSuggest} />
+            <ViewSwitcher currentView={activeView} onSelect={handleSelectView} mapPreviewVisible={mapFullscreen && !isDesktop && !!explorerPreviewEvent} previewOffsetPx={explorerPreviewHeight} onCreate={openSuggest} mobileLabelsEnabled={explorerViewControlLabelsEnabled} />
 
             {/* Overlay modal — calendar mode mobile + explorer (both breakpoints) */}
             {selectedEvent && (viewMode === 'explorer' || (viewMode === 'calendar' && !isDesktop)) && (

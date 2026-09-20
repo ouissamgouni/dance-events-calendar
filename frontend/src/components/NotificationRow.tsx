@@ -193,6 +193,10 @@ export default function NotificationRow({
         ? 'Someone'
         : item.actor.display_name || `@${item.actor.handle}`;
     const noEventSuffix = !hasEventSuffix(item);
+    const milestones = item.milestones ?? [];
+    const isMilestoneGroup =
+        (item.kind === 'milestone_unlocked' || item.kind === 'subscription_milestone')
+        && milestones.length > 1;
 
     // Variant style tokens.
     const mainCls = isPanel
@@ -284,7 +288,30 @@ export default function NotificationRow({
 
     let body: ReactNode;
 
-    if (item.kind === 'interest_event') {
+    if (isMilestoneGroup) {
+        body = (
+            <>
+                <p className={specialTitle}>
+                    {item.kind === 'milestone_unlocked' ? (
+                        <span className="text-ink-soft">
+                            You unlocked {milestones.length} milestones:
+                        </span>
+                    ) : (
+                        <>
+                            <span className="font-medium text-ink">{actorName}</span>{' '}
+                            <span className="text-ink-soft">
+                                unlocked {milestones.length} milestones:
+                            </span>
+                        </>
+                    )}
+                </p>
+                <p className={`${subLabelSize} text-ink mt-0.5`}>
+                    {milestones.map((milestone) => milestone.name).join(', ')}
+                </p>
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
+    } else if (item.kind === 'interest_event') {
         const label = item.context || 'your saved search';
         body = (
             <>

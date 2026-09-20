@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { fetchEvents, fetchInterestProfiles, fetchSettings, fetchTagGroups, type InterestProfile, type PreferredAreaPayload } from '../api';
 import { AREA_PRESETS, DEFAULT_AREA_BBOX } from '../constants/area';
 import Home from './Home';
@@ -45,6 +46,17 @@ function TestProviders({ children, initialEntries }: { children: React.ReactNode
                 </FeatureFlagsProvider>
             </AuthProvider>
         </MemoryRouter>
+    );
+}
+
+function LocationProbe() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    return (
+        <>
+            <output data-testid="location-probe">{`${location.pathname}${location.search}`}</output>
+            <button type="button" onClick={() => navigate(-1)}>Back</button>
+        </>
     );
 }
 
@@ -156,6 +168,33 @@ describe('Home — mobile map mount with applied area', () => {
             const map = screen.getByTestId('event-map');
             const initialArea = JSON.parse(map.getAttribute('data-initial-area') || 'null');
             expect(initialArea).toEqual(DEFAULT_AREA_BBOX);
+        });
+    });
+
+    it('opens Calendar from map view and restores map view through browser history', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestProviders initialEntries={['/?view=map']}>
+                <Home />
+                <LocationProbe />
+            </TestProviders>,
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Calendar view' }));
+
+        await waitFor(() => {
+            const location = screen.getByTestId('location-probe').textContent ?? '';
+            expect(location.startsWith('/calendar')).toBe(true);
+            expect(new URLSearchParams(location.split('?')[1]).has('view')).toBe(false);
+        });
+
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+
+        await waitFor(() => {
+            const location = screen.getByTestId('location-probe').textContent ?? '';
+            expect(new URLSearchParams(location.split('?')[1]).get('view')).toBe('map');
+            expect(screen.queryByTestId('view-switcher-map')).not.toBeInTheDocument();
+            expect(screen.getByTestId('view-switcher-list')).toBeInTheDocument();
         });
     });
 });

@@ -37,6 +37,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from backend.services.app_settings import get_interest_match_notifications_enabled
@@ -234,6 +235,19 @@ def _existing_notification_pairs(
     )
 
 
+def _is_event_dedupe_conflict(exc: IntegrityError) -> bool:
+    constraint_name = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+    if constraint_name == "uq_notification_dedupe":
+        return True
+    message = str(exc.orig)
+    return (
+        "uq_notification_dedupe" in message
+        or "UNIQUE constraint failed: notifications.recipient_user_id, "
+        "notifications.kind, notifications.actor_user_id, notifications.event_id"
+        in message
+    )
+
+
 def _scan_and_create(
     session: Session,
     since: datetime,
@@ -267,8 +281,14 @@ def _scan_and_create(
                 event_id=event_id,
                 context=context[:200],
             )
-            session.add(notif)
-            session.flush()
+            try:
+                with session.begin_nested():
+                    session.add(notif)
+                    session.flush()
+            except IntegrityError as exc:
+                if not _is_event_dedupe_conflict(exc):
+                    raise
+                continue
             record_delivery(session, notif.id, "app")
             created += 1
 

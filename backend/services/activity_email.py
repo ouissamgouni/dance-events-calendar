@@ -117,6 +117,7 @@ CHANNEL_FLAG: dict[tuple[str, str], str] = {
 # so it must skip these in the instant-email and push paths to avoid
 # double-sending.
 _DIGEST_ONLY_FEATURES = frozenset({"milestone_unlocked"})
+_MILESTONE_KINDS = frozenset({"milestone_unlocked", "subscription_milestone"})
 
 # Kinds whose event is inherently in the past (reviews) are exempt from the
 # digest past-event guard, mirroring ``skip_past_guard`` in notifications.py.
@@ -239,6 +240,7 @@ def _render_line(
     also_going: bool = False,
     subject_key: str | None = None,
     description: str | None = None,
+    milestone_names: list[str] | None = None,
 ) -> str:
     """Return an escaped HTML snippet describing one notification.
 
@@ -285,6 +287,12 @@ def _render_line(
     if kind == "subscription_review":
         return f"<strong>{who}</strong> shared their experience of {title}"
     if kind == "subscription_milestone":
+        if milestone_names and len(milestone_names) > 1:
+            names = ", ".join(escape(name) for name in milestone_names)
+            return (
+                f"<strong>{who}</strong> reached {len(milestone_names)} "
+                f"milestones: <strong>{names}</strong>"
+            )
         if context:
             return (
                 f"<strong>{who}</strong> reached a milestone: "
@@ -294,6 +302,9 @@ def _render_line(
     if kind == "subscription_suggested":
         return f"<strong>{who}</strong> suggested the event {title}"
     if kind == "milestone_unlocked":
+        if milestone_names and len(milestone_names) > 1:
+            names = ", ".join(escape(name) for name in milestone_names)
+            return f"\U0001f389 You unlocked {len(milestone_names)} milestones: {names}"
         name_text = escape(context) if context else "a new achievement"
         name = (
             f'<a href="{app}/mine/passport" '
@@ -331,6 +342,7 @@ def _render_plain(
     also_going: bool = False,
     subject_key: str | None = None,
     description: str | None = None,
+    milestone_names: list[str] | None = None,
 ) -> str:
     """Return a plain-text snippet describing one notification (for push)."""
     anon = kind == "subscription_review" and context == "anon"
@@ -347,12 +359,22 @@ def _render_plain(
     if kind == "subscription_review":
         return f"{who} shared their experience of {title}"
     if kind == "subscription_milestone":
+        if milestone_names and len(milestone_names) > 1:
+            return (
+                f"{who} reached {len(milestone_names)} milestones: "
+                f"{', '.join(milestone_names)}"
+            )
         if context:
             return f"{who} reached a milestone: {context}"
         return f"{who} reached a new milestone"
     if kind == "subscription_suggested":
         return f"{who} suggested the event {title}"
     if kind == "milestone_unlocked":
+        if milestone_names and len(milestone_names) > 1:
+            return (
+                f"You unlocked {len(milestone_names)} milestones: "
+                f"{', '.join(milestone_names)}"
+            )
         name = context or "a new achievement"
         return (
             f"You unlocked {name}"
@@ -387,6 +409,21 @@ def _push_tag_for(feature: str) -> str:
     return f"{feature.replace('_', '-')}-digest"
 
 
+def _logical_groups(notifications: list[Notification]) -> list[list[Notification]]:
+    groups: dict[tuple, list[Notification]] = {}
+    for notification in notifications:
+        if notification.kind in _MILESTONE_KINDS and notification.group_key:
+            key = (
+                notification.kind,
+                notification.actor_user_id,
+                notification.group_key,
+            )
+        else:
+            key = ("notification", notification.id)
+        groups.setdefault(key, []).append(notification)
+    return list(groups.values())
+
+
 def run_once(
     force: bool = False,
     user_ids: set | None = None,
@@ -414,7 +451,7 @@ def run_once(
     match) to act on a hand-picked set of users without disturbing
     everyone else's pending backlog.
 
-    ``max_notifications_per_user`` caps how many notifications per
+    ``max_notifications_per_user`` caps how many logical notifications per
     recipient are included in THIS run, applied independently per channel
     (the most recent N are kept for each of email/push). By default this
     cap only looks at PENDING rows (``emailed_at``/``pushed_at`` still
@@ -609,12 +646,14 @@ def run_once(
         def _apply_cap(by_recipient: dict) -> list[Notification]:
             included: list[Notification] = []
             for recipient_id, notifs in by_recipient.items():
+                logical_groups = _logical_groups(notifs)
                 if (
                     max_notifications_per_user is not None
-                    and len(notifs) > max_notifications_per_user
+                    and len(logical_groups) > max_notifications_per_user
                 ):
                     capped_recipient_ids.add(recipient_id)
-                    included.extend(notifs[-max_notifications_per_user:])
+                    for group in logical_groups[-max_notifications_per_user:]:
+                        included.extend(group)
                 else:
                     included.extend(notifs)
             return included
@@ -669,10 +708,12 @@ def run_once(
                 bits.append(event.location)
             return " · ".join(bits) if bits else None
 
-        def _build_entry(n: Notification) -> dict:
+        def _build_entry(group: list[Notification]) -> dict:
+            n = group[-1]
             actor = users.get(n.actor_user_id)
             event = events.get(n.event_id) if n.event_id else None
             anon = n.kind == "subscription_review" and n.context == "anon"
+            milestone_names = [item.context or "a new achievement" for item in group]
             return {
                 "kind": n.kind,
                 "primary_html": _render_line(
@@ -683,6 +724,7 @@ def run_once(
                     also_going=_also_going(n),
                     subject_key=n.subject_key,
                     description=n.description,
+                    milestone_names=milestone_names,
                 ),
                 "avatar_url": (
                     actor.avatar_url if actor is not None and not anon else None
@@ -694,7 +736,7 @@ def run_once(
                 ),
                 "subline": _card_subline(event),
                 "anon": anon,
-                "created_at": n.created_at,
+                "created_at": max(item.created_at for item in group),
             }
 
         def _send_combined_digests(groups: dict) -> int:
@@ -725,7 +767,10 @@ def run_once(
                     sections.append(
                         {
                             "feature": feature,
-                            "entries": [_build_entry(n) for n in visible],
+                            "entries": [
+                                _build_entry(group)
+                                for group in _logical_groups(visible)
+                            ],
                         }
                     )
                     delivered_ids.extend(n.id for n in visible)
@@ -773,17 +818,25 @@ def run_once(
                 ):
                     discover_more_count = len(visible) - max_events_per_interest_email
                     email_notifs = visible[:max_events_per_interest_email]
+                logical_groups = _logical_groups(email_notifs)
                 lines = [
                     _render_line(
-                        n.kind,
-                        users.get(n.actor_user_id),
-                        events.get(n.event_id) if n.event_id else None,
-                        n.context,
-                        also_going=_also_going(n),
-                        subject_key=n.subject_key,
-                        description=n.description,
+                        group[-1].kind,
+                        users.get(group[-1].actor_user_id),
+                        (
+                            events.get(group[-1].event_id)
+                            if group[-1].event_id
+                            else None
+                        ),
+                        group[-1].context,
+                        also_going=_also_going(group[-1]),
+                        subject_key=group[-1].subject_key,
+                        description=group[-1].description,
+                        milestone_names=[
+                            item.context or "a new achievement" for item in group
+                        ],
                     )
-                    for n in email_notifs
+                    for group in logical_groups
                 ]
                 suggestions = None
                 if feature == "social_activity":
@@ -824,14 +877,24 @@ def run_once(
             visible = [n for n in notifs if not _skip_past(n)]
             if not visible:
                 continue
+            logical_groups = _logical_groups(visible)
+            first_group = logical_groups[0]
+            first_notification = first_group[-1]
             first = _render_plain(
-                visible[0].kind,
-                users.get(visible[0].actor_user_id),
-                events.get(visible[0].event_id) if visible[0].event_id else None,
-                visible[0].context,
-                also_going=_also_going(visible[0]),
+                first_notification.kind,
+                users.get(first_notification.actor_user_id),
+                (
+                    events.get(first_notification.event_id)
+                    if first_notification.event_id
+                    else None
+                ),
+                first_notification.context,
+                also_going=_also_going(first_notification),
+                milestone_names=[
+                    item.context or "a new achievement" for item in first_group
+                ],
             )
-            extra = len(visible) - 1
+            extra = len(logical_groups) - 1
             body = first if extra <= 0 else f"{first} and {extra} more"
             title = "New match on Movida" if feature == "interest_matches" else "Movida"
             delivered = send_push(

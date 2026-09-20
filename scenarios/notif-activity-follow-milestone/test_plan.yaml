@@ -2,9 +2,9 @@ test_plan:
   name: "Friend milestones — activity notification"
   description: >
     When someone you follow reaches a Dance Passport milestone, followers
-    receive a `subscription_milestone` in-app row (plus push when
-    enabled) and the milestone folds into the batched activity digest
-    email. Fan-out is gated by the actor's `passport_visibility`:
+    receive grouped `subscription_milestone` activity in-app, by push, and
+    by email. Each milestone remains an atomic row, while milestones found
+    in one evaluation share a group_key. Fan-out is gated by the actor's `passport_visibility`:
     public notifies followers, private notifies nobody. Rows are deduped
     on the milestone key (`subject_key`).
 
@@ -15,11 +15,12 @@ test_plan:
       `SCENARIO=notif-activity-follow-milestone RESET=1 task start:scenario`
     - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
     - >-
-      Alice (public passport) and Mallory (private passport) each attend
-      one past event, enough to unlock the "First Steps" milestone.
+      Alice (public passport) attends five past events and unlocks "First
+      Steps" plus "Regular" together. Mallory (private passport) attends one
+      and unlocks "First Steps".
 
   cast:
-    - "Alice — actor, PUBLIC passport; unlocks First Steps."
+    - "Alice — actor, PUBLIC passport; unlocks First Steps + Regular."
     - "Mallory — actor, PRIVATE passport; unlocks First Steps."
     - "Bob — follows Alice; friend_milestones email + push ON."
     - "Carol — follows Mallory (private) → visibility-gate control."
@@ -40,8 +41,9 @@ test_plan:
       description: >
         `GET /api/notifications` as Bob.
       expected: >
-        Bob has one `subscription_milestone` row for Alice reading
-        "Alice reached a milestone: First Steps".
+        Bob has ONE visible `subscription_milestone` item saying Alice
+        unlocked 2 milestones and naming First Steps and Regular. Two atomic
+        rows share a non-null group_key and member_ids contains both IDs.
 
     - id: 3
       title: "Follower of a private passport is NOT notified"
@@ -63,8 +65,8 @@ test_plan:
       description: >
         Trigger a second dispatch tick.
       expected: >
-        Bob still has exactly one subscription_milestone row for the
-        First Steps key — the `subject_key` dedupe prevents duplicates.
+        Bob still has exactly two atomic subscription_milestone rows and one
+        visible grouped item. The `subject_key` dedupe prevents duplicates.
 
     - id: 6
       title: "Immediate push + instant email"
@@ -73,19 +75,29 @@ test_plan:
         enables friend_milestones INSTANT email mode. The plain dispatch
         tick from step 1 (no `--immediate-emails`) delivers both.
       expected: >
-        Bob's subscription_milestone row is pushed immediately
-        (pushed_at stamped) AND Bob receives an INSTANT email right away
-        (no schedule wait; instant_emailed_at stamped) containing "Alice
-        reached a milestone: First Steps".
+        Bob receives ONE push and ONE instant email, each saying Alice
+        unlocked 2 milestones and naming First Steps and Regular. Both raw
+        rows have pushed_at and instant_emailed_at stamped.
 
     - id: 7
       title: "Digest email on the scheduled/forced tick"
       description: >
+        In the admin Milestones settings, turn friend milestone Instant email
+        OFF and leave Digest ON. Then run
         `SCENARIO=notif-activity-follow-milestone task notify:trigger:scenario -- --immediate-emails`
         `--immediate-emails` passes `force=True` so the per-user digest
-        schedule is bypassed. Digest mode is still on (default) alongside
-        instant.
+        schedule is bypassed.
       expected: >
-        Bob receives a second, DIGEST email (emailed_at stamped)
-        containing "Alice reached a milestone: First Steps" — the digest
-        track is independent of the instant track.
+        Bob receives a DIGEST email containing one logical milestone item with
+        both names. Both raw rows have emailed_at stamped; enabling instant
+        suppresses digest delivery until instant is turned off.
+
+    - id: 8
+      title: "A later evaluation stays separate"
+      description: >
+        After Alice's first batch is delivered, add enough new past attendance
+        to cross another milestone threshold and trigger another tick.
+      expected: >
+        Bob sees a second in-app item with a different group_key. Marking one
+        item read updates all of its member IDs without changing the other
+        batch, and the later batch delivers separately by email and push.

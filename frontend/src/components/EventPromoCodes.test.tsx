@@ -87,6 +87,7 @@ describe('EventPromoCodes rows', () => {
         render(<EventPromoCodes event={event} variant="rows" />);
 
         expect(await screen.findByRole('heading', { name: 'Promo codes' })).toBeInTheDocument();
+        expect(screen.getByTestId('promo-codes-section')).toHaveClass('rounded-card', 'bg-surface', 'p-4');
         expect(screen.getByText('15% off pre-sale tickets')).toBeInTheDocument();
         expect(screen.getByText('SALSAFRIDAY')).toBeInTheDocument();
         expect(screen.getByText('No expiry')).toBeInTheDocument();

@@ -1,6 +1,6 @@
-# Two past events. Alice attends ev-past → unlocks the "First Steps"
-# milestone (threshold = 1 attended event). Mallory attends ev-past2 →
-# also unlocks "First Steps" but with a private passport.
+# Alice attends five past events, unlocking "First Steps" and "Regular" in
+# one evaluation. Mallory attends ev-past2, unlocking only "First Steps" with
+# a private passport.
 base_week: 0
 events:
   - id: ev-past
@@ -29,4 +29,52 @@ events:
     tags:
       - format:social
       - dance-style:bachata
+      - reach:local
+
+  - id: ev-alice-2
+    calendar_id: salsa-cal-001
+    title: Riverside Salsa Social
+    description: "Past event Alice attended."
+    location: "Lisbon, Portugal"
+    start: w-2 Wed 05:00
+    end: w-2 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-alice-3
+    calendar_id: salsa-cal-001
+    title: Old Town Salsa Social
+    description: "Past event Alice attended."
+    location: "Lisbon, Portugal"
+    start: w-3 Wed 05:00
+    end: w-3 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-alice-4
+    calendar_id: salsa-cal-001
+    title: Harbour Salsa Social
+    description: "Past event Alice attended."
+    location: "Lisbon, Portugal"
+    start: w-4 Wed 05:00
+    end: w-4 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-alice-5
+    calendar_id: salsa-cal-001
+    title: Garden Salsa Social
+    description: "Past event Alice attended."
+    location: "Lisbon, Portugal"
+    start: w-5 Wed 05:00
+    end: w-5 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
       - reach:local

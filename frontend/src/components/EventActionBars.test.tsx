@@ -50,10 +50,10 @@ describe('event action bar layout', () => {
             <EventActions {...commonProps} isPast={false} canReviewInline={false} />,
         );
 
-        expect(container.firstElementChild).toHaveClass('flex-nowrap', 'gap-1');
+        expect(container.firstElementChild).toHaveClass('min-w-0', 'flex-nowrap', 'gap-1');
         expect(screen.getByText('Save')).toHaveClass('hidden', 'min-[375px]:inline');
         const moreButton = screen.getByRole('button', { name: 'More actions' });
-        expect(moreButton).toHaveClass('w-9');
+        expect(moreButton).toHaveClass('h-9', 'w-9');
         expect(moreButton.parentElement).toHaveClass('ml-auto', 'shrink-0');
     });
 

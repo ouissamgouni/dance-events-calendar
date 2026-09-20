@@ -1,5 +1,5 @@
-# One past event. Alice attends ev-past → unlocks the "First Steps"
-# milestone (threshold = 1 attended event).
+# Five past events. Alice attends all five, unlocking "First Steps" and
+# "Regular" in the same milestone evaluation.
 base_week: 0
 events:
   - id: ev-past
@@ -11,6 +11,54 @@ events:
     longitude: -9.1394
     start: w-1 Wed 05:00
     end: w-1 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-past-2
+    calendar_id: salsa-cal-001
+    title: Riverside Salsa Social
+    description: "Past event Alice attended."
+    location: "Lisbon, Portugal"
+    start: w-2 Wed 05:00
+    end: w-2 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-past-3
+    calendar_id: salsa-cal-001
+    title: Old Town Salsa Social
+    description: "Past event Alice attended."
+    location: "Lisbon, Portugal"
+    start: w-3 Wed 05:00
+    end: w-3 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-past-4
+    calendar_id: salsa-cal-001
+    title: Harbour Salsa Social
+    description: "Past event Alice attended."
+    location: "Lisbon, Portugal"
+    start: w-4 Wed 05:00
+    end: w-4 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-past-5
+    calendar_id: salsa-cal-001
+    title: Garden Salsa Social
+    description: "Past event Alice attended."
+    location: "Lisbon, Portugal"
+    start: w-5 Wed 05:00
+    end: w-5 Wed 08:00
     tags:
       - format:social
       - dance-style:salsa

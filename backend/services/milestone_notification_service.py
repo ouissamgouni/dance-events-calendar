@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from uuid import uuid4
 
 from sqlmodel import Session, select
 
@@ -154,6 +155,7 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
             .where(Notification.kind == MILESTONE_UNLOCKED)
         ).all()
     }
+    group_key = uuid4().hex
     created = 0
     for key in unlocked_keys:
         milestone = passport.MILESTONES_BY_KEY.get(key)
@@ -166,6 +168,7 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
                 actor_user_id=user.id,  # self: no external actor
                 kind=MILESTONE_UNLOCKED,
                 subject_key=key,
+                group_key=group_key,
                 context=milestone.name,
                 description=milestone.achieved_description,
             )
@@ -181,6 +184,7 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
                 user,
                 key,
                 audience=getattr(user, "passport_visibility", "friends"),
+                group_key=group_key,
                 context=milestone.name,
                 description=milestone.achieved_description,
             )
@@ -190,11 +194,11 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
             and user.email_milestone_unlocked_enabled
             and notif.emailed_at is None
         ):
-            to_email.append((user, milestone))
+            to_email.append((user, notif.group_key, milestone))
         if user.push_milestone_unlocked_enabled and notif.pushed_at is None:
-            to_push.append((user.id, key, milestone))
+            to_push.append((user.id, notif.group_key, milestone))
     created += _create_consistency_notifications(
-        session, user, to_email, to_push, notif_ids
+        session, user, to_email, to_push, notif_ids, group_key
     )
     return created
 
@@ -219,7 +223,7 @@ def _consistency_milestone(subject_key, lvl):
 
 
 def _create_consistency_notifications(
-    session, user, to_email, to_push, notif_ids
+    session, user, to_email, to_push, notif_ids, group_key
 ) -> int:
     """Create in-app notifications for newly-reached recurring consistency
     levels, fan them out to the user's subscribers, and queue email/push like a
@@ -266,6 +270,7 @@ def _create_consistency_notifications(
                 actor_user_id=user.id,  # self: no external actor
                 kind=MILESTONE_UNLOCKED,
                 subject_key=subject_key,
+                group_key=group_key,
                 context=name,
                 description=description,
             )
@@ -278,6 +283,7 @@ def _create_consistency_notifications(
                 user,
                 subject_key,
                 audience=audience,
+                group_key=group_key,
                 context=name,
                 description=description,
             )
@@ -288,9 +294,9 @@ def _create_consistency_notifications(
             and user.email_milestone_unlocked_enabled
             and notif.emailed_at is None
         ):
-            to_email.append((user, milestone))
+            to_email.append((user, notif.group_key, milestone))
         if user.push_milestone_unlocked_enabled and notif.pushed_at is None:
-            to_push.append((user.id, subject_key, milestone))
+            to_push.append((user.id, notif.group_key, milestone))
     return created
 
 
@@ -302,14 +308,18 @@ def _dispatch_channels(to_email, to_push, notif_ids, session=None) -> tuple[int,
     are written on it; otherwise (scheduler path) a fresh engine session is
     opened so the main pass isn't held open during slow SMTP/webpush I/O.
     """
-    # Combine all milestones a user unlocked this pass into one email.
-    by_user: dict = {}
-    for user, milestone in to_email:
-        by_user.setdefault(user.id, (user, []))[1].append(milestone)
+
+    def _delivery_group(group_key, milestone_key):
+        return group_key or f"notification:{milestone_key}"
+
+    by_email_group: dict = {}
+    for user, group_key, milestone in to_email:
+        key = (user.id, _delivery_group(group_key, milestone.key))
+        by_email_group.setdefault(key, (user, []))[1].append(milestone)
 
     emailed = 0
     emailed_ids: list[int] = []
-    for user, milestones in by_user.values():
+    for user, milestones in by_email_group.values():
         if send_milestone_instant_email(user, milestones):
             emailed += len(milestones)
             for milestone in milestones:
@@ -317,21 +327,33 @@ def _dispatch_channels(to_email, to_push, notif_ids, session=None) -> tuple[int,
                 if nid is not None:
                     emailed_ids.append(nid)
 
+    by_push_group: dict = {}
+    for user_id, group_key, milestone in to_push:
+        key = (user_id, _delivery_group(group_key, milestone.key))
+        by_push_group.setdefault(key, (user_id, group_key, []))[2].append(milestone)
+
     pushed = 0
     pushed_ids: list[int] = []
-    for user_id, key, milestone in to_push:
+    for user_id, group_key, milestones in by_push_group.values():
+        names = ", ".join(milestone.name for milestone in milestones)
+        body = (
+            f"{milestones[0].icon} {milestones[0].name} — {milestones[0].description}"
+            if len(milestones) == 1
+            else f"You unlocked {len(milestones)} milestones: {names}"
+        )
         delivered = send_push(
             user_id,
             title="Milestone unlocked!",
-            body=f"{milestone.icon} {milestone.name} — {milestone.description}",
+            body=body,
             url="/mine/passport",
-            tag=f"milestone:{key}",
+            tag=f"milestone:{group_key or milestones[0].key}",
         )
         pushed += delivered
         if delivered:
-            nid = notif_ids.get((user_id, key))
-            if nid is not None:
-                pushed_ids.append(nid)
+            for milestone in milestones:
+                nid = notif_ids.get((user_id, milestone.key))
+                if nid is not None:
+                    pushed_ids.append(nid)
 
     if emailed_ids or pushed_ids:
         if session is not None:

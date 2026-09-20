@@ -22,6 +22,7 @@ from backend.api.schemas import (
     NotificationActor,
     NotificationItem,
     NotificationListResponse,
+    NotificationMilestoneSummary,
     UnreadCountResponse,
 )
 from backend.db.database import get_session
@@ -76,12 +77,26 @@ COLLAPSIBLE_KINDS = {
     "subscription_suggested",
     "subscription_review",
 }
+MILESTONE_KINDS = {"milestone_unlocked", "subscription_milestone"}
 # How many distinct actors to preview in an aggregated row.
 ACTOR_PREVIEW_CAP = 12
 # Upper bound of raw rows scanned per list request before aggregation. The
 # feed has no deep pagination, so a generous window keeps grouping correct
 # without a GROUP BY round-trip.
 AGGREGATION_WINDOW = 200
+
+
+def _aggregation_key(notification: Notification) -> tuple:
+    if notification.kind in COLLAPSIBLE_KINDS and notification.event_id is not None:
+        return ("__event__", notification.kind, notification.event_id)
+    if notification.kind in MILESTONE_KINDS and notification.group_key is not None:
+        return (
+            "__milestone__",
+            notification.kind,
+            notification.actor_user_id,
+            notification.group_key,
+        )
+    return ("__row__", notification.id)
 
 
 def _hydrate(
@@ -158,8 +173,7 @@ def _hydrate(
     order: list[tuple] = []
     groups: dict[tuple, dict] = {}
     for r in rows:
-        collapsible = r.kind in COLLAPSIBLE_KINDS and r.event_id is not None
-        key = (r.kind, r.event_id) if collapsible else ("__row__", r.id)
+        key = _aggregation_key(r)
         g = groups.get(key)
         if g is None:
             g = {
@@ -189,6 +203,11 @@ def _hydrate(
         group_read = (
             None if any(rd is None for rd in member_reads) else max(member_reads)
         )
+        milestone_members = (
+            sorted(g["members"], key=lambda member: (member.created_at, member.id))
+            if rep.kind in MILESTONE_KINDS
+            else []
+        )
         items.append(
             NotificationItem(
                 id=rep.id,
@@ -201,6 +220,15 @@ def _hydrate(
                 actors=preview,
                 actor_count=len(g["actor_ids"]),
                 member_ids=[m.id for m in g["members"]],
+                milestones=[
+                    NotificationMilestoneSummary(
+                        subject_key=member.subject_key,
+                        name=member.context or "a new achievement",
+                        description=member.description,
+                    )
+                    for member in milestone_members
+                    if member.subject_key is not None
+                ],
                 context=rep.context,
                 subject_key=rep.subject_key,
                 description=rep.description,
@@ -258,10 +286,15 @@ def list_notifications(
     grouped_total = len(aggregated) if len(rows) < AGGREGATION_WINDOW else int(total)
     page = aggregated[offset : offset + limit]
 
+    grouped_unread = (
+        sum(item.read_at is None for item in aggregated)
+        if len(rows) < AGGREGATION_WINDOW
+        else int(unread)
+    )
     return NotificationListResponse(
         items=page,
         total=grouped_total,
-        unread_count=int(unread),
+        unread_count=grouped_unread,
         limit=limit,
         offset=offset,
     )
@@ -272,12 +305,12 @@ def unread_count(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    n = session.exec(
-        select(func.count(Notification.id))
+    rows = session.exec(
+        select(Notification)
         .where(Notification.recipient_user_id == user.id)
         .where(Notification.read_at.is_(None))
-    ).one()
-    return UnreadCountResponse(count=int(n))
+    ).all()
+    return UnreadCountResponse(count=len({_aggregation_key(row) for row in rows}))
 
 
 @router.post("/{notification_id}/read", response_model=NotificationItem)
@@ -293,7 +326,16 @@ def mark_read(
     now = datetime.utcnow()
     # Collapsible rows render as one aggregated group, so marking the
     # representative read clears every sibling (same kind + event) too.
-    if row.kind in COLLAPSIBLE_KINDS and row.event_id is not None:
+    if row.kind in MILESTONE_KINDS and row.group_key is not None:
+        siblings = session.exec(
+            select(Notification)
+            .where(Notification.recipient_user_id == user.id)
+            .where(Notification.kind == row.kind)
+            .where(Notification.actor_user_id == row.actor_user_id)
+            .where(Notification.group_key == row.group_key)
+            .where(Notification.read_at.is_(None))
+        ).all()
+    elif row.kind in COLLAPSIBLE_KINDS and row.event_id is not None:
         siblings = session.exec(
             select(Notification)
             .where(Notification.recipient_user_id == user.id)

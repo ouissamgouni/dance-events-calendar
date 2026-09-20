@@ -765,6 +765,116 @@ def test_mark_read_clears_aggregated_group(client, session):
     assert unread == []
 
 
+def test_list_groups_personal_and_followed_milestone_batches(client, session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    rows = (
+        Notification(
+            recipient_user_id=bob.id,
+            actor_user_id=bob.id,
+            kind="milestone_unlocked",
+            subject_key="first_event",
+            group_key="personal-batch",
+            context="First Steps",
+            description="Attended your first event",
+        ),
+        Notification(
+            recipient_user_id=bob.id,
+            actor_user_id=bob.id,
+            kind="milestone_unlocked",
+            subject_key="events_5",
+            group_key="personal-batch",
+            context="Finding Your Rhythm",
+            description="Attended 5 events",
+        ),
+        Notification(
+            recipient_user_id=bob.id,
+            actor_user_id=alice.id,
+            kind="subscription_milestone",
+            subject_key="cities_3",
+            group_key="friend-batch",
+            context="City Explorer",
+            description="Danced in 3 cities",
+        ),
+        Notification(
+            recipient_user_id=bob.id,
+            actor_user_id=alice.id,
+            kind="subscription_milestone",
+            subject_key="countries_3",
+            group_key="friend-batch",
+            context="Border Crosser",
+            description="Danced in 3 countries",
+        ),
+    )
+    session.add_all(rows)
+    session.commit()
+
+    _login(client, "bob@example.com")
+    response = client.get("/api/notifications")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 2
+    assert data["unread_count"] == 2
+
+    by_kind = {item["kind"]: item for item in data["items"]}
+    assert [item["name"] for item in by_kind["milestone_unlocked"]["milestones"]] == [
+        "First Steps",
+        "Finding Your Rhythm",
+    ]
+    assert [
+        item["name"] for item in by_kind["subscription_milestone"]["milestones"]
+    ] == ["City Explorer", "Border Crosser"]
+    assert len(by_kind["milestone_unlocked"]["member_ids"]) == 2
+    assert len(by_kind["subscription_milestone"]["member_ids"]) == 2
+
+    unread_response = client.get("/api/notifications/unread-count")
+    assert unread_response.status_code == 200
+    assert unread_response.json() == {"count": 2}
+
+
+def test_mark_read_clears_only_selected_milestone_batch(client, session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    selected = Notification(
+        recipient_user_id=bob.id,
+        actor_user_id=alice.id,
+        kind="subscription_milestone",
+        subject_key="first_event",
+        group_key="batch-1",
+        context="First Steps",
+    )
+    sibling = Notification(
+        recipient_user_id=bob.id,
+        actor_user_id=alice.id,
+        kind="subscription_milestone",
+        subject_key="events_5",
+        group_key="batch-1",
+        context="Finding Your Rhythm",
+    )
+    later = Notification(
+        recipient_user_id=bob.id,
+        actor_user_id=alice.id,
+        kind="subscription_milestone",
+        subject_key="events_15",
+        group_key="batch-2",
+        context="Dance Regular",
+    )
+    session.add_all((selected, sibling, later))
+    session.commit()
+    session.refresh(selected)
+
+    _login(client, "bob@example.com")
+    response = client.post(f"/api/notifications/{selected.id}/read")
+    assert response.status_code == 200
+
+    session.refresh(selected)
+    session.refresh(sibling)
+    session.refresh(later)
+    assert selected.read_at is not None
+    assert sibling.read_at is not None
+    assert later.read_at is None
+
+
 # --- /api/social/me/subscribed-events ---------------------------------------
 
 
@@ -1349,7 +1459,16 @@ def test_fan_out_milestone_public_notifies_and_dedupes(session):
     bob = _make_user(session, "bob@example.com", "bob")
     _subscribe(session, bob, alice)
 
-    assert fan_out_milestone(session, alice, "first_event", audience="public") == 1
+    assert (
+        fan_out_milestone(
+            session,
+            alice,
+            "first_event",
+            audience="public",
+            group_key="milestone-batch-1",
+        )
+        == 1
+    )
     session.commit()
     row = session.exec(
         select(Notification).where(Notification.recipient_user_id == bob.id)
@@ -1357,6 +1476,7 @@ def test_fan_out_milestone_public_notifies_and_dedupes(session):
     assert row.kind == "subscription_milestone"
     assert row.event_id is None
     assert row.subject_key == "first_event"
+    assert row.group_key == "milestone-batch-1"
 
     # Same milestone key does not re-notify.
     assert fan_out_milestone(session, alice, "first_event", audience="public") == 0

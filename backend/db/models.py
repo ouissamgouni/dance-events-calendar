@@ -1488,13 +1488,34 @@ class Notification(SQLModel, table=True):
 
     __tablename__ = "notifications"
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_notification_dedupe",
             "recipient_user_id",
             "kind",
             "actor_user_id",
             "event_id",
+            unique=True,
+            postgresql_where=text("event_id IS NOT NULL"),
+            sqlite_where=text("event_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_notif_no_event",
+            "recipient_user_id",
+            "kind",
+            "actor_user_id",
+            unique=True,
+            postgresql_where=text("event_id IS NULL AND subject_key IS NULL"),
+            sqlite_where=text("event_id IS NULL AND subject_key IS NULL"),
+        ),
+        Index(
+            "uq_notif_subject",
+            "recipient_user_id",
+            "kind",
+            "actor_user_id",
             "subject_key",
-            name="uq_notification_dedupe",
+            unique=True,
+            postgresql_where=text("event_id IS NULL AND subject_key IS NOT NULL"),
+            sqlite_where=text("event_id IS NULL AND subject_key IS NOT NULL"),
         ),
     )
 
@@ -1537,11 +1558,10 @@ class Notification(SQLModel, table=True):
     # milestone's description here so front-end renderers can display rich
     # copy like "Milestone unlocked — {name} — {description}".
     description: Optional[str] = Field(default=None, max_length=255)
-    # Secondary dedupe discriminator for kinds whose actor is the recipient
-    # themselves and which carry no ``event_id`` (e.g. ``milestone_unlocked``
-    # stores the milestone key here). Part of ``uq_notification_dedupe`` so
-    # distinct milestones don't collide on the (recipient, kind, actor,
-    # event_id) tuple. NULL for kinds that don't need it.
+    group_key: Optional[str] = Field(default=None, max_length=64, index=True)
+    # Secondary dedupe discriminator for event-less kinds. A partial unique
+    # index includes this key for milestones while event-backed notifications
+    # are deduped independently of it.
     subject_key: Optional[str] = Field(default=None, max_length=64, index=True)
 
 

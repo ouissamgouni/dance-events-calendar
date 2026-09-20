@@ -117,8 +117,8 @@ export default function EventDetailsPanel({
                     showActions={false}
                 />
             </div>
-            <div className="border-t border-card-line bg-surface px-4 py-3 space-y-2">
-                <div className="flex justify-end">
+            <div className="border-t border-card-line bg-surface">
+                <div className="flex justify-end px-4 py-3">
                     <Link
                         to={detailPath}
                         onClick={() => onClose?.()}
@@ -127,13 +127,15 @@ export default function EventDetailsPanel({
                         See full details →
                     </Link>
                 </div>
-                <EventActions
-                    event={event}
-                    isPast={isPast}
-                    canReviewInline={isPast}
-                    shareUrl={shareUrl}
-                    onPostMessage={() => goToTab('discussion')}
-                />
+                <div className="border-t border-blue-100 bg-blue-50 px-4 py-3 shadow-[0_-2px_10px_rgba(15,23,42,0.06)]">
+                    <EventActions
+                        event={event}
+                        isPast={isPast}
+                        canReviewInline={isPast}
+                        shareUrl={shareUrl}
+                        onPostMessage={() => goToTab('discussion')}
+                    />
+                </div>
             </div>
         </div>
     );

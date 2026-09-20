@@ -1,6 +1,6 @@
-# Alice + Mallory each attend one past event → each unlocks the
-# "First Steps" milestone on the next milestone-service tick. No RSVP
-# fan-out needed here (events are past), so emit_notifications stays off.
+# Alice attends five past events and unlocks "First Steps" plus "Regular" in
+# one evaluation. Mallory attends one and unlocks "First Steps". No RSVP fan-out
+# is needed here (events are past), so emit_notifications stays off.
 emit_notifications: false
 attendances:
   - event_id: ev-past
@@ -9,5 +9,21 @@ attendances:
     share_audience: public
   - event_id: ev-past2
     email: mallory@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-alice-2
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-alice-3
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-alice-4
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-alice-5
+    email: alice@example.com
     share_publicly: true
     share_audience: public
