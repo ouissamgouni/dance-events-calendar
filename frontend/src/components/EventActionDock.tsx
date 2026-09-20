@@ -6,7 +6,6 @@ import SaveEventButton from './SaveEventButton';
 import ShareButton from './ShareButton';
 import RateEventButton from './RateEventButton';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import { useAuth } from '../context/AuthContext';
 
 interface Props {
     event: CalendarEvent;
@@ -19,8 +18,6 @@ interface Props {
     onPostMessage: () => void;
     /** Optional "Suggest an edit" affordance. */
     onSuggestEdit?: () => void;
-    /** Open the add-promo-code sheet/modal. */
-    onAddPromoCode?: () => void;
 }
 
 /**
@@ -38,10 +35,8 @@ export default function EventActionDock({
     eventHasReviews,
     onPostMessage,
     onSuggestEdit,
-    onAddPromoCode,
 }: Props) {
     const { showRatings } = useFeatureFlags();
-    const { user } = useAuth();
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -57,10 +52,10 @@ export default function EventActionDock({
     const reviewInline = showRatings && isPast;
 
     return (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-blue-100 bg-blue-50 shadow-[0_-2px_10px_rgba(15,23,42,0.06)] lg:sticky lg:inset-auto lg:top-6 lg:z-10 lg:w-fit lg:rounded-card lg:border lg:p-4 lg:shadow-sm">
-            <div className="mx-auto flex max-w-[480px] flex-nowrap items-center gap-2 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:mx-0 lg:w-max lg:flex-col lg:items-stretch lg:px-0 lg:py-0 lg:pb-0">
-                <SaveEventButton eventId={event.event_id} appearance="pill" className="shrink-0 border border-line lg:w-full" labelClassName="hidden min-[375px]:inline" />
-                <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="shrink-0 border border-line lg:w-full" labelClassName="hidden min-[375px]:inline" />
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-slate-50/95 backdrop-blur shadow-[0_-2px_10px_rgba(15,23,42,0.06)] lg:sticky lg:inset-auto lg:top-6 lg:z-10 lg:rounded-card lg:border lg:bg-surface lg:p-4 lg:shadow-sm lg:backdrop-blur-none">
+            <div className="mx-auto flex max-w-[480px] items-center gap-2 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] lg:mx-0 lg:max-w-none lg:flex-wrap lg:px-0 lg:py-0 lg:pb-0">
+                <SaveEventButton eventId={event.event_id} appearance="pill" className="border border-line" />
+                <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="border border-line" />
                 {reviewInline && (
                     <RateEventButton
                         eventId={event.event_id}
@@ -72,28 +67,22 @@ export default function EventActionDock({
                         showCount={false}
                         isPast={isPast}
                         onRatingChanged={onRatingChanged}
-                        actionStyle
-                        className="lg:w-full"
-                        labelClassName="hidden min-[375px]:inline"
                     />
                 )}
-                {!isPast && (
-                    <ShareButton
-                        eventId={event.event_id}
-                        title={event.title}
-                        url={shareUrl}
-                        labelClassName="hidden min-[375px]:inline"
-                        className="flex h-10 shrink-0 items-center gap-2 rounded-field border border-line bg-surface px-2 text-sm text-ink transition hover:bg-canvas lg:w-full"
-                    />
-                )}
-                <div ref={menuRef} className="relative ml-auto shrink-0 lg:ml-0 lg:w-full">
+                <ShareButton
+                    eventId={event.event_id}
+                    title={event.title}
+                    url={shareUrl}
+                    className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas"
+                />
+                <div ref={menuRef} className="relative ml-auto">
                     <button
                         type="button"
                         onClick={() => setMenuOpen((o) => !o)}
                         aria-label="More actions"
                         aria-haspopup="menu"
                         aria-expanded={menuOpen}
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-ink-soft transition hover:bg-canvas lg:w-full"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-ink-soft transition hover:bg-canvas"
                     >
                         <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                     </button>
@@ -114,15 +103,6 @@ export default function EventActionDock({
                                     onRatingChanged={onRatingChanged}
                                 />
                             )}
-                            {isPast && (
-                                <ShareButton
-                                    eventId={event.event_id}
-                                    title={event.title}
-                                    url={shareUrl}
-                                    onAction={() => setMenuOpen(false)}
-                                    className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
-                                />
-                            )}
                             <button
                                 type="button"
                                 role="menuitem"
@@ -131,16 +111,6 @@ export default function EventActionDock({
                             >
                                 Start discussion
                             </button>
-                            {user && onAddPromoCode && (
-                                <button
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => { setMenuOpen(false); onAddPromoCode(); }}
-                                    className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
-                                >
-                                    Add promo code
-                                </button>
-                            )}
                             {onSuggestEdit && (
                                 <button
                                     type="button"

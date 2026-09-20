@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import { currencySymbol } from '../utils/currency';
 import { fetchEventMessages } from '../api';
@@ -16,7 +15,6 @@ import SummaryMiniMap from './event-summary/SummaryMiniMap';
 import SeriesRow from './event-summary/SeriesRow';
 import EventActions from './event-summary/EventActions';
 import ExpandableDescription from './ExpandableDescription';
-import { cleanEventDescription } from '../utils/eventDescription';
 
 /** Detail tabs the summary can deep-link into. */
 export type EventDetailTab = 'overview' | 'about' | 'location' | 'people' | 'reviews' | 'discussion';
@@ -94,7 +92,6 @@ export default function EventSummary({
     const priceVisible = isPriceSectionVisible(event, showPrices);
     const price = priceVisible ? priceCompact(event) : null;
     const hasPromo = event.has_active_promo_codes;
-    const description = cleanEventDescription(event.description ?? '');
 
     return (
         <div className="space-y-5">
@@ -144,16 +141,12 @@ export default function EventSummary({
 
             {/* About preview — the whole entry opens Details; "…more" only
                 appears when the three-line preview actually overflows. */}
-            {description && (
-                <div className="relative space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-ink">About</p>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-                    </div>
+            {event.description && (
+                <div className="space-y-1">
+                    <p className="text-sm font-semibold text-ink">About</p>
                     <ExpandableDescription
-                        text={description}
-                        maxLines={3}
-                        moreBackgroundClassName={variant === 'modal' ? 'bg-surface' : 'bg-canvas'}
+                        text={event.description}
+                        clampClass="line-clamp-3"
                         onOpen={() => onOpenTab('about')}
                     />
                 </div>
