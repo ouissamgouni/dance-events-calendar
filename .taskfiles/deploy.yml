@@ -657,17 +657,19 @@ tasks:
       PROJECT_NAME: '{{.PROJECT_NAME | default "movida"}}'
     cmds:
       - |
-        if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-          echo "❌ CLOUDFLARE_API_TOKEN not set in config/secrets.env or CLOUDFLARE_ACCOUNT_ID not set in config/base.env"
+        if [ -z "$CLOUDFLARE_PAGES_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "❌ CLOUDFLARE_PAGES_API_TOKEN not set in config/secrets.env or CLOUDFLARE_ACCOUNT_ID not set in config/base.env"
           exit 1
         fi
         if [ -z "$VITE_API_URL" ]; then
           echo "❌ VITE_API_URL not set in config/staging.remote.frontend.env"
           exit 1
         fi
-        echo "Validating Cloudflare token..."
-        if ! CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID npx --yes wrangler whoami > /dev/null 2>&1; then
-          echo "❌ Cloudflare authentication failed — check token in config/secrets.env"
+        echo "Validating access to Cloudflare Pages project {{.PROJECT_NAME}}..."
+        if ! curl --fail --silent --show-error --output /dev/null \
+          --header "Authorization: Bearer $CLOUDFLARE_PAGES_API_TOKEN" \
+          "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/{{.PROJECT_NAME}}"; then
+          echo "❌ Cloudflare Pages access failed — CLOUDFLARE_PAGES_API_TOKEN needs 'Cloudflare Pages: Edit' for account $CLOUDFLARE_ACCOUNT_ID"
           exit 1
         fi
         cd "{{.SOURCE_DIR}}/frontend"
@@ -678,7 +680,7 @@ tasks:
         fi
         VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
         echo "Deploying to Cloudflare Pages (branch: develop)..."
-        CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
+        CLOUDFLARE_API_TOKEN=$CLOUDFLARE_PAGES_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
         npx --yes wrangler pages deploy \
           --project-name={{.PROJECT_NAME}} \
@@ -792,17 +794,19 @@ tasks:
       PROJECT_NAME: '{{.PROJECT_NAME | default "movida"}}'
     cmds:
       - |
-        if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-          echo "❌ CLOUDFLARE_API_TOKEN not set in config/secrets.env or CLOUDFLARE_ACCOUNT_ID not set in config/base.env"
+        if [ -z "$CLOUDFLARE_PAGES_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "❌ CLOUDFLARE_PAGES_API_TOKEN not set in config/secrets.env or CLOUDFLARE_ACCOUNT_ID not set in config/base.env"
           exit 1
         fi
         if [ -z "$VITE_API_URL" ]; then
           echo "❌ VITE_API_URL not set in config/prod.remote.frontend.env"
           exit 1
         fi
-        echo "Validating Cloudflare token..."
-        if ! CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID npx --yes wrangler whoami > /dev/null 2>&1; then
-          echo "❌ Cloudflare authentication failed — check token in config/secrets.env"
+        echo "Validating access to Cloudflare Pages project {{.PROJECT_NAME}}..."
+        if ! curl --fail --silent --show-error --output /dev/null \
+          --header "Authorization: Bearer $CLOUDFLARE_PAGES_API_TOKEN" \
+          "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/{{.PROJECT_NAME}}"; then
+          echo "❌ Cloudflare Pages access failed — CLOUDFLARE_PAGES_API_TOKEN needs 'Cloudflare Pages: Edit' for account $CLOUDFLARE_ACCOUNT_ID"
           exit 1
         fi
         echo "Building prod frontend in {{.SOURCE_DIR}}/frontend (VITE_API_URL=$VITE_API_URL)..."
@@ -813,7 +817,7 @@ tasks:
         fi
         VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
         echo "Deploying to Cloudflare Pages (branch: main)..."
-        CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
+        CLOUDFLARE_API_TOKEN=$CLOUDFLARE_PAGES_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
         npx --yes wrangler pages deploy \
           --project-name={{.PROJECT_NAME}} \

@@ -100,7 +100,7 @@ def test_ensure_buckets_skips_policy_on_r2(storage_env):
     """R2 publishes the bucket through a connected domain, not a policy."""
     storage_env.setenv("OBJECT_STORAGE_PROVIDER", "r2")
     storage_env.setenv("CLOUDFLARE_ACCOUNT_ID", "acct")
-    storage_env.setenv("CLOUDFLARE_API_TOKEN", "token")
+    storage_env.setenv("CLOUDFLARE_R2_API_TOKEN", "token")
     storage_env.setattr(object_storage, "_r2_api", lambda *a, **k: _ApiResponse(200))
     client = _StubClient()
 
@@ -119,7 +119,7 @@ def test_r2_buckets_are_created_through_the_cloudflare_api(storage_env):
     """R2 S3 tokens are object-scoped — CreateBucket over S3 returns AccessDenied."""
     storage_env.setenv("OBJECT_STORAGE_PROVIDER", "r2")
     storage_env.setenv("CLOUDFLARE_ACCOUNT_ID", "acct")
-    storage_env.setenv("CLOUDFLARE_API_TOKEN", "token")
+    storage_env.setenv("CLOUDFLARE_R2_API_TOKEN", "token")
     calls = []
 
     def fake_api(method, path, **kwargs):
@@ -141,11 +141,11 @@ def test_r2_buckets_are_created_through_the_cloudflare_api(storage_env):
 def test_r2_bucket_management_requires_the_account_api_token(storage_env):
     storage_env.setenv("OBJECT_STORAGE_PROVIDER", "r2")
     storage_env.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
-    storage_env.delenv("CLOUDFLARE_API_TOKEN", raising=False)
+    storage_env.delenv("CLOUDFLARE_R2_API_TOKEN", raising=False)
 
     with pytest.raises(object_storage.ObjectStorageError) as exc:
         object_storage.ensure_buckets(client=_StubClient())
-    assert "CLOUDFLARE_API_TOKEN" in str(exc.value)
+    assert "CLOUDFLARE_R2_API_TOKEN" in str(exc.value)
 
 
 def test_ensure_buckets_reapplies_policy_when_bucket_exists(storage_env):

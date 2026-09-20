@@ -26,10 +26,10 @@ def _enable_r2_public_domain(bucket: str) -> str | None:
     public bucket through a custom domain configured once in the dashboard.
     """
     account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
-    token = os.getenv("CLOUDFLARE_API_TOKEN", "")
+    token = os.getenv("CLOUDFLARE_R2_API_TOKEN", "")
     if not (account_id and token):
         logger.warning(
-            "CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN not set — skipping "
+            "CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_R2_API_TOKEN not set — skipping "
             "r2.dev public access for %s",
             bucket,
         )
