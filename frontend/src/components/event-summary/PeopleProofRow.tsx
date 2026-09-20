@@ -43,7 +43,7 @@ export default function PeopleProofRow({ event, postsCount, onOpenPeople, onOpen
                         <AttendeeAvatarStack
                             eventId={event.event_id}
                             max={3}
-                            friendsPreview={event.friends_going_preview}
+                            goingFriendsPreview={event.friends_going_preview}
                             size="lg"
                             layout="faces"
                             hideIfOnlyCurrentUser
