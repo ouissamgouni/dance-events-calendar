@@ -46,6 +46,7 @@ export default defineConfig(({ mode }) => {
   // Diagnostic for CI logs (Cloudflare) to confirm whether build-time env is present.
   console.log('[vite] VITE_API_URL detected:', viteApiUrl || '(empty)')
   console.log('[vite] VITE_APP_NAME detected:', appName)
+  console.log('[vite] VITE_CARTO_BASEMAP_KEY detected:', (env.VITE_CARTO_BASEMAP_KEY || process.env.VITE_CARTO_BASEMAP_KEY) ? '(set)' : '(empty — OSM fallback)')
   console.log('[vite] VITE_UMAMI_URL detected:', env.VITE_UMAMI_URL || process.env.VITE_UMAMI_URL || '(empty — Umami will be disabled)')
   console.log('[vite] VITE_UMAMI_WEBSITE_ID detected:', (env.VITE_UMAMI_WEBSITE_ID || process.env.VITE_UMAMI_WEBSITE_ID) ? '(set)' : '(empty — Umami will be disabled)')
 

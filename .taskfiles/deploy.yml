@@ -665,6 +665,10 @@ tasks:
           echo "❌ VITE_API_URL not set in config/staging.remote.frontend.env"
           exit 1
         fi
+        if [ -z "$VITE_CARTO_BASEMAP_KEY" ]; then
+          echo "❌ VITE_CARTO_BASEMAP_KEY not set in config/secrets.env"
+          exit 1
+        fi
         echo "Validating access to Cloudflare Pages project {{.PROJECT_NAME}}..."
         if ! curl --fail --silent --show-error --output /dev/null \
           --header "Authorization: Bearer $CLOUDFLARE_PAGES_API_TOKEN" \
@@ -678,7 +682,7 @@ tasks:
           echo "  Installing frontend deps (npm ci)..."
           npm ci --no-audit --no-fund
         fi
-        VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
+        VITE_API_URL=$VITE_API_URL VITE_CARTO_BASEMAP_KEY=$VITE_CARTO_BASEMAP_KEY VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
         echo "Deploying to Cloudflare Pages (branch: develop)..."
         CLOUDFLARE_API_TOKEN=$CLOUDFLARE_PAGES_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
@@ -802,6 +806,10 @@ tasks:
           echo "❌ VITE_API_URL not set in config/prod.remote.frontend.env"
           exit 1
         fi
+        if [ -z "$VITE_CARTO_BASEMAP_KEY" ]; then
+          echo "❌ VITE_CARTO_BASEMAP_KEY not set in config/secrets.env"
+          exit 1
+        fi
         echo "Validating access to Cloudflare Pages project {{.PROJECT_NAME}}..."
         if ! curl --fail --silent --show-error --output /dev/null \
           --header "Authorization: Bearer $CLOUDFLARE_PAGES_API_TOKEN" \
@@ -815,7 +823,7 @@ tasks:
           echo "  Installing frontend deps (npm ci)..."
           npm ci --no-audit --no-fund
         fi
-        VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
+        VITE_API_URL=$VITE_API_URL VITE_CARTO_BASEMAP_KEY=$VITE_CARTO_BASEMAP_KEY VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
         echo "Deploying to Cloudflare Pages (branch: main)..."
         CLOUDFLARE_API_TOKEN=$CLOUDFLARE_PAGES_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
