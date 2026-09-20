@@ -633,6 +633,26 @@ class TestDatabaseSeeder:
             assert (scenario_dir / "tags.yaml").exists() or default_tags.exists()
             assert (scenario_dir / "mock-users.yaml").exists() or default_users.exists()
 
+    @pytest.mark.parametrize("scenario", ["staging", "prod"])
+    def test_reference_taxonomies_have_unique_event_tag_slugs(self, scenario):
+        import yaml
+
+        from backend.db.seed import SCENARIOS_DIR
+
+        tags_path = SCENARIOS_DIR / scenario / "tags.yaml"
+        data = yaml.safe_load(tags_path.read_text()) or {}
+        seen: dict[str, str] = {}
+        for group in data.get("tag_groups") or []:
+            if group.get("scope", "event") != "event":
+                continue
+            for tag in group.get("tags") or []:
+                slug = tag.get("slug")
+                assert slug not in seen, (
+                    f"{tags_path}: event tag {slug!r} is duplicated in "
+                    f"{seen[slug]!r} and {group.get('slug')!r}"
+                )
+                seen[slug] = group.get("slug")
+
     def test_db_events_use_resolvable_fixture_tags(self):
         import yaml
 
