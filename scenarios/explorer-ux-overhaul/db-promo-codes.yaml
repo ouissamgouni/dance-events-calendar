@@ -1,27 +1,36 @@
 # Pre-seeded promo codes for the Explorer UX overhaul scenario.
 #
-# A few UPCOMING events (week 0 cluster) carry approved promo codes so the
-# "Discount" badge renders on the redesigned event cards. Each submitter_email
-# must exist in mock-users.yaml.
+# Only paid events carry approved promo codes. Selected paid events have
+# multiple offers so compact list behavior can be exercised. Each
+# submitter_email must exist in mock-users.yaml.
 promo_codes:
-  - event_id: evt-ux-001
+  - event_id: evt-ux-002
     submitter_email: alice@example.com
-    code: SALSAFRIDAY
-    description: 15% off pre-sale tickets
-    source_url: https://example.com/salsa-friday
+    code: BACHATA10
+    description: 10% off at the door with this code
+    source_url: https://example.com/berlin-bachata
     status: approved
   - event_id: evt-ux-002
     submitter_email: emma@example.com
-    code: BACHATA10
-    description: 10% off at the door with this code
+    code: BERLINPASS
+    description: Reduced pre-sale admission
+    source_url: https://example.com/berlin-bachata-presale
     status: approved
-  - event_id: evt-ux-003
+  - event_id: evt-ux-004
     submitter_email: bob@example.com
-    code: EARLYSPIN
-    description: Early-bird entry discount
+    code: LISBON15
+    description: 15% off workshop admission
+    source_url: https://example.com/lisbon-workshop
     status: approved
-  - event_id: evt-ux-005
+  - event_id: evt-ux-007
     submitter_email: viewer@example.com
-    code: WEEKENDPASS
-    description: Bundle discount for the weekend
+    code: VIENNA10
+    description: 10% off advance registration
+    source_url: https://example.com/vienna-class
+    status: approved
+  - event_id: evt-ux-007
+    submitter_email: alice@example.com
+    code: BRINGAFRIEND
+    description: Discount when booking two places
+    source_url: https://example.com/vienna-class-friends
     status: approved

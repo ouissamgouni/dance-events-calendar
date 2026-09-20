@@ -18,7 +18,7 @@ export default function SeriesRow({ title, to, onClick }: Props) {
         <>
             <Repeat className="h-4 w-4 shrink-0 text-ink-soft" aria-hidden="true" />
             <span className="shrink-0 text-ink-soft">Series</span>
-            <span className="ml-auto min-w-0 truncate text-right font-medium text-action">{title}</span>
+            <span className="min-w-0 flex-1 truncate text-left font-medium text-action">{title}</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
         </>
     );

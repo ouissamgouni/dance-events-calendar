@@ -37,6 +37,8 @@ interface Props {
     reviewTagLabels?: Map<number, string>;
     /** Open the review modal here instead of navigating through event details. */
     inlineModal?: boolean;
+    actionStyle?: boolean;
+    labelClassName?: string;
 }
 
 export default function RateEventButton({
@@ -55,6 +57,8 @@ export default function RateEventButton({
     isPast = true,
     reviewTagLabels,
     inlineModal = false,
+    actionStyle = false,
+    labelClassName = '',
 }: Props) {
     const { user } = useAuth();
     const location = useLocation();
@@ -220,8 +224,9 @@ export default function RateEventButton({
                 {ReviewIcon}
                 {dotColor && <span className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 ${dotColor}`} />}
             </span>
-            {countText
-                ? (
+            <span className={labelClassName}>
+                {countText
+                    ? (
                     <span className="tabular-nums">
                         Reviews <span className="text-muted">({countText})</span>
                         {hasRated && commentStatus === 'pending' && (
@@ -231,9 +236,10 @@ export default function RateEventButton({
                         )}
                     </span>
                 )
-                : hasRated
-                    ? (commentStatus === 'pending' ? 'Comment pending' : 'Your review')
-                    : 'Review'}
+                    : hasRated
+                        ? (commentStatus === 'pending' ? 'Comment pending' : 'Your review')
+                        : 'Review'}
+            </span>
         </>
     ) : appearance === 'count' ? (
         <>
@@ -253,7 +259,9 @@ export default function RateEventButton({
     const buttonClasses = appearance === 'preview'
         ? `block w-full text-left ${className}`.trim()
         : appearance === 'pill'
-            ? `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-ink-soft bg-surface border-line hover:bg-canvas'} ${className}`.trim()
+            ? actionStyle
+                ? `flex h-10 shrink-0 items-center gap-2 rounded-field border border-line bg-surface px-2 text-sm text-ink transition hover:bg-canvas ${className}`.trim()
+                : `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-ink-soft bg-surface border-line hover:bg-canvas'} ${className}`.trim()
             : appearance === 'count'
                 ? `inline-flex items-center gap-1 text-ink-soft hover:text-ink ${className}`.trim()
                 : `transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-sky-600 hover:text-sky-700' : 'text-slate-300 hover:text-ink-soft'} ${className}`.trim();

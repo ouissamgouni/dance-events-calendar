@@ -125,7 +125,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
                 <span
                     key={tag.id}
                     data-chip
-                    className={`inline-flex items-center font-medium ${chip}`}
+                    className={`inline-flex items-center whitespace-nowrap font-medium ${chip}`}
                     style={{ backgroundColor: `${c}20`, color: c, border: `1px solid ${c}40` }}
                     title={`${tag.group_label}: ${tag.label}`}
                 >
@@ -137,7 +137,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
             <span
                 key={tag.id}
                 data-chip
-                className={`inline-flex items-center bg-slate-100 font-medium text-ink-soft ${chip}`}
+                className={`inline-flex items-center whitespace-nowrap bg-slate-100 font-medium text-ink-soft ${chip}`}
                 title={`${tag.group_label}: ${tag.label}`}
             >
                 {tag.label}

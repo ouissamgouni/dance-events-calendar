@@ -202,6 +202,15 @@ describe('EventSummary shared implementation', () => {
         expect(within(view.container).getByRole('link', { name: 'Facebook' })).toHaveAttribute('href', facebookUrl)
     })
 
+    it('omits About when the description contains only an extracted link', () => {
+        const view = renderSummary('page', false, makeEvent({
+            description: 'Évènement : https://facebook.com/events/123',
+        }))
+
+        expect(within(view.container).queryByText('About')).toBeNull()
+        expect(within(view.container).getByRole('link', { name: 'Facebook' })).toBeInTheDocument()
+    })
+
     it('routes People and Posts independently', async () => {
         vi.mocked(fetchEventMessages).mockResolvedValueOnce({ items: [], total: 2 })
         const onOpenTab = vi.fn()

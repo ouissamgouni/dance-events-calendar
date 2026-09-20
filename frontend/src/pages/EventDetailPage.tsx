@@ -370,7 +370,7 @@ export default function EventDetailPage() {
                                         />
                                     </div>
 
-                                    <div className="mt-4 lg:mt-6">
+                                    <div className="mt-4 px-2 lg:mt-6">
                                         {activeTab === 'overview' && (
                                             <EventSummary
                                                 event={event}

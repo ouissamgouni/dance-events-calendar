@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, MoreHorizontal, Pencil, TicketPercent } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import GoingButton from './GoingButton';
 import SaveEventButton from './SaveEventButton';
@@ -57,10 +57,10 @@ export default function EventActionDock({
     const reviewInline = showRatings && isPast;
 
     return (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 backdrop-blur shadow-[0_-2px_10px_rgba(15,23,42,0.06)] lg:sticky lg:inset-auto lg:top-6 lg:z-10 lg:rounded-card lg:border lg:bg-surface lg:p-4 lg:shadow-sm lg:backdrop-blur-none">
-            <div className="mx-auto flex max-w-[480px] items-center gap-2 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:mx-0 lg:max-w-none lg:flex-wrap lg:px-0 lg:py-0 lg:pb-0">
-                <SaveEventButton eventId={event.event_id} appearance="pill" className="border border-line" />
-                <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="border border-line" />
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-action-tile shadow-[0_-2px_10px_rgba(15,23,42,0.06)] lg:sticky lg:inset-auto lg:top-6 lg:z-10 lg:rounded-card lg:border lg:p-4 lg:shadow-sm">
+            <div className="mx-auto flex max-w-[480px] flex-nowrap items-center gap-2 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:mx-0 lg:grid lg:max-w-none lg:grid-cols-2 lg:px-0 lg:py-0 lg:pb-0">
+                <SaveEventButton eventId={event.event_id} appearance="pill" className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
+                <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
                 {reviewInline && (
                     <RateEventButton
                         eventId={event.event_id}
@@ -72,43 +72,20 @@ export default function EventActionDock({
                         showCount={false}
                         isPast={isPast}
                         onRatingChanged={onRatingChanged}
+                        actionStyle
+                        labelClassName="hidden min-[375px]:inline"
                     />
                 )}
-                <ShareButton
-                    eventId={event.event_id}
-                    title={event.title}
-                    url={shareUrl}
-                    className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas"
-                />
-                <button
-                    type="button"
-                    onClick={onPostMessage}
-                    className="hidden h-10 items-center gap-2 rounded-field border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas lg:inline-flex"
-                >
-                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                    Discuss
-                </button>
-                {user && onAddPromoCode && (
-                    <button
-                        type="button"
-                        onClick={onAddPromoCode}
-                        className="hidden h-10 items-center gap-2 rounded-field border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas lg:inline-flex"
-                    >
-                        <TicketPercent className="h-4 w-4" aria-hidden="true" />
-                        Promo
-                    </button>
+                {!isPast && (
+                    <ShareButton
+                        eventId={event.event_id}
+                        title={event.title}
+                        url={shareUrl}
+                        labelClassName="hidden min-[375px]:inline"
+                        className="flex h-10 shrink-0 items-center gap-2 rounded-field border border-line bg-surface px-2 text-sm text-ink transition hover:bg-canvas"
+                    />
                 )}
-                {onSuggestEdit && (
-                    <button
-                        type="button"
-                        onClick={onSuggestEdit}
-                        className="hidden h-10 items-center gap-2 rounded-field border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas lg:inline-flex"
-                    >
-                        <Pencil className="h-4 w-4" aria-hidden="true" />
-                        Edit
-                    </button>
-                )}
-                <div ref={menuRef} className="relative ml-auto lg:hidden">
+                <div ref={menuRef} className="relative ml-auto shrink-0 lg:col-start-2 lg:ml-0 lg:justify-self-end">
                     <button
                         type="button"
                         onClick={() => setMenuOpen((o) => !o)}
@@ -134,6 +111,15 @@ export default function EventActionDock({
                                     showCount={false}
                                     isPast={isPast}
                                     onRatingChanged={onRatingChanged}
+                                />
+                            )}
+                            {isPast && (
+                                <ShareButton
+                                    eventId={event.event_id}
+                                    title={event.title}
+                                    url={shareUrl}
+                                    onAction={() => setMenuOpen(false)}
+                                    className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
                                 />
                             )}
                             <button

@@ -69,4 +69,14 @@ describe('TagBadges overflow chip', () => {
         expect(await screen.findByText('+2')).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Show 2 more tags' })).toBeNull()
     })
+
+    it('keeps multi-word tag labels on one line', async () => {
+        renderWithProviders(
+            <FeatureFlagsProvider>
+                <TagBadges tags={[tag(1, 'Mambo (on2)')]} forceBadge neutral />
+            </FeatureFlagsProvider>,
+        )
+
+        expect(await screen.findByText('Mambo (on2)')).toHaveClass('whitespace-nowrap')
+    })
 })
