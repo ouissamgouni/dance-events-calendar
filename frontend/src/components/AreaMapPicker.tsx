@@ -3,6 +3,7 @@ import { CircleMarker, MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { PreferredAreaPayload } from '../api';
 import { AREA_PRESETS, clampArea, DEFAULT_AREA_BBOX } from '../constants/area';
+import { BASEMAP_CONFIG } from '../constants/basemap';
 
 interface Props {
     /** Currently saved area (or null = no area saved). */
@@ -263,10 +264,7 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
                         mapRef={mapRef}
                         onReady={handleMapReady}
                     />
-                    <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
+                    <TileLayer {...BASEMAP_CONFIG} />
                     {markers?.map((m) => (
                         <CircleMarker
                             key={m.id}

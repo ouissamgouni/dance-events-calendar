@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import L from 'leaflet';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { clampArea } from '../constants/area';
+import { BASEMAP_CONFIG } from '../constants/basemap';
 import { hasMeaningfulAreaChange, hasMinimumAreaCoverage } from './onboarding/onboardingGeometry';
 import type { BboxSearchArea } from '../utils/searchArea';
 
@@ -246,7 +247,7 @@ export default function SquareAreaMapEditor({
                 style={{ height: '100%', width: '100%' }}
             >
                 <MapBinder mapRef={mapRef} onReady={() => setMapReady(true)} />
-                <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <TileLayer {...BASEMAP_CONFIG} />
             </MapContainer>
             {frame && (
                 <div className="pointer-events-none absolute inset-0 z-[500] overflow-hidden">

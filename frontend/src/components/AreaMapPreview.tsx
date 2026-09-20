@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Circle, CircleMarker, MapContainer, Rectangle, TileLayer, useMap } from 'react-leaflet';
+import { BASEMAP_CONFIG } from '../constants/basemap';
 import type { SearchArea } from '../utils/searchArea';
 
 interface Props {
@@ -25,7 +26,7 @@ export default function AreaMapPreview({ area, className = 'h-16 w-24' }: Props)
                 attributionControl={false}
                 keyboard={false}
             >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <TileLayer {...BASEMAP_CONFIG} />
                 <PreviewBounds area={area} />
                 {area.kind === 'bbox' ? (
                     <Rectangle

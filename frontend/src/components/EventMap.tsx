@@ -16,6 +16,7 @@ import TagBadges from './TagBadges';
 import AttendeeAvatarStack, { PEOPLE_ICON_PATH } from './AttendeeAvatarStack';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
+import { BASEMAP_CONFIG } from '../constants/basemap';
 import { buildJourneyLegs } from '../utils/myEvents';
 
 export interface MapBounds {
@@ -31,12 +32,6 @@ const DEFAULT_AREA_CENTER: [number, number] = [
 ];
 const DEFAULT_ZOOM = 5;
 const CITY_ZOOM = 13;
-const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
-const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-const CARTO_BASEMAP_KEY = (import.meta.env.VITE_CARTO_BASEMAP_KEY as string | undefined)?.trim();
-const BASEMAP_URL = CARTO_BASEMAP_KEY
-    ? `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(CARTO_BASEMAP_KEY)}`
-    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /**
  * Pick a fitBounds padding that won't cause Leaflet to fall back to a much
@@ -1162,10 +1157,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
             attributionControl={!compact}
         >
             <TileLayer
-                attribution={CARTO_BASEMAP_KEY ? CARTO_ATTRIBUTION : OSM_ATTRIBUTION}
-                url={BASEMAP_URL}
-                subdomains={CARTO_BASEMAP_KEY ? 'abcd' : 'abc'}
-                maxZoom={20}
+                {...BASEMAP_CONFIG}
             />
             {areaOverlay && (
                 <>

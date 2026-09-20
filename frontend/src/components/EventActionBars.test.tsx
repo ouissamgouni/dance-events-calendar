@@ -57,11 +57,13 @@ describe('event action bar layout', () => {
         expect(moreButton.parentElement).toHaveClass('ml-auto', 'shrink-0');
     });
 
-    it('uses the stronger surface and two-row desktop grid for the page dock', () => {
+    it('uses a content-width light-blue vertical desktop stack for the page dock', () => {
         const { container } = renderActionBar(<EventActionDock {...commonProps} isPast={false} />);
 
-        expect(container.firstElementChild).toHaveClass('bg-action-tile');
-        expect(container.firstElementChild?.firstElementChild).toHaveClass('flex-nowrap', 'lg:grid', 'lg:grid-cols-2');
-        expect(screen.getByRole('button', { name: 'More actions' }).parentElement).toHaveClass('lg:col-start-2');
+        expect(container.firstElementChild).toHaveClass('bg-blue-50', 'lg:w-fit');
+        expect(container.firstElementChild?.firstElementChild).toHaveClass('flex-nowrap', 'lg:w-max', 'lg:flex-col', 'lg:items-stretch');
+        const moreButton = screen.getByRole('button', { name: 'More actions' });
+        expect(moreButton).toHaveClass('lg:w-full');
+        expect(moreButton.parentElement).toHaveClass('lg:w-full');
     });
 });

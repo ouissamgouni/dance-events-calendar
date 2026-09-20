@@ -708,6 +708,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     </th>
                                     <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide">Title</th>
                                     <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Date</th>
+                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-16">Image</th>
                                     <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-20">Status</th>
                                     <th className="px-2 py-2 text-center font-semibold text-ink-soft uppercase tracking-wide w-10">Geo</th>
                                     <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Tags</th>
@@ -756,6 +757,17 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                         </td>
                                         <td className="px-2 py-1.5 text-ink-soft whitespace-nowrap">
                                             {formatDate(event.start)}
+                                        </td>
+                                        <td className="w-16 px-2 py-1.5">
+                                            {(event.image_thumb_url ?? event.image_url) && (
+                                                <img
+                                                    src={event.image_thumb_url ?? event.image_url ?? undefined}
+                                                    alt=""
+                                                    loading="lazy"
+                                                    className="aspect-video w-12 object-cover"
+                                                    onError={(error) => { error.currentTarget.hidden = true; }}
+                                                />
+                                            )}
                                         </td>
                                         <td className="px-2 py-1.5">
                                             <div className="flex flex-wrap gap-1">
