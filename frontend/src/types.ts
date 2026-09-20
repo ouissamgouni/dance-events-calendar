@@ -124,10 +124,11 @@ export interface CalendarEvent {
      */
     following_friend_count?: number;
     /**
-     * Up to 5 mutual friends (subset of ``following_friend_count``) used by
-     * the card's combined avatar track to render *who* — friends first.
+        * Up to 5 mutual friends contributing to the broader going-or-saved
+        * Following signal used by map indicators.
      */
     following_friends_preview?: FriendMini[];
+    /** Going-only mutual-friend signal used by attendee avatar stacks. */
     friends_going_count?: number;
     friends_going_preview?: FriendMini[];
     price_min: number | null;

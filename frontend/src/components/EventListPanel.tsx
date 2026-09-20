@@ -253,7 +253,7 @@ export function EventListCard({
                             size="lg"
                             layout="stacked"
                             max={5}
-                            friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                            goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
                         />
                     ) : undefined}
                     testId="event-list-card"
@@ -295,7 +295,7 @@ export function EventListCard({
                                 size="lg"
                                 layout="stacked"
                                 max={5}
-                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                                goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
                             />
                         </div>
                     )}
@@ -355,7 +355,7 @@ export function EventListCard({
                         <div className="mt-1.5 flex items-center gap-1.5 min-w-0">
                             <AttendeeAvatarStack
                                 eventId={event.event_id}
-                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                                goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
                             />
                             {eventCardImgoingLocationBottomEnabled && (
                                 <div

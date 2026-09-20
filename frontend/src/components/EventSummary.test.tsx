@@ -204,6 +204,18 @@ describe('EventSummary shared implementation', () => {
         expect(onOpenTab).toHaveBeenCalledWith('discussion')
     })
 
+    it.each(['page', 'modal'] as const)('shows saved-only interest without a going avatar stack in the %s', (variant) => {
+        const view = renderSummary(
+            variant,
+            false,
+            makeEvent({ going_count: 0, saved_count: 2 }),
+        )
+
+        expect(within(view.container).getByText('2 saved')).toBeInTheDocument()
+        expect(within(view.container).queryByRole('button', { name: /people going/i })).toBeNull()
+        expect(within(view.container).queryByTestId('attendee-track')).toBeNull()
+    })
+
     it('omits the Links heading and opens the series route directly', async () => {
         const onSeriesNavigate = vi.fn()
         const view = renderSummary(

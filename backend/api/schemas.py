@@ -78,11 +78,10 @@ class EventResponse(BaseModel):
     # is signed in; defaults to 0 otherwise so back-compat serializers
     # keep working.
     following_friend_count: int = 0
-    # Up to 5 friend mini-profiles (subset of the count above), used by
-    # the card's inline avatar track to show *who* — friends first, then
-    # the rest of the going set. Empty when the feature flag is off or
-    # the viewer is anonymous.
+    # Up to 5 friend mini-profiles contributing to the broader going-or-saved
+    # Following signal used by map indicators.
     following_friends_preview: list["FriendMini"] = []
+    # Going-only mutual-friend signal used by attendee avatar stacks.
     friends_going_count: int = 0
     friends_going_preview: list["FriendMini"] = []
     price_min: Optional[float] = None

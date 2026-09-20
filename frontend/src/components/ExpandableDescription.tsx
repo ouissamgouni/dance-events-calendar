@@ -71,7 +71,7 @@ export default function ExpandableDescription({
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
-                    className="mt-1 text-xs font-medium text-rose-500 hover:text-rose-700 transition"
+                    className="mt-1 text-xs font-medium text-blue-500 hover:text-rose-700 transition"
                 >
                     {expanded ? 'Show less' : 'Show more'}
                 </button>
