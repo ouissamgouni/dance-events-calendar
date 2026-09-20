@@ -37,7 +37,6 @@ primary_region = "cdg"
   SMTP_HOST = "smtp-relay.brevo.com"
   SMTP_PORT = "587"
   SMTP_FROM = "noreply@joinmovida.com"
-  OBJECT_STORAGE_PUBLIC_BASE_URL= "cdn.joinmovida.com"
 
 [http_service]
   internal_port = 8000
