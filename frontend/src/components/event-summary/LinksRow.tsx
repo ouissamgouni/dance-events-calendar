@@ -1,8 +1,8 @@
 import type { ComponentType } from 'react';
 import { Ticket, Globe, Link as LinkIcon } from 'lucide-react';
 import type { CalendarEvent } from '../../types';
-import { parseLinks } from '../../utils/parseLinks';
 import { deriveLinkLabel } from '../../utils/deriveLinkLabel';
+import { collectEventLinks } from '../../utils/eventDescription';
 import { trackLink } from '../../utils/tracking';
 
 interface Props {
@@ -25,10 +25,11 @@ function iconFor(label: string): ComponentType<{ className?: string }> {
  * item left partially peeking to signal more.
  */
 export default function LinksRow({ event }: Props) {
-    const structured = (event.links ?? []).filter((l) => l.url?.trim());
-    const links = structured.length > 0
-        ? structured.map((l) => ({ url: l.url, label: l.label || deriveLinkLabel(l.url) }))
-        : parseLinks(event.description).map((url) => ({ url, label: deriveLinkLabel(url) }));
+    const links = collectEventLinks(event.links, event.description)
+        .map((link) => ({
+            url: link.url,
+            label: link.label || deriveLinkLabel(link.url),
+        }));
 
     if (links.length === 0) return null;
 

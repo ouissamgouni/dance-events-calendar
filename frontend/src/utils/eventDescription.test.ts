@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanEventDescription } from './eventDescription';
+import { cleanEventDescription, collectEventLinks } from './eventDescription';
 
 describe('cleanEventDescription', () => {
     it('removes standalone extracted-link lines with localized labels', () => {
@@ -21,5 +21,23 @@ describe('cleanEventDescription', () => {
 
     it('returns an empty description when every line is an extracted link', () => {
         expect(cleanEventDescription('Tickets: https://example.test/tickets')).toBe('');
+    });
+});
+
+describe('collectEventLinks', () => {
+    it('merges structured and description links without duplicates', () => {
+        expect(collectEventLinks(
+            [{ url: 'https://tickets.example.test/event', label: 'Buy tickets' }],
+            'Tickets: https://tickets.example.test/event\nHost: https://facebook.com/events/123',
+        )).toEqual([
+            { url: 'https://tickets.example.test/event', label: 'Buy tickets' },
+            { url: 'https://facebook.com/events/123' },
+        ]);
+    });
+
+    it('collects description links when structured links are absent', () => {
+        expect(collectEventLinks(undefined, 'Visit https://example.test/event')).toEqual([
+            { url: 'https://example.test/event' },
+        ]);
     });
 });
