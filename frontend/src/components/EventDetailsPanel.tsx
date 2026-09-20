@@ -128,7 +128,7 @@ export default function EventDetailsPanel({
                     See full details →
                 </Link>
             </div>
-            <div className="bg-action-tile px-4 py-3">
+            <div className="bg-blue-50 px-4 py-3">
                 <EventActions
                     event={event}
                     isPast={isPast}

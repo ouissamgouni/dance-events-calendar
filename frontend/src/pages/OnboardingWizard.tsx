@@ -38,6 +38,7 @@ import {
 import ProfileEditor from '../components/ProfileEditor';
 import TagsPicker, { type TagsPickerValue } from '../components/TagsPicker';
 import { clampArea, DEFAULT_AREA_BBOX } from '../constants/area';
+import { BASEMAP_CONFIG } from '../constants/basemap';
 import { useAuth } from '../context/AuthContext';
 import { usePreferences } from '../context/PreferencesContext';
 import type { Tag, TagGroup } from '../types';
@@ -957,10 +958,7 @@ export function LegacyOnboardingWizard() {
                                                 scrollWheelZoom={false}
                                                 style={{ height: '100%', width: '100%' }}
                                             >
-                                                <TileLayer
-                                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                                />
+                                                <TileLayer {...BASEMAP_CONFIG} />
                                                 <MapRecenter pin={pin} radiusKm={radiusKm} />
                                                 <CircleMarker
                                                     center={[pin.lat, pin.lng]}
@@ -1143,7 +1141,7 @@ function AreaMiniMap({ area }: { area: PreferredAreaPayload }) {
                 attributionControl={false}
                 keyboard={false}
             >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <TileLayer {...BASEMAP_CONFIG} />
                 <Rectangle bounds={bounds} pathOptions={{ color: '#2563eb', weight: 1, fillOpacity: 0.1 }} />
             </MapContainer>
         </div>

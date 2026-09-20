@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Circle, CircleMarker, MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { BASEMAP_CONFIG } from '../constants/basemap';
 import { withRadiusKm, type RadiusSearchArea } from '../utils/searchArea';
 
 interface Props {
@@ -26,7 +27,7 @@ export default function RadiusAreaEditor({
                     zoomControl={false}
                     style={{ height: '100%', width: '100%' }}
                 >
-                    <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    <TileLayer {...BASEMAP_CONFIG} />
                     <RadiusMapView area={area} />
                     <Circle
                         center={[area.center_lat, area.center_lng]}
