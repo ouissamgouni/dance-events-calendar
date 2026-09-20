@@ -1,24 +1,20 @@
 name: Deploy to Staging
 
 # ════════════════════════════════════════════════════════════════════════════
-# Trigger: Automatically deploy to staging after CI passes on the develop branch,
-# or manually via workflow_dispatch.
+# Trigger: Manual deployment to staging only via workflow_dispatch.
+#
+# Automatic deployment to staging after CI passes has been disabled.
 #
 # This workflow:
-# 1. Waits for CI to succeed on develop (or is manually dispatched)
+# 1. Runs on manual dispatch (workflow_dispatch)
 # 2. Runs the full staging deploy (db + backend + frontend)
 # 3. Notifies on success/failure
 # 4. Queues concurrent deployments (one at a time)
 #
 # To manually trigger: gh workflow run deploy-staging.yml -f ref=develop
-# To disable: disable this workflow in GitHub UI (Actions → Workflows → Deploy to Staging)
 # ════════════════════════════════════════════════════════════════════════════
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [develop]
   workflow_dispatch:
     inputs:
       ref:
@@ -38,21 +34,15 @@ jobs:
     # Use the "staging" environment to access FLY_API_TOKEN and other environment secrets
     environment: staging
 
-    # Run for a successful CI run on develop, or a manual dispatch. The head_branch
-    # check is belt-and-suspenders: workflow_run trigger config is read from the
-    # default branch, so this job-level check protects against drift/misconfiguration.
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'develop')
+    # Run only for manual dispatch (automatic deployment has been disabled)
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # workflow_run events default to checking out the default branch (main),
-          # NOT the branch/commit CI actually ran on — pin explicitly.
-          ref: ${{ github.event.inputs.ref || github.event.workflow_run.head_sha }}
+          # Check out the specified ref (or default to develop)
+          ref: ${{ github.event.inputs.ref || 'develop' }}
           fetch-depth: 0 # Full history for git merge-base checks
 
       - name: Set up Python
@@ -161,15 +151,15 @@ jobs:
         if: success()
         run: |
           echo "✅ Staging deployment succeeded"
-          echo "   Commit: ${{ github.event.workflow_run.head_commit.message || github.sha }}"
-          echo "   By: ${{ github.event.workflow_run.actor.login || github.actor }}"
+          echo "   Branch/SHA: ${{ github.event.inputs.ref || 'develop' }}"
+          echo "   Actor: ${{ github.actor }}"
           echo "   URL: https://develop.joinmovida.com"
 
       - name: Notify on failure
         if: failure()
         run: |
           echo "❌ Staging deployment failed"
-          echo "   Commit: ${{ github.event.workflow_run.head_commit.message || github.sha }}"
+          echo "   Branch/SHA: ${{ github.event.inputs.ref || 'develop' }}"
           echo "   Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           exit 1
 
@@ -183,10 +173,10 @@ jobs:
           password: ${{ secrets.SMTP_PASSWORD }}
           from: Movida CI <noreply@joinmovida.com>
           to: ${{ secrets.CI_NOTIFY_EMAIL || secrets.STAGING_ADMIN_EMAIL }}
-          subject: "${{ job.status == 'success' && '✅' || '❌' }} Staging deploy ${{ job.status }} — ${{ github.event.workflow_run.head_commit.message || github.sha }}"
+          subject: "${{ job.status == 'success' && '✅' || '❌' }} Staging deploy ${{ job.status }} — ${{ github.event.inputs.ref || 'develop' }}"
           body: |
             Staging deployment: ${{ job.status }}
 
-            Commit: ${{ github.event.workflow_run.head_commit.message || github.sha }}
-            Actor:  ${{ github.event.workflow_run.actor.login || github.actor }}
+            Branch/SHA: ${{ github.event.inputs.ref || 'develop' }}
+            Actor:  ${{ github.actor }}
             Run:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
