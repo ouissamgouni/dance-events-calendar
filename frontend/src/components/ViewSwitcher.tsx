@@ -63,31 +63,32 @@ export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible,
     return (
         <nav
             aria-label="Change event view"
-            className={`fixed right-4 z-[8000] flex items-center border-2 border-line bg-surface shadow-xl md:bottom-4 ${bottomClass}`}
+            className={`fixed right-4 z-[8000] flex items-center gap-2 md:bottom-4 ${bottomClass}`}
             style={previewOpen ? { bottom: `calc(64px + env(safe-area-inset-bottom) + ${measuredOffset + 12}px)` } : undefined}
             data-testid="view-switcher"
         >
-
-            {destinations[currentView].map((view, index) => (
-                <button
-                    key={view}
-                    type="button"
-                    onClick={() => onSelect(view)}
-                    aria-label={`${labels[view]} view`}
-                    title={`${labels[view]} view`}
-                    className={`inline-flex h-11 w-11 items-center justify-center text-ink transition hover:bg-canvas ${index > 0 ? 'border-l-2 border-line' : ''}`}
-                    data-testid={`view-switcher-${view}`}
-                >
-                    <ViewIcon view={view} />
-                </button>
-            ))}
+            <div className="flex items-center border-2 border-line bg-surface shadow-xl">
+                {destinations[currentView].map((view, index) => (
+                    <button
+                        key={view}
+                        type="button"
+                        onClick={() => onSelect(view)}
+                        aria-label={`${labels[view]} view`}
+                        title={`${labels[view]} view`}
+                        className={`inline-flex h-11 w-11 items-center justify-center text-ink transition hover:bg-canvas ${index > 0 ? 'border-l-2 border-line' : ''}`}
+                        data-testid={`view-switcher-${view}`}
+                    >
+                        <ViewIcon view={view} />
+                    </button>
+                ))}
+            </div>
             {onCreate && (
                 <button
                     type="button"
                     onClick={onCreate}
                     aria-label="Suggest an event"
                     title="Suggest an event"
-                    className="inline-flex h-11 w-11 items-center justify-center border-r-2 border-line text-action transition hover:bg-canvas"
+                    className="inline-flex h-12 w-12 items-center justify-center border-2 border-line bg-surface text-action shadow-xl transition hover:bg-canvas"
                     data-testid="view-switcher-create"
                 >
                     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">

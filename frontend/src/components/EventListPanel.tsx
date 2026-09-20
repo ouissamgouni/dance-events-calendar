@@ -245,6 +245,7 @@ export function EventListCard({
                     isSavedFlag={isSavedFlag}
                     isPast={isPast}
                     tagsAsBadge={tagsAsBadge}
+                    tagsFitWidth
                     goingIconVariant="hand"
                     showAvatars={!tribeLayout}
                     headerSlot={tribeLayout ? (
@@ -379,6 +380,7 @@ export function EventListCard({
                                 tags={event.tags}
                                 maxVisible={tagsAsBadge ? 4 : tagsPerCard}
                                 forceBadge={tagsAsBadge}
+                                fitWidth
                             />
                         </div>
                     )}
