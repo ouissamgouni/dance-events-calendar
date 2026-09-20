@@ -16,6 +16,7 @@ import EventSummary, { type EventDetailTab } from '../components/EventSummary';
 import EventDetailTabsBar from '../components/EventDetailTabsBar';
 import SummaryHeader from '../components/event-summary/SummaryHeader';
 import EventActionDock from '../components/EventActionDock';
+import EventPromoCodeDialog from '../components/EventPromoCodeDialog';
 import AboutTab from '../components/event-tabs/AboutTab';
 import LocationTab from '../components/event-tabs/LocationTab';
 import PeopleTab from '../components/event-tabs/PeopleTab';
@@ -59,6 +60,8 @@ export default function EventDetailPage() {
     // Bumped by the "Ask" action in the details actions bar to open the
     // message board's compose form (and scroll it into view).
     const [askComposeToken, setAskComposeToken] = useState(0);
+    const [showPromoDialog, setShowPromoDialog] = useState(false);
+    const [promoRefreshToken, setPromoRefreshToken] = useState(0);
 
     // Active detail tab. Initialised from `?tab=` on first render; kept in
     // sync with `#community`/`#messages` hashes below. `pendingAnchor` scrolls
@@ -379,7 +382,9 @@ export default function EventDetailPage() {
                                                 omitHeader
                                             />
                                         )}
-                                        {activeTab === 'about' && <AboutTab event={event} />}
+                                        {activeTab === 'about' && (
+                                            <AboutTab event={event} promoRefreshToken={promoRefreshToken} />
+                                        )}
                                         {activeTab === 'location' && <LocationTab event={event} />}
                                         {activeTab === 'people' && <PeopleTab eventId={event.event_id} />}
                                         {activeTab === 'reviews' && (
@@ -418,6 +423,7 @@ export default function EventDetailPage() {
                                         onRatingChanged={() => setReviewsRefreshToken((t) => t + 1)}
                                         eventHasReviews={reviewCount > 0}
                                         onPostMessage={() => { setAskComposeToken((t) => t + 1); goToTab('discussion'); }}
+                                        onAddPromoCode={() => setShowPromoDialog(true)}
                                         onSuggestEdit={() => {
                                             if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
                                             setShowSuggestTags(true);
@@ -436,6 +442,13 @@ export default function EventDetailPage() {
                             existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
                             deviceId={getDeviceId()}
                             onClose={() => setShowSuggestTags(false)}
+                        />
+                    )}
+                    {showPromoDialog && (
+                        <EventPromoCodeDialog
+                            eventId={event.event_id}
+                            onClose={() => setShowPromoDialog(false)}
+                            onSubmitted={() => setPromoRefreshToken((token) => token + 1)}
                         />
                     )}
                 </div>

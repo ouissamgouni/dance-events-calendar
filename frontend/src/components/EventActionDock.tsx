@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { MoreHorizontal } from 'lucide-react';
+import { MessageCircle, MoreHorizontal, Pencil, TicketPercent } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import GoingButton from './GoingButton';
 import SaveEventButton from './SaveEventButton';
 import ShareButton from './ShareButton';
 import RateEventButton from './RateEventButton';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
     event: CalendarEvent;
@@ -18,6 +19,8 @@ interface Props {
     onPostMessage: () => void;
     /** Optional "Suggest an edit" affordance. */
     onSuggestEdit?: () => void;
+    /** Open the add-promo-code sheet/modal. */
+    onAddPromoCode?: () => void;
 }
 
 /**
@@ -35,8 +38,10 @@ export default function EventActionDock({
     eventHasReviews,
     onPostMessage,
     onSuggestEdit,
+    onAddPromoCode,
 }: Props) {
     const { showRatings } = useFeatureFlags();
+    const { user } = useAuth();
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -52,8 +57,8 @@ export default function EventActionDock({
     const reviewInline = showRatings && isPast;
 
     return (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-slate-50/95 backdrop-blur shadow-[0_-2px_10px_rgba(15,23,42,0.06)] lg:sticky lg:inset-auto lg:top-6 lg:z-10 lg:rounded-card lg:border lg:bg-surface lg:p-4 lg:shadow-sm lg:backdrop-blur-none">
-            <div className="mx-auto flex max-w-[480px] items-center gap-2 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] lg:mx-0 lg:max-w-none lg:flex-wrap lg:px-0 lg:py-0 lg:pb-0">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 backdrop-blur shadow-[0_-2px_10px_rgba(15,23,42,0.06)] lg:sticky lg:inset-auto lg:top-6 lg:z-10 lg:rounded-card lg:border lg:bg-surface lg:p-4 lg:shadow-sm lg:backdrop-blur-none">
+            <div className="mx-auto flex max-w-[480px] items-center gap-2 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:mx-0 lg:max-w-none lg:flex-wrap lg:px-0 lg:py-0 lg:pb-0">
                 <SaveEventButton eventId={event.event_id} appearance="pill" className="border border-line" />
                 <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="border border-line" />
                 {reviewInline && (
@@ -75,7 +80,35 @@ export default function EventActionDock({
                     url={shareUrl}
                     className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas"
                 />
-                <div ref={menuRef} className="relative ml-auto">
+                <button
+                    type="button"
+                    onClick={onPostMessage}
+                    className="hidden h-10 items-center gap-2 rounded-field border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas lg:inline-flex"
+                >
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                    Discuss
+                </button>
+                {user && onAddPromoCode && (
+                    <button
+                        type="button"
+                        onClick={onAddPromoCode}
+                        className="hidden h-10 items-center gap-2 rounded-field border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas lg:inline-flex"
+                    >
+                        <TicketPercent className="h-4 w-4" aria-hidden="true" />
+                        Promo
+                    </button>
+                )}
+                {onSuggestEdit && (
+                    <button
+                        type="button"
+                        onClick={onSuggestEdit}
+                        className="hidden h-10 items-center gap-2 rounded-field border border-line bg-surface px-2.5 text-sm text-ink transition hover:bg-canvas lg:inline-flex"
+                    >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        Edit
+                    </button>
+                )}
+                <div ref={menuRef} className="relative ml-auto lg:hidden">
                     <button
                         type="button"
                         onClick={() => setMenuOpen((o) => !o)}
@@ -111,6 +144,16 @@ export default function EventActionDock({
                             >
                                 Start discussion
                             </button>
+                            {user && onAddPromoCode && (
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => { setMenuOpen(false); onAddPromoCode(); }}
+                                    className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
+                                >
+                                    Add promo code
+                                </button>
+                            )}
                             {onSuggestEdit && (
                                 <button
                                     type="button"

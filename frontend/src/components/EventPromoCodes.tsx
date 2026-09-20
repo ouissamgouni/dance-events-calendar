@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { isPromoSectionVisible } from '../utils/sectionVisibility';
 import type { CalendarEvent, PromoCode } from '../types';
+import EventPromoCodeDialog from './EventPromoCodeDialog';
 
 interface Props {
     event: CalendarEvent;
@@ -19,6 +20,7 @@ interface Props {
      * section, which supplies its own heading.
      */
     variant?: 'compact' | 'rows';
+    refreshToken?: number;
 }
 
 interface FormState {
@@ -39,7 +41,7 @@ function formatExpiry(iso: string | null): string {
     }
 }
 
-export function EventPromoCodes({ event, variant = 'compact' }: Props) {
+export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }: Props) {
     const eventId = event.event_id;
     const { promoCodesEnabled } = useFeatureFlags();
     const visible = isPromoSectionVisible(event, promoCodesEnabled);
@@ -49,6 +51,7 @@ export function EventPromoCodes({ event, variant = 'compact' }: Props) {
     const [collapsed, setCollapsed] = useState(true);
     const [openPromoId, setOpenPromoId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
+    const [showAddDialog, setShowAddDialog] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(emptyForm);
     const [submitting, setSubmitting] = useState(false);
@@ -70,7 +73,7 @@ export function EventPromoCodes({ event, variant = 'compact' }: Props) {
         return () => {
             alive = false;
         };
-    }, [eventId, visible]);
+    }, [eventId, visible, refreshToken]);
 
     if (!visible) return null;
 
@@ -239,6 +242,16 @@ export function EventPromoCodes({ event, variant = 'compact' }: Props) {
         </div>
     ) : null;
 
+    const addDialog = showAddDialog ? (
+        <EventPromoCodeDialog
+            eventId={eventId}
+            onClose={() => setShowAddDialog(false)}
+            onSubmitted={(saved) => {
+                setCodes((current) => [saved, ...current.filter((promo) => promo.id !== saved.id)]);
+            }}
+        />
+    ) : null;
+
     if (variant === 'rows') {
         return (
             <div className="flex flex-col gap-2 text-sm" data-testid="promo-codes-section">
@@ -294,12 +307,7 @@ export function EventPromoCodes({ event, variant = 'compact' }: Props) {
                 {isAuthed && !showForm && (
                     <button
                         type="button"
-                        onClick={() => {
-                            setShowForm(true);
-                            setEditingId(null);
-                            setForm(emptyForm);
-                            setFormError(null);
-                        }}
+                        onClick={() => setShowAddDialog(true)}
                         className="self-start rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-ink-soft hover:text-action hover:border-blue-400"
                     >
                         + Add a promo code
@@ -307,6 +315,7 @@ export function EventPromoCodes({ event, variant = 'compact' }: Props) {
                 )}
 
                 {promoForm}
+                {addDialog}
                 {toast}
             </div>
         );
@@ -358,12 +367,7 @@ export function EventPromoCodes({ event, variant = 'compact' }: Props) {
                         {isAuthed && !showForm && (
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setShowForm(true);
-                                    setEditingId(null);
-                                    setForm(emptyForm);
-                                    setFormError(null);
-                                }}
+                                onClick={() => setShowAddDialog(true)}
                                 className="border border-dashed border-line px-2 py-0.5 text-[11px] text-ink-soft hover:text-action hover:border-blue-400"
                             >
                                 + Add a promo code
@@ -516,6 +520,8 @@ export function EventPromoCodes({ event, variant = 'compact' }: Props) {
                     </div>
                 </div>
             )}
+
+            {addDialog}
 
             {toastMsg && (
                 <div

@@ -1,12 +1,8 @@
 import SubPage from './SubPage';
+import PromoCodeFields, { promoCodeFormError } from '../PromoCodeFields';
 import {
     btnPrimary,
     errorCls,
-    fieldLabelCls,
-    inputCls,
-    isLinkFilled,
-    isUrlValid,
-    scrollIntoViewOnFocus,
     type PatchState,
     type SuggestFormState,
 } from './formState';
@@ -24,10 +20,12 @@ interface Props {
  * else, so a long promo description can never be mistaken for a final confirm.
  */
 export default function PromoCodePage({ state, patch, onDone }: Props) {
-    const urlError =
-        isLinkFilled(state.promoSourceUrl) && !isUrlValid(state.promoSourceUrl)
-            ? 'Enter a valid URL (including https://).'
-            : null;
+    const value = {
+        code: state.promoCode,
+        sourceUrl: state.promoSourceUrl,
+        description: state.promoDescription,
+    };
+    const urlError = promoCodeFormError(value);
 
     return (
         <SubPage
@@ -39,45 +37,13 @@ export default function PromoCodePage({ state, patch, onDone }: Props) {
                 </button>
             }
         >
-            <label className={fieldLabelCls} htmlFor="promo-code">
-                Promo code
-            </label>
-            <input
-                id="promo-code"
-                type="text"
-                autoCapitalize="characters"
-                value={state.promoCode}
-                onChange={(e) => patch({ promoCode: e.target.value })}
-                onFocus={scrollIntoViewOnFocus}
-                placeholder="e.g. SALSA10"
-                className={inputCls}
-            />
-
-            <label className={`${fieldLabelCls} mt-4`} htmlFor="promo-url">
-                Where you found it
-            </label>
-            <input
-                id="promo-url"
-                type="url"
-                inputMode="url"
-                value={state.promoSourceUrl}
-                onChange={(e) => patch({ promoSourceUrl: e.target.value })}
-                onFocus={scrollIntoViewOnFocus}
-                placeholder="https://"
-                className={inputCls}
-            />
-
-            <label className={`${fieldLabelCls} mt-4`} htmlFor="promo-description">
-                Details
-            </label>
-            <textarea
-                id="promo-description"
-                value={state.promoDescription}
-                onChange={(e) => patch({ promoDescription: e.target.value })}
-                onFocus={scrollIntoViewOnFocus}
-                rows={6}
-                placeholder="What does the code get you, and who can use it?"
-                className={inputCls}
+            <PromoCodeFields
+                value={value}
+                onChange={(changes) => patch({
+                    ...(changes.code !== undefined && { promoCode: changes.code }),
+                    ...(changes.sourceUrl !== undefined && { promoSourceUrl: changes.sourceUrl }),
+                    ...(changes.description !== undefined && { promoDescription: changes.description }),
+                })}
             />
 
             {urlError ? <p className={errorCls}>{urlError}</p> : null}

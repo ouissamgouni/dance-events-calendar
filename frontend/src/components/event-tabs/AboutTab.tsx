@@ -10,6 +10,7 @@ import LinksRow from '../event-summary/LinksRow';
 
 interface Props {
     event: CalendarEvent;
+    promoRefreshToken?: number;
 }
 
 function priceRange(event: CalendarEvent): string | null {
@@ -23,7 +24,7 @@ function priceRange(event: CalendarEvent): string | null {
 }
 
 /** Details tab: description, tags, series, links, price & promo codes. */
-export default function AboutTab({ event }: Props) {
+export default function AboutTab({ event, promoRefreshToken }: Props) {
     const { showPrices } = useFeatureFlags();
     const price = isPriceSectionVisible(event, showPrices) ? priceRange(event) : null;
     return (
@@ -31,7 +32,11 @@ export default function AboutTab({ event }: Props) {
             {event.description && (
                 <section className="space-y-2">
                     <h3 className="text-sm font-semibold text-ink">About this event</h3>
-                    <ExpandableDescription text={event.description} clampClass="line-clamp-5" />
+                    <ExpandableDescription
+                        text={event.description}
+                        maxLines={5}
+                        moreBackgroundClassName="bg-canvas"
+                    />
                 </section>
             )}
 
@@ -52,16 +57,16 @@ export default function AboutTab({ event }: Props) {
                         <p className="text-lg font-bold text-ink">{price}</p>
                         <p className="text-xs text-muted">Typical admission price</p>
                     </div>
-                    <EventPromoCodes event={event} variant="rows" />
+                    <EventPromoCodes event={event} variant="rows" refreshToken={promoRefreshToken} />
                 </section>
             ) : event.has_active_promo_codes ? (
                 <section id="discounts" className="scroll-mt-24 space-y-3">
                     <h3 className="text-sm font-semibold text-ink">Promo codes</h3>
-                    <EventPromoCodes event={event} variant="rows" />
+                    <EventPromoCodes event={event} variant="rows" refreshToken={promoRefreshToken} />
                 </section>
             ) : (
                 <div id="discounts" className="scroll-mt-24">
-                    <EventPromoCodes event={event} variant="rows" />
+                    <EventPromoCodes event={event} variant="rows" refreshToken={promoRefreshToken} />
                 </div>
             )}
         </div>

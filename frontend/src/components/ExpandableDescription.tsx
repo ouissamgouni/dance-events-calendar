@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { cleanEventDescription } from '../utils/eventDescription';
 
 interface Props {
     text: string;
     compact?: boolean;
-    /** Tailwind line-clamp class. Defaults to line-clamp-6. */
-    clampClass?: string;
+    /** Maximum visible lines while collapsed. Defaults to 6. */
+    maxLines?: number;
+    /** Opaque background behind the inline more control. */
+    moreBackgroundClassName?: string;
     /** When set, the whole preview opens another view instead of expanding inline. */
     onOpen?: () => void;
 }
@@ -17,19 +20,21 @@ interface Props {
 export default function ExpandableDescription({
     text,
     compact = false,
-    clampClass = 'line-clamp-6',
+    maxLines = 6,
+    moreBackgroundClassName = 'bg-surface',
     onOpen,
 }: Props) {
     const [expanded, setExpanded] = useState(false);
     const [overflowing, setOverflowing] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
+    const ref = useRef<HTMLSpanElement>(null);
+    const displayText = cleanEventDescription(text);
 
     useLayoutEffect(() => {
         const el = ref.current;
         if (!el) return;
         // When collapsed, scrollHeight > clientHeight means content is clipped.
         setOverflowing(el.scrollHeight - el.clientHeight > 1);
-    }, [text]);
+    }, [displayText, maxLines]);
 
     // Re-measure on window resize (line wrapping changes with width).
     useEffect(() => {
@@ -42,21 +47,26 @@ export default function ExpandableDescription({
         return () => window.removeEventListener('resize', onResize);
     }, [expanded]);
 
+    const collapsedStyle = expanded
+        ? undefined
+        : { maxHeight: `${maxLines * 1.625}em` };
+
     const description = (
-        <div
+        <span
             ref={ref}
-            className={`whitespace-pre-line leading-relaxed text-ink-soft ${compact ? 'text-xs' : 'text-sm'} ${expanded ? '' : clampClass}`}
+            style={collapsedStyle}
+            className={`block whitespace-pre-line leading-relaxed text-ink-soft ${compact ? 'text-xs' : 'text-sm'} ${expanded ? '' : 'overflow-hidden'}`}
         >
-            {text}
-        </div>
+            {displayText}
+        </span>
     );
 
     if (onOpen) {
         return (
-            <button type="button" onClick={onOpen} className="block w-full text-left">
+            <button type="button" onClick={onOpen} className="relative block w-full text-left">
                 {description}
                 {overflowing && (
-                    <span className="mt-1 block text-sm font-medium text-action hover:underline">
+                    <span className={`absolute bottom-0 right-0 pl-1 text-sm font-medium text-action ${moreBackgroundClassName}`}>
                         …more
                     </span>
                 )}
@@ -66,14 +76,25 @@ export default function ExpandableDescription({
 
     return (
         <div>
-            {description}
-            {(overflowing || expanded) && (
+            <div className="relative">
+                {description}
+                {!expanded && overflowing && (
+                    <button
+                        type="button"
+                        onClick={() => setExpanded(true)}
+                        className={`absolute bottom-0 right-0 pl-1 text-xs font-medium text-action hover:underline ${moreBackgroundClassName}`}
+                    >
+                        …more
+                    </button>
+                )}
+            </div>
+            {expanded && (
                 <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
-                    className="mt-1 text-xs font-medium text-blue-500 hover:text-rose-700 transition"
+                    onClick={() => setExpanded(false)}
+                    className="mt-1 text-xs font-medium text-action hover:underline"
                 >
-                    {expanded ? 'Show less' : 'Show more'}
+                    Show less
                 </button>
             )}
         </div>
