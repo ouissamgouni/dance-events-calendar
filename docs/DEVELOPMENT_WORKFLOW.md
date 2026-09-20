@@ -442,7 +442,7 @@ If automatic deploy fails:
 
 **GitHub Secrets required** (stored in Environment "staging"):
 - `FLY_API_TOKEN` — Fly.io deploy token
-- `CLOUDFLARE_API_TOKEN` — Cloudflare Pages API token
+- `CLOUDFLARE_PAGES_API_TOKEN` — account-owned token with **Cloudflare Pages → Edit**, scoped to the Movida account
 - `STAGING_DATABASE_URL` — Neon develop branch connection string
 - `STAGING_ADMIN_EMAIL` — Admin user for staging
 - `STAGING_SESSION_SECRET` — Session signing key
@@ -1022,7 +1022,12 @@ Copy the `.example` file and fill in the Neon connection string from the dashboa
 
 ### Cloudflare authentication failed
 
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` live in `secrets.env` (shared). The token needs **Account → Cloudflare Pages → Edit** permission, plus **Account → Workers R2 Storage → Edit** if you run `task objects:*` against R2 (R2 S3 credentials are object-scoped and cannot create or delete buckets, so bucket lifecycle goes through the Cloudflare REST API).
+`CLOUDFLARE_PAGES_API_TOKEN`, `CLOUDFLARE_R2_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` live in `secrets.env` (shared). Use separate account-owned tokens scoped to the Movida account:
+
+- `CLOUDFLARE_PAGES_API_TOKEN` needs **Account → Cloudflare Pages → Edit** for frontend deployments.
+- `CLOUDFLARE_R2_API_TOKEN` needs **Account → Workers R2 Storage → Edit** for `task objects:*` against R2. R2 S3 credentials are object-scoped and cannot create or delete buckets, so bucket lifecycle goes through the Cloudflare REST API.
+
+The deploy task validates access to the configured Pages project before building. `wrangler whoami` only proves a token is active and does not prove it can access that project.
 
 ### Database connection failed
 

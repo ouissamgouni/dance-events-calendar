@@ -122,11 +122,11 @@ def bucket_exists(client, bucket: str) -> bool:
 
 def _r2_api(method: str, path: str, **kwargs) -> httpx.Response:
     account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
-    token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+    token = os.getenv("CLOUDFLARE_R2_API_TOKEN", "").strip()
     if not (account_id and token):
         raise ObjectStorageError(
             "R2 bucket management needs CLOUDFLARE_ACCOUNT_ID and "
-            "CLOUDFLARE_API_TOKEN (R2 S3 tokens are object-scoped and cannot "
+            "CLOUDFLARE_R2_API_TOKEN (R2 S3 tokens are object-scoped and cannot "
             "create or delete buckets)"
         )
     url = f"{CLOUDFLARE_API_BASE}/accounts/{account_id}/r2/buckets{path}"
@@ -143,7 +143,7 @@ def _r2_api_error(action: str, bucket: str, response: httpx.Response) -> str:
     hint = ""
     if response.status_code in (401, 403):
         hint = (
-            " — CLOUDFLARE_API_TOKEN needs the account permission "
+            " — CLOUDFLARE_R2_API_TOKEN needs the account permission "
             "'Workers R2 Storage: Edit'"
         )
     return f"Cloudflare API refused to {action} bucket {bucket}: {response.text}{hint}"
