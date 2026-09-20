@@ -258,7 +258,7 @@ function AppShell() {
                 <Route
                   path="/admin"
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute requireAdmin>
                       <Admin />
                     </ProtectedRoute>
                   }
@@ -266,7 +266,7 @@ function AppShell() {
                 <Route
                   path="/admin/:tab"
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute requireAdmin>
                       <Admin />
                     </ProtectedRoute>
                   }

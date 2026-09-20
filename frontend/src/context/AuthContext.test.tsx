@@ -108,4 +108,52 @@ describe('ProtectedRoute', () => {
 
         await waitFor(() => expect(screen.getByText('secret content')).toBeInTheDocument())
     })
+
+    it.each([false, undefined])('redirects a non-admin user home when admin access is required', async (isAdmin) => {
+        server.use(http.get('*/api/auth/me', () => HttpResponse.json(makeUser({ is_admin: isAdmin }))))
+
+        render(
+            <MemoryRouter initialEntries={['/admin']}>
+                <AuthProvider>
+                    <Routes>
+                        <Route
+                            path="/admin"
+                            element={
+                                <ProtectedRoute requireAdmin>
+                                    <p>admin content</p>
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route path="/" element={<p>home page</p>} />
+                    </Routes>
+                </AuthProvider>
+            </MemoryRouter>,
+        )
+
+        await waitFor(() => expect(screen.getByText('home page')).toBeInTheDocument())
+        expect(screen.queryByText('admin content')).not.toBeInTheDocument()
+    })
+
+    it('renders admin content for an admin user', async () => {
+        server.use(http.get('*/api/auth/me', () => HttpResponse.json(makeUser({ is_admin: true }))))
+
+        render(
+            <MemoryRouter initialEntries={['/admin']}>
+                <AuthProvider>
+                    <Routes>
+                        <Route
+                            path="/admin"
+                            element={
+                                <ProtectedRoute requireAdmin>
+                                    <p>admin content</p>
+                                </ProtectedRoute>
+                            }
+                        />
+                    </Routes>
+                </AuthProvider>
+            </MemoryRouter>,
+        )
+
+        await waitFor(() => expect(screen.getByText('admin content')).toBeInTheDocument())
+    })
 })

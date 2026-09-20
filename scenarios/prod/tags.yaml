@@ -110,22 +110,6 @@ tag_groups:
         label: Practice
         ordinal: 9
         synonyms: ["practica", "práctica", "training", "drill", "drills"]
-      - slug: trip
-        label: Trip
-        ordinal: 10
-        synonyms: ["getaway", "retreat", "tour", "excursion"]
-      - slug: live-band
-        label: Live band
-        ordinal: 11
-        synonyms: ["live music", "orchestra"]
-      - slug: pool-party
-        label: Pool party
-        ordinal: 12
-        synonyms: ["pool"]
-      - slug: beach-side
-        label: Beach Side
-        ordinal: 13
-        synonyms: ["beach"]
 
   - slug: reach
     label: Event reach
