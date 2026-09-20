@@ -53,6 +53,8 @@ export interface EventCardProps {
     isSavedFlag?: boolean;
     hideAvatarsIfOnlyCurrentUser?: boolean;
     tagsAsBadge?: boolean;
+    /** Fit tag badges and their overflow count on a single line. */
+    tagsFitWidth?: boolean;
     maxTags?: number;
     // Slots
     /** Content rendered full-width at the very top of the card, above the
@@ -109,6 +111,7 @@ export default function EventCard({
     isSavedFlag = false,
     hideAvatarsIfOnlyCurrentUser = false,
     tagsAsBadge = false,
+    tagsFitWidth = false,
     maxTags,
     headerSlot,
     bottomSlot,
@@ -221,6 +224,7 @@ export default function EventCard({
                         tags={event.tags}
                         maxVisible={maxTags ?? (tagsAsBadge ? 4 : tagsPerCard)}
                         forceBadge={tagsAsBadge}
+                        fitWidth={tagsFitWidth}
                     />
                 )}
             </div>
