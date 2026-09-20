@@ -85,6 +85,56 @@ describe('NotificationsPage (milestone rows)', () => {
         await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/mine/passport'))
         expect(navigateMock).not.toHaveBeenCalledWith('/event/null')
     })
+
+    it('renders a followed user milestone batch and routes to their profile', async () => {
+        server.use(
+            http.get('*/api/notifications', () =>
+                HttpResponse.json({
+                    items: [
+                        {
+                            id: 92,
+                            kind: 'subscription_milestone',
+                            event_id: null,
+                            event_title: null,
+                            event_start: null,
+                            context: 'Regular',
+                            subject_key: 'events_5',
+                            milestones: [
+                                { subject_key: 'first_event', name: 'First Steps' },
+                                { subject_key: 'events_5', name: 'Regular' },
+                            ],
+                            actor: {
+                                handle: 'alice',
+                                display_name: 'Alice',
+                                avatar_url: null,
+                                is_verified_organizer: false,
+                            },
+                            created_at: '2026-06-25T10:00:00Z',
+                            read_at: null,
+                        },
+                    ],
+                    total: 1,
+                    unread_count: 1,
+                    limit: 50,
+                    offset: 0,
+                }),
+            ),
+        )
+
+        const user = userEvent.setup()
+        render(
+            <MemoryRouter>
+                <NotificationsPage />
+            </MemoryRouter>,
+        )
+
+        expect(await screen.findByText(/unlocked 2 milestones/i)).toBeInTheDocument()
+        expect(screen.getByText('Alice')).toBeInTheDocument()
+        expect(screen.getByText(/first steps, regular/i)).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: /alice unlocked 2 milestones/i }))
+        await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/u/alice'))
+    })
 })
 
 const actor = (over: Record<string, unknown> = {}) => ({

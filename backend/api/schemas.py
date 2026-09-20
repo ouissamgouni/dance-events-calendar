@@ -877,6 +877,9 @@ class SiteSettingsResponse(BaseModel):
     event_card_show_time_location_icons_enabled: bool = False
     # When True, the explorer list renders the shared My Events card style.
     explorer_event_card_card_style_enabled: bool = False
+    # When True, floating Explorer controls show labels below desktop widths.
+    # Desktop controls are always labeled.
+    explorer_view_control_labels_enabled: bool = True
     # When True, event pictures render on cards and detail pages. Admin upload
     # stays available regardless so images can be prepared before going live.
     event_images_enabled: bool = False
@@ -1121,6 +1124,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     event_card_show_people_icon_enabled: Optional[bool] = None
     event_card_show_time_location_icons_enabled: Optional[bool] = None
     explorer_event_card_card_style_enabled: Optional[bool] = None
+    explorer_view_control_labels_enabled: Optional[bool] = None
     event_images_enabled: Optional[bool] = None
     event_card_placeholder_style: Optional[str] = Field(
         default=None, pattern="^(gradient|initial|none)$"
@@ -2313,6 +2317,12 @@ class NotificationActor(BaseModel):
     is_following: bool = False
 
 
+class NotificationMilestoneSummary(BaseModel):
+    subject_key: str
+    name: str
+    description: Optional[str] = None
+
+
 class NotificationItem(BaseModel):
     """A single in-app notification row.
 
@@ -2339,6 +2349,7 @@ class NotificationItem(BaseModel):
     actors: list[NotificationActor] = []
     actor_count: int = 1
     member_ids: list[int] = []
+    milestones: list[NotificationMilestoneSummary] = Field(default_factory=list)
     context: Optional[str] = None
 
     subject_key: Optional[str] = None

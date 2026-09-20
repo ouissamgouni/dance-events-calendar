@@ -18,6 +18,7 @@ import os
 from datetime import datetime, timedelta
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 
@@ -322,6 +323,81 @@ def test_run_once_is_idempotent_across_ticks(session):
         select(Notification).where(Notification.kind == svc.INTEREST_EVENT)
     ).all()
     assert len(notifs) == 1
+
+
+def test_run_once_does_not_renotify_after_same_event_update(session):
+    dance_group = _make_tag_group(session, "dance")
+    salsa = _make_tag(session, dance_group, "salsa")
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_profile(session, alice, dance_tags=[salsa])
+
+    event = _make_event(session, "ev-1")
+    _tag_event(session, event.event_id, salsa)
+
+    assert svc.run_once()["created"] == 1
+
+    event.title = "Updated event title"
+    event.updated_at = datetime.utcnow() + timedelta(seconds=1)
+    session.add(event)
+    session.commit()
+
+    assert svc.run_once()["created"] == 0
+    notifs = session.exec(
+        select(Notification).where(Notification.kind == svc.INTEREST_EVENT)
+    ).all()
+    assert len(notifs) == 1
+
+
+def test_event_notification_dedupe_is_enforced_by_metadata_schema(session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(session, "ev-1")
+    values = {
+        "recipient_user_id": alice.id,
+        "actor_user_id": alice.id,
+        "kind": svc.INTEREST_EVENT,
+        "event_id": "ev-1",
+    }
+    session.add(Notification(**values))
+    session.commit()
+
+    session.add(Notification(**values))
+    with pytest.raises(IntegrityError):
+        session.commit()
+    session.rollback()
+
+
+def test_scan_treats_event_dedupe_conflict_as_idempotent(session, monkeypatch):
+    dance_group = _make_tag_group(session, "dance")
+    salsa = _make_tag(session, dance_group, "salsa")
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_profile(session, alice, dance_tags=[salsa])
+    event = _make_event(session, "ev-1")
+    _tag_event(session, event.event_id, salsa)
+
+    session.add(
+        Notification(
+            recipient_user_id=alice.id,
+            actor_user_id=alice.id,
+            kind=svc.INTEREST_EVENT,
+            event_id=event.event_id,
+        )
+    )
+    session.commit()
+    monkeypatch.setattr(svc, "_existing_notification_pairs", lambda *_: set())
+
+    result = svc._scan_and_create(
+        session,
+        event.updated_at - timedelta(seconds=1),
+        event.updated_at + timedelta(seconds=1),
+    )
+    session.commit()
+
+    assert result["created"] == 0
+    rows = session.exec(
+        select(Notification).where(Notification.kind == svc.INTEREST_EVENT)
+    ).all()
+    assert len(rows) == 1
 
 
 def test_run_once_ignores_user_channel_flags(session):

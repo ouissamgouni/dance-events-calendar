@@ -84,7 +84,7 @@ function formatPeriodLabel(startDate: string, endDate: string): string {
     }
     if (!start || !end) return `${startDate}-${endDate}`;
     const sameYear = start.getFullYear() === end.getFullYear();
-    const currentYear = today.getFullYear();
+    const sameMonth = sameYear && start.getMonth() === end.getMonth();
     const fmt = (d: Date, withYear: boolean) =>
         d.toLocaleDateString(undefined, {
             month: 'short',
@@ -94,7 +94,10 @@ function formatPeriodLabel(startDate: string, endDate: string): string {
     const startLabel = start.getTime() === today.getTime()
         ? 'Today'
         : fmt(start, !sameYear);
-    return `${startLabel}–${fmt(end, end.getFullYear() !== currentYear || !sameYear)}`;
+    const endLabel = sameMonth && start.getTime() !== today.getTime()
+        ? end.toLocaleDateString(undefined, { day: 'numeric' })
+        : fmt(end, !sameYear);
+    return `${startLabel}–${endLabel}`;
 }
 
 // Shared pill chrome. Neutral only — no accent/blue tone. Rounded ~10px to

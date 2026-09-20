@@ -126,6 +126,29 @@ class TestSettingsEndpoint:
         assert resp.status_code == 200
         assert resp.json()["my_events_nav_enabled"] is True
 
+    def test_admin_can_update_explorer_view_control_labels_flag(self, sqlite_client):
+        client, engine = sqlite_client
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["explorer_view_control_labels_enabled"] is True
+
+        resp = client.put(
+            "/api/settings",
+            json={"explorer_view_control_labels_enabled": False},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["explorer_view_control_labels_enabled"] is False
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "explorer_view_control_labels_enabled")
+            assert row is not None
+            assert row.value == "false"
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["explorer_view_control_labels_enabled"] is False
+
     def test_admin_can_update_my_events_nav_enabled_flag(self, sqlite_client):
         """Verify admin can explicitly disable My Events nav and it persists."""
         client, engine = sqlite_client

@@ -56,7 +56,7 @@ export default function EventActions({
     const reviewInline = showRatings && canReviewInline;
 
     return (
-        <div className="flex w-full flex-nowrap items-center gap-1">
+        <div className="flex w-full min-w-0 flex-nowrap items-center gap-1">
             <SaveEventButton eventId={event.event_id} appearance="pill" className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
             <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
             {!isPast && (
@@ -90,7 +90,7 @@ export default function EventActions({
                     aria-label="More actions"
                     aria-haspopup="menu"
                     aria-expanded={menuOpen}
-                    className="inline-flex h-10 w-9 shrink-0 items-center justify-center rounded-field border border-line bg-surface text-ink-soft transition hover:bg-canvas"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-ink-soft transition hover:bg-canvas"
                 >
                     <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                 </button>

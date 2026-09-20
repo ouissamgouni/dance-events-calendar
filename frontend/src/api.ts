@@ -265,6 +265,9 @@ export interface SiteSettings {
     /** When true, the explorer list renders the shared My Events card style.
      * Client default: false. */
     explorer_event_card_card_style_enabled?: boolean;
+    /** When true, floating Explorer controls show labels below desktop widths.
+     * Desktop controls are always labeled. Client default: true. */
+    explorer_view_control_labels_enabled?: boolean;
     /** When true, event pictures are displayed across cards and detail views.
      * Admins can always manage pictures regardless of this flag.
      * Client default: false. */
@@ -1857,6 +1860,12 @@ export interface NotificationActor {
     is_following?: boolean;
 }
 
+export interface NotificationMilestoneSummary {
+    subject_key: string;
+    name: string;
+    description?: string | null;
+}
+
 export interface NotificationItem {
     id: number;
     kind: NotificationKind;
@@ -1876,6 +1885,8 @@ export interface NotificationItem {
     /** All raw notification ids folded into this group, so a single
      *  mark-read clears every sibling. */
     member_ids?: number[];
+    /** Milestones folded into one evaluation batch. Empty for other kinds. */
+    milestones?: NotificationMilestoneSummary[];
     /** Extra rendering context, e.g. the matched interest profile label(s)
      *  for `interest_event` rows (comma-joined when multiple profiles
      *  matched). Null for kinds that don't use it. */

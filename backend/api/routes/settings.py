@@ -321,6 +321,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         explorer_event_card_card_style_enabled=_get_bool_setting(
             session, "explorer_event_card_card_style_enabled"
         ),
+        explorer_view_control_labels_enabled=_get_bool_setting(
+            session, "explorer_view_control_labels_enabled", default=True
+        ),
         event_images_enabled=_get_bool_setting(session, "event_images_enabled"),
         event_card_placeholder_style=_get_str_setting(
             session, "event_card_placeholder_style", "gradient"
@@ -555,6 +558,13 @@ def update_settings(
             session,
             "explorer_event_card_card_style_enabled",
             body.explorer_event_card_card_style_enabled,
+        )
+
+    if body.explorer_view_control_labels_enabled is not None:
+        _set_bool_setting(
+            session,
+            "explorer_view_control_labels_enabled",
+            body.explorer_view_control_labels_enabled,
         )
 
     if body.event_images_enabled is not None:

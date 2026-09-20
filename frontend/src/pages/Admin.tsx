@@ -241,6 +241,7 @@ export default function Admin() {
     const [eventCardShowPeopleIconEnabled, setEventCardShowPeopleIconEnabled] = useState(false);
     const [eventCardShowTimeLocationIconsEnabled, setEventCardShowTimeLocationIconsEnabled] = useState(false);
     const [explorerEventCardCardStyleEnabled, setExplorerEventCardCardStyleEnabled] = useState(false);
+    const [explorerViewControlLabelsEnabled, setExplorerViewControlLabelsEnabled] = useState(true);
     const [eventImagesEnabled, setEventImagesEnabled] = useState(false);
     const [eventCardPlaceholderStyle, setEventCardPlaceholderStyle] = useState<'gradient' | 'initial' | 'none'>('gradient');
     // Notification / re-engagement gates. Booleans are master switches
@@ -425,6 +426,7 @@ export default function Admin() {
             setEventCardShowPeopleIconEnabled(s.event_card_show_people_icon_enabled ?? false);
             setEventCardShowTimeLocationIconsEnabled(s.event_card_show_time_location_icons_enabled ?? false);
             setExplorerEventCardCardStyleEnabled(s.explorer_event_card_card_style_enabled ?? false);
+            setExplorerViewControlLabelsEnabled(s.explorer_view_control_labels_enabled ?? true);
             setEventImagesEnabled(s.event_images_enabled ?? false);
             setEventCardPlaceholderStyle(s.event_card_placeholder_style ?? 'gradient');
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
@@ -877,6 +879,18 @@ export default function Admin() {
         } catch {
             setExplorerEventCardCardStyleEnabled(!newVal);
             setMessage('Failed to update explorer card style toggle.');
+        }
+    };
+
+    const handleToggleExplorerViewControlLabels = async () => {
+        const newVal = !explorerViewControlLabelsEnabled;
+        setExplorerViewControlLabelsEnabled(newVal);
+        try {
+            await updateSettings({ explorer_view_control_labels_enabled: newVal });
+            setMessage(`Explorer control labels ${newVal ? 'enabled' : 'disabled'} on smaller screens.`);
+        } catch {
+            setExplorerViewControlLabelsEnabled(!newVal);
+            setMessage('Failed to update Explorer control labels toggle.');
         }
     };
 
@@ -2273,6 +2287,21 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${explorerEventCardCardStyleEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${explorerEventCardCardStyleEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Explorer: floating control labels */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Explorer control labels</span>
+                                        <p className="text-[10px] text-muted">Show Map, Calendar, List and Add labels on smaller screens</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleExplorerViewControlLabels}
+                                        aria-label="Toggle Explorer control labels"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${explorerViewControlLabelsEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${explorerViewControlLabelsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

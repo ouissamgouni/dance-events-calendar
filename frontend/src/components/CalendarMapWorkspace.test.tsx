@@ -43,15 +43,17 @@ describe('CalendarMapWorkspace', () => {
         );
 
         expect(await screen.findByTestId('calendar')).toHaveAttribute('data-view-mode', '3week');
-        expect(await screen.findByText(/Sep 1.*21, 2026/)).toBeInTheDocument();
+        expect(await screen.findByText(/Sep 1.*21$/)).toBeInTheDocument();
         expect(onDatesChange).toHaveBeenCalled();
 
         await user.click(screen.getByRole('button', { name: '30d' }));
         expect(onViewModeChange).toHaveBeenCalledWith('month');
 
-        await user.click(screen.getByRole('button', { name: 'Show map only' }));
+        const mapOnlyButton = screen.getByRole('button', { name: 'Show map only' });
+        expect(mapOnlyButton).toHaveTextContent('Map only');
+        await user.click(mapOnlyButton);
         expect(screen.getByTestId('map')).toHaveAttribute('data-calendar-visible', 'false');
-        expect(screen.getByRole('button', { name: 'Show calendar and map' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Show calendar and map' })).toHaveTextContent('Calendar + map');
     });
 
     it('renders a calendar-only workspace without map controls', async () => {

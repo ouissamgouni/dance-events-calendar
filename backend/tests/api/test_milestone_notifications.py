@@ -154,6 +154,41 @@ def test_distinct_milestones_get_distinct_notifications(session):
         ).all()
     }
     assert {"first_event", "events_5"} <= keys
+    grouped = session.exec(
+        select(Notification).where(
+            Notification.kind == "milestone_unlocked",
+            Notification.subject_key.in_(("first_event", "events_5")),
+        )
+    ).all()
+    assert grouped[0].group_key is not None
+    assert {n.group_key for n in grouped} == {grouped[0].group_key}
+
+
+def test_later_milestone_evaluation_gets_a_new_group(session):
+    bob = _make_user(session, "bob@example.com", "bob")
+    _attend_past_event(session, bob, "ev-0", days_ago=100)
+    assert milestone_notification_service.run_once()["milestones"] == 1
+
+    first = session.exec(
+        select(Notification).where(
+            Notification.kind == "milestone_unlocked",
+            Notification.subject_key == "first_event",
+        )
+    ).one()
+    assert first.group_key is not None
+
+    for i in range(1, 5):
+        _attend_past_event(session, bob, f"ev-{i}", days_ago=100 - i)
+    assert milestone_notification_service.run_once()["milestones"] == 1
+
+    fifth = session.exec(
+        select(Notification).where(
+            Notification.kind == "milestone_unlocked",
+            Notification.subject_key == "events_5",
+        )
+    ).one()
+    assert fifth.group_key is not None
+    assert fifth.group_key != first.group_key
 
 
 def test_multiple_milestones_combined_into_one_email(session, monkeypatch):
@@ -161,12 +196,17 @@ def test_multiple_milestones_combined_into_one_email(session, monkeypatch):
     session.add(SiteSetting(key="milestone_unlocked_email_instant", value="true"))
     session.commit()
     calls: list = []
+    push_calls: list = []
     monkeypatch.setattr(
         milestone_notification_service,
         "send_milestone_instant_email",
         lambda u, ms: calls.append([m.key for m in ms]) or True,
     )
-    monkeypatch.setattr(milestone_notification_service, "send_push", lambda *a, **k: 0)
+    monkeypatch.setattr(
+        milestone_notification_service,
+        "send_push",
+        lambda *a, **k: push_calls.append(k) or 1,
+    )
     fran = _make_user(session, "fran@example.com", "fran")
     for i in range(10):
         _attend_past_event(session, fran, f"fev-{i}", days_ago=100 - i)
@@ -177,12 +217,16 @@ def test_multiple_milestones_combined_into_one_email(session, monkeypatch):
     # A single email call covering both milestones.
     assert len(calls) == 1
     assert set(calls[0]) == {"first_event", "events_5"}
+    assert len(push_calls) == 1
+    assert "First Steps" in push_calls[0]["body"]
+    assert "Regular" in push_calls[0]["body"]
     # Both notification rows stamped emailed_at by the one send.
     notifs = session.exec(
         select(Notification).where(Notification.kind == "milestone_unlocked")
     ).all()
     assert len(notifs) == 2
     assert all(n.emailed_at is not None for n in notifs)
+    assert all(n.pushed_at is not None for n in notifs)
 
 
 def test_digest_mode_defers_milestone_email(session, monkeypatch):
@@ -349,13 +393,12 @@ def test_consistency_reach_emails_and_pushes(session, monkeypatch):
         and desc == "Active 3 of the last 12 months"
         for key, desc in emailed
     )
-    # Push fired for the consistency reach carrying its description.
-    assert any(
-        tag is not None
-        and tag.startswith("milestone:consistency:consistency_3:")
-        and "Active 3 of the last 12 months" in (body or "")
-        for tag, body in pushed
-    )
+    # One grouped push names both milestones unlocked by this evaluation.
+    assert len(pushed) == 1
+    tag, body = pushed[0]
+    assert tag is not None and tag.startswith("milestone:")
+    assert "2 milestones" in body
+    assert "Consistent" in body
     # Both channels stamped on the consistency notification row.
     session.refresh(consistency[0])
     assert consistency[0].emailed_at is not None

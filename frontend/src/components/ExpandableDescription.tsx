@@ -1,8 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Props {
     text: string;
     compact?: boolean;
+    /** Larger body copy with a centered expansion control for the Details tab. */
+    variant?: 'default' | 'details';
     /** Tailwind line-clamp class. Defaults to line-clamp-6. */
     clampClass?: string;
     /** Numeric line limit used when a generated Tailwind class is unavailable. */
@@ -21,6 +24,7 @@ interface Props {
 export default function ExpandableDescription({
     text,
     compact = false,
+    variant = 'default',
     clampClass = 'line-clamp-6',
     maxLines,
     moreBackgroundClassName = 'bg-surface',
@@ -48,10 +52,11 @@ export default function ExpandableDescription({
         return () => window.removeEventListener('resize', onResize);
     }, [expanded]);
 
+    const details = variant === 'details';
     const description = (
         <div
             ref={ref}
-            className={`whitespace-pre-line leading-relaxed text-ink-soft ${compact ? 'text-xs' : 'text-sm'} ${expanded || maxLines != null ? '' : clampClass}`}
+            className={`whitespace-pre-line text-ink-soft ${details ? 'text-sm leading-relaxed' : `leading-relaxed ${compact ? 'text-xs' : 'text-sm'}`} ${expanded || maxLines != null ? '' : clampClass}`}
             style={!expanded && maxLines != null ? {
                 display: '-webkit-box',
                 WebkitBoxOrient: 'vertical',
@@ -73,6 +78,27 @@ export default function ExpandableDescription({
                     </span>
                 )}
             </button>
+        );
+    }
+
+    if (details) {
+        return (
+            <div>
+                {description}
+                {overflowing && (
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setExpanded((current) => !current); }}
+                        aria-expanded={expanded}
+                        className="mx-auto mt-3 flex items-center gap-1 text-sm font-medium text-action hover:underline"
+                    >
+                        {expanded ? 'Show less' : 'Read more'}
+                        {expanded
+                            ? <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                            : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
+                    </button>
+                )}
+            </div>
         );
     }
 

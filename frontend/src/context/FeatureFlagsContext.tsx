@@ -60,6 +60,8 @@ export interface FeatureFlags {
     eventCardShowTimeLocationIconsEnabled: boolean;
     /** When true, the explorer list renders the shared My Events card style. */
     explorerEventCardCardStyleEnabled: boolean;
+    /** Show floating Explorer control labels below desktop widths. */
+    explorerViewControlLabelsEnabled: boolean;
     /** When true, event pictures are displayed. Admin picture management is
      * always available regardless of this flag. */
     eventImagesEnabled: boolean;
@@ -98,6 +100,7 @@ const defaultFlags: FeatureFlags = {
     eventCardShowPeopleIconEnabled: false,
     eventCardShowTimeLocationIconsEnabled: false,
     explorerEventCardCardStyleEnabled: true,
+    explorerViewControlLabelsEnabled: true,
     eventImagesEnabled: false,
     eventCardPlaceholderStyle: 'gradient',
 };
@@ -153,6 +156,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     eventCardShowPeopleIconEnabled: s.event_card_show_people_icon_enabled ?? false,
                     eventCardShowTimeLocationIconsEnabled: s.event_card_show_time_location_icons_enabled ?? false,
                     explorerEventCardCardStyleEnabled: s.explorer_event_card_card_style_enabled ?? false,
+                    explorerViewControlLabelsEnabled: s.explorer_view_control_labels_enabled ?? true,
                     eventImagesEnabled: s.event_images_enabled ?? false,
                     eventCardPlaceholderStyle: s.event_card_placeholder_style ?? 'gradient',
                 });

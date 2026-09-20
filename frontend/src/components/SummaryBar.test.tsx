@@ -122,6 +122,16 @@ describe('SummaryBar', () => {
         window.ResizeObserver = OriginalResizeObserver;
     });
 
+    it.each([
+        ['same-month', '2026-01-01', '2026-01-31', 'Jan 1–31'],
+        ['same-year', '2026-01-31', '2026-02-05', 'Jan 31–Feb 5'],
+        ['cross-year', '2025-12-30', '2026-01-02', 'Dec 30, 2025–Jan 2, 2026'],
+    ])('formats a compact %s period label', (_case, startDate, endDate, expected) => {
+        render(<SummaryBar {...baseProps({ startDate, endDate })} />);
+
+        expect(screen.getByTestId('summary-chip-period')).toHaveTextContent(expected);
+    });
+
     it('renders the area chip with a map icon and opens the area picker on click', async () => {
         const onEditArea = vi.fn();
         render(<SummaryBar {...baseProps({ onEditArea })} />);

@@ -89,6 +89,7 @@ def _fan_out(
     *,
     audience: str = "public",
     subject_key: str | None = None,
+    group_key: str | None = None,
     context: str | None = None,
     description: str | None = None,
     skip_past_guard: bool = False,
@@ -164,6 +165,7 @@ def _fan_out(
             kind=kind,
             event_id=event_id,
             subject_key=subject_key,
+            group_key=group_key,
             context=context,
             description=description,
         )
@@ -234,6 +236,7 @@ def fan_out_milestone(
     subject_key: str,
     *,
     audience: str = "public",
+    group_key: str | None = None,
     context: str | None = None,
     description: str | None = None,
 ) -> int:
@@ -249,6 +252,7 @@ def fan_out_milestone(
         SUBSCRIPTION_MILESTONE,
         audience=audience,
         subject_key=subject_key,
+        group_key=group_key,
         context=context,
         description=description,
         skip_past_guard=True,

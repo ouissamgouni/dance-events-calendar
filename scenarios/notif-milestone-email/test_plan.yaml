@@ -1,14 +1,14 @@
 test_plan:
   name: "Milestones — personal unlock email routing"
   description: >
-    A personal Dance Passport milestone unlock (`milestone_unlocked`) is a
+    Personal Dance Passport milestone unlocks (`milestone_unlocked`) are
     configurable notification with its own admin "Milestones" box. In-app
     and push are always immediate. Email delivery is admin-routed per
-    feature: with instant OFF / digest ON (the default) the unlock email
-    arrives through the batched activity digest (the legacy digest line);
-    with instant ON the milestone service sends the rich per-milestone
-    email immediately. Additive — no template retirement, no combined
-    email, no card layout.
+    feature. Milestones discovered by one evaluation render and deliver as
+    one group while retaining one database row per milestone. With instant
+    OFF / digest ON (the default), the group arrives through the activity
+    digest; with instant ON, the milestone service sends one rich grouped
+    email immediately.
 
   preconditions:
     - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
@@ -17,11 +17,11 @@ test_plan:
       `SCENARIO=notif-milestone-email RESET=1 task start:scenario`
     - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
     - >-
-      Alice attends one past event, enough to unlock the "First Steps"
-      milestone.
+      Alice attends five past events, enough to unlock "First Steps" and
+      "Regular" in one evaluation.
 
   cast:
-    - "Alice — the only dancer; unlocks First Steps. Milestone email + push ON."
+    - "Alice — the only dancer; unlocks First Steps + Regular. Milestone email + push ON."
     - "Admin — signs in to the admin panel to configure the Milestones box."
 
   steps:
@@ -42,10 +42,11 @@ test_plan:
         With Instant OFF / Digest ON, trigger a dispatch tick:
         `SCENARIO=notif-milestone-email task notify:trigger:scenario`.
       expected: >
-        Alice gets a self `milestone_unlocked` in-app row and an immediate
-        push (pushed_at stamped). NO email arrives yet — the milestone
-        service left emailed_at NULL because instant is off. Mailpit inbox
-        is still empty.
+        Alice gets ONE visible in-app item saying she unlocked 2 milestones
+        and naming First Steps and Regular. Two atomic `milestone_unlocked`
+        rows share a non-null group_key and member_ids contains both IDs.
+        ONE immediate push names both milestones; both rows have pushed_at
+        stamped. NO email arrives yet because instant is off.
 
     - id: 3
       title: "Digest email delivered on the forced tick"
@@ -53,9 +54,9 @@ test_plan:
         Trigger a forced tick so the per-user digest schedule is bypassed:
         `SCENARIO=notif-milestone-email task notify:trigger:scenario -- --immediate-emails`.
       expected: >
-        Alice receives ONE activity digest email whose body includes the
-        milestone line "You unlocked First Steps …" (emailed_at stamped).
-        The email is the existing/legacy digest — no new combined template.
+        Alice receives ONE activity digest email with one logical milestone
+        item saying she unlocked 2 milestones and naming First Steps and
+        Regular. Both raw rows have emailed_at stamped.
 
     - id: 4
       title: "Master toggle OFF suppresses milestone notifications"
@@ -74,10 +75,10 @@ test_plan:
         checkbox on the "Milestone unlocked" card, RESET the scenario, and
         trigger a plain dispatch tick (no `--immediate-emails`).
       expected: >
-        Alice receives the rich per-milestone email immediately with no
-        schedule wait (instant_emailed_at stamped) containing "You unlocked
-        First Steps". Push still fires immediately. The digest track is
-        untouched (emailed_at stays NULL).
+        Alice receives ONE rich grouped email immediately with no schedule
+        wait, naming First Steps and Regular. Both rows have
+        instant_emailed_at stamped. ONE grouped push also fires immediately;
+        the digest track is untouched (emailed_at stays NULL).
 
     - id: 6
       title: "Send now delivers pending milestone email on demand"
@@ -93,6 +94,16 @@ test_plan:
       description: >
         Trigger a second dispatch tick without any new attendance.
       expected: >
-        Alice still has exactly one `milestone_unlocked` row for the First
-        Steps key — the `subject_key` dedupe prevents duplicates, and no
-        duplicate email is sent.
+        Alice still has exactly two atomic `milestone_unlocked` rows and one
+        visible grouped item. The `subject_key` dedupe prevents duplicate
+        rows, email, and push.
+
+    - id: 8
+      title: "A later evaluation forms a separate group"
+      description: >
+        After the first group is delivered, add enough new past attendance to
+        cross another milestone threshold and trigger another dispatch tick.
+      expected: >
+        The newly unlocked milestone has a different group_key and appears as
+        a separate in-app item. Reading either item does not mark the other
+        item read.

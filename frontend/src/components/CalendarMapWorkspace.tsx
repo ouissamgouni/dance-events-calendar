@@ -33,13 +33,17 @@ function rangeTitle(start: Date, end: Date): string {
     }
     const sameYear = start.getFullYear() === endInclusive.getFullYear();
     const sameMonth = sameYear && start.getMonth() === endInclusive.getMonth();
-    const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const startLabel = start.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: sameYear ? undefined : 'numeric',
+    });
     const endLabel = endInclusive.toLocaleDateString(undefined, {
         month: sameMonth ? undefined : 'short',
         day: 'numeric',
         year: sameYear ? undefined : 'numeric',
     });
-    return `${startLabel} – ${endLabel}${sameYear ? `, ${endInclusive.getFullYear()}` : ''}`;
+    return `${startLabel} – ${endLabel}`;
 }
 
 export default function CalendarMapWorkspace({
@@ -142,13 +146,14 @@ export default function CalendarMapWorkspace({
                     <button
                         type="button"
                         onClick={() => setCalendarVisible((visible) => !visible)}
-                        className="inline-flex h-8 w-8 items-center justify-center border border-line bg-surface text-ink transition hover:bg-canvas"
+                        className="inline-flex h-8 items-center justify-center gap-1.5 border border-line bg-surface px-2 text-xs font-medium text-ink transition hover:bg-canvas"
                         aria-pressed={!calendarVisible}
                         aria-label={calendarVisible ? 'Show map only' : 'Show calendar and map'}
                         title={calendarVisible ? 'Show map only' : 'Show calendar and map'}
                         data-testid="calendar-map-toggle"
                     >
                         {calendarVisible ? <Map className="h-4 w-4" aria-hidden="true" /> : <CalendarDays className="h-4 w-4" aria-hidden="true" />}
+                        <span>{calendarVisible ? 'Map only' : 'Calendar + map'}</span>
                     </button>
                 )}
             </div>
