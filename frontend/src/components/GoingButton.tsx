@@ -27,6 +27,7 @@ interface Props {
     prominent?: boolean;
     stopPropagation?: boolean;
     className?: string;
+    labelClassName?: string;
     /** When true, the event has already ended — labels use past tense ("Attended"). */
     isPast?: boolean;
     iconVariant?: 'hand' | 'person';
@@ -144,6 +145,7 @@ export default function GoingButton({
     appearance = 'icon',
     stopPropagation = false,
     className = '',
+    labelClassName = '',
     isPast = false,
     iconVariant,
 }: Props) {
@@ -525,7 +527,7 @@ export default function GoingButton({
                         className="flex items-center gap-2 px-3 text-sm transition-colors hover:bg-action/10 focus-visible:outline-none"
                     >
                         <AttendanceIcon variant={resolvedIconVariant} solid className="shrink-0" />
-                        {goingLabel}
+                        <span className={labelClassName}>{goingLabel}</span>
                     </button>
                     <button
                         type="button"
@@ -556,7 +558,7 @@ export default function GoingButton({
                         solid={going}
                         className="shrink-0"
                     />
-                    {going ? goingLabel : markLabel}
+                    <span className={labelClassName}>{going ? goingLabel : markLabel}</span>
                 </button>
                 {popover}
                 {postRsvpNode}

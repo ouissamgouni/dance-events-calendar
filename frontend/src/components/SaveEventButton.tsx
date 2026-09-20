@@ -14,6 +14,7 @@ interface Props {
     size?: 'sm' | 'md';
     stopPropagation?: boolean;
     className?: string;
+    labelClassName?: string;
 }
 
 interface PopoverPos { top: number; left: number; }
@@ -51,6 +52,7 @@ export default function SaveEventButton({
     appearance = 'icon',
     stopPropagation = false,
     className = '',
+    labelClassName = '',
 }: Props) {
     const { isSaved, toggleSave, getSavedAudience, setSavedAudience } = useSavedEvents();
     const { user } = useAuth();
@@ -246,7 +248,7 @@ export default function SaveEventButton({
                             />
                         </svg>
                     </span>
-                    {saved ? 'Saved' : 'Save'}
+                    <span className={labelClassName}>{saved ? 'Saved' : 'Save'}</span>
                 </button>
                 {toast.node}
                 {popover}

@@ -119,16 +119,16 @@ export default function EventDetailsPanel({
                     showActions={false}
                 />
             </div>
-            <div className="space-y-3 border-t border-card-line bg-canvas px-4 py-4">
-                <div className="flex justify-end">
-                    <Link
-                        to={detailPath}
-                        onClick={() => onClose?.()}
-                        className="text-xs font-medium text-action hover:underline"
-                    >
-                        See full details →
-                    </Link>
-                </div>
+            <div className="border-t border-card-line bg-surface px-4 py-2">
+                <Link
+                    to={detailPath}
+                    onClick={() => onClose?.()}
+                    className="text-xs font-medium text-action hover:underline"
+                >
+                    See full details →
+                </Link>
+            </div>
+            <div className="bg-action-tile px-4 py-3">
                 <EventActions
                     event={event}
                     isPast={isPast}

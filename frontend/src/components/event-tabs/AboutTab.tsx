@@ -7,6 +7,7 @@ import ExpandableDescription from '../ExpandableDescription';
 import EventSeriesLink from '../EventSeriesLink';
 import { EventPromoCodes } from '../EventPromoCodes';
 import LinksRow from '../event-summary/LinksRow';
+import { cleanEventDescription } from '../../utils/eventDescription';
 
 interface Props {
     event: CalendarEvent;
@@ -27,13 +28,14 @@ function priceRange(event: CalendarEvent): string | null {
 export default function AboutTab({ event, promoRefreshToken }: Props) {
     const { showPrices } = useFeatureFlags();
     const price = isPriceSectionVisible(event, showPrices) ? priceRange(event) : null;
+    const description = cleanEventDescription(event.description ?? '');
     return (
         <div className="space-y-6">
-            {event.description && (
+            {description && (
                 <section className="space-y-2">
                     <h3 className="text-sm font-semibold text-ink">About this event</h3>
                     <ExpandableDescription
-                        text={event.description}
+                        text={description}
                         maxLines={5}
                         moreBackgroundClassName="bg-canvas"
                     />
