@@ -20,7 +20,6 @@ export default function MilestoneCarousel({ milestones }: MilestoneCarouselProps
             <SectionHeading
                 id="next-milestone-title"
                 title="Next Milestones"
-                action={{ label: 'See all', to: '/mine/passport' }}
             />
             <div
                 ref={scrollerRef}
@@ -29,7 +28,7 @@ export default function MilestoneCarousel({ milestones }: MilestoneCarouselProps
                 {milestones.map((m) => (
                     <Link
                         key={m.key}
-                        to="/mine/passport"
+                        to="/passport"
                         className="w-full shrink-0 snap-start flex h-28 items-center gap-3 rounded-card border border-card-line bg-surface p-4 shadow-sm transition hover:border-action focus:outline-none focus:ring-2 focus:ring-action"
                     >
                         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-line bg-surface/70 text-3xl" aria-hidden="true">{m.icon || '🏆'}</span>

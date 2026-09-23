@@ -1100,7 +1100,12 @@ def test_pending_reviews_requires_auth(client):
 def test_pending_reviews_lists_attended_unreviewed(client, session):
     assert _login(client, email="user@example.com").status_code == 200
     me = _me(session, "user@example.com")
-    _past_event(session, "ev-attended", days_ago=1, title="Barcelona Thursday Social")
+    event = _past_event(
+        session, "ev-attended", days_ago=1, title="Barcelona Thursday Social"
+    )
+    event.location = "Sala Apolo"
+    event.city = "Barcelona"
+    event.country = "Spain"
     session.add(
         UserEventAttendance(device_id="dev-me", event_id="ev-attended", user_id=me.id)
     )
@@ -1112,6 +1117,9 @@ def test_pending_reviews_lists_attended_unreviewed(client, session):
     assert len(body) == 1
     assert body[0]["event_id"] == "ev-attended"
     assert body[0]["event_title"] == "Barcelona Thursday Social"
+    assert body[0]["event_location"] == "Sala Apolo"
+    assert body[0]["event_city"] == "Barcelona"
+    assert body[0]["event_country"] == "Spain"
     assert body[0]["friend_proof"] is None
 
 

@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { CalendarEvent } from '../types';
+import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import YourNextEventsRail from './YourNextEventsRail';
 
 const event: CalendarEvent = {
@@ -35,11 +36,14 @@ const event: CalendarEvent = {
 };
 
 function renderRail(events: CalendarEvent[], onEventClick = vi.fn(), loading = false) {
+    const flags = { ...defaultFlags, eventCardPlaceholderStyle: 'gradient' as const };
     return {
         onEventClick,
         ...render(
             <MemoryRouter>
-                <YourNextEventsRail events={events} onEventClick={onEventClick} loading={loading} />
+                <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
+                    <YourNextEventsRail events={events} onEventClick={onEventClick} loading={loading} />
+                </FeatureFlagsContext.Provider>
             </MemoryRouter>,
         ),
     };
@@ -53,7 +57,7 @@ describe('YourNextEventsRail', () => {
 
         expect(screen.getByText(event.title)).toBeInTheDocument();
         expect(screen.queryByText(second.title)).not.toBeInTheDocument();
-        expect(screen.queryByTestId('your-next-event-image')).not.toBeInTheDocument();
+        expect(screen.getByTestId('your-next-event-image')).toHaveAttribute('src', '/event.jpg');
         expect(screen.getByLabelText('Paul')).toHaveTextContent('P');
         expect(screen.getByRole('img', { name: 'Ana' })).toHaveAttribute('src', '/ana.jpg');
         expect(screen.getByRole('img', { name: 'Mia' })).toHaveAttribute('src', '/mia.jpg');
@@ -74,7 +78,9 @@ describe('YourNextEventsRail', () => {
     it('links directly to the event when no click override is provided', () => {
         render(
             <MemoryRouter>
-                <YourNextEventsRail events={[event]} />
+                <FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}>
+                    <YourNextEventsRail events={[event]} />
+                </FeatureFlagsContext.Provider>
             </MemoryRouter>,
         );
 
@@ -90,13 +96,36 @@ describe('YourNextEventsRail', () => {
         const events = Array.from({ length: total }, (_, index) => ({ ...event, event_id: `evt-${index}` }));
         renderRail(events);
 
-        expect(screen.getByRole('link', { name: copy })).toHaveAttribute('href', '/mine/calendar?filter=going');
+        expect(screen.getByRole('link', { name: copy })).toHaveAttribute('href', '/my-events?filter=going');
     });
 
-    it('uses the shared image-free Next Up card style', () => {
+    it('overlays the original date treatment on a compact left picture', () => {
         renderRail([event]);
-        expect(screen.queryByTestId('your-next-event-image')).not.toBeInTheDocument();
+        expect(screen.getByTestId('next-up-image-slot')).toHaveClass('mr-3', 'w-28', 'self-stretch', 'rounded-none');
+        expect(screen.getByTestId('your-next-event-image')).toHaveClass('h-full', 'w-full', 'object-cover');
+        expect(screen.getByTestId('next-up-date-overlay')).toHaveClass('text-white', 'uppercase');
+        expect(screen.getByTestId('next-up-date-overlay')).toHaveTextContent('Sep');
+        expect(screen.getByTestId('next-up-date-overlay')).toHaveTextContent('5');
+        expect(screen.queryByTestId('next-up-date')).not.toBeInTheDocument();
         expect(screen.getByTestId('your-next-event-card')).toHaveClass('bg-brand/10');
+    });
+
+    it('keeps the original date row when the event has no picture', () => {
+        renderRail([{ ...event, image_url: null, image_thumb_url: null }]);
+
+        expect(screen.queryByTestId('your-next-event-image')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('event-card-placeholder')).not.toBeInTheDocument();
+        expect(screen.getByTestId('next-up-date')).toHaveClass('w-16', 'pr-4', 'text-brand');
+    });
+
+    it('keeps the original date row when the event picture fails to load', () => {
+        renderRail([event]);
+
+        fireEvent.error(screen.getByTestId('your-next-event-image'));
+
+        expect(screen.queryByTestId('your-next-event-image')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('event-card-placeholder')).not.toBeInTheDocument();
+        expect(screen.getByTestId('next-up-date')).toHaveClass('w-16', 'pr-4', 'text-brand');
     });
 
     it('renders the compact empty state after loading', () => {

@@ -32,6 +32,10 @@ export interface FeatureFlags {
     myEventsRouteEnabled: boolean;
     /** Show 'My Events' as a top-level navigation entry (admin feature). */
     myEventsNavEnabled: boolean;
+    /** Show Browse as a top-level navigation entry. */
+    browseNavEnabled: boolean;
+    /** Send the Browse events action directly to the Explorer list. */
+    browseDirectToExplorerEnabled: boolean;
     /** Show the optional event-size question in the review wizard. */
     eventReviewSizeStepEnabled: boolean;
     /** When true, tags on event cards render as colored badges (legacy
@@ -89,6 +93,8 @@ const defaultFlags: FeatureFlags = {
     networkGoingSnapshotEnabled: false,
     myEventsRouteEnabled: true,
     myEventsNavEnabled: true,
+    browseNavEnabled: false,
+    browseDirectToExplorerEnabled: false,
     eventReviewSizeStepEnabled: true,
     tagAsBadge: false,
     tagBadgeColored: false,
@@ -101,8 +107,8 @@ const defaultFlags: FeatureFlags = {
     eventCardShowTimeLocationIconsEnabled: false,
     explorerEventCardCardStyleEnabled: true,
     explorerViewControlLabelsEnabled: true,
-    eventImagesEnabled: false,
-    eventCardPlaceholderStyle: 'gradient',
+    eventImagesEnabled: true,
+    eventCardPlaceholderStyle: 'none',
 };
 
 const FeatureFlagsContext = createContext<{
@@ -145,6 +151,8 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? false,
                     myEventsRouteEnabled: s.my_events_route_enabled ?? false,
                     myEventsNavEnabled: s.my_events_nav_enabled ?? true,
+                    browseNavEnabled: s.browse_nav_enabled ?? false,
+                    browseDirectToExplorerEnabled: s.browse_direct_to_explorer_enabled ?? false,
                     eventReviewSizeStepEnabled: s.event_review_size_step_enabled ?? true,
                     tagAsBadge: s.tag_as_badge_enabled ?? false,
                     tagBadgeColored: s.tag_badge_colored ?? false,
@@ -157,8 +165,8 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     eventCardShowTimeLocationIconsEnabled: s.event_card_show_time_location_icons_enabled ?? false,
                     explorerEventCardCardStyleEnabled: s.explorer_event_card_card_style_enabled ?? false,
                     explorerViewControlLabelsEnabled: s.explorer_view_control_labels_enabled ?? true,
-                    eventImagesEnabled: s.event_images_enabled ?? false,
-                    eventCardPlaceholderStyle: s.event_card_placeholder_style ?? 'gradient',
+                    eventImagesEnabled: s.event_images_enabled ?? true,
+                    eventCardPlaceholderStyle: s.event_card_placeholder_style ?? 'none',
                 });
             })
             .catch(() => {

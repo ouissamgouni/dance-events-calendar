@@ -36,9 +36,9 @@ test_plan:
         Open the explorer event search and type "moonrise".
       expected: >
         Exactly three results appear: evt-se-001, evt-se-002, and evt-se-003.
-        Each row shows the title plus a secondary line containing date/time and
-        location. Hidden Moonrise (evt-se-004) and Past Moonrise (evt-se-005)
-        do not appear.
+        Each result uses the shared rich event card with its available image,
+        date/time, location, tags, community context and Save/Going actions.
+        Hidden Moonrise (evt-se-004) and Past Moonrise (evt-se-005) do not appear.
 
     - id: 3
       title: "Search is global across future events, not limited to current explorer window"
@@ -67,16 +67,15 @@ test_plan:
         The app navigates to /event/evt-se-003. The event detail page loads the
         Lisbon fixture and shows the same title as the result row.
 
-      - id: 6
-      title: "Rooftop query respects the dropdown limit and keyboard controls"
+    - id: 6
+      title: "Rooftop query supports scrolling and keyboard controls"
       description: >
         Return to /, reopen the event search, and type "rooftop". Use ArrowDown
         and Enter at least once.
       expected: >
-        The popover shows at most 8 results even though the scenario seeds 9
-        visible upcoming rooftop matches. Arrow keys move the active row
-        highlight, Enter opens the active event detail page, and Escape closes
-        the popover.
+        All nine visible upcoming rooftop matches are available in the
+        scrollable popover. Arrow keys move the active card highlight, Enter
+        opens the active event detail page, and Escape closes the popover.
 
     - id: 7
       title: "Tablet and mobile searches open below the header"
@@ -97,3 +96,33 @@ test_plan:
         The same three visible Moonrise results appear in the same order. Event
         search availability and matching are not restricted to authenticated
         users.
+
+    - id: 9
+      title: "Full-page search has one clear control"
+      description: >
+        From the Explore search entry, open the event-name search page and type
+        "moonrise" on Safari or Chrome.
+      expected: >
+        The field shows exactly one clear cross. Clearing it empties the field,
+        removes the query from the URL and restores the minimum-query prompt.
+
+    - id: 10
+      title: "Changing a full-results query restores the refreshed Show all action"
+      description: >
+        Search for "moonrise", choose Show all matching events, then replace
+        the query with "rooftop" without leaving the search page.
+      expected: >
+        Moonrise opens full results with Show more when applicable. Typing the
+        new query returns to the limited preview and shows "Show all 9 matching
+        events" for Rooftop. Choosing it opens Rooftop full results and does not
+        immediately bounce back to preview.
+
+    - id: 11
+      title: "Search Back returns directly to its entry page"
+      description: >
+        Open text search from Explore, choose Show all, then use the search
+        page's Back button. Repeat from the global header while on /calendar.
+      expected: >
+        The Explore journey returns directly to /, without an intermediate
+        reduced result list. The global-header journey returns directly to the
+        original /calendar URL, including its query string.

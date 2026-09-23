@@ -201,24 +201,27 @@ export default function PassportShareCard({
 
     return (
         <div
-            style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
-            className="flex flex-col justify-between bg-slate-900 p-6 text-white"
+            style={{
+                width: CARD_WIDTH,
+                height: CARD_HEIGHT,
+                fontFamily: 'Arial, Helvetica, sans-serif',
+            }}
+            className="flex flex-col justify-between overflow-hidden bg-slate-900 p-6 text-white"
         >
-            <div>
+            <div className="shrink-0">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted">
                     ✦ Movida · Dance Passport
                 </div>
                 <div className="mt-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <h1 className="text-3xl font-bold leading-tight">{displayName}</h1>
-
+                    <div className="min-w-0 flex-1">
+                        <h1 className="truncate text-3xl font-bold leading-tight">{displayName}</h1>
                     </div>
-                    <p className="mt-4 max-w-[90%] text-right text-sm font-medium leading-tight text-blue-300">
-                        {headline}
+                    <div className="mt-1 max-w-[52%] shrink-0 text-right">
+                        <p className="text-sm font-medium leading-tight text-blue-300">{headline}</p>
                         {dancingSinceLine && (
                             <p className="mt-1 text-xs font-medium text-muted">{dancingSinceLine}</p>
                         )}
-                    </p>
+                    </div>
                 </div>
             </div>
 
@@ -231,7 +234,7 @@ export default function PassportShareCard({
                     </p>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="min-h-0 space-y-3 overflow-hidden">
                     {showMap && scoped.coords.length >= 2 && (
                         <div>
                             <WorldMap coords={scoped.coords} />
@@ -259,20 +262,20 @@ export default function PassportShareCard({
                             {scoped.badges.map((b) => (
                                 <div
                                     key={b.key}
-                                    className="flex items-start gap-2 border border-slate-700 bg-slate-800 px-2 py-2"
+                                    className="flex min-h-0 items-start gap-2 overflow-hidden border border-slate-700 bg-slate-800 px-2 py-2"
                                 >
-                                    <span className="text-lg leading-none">{b.icon}</span>
-                                    <span className="min-w-0">
-                                        <span className="block text-[11px] font-semibold leading-tight text-slate-100">
-                                            {b.label}
+                                    <span className="shrink-0 text-lg leading-none">{b.icon}</span>
+                                    <span className="min-w-0 flex-1 overflow-hidden">
+                                        <span className="flex min-w-0 items-center gap-1 text-[11px] font-semibold leading-tight text-slate-100">
+                                            <span className="truncate">{b.label}</span>
                                             {b.tag && (
-                                                <span className="ml-1 align-middle text-[8px] font-medium uppercase tracking-wide text-ink-soft">
+                                                <span className="shrink-0 text-[8px] font-medium uppercase tracking-wide text-ink-soft">
                                                     {b.tag}
                                                 </span>
                                             )}
                                         </span>
                                         {b.description && (
-                                            <span className="mt-0.5 block text-[10px] leading-tight text-muted">
+                                            <span className="mt-0.5 block truncate text-[10px] leading-tight text-muted">
                                                 {b.description}
                                             </span>
                                         )}
@@ -284,7 +287,7 @@ export default function PassportShareCard({
                 </div>
             )}
 
-            <div className="flex items-center gap-3 border-t border-slate-700 pt-4">
+            <div className="flex shrink-0 items-center gap-3 border-t border-slate-700 pt-4">
                 <div className="bg-surface p-1.5">
                     <QRCodeSVG value={profileUrl} size={44} level="M" />
                 </div>

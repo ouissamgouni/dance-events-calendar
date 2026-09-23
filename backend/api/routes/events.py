@@ -623,7 +623,7 @@ def get_events(
     color_map = {c.calendar_id: c.color for c in visible_calendars}
 
     if not calendar_ids:
-        return []
+        return JSONResponse(content=[], headers={"X-Total-Count": "0"})
 
     query = select(CachedEvent).where(
         CachedEvent.calendar_id.in_(calendar_ids),
@@ -694,6 +694,7 @@ def get_events(
             # downstream batch queries (and so anonymous viewers get a
             # consistently empty list).
             response = JSONResponse(content=[])
+            response.headers["X-Total-Count"] = "0"
             _set_event_list_cache_headers(
                 response,
                 current_user=current_user,
@@ -714,13 +715,19 @@ def get_events(
                 detail="profiles only accepts 'me' at this time",
             )
         if current_user is None:
-            return []
+            return JSONResponse(content=[], headers={"X-Total-Count": "0"})
         profile_event_ids = _profiles_filtered_event_ids(
             session=session, user=current_user
         )
         if not profile_event_ids:
-            return []
+            return JSONResponse(content=[], headers={"X-Total-Count": "0"})
         query = query.where(CachedEvent.event_id.in_(profile_event_ids))
+
+    total_count: int | None = None
+    if limit is not None:
+        total_count = session.exec(
+            select(func.count()).select_from(query.subquery())
+        ).one()
 
     # Ordering is required for stable pagination — without it, offset/limit
     # windows could shift between requests as the underlying table changes.
@@ -876,6 +883,9 @@ def get_events(
     ]
 
     response = JSONResponse(content=[d.model_dump(mode="json") for d in data])
+    response.headers["X-Total-Count"] = str(
+        total_count if total_count is not None else len(data)
+    )
     if limit is not None:
         response.headers["X-Has-More"] = "true" if has_more else "false"
     _set_event_list_cache_headers(
@@ -891,8 +901,10 @@ def get_events(
 @limiter.limit("60/minute")
 def search_events(
     request: Request,
+    response: Response,
     q: str = Query(..., min_length=2, max_length=120),
     limit: int = Query(default=10, ge=1, le=25),
+    offset: int = Query(default=0, ge=0),
     include_past: bool = Query(default=False),
     exclude_attended: bool = Query(default=False),
     session: Session = Depends(get_session),
@@ -915,6 +927,8 @@ def search_events(
     """
     needle = " ".join(q.split())
     if not needle:
+        response.headers["X-Total-Count"] = "0"
+        response.headers["X-Has-More"] = "false"
         return []
     tokens = needle.split()
 
@@ -975,7 +989,7 @@ def search_events(
     if include_past:
         # Most-recent-first so recently-ended events (the review-prompt
         # targets) surface at the top of the typeahead.
-        stmt = stmt.order_by(
+        ordering = (
             title_exact_rank,
             title_prefix_rank,
             title_match_rank,
@@ -984,7 +998,8 @@ def search_events(
             col(CachedEvent.event_id),
         )
     else:
-        stmt = stmt.where(CachedEvent.start >= now).order_by(
+        stmt = stmt.where(CachedEvent.start >= now)
+        ordering = (
             title_exact_rank,
             title_prefix_rank,
             title_match_rank,
@@ -992,7 +1007,13 @@ def search_events(
             col(CachedEvent.start).asc(),
             col(CachedEvent.event_id),
         )
-    rows = session.exec(stmt.limit(limit)).all()
+
+    total_count = session.exec(select(func.count()).select_from(stmt.subquery())).one()
+    rows = session.exec(stmt.order_by(*ordering).offset(offset).limit(limit + 1)).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    response.headers["X-Total-Count"] = str(total_count)
+    response.headers["X-Has-More"] = "true" if has_more else "false"
 
     tags_by_event = get_event_tags(session, [event.event_id for event in rows])
     lowered_tokens = [token.casefold() for token in tokens]

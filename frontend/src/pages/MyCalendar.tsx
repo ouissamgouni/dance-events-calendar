@@ -396,7 +396,7 @@ function LegacyCalendar() {
                             You&apos;ve already added {allEventIds.length} event{allEventIds.length === 1 ? '' : 's'}. Sign in to keep them synced across devices and ready to share.
                         </p>
                         <Link
-                            to={`/login?next=${encodeURIComponent('/mine/calendar')}`}
+                            to={`/login?next=${encodeURIComponent('/my-events')}`}
                             className="shrink-0 bg-action px-4 py-1.5 text-xs font-medium text-white hover:bg-action transition"
                         >
                             Sign in
@@ -819,7 +819,7 @@ function LegacyCalendar() {
 
 export default function MyCalendar() {
     const { pathname } = useLocation();
-    if (pathname === '/mine/calendar') return <MyEventsExperience />;
+    if (pathname === '/my-events' || pathname === '/mine/calendar') return <MyEventsExperience />;
     if (pathname === '/tribe/calendars') return <TribeCalendarsView />;
     return <LegacyCalendar />;
 }

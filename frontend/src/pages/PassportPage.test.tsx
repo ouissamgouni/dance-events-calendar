@@ -7,6 +7,7 @@ import { AuthProvider } from '../context/AuthContext'
 import { AttendanceSummariesProvider } from '../context/AttendanceSummariesContext'
 import { SavedEventsProvider } from '../context/SavedEventsContext'
 import { AttendingEventsProvider } from '../context/AttendingEventsContext'
+import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext'
 import { ToastProvider } from '../components/Toast'
 import { server } from '../test/server'
 import { makeUser } from '../test/handlers'
@@ -57,11 +58,13 @@ function renderPassport() {
                     <AttendanceSummariesProvider>
                         <SavedEventsProvider>
                             <AttendingEventsProvider>
-                                <Routes>
-                                    <Route path="/mine/passport" element={<PassportPage />} />
-                                    <Route path="/login" element={<p>login page</p>} />
-                                    <Route path="/event/:eventId" element={<p>event page</p>} />
-                                </Routes>
+                                <FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}>
+                                    <Routes>
+                                        <Route path="/mine/passport" element={<PassportPage />} />
+                                        <Route path="/login" element={<p>login page</p>} />
+                                        <Route path="/event/:eventId" element={<p>event page</p>} />
+                                    </Routes>
+                                </FeatureFlagsContext.Provider>
                             </AttendingEventsProvider>
                         </SavedEventsProvider>
                     </AttendanceSummariesProvider>
@@ -282,6 +285,9 @@ describe('PassportPage', () => {
         renderPassport()
 
         expect(await screen.findByText('Milestone progress')).toBeInTheDocument()
+        const milestoneProgress = screen.getByText('Milestone progress')
+        const nextMilestones = screen.getByText('Next Milestones')
+        expect(milestoneProgress.compareDocumentPosition(nextMilestones) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(screen.getByRole('button', { name: 'Community, 0 / 0 unlocked' })).toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: /Events.*1 \/ 2 unlocked/ }))
         const dialog = await screen.findByRole('dialog', { name: 'Events Milestones' })
@@ -442,6 +448,28 @@ describe('PassportPage', () => {
                     view_count: 0,
                 }),
             ),
+            http.post('*/api/events/by-ids', () =>
+                HttpResponse.json([{
+                    event_id: 'past-1',
+                    calendar_id: 'cal-1',
+                    title: 'Havana Rooftop Social',
+                    description: 'A long night of son and salsa under the stars.',
+                    location: 'Rooftop Bar',
+                    latitude: null,
+                    longitude: null,
+                    start: '2023-09-01T21:00:00',
+                    end: '2023-09-02T02:00:00',
+                    all_day: false,
+                    color: null,
+                    view_count: 0,
+                    price_min: null,
+                    price_max: null,
+                    price_currency: null,
+                    price_is_free: false,
+                    links: null,
+                    tags: [],
+                }]),
+            ),
             http.post('*/api/track/event-attendance', async ({ request }) => {
                 attendanceBody = (await request.json()) as Record<string, unknown>
                 return new HttpResponse(null, { status: 204 })
@@ -453,7 +481,7 @@ describe('PassportPage', () => {
         // The "Add a past event" control lives at the top of Journey.
         await screen.findByText('Your stats')
         fireEvent.click(screen.getByRole('tab', { name: 'Journey' }))
-        const addTrigger = await screen.findByRole('button', { name: 'Add past event' })
+        const addTrigger = await screen.findByRole('button', { name: 'Add event' })
         expect(addTrigger.className).toContain('border-line')
         expect(addTrigger.className).not.toContain('danger')
         fireEvent.click(addTrigger)
@@ -461,10 +489,11 @@ describe('PassportPage', () => {
         // Type a query and pick the returned past event.
         const input = await screen.findByLabelText('Search past events')
         fireEvent.change(input, { target: { value: 'Havana' } })
-        const result = await screen.findByText('Havana Rooftop Social')
-        // The result card shows the event year (past events span years).
-        expect(screen.getByText(/2023 · Rooftop Bar/)).toBeInTheDocument()
-        fireEvent.click(result)
+        const result = await screen.findByTestId('explorer-event-search-result-0')
+        expect(result).toHaveTextContent('Havana Rooftop Social')
+        expect(result).toHaveTextContent('Rooftop Bar')
+        expect(result.querySelector('[data-testid="card-actions"]')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Open Havana Rooftop Social' }))
 
         // The confirmation dialog shows the event details and the attendance question.
         expect(await screen.findByText(/Did you really attend this event\?/)).toBeInTheDocument()
@@ -504,7 +533,7 @@ describe('PassportPage', () => {
 
         await screen.findByText('Your stats')
         fireEvent.click(screen.getByRole('tab', { name: 'Journey' }))
-        fireEvent.click(await screen.findByRole('button', { name: 'Add past event' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Add event' }))
 
         const input = await screen.findByLabelText('Search past events')
         fireEvent.change(input, { target: { value: 'Havana' } })

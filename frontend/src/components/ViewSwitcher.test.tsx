@@ -46,9 +46,19 @@ describe('ViewSwitcher', () => {
         expect(screen.queryByTestId('view-switcher-create')).toBeNull();
 
         rerender(<ViewSwitcher currentView="map" onSelect={vi.fn()} onCreate={onCreate} />);
-    const createButton = screen.getByRole('button', { name: 'Add event' });
-    expect(createButton).toHaveTextContent('Add');
-    await userEvent.click(createButton);
+        const createButton = screen.getByRole('button', { name: 'Add event' });
+        expect(createButton).toHaveTextContent('Add');
+        expect(createButton).not.toHaveAttribute('aria-expanded');
+        await userEvent.click(createButton);
         expect(onCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('presents the create action as Close when its flow is expanded', () => {
+        render(<ViewSwitcher currentView="list" onSelect={vi.fn()} onCreate={vi.fn()} createExpanded />);
+
+        const createButton = screen.getByRole('button', { name: 'Close event search' });
+        expect(createButton).toHaveTextContent('Close');
+        expect(createButton).toHaveAttribute('aria-expanded', 'true');
+        expect(createButton.querySelector('svg')).toHaveClass('rotate-45');
     });
 });

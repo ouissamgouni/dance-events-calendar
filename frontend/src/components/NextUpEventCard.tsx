@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ChevronRight, MapPin, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { CalendarEvent, FriendMini } from '../types';
+import { useEventCardImage } from '../hooks/useEventCardImage';
 import { firstNameOf } from '../utils/displayName';
 import { shortLocation } from '../utils/locationShort';
 
@@ -77,17 +78,44 @@ function FriendsGoing({ event, variant }: { event: CalendarEvent; variant: 'coun
 }
 
 function CardContent({ event, friendsVariant }: Pick<NextUpEventCardProps, 'event' | 'friendsVariant'>) {
+    const { imageVisible, node: imageSlot } = useEventCardImage(event, {
+        className: 'h-full w-full object-cover',
+        imageTestId: 'your-next-event-image',
+    });
     const start = new Date(event.start);
     const location = shortLocation(event.location);
+    const dateContent = (
+        <>
+            <span className="text-xs">{start.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+            <span className="text-xs">{start.toLocaleDateString(undefined, { month: 'short' })}</span>
+            <span className="text-3xl leading-none">{start.getDate()}</span>
+        </>
+    );
 
     return (
         <>
-            <span className="flex w-16 shrink-0 flex-col items-center border-r border-brand/25 pr-4 text-center font-bold uppercase text-brand">
-                <span className="text-xs">{start.toLocaleDateString(undefined, { weekday: 'short' })}</span>
-                <span className="mt-2 text-xs">{start.toLocaleDateString(undefined, { month: 'short' })}</span>
-                <span className="mt-1 text-3xl leading-none">{start.getDate()}</span>
-            </span>
-            <span className="min-w-0 flex-1 pl-4">
+            {imageVisible ? (
+                <span
+                    className="relative mr-3 w-28 shrink-0 self-stretch overflow-hidden rounded-none"
+                    data-testid="next-up-image-slot"
+                >
+                    {imageSlot}
+                    <span
+                        className="absolute inset-0 flex flex-col items-center justify-center bg-ink/40 text-center font-bold uppercase text-white"
+                        data-testid="next-up-date-overlay"
+                    >
+                        {dateContent}
+                    </span>
+                </span>
+            ) : (
+                <span
+                    className="flex w-16 shrink-0 flex-col items-center border-r border-brand/25 pr-4 text-center font-bold uppercase text-brand"
+                    data-testid="next-up-date"
+                >
+                    {dateContent}
+                </span>
+            )}
+            <span className={`min-w-0 flex-1 ${imageVisible ? '' : 'pl-4'}`}>
                 <span className="line-clamp-2 block text-lg font-bold leading-6">{event.title}</span>
                 {location && (
                     <span className="mt-2 flex items-center gap-1.5 truncate text-sm font-medium text-ink-soft">

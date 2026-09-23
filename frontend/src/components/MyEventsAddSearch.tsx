@@ -53,6 +53,7 @@ export default function MyEventsAddSearch({ tab, onSuggest, onComplete }: Props)
                 guidancePrefix={tab === 'past' ? 'Searching past events only.' : 'Searching upcoming events only.'}
                 resultFilter={resultFilter}
                 onNoResultsAction={onSuggest}
+                resultPurpose="select"
             />
             {status && <p className="px-4 py-2 text-sm text-ink-soft" role="status">{status}</p>}
             <ConfirmDialog

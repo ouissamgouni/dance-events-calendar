@@ -26,7 +26,7 @@ export default function SearchProfileEditorPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const routeState = location.state as EditorRouteState | null;
-    const returnTo = routeState?.returnTo ?? '/mine/profiles';
+    const returnTo = routeState?.returnTo ?? '/saved-searches';
     const { profileId } = useParams();
     const editingId = profileId ? Number(profileId) : null;
     const { profiles, createProfile, updateProfile } = useInterestProfiles();

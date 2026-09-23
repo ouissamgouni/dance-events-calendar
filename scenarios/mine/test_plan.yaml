@@ -47,9 +47,10 @@ test_plan:
       expected: >
         The header reads "My Events" with one share icon and no ellipsis or
         breadcrumb. Equal-width Upcoming, Saved and Past tabs use blue text
-        and a thin underline only for the active tab. The compact secondary bar
-        hides the active view: List offers Map then Calendar, while Calendar and
-        Map offer List first; Add event remains last. Events are grouped
+        and a thin underline only for the active tab. An Explorer-style floating
+        control at bottom right hides the active view: List offers Map then Calendar,
+        while Calendar and Map offer List first; Add is a separate final button.
+        Events are grouped
         under strong month headings in rounded cards with a left date rail,
         event details, and no right chevron or sequence number. Upcoming has no
         Save/Going action and Saved has bookmark and small hand actions. Past
@@ -98,15 +99,16 @@ test_plan:
       title: "Calendar fills remaining space with a range-scoped map"
       description: "From My Events, open Calendar and navigate backward and forward through seeded events."
       expected: >
-        The My Events header, tabs and compact controls remain visible. Calendar
+        The My Events header and tabs remain visible. The floating view controls remain
+        clear of app navigation. Calendar
         defaults to a 3-week range with previous, Today and next navigation.
         Every event overlapping the displayed range appears in the calendar.
         When at least 200px remains between the calendar and app navigation, a
         map fills exactly that space and centers only mapped events overlapping
         the visible range. With less than 200px, no map is shown. The map uses
         cooperative gestures and has no calendar/map toggle. Selecting a
-        calendar or map event opens its event modal. The compact bar hides
-        Calendar while this view is active and offers List, Map and Add event.
+        calendar or map event opens its event modal. The floating control hides
+        Calendar while this view is active and offers List, Map and Add.
 
     - id: 9
       title: "Standalone map preserves chronological navigation"
@@ -114,9 +116,9 @@ test_plan:
       expected: >
         CARTO's Positron vector basemap renders crisply without an API-key
         watermark. The map occupies its own flex row and fills the available space
-        between the List/Calendar/Add bar and the preview below, with no page scrolling.
-        The compact bar hides Map while this view is active and offers List, Calendar
-        and Add event. Every mappable event in the active tab appears, independent
+        between the tabs and the preview below, with no page scrolling. The floating
+        control moves above the preview, hides Map while this view is active, and offers
+        List, Calendar and Add. Every mappable event in the active tab appears, independent
         of Calendar's visible range, with chronologically numbered pins and initially
         frames all pins within the unobstructed map canvas with adaptive tight margins.
         Route displays as a visual toggle switch (track and thumb) with action-blue
@@ -142,12 +144,14 @@ test_plan:
       title: "Add event is contextual and confirms before mutation"
       description: "Use Add event from Upcoming, Saved and Past; also search for a missing event."
       expected: >
-        Search stays inline and never navigates to Explore. Its initial one-line
+        The floating Add control opens the search inline, changes to Close while it is
+        open, and dismisses the search when tapped again. Search never navigates to Explore. Its initial one-line
         prompt prefixes "Type at least 2 letters" with the upcoming/past scope.
         Results use the same rich cards and keyboard selection as header event
-        search, but do not navigate or open an event modal. Tapping a result card asks for confirmation before
-        Going, Save or Attended state changes. Already-applied events are absent.
-        Empty results offer Suggest an event.
+        search, but omit embedded Save/Going controls and do not navigate or
+        open an event modal. Tapping a result card asks for confirmation before
+        Going, Save or Attended state changes. Already-applied events are
+        absent. Empty results offer Suggest an event.
 
     - id: 12
       title: "Share and export uses the approved bottom sheet"

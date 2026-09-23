@@ -4,8 +4,9 @@ import type { CalendarEvent, TagGroup } from '../types';
 import type { MyEventsTab } from '../utils/myEvents';
 import { groupMyEventsByMonth } from '../utils/myEvents';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useMyRating, useMyRatingsLoaded } from '../context/MyRatingsContext';
 import EventCard from './EventCard';
-import RateEventButton from './RateEventButton';
+import EventReviewCard from './EventReviewCard';
 
 interface Props {
     events: CalendarEvent[];
@@ -16,42 +17,23 @@ interface Props {
 
 function MyEventRow({ event, tab, onEventClick, reviewTagLabels }: { event: CalendarEvent; tab: MyEventsTab; onEventClick: (event: CalendarEvent) => void; reviewTagLabels: Map<number, string> }) {
     const { showRatings } = useFeatureFlags();
+    const myRating = useMyRating(event.event_id);
+    const ratingsLoaded = useMyRatingsLoaded();
     const isPast = tab === 'past';
     const isUpcoming = tab === 'upcoming';
     const isSaved = tab === 'saved';
     // Base My Events card keeps picture, title, time and location only.
     // Upcoming adds the avatars stack; Saved adds the "I'm going" button;
-    // Past wraps the (borderless) card and its rate-event affordance in a
-    // single bordered container so they read as one unit.
+    // Past uses the shared pending/reviewed event card.
     if (isPast) {
         return (
-            <div className="overflow-hidden rounded-card border border-card-line bg-surface">
-                <EventCard
-                    event={event}
-                    onOpen={onEventClick}
-                    followingBadgeEnabled
-                    showRatings={showRatings}
-                    isPast
-                    showAvatars={false}
-                    showTags={false}
-                    showReviews={false}
-                    showPrice={false}
-                    showActions={false}
-                    goingIconVariant="hand"
-                    borderless
-                    testId="my-events-row"
-                />
-                <div className="border-t border-card-line px-3 py-2">
-                    <RateEventButton
-                        eventId={event.event_id}
-                        appearance="preview"
-                        isPast
-                        inlineModal
-                        entryPoint="list"
-                        reviewTagLabels={reviewTagLabels}
-                    />
-                </div>
-            </div>
+            <EventReviewCard
+                event={event}
+                variant={ratingsLoaded && !myRating ? 'pending' : 'reviewed'}
+                onOpen={onEventClick}
+                reviewTagLabels={reviewTagLabels}
+                testId="my-events-row"
+            />
         );
     }
     return (

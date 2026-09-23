@@ -81,7 +81,7 @@ export function getNotificationVerb(item: NotificationItem): string {
 export function resolveNotificationDestination(item: NotificationItem): string {
     switch (item.kind) {
         case 'milestone_unlocked':
-            return '/mine/passport';
+            return '/passport';
         case 'subscription_milestone':
         case 'new_follower':
         case 'new_friend':

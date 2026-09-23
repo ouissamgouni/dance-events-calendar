@@ -201,6 +201,12 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         my_events_nav_enabled=_get_bool_setting(
             session, "my_events_nav_enabled", default=True
         ),
+        browse_nav_enabled=_get_bool_setting(
+            session, "browse_nav_enabled", default=False
+        ),
+        browse_direct_to_explorer_enabled=_get_bool_setting(
+            session, "browse_direct_to_explorer_enabled", default=False
+        ),
         suggest_event_required_dance_group_id=_get_optional_int_setting(
             session, "suggest_event_required_dance_group_id"
         ),
@@ -324,9 +330,11 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         explorer_view_control_labels_enabled=_get_bool_setting(
             session, "explorer_view_control_labels_enabled", default=True
         ),
-        event_images_enabled=_get_bool_setting(session, "event_images_enabled"),
+        event_images_enabled=_get_bool_setting(
+            session, "event_images_enabled", default=True
+        ),
         event_card_placeholder_style=_get_str_setting(
-            session, "event_card_placeholder_style", "gradient"
+            session, "event_card_placeholder_style", "none"
         ),
     )
 
@@ -595,6 +603,16 @@ def update_settings(
 
     if body.my_events_nav_enabled is not None:
         _set_bool_setting(session, "my_events_nav_enabled", body.my_events_nav_enabled)
+
+    if body.browse_nav_enabled is not None:
+        _set_bool_setting(session, "browse_nav_enabled", body.browse_nav_enabled)
+
+    if body.browse_direct_to_explorer_enabled is not None:
+        _set_bool_setting(
+            session,
+            "browse_direct_to_explorer_enabled",
+            body.browse_direct_to_explorer_enabled,
+        )
 
     if body.suggest_event_required_dance_group_id is not None:
         row = session.get(SiteSetting, "suggest_event_required_dance_group_id")

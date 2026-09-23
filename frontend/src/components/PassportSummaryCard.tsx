@@ -85,7 +85,7 @@ export default function PassportSummaryCard({
 
             {/* Actions (share button, etc.) */}
             {actions && (
-                <div className="absolute bottom-4 right-4 z-[9000]">
+                <div className="absolute bottom-4 right-4">
                     {actions}
                 </div>
             )}

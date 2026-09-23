@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { searchEvents } from '../api';
+import { fetchEventsByIds, searchEvents } from '../api';
 import ExplorerEventSearch from './ExplorerEventSearch';
 
 vi.mock('../api', () => ({
+    fetchEventsByIds: vi.fn(),
     searchEvents: vi.fn(),
 }));
 
@@ -12,9 +13,9 @@ vi.mock('../context/AttendingEventsContext', () => ({
     useAttendingEvents: () => ({ isAttending: () => false }),
 }));
 
-vi.mock('./EventListPanel', () => ({
-    EventListCard: ({ event, onEventClick }: { event: { title: string }; onEventClick: () => void }) => (
-        <button type="button" onClick={onEventClick}>{event.title}</button>
+vi.mock('./SearchEventCard', () => ({
+    default: ({ result, onOpen }: { result: { title: string }; onOpen: () => void }) => (
+        <button type="button" onClick={onOpen}>{result.title}</button>
     ),
 }));
 
@@ -25,6 +26,7 @@ describe('ExplorerEventSearch', () => {
 
     it('explains and selects a place and tag match', async () => {
         vi.useFakeTimers();
+        vi.mocked(fetchEventsByIds).mockResolvedValue([]);
         vi.mocked(searchEvents).mockResolvedValue([
             {
                 event_id: 'evt-pool',

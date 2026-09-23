@@ -42,6 +42,26 @@ describe('MyEventsAddSearch', () => {
                 matched_fields: ['title'],
                 matched_tags: [],
             }])),
+            http.post('*/api/events/by-ids', () => HttpResponse.json([{
+                event_id: 'evt-upcoming',
+                calendar_id: 'calendar-1',
+                title: 'Madrid Salsa Social',
+                description: null,
+                location: 'Madrid, Spain',
+                latitude: null,
+                longitude: null,
+                start: '2026-09-05T20:00:00Z',
+                end: '2026-09-06T01:00:00Z',
+                all_day: false,
+                color: null,
+                view_count: 0,
+                price_min: null,
+                price_max: null,
+                price_currency: null,
+                price_is_free: false,
+                links: null,
+                tags: [],
+            }])),
         );
         const { user } = renderWithProviders(
             <FeatureFlagsProvider>
@@ -50,7 +70,10 @@ describe('MyEventsAddSearch', () => {
         );
 
         await user.type(screen.getByRole('textbox', { name: 'Search events to add' }), 'madrid');
-        await user.click(await screen.findByRole('button', { name: /Madrid Salsa Social/ }));
+        const result = await screen.findByTestId('explorer-event-search-result-0');
+        expect(result).toHaveTextContent('Madrid Salsa Social');
+        expect(result.querySelector('[data-testid="card-actions"]')).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Open Madrid Salsa Social' }));
 
         expect(screen.getByRole('dialog', { name: 'Mark going?' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Mark going' })).toBeInTheDocument();

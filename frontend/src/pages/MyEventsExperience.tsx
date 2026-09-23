@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { fetchEventsByIds } from '../api';
 import type { CalendarViewMode } from '../components/Calendar';
 import CalendarMapWorkspace from '../components/CalendarMapWorkspace';
@@ -9,7 +9,7 @@ import MyEventsAddSearch from '../components/MyEventsAddSearch';
 import MyEventsList from '../components/MyEventsList';
 import MyEventsMapPreview from '../components/MyEventsMapPreview';
 import MyEventsUtilityMenu from '../components/MyEventsUtilityMenu';
-import MyEventsViewControls from '../components/MyEventsViewControls';
+import ViewSwitcher from '../components/ViewSwitcher';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
@@ -44,6 +44,7 @@ export default function MyEventsExperience() {
     const [selectedIds, setSelectedIds] = useState<Record<MyEventsTab, string | null>>({ upcoming: null, saved: null, past: null });
     const [modalEvent, setModalEvent] = useState<CalendarEvent | null>(null);
     const [searchOpen, setSearchOpen] = useState(false);
+    const [mapPreviewHeight, setMapPreviewHeight] = useState(0);
     const [calendarRange, setCalendarRange] = useState<{ start: Date; end: Date } | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
@@ -117,7 +118,13 @@ export default function MyEventsExperience() {
                         );
                     })}
                 </nav>
-                <MyEventsViewControls view={view} searchOpen={searchOpen} onViewChange={changeView} onToggleSearch={() => setSearchOpen((open) => !open)} />
+                {activeTab === 'past' && (
+                    <div className="border-b border-line px-4 py-2 text-right">
+                        <Link to="/passport?tab=journey" className="text-xs font-medium text-action hover:underline">
+                            View your full dance journey
+                        </Link>
+                    </div>
+                )}
             </div>
             {activeLoading && <p className="py-20 text-center text-sm text-muted">Loading your events…</p>}
             {!activeLoading && searchOpen && <div className="min-h-0 flex-1 overflow-y-auto"><MyEventsAddSearch tab={activeTab} onSuggest={openSuggest} onComplete={() => setSearchOpen(false)} /></div>}
@@ -180,10 +187,19 @@ export default function MyEventsExperience() {
                             showActions={activeTab === 'saved'}
                             showPrice={false}
                             actions={activeTab === 'saved' ? ['going'] : undefined}
+                            onHeightChange={setMapPreviewHeight}
                         />
                     )}
                 </div>
             )}
+            <ViewSwitcher
+                currentView={view}
+                onSelect={changeView}
+                mapPreviewVisible={!searchOpen && view === 'map' && selected !== null}
+                previewOffsetPx={mapPreviewHeight}
+                onCreate={() => setSearchOpen((open) => !open)}
+                createExpanded={searchOpen}
+            />
             {modalEvent && <EventModal event={modalEvent} onClose={() => setModalEvent(null)} />}
         </div>
     );

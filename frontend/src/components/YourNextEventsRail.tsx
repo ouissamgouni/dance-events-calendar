@@ -21,7 +21,7 @@ export default function YourNextEventsRail({ events, onEventClick, className = '
             <SectionHeading
                 title="Next up"
                 action={events.length > 0
-                    ? { label: `${events.length} upcoming`, to: '/mine/calendar?filter=going' }
+                    ? { label: `${events.length} upcoming`, to: '/my-events?filter=going' }
                     : undefined}
             />
             {nextEvent ? (

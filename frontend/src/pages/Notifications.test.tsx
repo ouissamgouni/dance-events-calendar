@@ -82,7 +82,7 @@ describe('NotificationsPage (milestone rows)', () => {
 
         await user.click(screen.getByRole('button', { name: /milestone unlocked/i }))
 
-        await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/mine/passport'))
+        await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/passport'))
         expect(navigateMock).not.toHaveBeenCalledWith('/event/null')
     })
 

@@ -7,9 +7,11 @@ interface ViewSwitcherProps {
     /** Height (px) of the map preview sheet, so the control floats just
      * above it instead of jumping to the top of the viewport. */
     previewOffsetPx?: number;
-    /** When provided, renders a leading "+" button that opens the
-     * suggest-event flow. */
+    /** When provided, renders a separate "+" action. */
     onCreate?: () => void;
+    /** When true, presents the create action as a control that closes the
+     * currently open create flow. */
+    createExpanded?: boolean;
     /** Show text labels below the desktop breakpoint. Desktop labels are
      * always visible. */
     mobileLabelsEnabled?: boolean;
@@ -51,7 +53,7 @@ function ViewIcon({ view }: { view: ExploreView }) {
     );
 }
 
-export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible, previewOffsetPx, onCreate, mobileLabelsEnabled = true }: ViewSwitcherProps) {
+export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible, previewOffsetPx, onCreate, createExpanded, mobileLabelsEnabled = true }: ViewSwitcherProps) {
     // When a map preview sheet is open, sit just above it at the bottom of the
     // map. The preview lives inside the fullscreen map shell, whose bottom edge
     // is lifted above the bottom nav (64px + safe-area), so we add that inset to
@@ -99,15 +101,16 @@ export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible,
                 <button
                     type="button"
                     onClick={onCreate}
-                    aria-label="Add event"
-                    title="Add event"
+                    aria-label={createExpanded ? 'Close event search' : 'Add event'}
+                    aria-expanded={createExpanded}
+                    title={createExpanded ? 'Close event search' : 'Add event'}
                     className={createClass}
                     data-testid="view-switcher-create"
                 >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-6 w-6 transition ${createExpanded ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 5v14M5 12h14" />
                     </svg>
-                    <span className={labelClass}>Add</span>
+                    <span className={labelClass}>{createExpanded ? 'Close' : 'Add'}</span>
                 </button>
             )}
         </nav>

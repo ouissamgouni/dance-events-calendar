@@ -1,7 +1,7 @@
-import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 
 export interface NavDestination {
-    id: 'explore' | 'for-you' | 'tribe' | 'my-events' | 'mine';
+    id: 'explore' | 'browse' | 'my-events' | 'tribe' | 'passport';
     label: string;
     path: string;
     icon: string;
@@ -9,20 +9,30 @@ export interface NavDestination {
 }
 
 // Order defines the left-to-right / bottom-nav order of the primary surfaces.
-const ALL_NAV_DESTINATIONS: NavDestination[] = [
+const EXPLORE_DESTINATION: NavDestination = {
+    id: 'explore',
+    label: 'Explore',
+    path: '/',
+    icon: '/find-event.png',
+    isActive: (p) => p === '/' || p.startsWith('/search') || p === '/explore',
+};
+
+const BROWSE_DESTINATION: NavDestination = {
+    id: 'browse',
+    label: 'Browse',
+    path: '/browse',
+    icon: '/filter.png',
+    isActive: (p) => p.startsWith('/browse') || p === '/calendar',
+};
+
+export const NAV_DESTINATIONS: NavDestination[] = [
+    EXPLORE_DESTINATION,
     {
-        id: 'explore',
-        label: 'Explore',
-        path: '/',
-        icon: '/find-event.png',
-        isActive: (p) => p === '/' || p === '/calendar',
-    },
-    {
-        id: 'for-you',
-        label: 'For You',
-        path: '/for-you',
-        icon: '/sparkles.png',
-        isActive: (p) => p === '/for-you',
+        id: 'my-events',
+        label: 'My Events',
+        path: '/my-events',
+        icon: '/calendar.png',
+        isActive: (p) => p === '/my-events' || p.startsWith('/my-events/'),
     },
     {
         id: 'tribe',
@@ -32,35 +42,23 @@ const ALL_NAV_DESTINATIONS: NavDestination[] = [
         isActive: (p) => p === '/tribe' || p.startsWith('/tribe/'),
     },
     {
-        id: 'my-events',
-        label: 'My Events',
-        path: '/mine/calendar',
-        icon: '/calendar.png',
-        isActive: (p) => p === '/mine/calendar' || p.startsWith('/mine/calendar/'),
-    },
-    {
-        id: 'mine',
-        label: 'MyDance',
-        path: '/mine',
-        icon: '/dance.png',
-        isActive: (p) => p === '/mine' || p.startsWith('/mine/'),
+        id: 'passport',
+        label: 'Passport',
+        path: '/passport',
+        icon: '/passport.png',
+        isActive: (p) => p === '/passport' || p.startsWith('/passport/'),
     },
 ];
 
 /**
- * Hook that returns navigation destinations filtered by feature flags.
- * "My Events" entry is only included if myEventsNavEnabled flag is true.
+ * Shared mobile and desktop destinations.
  */
 export function useNavDestinations(): NavDestination[] {
-    const { myEventsNavEnabled } = useFeatureFlags();
-
-    return ALL_NAV_DESTINATIONS.filter(
-        (dest) => dest.id !== 'my-events' || myEventsNavEnabled
-    );
+    const { browseNavEnabled } = useOptionalFeatureFlags();
+    if (browseNavEnabled) {
+        return [EXPLORE_DESTINATION, BROWSE_DESTINATION, ...NAV_DESTINATIONS.slice(1)];
+    }
+    return NAV_DESTINATIONS.map((destination) => destination.id === 'explore'
+        ? { ...destination, isActive: (pathname) => destination.isActive(pathname) || BROWSE_DESTINATION.isActive(pathname) }
+        : destination);
 }
-
-/**
- * @deprecated Use useNavDestinations() hook instead for feature-flag-filtered destinations.
- * Kept for backward compatibility; includes all destinations regardless of flags.
- */
-export const NAV_DESTINATIONS: NavDestination[] = ALL_NAV_DESTINATIONS;

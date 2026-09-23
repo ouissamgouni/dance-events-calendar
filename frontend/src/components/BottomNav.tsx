@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useNavDestinations } from './navDestinations';
-import { useForYouHasNew } from '../hooks/useForYouHasNew';
 
 /**
  * Mobile sticky primary navigation. Hidden on md+ (desktop uses the
@@ -9,8 +8,6 @@ import { useForYouHasNew } from '../hooks/useForYouHasNew';
  */
 export default function BottomNav() {
     const { pathname } = useLocation();
-    const forYouActive = pathname === '/for-you';
-    const hasNewForYou = useForYouHasNew(forYouActive);
     const navDestinations = useNavDestinations();
 
     return (
@@ -21,7 +18,6 @@ export default function BottomNav() {
         >
             {navDestinations.map((dest) => {
                 const active = dest.isActive(pathname);
-                const showDot = dest.id === 'for-you' && hasNewForYou;
                 return (
                     <Link
                         key={dest.id}
@@ -41,14 +37,6 @@ export default function BottomNav() {
                                 className="h-6 w-6 object-contain"
                                 style={active ? undefined : { filter: 'grayscale(1)', opacity: 0.6 }}
                             />
-                            {showDot && (
-                                <span
-                                    // eslint-disable-next-line no-restricted-syntax -- small status dot (new indicator) — allowed exception per frontend rules
-                                    className="absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-action"
-                                    aria-label="New items available"
-                                    data-testid="for-you-nav-new-dot"
-                                />
-                            )}
                         </span>
                         <span>{dest.label}</span>
                     </Link>

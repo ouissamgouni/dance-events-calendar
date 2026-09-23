@@ -23,7 +23,8 @@ import { useAuth } from '../context/AuthContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useToast } from '../components/Toast';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
-import PassportView from '../components/PassportView';
+import PassportView, { type PassportTab } from '../components/PassportView';
+import MilestoneCarousel from '../components/MilestoneCarousel';
 import PassportShareCard from '../components/PassportShareCard';
 import { scopePassport, type ShareScope } from '../utils/passportScope';
 import { CARD_HEIGHT, CARD_WIDTH, downloadImage, renderCardToBlob, shareImage } from '../utils/passportShareImage';
@@ -1054,9 +1055,11 @@ function AddPastEventControl({ onAdded, onOpenSubmitEvent }: { onAdded: () => vo
                 includePast
                 small
                 triggerIcon="plus"
-                triggerLabel="Add past event"
+                triggerLabel="Add event"
+                portal
                 onSelectEvent={(id) => setConfirmId(id)}
                 onOpenSubmitEvent={onOpenSubmitEvent}
+                resultPurpose="select"
             />
             {confirmId && (
                 <AttendedEventConfirmModal
@@ -1085,6 +1088,10 @@ export default function PassportPage() {
     const [mapEvents, setMapEvents] = useState<PassportMapEvent[] | null>(null);
     const navigate = useNavigate();
     const location = useLocation();
+    const initialTab = (() => {
+        const value = new URLSearchParams(location.search).get('tab');
+        return value === 'journey' || value === 'places' ? value : 'milestones';
+    })() satisfies PassportTab;
 
     // `/suggest` renders over the passport so its timeline stays mounted.
     const openSuggest = useCallback(() => {
@@ -1179,6 +1186,20 @@ export default function PassportPage() {
     }, []);
 
     const hasMore = useMemo(() => items.length < total, [items.length, total]);
+    const nextMilestones = useMemo(() => {
+        if (!data) return [];
+        const nextByCategory = new Map<string, (typeof data.milestones)[number]>();
+        for (const milestone of data.milestones) {
+            if (milestone.unlocked || milestone.threshold <= 0) continue;
+            const current = nextByCategory.get(milestone.category);
+            if (!current || milestone.progress / milestone.threshold > current.progress / current.threshold) {
+                nextByCategory.set(milestone.category, milestone);
+            }
+        }
+        return [...nextByCategory.values()].sort((left, right) =>
+            right.progress / right.threshold - left.progress / left.threshold,
+        );
+    }, [data]);
 
     // Lazily load the full attended-event set for the Cities/Countries map the
     // first time the viewer opens one of those tabs.
@@ -1274,15 +1295,18 @@ export default function PassportPage() {
                         handle={user?.handle ?? null}
                         avatarUrl={user?.avatar_url ?? null}
                         headerActions={
-                            user?.handle ? (
-                                <SharePassportMenu
-                                    handle={user.handle}
-                                    displayName={(user.name || '').trim().split(/\s+/)[0] || user.handle}
-                                    shareCode={user.share_code ?? null}
-                                    data={data}
-                                    mapEvents={mapEvents}
-                                />
-                            ) : undefined
+                            <div className="flex items-center gap-2">
+                                <AddPastEventControl onAdded={handlePastEventAdded} onOpenSubmitEvent={openSuggest} />
+                                {user?.handle && (
+                                    <SharePassportMenu
+                                        handle={user.handle}
+                                        displayName={(user.name || '').trim().split(/\s+/)[0] || user.handle}
+                                        shareCode={user.share_code ?? null}
+                                        data={data}
+                                        mapEvents={mapEvents}
+                                    />
+                                )}
+                            </div>
                         }
                         dancingSinceSlot={
                             <DancingSinceControl
@@ -1296,7 +1320,9 @@ export default function PassportPage() {
                                 }
                             />
                         }
-                        timelineActions={<AddPastEventControl onAdded={handlePastEventAdded} onOpenSubmitEvent={openSuggest} />}
+                        initialTab={initialTab}
+                        onTabChange={(tab) => navigate({ pathname: location.pathname, search: `?tab=${tab}` }, { replace: true })}
+                        milestonesLead={<div className="px-4"><MilestoneCarousel milestones={nextMilestones} /></div>}
                         timelineItems={items}
                         timelineMarkers={markers}
                         timelineHasMore={hasMore}

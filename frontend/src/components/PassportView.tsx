@@ -32,7 +32,7 @@ import type {
 export type { PassportSection };
 
 const ALL_SECTIONS: PassportSection[] = ['milestones', 'timeline', 'cities', 'countries'];
-type PassportTab = 'milestones' | 'journey' | 'places';
+export type PassportTab = 'milestones' | 'journey' | 'places';
 type MilestoneCategoryKey = 'events' | 'consistency' | 'cities' | 'countries' | 'reviews';
 type MilestoneCardState = 'unlocked' | 'in-progress' | 'locked';
 
@@ -679,7 +679,10 @@ export interface PassportViewProps {
     sections?: PassportSection[];
     headerActions?: ReactNode;
     dancingSinceSlot?: ReactNode;
+    milestonesLead?: ReactNode;
     timelineActions?: ReactNode;
+    initialTab?: PassportTab;
+    onTabChange?: (tab: PassportTab) => void;
     timelineItems?: PassportTimelineItem[];
     timelineMarkers?: PassportTimelineMarker[];
     timelineHasMore?: boolean;
@@ -699,7 +702,10 @@ export default function PassportView({
     sections = ALL_SECTIONS,
     headerActions,
     dancingSinceSlot,
+    milestonesLead,
     timelineActions,
+    initialTab = 'milestones',
+    onTabChange,
     timelineItems = [],
     timelineMarkers = [],
     timelineHasMore = false,
@@ -709,7 +715,7 @@ export default function PassportView({
     onNeedMapEvents,
     onTimelineSearch,
 }: PassportViewProps) {
-    const [tab, setTab] = useState<PassportTab>('milestones');
+    const [tab, setTab] = useState<PassportTab>(initialTab);
     const [selectedCategory, setSelectedCategory] = useState<MilestoneCategoryKey | null>(null);
     const hasMilestones = sections.includes('milestones');
     const hasJourney = sections.includes('timeline');
@@ -721,7 +727,8 @@ export default function PassportView({
     const selectTab = useCallback((next: PassportTab) => {
         setSelectedCategory(null);
         setTab(next);
-    }, []);
+        onTabChange?.(next);
+    }, [onTabChange]);
 
     useEffect(() => {
         if (tab !== 'places' || (!hasCities && !hasCountries) || mapEvents !== null) return;
@@ -832,6 +839,7 @@ export default function PassportView({
                         {tab === 'milestones' && (
                             <>
                                 <PassportStatsPanel data={data} />
+                                {milestonesLead}
                                 {hasMilestones
                                     ? (
                                         <MilestonesOverview categories={categories} onOpen={setSelectedCategory} />

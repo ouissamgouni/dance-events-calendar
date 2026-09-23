@@ -26,6 +26,7 @@ settings:
   event_card_imgoing_location_bottom_enabled: true
   event_card_show_people_icon_enabled: false
   explorer_event_card_card_style_enabled: true
+  browse_nav_enabled: true
 
   # Experiment under test: two-line, icon-prefixed filter summary bar with
   # the Map/Calendar controls pinned to its right.
