@@ -129,7 +129,7 @@ export default function OrganizerClaimSection({ handle }: Props) {
         setSearching(true);
         searchTimerRef.current = window.setTimeout(async () => {
             try {
-                const rows = await searchEvents(q, 10);
+                const rows = await searchEvents(q, { limit: 10, dateScope: 'upcoming' });
                 setSearchResults(rows);
             } catch {
                 setSearchResults([]);

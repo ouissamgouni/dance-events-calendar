@@ -20,7 +20,7 @@ export default function MyDanceActivityStrip({ months, size = 'default' }: MyDan
     const rolling = rollingTwelveMonths(months);
 
     const config = size === 'xs'
-        ? { gap: 'gap-0', textSize: 'text-[5px]', marginTop: 'mt-0.5', cellSize: 'h-3 w-3' }
+        ? { gap: 'gap-0', textSize: 'text-[5px]', marginTop: 'mt-0.5', cellSize: 'h-3 w-full' }
         : size === 'small'
             ? { gap: 'gap-0.5', textSize: 'text-[7px]', marginTop: 'mt-0.5', cellSize: 'aspect-square w-full' }
             : { gap: 'gap-2', textSize: 'text-[11px]', marginTop: 'mt-1.5', cellSize: 'aspect-square w-full' };

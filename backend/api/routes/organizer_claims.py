@@ -37,6 +37,7 @@ from backend.db.models import (
     User,
 )
 from backend.services.email import send_organizer_claim_notification
+from backend.services.user_avatars import resolve_user_avatar
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +109,7 @@ def _to_admin_out(
         user_handle=user.handle if user else None,
         user_display_name=user.display_name if user else None,
         user_email=user.email if user else None,
-        user_avatar_url=user.avatar_url if user else None,
+        user_avatar_url=resolve_user_avatar(user) if user else None,
         user_bio=user.bio if user else None,
         user_instagram_url=user.instagram_url if user else None,
         user_facebook_url=user.facebook_url if user else None,

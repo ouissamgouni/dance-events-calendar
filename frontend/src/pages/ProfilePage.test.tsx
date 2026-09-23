@@ -21,12 +21,40 @@ function renderProfile(handle = 'testorg') {
                     <Routes>
                         <Route path="/u/:handle" element={<ProfilePage />} />
                         <Route path="/login" element={<p>login page</p>} />
+                        <Route path="/account" element={<p>account settings</p>} />
                     </Routes>
                 </AuthProvider>
             </MemoryRouter>,
         ),
     }
 }
+
+describe('ProfilePage header actions', () => {
+    it('links to account settings when viewing the current user profile', async () => {
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/social/users/:handle', ({ params }) =>
+                HttpResponse.json(makeProfile({ handle: String(params.handle), is_self: true })),
+            ),
+        )
+
+        const { user } = renderProfile('testdancer')
+
+        const editLink = await screen.findByRole('link', { name: 'Edit profile' })
+        expect(editLink).toHaveAttribute('href', '/account')
+
+        await user.click(editLink)
+
+        expect(await screen.findByText('account settings')).toBeInTheDocument()
+    })
+
+    it('does not show the edit link on another user profile', async () => {
+        renderProfile()
+
+        await screen.findByRole('heading', { name: 'Test Org' })
+        expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument()
+    })
+})
 
 describe('ProfilePage follow flow', () => {
     it('lets an authenticated viewer follow a public profile', async () => {

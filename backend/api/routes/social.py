@@ -123,6 +123,7 @@ from backend.services.follows import (
     ensure_approved_follow_with_subscription,
     ensure_calendar_subscription,
 )
+from backend.services.user_avatars import delete_user_avatar, resolve_user_avatar
 from backend.api.deps import get_admin_user_id, is_admin_user
 from backend.config.loader import get_current_onboarding_version
 
@@ -230,7 +231,7 @@ def _to_admin_user(session: Session, user: User) -> AdminUser:
         email=user.email,
         handle=user.handle,
         display_name=user.display_name,
-        avatar_url=user.avatar_url,
+        avatar_url=resolve_user_avatar(user),
         is_admin=is_admin_user(user),
         is_verified_organizer=bool(user.is_verified_organizer),
         is_admin_managed=bool(user.is_admin_managed),
@@ -383,7 +384,7 @@ def _mutual_subscribers(
         MutualSubscriberPreview(
             handle=u.handle or "",
             display_name=u.display_name,
-            avatar_url=u.avatar_url,
+            avatar_url=resolve_user_avatar(u),
         )
         for u in rows
     ]
@@ -488,7 +489,7 @@ def _to_follow_user(
     return FollowUserResponse(
         handle=target.handle or "",
         display_name=target.display_name,
-        avatar_url=target.avatar_url,
+        avatar_url=resolve_user_avatar(target),
         is_verified_organizer=target.is_verified_organizer,
         is_friend=is_friend,
     )
@@ -693,7 +694,7 @@ def get_public_profile(
     return PublicProfileResponse(
         handle=target.handle or "",
         display_name=target.display_name,
-        avatar_url=target.avatar_url,
+        avatar_url=resolve_user_avatar(target),
         is_verified_organizer=target.is_verified_organizer,
         is_admin_managed=bool(target.is_admin_managed),
         instagram_url=target.instagram_url,
@@ -775,7 +776,11 @@ def get_profile_passport(
         f"@{target.handle}" if target.handle else None
     )
     return build_shared_passport(
-        session, target, display_name=display_name, viewer=viewer
+        session,
+        target,
+        display_name=display_name,
+        viewer=viewer,
+        include_monthly_activity=True,
     )
 
 
@@ -1065,7 +1070,7 @@ def list_follow_requests(
         FollowRequestItem(
             handle=u.handle or "",
             display_name=u.display_name,
-            avatar_url=u.avatar_url,
+            avatar_url=resolve_user_avatar(u),
             requested_at=f.created_at,
         )
         for (f, u) in rows
@@ -1499,7 +1504,7 @@ def friends_leaderboard(
                 rank=idx,
                 handle=u.handle or "",
                 display_name=u.display_name,
-                avatar_url=u.avatar_url,
+                avatar_url=resolve_user_avatar(u),
                 is_verified_organizer=bool(u.is_verified_organizer),
                 going_count=int(count),
             )
@@ -1593,7 +1598,7 @@ def following_most_active(
                 rank=idx,
                 handle=u.handle or "",
                 display_name=u.display_name,
-                avatar_url=u.avatar_url,
+                avatar_url=resolve_user_avatar(u),
                 is_verified_organizer=bool(u.is_verified_organizer),
                 going_count=int(count),
             )
@@ -2124,7 +2129,7 @@ def _user_to_search_result(
     return UserSearchResult(
         handle=user.handle or "",
         display_name=user.display_name,
-        avatar_url=user.avatar_url,
+        avatar_url=resolve_user_avatar(user),
         is_verified_organizer=bool(user.is_verified_organizer),
         is_admin_managed=bool(user.is_admin_managed),
         subscribers_count=_subscribers_count(session, user.id),
@@ -3318,7 +3323,9 @@ def _merge_managed_user_account(
     source.email = f"merged-{source.id}@example.invalid"
     source.provider_subject = None
     source.display_name = None
+    delete_user_avatar(source.avatar_key)
     source.avatar_url = None
+    source.avatar_key = None
     source.handle = None
     source.share_code = None
     source.is_admin_managed = False
@@ -3657,7 +3664,7 @@ def _to_subscribed_user(
     return SubscribedUser(
         handle=target.handle or "",
         display_name=target.display_name or (target.handle or ""),
-        avatar_url=target.avatar_url,
+        avatar_url=resolve_user_avatar(target),
         is_verified_organizer=bool(target.is_verified_organizer),
         notify_new_events=bool(sub.notify_new_events),
         can_view_calendar=can_view(session, viewer, target, "calendar"),
@@ -3835,7 +3842,7 @@ def list_my_subscribers(
                 handle=subscriber.handle or "",
                 display_name=subscriber.display_name
                 or subscriber.email.split("@", 1)[0],
-                avatar_url=subscriber.avatar_url,
+                avatar_url=resolve_user_avatar(subscriber),
                 is_verified_organizer=bool(subscriber.is_verified_organizer),
                 subscribed_at=sub.created_at,
             )
@@ -3886,7 +3893,7 @@ def _actor_payload(u: User) -> NotificationActor:
     return NotificationActor(
         handle=u.handle or "",
         display_name=u.display_name or u.email.split("@", 1)[0],
-        avatar_url=u.avatar_url,
+        avatar_url=resolve_user_avatar(u),
         is_verified_organizer=bool(u.is_verified_organizer),
     )
 
@@ -4459,7 +4466,7 @@ def _build_fof_suggestions(
                 FoFSuggestionItem(
                     handle=u.handle or "",
                     display_name=u.display_name,
-                    avatar_url=u.avatar_url,
+                    avatar_url=resolve_user_avatar(u),
                     is_verified_organizer=bool(u.is_verified_organizer),
                     is_admin_managed=bool(u.is_admin_managed),
                     mutual_friend_count=0,
@@ -4502,7 +4509,7 @@ def _build_fof_suggestions(
             FoFSuggestionItem(
                 handle=u.handle or "",
                 display_name=u.display_name,
-                avatar_url=u.avatar_url,
+                avatar_url=resolve_user_avatar(u),
                 is_verified_organizer=bool(u.is_verified_organizer),
                 is_admin_managed=bool(u.is_admin_managed),
                 mutual_friend_count=candidate_scores.get(u.id, 0),
@@ -4666,5 +4673,5 @@ def get_share_source(
     return ShareSourceResponse(
         handle=sharer.handle,
         display_name=sharer.display_name,
-        avatar_url=sharer.avatar_url,
+        avatar_url=resolve_user_avatar(sharer),
     )

@@ -171,7 +171,7 @@ describe('PassportPage', () => {
         expect(screen.getByText('City Starter')).toBeInTheDocument()
         expect(screen.getAllByTestId('journey-entry')).toHaveLength(1)
         expect(screen.getByRole('heading', { name: '2024' })).toBeInTheDocument()
-        expect(screen.getByPlaceholderText('Search events by name, city or tag')).toBeInTheDocument()
+        expect(screen.getByPlaceholderText('Search attended events, cities, or tags')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Show in map' })).toBeInTheDocument()
         // No "Styles danced" stat card.
         expect(screen.queryByText('Styles danced')).not.toBeInTheDocument()
@@ -213,7 +213,7 @@ describe('PassportPage', () => {
         renderPassport()
         await screen.findByText('Your stats')
         fireEvent.click(screen.getByRole('tab', { name: 'Journey' }))
-        fireEvent.change(screen.getByPlaceholderText('Search events by name, city or tag'), { target: { value: 'Salsa' } })
+        fireEvent.change(screen.getByPlaceholderText('Search attended events, cities, or tags'), { target: { value: 'Salsa' } })
 
         await waitFor(() => expect(query).toBe('Salsa'))
     })
@@ -417,21 +417,23 @@ describe('PassportPage', () => {
 
     it('adds a past event to the passport via the search + confirm flow', async () => {
         let attendanceBody: Record<string, unknown> | null = null
+        let searchUrl = ''
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
             http.get('*/api/passport', () => HttpResponse.json(PASSPORT)),
             http.get('*/api/passport/timeline', () => HttpResponse.json(TIMELINE)),
             http.get('*/api/auth/attending-events', () => HttpResponse.json({ events: [] })),
-            http.get('*/api/events/search', () =>
-                HttpResponse.json([
+            http.get('*/api/events/search', ({ request }) => {
+                searchUrl = request.url
+                return HttpResponse.json([
                     {
                         event_id: 'past-1',
                         title: 'Havana Rooftop Social',
                         start: '2023-09-01T21:00:00',
                         location: 'Rooftop Bar',
                     },
-                ]),
-            ),
+                ])
+            }),
             http.get('*/api/events/past-1', () =>
                 HttpResponse.json({
                     event_id: 'past-1',
@@ -487,8 +489,12 @@ describe('PassportPage', () => {
         fireEvent.click(addTrigger)
 
         // Type a query and pick the returned past event.
-        const input = await screen.findByLabelText('Search past events')
+        const input = await screen.findByLabelText('Search events, places, or tags')
         fireEvent.change(input, { target: { value: 'Havana' } })
+        await waitFor(() => expect(searchUrl).not.toBe(''))
+        const searchParams = new URL(searchUrl).searchParams
+        expect(searchParams.get('date_scope')).toBe('past')
+        expect(searchParams.get('exclude_attended')).toBe('true')
         const result = await screen.findByTestId('explorer-event-search-result-0')
         expect(result).toHaveTextContent('Havana Rooftop Social')
         expect(result).toHaveTextContent('Rooftop Bar')
@@ -535,7 +541,7 @@ describe('PassportPage', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Journey' }))
         fireEvent.click(await screen.findByRole('button', { name: 'Add event' }))
 
-        const input = await screen.findByLabelText('Search past events')
+        const input = await screen.findByLabelText('Search events, places, or tags')
         fireEvent.change(input, { target: { value: 'Havana' } })
 
         // Already-attended event is filtered out, so the empty-state calendar

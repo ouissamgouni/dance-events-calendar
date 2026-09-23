@@ -19,6 +19,7 @@ from backend.api.schemas import (
     EventBatchRequest,
     EventOrganizerMini,
     EventResponse,
+    EventSearchDateScope,
     EventSearchResponse,
 )
 from backend.api.routes.tags import get_event_tags
@@ -41,6 +42,7 @@ from backend.db.models import (
 from backend.services.event_images import event_image_fields
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
 from backend.services.profile_geography import profile_contains_point
+from backend.services.user_avatars import resolve_user_avatar
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -206,7 +208,7 @@ def _following_friend_signals(
                 "user_id": u.id,
                 "handle": u.handle,
                 "display_name": u.display_name,
-                "avatar_url": u.avatar_url,
+                "avatar_url": resolve_user_avatar(u),
             }
             for u in owners[:preview_limit]
         ]
@@ -906,6 +908,7 @@ def search_events(
     limit: int = Query(default=10, ge=1, le=25),
     offset: int = Query(default=0, ge=0),
     include_past: bool = Query(default=False),
+    date_scope: Optional[EventSearchDateScope] = Query(default=None),
     exclude_attended: bool = Query(default=False),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_current_user_optional),
@@ -914,11 +917,10 @@ def search_events(
 
     Returns up to ``limit`` (non-deleted, non-hidden) events matching every
     query token against the title, city, country, or an enabled tag. By default only
-    *upcoming* events are returned (the public explorer + organizer
-    event-claim picker); pass ``include_past=true`` to also match events
-    that have already started (used by the admin review-prompt force-send,
-    which targets events that have ended). Payload is intentionally minimal
-    and includes match context for the finder.
+    current and upcoming events are returned. ``date_scope`` can select ended
+    events or all dates; the legacy ``include_past=true`` maps to all dates when
+    no explicit scope is provided. Payload is intentionally minimal and includes
+    match context for the finder.
 
     When ``exclude_attended`` is set for an authenticated caller (the passport
     "add a past event" picker), events the user has already logged as attended
@@ -972,6 +974,9 @@ def search_events(
         else_=1,
     )
     now = datetime.now(UTC).replace(tzinfo=None)
+    effective_date_scope: EventSearchDateScope = date_scope or (
+        "all" if include_past else "upcoming"
+    )
     stmt = (
         select(CachedEvent)
         .where(CachedEvent.deleted_at.is_(None))  # type: ignore[union-attr]
@@ -986,9 +991,8 @@ def search_events(
         ).all()
         if attended_ids:
             stmt = stmt.where(col(CachedEvent.event_id).not_in(attended_ids))
-    if include_past:
-        # Most-recent-first so recently-ended events (the review-prompt
-        # targets) surface at the top of the typeahead.
+    if effective_date_scope == "past":
+        stmt = stmt.where(CachedEvent.end < now)
         ordering = (
             title_exact_rank,
             title_prefix_rank,
@@ -997,8 +1001,22 @@ def search_events(
             col(CachedEvent.start).desc(),
             col(CachedEvent.event_id),
         )
+    elif effective_date_scope == "all":
+        ended_rank = case((CachedEvent.end < now, 1), else_=0)
+        current_start = case((CachedEvent.end >= now, CachedEvent.start))
+        past_start = case((CachedEvent.end < now, CachedEvent.start))
+        ordering = (
+            title_exact_rank,
+            title_prefix_rank,
+            title_match_rank,
+            place_match_rank,
+            ended_rank,
+            current_start.asc(),
+            past_start.desc(),
+            col(CachedEvent.event_id),
+        )
     else:
-        stmt = stmt.where(CachedEvent.start >= now)
+        stmt = stmt.where(CachedEvent.end >= now)
         ordering = (
             title_exact_rank,
             title_prefix_rank,
@@ -1027,6 +1045,7 @@ def search_events(
             event_id=event.event_id,
             title=event.title,
             start=event.start,
+            end=event.end,
             location=event.location,
             city=event.city,
             country=event.country,
@@ -1288,7 +1307,7 @@ def get_event(
                     user_id=u.id,
                     handle=u.handle,
                     display_name=u.display_name,
-                    avatar_url=u.avatar_url,
+                    avatar_url=resolve_user_avatar(u),
                     is_verified_organizer=u.is_verified_organizer,
                 )
 

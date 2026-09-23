@@ -54,6 +54,7 @@ from backend.services.email import (
 )
 from backend.services.notification_delivery import record_delivery
 from backend.services.push_service import send_push
+from backend.services.user_avatars import resolve_user_avatar
 
 logger = logging.getLogger(__name__)
 
@@ -727,7 +728,9 @@ def run_once(
                     milestone_names=milestone_names,
                 ),
                 "avatar_url": (
-                    actor.avatar_url if actor is not None and not anon else None
+                    resolve_user_avatar(actor)
+                    if actor is not None and not anon
+                    else None
                 ),
                 "initial": (
                     (actor.display_name or actor.handle or "?")
@@ -782,7 +785,7 @@ def run_once(
                         {
                             "handle": item.handle,
                             "display_name": item.display_name,
-                            "avatar_url": item.avatar_url,
+                            "avatar_url": resolve_user_avatar(item),
                             "mutual_friend_count": item.mutual_friend_count,
                             "followers_count": item.followers_count,
                         }
@@ -844,7 +847,7 @@ def run_once(
                         {
                             "handle": item.handle,
                             "display_name": item.display_name,
-                            "avatar_url": item.avatar_url,
+                            "avatar_url": resolve_user_avatar(item),
                             "mutual_friend_count": item.mutual_friend_count,
                             "followers_count": item.followers_count,
                         }

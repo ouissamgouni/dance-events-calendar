@@ -9,8 +9,8 @@ vi.mock('../context/FeatureFlagsContext', () => ({
 }));
 
 vi.mock('./EventCard', () => ({
-    default: ({ showActions, isPast, onOpen }: { showActions: boolean; isPast: boolean; onOpen: () => void }) => (
-        <button type="button" onClick={onOpen} data-testid="event-card" data-actions={showActions} data-past={isPast}>
+    default: ({ showActions, isPast, showPastLabel, onOpen }: { showActions: boolean; isPast: boolean; showPastLabel: boolean; onOpen: () => void }) => (
+        <button type="button" onClick={onOpen} data-testid="event-card" data-actions={showActions} data-past={isPast} data-past-label={showPastLabel}>
             Hydrated event
         </button>
     ),
@@ -20,6 +20,7 @@ const result: EventSearchResult = {
     event_id: 'event-1',
     title: 'Havana Rooftop Social',
     start: '2023-09-01T21:00:00Z',
+    end: '2023-09-02T02:00:00Z',
     location: 'Rooftop Bar',
     city: 'Havana',
     country: 'Cuba',
@@ -63,6 +64,18 @@ describe('SearchEventCard', () => {
 
         expect(screen.getByTestId('event-card')).toHaveAttribute('data-actions', 'false');
         expect(screen.getByTestId('event-card')).toHaveAttribute('data-past', 'true');
+        expect(screen.getByTestId('event-card')).toHaveAttribute('data-past-label', 'false');
+    });
+
+    it('shows an explicit Past marker only when mixed results request it', () => {
+        const { rerender } = render(<SearchEventCard result={result} onOpen={vi.fn()} />);
+        expect(screen.queryByText('Past')).not.toBeInTheDocument();
+
+        rerender(<SearchEventCard result={result} onOpen={vi.fn()} showPastLabel />);
+        expect(screen.getByText('Past')).toBeInTheDocument();
+
+        rerender(<SearchEventCard result={result} event={event} onOpen={vi.fn()} showPastLabel />);
+        expect(screen.getByTestId('event-card')).toHaveAttribute('data-past-label', 'true');
     });
 
     it('renders a selectable sparse-result fallback when hydration fails', () => {

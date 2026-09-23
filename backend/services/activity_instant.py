@@ -39,6 +39,7 @@ from backend.services import activity_email
 from backend.services.app_settings import get_feature_email_instant
 from backend.services.email import send_activity_digest_email
 from backend.services.notification_delivery import record_delivery
+from backend.services.user_avatars import resolve_user_avatar
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +183,7 @@ def dispatch_activity_instant(
                 {
                     "handle": item.handle,
                     "display_name": item.display_name,
-                    "avatar_url": item.avatar_url,
+                    "avatar_url": resolve_user_avatar(item),
                     "mutual_friend_count": item.mutual_friend_count,
                     "followers_count": item.followers_count,
                 }

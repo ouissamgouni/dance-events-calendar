@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
-import { fetchEventsByIds, searchEvents, type EventSearchResult } from '../api';
+import { fetchEventsByIds, searchEvents, type EventSearchDateScope, type EventSearchResult } from '../api';
 import type { CalendarEvent } from '../types';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import SearchEventCard, { type SearchEventCardPurpose } from './SearchEventCard';
@@ -16,8 +16,10 @@ interface ExplorerEventSearchProps {
     /** Render a smaller trigger button (used inline in the passport Timeline tab). */
     small?: boolean;
     triggerIcon?: 'search' | 'plus';
-    /** Search past events (start in the past) instead of upcoming ones. */
-    includePast?: boolean;
+    /** Restrict results to the date scope required by the surrounding workflow. */
+    dateScope?: EventSearchDateScope;
+    /** Exclude events the signed-in viewer already marked as attended. */
+    excludeAttended?: boolean;
     /** Render an "Include past" checkbox that lets the user opt past events
      *  into the results (used by the header search). */
     pastToggle?: boolean;
@@ -25,7 +27,7 @@ interface ExplorerEventSearchProps {
      *  "Include past" toggle inline in the header box, and show only results
      *  (no duplicate search input) in the dropdown below. */
     headerInline?: boolean;
-    /** Callback to open the submit event form (shown in search overlay footer when includePast is true). */
+    /** Callback to open the submit event form in past-event selection flows. */
     onOpenSubmitEvent?: () => void;
     /** Always-open result surface used when search is embedded in page content. */
     embedded?: boolean;
@@ -63,7 +65,8 @@ export default function ExplorerEventSearch({
     className = '',
     small = false,
     triggerIcon = 'search',
-    includePast = false,
+    dateScope = 'upcoming',
+    excludeAttended = false,
     pastToggle = false,
     headerInline = false,
     onOpenSubmitEvent,
@@ -82,9 +85,7 @@ export default function ExplorerEventSearch({
     const [loading, setLoading] = useState(false);
     const [activeIdx, setActiveIdx] = useState(-1);
     const [pastChecked, setPastChecked] = useState(false);
-    // Passport mode (`includePast`) always includes past + excludes attended;
-    // the header checkbox only opts past events in, without hiding attended.
-    const effectiveIncludePast = includePast || pastChecked;
+    const effectiveDateScope: EventSearchDateScope = pastToggle && pastChecked ? 'all' : dateScope;
     const containerRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
@@ -147,7 +148,11 @@ export default function ExplorerEventSearch({
         }
         let cancelled = false;
         setLoading(true);
-        searchEvents(term, 25, effectiveIncludePast, includePast)
+        searchEvents(term, {
+            limit: 25,
+            dateScope: effectiveDateScope,
+            excludeAttended,
+        })
             .then(async (rows) => {
                 if (cancelled) return;
                 const events = await fetchEventsByIds(rows.map((row) => row.event_id)).catch(() => []);
@@ -168,18 +173,16 @@ export default function ExplorerEventSearch({
         return () => {
             cancelled = true;
         };
-    }, [debounced, embedded, open, effectiveIncludePast, includePast]);
+    }, [debounced, embedded, open, effectiveDateScope, excludeAttended]);
 
     const term = q.trim();
 
-    // In past-event (passport) mode, only offer events the viewer hasn't
-    // already added to their passport.
     const visibleResults = useMemo(
         () => {
-            const attendanceFiltered = includePast ? results.filter((result) => !isAttending(result.event_id)) : results;
+            const attendanceFiltered = excludeAttended ? results.filter((result) => !isAttending(result.event_id)) : results;
             return resultFilter ? attendanceFiltered.filter(resultFilter) : attendanceFiltered;
         },
-        [results, includePast, isAttending, resultFilter],
+        [results, excludeAttended, isAttending, resultFilter],
     );
 
     const reset = () => {
@@ -259,7 +262,7 @@ export default function ExplorerEventSearch({
                         onChange={(event) => setQ(event.target.value)}
                         onKeyDown={onKeyDown}
                         onFocus={() => setOpen(true)}
-                        placeholder={effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
+                        placeholder="Search events, places, or tags…"
                         aria-label={triggerLabel}
                         className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none"
                     />
@@ -336,8 +339,8 @@ export default function ExplorerEventSearch({
                                             value={q}
                                             onChange={(event) => setQ(event.target.value)}
                                             onKeyDown={onKeyDown}
-                                            placeholder={effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
-                                            aria-label={embedded ? triggerLabel : effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
+                                            placeholder="Search events, places, or tags…"
+                                            aria-label={embedded ? triggerLabel : 'Search events, places, or tags'}
                                             className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
                                         />
                                     </div>
@@ -347,7 +350,7 @@ export default function ExplorerEventSearch({
                         <div className="max-h-80 overflow-auto bg-canvas px-2 py-1.5">
                             {term.length < 2 && (
                                 <div className="bg-surface p-3 text-xs text-ink-soft">
-                                    {guidancePrefix ? `${guidancePrefix} ` : ''}Type at least 2 letters to find {includePast ? 'past' : 'upcoming'} events.
+                                    {guidancePrefix ? `${guidancePrefix} ` : ''}Type at least 2 letters to find {effectiveDateScope === 'all' ? 'events' : `${effectiveDateScope} events`}.
                                 </div>
                             )}
                             {term.length >= 2 && loading && (
@@ -355,8 +358,8 @@ export default function ExplorerEventSearch({
                             )}
                             {term.length >= 2 && !loading && visibleResults.length === 0 && (
                                 <div className="bg-surface p-3 text-xs text-ink-soft">
-                                    No {effectiveIncludePast ? 'past' : 'upcoming'} events match “{term}”.
-                                    {effectiveIncludePast && !embedded && (
+                                    No {effectiveDateScope === 'all' ? '' : `${effectiveDateScope} `}events match “{term}”.
+                                    {effectiveDateScope !== 'upcoming' && !embedded && (
                                         <>
                                             {' '}
                                             <Link
@@ -383,13 +386,14 @@ export default function ExplorerEventSearch({
                                         event={eventsById.get(row.event_id)}
                                         onOpen={() => selectEvent(row)}
                                         purpose={resultPurpose}
+                                        showPastLabel={effectiveDateScope === 'all'}
                                         highlighted={index === activeIdx}
                                         testId={`explorer-event-search-result-${index}`}
                                     />
                                 </div>
                             ))}
                         </div>
-                        {includePast && onOpenSubmitEvent && (
+                        {dateScope === 'past' && onOpenSubmitEvent && (
                             <div className="border-t border-line bg-surface px-3 py-2 text-center text-xs">
                                 <button
                                     type="button"

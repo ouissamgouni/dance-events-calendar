@@ -11,6 +11,7 @@ interface SearchEventCardProps {
     event?: CalendarEvent;
     onOpen: () => void;
     purpose?: SearchEventCardPurpose;
+    showPastLabel?: boolean;
     highlighted?: boolean;
     testId?: string;
 }
@@ -20,6 +21,7 @@ export default function SearchEventCard({
     event,
     onOpen,
     purpose = 'browse',
+    showPastLabel = false,
     highlighted = false,
     testId = 'search-event-card',
 }: SearchEventCardProps) {
@@ -32,6 +34,7 @@ export default function SearchEventCard({
                 onOpen={onOpen}
                 highlighted={highlighted}
                 isPast={new Date(event.end).getTime() < Date.now()}
+                showPastLabel={showPastLabel}
                 followingBadgeEnabled={followingBadgeEnabled}
                 showRatings={showRatings}
                 showActions={purpose === 'browse'}
@@ -46,6 +49,7 @@ export default function SearchEventCard({
         ? new Date(result.start).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
         : null;
     const place = [result.location, result.city, result.country].filter(Boolean).join(', ');
+    const isPast = result.end ? new Date(result.end).getTime() < Date.now() : false;
 
     return (
         <button
@@ -59,7 +63,10 @@ export default function SearchEventCard({
                 <Search className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-ink">{result.title}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 truncate text-sm font-semibold text-ink">{result.title}</span>
+                    {showPastLabel && isPast && <span className="shrink-0 text-xs font-semibold text-ink-soft">Past</span>}
+                </span>
                 {date && <span className="mt-1 block text-xs text-ink-soft">{date}</span>}
                 {place && <span className="mt-0.5 block truncate text-xs text-muted">{place}</span>}
             </span>

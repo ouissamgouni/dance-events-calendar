@@ -839,12 +839,12 @@ export default function PassportView({
                         {tab === 'milestones' && (
                             <>
                                 <PassportStatsPanel data={data} />
-                                {milestonesLead}
                                 {hasMilestones
                                     ? (
                                         <MilestonesOverview categories={categories} onOpen={setSelectedCategory} />
                                     )
                                     : <UnavailableState message="Milestones are not shared on this passport." />}
+                                {milestonesLead}
                             </>
                         )}
                         {tab === 'journey' && (
@@ -870,7 +870,7 @@ export default function PassportView({
                                                     type="search"
                                                     value={timelineSearch}
                                                     onChange={(event) => setTimelineSearch(event.target.value)}
-                                                    placeholder="Search events by name, city or tag"
+                                                    placeholder="Search attended events, cities, or tags"
                                                     className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
                                                 />
                                             </label>

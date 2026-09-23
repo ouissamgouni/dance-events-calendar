@@ -46,6 +46,8 @@ export interface EventCardProps {
     goingIconVariant?: 'hand' | 'person';
     // Context
     isPast?: boolean;
+    /** Show an explicit marker when past and current events share one result list. */
+    showPastLabel?: boolean;
     isNew?: boolean;
     isTrending?: boolean;
     followingBadgeEnabled?: boolean;
@@ -104,6 +106,7 @@ export default function EventCard({
     actions,
     goingIconVariant,
     isPast = false,
+    showPastLabel = false,
     isNew = false,
     isTrending = false,
     followingBadgeEnabled = false,
@@ -306,6 +309,7 @@ export default function EventCard({
                             >
                                 {newDot}
                                 {event.title}
+                                {showPastLabel && isPast && <span className="ml-2 text-xs font-semibold text-ink-soft">Past</span>}
                             </h3>
                             {topActions.length > 0 && (
                                 <div
@@ -386,6 +390,7 @@ export default function EventCard({
                                     >
                                         {newDot}
                                         {event.title}
+                                        {showPastLabel && isPast && <span className="ml-2 text-xs font-semibold text-ink-soft">Past</span>}
                                     </h3>
                                     {popularityBadges}
                                 </div>

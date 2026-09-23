@@ -40,21 +40,24 @@ export default function ExploreSearchEntry({ isSticky = false }: ExploreSearchEn
                     className="flex min-h-11 flex-1 items-center gap-2 rounded-field border border-line bg-canvas px-3 text-left text-sm text-muted"
                 >
                     <Search className="h-4 w-4" aria-hidden="true" />
-                    Search events by name...
+                    Search events, places, or tags…
                 </button>
                 <button type="button" onClick={() => setExpanded(false)} aria-label="Collapse search" className="inline-flex h-11 w-11 items-center justify-center text-ink-soft hover:text-ink">
                     <X className="h-5 w-5" aria-hidden="true" />
                 </button>
             </div>
             <div className="py-2 text-center text-xs text-muted">or</div>
-            <button
-                type="button"
-                onClick={() => navigate(browseDirectToExplorerEnabled ? '/browse' : '/browse?sheet=1')}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-field bg-blue-50 px-4 py-2 text-sm font-semibold text-action hover:bg-blue-100"
-            >
-                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                Browse events
-            </button>
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={() => navigate(browseDirectToExplorerEnabled ? '/browse' : '/browse?sheet=1')}
+                    className="inline-flex flex-1 min-h-11 items-center justify-center gap-2 rounded-field bg-blue-50 px-4 py-2 text-sm font-semibold text-action hover:bg-blue-100"
+                >
+                    <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                    Browse events
+                </button>
+                <div className="h-11 w-11" />
+            </div>
         </div>
     );
 }

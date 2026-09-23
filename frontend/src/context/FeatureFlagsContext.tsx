@@ -36,6 +36,8 @@ export interface FeatureFlags {
     browseNavEnabled: boolean;
     /** Send the Browse events action directly to the Explorer list. */
     browseDirectToExplorerEnabled: boolean;
+    /** Ask onboarding users to confirm their name and optionally add a picture. */
+    onboardingProfileStepEnabled: boolean;
     /** Show the optional event-size question in the review wizard. */
     eventReviewSizeStepEnabled: boolean;
     /** When true, tags on event cards render as colored badges (legacy
@@ -95,6 +97,7 @@ const defaultFlags: FeatureFlags = {
     myEventsNavEnabled: true,
     browseNavEnabled: false,
     browseDirectToExplorerEnabled: false,
+    onboardingProfileStepEnabled: false,
     eventReviewSizeStepEnabled: true,
     tagAsBadge: false,
     tagBadgeColored: false,
@@ -114,6 +117,7 @@ const defaultFlags: FeatureFlags = {
 const FeatureFlagsContext = createContext<{
     flags: FeatureFlags;
     updateFlag: (key: keyof FeatureFlags, value: any) => void;
+    ready?: boolean;
 } | null>(null);
 
 export { FeatureFlagsContext };
@@ -123,6 +127,7 @@ export { defaultFlags };
 
 export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
+    const [ready, setReady] = useState(false);
 
     const updateFlag = (key: keyof FeatureFlags, value: any) => {
         setFlags((prev) => ({ ...prev, [key]: value }));
@@ -153,6 +158,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     myEventsNavEnabled: s.my_events_nav_enabled ?? true,
                     browseNavEnabled: s.browse_nav_enabled ?? false,
                     browseDirectToExplorerEnabled: s.browse_direct_to_explorer_enabled ?? false,
+                    onboardingProfileStepEnabled: s.onboarding_profile_step_enabled ?? false,
                     eventReviewSizeStepEnabled: s.event_review_size_step_enabled ?? true,
                     tagAsBadge: s.tag_as_badge_enabled ?? false,
                     tagBadgeColored: s.tag_badge_colored ?? false,
@@ -171,11 +177,12 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
             })
             .catch(() => {
                 // Keep defaults on error
-            });
+            })
+            .finally(() => setReady(true));
     }, []);
 
     return (
-        <FeatureFlagsContext.Provider value={{ flags, updateFlag }}>
+        <FeatureFlagsContext.Provider value={{ flags, updateFlag, ready }}>
             {children}
         </FeatureFlagsContext.Provider>
     );
@@ -195,6 +202,11 @@ export function useFeatureFlags(): FeatureFlags {
 export function useOptionalFeatureFlags(): FeatureFlags {
     const context = useContext(FeatureFlagsContext);
     return context?.flags ?? defaultFlags;
+}
+
+export function useFeatureFlagsReady(): boolean {
+    const context = useContext(FeatureFlagsContext);
+    return context?.ready ?? true;
 }
 
 export function useUpdateFeatureFlag() {

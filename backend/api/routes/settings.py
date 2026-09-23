@@ -207,6 +207,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         browse_direct_to_explorer_enabled=_get_bool_setting(
             session, "browse_direct_to_explorer_enabled", default=False
         ),
+        onboarding_profile_step_enabled=_get_bool_setting(
+            session, "onboarding_profile_step_enabled", default=False
+        ),
         suggest_event_required_dance_group_id=_get_optional_int_setting(
             session, "suggest_event_required_dance_group_id"
         ),
@@ -577,6 +580,13 @@ def update_settings(
 
     if body.event_images_enabled is not None:
         _set_bool_setting(session, "event_images_enabled", body.event_images_enabled)
+
+    if body.onboarding_profile_step_enabled is not None:
+        _set_bool_setting(
+            session,
+            "onboarding_profile_step_enabled",
+            body.onboarding_profile_step_enabled,
+        )
 
     if body.event_card_placeholder_style is not None:
         row = session.get(SiteSetting, "event_card_placeholder_style")

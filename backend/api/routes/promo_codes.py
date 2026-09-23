@@ -48,6 +48,7 @@ from backend.services.email import (
     send_promo_code_notification,
 )
 from backend.services.notification_delivery import record_delivery
+from backend.services.user_avatars import resolve_user_avatar
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ def _submitter_payload(user: User) -> PromoCodeSubmitter:
         user_id=user.id,
         handle=user.handle,
         display_name=user.display_name,
-        avatar_url=user.avatar_url,
+        avatar_url=resolve_user_avatar(user),
     )
 
 

@@ -10,7 +10,16 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from slowapi import Limiter
@@ -38,6 +47,7 @@ from backend.api.schemas import (
     RedeemShareFollowResponse,
     UpdatePreferencesRequest,
     UpdateProfileRequest,
+    UserAvatarResponse,
     UserPreferencesResponse,
 )
 from backend.config.loader import (
@@ -65,7 +75,13 @@ from backend.db.models import (
 )
 from backend.services.email import send_login_code_email, send_new_user_notification
 from backend.services.follows import ensure_approved_follow_with_subscription
+from backend.services.image_processing import ImageValidationError
 from backend.services.user_bootstrap import ensure_default_interest_profile
+from backend.services.user_avatars import (
+    delete_user_avatar,
+    resolve_user_avatar,
+    store_user_avatar,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -482,7 +498,8 @@ def _build_auth_response(session: Session, user: User, is_new_user: bool) -> dic
         "email": user.email,
         "name": user.display_name or user.email,
         "handle": user.handle,
-        "avatar_url": user.avatar_url,
+        "avatar_url": resolve_user_avatar(user),
+        "has_custom_avatar": bool(user.avatar_key),
         "is_admin": is_admin,
         "is_new_user": is_new_user,
         "share_attendance_default": user.share_attendance_default,
@@ -868,7 +885,8 @@ def get_me(
         "name": user.display_name or user.email,
         "handle": user.handle,
         "share_code": user.share_code,
-        "avatar_url": user.avatar_url,
+        "avatar_url": resolve_user_avatar(user),
+        "has_custom_avatar": bool(user.avatar_key),
         "is_admin": _is_admin_email(user.email),
         "share_attendance_default": user.share_attendance_default,
         "share_attendance_default_audience": (
@@ -1470,6 +1488,48 @@ def update_profile(
     }
 
 
+@router.post("/me/avatar", response_model=UserAvatarResponse)
+@limiter.limit("10/hour")
+async def upload_my_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    previous_key = user.avatar_key
+    try:
+        new_key = store_user_avatar(str(user.id), await file.read(), file.content_type)
+    except ImageValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    user.avatar_key = new_key
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    delete_user_avatar(previous_key)
+    return UserAvatarResponse(
+        avatar_url=resolve_user_avatar(user), has_custom_avatar=True
+    )
+
+
+@router.delete("/me/avatar", response_model=UserAvatarResponse)
+@limiter.limit("10/hour")
+def remove_my_avatar(
+    request: Request,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    previous_key = user.avatar_key
+    user.avatar_key = None
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    delete_user_avatar(previous_key)
+    return UserAvatarResponse(
+        avatar_url=resolve_user_avatar(user), has_custom_avatar=False
+    )
+
+
 @router.post("/logout")
 def logout():
     """Clear the session cookie and rotate the anonymous-id cookie.
@@ -1526,9 +1586,11 @@ def purge_user_account(session: Session, user_id) -> None:
 
     db_user = session.get(User, user_id)
     if db_user is not None:
+        delete_user_avatar(db_user.avatar_key)
         db_user.email = f"deleted-{db_user.id}@example.invalid"
         db_user.display_name = None
         db_user.avatar_url = None
+        db_user.avatar_key = None
         db_user.deleted_at = datetime.utcnow()
         session.add(db_user)
 

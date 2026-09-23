@@ -16,28 +16,27 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
-from PIL import Image, UnidentifiedImageError
 
 from backend.services import object_storage
+from backend.services.image_processing import (
+    ALLOWED_CONTENT_TYPES,
+    ImageValidationError,
+    cover_crop,
+    flatten_image,
+    load_image,
+    scale_down,
+)
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 DEFAULT_MAX_BYTES = 8 * 1024 * 1024
 
 THUMB_WIDTH = 400
 THUMB_ASPECT = 16 / 9
 FULL_MAX_WIDTH = 1200
-# Guards against decompression bombs before we allocate the full raster.
-MAX_SOURCE_PIXELS = 50_000_000
-
 WEBP_CONTENT_TYPE = "image/webp"
 REMOTE_FETCH_TIMEOUT = 10.0
 REMOTE_MAX_REDIRECTS = 3
-
-
-class ImageValidationError(ValueError):
-    """Raised when the submitted image or URL is not acceptable."""
 
 
 def get_max_bytes() -> int:
@@ -91,53 +90,6 @@ def event_image_fields(event) -> dict:
     return {"image_url": image_url, "image_thumb_url": thumb_url}
 
 
-def _load_image(data: bytes) -> Image.Image:
-    try:
-        image = Image.open(io.BytesIO(data))
-        image.load()
-    except (UnidentifiedImageError, OSError) as exc:
-        raise ImageValidationError("File is not a readable image") from exc
-
-    if image.format and f"image/{image.format.lower()}" not in ALLOWED_CONTENT_TYPES:
-        raise ImageValidationError("Only JPEG, PNG and WebP images are supported")
-    if image.width * image.height > MAX_SOURCE_PIXELS:
-        raise ImageValidationError("Image resolution is too large")
-    return image
-
-
-def _flatten(image: Image.Image) -> Image.Image:
-    """Drop alpha/EXIF by recomposing onto white in RGB."""
-    if image.mode in ("RGBA", "LA", "P"):
-        rgba = image.convert("RGBA")
-        canvas = Image.new("RGB", rgba.size, (255, 255, 255))
-        canvas.paste(rgba, mask=rgba.split()[-1])
-        return canvas
-    return image.convert("RGB")
-
-
-def _cover_crop(image: Image.Image, width: int, aspect: float) -> Image.Image:
-    """Center-crop to ``aspect`` then scale to ``width`` — never distorts."""
-    target_ratio = aspect
-    src_ratio = image.width / image.height
-    if src_ratio > target_ratio:
-        crop_h = image.height
-        crop_w = round(crop_h * target_ratio)
-    else:
-        crop_w = image.width
-        crop_h = round(crop_w / target_ratio)
-    left = (image.width - crop_w) // 2
-    top = (image.height - crop_h) // 2
-    cropped = image.crop((left, top, left + crop_w, top + crop_h))
-    return cropped.resize((width, round(width / target_ratio)), Image.LANCZOS)
-
-
-def _scale_down(image: Image.Image, max_width: int) -> Image.Image:
-    if image.width <= max_width:
-        return image
-    height = round(image.height * max_width / image.width)
-    return image.resize((max_width, height), Image.LANCZOS)
-
-
 def process_image(data: bytes) -> tuple[bytes, bytes]:
     """Validate ``data`` and render the ``(thumb, full)`` WebP variants."""
     if not data:
@@ -148,15 +100,15 @@ def process_image(data: bytes) -> tuple[bytes, bytes]:
             f"Image is larger than {max_bytes // (1024 * 1024)}MB"
         )
 
-    source = _flatten(_load_image(data))
+    source = flatten_image(load_image(data))
 
     thumb_buffer = io.BytesIO()
-    _cover_crop(source, THUMB_WIDTH, THUMB_ASPECT).save(
+    cover_crop(source, THUMB_WIDTH, THUMB_ASPECT).save(
         thumb_buffer, format="WEBP", quality=82, method=4
     )
 
     full_buffer = io.BytesIO()
-    _scale_down(source, FULL_MAX_WIDTH).save(
+    scale_down(source, FULL_MAX_WIDTH).save(
         full_buffer, format="WEBP", quality=85, method=4
     )
 

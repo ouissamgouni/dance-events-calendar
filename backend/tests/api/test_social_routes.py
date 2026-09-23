@@ -11,7 +11,7 @@ Covers:
 import os
 
 import pytest
-from datetime import date
+from datetime import date, datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
@@ -24,7 +24,12 @@ from backend.api.main import app  # noqa: E402
 from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.api.routes import social as social_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
-from backend.db.models import User, UserFollow  # noqa: E402
+from backend.db.models import (  # noqa: E402
+    CachedEvent,
+    User,
+    UserEventAttendance,
+    UserFollow,
+)
 
 
 @pytest.fixture
@@ -465,6 +470,38 @@ def test_profile_passport_public_is_visible_to_anon(client, session):
     # Full display name on the profile surface (not first-name-only).
     assert body["display_name"] == "Alice"
     assert "stats" in body and "sections" in body
+
+
+def test_profile_passport_includes_monthly_activity_without_timeline(client, session):
+    alice = _make_user(
+        session, "alice@example.com", "alice", account_visibility="public"
+    )
+    _set_passport(session, "alice@example.com", passport_visibility="public")
+    attended_at = datetime.utcnow() - timedelta(days=5)
+    session.add(
+        CachedEvent(
+            event_id="profile-activity",
+            calendar_id="cal-1",
+            title="Profile activity",
+            start=attended_at,
+            end=attended_at + timedelta(hours=3),
+        )
+    )
+    session.add(
+        UserEventAttendance(
+            device_id="profile-activity-device",
+            event_id="profile-activity",
+            user_id=alice.id,
+        )
+    )
+    session.commit()
+
+    body = client.get("/api/social/users/alice/passport").json()
+
+    assert "timeline" not in body["sections"]
+    assert body["monthly_activity"] == [
+        {"month": attended_at.strftime("%Y-%m"), "count": 1}
+    ]
 
 
 def test_profile_passport_friends_default_hidden_from_stranger(client, session):

@@ -23,11 +23,28 @@ describe('MyEventsAddSearch', () => {
 
         await waitFor(() => expect(requestedUrl).not.toBe(''));
         const query = new URL(requestedUrl).searchParams;
-        expect(query.get('include_past')).toBe('true');
+        expect(query.get('date_scope')).toBe('past');
         expect(query.get('exclude_attended')).toBe('true');
 
         await user.click(await screen.findByRole('button', { name: 'Suggest an event' }));
         expect(onSuggest).toHaveBeenCalledOnce();
+    });
+
+    it.each(['upcoming', 'saved'] as const)('searches only upcoming events from the %s tab', async (tab) => {
+        let requestedUrl = '';
+        server.use(
+            http.get('*/api/events/search', ({ request }) => {
+                requestedUrl = request.url;
+                return HttpResponse.json([]);
+            }),
+        );
+        const { user } = renderWithProviders(<MyEventsAddSearch tab={tab} onSuggest={vi.fn()} />);
+
+        await user.type(screen.getByRole('textbox', { name: 'Search events to add' }), 'salsa');
+        await waitFor(() => expect(requestedUrl).not.toBe(''));
+        const query = new URL(requestedUrl).searchParams;
+        expect(query.get('date_scope')).toBe('upcoming');
+        expect(query.has('exclude_attended')).toBe(false);
     });
 
     it('asks for confirmation when the result card is selected', async () => {

@@ -41,7 +41,8 @@ describe('TextSearchPage', () => {
         expect(screen.getByText('12 matching events')).toBeInTheDocument();
         expect(screen.getByTestId('event-card-image')).toHaveAttribute('src', '/prague.jpg');
         expect(screen.getByRole('link', { name: 'Show all 12 matching events' })).toHaveAttribute('href', '/search/results?q=prague');
-        expect(screen.getByRole('textbox', { name: 'Search events by name' })).toHaveAttribute('type', 'text');
+        expect(screen.getByRole('textbox', { name: 'Search events, places, or tags' })).toHaveAttribute('type', 'text');
+        expect(searchEventsPage).toHaveBeenCalledWith('prague', { limit: 3, dateScope: 'upcoming' });
         expect(screen.getAllByRole('button', { name: 'Clear search' })).toHaveLength(1);
         expect(screen.queryByText(/filter/i)).not.toBeInTheDocument();
     });
@@ -73,10 +74,10 @@ describe('TextSearchPage', () => {
     });
 
     it('returns a changed full-results query to preview mode with a refreshed Show all link', async () => {
-        vi.mocked(searchEventsPage).mockImplementation(async (query, limit) => ({
+        vi.mocked(searchEventsPage).mockImplementation(async (query, options) => ({
             results: [{ event_id: `${query}-1`, title: `${query} social`, start: '2026-09-24T18:00:00Z', location: 'Dance Hall', city: null, country: null, matched_fields: ['title'], matched_tags: [] }],
             total: query === 'berlin' ? 7 : 12,
-            hasMore: (limit ?? 0) < 7,
+            hasMore: (options?.limit ?? 0) < 7,
         }));
         vi.mocked(fetchEventsByIds).mockResolvedValue([]);
 
@@ -93,11 +94,11 @@ describe('TextSearchPage', () => {
         );
 
         await screen.findByText('prague social');
-        fireEvent.change(screen.getByRole('textbox', { name: 'Search events by name' }), { target: { value: 'berlin' } });
+        fireEvent.change(screen.getByRole('textbox', { name: 'Search events, places, or tags' }), { target: { value: 'berlin' } });
 
         await waitFor(() => expect(screen.getByTestId('location-probe')).toHaveTextContent('/search?q=berlin'));
         expect(await screen.findByRole('link', { name: 'Show all 7 matching events' })).toBeInTheDocument();
-        expect(searchEventsPage).toHaveBeenLastCalledWith('berlin', 3);
+        expect(searchEventsPage).toHaveBeenLastCalledWith('berlin', { limit: 3, dateScope: 'upcoming' });
     });
 
     it('keeps Show all in full mode and Back returns directly to the entry page', async () => {
@@ -124,10 +125,53 @@ describe('TextSearchPage', () => {
         fireEvent.click(await screen.findByRole('link', { name: 'Show all 12 matching events' }));
         await waitFor(() => expect(screen.getByTestId('location-probe')).toHaveTextContent('/search/results?q=prague'));
         expect(screen.queryByRole('link', { name: /Show all/ })).not.toBeInTheDocument();
-        expect(searchEventsPage).toHaveBeenLastCalledWith('prague', 20);
+        expect(searchEventsPage).toHaveBeenLastCalledWith('prague', { limit: 20, dateScope: 'upcoming' });
 
         fireEvent.click(screen.getByRole('button', { name: 'Back' }));
         expect(await screen.findByText('Calendar origin')).toBeInTheDocument();
         expect(screen.getByTestId('location-probe')).toHaveTextContent('/calendar?view=map');
+    });
+
+    it('hides Show all when the preview already contains every match', async () => {
+        vi.mocked(searchEventsPage).mockResolvedValue({
+            results: [{ event_id: 'prague-1', title: 'Prague Salsa Marathon', start: '2026-09-24T18:00:00Z', location: null, city: 'Prague', country: 'Czechia', matched_fields: ['title'], matched_tags: [] }],
+            total: 1,
+            hasMore: false,
+        });
+        vi.mocked(fetchEventsByIds).mockResolvedValue([]);
+
+        render(
+            <MemoryRouter initialEntries={['/search?q=prague']}>
+                <FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}>
+                    <Routes><Route path="/search" element={<TextSearchPage />} /></Routes>
+                </FeatureFlagsContext.Provider>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByText('Prague Salsa Marathon')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /Show all/ })).not.toBeInTheDocument();
+    });
+
+    it('persists Past in the URL and full-results link', async () => {
+        vi.mocked(searchEventsPage).mockResolvedValue({
+            results: [{ event_id: 'prague-1', title: 'Prague Salsa Marathon', start: '2026-09-24T18:00:00Z', location: null, city: 'Prague', country: 'Czechia', matched_fields: ['title'], matched_tags: [] }],
+            total: 12,
+            hasMore: true,
+        });
+        vi.mocked(fetchEventsByIds).mockResolvedValue([]);
+
+        render(
+            <MemoryRouter initialEntries={['/search?q=prague']}>
+                <FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}>
+                    <LocationProbe />
+                    <Routes><Route path="/search" element={<TextSearchPage />} /></Routes>
+                </FeatureFlagsContext.Provider>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('checkbox', { name: 'Past' }));
+        await waitFor(() => expect(screen.getByTestId('location-probe')).toHaveTextContent('/search?q=prague&scope=all'));
+        await waitFor(() => expect(searchEventsPage).toHaveBeenLastCalledWith('prague', { limit: 3, dateScope: 'all' }));
+        expect(screen.getByRole('link', { name: 'Show all 12 matching events' })).toHaveAttribute('href', '/search/results?q=prague&scope=all');
     });
 });

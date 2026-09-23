@@ -26,6 +26,7 @@ from backend.db.models import (
 )
 from backend.services.event_images import event_image_fields
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
+from backend.services.user_avatars import resolve_user_avatar
 
 
 def _trending_settings(session: Session) -> tuple[bool, int, int]:
@@ -163,7 +164,7 @@ def serialize_events(
                         user_id=u.id,
                         handle=u.handle,
                         display_name=u.display_name,
-                        avatar_url=u.avatar_url,
+                        avatar_url=resolve_user_avatar(u),
                         is_verified_organizer=u.is_verified_organizer,
                     )
 

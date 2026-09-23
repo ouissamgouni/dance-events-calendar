@@ -16,7 +16,7 @@ interface PassportSummaryCardProps {
     mapOverlay?: ReactNode;
     /** Slot for bottom footer row (e.g., "Dancing since" info). Full-width at bottom. */
     footer?: ReactNode;
-    /** Slot for actions (e.g., share button). Positioned absolutely bottom-right. */
+    /** Slot for actions (e.g., share button). Stacks below the footer on narrow screens. */
     actions?: ReactNode;
 }
 
@@ -35,10 +35,17 @@ export default function PassportSummaryCard({
 }: PassportSummaryCardProps) {
     return (
         <header className="relative overflow-hidden rounded-card bg-brand-strong p-4 text-white shadow-sm">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-                {/* Left column: Avatar, name, stats */}
-                <div className="flex flex-col gap-1">
-                    <div className="relative z-10 flex items-center gap-2">
+            <div className="relative min-h-20">
+                <div className="absolute inset-y-0 right-0 w-2/3 opacity-90 md:w-2/5">
+                    {mapOverlay && <div className="absolute right-1 top-1 z-20">{mapOverlay}</div>}
+                    <MyDanceJourneyMap coords={coords} />
+                </div>
+
+                <div className="relative z-10">
+                    <div className={mapOverlay
+                        ? 'flex items-start gap-2 pr-12'
+                        : 'flex items-start gap-2'}
+                    >
                         {avatarUrl ? (
                             <img
                                 src={avatarUrl}
@@ -52,41 +59,34 @@ export default function PassportSummaryCard({
                             </span>
                         )}
                         <div className="min-w-0">
-                            <h1 className="truncate text-2xl font-bold">{displayName}</h1>
-                            {handle && <p className="mt-1 truncate text-xs text-white/80">@{handle}</p>}
+                            <h1 className="break-words text-2xl font-bold">{displayName}</h1>
+                            {handle && <p className="mt-1 break-words text-xs text-white/80">@{handle}</p>}
                         </div>
                     </div>
-                    <div className="mt-4 relative z-10 text-sm font-bold leading-none">{eventsCount} Events</div>
-                    {(citiesCount > 0 || countriesCount > 0) && (
-                        <div className="relative z-10 text-xs font-semibold text-white/80">
-                            <span>{citiesCount} {citiesCount === 1 ? 'city' : 'cities'}</span>
-                            <span aria-hidden="true"> · </span>
-                            <span>{countriesCount} {countriesCount === 1 ? 'country' : 'countries'}</span>
-                        </div>
-                    )}
-                </div>
 
-                {/* Right column: Map miniature + activity strip */}
-                <div className="min-w-0 opacity-90 flex flex-col gap-0.5">
-                    <div className="relative h-20">
-                        {mapOverlay && <div className="absolute right-1 top-1 z-20">{mapOverlay}</div>}
-                        <MyDanceJourneyMap coords={coords} />
+                    <div className="mt-2 flex flex-col gap-1">
+                        <div className="text-sm font-bold leading-none">{eventsCount} Events</div>
+                        {(citiesCount > 0 || countriesCount > 0) && (
+                            <div className="text-xs font-semibold text-white/80">
+                                <span>{citiesCount} {citiesCount === 1 ? 'city' : 'cities'}</span>
+                                <span aria-hidden="true"> · </span>
+                                <span>{countriesCount} {countriesCount === 1 ? 'country' : 'countries'}</span>
+                            </div>
+                        )}
                     </div>
+                </div>
+            </div>
+
+            <div className="mt-3 w-full md:w-[45%] md:pr-4">
+                <div className="w-full min-w-0 opacity-90">
                     <MyDanceActivityStrip months={monthlyActivity} size="xs" />
                 </div>
             </div>
 
-            {/* Footer row (full-width, below map/stats) */}
-            {footer && (
-                <div className="mt-3 border-t border-white/20 pt-3">
-                    {footer}
-                </div>
-            )}
-
-            {/* Actions (share button, etc.) */}
-            {actions && (
-                <div className="absolute bottom-4 right-4">
-                    {actions}
+            {(footer || actions) && (
+                <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-white/20 pt-3">
+                    {footer && <div className="min-w-0 flex-[1_1_18rem]">{footer}</div>}
+                    {actions && <div className="ml-auto shrink-0">{actions}</div>}
                 </div>
             )}
         </header>
