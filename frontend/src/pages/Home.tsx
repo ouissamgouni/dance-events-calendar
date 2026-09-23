@@ -704,8 +704,9 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         const openMap = nextView === 'map';
         if (openMap) nextParams.set('view', 'map');
         else nextParams.delete('view');
-        navigate({ pathname: '/', search: nextParams.toString() });
-    }, [navigate, searchParams]);
+        const explorerPathname = location.pathname === '/browse' ? '/browse' : '/';
+        navigate({ pathname: explorerPathname, search: nextParams.toString() });
+    }, [location.pathname, navigate, searchParams]);
 
     // Opening the fullscreen map resizes the shared map container; re-fit to
     // markers so it opens centered instead of keeping the miniature's viewport.

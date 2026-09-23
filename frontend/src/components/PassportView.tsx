@@ -839,12 +839,12 @@ export default function PassportView({
                         {tab === 'milestones' && (
                             <>
                                 <PassportStatsPanel data={data} />
+                                {milestonesLead}
                                 {hasMilestones
                                     ? (
                                         <MilestonesOverview categories={categories} onOpen={setSelectedCategory} />
                                     )
                                     : <UnavailableState message="Milestones are not shared on this passport." />}
-                                {milestonesLead}
                             </>
                         )}
                         {tab === 'journey' && (

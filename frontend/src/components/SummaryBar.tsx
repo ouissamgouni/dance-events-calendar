@@ -104,7 +104,7 @@ function formatPeriodLabel(startDate: string, endDate: string): string {
 // match the design reference (this bar intentionally deviates from the
 // square-control convention; it is a distinct, quiet search-state surface).
 const PILL_BASE =
-    'inline-flex items-center gap-1 h-7 px-2.5 rounded-[10px] border border-line bg-surface text-ink text-xs font-medium whitespace-nowrap';
+    'inline-flex items-center gap-1 h-8 px-3 rounded-[10px] border border-line bg-surface text-ink text-sm font-medium whitespace-nowrap';
 const PILL_INTERACTIVE = 'cursor-pointer hover:bg-canvas transition';
 
 interface PillProps {
@@ -402,7 +402,7 @@ export default function SummaryBar(props: SummaryBarProps) {
     return (
         <div
             ref={containerRef}
-            className={`summary-bar relative w-full bg-surface border-y border-line px-2 py-2 overflow-hidden ${onOpenFilters ? 'cursor-pointer' : ''} ${className}`}
+            className={`summary-bar relative w-full overflow-hidden border-y border-line bg-surface px-3 py-3 shadow-sm ${onOpenFilters ? 'cursor-pointer' : ''} ${className}`}
             data-testid="summary-bar"
             data-variant="single"
             aria-label="Active filters"
