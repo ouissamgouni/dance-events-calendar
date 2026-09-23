@@ -36,13 +36,13 @@ export default function YourNextEventsRail({ events, onEventClick, className = '
                 </div>
             ) : (
                 <div className="flex items-start gap-3 rounded-card border border-card-line bg-canvas p-3.5" data-testid="your-next-events-empty">
-                    <img src="/no-calendar.png" alt="" className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    <img src="/no-calendar-0.png" alt="" className="h-8 w-8 shrink-0" aria-hidden="true" />
                     <div className="min-w-0 flex-1">
                         <p className="text-[15px] font-semibold text-ink">No upcoming events</p>
                         <p className="mt-0.5 text-[13px] text-ink-soft">Find your next dance event</p>
                     </div>
-                    <Link to="/" className="shrink-0 text-[13px] font-medium text-action hover:text-action-strong focus:outline-none focus:underline">
-                        Explore →
+                    <Link to="/browse" className="shrink-0 text-[13px] font-medium text-action hover:text-action-strong focus:outline-none focus:underline">
+                        Browse →
                     </Link>
                 </div>
             )}

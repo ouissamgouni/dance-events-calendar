@@ -197,4 +197,24 @@ describe('Home — mobile map mount with applied area', () => {
             expect(screen.getByTestId('view-switcher-list')).toBeInTheDocument();
         });
     });
+
+    it('opens the map without leaving Browse', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestProviders initialEntries={['/browse']}>
+                <Home />
+                <LocationProbe />
+            </TestProviders>,
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Map view' }));
+
+        await waitFor(() => {
+            const currentLocation = screen.getByTestId('location-probe').textContent ?? '';
+            expect(currentLocation.startsWith('/browse?')).toBe(true);
+            expect(new URLSearchParams(currentLocation.split('?')[1]).get('view')).toBe('map');
+            expect(screen.queryByTestId('view-switcher-map')).not.toBeInTheDocument();
+            expect(screen.getByTestId('view-switcher-list')).toBeInTheDocument();
+        });
+    });
 });

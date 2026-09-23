@@ -51,48 +51,48 @@ export default function TrendingEventsBanner({
     if (trendingEvents.length === 0) return null;
 
     return (
-        <section className={className} data-testid="trending-events-banner">
+        <>
             <button
                 type="button"
-                className="flex w-full items-center justify-between border-b border-line px-2.5 py-1 text-left text-sm font-semibold text-ink hover:text-ink focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-base font-semibold text-ink hover:text-ink focus:outline-none focus:ring-2 focus:ring-rose-300"
                 aria-expanded={!collapsed}
                 onClick={() => setCollapsed((value) => !value)}
             >
-                <span className="inline-flex items-center gap-1 text-ink">
-                    <img src="/trending-0.png" alt="" aria-hidden="true" className="w-4 h-4 object-contain" />
-                    Trending <span className="text-[10px] font-normal text-muted">for this search</span>
+                <span className="inline-flex items-center gap-2 text-ink">
+                    <img src="/trending-0.png" alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
+                    Trending <span className="text-xs font-normal text-ink-soft">for this search</span>
                 </span>
                 <span aria-hidden="true" className="text-xs text-muted">{collapsed ? '+' : '-'}</span>
             </button>
             {!collapsed && (
-                <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Trending events">
-                    {trendingEvents.map((event) => (
-                        <EventCard
-                            key={event.event_id}
-                            event={event}
-                            onOpen={onEventClick}
-                            onHover={onEventHover}
-                            highlighted={hoveredEventId === event.event_id}
-                            followingBadgeEnabled={followingBadgeEnabled}
-                            showReviews={false}
-                            showTags={false}
-                            showActions={false}
-                            widthClass="w-[300px]"
-                            dateHeaderRow
-                            twoLineTitle
-                            goingIconVariant="hand"
-                        />
-                    ))}
-                </div>
+                <section className={`mb-3 rounded-card border border-rose-100 bg-red-50 py-2 ${className}`} data-testid="trending-events-banner">
+                    <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-3 py-2" aria-label="Trending events">
+                        {trendingEvents.map((event) => (
+                            <EventCard
+                                key={event.event_id}
+                                event={event}
+                                onOpen={onEventClick}
+                                onHover={onEventHover}
+                                highlighted={hoveredEventId === event.event_id}
+                                followingBadgeEnabled={followingBadgeEnabled}
+                                showReviews={false}
+                                showTags={false}
+                                showActions={false}
+                                widthClass="w-[300px]"
+                                dateHeaderRow
+                                twoLineTitle
+                                goingIconVariant="hand"
+                            />
+                        ))}
+                    </div>
+                    <ScrollDotsIndicator
+                        count={dotCount}
+                        activeIndex={activeIndex}
+                        onSelect={scrollToIndex}
+                        label="Trending events scroll position"
+                    />
+                </section>
             )}
-            {!collapsed && (
-                <ScrollDotsIndicator
-                    count={dotCount}
-                    activeIndex={activeIndex}
-                    onSelect={scrollToIndex}
-                    label="Trending events scroll position"
-                />
-            )}
-        </section>
+        </>
     );
 }

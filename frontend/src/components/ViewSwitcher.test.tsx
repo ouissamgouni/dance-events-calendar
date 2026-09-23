@@ -33,6 +33,14 @@ describe('ViewSwitcher', () => {
         expect(screen.getByText('Calendar')).toBeVisible();
     });
 
+    it('places view destinations left and the create action right', () => {
+        render(<ViewSwitcher currentView="list" onSelect={vi.fn()} onCreate={vi.fn()} />);
+
+        expect(screen.getByTestId('view-switcher')).toHaveClass('inset-x-4', 'justify-between', 'pointer-events-none');
+        expect(screen.getByTestId('view-switcher-destinations')).toHaveClass('pointer-events-auto', 'bg-blue-50');
+        expect(screen.getByTestId('view-switcher-create')).toHaveClass('pointer-events-auto', 'bg-canvas');
+    });
+
     it('keeps labels desktop-only when mobile labels are disabled', () => {
         render(<ViewSwitcher currentView="list" onSelect={vi.fn()} mobileLabelsEnabled={false} />);
 

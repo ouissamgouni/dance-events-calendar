@@ -66,22 +66,22 @@ export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible,
         ? ''
         : 'bottom-[calc(80px+env(safe-area-inset-bottom))]';
     const destinationClass = mobileLabelsEnabled
-        ? 'inline-flex h-11 items-center justify-center gap-2 px-3 text-ink transition hover:bg-canvas'
-        : 'inline-flex h-11 w-11 items-center justify-center text-ink transition hover:bg-canvas lg:w-auto lg:gap-2 lg:px-3';
+        ? 'inline-flex h-11 items-center justify-center gap-2 px-3 text-ink transition hover:bg-blue-100'
+        : 'inline-flex h-11 w-11 items-center justify-center text-ink transition hover:bg-blue-100 lg:w-auto lg:gap-2 lg:px-3';
     const labelClass = mobileLabelsEnabled
         ? 'text-sm font-medium'
         : 'hidden text-sm font-medium lg:inline';
     const createClass = mobileLabelsEnabled
-        ? 'inline-flex h-12 items-center justify-center gap-2 border-2 border-line bg-surface px-3 text-action shadow-xl transition hover:bg-canvas'
-        : 'inline-flex h-12 w-12 items-center justify-center border-2 border-line bg-surface text-action shadow-xl transition hover:bg-canvas lg:w-auto lg:gap-2 lg:px-3';
+        ? 'pointer-events-auto inline-flex h-12 items-center justify-center gap-2 border-2 border-line bg-canvas px-3 text-action shadow-xl transition hover:bg-surface'
+        : 'pointer-events-auto inline-flex h-12 w-12 items-center justify-center border-2 border-line bg-canvas text-action shadow-xl transition hover:bg-surface lg:w-auto lg:gap-2 lg:px-3';
     return (
         <nav
             aria-label="Change event view"
-            className={`fixed right-4 z-[8000] flex items-center gap-2 md:bottom-4 ${bottomClass}`}
+            className={`pointer-events-none fixed inset-x-4 z-[8000] flex items-center justify-between md:bottom-4 ${bottomClass}`}
             style={previewOpen ? { bottom: `calc(64px + env(safe-area-inset-bottom) + ${measuredOffset + 12}px)` } : undefined}
             data-testid="view-switcher"
         >
-            <div className="flex items-center border-2 border-line bg-surface shadow-xl">
+            <div className="pointer-events-auto flex items-center border-2 border-blue-100 bg-blue-50 shadow-xl" data-testid="view-switcher-destinations">
                 {destinations[currentView].map((view, index) => (
                     <button
                         key={view}

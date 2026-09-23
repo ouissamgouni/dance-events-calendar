@@ -138,26 +138,14 @@ export default function FilterSheet({
     const header = (
         <div className="flex items-center justify-between border-b border-line px-3 py-2">
             <h2 className="text-sm font-semibold text-ink">Filters</h2>
-            <div className="flex items-center gap-1">
-                {onReset && (
-                    <button
-                        type="button"
-                        onClick={onReset}
-                        className="text-xs text-ink-soft hover:text-ink underline-offset-2 hover:underline"
-                        data-testid="filter-sheet-reset"
-                    >
-                        Reset to defaults
-                    </button>
-                )}
-                <button
-                    type="button"
-                    onClick={onClose}
-                    aria-label="Close filters"
-                    className="inline-flex h-7 w-7 items-center justify-center text-ink-soft hover:text-ink hover:bg-canvas"
-                >
-                    ×
-                </button>
-            </div>
+            <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close filters"
+                className="inline-flex h-7 w-7 items-center justify-center text-ink-soft hover:text-ink hover:bg-canvas"
+            >
+                ×
+            </button>
         </div>
     );
 
@@ -174,15 +162,27 @@ export default function FilterSheet({
                 </button>
             )}
             <div className="flex items-center justify-between gap-3">
-                <button
-                    type="button"
-                    onClick={onClearAll}
-                    disabled={!onClearAll || activeFilterCount === 0}
-                    className="text-xs text-ink-soft hover:text-ink underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
-                    data-testid="filter-sheet-clear-all"
-                >
-                    Clear all
-                </button>
+                <div className="flex items-center gap-3">
+                    {onReset && (
+                        <button
+                            type="button"
+                            onClick={onReset}
+                            className="text-xs text-ink-soft hover:text-ink underline-offset-2 hover:underline"
+                            data-testid="filter-sheet-reset"
+                        >
+                            Reset to defaults
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={onClearAll}
+                        disabled={!onClearAll || activeFilterCount === 0}
+                        className="text-xs text-ink-soft hover:text-ink underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
+                        data-testid="filter-sheet-clear-all"
+                    >
+                        Clear all
+                    </button>
+                </div>
                 <button
                     type="button"
                     onClick={onClose}
