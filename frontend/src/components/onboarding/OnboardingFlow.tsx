@@ -6,6 +6,7 @@ import {
     deleteInterestProfile,
     fetchInterestProfiles,
     fetchTagGroups,
+    updateUserProfile,
     updateInterestProfile,
     type HomeLocationPayload,
     type InterestProfile,
@@ -15,18 +16,21 @@ import CityRadiusEditor from '../CityRadiusEditor';
 import AreaMapPreview from '../AreaMapPreview';
 import { AREA_PRESETS, DEFAULT_AREA_BBOX } from '../../constants/area';
 import { useAuth } from '../../context/AuthContext';
+import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../../context/FeatureFlagsContext';
 import { usePreferences } from '../../context/PreferencesContext';
 import type { Tag, TagGroup } from '../../types';
+import AvatarEditor from '../AvatarEditor';
 import OnboardingAreaEditor from './OnboardingAreaEditor';
 import { bboxFromPinRadius } from './onboardingGeometry';
 import { bboxSearchArea, radiusSearchArea } from '../../utils/searchArea';
 import { generateProfileName } from '../../utils/searchProfiles';
 
-type Step = 'dances' | 'international' | 'home' | 'review';
+type Step = 'dances' | 'international' | 'home' | 'profile' | 'review';
 type InternationalView = 'presets' | 'editor';
 type HomeView = 'choice' | 'editor';
 
-const STEPS: Step[] = ['dances', 'international', 'home', 'review'];
+const BASE_STEPS: Step[] = ['dances', 'international', 'home', 'review'];
+const PROFILE_STEPS: Step[] = ['dances', 'international', 'home', 'profile', 'review'];
 const LATIN_AMERICA: PreferredAreaPayload = { label: 'Latin America', min_lat: -56, min_lng: -118, max_lat: 33, max_lng: -34 };
 const CUSTOM_AREA: PreferredAreaPayload = { label: 'Custom', min_lat: -55, min_lng: -70, max_lat: 55, max_lng: 70 };
 const ONBOARDING_PRESETS: PreferredAreaPayload[] = [
@@ -43,11 +47,25 @@ interface HomeDraft {
 }
 
 export default function OnboardingFlow() {
+    const flags = useOptionalFeatureFlags();
+    const flagsReady = useFeatureFlagsReady();
+    const { user, loading: authLoading } = useAuth();
+
+    if (!flagsReady || (flags.onboardingProfileStepEnabled && (authLoading || !user))) {
+        return <div className="flex h-full items-center justify-center text-sm text-ink-soft">Loading…</div>;
+    }
+
+    return <OnboardingFlowContent profileStepEnabledAtMount={flags.onboardingProfileStepEnabled} />;
+}
+
+function OnboardingFlowContent({ profileStepEnabledAtMount }: { profileStepEnabledAtMount: boolean }) {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const next = searchParams.get('next') || '/';
     const { prefs, setPrefs } = usePreferences();
-    const { refreshUser } = useAuth();
+    const { user, refreshUser } = useAuth();
+    const [profileStepEnabled] = useState(profileStepEnabledAtMount);
+    const steps = profileStepEnabled ? PROFILE_STEPS : BASE_STEPS;
     const [step, setStep] = useState<Step>('dances');
     const [internationalView, setInternationalView] = useState<InternationalView>('presets');
     const [homeView, setHomeView] = useState<HomeView>('choice');
@@ -62,6 +80,7 @@ export default function OnboardingFlow() {
     const [internationalAlerts, setInternationalAlerts] = useState(true);
     const [internationalNameManuallyEdited, setInternationalNameManuallyEdited] = useState(false);
     const [home, setHome] = useState<HomeDraft | null>(null);
+    const [nameDraft, setNameDraft] = useState(user?.name ?? '');
     const initialPrefsRef = useRef(prefs);
 
     const danceGroup = useMemo(() => tagGroups.find((group) => group.slug === 'dance-style' && group.enabled !== false) ?? null, [tagGroups]);
@@ -113,9 +132,14 @@ export default function OnboardingFlow() {
 
     const saveAll = async () => {
         if (danceIds.length === 0) return;
+        const displayName = nameDraft.trim();
+        if (profileStepEnabled && !displayName) return;
         setSaving(true);
         setError(null);
         try {
+            if (profileStepEnabled && user && displayName !== user.name.trim()) {
+                await updateUserProfile({ display_name: displayName });
+            }
             await setPrefs({ area, tagIds: danceIds, homeLocation: home?.location ?? null });
             const internationalPayload = {
                 label: generateProfileName({ danceIds, danceGroup, areaLabel: area.label, reachFilter: 'international' }),
@@ -161,17 +185,18 @@ export default function OnboardingFlow() {
         }
     };
 
-    const stepIndex = STEPS.indexOf(step);
+    const stepIndex = steps.indexOf(step);
     const header = {
         dances: ['What do you dance?', 'Select all that apply'],
         international: ['Where do you want to discover events?', 'Choose your international area.'],
         home: ['Find events near home?', 'Add a local search for events in your city and nearby area.'],
+        profile: ['Complete your profile', 'Confirm the name people will see and optionally add a picture.'],
         review: ["You're all set", 'Review your preferences before exploring.'],
     }[step];
 
     if (step === 'international' && internationalView === 'editor') {
         return (
-            <OnboardingShell stepIndex={1} compactHeader>
+            <OnboardingShell stepIndex={1} profileStepEnabled={profileStepEnabled} compactHeader>
                 <OnboardingAreaEditor
                     area={area}
                     alertsEnabled={internationalAlerts}
@@ -188,7 +213,7 @@ export default function OnboardingFlow() {
     }
 
     return (
-        <OnboardingShell stepIndex={stepIndex}>
+        <OnboardingShell stepIndex={stepIndex} profileStepEnabled={profileStepEnabled}>
             <div className="relative flex min-h-0 flex-1 flex-col">
                 <header className="px-4 pt-5 text-center">
                     {step !== 'dances' && (
@@ -198,7 +223,7 @@ export default function OnboardingFlow() {
                             onClick={() => {
                                 if (step === 'home' && homeView === 'editor') setHomeView('choice');
                                 else if (editingFromReview) goToStep('review');
-                                else setStep(STEPS[Math.max(0, stepIndex - 1)]);
+                                else setStep(steps[Math.max(0, stepIndex - 1)]);
                             }}
                             className="absolute left-4 top-3 min-h-11 min-w-11 text-left text-2xl text-ink"
                         >
@@ -212,18 +237,29 @@ export default function OnboardingFlow() {
                 <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-6">
                     {step === 'dances' && <DanceStep loading={loading} group={danceGroup} selectedIds={danceIds} onChange={setDanceIds} />}
                     {step === 'international' && <PresetStep onSelect={(preset) => { setArea({ ...preset }); setInternationalNameManuallyEdited(false); setInternationalView('editor'); }} />}
-                    {step === 'home' && homeView === 'choice' && <HomeChoice onYes={() => setHomeView('editor')} onNo={() => { setHome(null); finishEditOrAdvance('review'); }} />}
+                    {step === 'home' && homeView === 'choice' && <HomeChoice onYes={() => setHomeView('editor')} onNo={() => { setHome(null); finishEditOrAdvance(profileStepEnabled ? 'profile' : 'review'); }} />}
                     {step === 'home' && homeView === 'editor' && <HomeEditor value={home} onChange={setHome} />}
-                    {step === 'review' && <ReviewStep dances={danceGroup?.tags.filter((tag) => danceIds.includes(tag.id)) ?? []} area={area} home={home} onEdit={(target) => goToStep(target, true)} />}
+                    {step === 'profile' && (
+                        <ProfileStep
+                            loading={!user}
+                            name={nameDraft}
+                            avatarUrl={user?.avatar_url ?? null}
+                            hasCustomAvatar={user?.has_custom_avatar ?? false}
+                            onNameChange={setNameDraft}
+                            onAvatarChange={refreshUser}
+                        />
+                    )}
+                    {step === 'review' && <ReviewStep dances={danceGroup?.tags.filter((tag) => danceIds.includes(tag.id)) ?? []} area={area} home={home} profile={profileStepEnabled ? { name: nameDraft.trim(), avatarUrl: user?.avatar_url ?? null } : null} onEdit={(target) => goToStep(target, true)} />}
                 </main>
-                {(step === 'dances' || (step === 'home' && homeView === 'editor') || step === 'review') && (
+                {(step === 'dances' || (step === 'home' && homeView === 'editor') || step === 'profile' || step === 'review') && (
                     <StickyFooter>
                         <button
                             type="button"
-                            disabled={saving || (step === 'dances' && danceIds.length === 0) || (step === 'home' && homeView === 'editor' && !home)}
+                            disabled={saving || (step === 'dances' && danceIds.length === 0) || (step === 'home' && homeView === 'editor' && !home) || (step === 'profile' && (!user || !nameDraft.trim()))}
                             onClick={() => {
                                 if (step === 'dances') finishEditOrAdvance('international');
-                                else if (step === 'home') finishEditOrAdvance('review');
+                                else if (step === 'home') finishEditOrAdvance(profileStepEnabled ? 'profile' : 'review');
+                                else if (step === 'profile') finishEditOrAdvance('review');
                                 else void saveAll();
                             }}
                             className="min-h-12 w-full bg-action px-4 text-sm font-semibold text-white hover:bg-action-strong disabled:cursor-not-allowed disabled:opacity-40"
@@ -237,13 +273,14 @@ export default function OnboardingFlow() {
     );
 }
 
-function OnboardingShell({ stepIndex, compactHeader = false, children }: { stepIndex: number; compactHeader?: boolean; children: ReactNode }) {
+function OnboardingShell({ stepIndex, profileStepEnabled, compactHeader = false, children }: { stepIndex: number; profileStepEnabled: boolean; compactHeader?: boolean; children: ReactNode }) {
+    const labels = profileStepEnabled ? ['Dance styles', 'International area', 'Near home', 'Profile', 'Review'] : ['Dance styles', 'International area', 'Near home', 'Review'];
     return (
         <div className="mx-auto flex h-full min-h-[560px] w-full max-w-lg flex-col overflow-hidden bg-surface sm:my-4 sm:h-[min(820px,calc(100%-32px))] sm:rounded-card sm:border sm:border-card-line sm:shadow-sm">
             <div className={compactHeader ? 'px-4 pt-3' : 'px-4 pt-4'}>
-                <div className="mb-2 flex items-center justify-between text-xs font-bold text-action"><span>{stepIndex + 1}/4</span><span>{['Dance styles', 'International area', 'Near home', 'Review'][stepIndex]}</span></div>
-                <div role="progressbar" aria-valuemin={1} aria-valuemax={4} aria-valuenow={stepIndex + 1} className="flex gap-2">
-                    {[0, 1, 2, 3].map((index) => <span key={index} className={`h-1 flex-1 ${index <= stepIndex ? 'bg-action' : 'bg-line'}`} />)}
+                <div className="mb-2 flex items-center justify-between text-xs font-bold text-action"><span>{stepIndex + 1}/{labels.length}</span><span>{labels[stepIndex]}</span></div>
+                <div role="progressbar" aria-valuemin={1} aria-valuemax={labels.length} aria-valuenow={stepIndex + 1} className="flex gap-2">
+                    {labels.map((label, index) => <span key={label} className={`h-1 flex-1 ${index <= stepIndex ? 'bg-action' : 'bg-line'}`} />)}
                 </div>
             </div>
             {children}
@@ -299,8 +336,23 @@ function HomeEditor({ value, onChange }: { value: HomeDraft | null; onChange: (v
     );
 }
 
-function ReviewStep({ dances, area, home, onEdit }: { dances: Tag[]; area: PreferredAreaPayload; home: HomeDraft | null; onEdit: (step: Step) => void }) {
-    return <div className="space-y-3"><ReviewCard icon="♪" title="Dance styles" value={dances.map((tag) => tag.label).join(', ')} onClick={() => onEdit('dances')} /><ReviewCard icon="◎" title="International area" value={area.label} preview={<AreaMapPreview area={bboxSearchArea(area, 'preference')} className="h-12 w-16" />} onClick={() => onEdit('international')} /><ReviewCard icon="⌂" title="Near home" value={home ? `${home.location.label} · ${home.radiusKm} km` : 'Not set'} preview={home ? <AreaMapPreview area={radiusSearchArea(home.location.label, home.location, home.radiusKm, 'preference')} className="h-12 w-16" /> : undefined} onClick={() => onEdit('home')} /></div>;
+function ProfileStep({ loading, name, avatarUrl, hasCustomAvatar, onNameChange, onAvatarChange }: { loading: boolean; name: string; avatarUrl: string | null; hasCustomAvatar: boolean; onNameChange: (name: string) => void; onAvatarChange: () => Promise<void> }) {
+    if (loading) return <p className="text-sm text-ink-soft">Loading your profile…</p>;
+    return (
+        <div className="space-y-6">
+            <AvatarEditor avatarUrl={avatarUrl} hasCustomAvatar={hasCustomAvatar} name={name} onChange={onAvatarChange} />
+            <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-ink">Display name</span>
+                <input type="text" value={name} onChange={(event) => onNameChange(event.target.value)} maxLength={120} autoComplete="name" className="min-h-12 w-full rounded-field border border-line bg-surface px-3 text-base text-ink focus:border-action focus:outline-none" />
+                {!name.trim() && <span className="mt-2 block text-sm text-danger">Enter the name you want people to see.</span>}
+            </label>
+        </div>
+    );
+}
+
+function ReviewStep({ dances, area, home, profile, onEdit }: { dances: Tag[]; area: PreferredAreaPayload; home: HomeDraft | null; profile: { name: string; avatarUrl: string | null } | null; onEdit: (step: Step) => void }) {
+    // eslint-disable-next-line no-restricted-syntax -- Profile avatars are circular by design.
+    return <div className="space-y-3"><ReviewCard icon="♪" title="Dance styles" value={dances.map((tag) => tag.label).join(', ')} onClick={() => onEdit('dances')} /><ReviewCard icon="◎" title="International area" value={area.label} preview={<AreaMapPreview area={bboxSearchArea(area, 'preference')} className="h-12 w-16" />} onClick={() => onEdit('international')} /><ReviewCard icon="⌂" title="Near home" value={home ? `${home.location.label} · ${home.radiusKm} km` : 'Not set'} preview={home ? <AreaMapPreview area={radiusSearchArea(home.location.label, home.location, home.radiusKm, 'preference')} className="h-12 w-16" /> : undefined} onClick={() => onEdit('home')} />{profile && <ReviewCard icon="" title="Profile" value={profile.name} preview={profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-12 w-12 rounded-full object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-canvas font-semibold text-ink-soft">{profile.name.charAt(0).toUpperCase()}</span>} onClick={() => onEdit('profile')} />}</div>;
 }
 
 function ReviewCard({ icon, title, value, preview, onClick }: { icon: string; title: string; value: string; preview?: ReactNode; onClick: () => void }) {

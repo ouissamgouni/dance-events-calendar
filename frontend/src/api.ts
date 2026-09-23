@@ -238,6 +238,7 @@ export interface SiteSettings {
     my_events_nav_enabled?: boolean;
     browse_nav_enabled?: boolean;
     browse_direct_to_explorer_enabled?: boolean;
+    onboarding_profile_step_enabled?: boolean;
     /** Experiment: two-line, icon-prefixed filter summary bar with the
      * Map/Calendar controls pinned to its right. */
     suggest_event_required_dance_group_id?: number | null;
@@ -697,6 +698,7 @@ export interface AuthUser {
      *  on the first /me call). Null only in transient pre-backfill states. */
     share_code?: string | null;
     avatar_url?: string | null;
+    has_custom_avatar?: boolean;
     is_admin?: boolean;
     share_attendance_default?: boolean;
     /** New 3-tier replacement for ``share_attendance_default``. May be
@@ -1172,6 +1174,30 @@ export async function updateUserProfile(
         throw new Error(detail);
     }
     return res.json();
+}
+
+export interface UserAvatarUpdate {
+    avatar_url: string | null;
+    has_custom_avatar: boolean;
+}
+
+export async function uploadUserAvatar(file: File): Promise<UserAvatarUpdate> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/auth/me/avatar`, {
+        method: 'POST',
+        credentials: 'include',
+        body: form,
+    });
+    return parseJsonResponse<UserAvatarUpdate>(res, 'Failed to upload profile picture');
+}
+
+export async function deleteUserAvatar(): Promise<UserAvatarUpdate> {
+    const res = await fetch(`${BASE}/auth/me/avatar`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    return parseJsonResponse<UserAvatarUpdate>(res, 'Failed to remove profile picture');
 }
 
 export interface HandleAvailability {
@@ -4335,6 +4361,7 @@ export interface EventSearchResult {
     event_id: string;
     title: string;
     start: string | null;
+    end?: string | null;
     location: string | null;
     city: string | null;
     country: string | null;
@@ -4342,14 +4369,26 @@ export interface EventSearchResult {
     matched_tags: string[];
 }
 
+export type EventSearchDateScope = 'upcoming' | 'past' | 'all';
+
+interface EventSearchOptions {
+    limit?: number;
+    offset?: number;
+    dateScope?: EventSearchDateScope;
+    excludeAttended?: boolean;
+}
+
 export async function searchEvents(
     q: string,
-    limit = 10,
-    includePast = false,
-    excludeAttended = false,
+    options: EventSearchOptions = {},
 ): Promise<EventSearchResult[]> {
-    const qs = `?q=${encodeURIComponent(q)}&limit=${limit}${includePast ? '&include_past=true' : ''}${excludeAttended ? '&exclude_attended=true' : ''}`;
-    const res = await fetch(`${BASE}/events/search${qs}`, {
+    const params = new URLSearchParams({
+        q,
+        limit: String(options.limit ?? 10),
+        date_scope: options.dateScope ?? 'upcoming',
+    });
+    if (options.excludeAttended) params.set('exclude_attended', 'true');
+    const res = await fetch(`${BASE}/events/search?${params.toString()}`, {
         credentials: 'include',
     });
     return parseJsonResponse<EventSearchResult[]>(res, 'Failed to search events');
@@ -4363,10 +4402,14 @@ export interface EventSearchPage {
 
 export async function searchEventsPage(
     q: string,
-    limit = 10,
-    offset = 0,
+    options: EventSearchOptions = {},
 ): Promise<EventSearchPage> {
-    const params = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
+    const params = new URLSearchParams({
+        q,
+        limit: String(options.limit ?? 10),
+        offset: String(options.offset ?? 0),
+        date_scope: options.dateScope ?? 'upcoming',
+    });
     const res = await fetch(`${BASE}/events/search?${params.toString()}`, { credentials: 'include' });
     const results = await parseJsonResponse<EventSearchResult[]>(res, 'Failed to search events');
     return {

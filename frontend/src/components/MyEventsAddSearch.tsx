@@ -46,7 +46,8 @@ export default function MyEventsAddSearch({ tab, onSuggest, onComplete }: Props)
         <div className="bg-surface" data-testid="my-events-add-search">
             <ExplorerEventSearch
                 embedded
-                includePast={tab === 'past'}
+                dateScope={tab === 'past' ? 'past' : 'upcoming'}
+                excludeAttended={tab === 'past'}
                 onSelectEvent={() => undefined}
                 onSelectResult={setSelected}
                 triggerLabel="Search events to add"

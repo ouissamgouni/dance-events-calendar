@@ -8,6 +8,7 @@ from backend.services.recurrence import MAX_OCCURRENCES, validate_rule
 
 # My Events context view type: mirrors frontend MyEventsTab
 MyEventsView = Literal["upcoming", "saved", "past"]
+EventSearchDateScope = Literal["upcoming", "past", "all"]
 
 
 class LinkItem(BaseModel):
@@ -36,6 +37,7 @@ class EventSearchResponse(BaseModel):
     event_id: str
     title: str
     start: Optional[datetime] = None
+    end: Optional[datetime] = None
     location: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
@@ -385,6 +387,11 @@ class UpdateProfileRequest(BaseModel):
 
     display_name: Optional[str] = Field(default=None, min_length=1, max_length=120)
     handle: Optional[str] = Field(default=None, min_length=3, max_length=24)
+
+
+class UserAvatarResponse(BaseModel):
+    avatar_url: Optional[str] = None
+    has_custom_avatar: bool = False
 
 
 class HandleAvailabilityResponse(BaseModel):
@@ -784,6 +791,8 @@ class SiteSettingsResponse(BaseModel):
     browse_nav_enabled: bool = False
     # Send the Browse events action directly to the Explorer list.
     browse_direct_to_explorer_enabled: bool = False
+    # Ask onboarding users to confirm their name and optionally add a picture.
+    onboarding_profile_step_enabled: bool = False
     # Required tag-group ids used by the event suggestion form.
     suggest_event_required_dance_group_id: Optional[int] = None
     suggest_event_required_reach_group_id: Optional[int] = None
@@ -1075,6 +1084,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     my_events_nav_enabled: Optional[bool] = None
     browse_nav_enabled: Optional[bool] = None
     browse_direct_to_explorer_enabled: Optional[bool] = None
+    onboarding_profile_step_enabled: Optional[bool] = None
     suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
     suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)
     # Notification / re-engagement global gates.
@@ -3054,7 +3064,7 @@ class SharedPassportResponse(BaseModel):
     # Populated only when 'timeline' is in ``sections``.
     timeline_items: list[PassportTimelineItem] = []
     timeline_markers: list[PassportTimelineMarker] = []
-    # Populated only when 'timeline' is in ``sections`` (privacy gate).
+    # Always populated on profiles; share links require ``timeline`` visibility.
     monthly_activity: list[MonthlyActivity] = []
     # Phase 3 Follow CTA: owner handle + the viewer's relationship so the
     # shared/profile passport can render a Follow button (or a sign-in

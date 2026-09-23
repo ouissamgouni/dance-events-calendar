@@ -17,6 +17,7 @@ export default function MyDanceJourneyMap({ coords }: { coords: JourneyCoordinat
     return (
         <svg
             viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+            preserveAspectRatio="xMaxYMid meet"
             className="block h-full w-full"
             role="img"
             aria-label={`${coords.length} attended event ${coords.length === 1 ? 'location' : 'locations'} on your journey map`}

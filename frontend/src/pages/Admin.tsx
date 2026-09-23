@@ -237,6 +237,7 @@ export default function Admin() {
     const [myEventsNavEnabled, setMyEventsNavEnabled] = useState(true);
     const [browseNavEnabled, setBrowseNavEnabled] = useState(false);
     const [browseDirectToExplorerEnabled, setBrowseDirectToExplorerEnabled] = useState(false);
+    const [onboardingProfileStepEnabled, setOnboardingProfileStepEnabled] = useState(false);
     const [eventCardSaveShowStatsEnabled, setEventCardSaveShowStatsEnabled] = useState(false);
     const [eventCardImgoingShowStatsEnabled, setEventCardImgoingShowStatsEnabled] = useState(false);
     const [eventCardImgoingLocationBottomEnabled, setEventCardImgoingLocationBottomEnabled] = useState(true);
@@ -424,6 +425,7 @@ export default function Admin() {
             setMyEventsNavEnabled(s.my_events_nav_enabled ?? true);
             setBrowseNavEnabled(s.browse_nav_enabled ?? false);
             setBrowseDirectToExplorerEnabled(s.browse_direct_to_explorer_enabled ?? false);
+            setOnboardingProfileStepEnabled(s.onboarding_profile_step_enabled ?? false);
             setEventCardSaveShowStatsEnabled(s.event_card_save_show_stats_enabled ?? false);
             setEventCardImgoingShowStatsEnabled(s.event_card_imgoing_show_stats_enabled ?? false);
             setEventCardImgoingLocationBottomEnabled(s.event_card_imgoing_location_bottom_enabled ?? true);
@@ -837,6 +839,19 @@ export default function Admin() {
         } catch {
             setBrowseDirectToExplorerEnabled(!newVal);
             setMessage('Failed to update direct Browse navigation toggle.');
+        }
+    };
+
+    const handleToggleOnboardingProfileStep = async () => {
+        const newVal = !onboardingProfileStepEnabled;
+        setOnboardingProfileStepEnabled(newVal);
+        try {
+            await updateSettings({ onboarding_profile_step_enabled: newVal });
+            updateFlagFn('onboardingProfileStepEnabled', newVal);
+            setMessage(`Onboarding profile step ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setOnboardingProfileStepEnabled(!newVal);
+            setMessage('Failed to update onboarding profile step toggle.');
         }
     };
 
@@ -1350,8 +1365,7 @@ export default function Admin() {
     };
 
     // Debounced typeahead for the review-prompt "Send now" event picker.
-    // include_past=true so already-ended events (the review-prompt targets)
-    // surface — the default search only returns upcoming events.
+    // Review prompts target events that have already ended.
     useEffect(() => {
         const q = reviewNowQuery.trim();
         if (q.length < 2) {
@@ -1359,7 +1373,7 @@ export default function Admin() {
             return;
         }
         const t = setTimeout(() => {
-            searchEvents(q, 8, true)
+            searchEvents(q, { limit: 8, dateScope: 'past' })
                 .then(setReviewNowSearchResults)
                 .catch(() => setReviewNowSearchResults([]));
         }, 250);
@@ -2436,6 +2450,20 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${browseDirectToExplorerEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${browseDirectToExplorerEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Onboarding profile step</span>
+                                        <p className="text-[10px] text-muted">Ask new users to confirm their name and optionally add a picture before Review</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleOnboardingProfileStep}
+                                        aria-label="Toggle onboarding profile step"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${onboardingProfileStepEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${onboardingProfileStepEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

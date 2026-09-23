@@ -392,9 +392,10 @@ function SharePassportMenu({
                 aria-label="Share passport"
                 aria-haspopup="dialog"
                 aria-expanded={menuOpen}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-white hover:bg-white/10"
+                className="inline-flex items-center justify-center gap-1 whitespace-nowrap border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-canvas transition"
             >
-                <Share2 className="h-5 w-5" aria-hidden="true" />
+                <Share2 className="h-4 w-4" aria-hidden="true" />
+                <span>Share</span>
             </button>
             {menuOpen && (
                 <div
@@ -1052,7 +1053,8 @@ function AddPastEventControl({ onAdded, onOpenSubmitEvent }: { onAdded: () => vo
     return (
         <>
             <ExplorerEventSearch
-                includePast
+                dateScope="past"
+                excludeAttended
                 small
                 triggerIcon="plus"
                 triggerLabel="Add event"

@@ -59,6 +59,7 @@ from backend.services.notifications import (
     notify_message_reported,
     notify_thread_reply,
 )
+from backend.services.user_avatars import resolve_user_avatar
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ def _author_schema(u: User | None) -> EventMessageAuthor | None:
     return EventMessageAuthor(
         handle=u.handle or "",
         display_name=(u.display_name or (u.email.split("@", 1)[0] if u.email else "")),
-        avatar_url=u.avatar_url,
+        avatar_url=resolve_user_avatar(u),
         is_verified_organizer=bool(u.is_verified_organizer),
     )
 

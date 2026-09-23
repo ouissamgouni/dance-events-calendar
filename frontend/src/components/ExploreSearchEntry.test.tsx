@@ -21,7 +21,7 @@ describe('ExploreSearchEntry', () => {
         render(<MemoryRouter><ExploreSearchEntry /></MemoryRouter>);
 
         await user.click(screen.getByRole('button', { name: 'Start your search' }));
-        expect(screen.getByRole('button', { name: /Search events by name/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Search events, places, or tags/ })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Browse events' })).toBeInTheDocument();
 
         await user.click(screen.getByRole('button', { name: 'Collapse search' }));
@@ -40,7 +40,7 @@ describe('ExploreSearchEntry', () => {
         );
 
         await user.click(screen.getByRole('button', { name: 'Start your search' }));
-        await user.click(screen.getByRole('button', { name: /Search events by name/ }));
+        await user.click(screen.getByRole('button', { name: /Search events, places, or tags/ }));
         expect(await screen.findByText('Return to: /')).toBeInTheDocument();
     });
 

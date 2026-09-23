@@ -7,6 +7,7 @@ import { http, HttpResponse } from 'msw'
 import OnboardingWizard from './OnboardingWizard'
 import { AuthProvider } from '../context/AuthContext'
 import { PreferencesProvider } from '../context/PreferencesContext'
+import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext'
 import { AttendanceSummariesProvider } from '../context/AttendanceSummariesContext'
 import { SavedEventsProvider } from '../context/SavedEventsContext'
 import { AttendingEventsProvider } from '../context/AttendingEventsContext'
@@ -51,17 +52,19 @@ const reachGroup: TagGroup = {
     tags: [makeTag(20, 'international', 'International', 'reach'), makeTag(21, 'local', 'Local', 'reach')],
 }
 
-function renderWizard() {
+function renderWizard(profileStepEnabled = false) {
     return render(
         <MemoryRouter initialEntries={['/onboarding/preferences?next=/']}>
-            <AuthProvider><PreferencesProvider><AttendanceSummariesProvider><SavedEventsProvider><AttendingEventsProvider>
-                <Routes><Route path="/onboarding/preferences" element={<OnboardingWizard />} /><Route path="/" element={<p>home page</p>} /></Routes>
-            </AttendingEventsProvider></SavedEventsProvider></AttendanceSummariesProvider></PreferencesProvider></AuthProvider>
+            <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, onboardingProfileStepEnabled: profileStepEnabled }, updateFlag: vi.fn() }}>
+                <AuthProvider><PreferencesProvider><AttendanceSummariesProvider><SavedEventsProvider><AttendingEventsProvider>
+                    <Routes><Route path="/onboarding/preferences" element={<OnboardingWizard />} /><Route path="/" element={<p>home page</p>} /></Routes>
+                </AttendingEventsProvider></SavedEventsProvider></AttendanceSummariesProvider></PreferencesProvider></AuthProvider>
+            </FeatureFlagsContext.Provider>
         </MemoryRouter>,
     )
 }
 
-function useBaseHandlers(overrides?: { onComplete?: () => void; onCreate?: (body: Record<string, unknown>) => void }) {
+function useBaseHandlers(overrides?: { onComplete?: () => void; onCreate?: (body: Record<string, unknown>) => void; onProfile?: (body: Record<string, unknown>) => void }) {
     server.use(
         http.get('*/api/auth/me', () => HttpResponse.json(makeUser({
             needs_onboarding: true, onboarded_at: null,
@@ -73,6 +76,11 @@ function useBaseHandlers(overrides?: { onComplete?: () => void; onCreate?: (body
         http.patch('*/api/auth/preferences', async ({ request }) => {
             const body = await request.json() as Record<string, unknown>
             return HttpResponse.json({ share_attendance_default: false, preferred_area: body.preferred_area ?? null, preferred_tag_ids: body.preferred_tag_ids ?? [], home_location: body.home_location ?? null, set_at: new Date().toISOString() })
+        }),
+        http.patch('*/api/auth/profile', async ({ request }) => {
+            const body = await request.json() as Record<string, unknown>
+            overrides?.onProfile?.(body)
+            return HttpResponse.json({ display_name: body.display_name ?? 'Test Dancer', handle: 'testdancer' })
         }),
         http.post('*/api/interest-profiles', async ({ request }) => {
             const body = await request.json() as Record<string, unknown>
@@ -124,6 +132,7 @@ describe('OnboardingWizard', () => {
         expect(await screen.findByText('Where do you want to discover events?')).toBeInTheDocument()
         expect(completed).toBe(false)
         expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2')
+        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '4')
     })
 
     it('opens a preset in step 2 and progressively reveals near-home controls', async () => {
@@ -175,6 +184,42 @@ describe('OnboardingWizard', () => {
         await waitFor(() => expect(completed).toBe(true))
         expect(created).toHaveLength(1)
         expect(created[0]).toMatchObject({ area_label: 'Europe', dance_tag_ids: [10, 11], reach_filter: 'international', matches_enabled: true, is_active: true })
+        expect(await screen.findByText('home page')).toBeInTheDocument()
+    })
+
+    it('adds a required Profile step before Review when the flag is enabled', async () => {
+        let completed = false
+        const profiles: Record<string, unknown>[] = []
+        useBaseHandlers({
+            onComplete: () => { completed = true },
+            onProfile: (body) => profiles.push(body),
+        })
+        const user = userEvent.setup()
+        renderWizard(true)
+
+        await user.click(await screen.findByRole('button', { name: 'Salsa' }))
+        await user.click(screen.getByRole('button', { name: 'Continue' }))
+        await user.click(await screen.findByRole('button', { name: 'Europe' }))
+        await user.click(await screen.findByRole('button', { name: 'Continue' }))
+        await user.click(await screen.findByRole('button', { name: /Not now/i }))
+
+        expect(await screen.findByText('Complete your profile')).toBeInTheDocument()
+        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '4')
+        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '5')
+        const nameInput = screen.getByRole('textbox', { name: 'Display name' })
+        expect(nameInput).toHaveValue('Test Dancer')
+        await user.clear(nameInput)
+        expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+        await user.type(nameInput, '  Nora Newbie  ')
+        await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+        expect(await screen.findByText("You're all set!")).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Profile/i })).toHaveTextContent('Nora Newbie')
+        expect(completed).toBe(false)
+        await user.click(screen.getByRole('button', { name: 'Start exploring' }))
+
+        await waitFor(() => expect(completed).toBe(true))
+        expect(profiles).toEqual([{ display_name: 'Nora Newbie' }])
         expect(await screen.findByText('home page')).toBeInTheDocument()
     })
 })

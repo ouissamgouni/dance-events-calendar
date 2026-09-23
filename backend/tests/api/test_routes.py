@@ -127,6 +127,19 @@ class TestSettingsEndpoint:
         assert resp.json()["my_events_nav_enabled"] is True
         assert resp.json()["browse_nav_enabled"] is False
         assert resp.json()["browse_direct_to_explorer_enabled"] is False
+        assert resp.json()["onboarding_profile_step_enabled"] is False
+
+    def test_admin_can_update_onboarding_profile_step_flag(self, sqlite_client):
+        client, _engine = sqlite_client
+
+        resp = client.put(
+            "/api/settings",
+            json={"onboarding_profile_step_enabled": True},
+            headers={"X-Admin-Email": "admin@example.com"},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["onboarding_profile_step_enabled"] is True
 
     def test_settings_returns_event_picture_defaults(self, sqlite_client):
         client, _engine = sqlite_client
@@ -593,6 +606,16 @@ class TestEventsEndpoint:
             session.add_all(
                 [
                     CachedEvent(
+                        event_id="evt-current",
+                        calendar_id="cal-1",
+                        title="Ongoing Salsa Social",
+                        location="Current Venue",
+                        start=now - timedelta(hours=1),
+                        end=now + timedelta(hours=2),
+                        all_day=False,
+                        is_hidden=False,
+                    ),
+                    CachedEvent(
                         event_id="evt-future-1",
                         calendar_id="cal-1",
                         title="Salsa Social Night",
@@ -651,16 +674,34 @@ class TestEventsEndpoint:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert [row["event_id"] for row in data] == ["evt-future-1", "evt-future-2"]
+        assert [row["event_id"] for row in data] == [
+            "evt-future-1",
+            "evt-current",
+            "evt-future-2",
+        ]
         assert data[0]["location"] == "Studio One"
-        assert resp.headers["x-total-count"] == "2"
+        assert data[1]["end"] is not None
+        assert resp.headers["x-total-count"] == "3"
         assert resp.headers["x-has-more"] == "false"
 
         page = client.get("/api/events/search?q=salsa&limit=1&offset=1")
         assert page.status_code == 200
-        assert [row["event_id"] for row in page.json()] == ["evt-future-2"]
-        assert page.headers["x-total-count"] == "2"
-        assert page.headers["x-has-more"] == "false"
+        assert [row["event_id"] for row in page.json()] == ["evt-current"]
+        assert page.headers["x-total-count"] == "3"
+        assert page.headers["x-has-more"] == "true"
+
+        past = client.get("/api/events/search?q=salsa&date_scope=past")
+        assert past.status_code == 200
+        assert [row["event_id"] for row in past.json()] == ["evt-past"]
+
+        all_dates = client.get("/api/events/search?q=salsa&date_scope=all")
+        assert all_dates.status_code == 200
+        assert [row["event_id"] for row in all_dates.json()] == [
+            "evt-future-1",
+            "evt-current",
+            "evt-future-2",
+            "evt-past",
+        ]
 
     def test_search_events_rejects_too_short_query(self, sqlite_client):
         client, _engine = sqlite_client

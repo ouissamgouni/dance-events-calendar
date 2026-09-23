@@ -232,7 +232,14 @@ function ProfileHeader({
                             </div>
                             <div className="mt-0.5 text-sm leading-tight text-ink-soft">@{profile.handle}</div>
                         </div>
-                        {!profile.is_self && (
+                        {profile.is_self ? (
+                            <Link
+                                to="/account"
+                                className="shrink-0 border border-line bg-surface px-3.5 py-1.5 text-sm font-medium text-ink transition hover:bg-canvas"
+                            >
+                                Edit profile
+                            </Link>
+                        ) : (
                             <div className="flex shrink-0 items-stretch gap-1">
                                 <FollowButton
                                     profile={profile}

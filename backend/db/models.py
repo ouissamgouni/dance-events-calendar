@@ -23,6 +23,7 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True, max_length=255)
     display_name: Optional[str] = Field(default=None, max_length=120)
     avatar_url: Optional[str] = Field(default=None, max_length=512)
+    avatar_key: Optional[str] = Field(default=None)
     # Public, user-chosen identifier used for /u/{handle} URLs and future
     # social features. Nullable so existing accounts can claim one later.
     # Case-insensitive uniqueness is enforced by a functional unique index

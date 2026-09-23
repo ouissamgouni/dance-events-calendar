@@ -30,8 +30,8 @@ function friendName(friend: FriendMini): string {
     return firstNameOf(friend.display_name, friend.handle) || 'Friend';
 }
 
-const FRIEND_AVATAR_SIZE = 'h-[20px] w-[20px]';
-const FRIEND_AVATAR_GAP = '-ml-1';
+const FRIEND_AVATAR_SIZE = 'h-[32px] w-[32px]';
+const FRIEND_AVATAR_GAP = '-ml-2';
 
 function Avatar({ friend, index }: { friend: FriendMini; index: number }) {
     const name = friendName(friend);
@@ -43,7 +43,7 @@ function Avatar({ friend, index }: { friend: FriendMini; index: number }) {
             referrerPolicy="no-referrer"
         />
     ) : (
-        <span className={`flex ${FRIEND_AVATAR_SIZE} items-center justify-center rounded-full bg-blue-50 text-[9px] font-semibold text-action ring-2 ring-white`}>
+        <span className={`flex ${FRIEND_AVATAR_SIZE} items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-action ring-2 ring-white`}>
             {name.charAt(0).toUpperCase()}
         </span>
     );

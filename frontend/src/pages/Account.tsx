@@ -11,6 +11,7 @@ import NotificationSettings from '../components/NotificationSettings';
 import PushNotificationSettings from '../components/PushNotificationSettings';
 import InstallAppSection from '../components/InstallAppSection';
 import BioEditor from '../components/BioEditor';
+import AvatarEditor from '../components/AvatarEditor';
 import ReferralCard from '../components/ReferralCard';
 import OrganizerClaimSection from '../components/OrganizerClaimSection';
 
@@ -234,19 +235,14 @@ export default function Account() {
                     )}
                 </div>
 
-                <div className="flex items-center gap-3">
-                    {user.avatar_url ? (
-                        <img
-                            src={user.avatar_url}
-                            alt=""
-                            className="h-11 w-11 rounded-full"
-                            referrerPolicy="no-referrer"
-                        />
-                    ) : (
-                        <div className="h-11 w-11 rounded-full bg-slate-200 flex items-center justify-center text-base font-semibold text-ink-soft">
-                            {user.name?.[0]?.toUpperCase() ?? '?'}
-                        </div>
-                    )}
+                <div className="space-y-3">
+                    <AvatarEditor
+                        avatarUrl={user.avatar_url ?? null}
+                        hasCustomAvatar={user.has_custom_avatar ?? false}
+                        name={user.name}
+                        onChange={() => refreshUser()}
+                        compact
+                    />
                     <div className="min-w-0">
                         <div className="flex min-w-0 items-baseline gap-1.5">
                             <span className="truncate text-sm font-semibold text-ink">{user.name}</span>

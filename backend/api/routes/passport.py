@@ -28,6 +28,7 @@ from backend.api.schemas import (
 from backend.db.database import get_session
 from backend.db.models import PassportShareToken, User, UserFollow
 from backend.services import passport as passport_service
+from backend.services.user_avatars import resolve_user_avatar
 
 router = APIRouter(prefix="/api/passport", tags=["passport"])
 
@@ -83,6 +84,7 @@ def build_shared_passport(
     *,
     display_name: str | None,
     viewer: User | None = None,
+    include_monthly_activity: bool = False,
 ) -> SharedPassportResponse:
     """Assemble a read-only passport honoring the owner's per-section flags.
 
@@ -149,12 +151,13 @@ def build_shared_passport(
 
     timeline_items: list[PassportTimelineItem] = []
     timeline_markers: list[PassportTimelineMarker] = []
-    monthly = []
+    monthly = (
+        [MonthlyActivity(**m) for m in passport_service.monthly_activity(ctx["events"])]
+        if include_monthly_activity or show_timeline
+        else []
+    )
     if show_timeline:
         tag_labels = _timeline_tag_labels(session, attended)
-        monthly = [
-            MonthlyActivity(**m) for m in passport_service.monthly_activity(attended)
-        ]
         # City-level softening: drop the exact venue string and coordinates so
         # the shared timeline never pinpoints where the dancer was.
         timeline_items = [
@@ -199,7 +202,7 @@ def build_shared_passport(
 
     return SharedPassportResponse(
         display_name=display_name,
-        avatar_url=owner.avatar_url,
+        avatar_url=resolve_user_avatar(owner),
         stats=stats,
         collections=PassportCollections(**collections),
         milestones=milestones,

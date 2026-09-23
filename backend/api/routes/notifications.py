@@ -33,6 +33,7 @@ from backend.db.models import (
     UserFollow,
     UserEventAttendance,
 )
+from backend.services.user_avatars import resolve_user_avatar
 
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
@@ -162,7 +163,7 @@ def _hydrate(
                 if a and a.display_name
                 else (a.email.split("@", 1)[0] if a else "")
             ),
-            avatar_url=a.avatar_url if a else None,
+            avatar_url=resolve_user_avatar(a) if a else None,
             is_verified_organizer=bool(a.is_verified_organizer if a else False),
             is_following=bool(a and a.id in following_ids),
         )

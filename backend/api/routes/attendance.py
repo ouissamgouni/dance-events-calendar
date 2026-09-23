@@ -33,6 +33,7 @@ from backend.api.schemas import (
 )
 from backend.db.database import get_session
 from backend.db.models import User, UserEventAttendance, UserFollow, UserSavedEvent
+from backend.services.user_avatars import resolve_user_avatar
 
 router = APIRouter(prefix="/api/events", tags=["attendance"])
 
@@ -104,7 +105,7 @@ def _summarize_for_event(
                 AttendeeResponse(
                     user_id=u.id,
                     display_name=u.display_name,
-                    avatar_url=u.avatar_url,
+                    avatar_url=resolve_user_avatar(u),
                     handle=u.handle,
                 )
             )
@@ -196,7 +197,7 @@ def get_attendance_summary_batch(
                 AttendeeResponse(
                     user_id=u.id,
                     display_name=u.display_name,
-                    avatar_url=u.avatar_url,
+                    avatar_url=resolve_user_avatar(u),
                     handle=u.handle,
                 )
             )
@@ -340,7 +341,7 @@ def get_event_attendees(
         return AttendeeResponse(
             user_id=u.id,
             display_name=u.display_name,
-            avatar_url=u.avatar_url,
+            avatar_url=resolve_user_avatar(u),
             handle=u.handle,
             viewer_follow_status=viewer_follow_statuses.get(u.id),
             is_friend=u.id in viewer_friends,
@@ -515,7 +516,7 @@ def get_going_wedge(
             AttendeeResponse(
                 user_id=u.id,
                 display_name=u.display_name,
-                avatar_url=u.avatar_url,
+                avatar_url=resolve_user_avatar(u),
                 handle=u.handle,
                 viewer_follow_status=viewer_follow_statuses.get(u.id, "approved"),
             )
@@ -538,7 +539,7 @@ def get_going_wedge(
                     user_id=cand_u.id,
                     handle=cand_u.handle,
                     display_name=cand_u.display_name,
-                    avatar_url=cand_u.avatar_url,
+                    avatar_url=resolve_user_avatar(cand_u),
                     via_friend_handle=wu.handle if wu else None,
                     via_friend_display_name=wu.display_name if wu else None,
                     viewer_follow_status=viewer_follow_statuses.get(cand_u.id),

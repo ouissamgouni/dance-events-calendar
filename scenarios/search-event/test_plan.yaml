@@ -27,7 +27,7 @@ test_plan:
         Open / on a desktop viewport as an anonymous visitor.
       expected: >
         At 1024px or wider, the global header shows aligned event and people
-        inputs. The event placeholder reads "Search by event, place, or tag".
+        inputs. The event placeholder reads "Search events, places, or tags…".
         The main event list, map, and SummaryBar render normally beneath them.
 
     - id: 2
@@ -98,24 +98,27 @@ test_plan:
         users.
 
     - id: 9
-      title: "Full-page search has one clear control"
+      title: "Full-page search has accurate controls and no redundant Show all"
       description: >
         From the Explore search entry, open the event-name search page and type
         "moonrise" on Safari or Chrome.
       expected: >
-        The field shows exactly one clear cross. Clearing it empties the field,
-        removes the query from the URL and restores the minimum-query prompt.
+        The field reads "Search events, places, or tags…", has an Include past
+        checkbox immediately to its left, and shows exactly one clear cross.
+        The three matching upcoming events are all displayed, so no Show all
+        action appears. Clearing the field removes the query from the URL and
+        restores the minimum-query prompt.
 
     - id: 10
-      title: "Changing a full-results query restores the refreshed Show all action"
+      title: "Show all appears only when the preview is truncated"
       description: >
-        Search for "moonrise", choose Show all matching events, then replace
-        the query with "rooftop" without leaving the search page.
+        Search for "rooftop", choose Show all matching events, then replace
+        the query with "moonrise" without leaving the search page.
       expected: >
-        Moonrise opens full results with Show more when applicable. Typing the
-        new query returns to the limited preview and shows "Show all 9 matching
-        events" for Rooftop. Choosing it opens Rooftop full results and does not
-        immediately bounce back to preview.
+        The Rooftop preview shows three of nine events and offers "Show all 9
+        matching events". Choosing it opens Rooftop full results. Typing the
+        new Moonrise query returns to the complete three-result preview, where
+        Show all is absent.
 
     - id: 11
       title: "Search Back returns directly to its entry page"
@@ -126,3 +129,15 @@ test_plan:
         The Explore journey returns directly to /, without an intermediate
         reduced result list. The global-header journey returns directly to the
         original /calendar URL, including its query string.
+
+    - id: 12
+      title: "Include past persists into mixed full results"
+      description: >
+        On /search, enable Include past and search for "moonrise", then choose
+        Show all matching events.
+      expected: >
+        The URL contains scope=all and the count increases from three to four.
+        The three-result preview remains future-first. Show all preserves
+        scope=all, and the full-results page includes evt-se-005 with a visible
+        "Past" label and the existing muted date treatment. The card remains
+        actionable and does not look disabled.
