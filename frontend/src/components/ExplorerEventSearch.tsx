@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
-import { searchEvents, type EventSearchResult } from '../api';
+import { fetchEventsByIds, searchEvents, type EventSearchResult } from '../api';
 import type { CalendarEvent } from '../types';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
-import { EventListCard } from './EventListPanel';
+import SearchEventCard, { type SearchEventCardPurpose } from './SearchEventCard';
 
 interface ExplorerEventSearchProps {
     onSelectEvent: (eventId: string) => void;
@@ -33,6 +34,14 @@ interface ExplorerEventSearchProps {
     resultFilter?: (result: EventSearchResult) => boolean;
     onNoResultsAction?: () => void;
     noResultsActionLabel?: string;
+    /** Render the dropdown under document.body when an ancestor clips overflow. */
+    portal?: boolean;
+    /** Browse opens event details with card actions; select delegates to a context confirmation flow. */
+    resultPurpose?: SearchEventCardPurpose;
+}
+
+function OptionalPortal({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
+    return enabled ? createPortal(children, document.body) : children;
 }
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -44,30 +53,6 @@ function useDebounced<T>(value: T, ms: number): T {
     }, [value, ms]);
 
     return v;
-}
-
-function toSearchCardEvent(row: EventSearchResult): CalendarEvent {
-    const start = row.start ?? new Date().toISOString();
-    return {
-        event_id: row.event_id,
-        calendar_id: 'search-result',
-        title: row.title,
-        description: null,
-        location: row.location,
-        latitude: null,
-        longitude: null,
-        start,
-        end: start,
-        all_day: false,
-        color: null,
-        view_count: 0,
-        price_min: null,
-        price_max: null,
-        price_currency: null,
-        price_is_free: false,
-        links: null,
-        tags: [],
-    };
 }
 
 export default function ExplorerEventSearch({
@@ -87,10 +72,13 @@ export default function ExplorerEventSearch({
     resultFilter,
     onNoResultsAction,
     noResultsActionLabel = 'Suggest an event',
+    portal = false,
+    resultPurpose = 'browse',
 }: ExplorerEventSearchProps) {
     const [open, setOpen] = useState(embedded);
     const [q, setQ] = useState('');
     const [results, setResults] = useState<EventSearchResult[]>([]);
+    const [eventsById, setEventsById] = useState<Map<string, CalendarEvent>>(new Map());
     const [loading, setLoading] = useState(false);
     const [activeIdx, setActiveIdx] = useState(-1);
     const [pastChecked, setPastChecked] = useState(false);
@@ -98,8 +86,10 @@ export default function ExplorerEventSearch({
     // the header checkbox only opts past events in, without hiding attended.
     const effectiveIncludePast = includePast || pastChecked;
     const containerRef = useRef<HTMLDivElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const [portalStyle, setPortalStyle] = useState<React.CSSProperties>();
     const debounced = useDebounced(q, 250);
     const { isAttending } = useAttendingEvents();
 
@@ -112,7 +102,8 @@ export default function ExplorerEventSearch({
         const onDoc = (event: MouseEvent) => {
             if (
                 containerRef.current &&
-                !containerRef.current.contains(event.target as Node)
+                !containerRef.current.contains(event.target as Node) &&
+                !panelRef.current?.contains(event.target as Node)
             ) {
                 setOpen(false);
             }
@@ -122,10 +113,34 @@ export default function ExplorerEventSearch({
     }, []);
 
     useEffect(() => {
+        if (!portal || !open) return;
+        const positionPanel = () => {
+            const trigger = triggerRef.current;
+            if (!trigger) return;
+            const rect = trigger.getBoundingClientRect();
+            const width = Math.min(320, window.innerWidth - 24);
+            setPortalStyle({
+                position: 'fixed',
+                top: rect.bottom + 4,
+                left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
+                width,
+            });
+        };
+        positionPanel();
+        window.addEventListener('resize', positionPanel);
+        window.addEventListener('scroll', positionPanel, true);
+        return () => {
+            window.removeEventListener('resize', positionPanel);
+            window.removeEventListener('scroll', positionPanel, true);
+        };
+    }, [open, portal]);
+
+    useEffect(() => {
         if (!open && !embedded) return;
         const term = debounced.trim();
         if (term.length < 2) {
             setResults([]);
+            setEventsById(new Map());
             setLoading(false);
             setActiveIdx(-1);
             return;
@@ -133,14 +148,18 @@ export default function ExplorerEventSearch({
         let cancelled = false;
         setLoading(true);
         searchEvents(term, 25, effectiveIncludePast, includePast)
-            .then((rows) => {
+            .then(async (rows) => {
+                if (cancelled) return;
+                const events = await fetchEventsByIds(rows.map((row) => row.event_id)).catch(() => []);
                 if (cancelled) return;
                 setResults(rows);
+                setEventsById(new Map(events.map((event) => [event.event_id, event])));
                 setActiveIdx(rows.length > 0 ? 0 : -1);
             })
             .catch(() => {
                 if (cancelled) return;
                 setResults([]);
+                setEventsById(new Map());
                 setActiveIdx(-1);
             })
             .finally(() => {
@@ -167,6 +186,7 @@ export default function ExplorerEventSearch({
         if (!embedded) setOpen(false);
         setQ('');
         setResults([]);
+        setEventsById(new Map());
         setLoading(false);
         setActiveIdx(-1);
     };
@@ -199,14 +219,18 @@ export default function ExplorerEventSearch({
         }
     };
 
-    const panelClassName = embedded
-        ? 'w-full border-y border-line bg-surface'
+    const panelClassName = portal
+        ? 'z-[8600] border border-line bg-surface shadow-lg'
+        : embedded
+            ? 'w-full border-y border-line bg-surface'
+            : compact
+                ? 'fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg'
+                : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-line bg-surface shadow-lg';
+    const panelStyle = portal
+        ? portalStyle
         : compact
-            ? 'fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg'
-            : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-line bg-surface shadow-lg';
-    const panelStyle = compact
-        ? { top: 'calc(64px + env(safe-area-inset-top) + 6px)' }
-        : undefined;
+            ? { top: 'calc(64px + env(safe-area-inset-top) + 6px)' }
+            : undefined;
 
     // Desktop inline mode: show input directly instead of trigger button
     const isDesktopInline = !embedded && !compact && !small;
@@ -276,143 +300,111 @@ export default function ExplorerEventSearch({
                 </button>
             )}
             {(open || embedded) && (
-                <div className={panelClassName} style={panelStyle}>
-                    {!headerInline && (
-                        <div className="border-b border-line p-2">
-                            <div className="flex items-center gap-2">
-                                {pastToggle && (
-                                    <label className="flex items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
-                                        <input
-                                            type="checkbox"
-                                            checked={pastChecked}
-                                            onChange={(event) => setPastChecked(event.target.checked)}
-                                            className="h-3.5 w-3.5"
-                                            data-testid="explorer-event-search-include-past"
-                                        />
-                                        Include past
-                                    </label>
-                                )}
-                                <div className="flex flex-1 items-center gap-2 border border-line bg-surface px-2 py-1.5">
-                                    <svg
-                                        viewBox="0 0 20 20"
-                                        fill="currentColor"
-                                        className="h-4 w-4 text-muted"
-                                        aria-hidden="true"
-                                    >
-                                        <path
-                                            fillRule="evenodd"
-                                            clipRule="evenodd"
-                                            d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
-                                        />
-                                    </svg>
-                                    <input
-                                        ref={inputRef}
-                                        type="text"
-                                        value={q}
-                                        onChange={(event) => setQ(event.target.value)}
-                                        onKeyDown={onKeyDown}
-                                        placeholder={effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
-                                        aria-label={embedded ? triggerLabel : effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
-                                        className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    <div className="max-h-80 overflow-auto bg-canvas px-2 py-1.5">
-                        {term.length < 2 && (
-                            <div className="bg-surface p-3 text-xs text-ink-soft">
-                                {guidancePrefix ? `${guidancePrefix} ` : ''}Type at least 2 letters to find {includePast ? 'past' : 'upcoming'} events.
-                            </div>
-                        )}
-                        {term.length >= 2 && loading && (
-                            <div className="bg-surface p-3 text-xs text-ink-soft">Searching…</div>
-                        )}
-                        {term.length >= 2 && !loading && visibleResults.length === 0 && (
-                            <div className="bg-surface p-3 text-xs text-ink-soft">
-                                No {effectiveIncludePast ? 'past' : 'upcoming'} events match “{term}”.
-                                {effectiveIncludePast && !embedded && (
-                                    <>
-                                        {' '}
-                                        <Link
-                                            to="/calendar"
-                                            onClick={reset}
-                                            className="font-medium text-action hover:underline"
+                <OptionalPortal enabled={portal}>
+                    <div ref={panelRef} className={panelClassName} style={panelStyle}>
+                        {!headerInline && (
+                            <div className="border-b border-line p-2">
+                                <div className="flex items-center gap-2">
+                                    {pastToggle && (
+                                        <label className="flex items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={pastChecked}
+                                                onChange={(event) => setPastChecked(event.target.checked)}
+                                                className="h-3.5 w-3.5"
+                                                data-testid="explorer-event-search-include-past"
+                                            />
+                                            Include past
+                                        </label>
+                                    )}
+                                    <div className="flex flex-1 items-center gap-2 border border-line bg-surface px-2 py-1.5">
+                                        <svg
+                                            viewBox="0 0 20 20"
+                                            fill="currentColor"
+                                            className="h-4 w-4 text-muted"
+                                            aria-hidden="true"
                                         >
-                                            Browse the calendar
-                                        </Link>{' '}
-                                        to find past events with filters.
-                                    </>
-                                )}
-                                {onNoResultsAction && (
-                                    <button type="button" onClick={onNoResultsAction} className="ml-1 font-semibold text-action hover:underline">
-                                        {noResultsActionLabel}
-                                    </button>
-                                )}
+                                            <path
+                                                fillRule="evenodd"
+                                                clipRule="evenodd"
+                                                d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
+                                            />
+                                        </svg>
+                                        <input
+                                            ref={inputRef}
+                                            type="text"
+                                            value={q}
+                                            onChange={(event) => setQ(event.target.value)}
+                                            onKeyDown={onKeyDown}
+                                            placeholder={effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
+                                            aria-label={embedded ? triggerLabel : effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
+                                            className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         )}
-                        {visibleResults.map((row, index) => {
-                            const place = [row.city, row.country].filter(Boolean).join(', ');
-                            if (effectiveIncludePast && !embedded) {
-                                const when = row.start ? new Date(row.start).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
-                                return (
-                                    <button
-                                        key={row.event_id}
-                                        type="button"
-                                        onClick={() => selectEvent(row)}
-                                        aria-label={`Open ${row.title}`}
-                                        data-testid={`explorer-event-search-result-${index}`}
-                                        className={`mb-1.5 flex w-full flex-col items-start gap-0.5 border bg-surface px-3 py-2 text-left last:mb-0 hover:bg-canvas ${index === activeIdx ? 'border-blue-300 ring-2 ring-blue-300' : 'border-line'}`}
-                                    >
-                                        <span className="text-sm font-medium text-ink">{row.title}</span>
-                                        {(when || place || row.location) && (
-                                            <span className="text-xs text-ink-soft">
-                                                {[when, place || row.location].filter(Boolean).join(' · ')}
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            }
-                            const event = toSearchCardEvent(row);
-                            return (
-                                <div
-                                    key={row.event_id}
-                                    className={`mb-1.5 last:mb-0 ${index === activeIdx ? 'ring-2 ring-blue-300' : ''}`}
-                                    data-testid={`explorer-event-search-result-${index}`}
-                                >
-                                    <EventListCard
-                                        event={event}
-                                        mapBounds={null}
-                                        onEventClick={() => selectEvent(row)}
-                                        showPrices={false}
-                                        showPopularity={false}
-                                        popularityThreshold={0}
-                                        trendingTopN={0}
-                                        trendingTopPercent={0}
-                                        allViewCounts={[]}
-                                        followingBadgeEnabled={false}
-                                        showRatings={false}
-                                        isSavedFlag={false}
+                        <div className="max-h-80 overflow-auto bg-canvas px-2 py-1.5">
+                            {term.length < 2 && (
+                                <div className="bg-surface p-3 text-xs text-ink-soft">
+                                    {guidancePrefix ? `${guidancePrefix} ` : ''}Type at least 2 letters to find {includePast ? 'past' : 'upcoming'} events.
+                                </div>
+                            )}
+                            {term.length >= 2 && loading && (
+                                <div className="bg-surface p-3 text-xs text-ink-soft">Searching…</div>
+                            )}
+                            {term.length >= 2 && !loading && visibleResults.length === 0 && (
+                                <div className="bg-surface p-3 text-xs text-ink-soft">
+                                    No {effectiveIncludePast ? 'past' : 'upcoming'} events match “{term}”.
+                                    {effectiveIncludePast && !embedded && (
+                                        <>
+                                            {' '}
+                                            <Link
+                                                to="/calendar"
+                                                onClick={reset}
+                                                className="font-medium text-action hover:underline"
+                                            >
+                                                Browse the calendar
+                                            </Link>{' '}
+                                            to find past events with filters.
+                                        </>
+                                    )}
+                                    {onNoResultsAction && (
+                                        <button type="button" onClick={onNoResultsAction} className="ml-1 font-semibold text-action hover:underline">
+                                            {noResultsActionLabel}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                            {visibleResults.map((row, index) => (
+                                <div key={row.event_id} className="mb-1.5 last:mb-0">
+                                    <SearchEventCard
+                                        result={row}
+                                        event={eventsById.get(row.event_id)}
+                                        onOpen={() => selectEvent(row)}
+                                        purpose={resultPurpose}
+                                        highlighted={index === activeIdx}
+                                        testId={`explorer-event-search-result-${index}`}
                                     />
                                 </div>
-                            );
-                        })}
-                    </div>
-                    {includePast && onOpenSubmitEvent && (
-                        <div className="border-t border-line bg-surface px-3 py-2 text-center text-xs">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onOpenSubmitEvent();
-                                    reset();
-                                }}
-                                className="font-medium text-action hover:underline"
-                            >
-                                Missing event? Add it
-                            </button>
+                            ))}
                         </div>
-                    )}
-                </div>
+                        {includePast && onOpenSubmitEvent && (
+                            <div className="border-t border-line bg-surface px-3 py-2 text-center text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onOpenSubmitEvent();
+                                        reset();
+                                    }}
+                                    className="font-medium text-action hover:underline"
+                                >
+                                    Missing event? Add it
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </OptionalPortal>
             )}
         </div>
     );

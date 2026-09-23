@@ -11,7 +11,7 @@ import { Pencil } from 'lucide-react';
 
 interface Props {
     eventId: string;
-    appearance?: 'icon' | 'pill' | 'count' | 'preview';
+    appearance?: 'icon' | 'pill' | 'count' | 'preview' | 'write';
     size?: 'sm' | 'md';
     stopPropagation?: boolean;
     className?: string;
@@ -138,7 +138,7 @@ export default function RateEventButton({
             setShowSignIn((s) => !s);
             return;
         }
-        const trackedEntryPoint = appearance === 'count' || appearance === 'preview' ? 'icon' : appearance;
+        const trackedEntryPoint = appearance === 'count' || appearance === 'preview' || appearance === 'write' ? 'icon' : appearance;
         trackRatingModalOpened(entryPoint ?? trackedEntryPoint, !!myRating);
         setOpen(true);
     };
@@ -166,13 +166,15 @@ export default function RateEventButton({
         </svg>
     );
 
-    const tooltip = hasAggregate
-        ? hasRated
-            ? `${aggCount} review${aggCount !== 1 ? 's' : ''} — edit your review`
-            : `${aggCount} review${aggCount !== 1 ? 's' : ''} — add yours`
-        : hasRated
-            ? 'Edit your review'
-            : 'Be the first to review';
+    const tooltip = appearance === 'write'
+        ? 'Write a review'
+        : hasAggregate
+            ? hasRated
+                ? `${aggCount} review${aggCount !== 1 ? 's' : ''} — edit your review`
+                : `${aggCount} review${aggCount !== 1 ? 's' : ''} — add yours`
+            : hasRated
+                ? 'Edit your review'
+                : 'Be the first to review';
 
     const countText = showCount && hasAggregate ? String(aggCount) : null;
 
@@ -218,7 +220,7 @@ export default function RateEventButton({
     }
 
     // Common content for both button and link
-    const buttonContent = appearance === 'preview' ? previewContent : appearance === 'pill' ? (
+    const buttonContent = appearance === 'write' ? 'Write a review' : appearance === 'preview' ? previewContent : appearance === 'pill' ? (
         <>
             <span className="relative inline-flex">
                 {ReviewIcon}
@@ -227,15 +229,15 @@ export default function RateEventButton({
             <span className={labelClassName}>
                 {countText
                     ? (
-                    <span className="tabular-nums">
-                        Reviews <span className="text-muted">({countText})</span>
-                        {hasRated && commentStatus === 'pending' && (
-                            <span className="ml-1.5 pl-1.5 border-l border-amber-300 text-[11px] text-amber-700">
-                                Your comment pending
-                            </span>
-                        )}
-                    </span>
-                )
+                        <span className="tabular-nums">
+                            Reviews <span className="text-muted">({countText})</span>
+                            {hasRated && commentStatus === 'pending' && (
+                                <span className="ml-1.5 pl-1.5 border-l border-amber-300 text-[11px] text-amber-700">
+                                    Your comment pending
+                                </span>
+                            )}
+                        </span>
+                    )
                     : hasRated
                         ? (commentStatus === 'pending' ? 'Comment pending' : 'Your review')
                         : 'Review'}
@@ -256,15 +258,17 @@ export default function RateEventButton({
         </>
     );
 
-    const buttonClasses = appearance === 'preview'
-        ? `block w-full text-left ${className}`.trim()
-        : appearance === 'pill'
-            ? actionStyle
-                ? `flex h-10 shrink-0 items-center gap-2 rounded-field border border-line bg-surface px-2 text-sm text-ink transition hover:bg-canvas ${className}`.trim()
-                : `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-ink-soft bg-surface border-line hover:bg-canvas'} ${className}`.trim()
-            : appearance === 'count'
-                ? `inline-flex items-center gap-1 text-ink-soft hover:text-ink ${className}`.trim()
-                : `transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-sky-600 hover:text-sky-700' : 'text-slate-300 hover:text-ink-soft'} ${className}`.trim();
+    const buttonClasses = appearance === 'write'
+        ? `inline-flex min-h-11 shrink-0 items-center rounded-field bg-action px-4 text-sm font-semibold text-white hover:opacity-90 ${className}`.trim()
+        : appearance === 'preview'
+            ? `block w-full text-left ${className}`.trim()
+            : appearance === 'pill'
+                ? actionStyle
+                    ? `flex h-10 shrink-0 items-center gap-2 rounded-field border border-line bg-surface px-2 text-sm text-ink transition hover:bg-canvas ${className}`.trim()
+                    : `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-ink-soft bg-surface border-line hover:bg-canvas'} ${className}`.trim()
+                : appearance === 'count'
+                    ? `inline-flex items-center gap-1 text-ink-soft hover:text-ink ${className}`.trim()
+                    : `transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-sky-600 hover:text-sky-700' : 'text-slate-300 hover:text-ink-soft'} ${className}`.trim();
 
     // Upcoming editions can't be reviewed — hide the button entirely (except the
     // read-only "count" appearance, which is naturally empty).

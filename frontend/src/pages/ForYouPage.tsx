@@ -20,6 +20,7 @@ import ShareExperienceCard from '../components/ShareExperienceCard';
 import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
 import SectionHeading, { type SectionHeadingAction } from '../components/SectionHeading';
 import ScrollDotsIndicator from '../components/ScrollDots';
+import ExploreSearchEntry from '../components/ExploreSearchEntry';
 import { useScrollDots } from '../hooks/useScrollDots';
 
 const DISPLAY_CAP = 5;
@@ -195,7 +196,20 @@ export default function ForYouPage() {
     } = useFeatureFlags();
 
     const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
+    const stickySearchSentinelRef = useRef<HTMLDivElement>(null);
+    const [isSearchSticky, setIsSearchSticky] = useState(false);
     const onEventHover = useCallback((id: string | null) => setHoveredEventId(id), []);
+
+    useEffect(() => {
+        const sentinel = stickySearchSentinelRef.current;
+        if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+        const observer = new IntersectionObserver(
+            ([entry]) => setIsSearchSticky(!entry.isIntersecting),
+            { threshold: 0 },
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, []);
 
     const forYouArea = useMemo(() => {
         const src = prefs.area ?? DEFAULT_AREA_BBOX;
@@ -226,6 +240,11 @@ export default function ForYouPage() {
             interestKind: 'going',
         },
         resetKey: forYouResetKey,
+    });
+    const publicLens = useForYouLens({
+        enabled: !user,
+        fetchArgs: { startDate: forYouStartDate, area: forYouArea },
+        resetKey: `public:${forYouResetKey}`,
     });
 
     // Client-side "not yet ended" guard — the backend `startDate` filter
@@ -338,8 +357,8 @@ export default function ForYouPage() {
 
     const handleEventClick = useCallback((evt: CalendarEvent) => {
         markSeen(evt.event_id);
-        trackView(evt.event_id, 'for-you');
-        navigate(`/event/${evt.event_id}?src=for-you`);
+        trackView(evt.event_id, 'explore');
+        navigate(`/event/${evt.event_id}?src=explore`);
     }, [markSeen, navigate]);
 
     const trendingDecoration = trendingEnabled && showPopularity;
@@ -347,27 +366,43 @@ export default function ForYouPage() {
     const greeting = timeOfDayGreeting(new Date().getHours());
 
     return (
-        <div className="min-h-screen bg-[#f8fafc]">
+        <div className="min-h-screen bg-canvas">
             <main className="mx-auto max-w-7xl px-4 py-4 sm:py-6">
                 <header className="mb-4">
                     <h1 className="text-2xl font-bold text-ink">
                         {greeting}{firstName ? `, ${firstName}` : ''} 👋
                     </h1>
-                    <p className="mt-1 text-[12px] text-ink-soft">Your picks for today.</p>
                 </header>
+                <div ref={stickySearchSentinelRef} aria-hidden="true" className="h-px w-full" />
+                <div className="sticky top-0 z-50 -mx-4 bg-canvas/95 px-4 py-2 backdrop-blur-sm">
+                    <ExploreSearchEntry isSticky={isSearchSticky} />
+                </div>
                 {!user ? (
-                    <div className="bg-blue-50 border border-blue-100 p-4 text-sm text-ink">
-                        <p className="mb-2 font-medium text-ink">Personalised events for you</p>
-                        <p className="mb-3 text-ink-soft">Sign in to see events tailored to your saved area, dance styles and friends.</p>
-                        <Link
-                            to={`/login?next=${encodeURIComponent('/for-you')}`}
-                            className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
-                        >
-                            Sign in
-                        </Link>
+                    <div className="mt-4 flex flex-col gap-4">
+                        <LensTrail
+                            title="You might like"
+                            testId="explore-public-recommended"
+                            contextLabel="recommended event"
+                            dateFirstEligible
+                            events={publicLens.events}
+                            hasMore={publicLens.hasMore}
+                            loading={publicLens.loading}
+                            onLoadMore={publicLens.loadMore}
+                            onEventClick={handleEventClick}
+                            hoveredEventId={hoveredEventId}
+                            onEventHover={onEventHover}
+                            trendingEnabled={trendingDecoration}
+                            popularityThreshold={popularityThreshold}
+                            trendingTopN={trendingTopN}
+                            trendingTopPercent={trendingTopPercent}
+                            newEventIds={new Set()}
+                            unseenStateEnabled={false}
+                            followingBadgeEnabled={false}
+                            emptyContent="No upcoming events found in this area."
+                        />
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-4">
+                    <div className="mt-4 flex flex-col gap-4">
                         <YourNextEventsRail
                             events={yourNextEvents}
                             onEventClick={handleEventClick}

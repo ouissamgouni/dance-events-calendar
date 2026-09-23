@@ -780,6 +780,10 @@ class SiteSettingsResponse(BaseModel):
     my_events_route_enabled: bool = False
     # Show 'My Events' as a top-level navigation entry (admin feature).
     my_events_nav_enabled: bool = True
+    # Show Browse as a top-level navigation entry.
+    browse_nav_enabled: bool = False
+    # Send the Browse events action directly to the Explorer list.
+    browse_direct_to_explorer_enabled: bool = False
     # Required tag-group ids used by the event suggestion form.
     suggest_event_required_dance_group_id: Optional[int] = None
     suggest_event_required_reach_group_id: Optional[int] = None
@@ -882,9 +886,9 @@ class SiteSettingsResponse(BaseModel):
     explorer_view_control_labels_enabled: bool = True
     # When True, event pictures render on cards and detail pages. Admin upload
     # stays available regardless so images can be prepared before going live.
-    event_images_enabled: bool = False
+    event_images_enabled: bool = True
     # What fills a card's picture slot when the event has no picture.
-    event_card_placeholder_style: str = "gradient"
+    event_card_placeholder_style: str = "none"
 
 
 # ---------------------------------------------------------------------------
@@ -1069,6 +1073,8 @@ class SiteSettingsUpdateRequest(BaseModel):
     network_going_snapshot_enabled: Optional[bool] = None
     my_events_route_enabled: Optional[bool] = None
     my_events_nav_enabled: Optional[bool] = None
+    browse_nav_enabled: Optional[bool] = None
+    browse_direct_to_explorer_enabled: Optional[bool] = None
     suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
     suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)
     # Notification / re-engagement global gates.
@@ -2015,6 +2021,9 @@ class PendingReviewResponse(BaseModel):
     event_title: Optional[str] = None
     event_start: Optional[datetime] = None
     event_end: Optional[datetime] = None
+    event_location: Optional[str] = None
+    event_city: Optional[str] = None
+    event_country: Optional[str] = None
     # Social proof line ("Laura", "Laura and Marc", "Laura, Marc +3 others")
     # for followed users who already reviewed; None when no nameable proof.
     friend_proof: Optional[str] = None

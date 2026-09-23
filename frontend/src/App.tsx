@@ -1,4 +1,4 @@
-import { Routes, Route, Link, Navigate, useLocation, useNavigate, type Location } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useLocation, useNavigate, useParams, type Location } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
@@ -42,9 +42,9 @@ const Privacy = lazy(() => import('./pages/Privacy'));
 const OnboardingWizard = lazy(() => import('./pages/OnboardingWizard'));
 const ReferralLanding = lazy(() => import('./pages/ReferralLanding'));
 const ForYouPage = lazy(() => import('./pages/ForYouPage'));
+const TextSearchPage = lazy(() => import('./pages/TextSearchPage'));
 const InstallPage = lazy(() => import('./pages/InstallPage'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
-const MineHub = lazy(() => import('./pages/MineHub'));
 const NetworkPage = lazy(() => import('./pages/NetworkPage'));
 const FollowingReviewsPage = lazy(() => import('./pages/FollowingReviewsPage'));
 const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
@@ -54,8 +54,6 @@ const SectionLayout = lazy(() => import('./components/SectionTabs'));
 const SuggestEventWizard = lazy(() => import('./components/suggest/SuggestEventWizard'));
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
-import ExplorerEventSearch from './components/ExplorerEventSearch';
-import MyDanceHeader from './components/MyDanceHeader';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
 
@@ -79,6 +77,16 @@ function SuggestEventRoute() {
       onClose={() => (hasBackground ? navigate(-1) : navigate('/', { replace: true }))}
     />
   );
+}
+
+function LegacyRedirect({ to }: { to: string }) {
+  const location = useLocation();
+  return <Navigate to={`${to}${location.search}${location.hash}`} replace />;
+}
+
+function LegacySavedSearchEditRedirect() {
+  const { profileId } = useParams();
+  return <LegacyRedirect to={`/saved-searches/${profileId}/edit`} />;
 }
 
 export default function App() {
@@ -118,8 +126,7 @@ function AppShell() {
   const qaPinnedWidth = useQaPinnedWidth();
   const mainRef = useRef<HTMLElement | null>(null);
   const backgroundLocation = (location.state as ModalLocationState | null)?.backgroundLocation;
-  const isMineDashboard = location.pathname === '/mine';
-  const isMyEvents = location.pathname === '/mine/calendar';
+  const isMyEvents = location.pathname === '/my-events' || location.pathname === '/mine/calendar';
 
   // Full-screen flows (auth, onboarding) and leaf detail pages (event/series,
   // admin, notifications, shared views) suppress the primary bottom nav.
@@ -152,57 +159,50 @@ function AppShell() {
           className="flex flex-col h-full"
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
-          {isMineDashboard ? (
-            <MyDanceHeader />
-          ) : (
-            <header
-              className="flex items-center justify-between gap-2 bg-surface border-b border-line px-3 sm:px-4"
-              style={{ height: 'calc(64px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <Link to="/" reloadDocument className="flex items-center gap-2 shrink-0">
-                  <img src="/movida.png" alt="Movida" className="h-9 w-9 object-contain shrink-0" />
-                  <span className="text-[21px] font-bold leading-none tracking-tight">Movida</span>
-                </Link>
-                <DesktopNav />
-              </div>
-              <div className="flex items-center gap-1 sm:gap-2">
-                {/* Desktop: inline event search, mirroring the people search box */}
-                <ExplorerEventSearch
-                  className="hidden lg:block w-64"
-                  pastToggle
-                  headerInline
-                  onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
-                  triggerLabel="Search events"
-                />
-                {/* Mobile: compact icon trigger opening a panel */}
-                <ExplorerEventSearch
-                  className="lg:hidden"
-                  compact
-                  pastToggle
-                  onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
-                  triggerLabel="Search events"
-                />
-                <UserSearchBox />
-                <NotificationBell />
-                <HeaderUserMenu />
-              </div>
-            </header>
-          )}
+          <header
+            className="flex items-center justify-between gap-2 bg-surface border-b border-line px-3 sm:px-4"
+            style={{ height: 'calc(64px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <Link to="/" reloadDocument className="flex items-center gap-2 shrink-0">
+                <img src="/movida.png" alt="Movida" className="h-9 w-9 object-contain shrink-0" />
+                <span className="text-[21px] font-bold leading-none tracking-tight">Movida</span>
+              </Link>
+              <DesktopNav />
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/search', { state: { returnTo: `${location.pathname}${location.search}` } })}
+                aria-label="Search events"
+                title="Search events"
+                className="inline-flex h-11 w-11 items-center justify-center text-ink-soft transition hover:text-ink"
+              >
+                <img src="/search.png" alt="" aria-hidden="true" className="h-6 w-6" />
+              </button>
+              <UserSearchBox />
+              <NotificationBell />
+              <HeaderUserMenu />
+            </div>
+          </header>
           <SignUpBanner />
           <ShareReferralBanner />
           <OnboardingGate />
-          <main ref={mainRef} className={`flex-1 ${isMyEvents ? 'min-h-0 overflow-hidden' : 'overflow-auto'}`}>
+          <main ref={mainRef} className={`flex-1 ${isMyEvents ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-auto'}`}>
             <Suspense fallback={null}>
               <Routes location={backgroundLocation ?? location}>
-                <Route path="/" element={<Home />} />
+                <Route path="/" element={<ForYouPage />} />
                 <Route path="/onboarding" element={<OnboardingWizard />} />
                 <Route path="/onboarding/preferences" element={<OnboardingWizard />} />
                 <Route path="/onboarding/local" element={<OnboardingWizard />} />
                 <Route path="/onboarding/follow" element={<OnboardingWizard />} />
                 <Route path="/r/:code" element={<ReferralLanding />} />
                 <Route path="/calendar" element={<Home />} />
-                <Route path="/for-you" element={<ForYouPage />} />
+                <Route path="/browse" element={<Home />} />
+                <Route path="/search" element={<TextSearchPage />} />
+                <Route path="/search/results" element={<TextSearchPage />} />
+                <Route path="/explore" element={<LegacyRedirect to="/" />} />
+                <Route path="/for-you" element={<LegacyRedirect to="/" />} />
                 <Route path="/event/:eventId" element={<EventDetailPage />} />
                 <Route path="/event/:eventId/review" element={<EventDetailPage />} />
                 <Route path="/event/:eventId/ask" element={<EventDetailPage />} />
@@ -222,22 +222,19 @@ function AppShell() {
                   <Route path="network" element={<NetworkPage />} />
                   <Route path="reviews" element={<FollowingReviewsPage />} />
                 </Route>
-                <Route path="/mine" element={<SectionLayout section="mine" />}>
-                  <Route index element={<MineHub />} />
-                  <Route path="calendar" element={<MyCalendar />} />
-                  <Route
-                    path="passport"
-                    element={
-                      <ProtectedRoute>
-                        <PassportPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route path="reviews" element={<MyReviewsPage />} />
-                  <Route path="profiles" element={<DiscoveryProfilesPage />} />
-                  <Route path="profiles/new" element={<SearchProfileEditorPage />} />
-                  <Route path="profiles/:profileId/edit" element={<SearchProfileEditorPage />} />
-                </Route>
+                <Route path="/my-events" element={<MyCalendar />} />
+                <Route path="/passport" element={<ProtectedRoute><PassportPage /></ProtectedRoute>} />
+                <Route path="/reviews" element={<MyReviewsPage />} />
+                <Route path="/saved-searches" element={<DiscoveryProfilesPage />} />
+                <Route path="/saved-searches/new" element={<SearchProfileEditorPage />} />
+                <Route path="/saved-searches/:profileId/edit" element={<SearchProfileEditorPage />} />
+                <Route path="/mine" element={<LegacyRedirect to="/" />} />
+                <Route path="/mine/calendar" element={<LegacyRedirect to="/my-events" />} />
+                <Route path="/mine/passport" element={<LegacyRedirect to="/passport" />} />
+                <Route path="/mine/reviews" element={<LegacyRedirect to="/reviews" />} />
+                <Route path="/mine/profiles" element={<LegacyRedirect to="/saved-searches" />} />
+                <Route path="/mine/profiles/new" element={<LegacyRedirect to="/saved-searches/new" />} />
+                <Route path="/mine/profiles/:profileId/edit" element={<LegacySavedSearchEditRedirect />} />
                 <Route path="/shared/:token" element={<SharedCalendarPage />} />
                 <Route path="/shared/passport/:token" element={<SharedPassportPage />} />
                 <Route path="/privacy" element={<Privacy />} />
@@ -278,7 +275,7 @@ function AppShell() {
                 </Routes>
               ) : null}
             </Suspense>
-            {!isMineDashboard && !isMyEvents && (
+            {!isMyEvents && (
               <footer className="py-3 text-center flex items-center justify-center gap-3">
                 <Link to="/privacy" className="text-[11px] text-muted hover:text-ink-soft transition">
                   Privacy Policy

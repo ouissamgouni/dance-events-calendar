@@ -131,6 +131,7 @@ export async function fetchEvents(
 export interface EventsPage {
     events: CalendarEvent[];
     hasMore: boolean;
+    total: number;
 }
 
 /**
@@ -186,7 +187,11 @@ export async function fetchEventsPage(
     if (opts?.fresh) init.cache = 'no-store';
     const res = await fetch(`${BASE}/events?${qs}`, init);
     const events = await parseJsonResponse<CalendarEvent[]>(res, 'Failed to fetch events');
-    return { events, hasMore: res.headers.get('X-Has-More') === 'true' };
+    return {
+        events,
+        hasMore: res.headers.get('X-Has-More') === 'true',
+        total: Number(res.headers.get('X-Total-Count') ?? events.length),
+    };
 }
 
 export async function fetchEvent(eventId: string, opts?: { fresh?: boolean }): Promise<CalendarEvent> {
@@ -231,6 +236,8 @@ export interface SiteSettings {
     network_going_snapshot_enabled?: boolean;
     my_events_route_enabled?: boolean;
     my_events_nav_enabled?: boolean;
+    browse_nav_enabled?: boolean;
+    browse_direct_to_explorer_enabled?: boolean;
     /** Experiment: two-line, icon-prefixed filter summary bar with the
      * Map/Calendar controls pinned to its right. */
     suggest_event_required_dance_group_id?: number | null;
@@ -4346,6 +4353,27 @@ export async function searchEvents(
         credentials: 'include',
     });
     return parseJsonResponse<EventSearchResult[]>(res, 'Failed to search events');
+}
+
+export interface EventSearchPage {
+    results: EventSearchResult[];
+    total: number;
+    hasMore: boolean;
+}
+
+export async function searchEventsPage(
+    q: string,
+    limit = 10,
+    offset = 0,
+): Promise<EventSearchPage> {
+    const params = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
+    const res = await fetch(`${BASE}/events/search?${params.toString()}`, { credentials: 'include' });
+    const results = await parseJsonResponse<EventSearchResult[]>(res, 'Failed to search events');
+    return {
+        results,
+        total: Number(res.headers.get('X-Total-Count') ?? results.length),
+        hasMore: res.headers.get('X-Has-More') === 'true',
+    };
 }
 
 export interface PopularCity {

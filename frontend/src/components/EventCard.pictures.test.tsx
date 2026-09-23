@@ -100,7 +100,10 @@ describe('EventCard pictures', () => {
     })
 
     it('renders a placeholder when the event has no picture', () => {
-        renderCard(makeEvent(), { eventImagesEnabled: true })
+        renderCard(makeEvent(), {
+            eventImagesEnabled: true,
+            eventCardPlaceholderStyle: 'gradient',
+        })
 
         expect(screen.queryByTestId('event-card-image')).not.toBeInTheDocument()
         expect(screen.getByTestId('event-card-placeholder')).toHaveAttribute(

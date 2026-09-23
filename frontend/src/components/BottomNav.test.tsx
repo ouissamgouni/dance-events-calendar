@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import BottomNav from './BottomNav'
-import { FeatureFlagsContext } from '../context/FeatureFlagsContext'
+import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext'
 
 // The For-You "new" dot pulls in Auth/Preferences/FeatureFlags + a live lens
 // fetch; stub it so the nav renders without that provider tree.
@@ -10,83 +10,61 @@ vi.mock('../hooks/useForYouHasNew', () => ({
     useForYouHasNew: () => false,
 }))
 
-function renderAt(path: string, contextValue?: { flags: any; updateFlag: any }) {
-    const defaultContext = {
-        flags: {
-            myEventsNavEnabled: true,
-            showPrices: false,
-            showPopularity: false,
-            showRatings: false,
-            popularityThreshold: 10,
-            followingBadgeEnabled: false,
-            unseenStateEnabled: false,
-            trendingEnabled: false,
-            trendingBannerEnabled: false,
-            trendingFloorGoing: 3,
-            trendingTopN: 3,
-            trendingTopPercent: 100,
-            eventColorBarColor: '#64748b',
-            tagSortMode: 'group' as const,
-            goingButtonIconVariant: 'hand' as const,
-            promoCodesEnabled: false,
-            organizerClaimsEnabled: false,
-            networkGoingSnapshotEnabled: true,
-            myEventsRouteEnabled: false,
-            eventReviewSizeStepEnabled: true,
-            tagAsBadge: false,
-            tagBadgeColored: false,
-            trendingTrailRichEnabled: false,
-            tagsPerCard: 3,
-        },
-        updateFlag: () => { },
-    }
-
-    const value = contextValue || defaultContext
-
+function renderAt(path: string, browseNavEnabled = false) {
     return render(
-        <FeatureFlagsContext.Provider value={value}>
-            <MemoryRouter initialEntries={[path]}>
+        <MemoryRouter initialEntries={[path]}>
+            <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, browseNavEnabled }, updateFlag: vi.fn() }}>
                 <BottomNav />
-            </MemoryRouter>
-        </FeatureFlagsContext.Provider>,
+            </FeatureFlagsContext.Provider>
+        </MemoryRouter>,
     )
 }
 
 describe('BottomNav', () => {
-    it('renders the five primary destinations when my events nav is enabled', () => {
+    it('renders the four primary destinations', () => {
         renderAt('/')
         expect(screen.getByRole('link', { name: 'Explore' })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'For You' })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'Tribe' })).toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'My Events' })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'MyDance' })).toBeInTheDocument()
-    })
-
-    it('hides My Events when nav flag is disabled', () => {
-        renderAt('/', {
-            flags: { myEventsNavEnabled: false } as any,
-            updateFlag: () => { },
-        })
-        expect(screen.queryByRole('link', { name: 'My Events' })).not.toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'Explore' })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'MyDance' })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Tribe' })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Passport' })).toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: 'Browse' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: 'For You' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: 'MyDance' })).not.toBeInTheDocument()
     })
 
     it('marks Explore active on the root route', () => {
         renderAt('/')
         expect(screen.getByRole('link', { name: 'Explore' })).toHaveAttribute('aria-current', 'page')
-        expect(screen.getByRole('link', { name: 'MyDance' })).not.toHaveAttribute('aria-current')
+        expect(screen.getByRole('link', { name: 'Passport' })).not.toHaveAttribute('aria-current')
     })
 
-    it('marks MyDance active on /mine but not Tribe', () => {
-        renderAt('/mine')
-        expect(screen.getByRole('link', { name: 'MyDance' })).toHaveAttribute('aria-current', 'page')
+    it('marks My Events active on its top-level route', () => {
+        renderAt('/my-events')
+        expect(screen.getByRole('link', { name: 'My Events' })).toHaveAttribute('aria-current', 'page')
         expect(screen.getByRole('link', { name: 'Tribe' })).not.toHaveAttribute('aria-current')
     })
 
     it('marks Tribe active on the tribe route', () => {
         renderAt('/tribe')
         expect(screen.getByRole('link', { name: 'Tribe' })).toHaveAttribute('aria-current', 'page')
-        expect(screen.getByRole('link', { name: 'MyDance' })).not.toHaveAttribute('aria-current')
+        expect(screen.getByRole('link', { name: 'Passport' })).not.toHaveAttribute('aria-current')
+    })
+
+    it('marks Passport active on its top-level route', () => {
+        renderAt('/passport')
+        expect(screen.getByRole('link', { name: 'Passport' })).toHaveAttribute('aria-current', 'page')
+    })
+
+    it('inserts Browse after Explore and gives it ownership of Browse routes when enabled', () => {
+        renderAt('/browse', true)
+        const links = screen.getAllByRole('link')
+        expect(links.map((link) => link.textContent)).toEqual(['Explore', 'Browse', 'My Events', 'Tribe', 'Passport'])
+        expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('aria-current', 'page')
+        expect(screen.getByRole('link', { name: 'Explore' })).not.toHaveAttribute('aria-current')
+    })
+
+    it('keeps Browse routes under Explore while Browse navigation is disabled', () => {
+        renderAt('/browse')
+        expect(screen.getByRole('link', { name: 'Explore' })).toHaveAttribute('aria-current', 'page')
     })
 })

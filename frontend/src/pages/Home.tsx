@@ -1005,6 +1005,19 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         setFilterSheetSection(section);
         setFilterSheetOpen(true);
     }, []);
+    const closeFilterSheet = useCallback(() => {
+        setFilterSheetOpen(false);
+        if (searchParams.has('sheet')) {
+            const next = new URLSearchParams(searchParams);
+            next.delete('sheet');
+            setSearchParams(next, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
+    useEffect(() => {
+        if (location.pathname === '/browse' && searchParams.get('sheet') === '1') {
+            setFilterSheetOpen(true);
+        }
+    }, [location.pathname, searchParams]);
     const defaultDateRange = useMemo(() => defaultExplorerDateRange(defaultExplorerPeriod), [defaultExplorerPeriod]);
     const dateRangeDiffers =
         startDate !== defaultDateRange.startDate || endDate !== defaultDateRange.endDate;
@@ -2066,7 +2079,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             {viewMode === 'calendar' ? (
                 <FilterSheet
                     open={filterSheetOpen}
-                    onClose={() => setFilterSheetOpen(false)}
+                    onClose={closeFilterSheet}
                     sections={explorerFilterSections}
                     initialSectionId={filterSheetSection}
                     onReset={handleResetFilters}
@@ -2078,7 +2091,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             ) : (
                 <FilterSheet
                     open={filterSheetOpen}
-                    onClose={() => setFilterSheetOpen(false)}
+                    onClose={closeFilterSheet}
                     sections={explorerFilterSections}
                     initialSectionId={filterSheetSection}
                     onReset={handleResetFilters}

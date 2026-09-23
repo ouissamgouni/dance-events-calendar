@@ -1229,6 +1229,9 @@ def list_my_pending_reviews(
                 event_title=event.title,
                 event_start=event.start,
                 event_end=event.end,
+                event_location=event.location,
+                event_city=event.city,
+                event_country=event.country,
                 friend_proof=proof_phrase(proof) if proof else None,
             )
         )

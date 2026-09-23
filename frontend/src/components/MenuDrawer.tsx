@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { fetchMyPendingReviews } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { firstNameOf } from '../utils/displayName';
 
@@ -12,6 +13,7 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
     const { user, logout } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
+    const [pendingReviewCount, setPendingReviewCount] = useState(0);
 
     // Close on route change and on Escape.
     useEffect(() => {
@@ -27,6 +29,15 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
     }, [open, onClose]);
+
+    useEffect(() => {
+        if (!open || !user) return;
+        let cancelled = false;
+        fetchMyPendingReviews()
+            .then((rows) => { if (!cancelled) setPendingReviewCount(rows.length); })
+            .catch(() => { if (!cancelled) setPendingReviewCount(0); });
+        return () => { cancelled = true; };
+    }, [open, user]);
 
     if (!open) return null;
 
@@ -93,9 +104,17 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                 <nav aria-label="Menu" className="py-2">
                     {user ? (
                         <>
-                            <Link to="/mine/passport" onClick={onClose} className={rowClass}>
-                                <img src="/passport.png" alt="" aria-hidden="true" className={iconClass} />
-                                Dance Passport
+                            <Link to="/saved-searches" onClick={onClose} className={rowClass}>
+                                <img src="/search.png" alt="" aria-hidden="true" className={iconClass} />
+                                Saved searches
+                            </Link>
+                            <Link to="/reviews" onClick={onClose} className={rowClass}>
+                                <img src="/review.png" alt="" aria-hidden="true" className={iconClass} />
+                                <span>Reviews</span>
+                            </Link>
+                            <Link to="/notifications" onClick={onClose} className={rowClass}>
+                                <img src="/notification.png" alt="" aria-hidden="true" className={iconClass} />
+                                Notifications
                             </Link>
                             {divider}
                             <Link
@@ -120,9 +139,13 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                                 <img src="/setting.png" alt="" aria-hidden="true" className={iconClass} />
                                 Settings
                             </Link>
+                            <a href="mailto:support@joinmovida.com?subject=Movida%20support" onClick={onClose} className={rowClass}>
+                                <img src="/question.png" alt="" aria-hidden="true" className={iconClass} />
+                                Help &amp; support
+                            </a>
                             {user.is_admin && (
                                 <Link to={isAdminPage ? '/' : '/admin'} onClick={onClose} className={rowClass}>
-                                    <img src="/setting.png" alt="" aria-hidden="true" className={iconClass} />
+                                    <img src={isAdminPage ? '/calendar.png' : '/setting.png'} alt="" aria-hidden="true" className={iconClass} />
                                     {isAdminPage ? 'Explore' : 'Admin'}
                                 </Link>
                             )}

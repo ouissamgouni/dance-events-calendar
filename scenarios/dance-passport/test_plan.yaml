@@ -71,9 +71,11 @@ test_plan:
         Journey and Places. The light 2x3 stats panel shows 13 events, 11
         cities, 7 countries and 10 reviews (a rejected review is not counted).
         Places is map-first with Cities/Countries switching; Journey contains
-        the heatmap, newest-first history and Add past event. Duplicate cities
-        collapse to one entry with a count; the null-geo event is counted as an
-        event but shown in no city/country.
+        the heatmap, newest-first history and Add past event. Add past event
+        searches eligible unattended past events using the shared rich event
+        card without Save/Going controls, then requires explicit attendance
+        confirmation. Duplicate cities collapse to one entry with a count; the
+        null-geo event is counted as an event but shown in no city/country.
         At 390-400px wide the identity header, mini map, 2x3 stats, category
         rows and two-column detail cards do not clip or overlap; share sheets
         remain scrollable above the existing bottom navigation.

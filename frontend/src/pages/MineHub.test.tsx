@@ -11,6 +11,7 @@ import {
     fetchPassportEvents,
 } from '../api';
 import type { CalendarEvent, PassportMilestone, PassportResponse } from '../types';
+import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import { renderWithProviders } from '../test/render';
 import MineHub, { closestMilestone, inProgressMilestones } from './MineHub';
 
@@ -36,7 +37,7 @@ function event(eventId: string, title: string, startOffsetDays: number): Calenda
         calendar_id: 'calendar-1',
         title,
         description: null,
-        image_url: '/should-not-render.jpg',
+        image_url: '/event.jpg',
         location: 'Paris, France',
         latitude: 48.8566,
         longitude: 2.3522,
@@ -96,6 +97,15 @@ const passport: PassportResponse = {
     consistency: null,
     monthly_activity: [{ month: '2026-08', count: 2 }],
 };
+
+function renderMineHub() {
+    return renderWithProviders(
+        <FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}>
+            <MineHub />
+        </FeatureFlagsContext.Provider>,
+        { routerEntries: ['/mine'] },
+    );
+}
 
 describe('closestMilestone', () => {
     it('selects the locked milestone with the highest completion ratio', () => {
@@ -165,13 +175,13 @@ describe('MineHub', () => {
     });
 
     it('renders the approved sections with real counts and nearest future Going event', async () => {
-        renderWithProviders(<MineHub />, { routerEntries: ['/mine'] });
+        renderMineHub();
 
         expect(await screen.findByText('Batignolles Bachata')).toBeInTheDocument();
         expect(screen.queryByText('Later Social')).not.toBeInTheDocument();
         expect(screen.queryByText('Past Social')).not.toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Next up' })).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '2 upcoming' })).toHaveAttribute('href', '/mine/calendar?filter=going');
+        expect(screen.getByRole('link', { name: '2 upcoming' })).toHaveAttribute('href', '/my-events?filter=going');
         expect(screen.getByTestId('your-next-event-card')).toHaveAttribute('href', '/event/next');
         expect(screen.getByText('+3 friends going')).toBeInTheDocument();
 
@@ -184,13 +194,13 @@ describe('MineHub', () => {
         expect(screen.getByText('13 / 15 events')).toBeInTheDocument();
         expect(screen.queryByText('Share your experience')).not.toBeInTheDocument();
         expect(screen.queryByText('Recent Activity')).not.toBeInTheDocument();
-        expect(screen.queryByRole('img', { name: /Batignolles Bachata/ })).not.toBeInTheDocument();
+        expect(screen.getByTestId('your-next-event-image')).toHaveAttribute('src', '/event.jpg');
     });
 
     it('renders the shared next-event empty state', async () => {
         vi.mocked(fetchEventsByIds).mockResolvedValue([]);
 
-        renderWithProviders(<MineHub />, { routerEntries: ['/mine'] });
+        renderMineHub();
 
         expect(await screen.findByText('No upcoming events')).toBeInTheDocument();
         expect(screen.getByText('Find your next dance event')).toBeInTheDocument();

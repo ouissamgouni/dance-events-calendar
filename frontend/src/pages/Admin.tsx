@@ -235,6 +235,8 @@ export default function Admin() {
     const [networkGoingSnapshotEnabled, setNetworkGoingSnapshotEnabled] = useState(true);
     const [myEventsRouteEnabled, setMyEventsRouteEnabled] = useState(false);
     const [myEventsNavEnabled, setMyEventsNavEnabled] = useState(true);
+    const [browseNavEnabled, setBrowseNavEnabled] = useState(false);
+    const [browseDirectToExplorerEnabled, setBrowseDirectToExplorerEnabled] = useState(false);
     const [eventCardSaveShowStatsEnabled, setEventCardSaveShowStatsEnabled] = useState(false);
     const [eventCardImgoingShowStatsEnabled, setEventCardImgoingShowStatsEnabled] = useState(false);
     const [eventCardImgoingLocationBottomEnabled, setEventCardImgoingLocationBottomEnabled] = useState(true);
@@ -420,6 +422,8 @@ export default function Admin() {
             setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? false);
             setMyEventsRouteEnabled(s.my_events_route_enabled ?? false);
             setMyEventsNavEnabled(s.my_events_nav_enabled ?? true);
+            setBrowseNavEnabled(s.browse_nav_enabled ?? false);
+            setBrowseDirectToExplorerEnabled(s.browse_direct_to_explorer_enabled ?? false);
             setEventCardSaveShowStatsEnabled(s.event_card_save_show_stats_enabled ?? false);
             setEventCardImgoingShowStatsEnabled(s.event_card_imgoing_show_stats_enabled ?? false);
             setEventCardImgoingLocationBottomEnabled(s.event_card_imgoing_location_bottom_enabled ?? true);
@@ -427,8 +431,8 @@ export default function Admin() {
             setEventCardShowTimeLocationIconsEnabled(s.event_card_show_time_location_icons_enabled ?? false);
             setExplorerEventCardCardStyleEnabled(s.explorer_event_card_card_style_enabled ?? false);
             setExplorerViewControlLabelsEnabled(s.explorer_view_control_labels_enabled ?? true);
-            setEventImagesEnabled(s.event_images_enabled ?? false);
-            setEventCardPlaceholderStyle(s.event_card_placeholder_style ?? 'gradient');
+            setEventImagesEnabled(s.event_images_enabled ?? true);
+            setEventCardPlaceholderStyle(s.event_card_placeholder_style ?? 'none');
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
             setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
             setDigestV2Enabled(s.digest_v2_enabled ?? true);
@@ -807,6 +811,32 @@ export default function Admin() {
         } catch {
             setMyEventsNavEnabled(!newVal);
             setMessage('Failed to update My Events navigation toggle.');
+        }
+    };
+
+    const handleToggleBrowseNav = async () => {
+        const newVal = !browseNavEnabled;
+        setBrowseNavEnabled(newVal);
+        try {
+            await updateSettings({ browse_nav_enabled: newVal });
+            updateFlagFn('browseNavEnabled', newVal);
+            setMessage(`Browse navigation ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setBrowseNavEnabled(!newVal);
+            setMessage('Failed to update Browse navigation toggle.');
+        }
+    };
+
+    const handleToggleBrowseDirectToExplorer = async () => {
+        const newVal = !browseDirectToExplorerEnabled;
+        setBrowseDirectToExplorerEnabled(newVal);
+        try {
+            await updateSettings({ browse_direct_to_explorer_enabled: newVal });
+            updateFlagFn('browseDirectToExplorerEnabled', newVal);
+            setMessage(`Direct Browse navigation ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setBrowseDirectToExplorerEnabled(!newVal);
+            setMessage('Failed to update direct Browse navigation toggle.');
         }
     };
 
@@ -2378,6 +2408,34 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${myEventsNavEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${myEventsNavEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Browse navigation</span>
+                                        <p className="text-[10px] text-muted">Show Browse beside Explore in primary navigation</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleBrowseNav}
+                                        aria-label="Toggle Browse navigation"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${browseNavEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${browseNavEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Browse directly to Explorer</span>
+                                        <p className="text-[10px] text-muted">Skip the filter sheet when Browse events is selected</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleBrowseDirectToExplorer}
+                                        aria-label="Toggle direct Browse navigation"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${browseDirectToExplorerEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${browseDirectToExplorerEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

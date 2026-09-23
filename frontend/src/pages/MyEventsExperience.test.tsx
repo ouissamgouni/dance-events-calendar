@@ -70,8 +70,16 @@ vi.mock('../components/EventMap', () => ({
 }));
 
 vi.mock('../components/MyEventsList', () => ({ default: () => <div data-testid="events-list" /> }));
-vi.mock('../components/MyEventsMapPreview', () => ({ default: () => <div data-testid="map-preview" /> }));
-vi.mock('../components/MyEventsAddSearch', () => ({ default: () => <div /> }));
+vi.mock('../components/MyEventsMapPreview', () => ({
+    default: ({ onHeightChange }: { onHeightChange?: (height: number) => void }) => {
+        useEffect(() => {
+            onHeightChange?.(180);
+            return () => onHeightChange?.(0);
+        }, [onHeightChange]);
+        return <div data-testid="map-preview" />;
+    },
+}));
+vi.mock('../components/MyEventsAddSearch', () => ({ default: () => <div data-testid="add-search" /> }));
 vi.mock('../components/EventModal', () => ({ default: () => <div /> }));
 vi.mock('../components/suggest/SuggestEventWizard', () => ({ default: () => <div /> }));
 
@@ -156,5 +164,22 @@ describe('MyEventsExperience view modes', () => {
         await user.click(screen.getByRole('button', { name: 'Map view' }));
         expect(screen.getByTestId('event-map')).toHaveAttribute('data-route-on', 'false');
         expect(screen.getByRole('button', { name: 'Show route' })).toHaveAttribute('aria-pressed', 'false');
+        await waitFor(() => expect(screen.getByTestId('view-switcher').getAttribute('style')).toContain('256px'));
+    });
+
+    it('opens and closes the contextual event search from the floating control', async () => {
+        const user = userEvent.setup();
+        renderExperience();
+
+        await waitFor(() => expect(screen.getByTestId('events-list')).toBeInTheDocument());
+        await user.click(screen.getByRole('button', { name: 'Add event' }));
+
+        expect(screen.getByTestId('add-search')).toBeInTheDocument();
+        const closeButton = screen.getByRole('button', { name: 'Close event search' });
+        expect(closeButton).toHaveAttribute('aria-expanded', 'true');
+
+        await user.click(closeButton);
+        expect(screen.queryByTestId('add-search')).not.toBeInTheDocument();
+        expect(screen.getByTestId('events-list')).toBeInTheDocument();
     });
 });

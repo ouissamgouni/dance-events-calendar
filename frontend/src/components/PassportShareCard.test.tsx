@@ -149,4 +149,34 @@ describe('PassportShareCard', () => {
         expect(screen.getByText('No events yet in 2026')).toBeInTheDocument()
         expect(screen.getByText('Just getting started')).toBeInTheDocument()
     })
+
+    it('constrains long variable text within the fixed-size export card', () => {
+        const crowded: ScopedPassport = {
+            ...scoped,
+            badges: Array.from({ length: 6 }, (_, index) => ({
+                key: `long-${index}`,
+                icon: '🏆',
+                label: `Most active · September ${index}`,
+                tag: 'Unlocked',
+                description: 'São Paulo, Mexico City, San Francisco, United Kingdom',
+            })),
+        }
+        const { container } = render(
+            <PassportShareCard
+                displayName="Alexandria García Fernández-Smith"
+                handle="alexandria"
+                scoped={crowded}
+                memberSince="2024-03-01T00:00:00"
+                profileUrl="https://joinmovida.com/u/alexandria"
+            />,
+        )
+
+        const card = container.firstElementChild
+        expect(card).toHaveClass('overflow-hidden')
+        expect(card).toHaveStyle({ fontFamily: 'Arial, Helvetica, sans-serif' })
+        expect(screen.getByText('Alexandria García Fernández-Smith')).toHaveClass('truncate')
+        expect(screen.getByText('Most active · September 0')).toHaveClass('truncate')
+        expect(screen.getAllByText('São Paulo, Mexico City, San Francisco, United Kingdom')[0]).toHaveClass('truncate')
+        expect(screen.getAllByText('Unlocked')[0]).toHaveClass('shrink-0')
+    })
 })

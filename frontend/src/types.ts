@@ -681,6 +681,9 @@ export interface PendingReview {
     event_title: string | null;
     event_start: string | null;
     event_end: string | null;
+    event_location?: string | null;
+    event_city?: string | null;
+    event_country?: string | null;
     /** Social proof line ("Laura", "Laura and Marc", "Laura, Marc +3 others")
      * for followed users who already reviewed; null when no nameable proof. */
     friend_proof: string | null;
