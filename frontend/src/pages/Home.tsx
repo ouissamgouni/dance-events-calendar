@@ -2076,6 +2076,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             <AdminEventDetailPanel
                 eventId={editingEventId}
                 onClose={handleCloseEdit}
+                onEventUpdated={handleCloseEdit}
             />
             {viewMode === 'calendar' ? (
                 <FilterSheet
