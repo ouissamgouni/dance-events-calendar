@@ -102,6 +102,8 @@ describe('NotificationsPage (milestone rows)', () => {
                             milestones: [
                                 { subject_key: 'first_event', name: 'First Steps' },
                                 { subject_key: 'events_5', name: 'Regular' },
+                                { subject_key: 'events_10', name: 'Committed' },
+                                { subject_key: 'cities_5', name: 'City Hopper' },
                             ],
                             actor: {
                                 handle: 'alice',
@@ -128,12 +130,56 @@ describe('NotificationsPage (milestone rows)', () => {
             </MemoryRouter>,
         )
 
-        expect(await screen.findByText(/unlocked 2 milestones/i)).toBeInTheDocument()
+        expect(await screen.findByText(/unlocked 4 milestones/i)).toBeInTheDocument()
         expect(screen.getByText('Alice')).toBeInTheDocument()
-        expect(screen.getByText(/first steps, regular/i)).toBeInTheDocument()
+        expect(screen.getByText(/first steps, regular, committed/i)).toBeInTheDocument()
+        expect(screen.getByText(/and 1 more/i)).toBeInTheDocument()
+        expect(screen.queryByText(/city hopper/i)).not.toBeInTheDocument()
 
-        await user.click(screen.getByRole('button', { name: /alice unlocked 2 milestones/i }))
+        await user.click(screen.getByRole('button', { name: /alice unlocked 4 milestones/i }))
         await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/u/alice'))
+    })
+
+    it('opens saved searches when the alert label is clicked', async () => {
+        server.use(
+            http.get('*/api/notifications', () =>
+                HttpResponse.json({
+                    items: [
+                        {
+                            id: 93,
+                            kind: 'interest_event',
+                            event_id: 'ev-match',
+                            event_title: 'Oslo Training Weekender',
+                            event_start: null,
+                            context: 'Europe & nearby',
+                            actor: {
+                                handle: 'alice',
+                                display_name: 'Alice',
+                                avatar_url: null,
+                                is_verified_organizer: false,
+                            },
+                            created_at: '2026-06-25T10:00:00Z',
+                            read_at: null,
+                        },
+                    ],
+                    total: 1,
+                    unread_count: 1,
+                    limit: 50,
+                    offset: 0,
+                }),
+            ),
+        )
+        const user = userEvent.setup()
+
+        render(
+            <MemoryRouter>
+                <NotificationsPage />
+            </MemoryRouter>,
+        )
+
+        await user.click(await screen.findByRole('button', { name: 'Europe & nearby' }))
+        expect(navigateMock).toHaveBeenCalledWith('/saved-searches')
+        expect(navigateMock).not.toHaveBeenCalledWith('/event/ev-match')
     })
 })
 

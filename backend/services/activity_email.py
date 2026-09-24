@@ -53,6 +53,7 @@ from backend.services.email import (
     send_activity_digest_v2_email,
 )
 from backend.services.notification_delivery import record_delivery
+from backend.services.event_images import resolve_event_image
 from backend.services.push_service import send_push
 from backend.services.user_avatars import resolve_user_avatar
 
@@ -119,6 +120,16 @@ CHANNEL_FLAG: dict[tuple[str, str], str] = {
 # double-sending.
 _DIGEST_ONLY_FEATURES = frozenset({"milestone_unlocked"})
 _MILESTONE_KINDS = frozenset({"milestone_unlocked", "subscription_milestone"})
+_ACTOR_GROUPED_FEATURES = frozenset(
+    {
+        "friends_going",
+        "friend_reviews",
+        "friend_milestones",
+        "social_activity",
+        "suggested_events",
+        "milestone_unlocked",
+    }
+)
 
 # Kinds whose event is inherently in the past (reviews) are exempt from the
 # digest past-event guard, mirroring ``skip_past_guard`` in notifications.py.
@@ -324,8 +335,12 @@ def _render_line(
     if kind == "follow_request_approved":
         return f"<strong>{who}</strong> approved your follow request"
     if kind == "interest_event":
-        label = escape(context) if context else "your saved search"
-        return f"{title} matched your <strong>{label}</strong> alert"
+        label = escape(context) if context else "saved search"
+        alert = (
+            f'<a href="{app}/saved-searches" '
+            f'style="color:#1d4ed8;text-decoration:underline"><strong>{label}</strong></a>'
+        )
+        return f"{title} matched your {alert} alert"
     if kind in ("event_message", "event_message_reply"):
         action = _message_action(kind, context)
         line = f"<strong>{who}</strong> {action} {title}"
@@ -391,7 +406,7 @@ def _render_plain(
     if kind == "follow_request_approved":
         return f"{who} approved your follow request"
     if kind == "interest_event":
-        label = context or "your saved search"
+        label = context or "saved search"
         return f"{title} matched your {label} alert"
     if kind == "event_reminder":
         # actor_user_id == recipient for this kind (no real actor, see
@@ -715,6 +730,10 @@ def run_once(
             event = events.get(n.event_id) if n.event_id else None
             anon = n.kind == "subscription_review" and n.context == "anon"
             milestone_names = [item.context or "a new achievement" for item in group]
+            image_url = None
+            if event is not None:
+                full_image_url, thumb_image_url = resolve_event_image(event)
+                image_url = thumb_image_url or full_image_url
             return {
                 "kind": n.kind,
                 "primary_html": _render_line(
@@ -725,7 +744,12 @@ def run_once(
                     also_going=_also_going(n),
                     subject_key=n.subject_key,
                     description=n.description,
-                    milestone_names=milestone_names,
+                    milestone_names=milestone_names[:3],
+                ),
+                "group_key": (
+                    str(n.actor_user_id)
+                    if FEATURE_BY_KIND.get(n.kind) in _ACTOR_GROUPED_FEATURES
+                    else None
                 ),
                 "avatar_url": (
                     resolve_user_avatar(actor)
@@ -738,9 +762,34 @@ def run_once(
                     else None
                 ),
                 "subline": _card_subline(event),
+                "event_image_url": image_url,
                 "anon": anon,
+                "more_count": max(0, len(milestone_names) - 3),
                 "created_at": max(item.created_at for item in group),
             }
+
+        def _digest_groups(
+            feature: str, notifications: list[Notification]
+        ) -> list[list[Notification]]:
+            visible = notifications
+            if feature == "social_activity":
+                friend_actor_ids = {
+                    item.actor_user_id for item in visible if item.kind == "new_friend"
+                }
+                visible = [
+                    item
+                    for item in visible
+                    if not (
+                        item.kind == "new_follower"
+                        and item.actor_user_id in friend_actor_ids
+                    )
+                ]
+            if feature in {"friend_milestones", "milestone_unlocked"}:
+                by_actor: dict[object, list[Notification]] = {}
+                for item in visible:
+                    by_actor.setdefault(item.actor_user_id, []).append(item)
+                return list(by_actor.values())
+            return _logical_groups(visible)
 
         def _send_combined_digests(groups: dict) -> int:
             """Combined v2 digest: one card email per recipient.
@@ -772,7 +821,7 @@ def run_once(
                             "feature": feature,
                             "entries": [
                                 _build_entry(group)
-                                for group in _logical_groups(visible)
+                                for group in _digest_groups(feature, visible)
                             ],
                         }
                     )

@@ -783,7 +783,7 @@ def test_list_groups_personal_and_followed_milestone_batches(client, session):
             actor_user_id=bob.id,
             kind="milestone_unlocked",
             subject_key="events_5",
-            group_key="personal-batch",
+            group_key="later-personal-batch",
             context="Finding Your Rhythm",
             description="Attended 5 events",
         ),
@@ -801,7 +801,7 @@ def test_list_groups_personal_and_followed_milestone_batches(client, session):
             actor_user_id=alice.id,
             kind="subscription_milestone",
             subject_key="countries_3",
-            group_key="friend-batch",
+            group_key=None,
             context="Border Crosser",
             description="Danced in 3 countries",
         ),
@@ -832,7 +832,7 @@ def test_list_groups_personal_and_followed_milestone_batches(client, session):
     assert unread_response.json() == {"count": 2}
 
 
-def test_mark_read_clears_only_selected_milestone_batch(client, session):
+def test_mark_read_clears_all_milestones_for_actor_and_kind(client, session):
     alice = _make_user(session, "alice@example.com", "alice")
     bob = _make_user(session, "bob@example.com", "bob")
     selected = Notification(
@@ -872,7 +872,35 @@ def test_mark_read_clears_only_selected_milestone_batch(client, session):
     session.refresh(later)
     assert selected.read_at is not None
     assert sibling.read_at is not None
-    assert later.read_at is None
+    assert later.read_at is not None
+
+
+def test_friendship_suppresses_follower_in_feed_and_read_state(client, session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    follower = _seed_one_notif(session, bob, alice, kind="new_follower")
+    friendship = _seed_one_notif(session, bob, alice, kind="new_friend")
+    follower.created_at = friendship.created_at + timedelta(seconds=1)
+    session.add(follower)
+    session.commit()
+
+    _login(client, "bob@example.com")
+    response = client.get("/api/notifications")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["unread_count"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["kind"] == "new_friend"
+    assert set(data["items"][0]["member_ids"]) == {follower.id, friendship.id}
+    assert client.get("/api/notifications/unread-count").json() == {"count": 1}
+
+    read_response = client.post(f"/api/notifications/{friendship.id}/read")
+    assert read_response.status_code == 200
+    session.refresh(follower)
+    session.refresh(friendship)
+    assert follower.read_at is not None
+    assert friendship.read_at is not None
 
 
 # --- /api/social/me/subscribed-events ---------------------------------------

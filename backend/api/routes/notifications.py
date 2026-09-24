@@ -79,6 +79,7 @@ COLLAPSIBLE_KINDS = {
     "subscription_review",
 }
 MILESTONE_KINDS = {"milestone_unlocked", "subscription_milestone"}
+RELATIONSHIP_KINDS = {"new_follower", "new_friend"}
 # How many distinct actors to preview in an aggregated row.
 ACTOR_PREVIEW_CAP = 12
 # Upper bound of raw rows scanned per list request before aggregation. The
@@ -90,13 +91,14 @@ AGGREGATION_WINDOW = 200
 def _aggregation_key(notification: Notification) -> tuple:
     if notification.kind in COLLAPSIBLE_KINDS and notification.event_id is not None:
         return ("__event__", notification.kind, notification.event_id)
-    if notification.kind in MILESTONE_KINDS and notification.group_key is not None:
+    if notification.kind in MILESTONE_KINDS:
         return (
             "__milestone__",
             notification.kind,
             notification.actor_user_id,
-            notification.group_key,
         )
+    if notification.kind in RELATIONSHIP_KINDS:
+        return ("__relationship__", notification.actor_user_id)
     return ("__row__", notification.id)
 
 
@@ -187,6 +189,8 @@ def _hydrate(
             order.append(key)
         else:
             g["members"].append(r)
+            if r.kind == "new_friend" and g["rep"].kind == "new_follower":
+                g["rep"] = r
             if r.actor_user_id not in g["actor_id_set"]:
                 g["actor_id_set"].add(r.actor_user_id)
                 g["actor_ids"].append(r.actor_user_id)
@@ -327,13 +331,20 @@ def mark_read(
     now = datetime.utcnow()
     # Collapsible rows render as one aggregated group, so marking the
     # representative read clears every sibling (same kind + event) too.
-    if row.kind in MILESTONE_KINDS and row.group_key is not None:
+    if row.kind in MILESTONE_KINDS:
         siblings = session.exec(
             select(Notification)
             .where(Notification.recipient_user_id == user.id)
             .where(Notification.kind == row.kind)
             .where(Notification.actor_user_id == row.actor_user_id)
-            .where(Notification.group_key == row.group_key)
+            .where(Notification.read_at.is_(None))
+        ).all()
+    elif row.kind in RELATIONSHIP_KINDS:
+        siblings = session.exec(
+            select(Notification)
+            .where(Notification.recipient_user_id == user.id)
+            .where(col(Notification.kind).in_(RELATIONSHIP_KINDS))
+            .where(Notification.actor_user_id == row.actor_user_id)
             .where(Notification.read_at.is_(None))
         ).all()
     elif row.kind in COLLAPSIBLE_KINDS and row.event_id is not None:
