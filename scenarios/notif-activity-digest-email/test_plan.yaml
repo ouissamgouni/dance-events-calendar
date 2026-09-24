@@ -5,12 +5,12 @@ test_plan:
     activity across EVERY digest-eligible feature bucket and a single
     follower (Bob) with all `email_*` toggles ON receives ONE combined
     digest email whose body carries a section for each feature:
-    friends_going (Alice is going), social_activity (a new follower + a
-    new friend), friend_reviews (Alice reviewed an event),
+    interest_matches (a new event matched Bob's profile), friends_going
+    (Alice is going), milestone_unlocked (Bob's OWN first passport
+    milestone), social_activity (a new friend), friend_reviews (Alice
+    reviewed an event),
     friend_milestones (Alice reached a passport milestone),
-    interest_matches (a new event matched Bob's profile),
     suggested_events (Alice's suggested event was approved),
-    milestone_unlocked (Bob's OWN first passport milestone) and
     event_messages (Alice posted on a board Bob is going to) — plus the
     "People you may want to follow" suggestions section and the
     engagement CTA block. Carol (all toggles OFF) is the negative probe.
@@ -55,17 +55,16 @@ test_plan:
         Open Bob's digest email in Mailpit and read the activity list.
       expected: >
         Bob receives exactly ONE combined digest email prefixed with
-        "Movida:" containing a section for each feature:
-        friends_going — "Alice is going to Bachata Friendly Social";
-        social_activity — "Carol started following you" and "You and Alice
-        are now friends"; friend_reviews — "Alice shared their experience
-        of Rooftop Salsa Social"; friend_milestones — "Alice reached a
-        milestone: ..."; interest_matches — "International Salsa Congress
-        Paris matched your ... alert"; suggested_events — "Alice suggested
-        the event Rooftop Kizomba Sunset"; milestone_unlocked (Your
-        achievements) — "🎉 You unlocked ..." for Bob's own first milestone,
-        whose card tile is a 🏅 medal (NOT a duplicate 🎉); event_messages —
-        "Alice asked ... Sunday Social Practica". Carol receives 0 emails.
+        "Movida:" with 18px icon-prefixed sections in this order: New matches
+        for your saved searches; Friends going out; Your achievements; Your
+        social activity; Reviews from people you follow; Milestones from
+        people you follow; Suggested events; Event conversations; People you
+        may want to follow. The saved-search event uses its picture when one
+        exists and a gradient tile otherwise; its alert name and "See all"
+        link both open `/saved-searches`. Alice's activity is grouped into one
+        avatar block per section, with at most 3 child items followed by "and
+        N more". If the same actor has both follower and friendship activity,
+        only "You and Alice are now friends" is shown. Carol receives 0 emails.
 
     - id: 3
       title: "Push channel remains silent"

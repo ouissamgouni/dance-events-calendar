@@ -350,7 +350,7 @@ def _people_suggestions_html(suggestions: list[dict]) -> str:
         )
     return f"""
     <div style="margin:20px 0">
-      <h3 style="font-size:14px;color:#111827;margin:0 0 8px">People you may want to follow</h3>
+            <h3 style="font-size:18px;color:#111827;margin:0 0 8px">👤 People you may want to follow</h3>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%">
         {"".join(rows)}
       </table>
@@ -750,19 +750,46 @@ _CARD_KIND_EMOJI = {
 }
 
 # (heading, CTA path) per feature section. A ``None`` path renders no CTA.
-_SECTION_META: dict[str, tuple[str, str | None]] = {
-    "friends_going": ("Friends going out", "/notifications"),
-    "friend_reviews": ("Reviews from people you follow", "/notifications"),
-    "friend_milestones": ("Milestones from people you follow", "/notifications"),
-    "social_activity": ("Your social activity", "/notifications"),
-    "interest_matches": ("New matches for your saved searches", "/for-you"),
-    "milestone_unlocked": ("Your achievements", "/mine/passport"),
-    "suggested_events": ("Suggested events", "/notifications"),
+_SECTION_META: dict[str, tuple[str, str, str | None]] = {
+    "interest_matches": (
+        "🔎",
+        "New matches for your saved searches",
+        "/saved-searches",
+    ),
+    "friends_going": ("🕺", "Friends going out", "/notifications"),
+    "milestone_unlocked": ("🏆", "Your achievements", "/mine/passport"),
+    "social_activity": ("👥", "Your social activity", "/notifications"),
+    "friend_reviews": ("⭐", "Reviews from people you follow", "/notifications"),
+    "friend_milestones": ("🏅", "Milestones from people you follow", "/notifications"),
+    "suggested_events": ("💡", "Suggested events", "/notifications"),
+    "event_messages": ("💬", "Event conversations", "/notifications"),
 }
+
+_SECTION_ORDER = (
+    "interest_matches",
+    "friends_going",
+    "milestone_unlocked",
+    "social_activity",
+    "friend_reviews",
+    "friend_milestones",
+    "suggested_events",
+    "event_messages",
+)
 
 
 def _card_avatar_html(entry: dict) -> str:
     kind = entry.get("kind")
+    if kind == "interest_event":
+        url = entry.get("event_image_url")
+        if url:
+            return (
+                f'<img src="{escape(url)}" alt="" width="40" height="40" '
+                'style="display:block;object-fit:cover">'
+            )
+        return (
+            '<div style="width:40px;height:40px;background:#dbeafe;'
+            'background-image:linear-gradient(135deg,#dbeafe,#fce7f3)"></div>'
+        )
     is_person = kind in _CARD_PERSON_KINDS and not entry.get("anon")
     if is_person:
         url = entry.get("avatar_url")
@@ -792,11 +819,27 @@ def _render_card(entry: dict) -> str:
     ``initial`` (fallback avatar letter), ``subline`` ("date · city"), and
     ``anon`` (mask the avatar for anonymous reviews).
     """
-    avatar = _card_avatar_html(entry)
-    subline = entry.get("subline")
-    subline_html = (
-        f'<div style="color:#6b7280;font-size:12px;margin-top:2px">{escape(subline)}</div>'
-        if subline
+    children = entry.get("entries") or [entry]
+    avatar = _card_avatar_html(children[0])
+    child_blocks: list[str] = []
+    for index, child in enumerate(children):
+        subline = child.get("subline")
+        subline_html = (
+            f'<div style="color:#6b7280;font-size:12px;margin-top:2px">{escape(subline)}</div>'
+            if subline
+            else ""
+        )
+        child_blocks.append(
+            f'<div style="color:#111827;font-size:14px;line-height:1.4;'
+            f'margin-top:{"6px" if index else "0"}">'
+            f"{child.get('primary_html', '')}{subline_html}</div>"
+        )
+    more_count = entry.get("more", 0) + sum(
+        child.get("more_count", 0) for child in children
+    )
+    more_html = (
+        f'<div style="color:#6b7280;font-size:12px;margin-top:6px">and {more_count} more</div>'
+        if more_count
         else ""
     )
     return f"""
@@ -804,8 +847,8 @@ def _render_card(entry: dict) -> str:
       <tr>
         <td style="width:40px;vertical-align:top;padding-right:10px">{avatar}</td>
         <td style="vertical-align:top">
-          <div style="color:#111827;font-size:14px;line-height:1.4">{entry.get("primary_html", "")}</div>
-          {subline_html}
+          {"".join(child_blocks)}
+          {more_html}
         </td>
       </tr>
     </table>
@@ -825,19 +868,35 @@ def _balance_sections(
     from datetime import datetime as _dt
 
     section_data: list[dict] = []
-    for sec in sections:
+    section_rank = {feature: index for index, feature in enumerate(_SECTION_ORDER)}
+    ordered_sections = sorted(
+        sections,
+        key=lambda section: section_rank.get(section.get("feature"), len(section_rank)),
+    )
+    for sec in ordered_sections:
         buckets: dict[str, dict] = {}
         ordered = sorted(
             sec.get("entries", []),
             key=lambda e: e.get("created_at") or _dt.min,
             reverse=True,
         )
-        for e in ordered:
-            b = buckets.setdefault(e["kind"], {"entries": [], "more": 0})
-            if len(b["entries"]) < max(1, per_kind_cap):
-                b["entries"].append(e)
+        grouped: dict[object, dict] = {}
+        for index, e in enumerate(ordered):
+            key = e.get("group_key") or ("entry", index)
+            card = grouped.setdefault(
+                key,
+                {"kind": e["kind"], "entries": [], "more": 0},
+            )
+            if len(card["entries"]) < 3:
+                card["entries"].append(e)
             else:
-                b["more"] += 1
+                card["more"] += 1
+        for card in grouped.values():
+            b = buckets.setdefault(card["kind"], {"entries": [], "more": 0})
+            if len(b["entries"]) < max(1, per_kind_cap):
+                b["entries"].append(card)
+            else:
+                b["more"] += len(card["entries"]) + card["more"]
         if buckets:
             section_data.append({"feature": sec["feature"], "buckets": buckets})
 
@@ -894,8 +953,8 @@ def send_activity_digest_v2_email(
                 )
         if not cards:
             continue
-        label, href = _SECTION_META.get(
-            s["feature"], ("Recent activity", "/notifications")
+        icon, label, href = _SECTION_META.get(
+            s["feature"], ("🔔", "Recent activity", "/notifications")
         )
         cta = (
             f'<a href="{app}{href}" style="color:#1d4ed8;text-decoration:underline;'
@@ -906,7 +965,7 @@ def send_activity_digest_v2_email(
         blocks.append(
             f"""
     <div style="margin:20px 0 8px">
-      <h3 style="font-size:14px;color:#111827;margin:0 0 4px">{escape(label)}</h3>
+            <h3 style="font-size:18px;color:#111827;margin:0 0 8px">{icon} {escape(label)}</h3>
       {"".join(cards)}
       {cta}
     </div>

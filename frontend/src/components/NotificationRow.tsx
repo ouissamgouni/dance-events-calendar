@@ -1,4 +1,4 @@
-import { useState, type MouseEvent, type ReactNode } from 'react';
+import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Bell,
@@ -110,7 +110,7 @@ function groupVerb(item: NotificationItem): string {
  * copy stay in sync. `variant` only drives layout/sizing differences:
  *   - `page`: row is a flex `<li>` with a trailing "Mark read" control; the
  *     component owns navigation (marks read, then routes).
- *   - `panel`: the whole row is one clickable `<button>` (`onClick`) with a
+ *   - `panel`: the whole row is one keyboard-operable clickable row with a
  *     compact unread dot; navigation is delegated to the caller.
  */
 export default function NotificationRow({
@@ -119,6 +119,7 @@ export default function NotificationRow({
     busy = false,
     onMarkRead,
     onClick,
+    onSavedSearchClick,
     onFollowedBack,
 }: {
     item: NotificationItem;
@@ -126,6 +127,7 @@ export default function NotificationRow({
     busy?: boolean;
     onMarkRead?: () => void;
     onClick?: () => void;
+    onSavedSearchClick?: () => void;
     onFollowedBack?: (handle: string) => void;
 }) {
     const navigate = useNavigate();
@@ -145,6 +147,14 @@ export default function NotificationRow({
         }
         if (isUnread) onMarkRead?.();
         navigate(destination);
+    };
+
+    const handleRowKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleNavigate();
+        }
     };
 
     const handleApprove = async (e: MouseEvent) => {
@@ -289,6 +299,8 @@ export default function NotificationRow({
     let body: ReactNode;
 
     if (isMilestoneGroup) {
+        const milestonePreview = milestones.slice(0, 3);
+        const milestoneOverflow = milestones.length - milestonePreview.length;
         body = (
             <>
                 <p className={specialTitle}>
@@ -306,39 +318,43 @@ export default function NotificationRow({
                     )}
                 </p>
                 <p className={`${subLabelSize} text-ink mt-0.5`}>
-                    {milestones.map((milestone) => milestone.name).join(', ')}
+                    {milestonePreview.map((milestone) => milestone.name).join(', ')}
+                    {milestoneOverflow > 0 && (
+                        <span className="text-ink-soft"> and {milestoneOverflow} more</span>
+                    )}
                 </p>
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
             </>
         );
     } else if (item.kind === 'interest_event') {
-        const label = item.context || 'your saved search';
+        const label = item.context || 'saved search';
         body = (
             <>
                 <p className={specialTitle}>
                     <span className="font-medium text-ink">
                         {item.event_title || 'An event'}
                     </span>{' '}
-                    <span className="text-ink-soft">matched your {label} alert</span>
+                    <span className="text-ink-soft">
+                        matched your{' '}
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                if (isPanel && onSavedSearchClick) {
+                                    onSavedSearchClick();
+                                } else {
+                                    navigate('/saved-searches');
+                                }
+                            }}
+                            className="text-action underline hover:text-action"
+                        >
+                            {label}
+                        </button>{' '}
+                        alert
+                    </span>
                 </p>
                 <p className={timeClass}>
                     {formatRelative(item.created_at)}
-                    {!isPanel && (
-                        <>
-                            {' '}·{' '}
-                            <span
-                                role="link"
-                                tabIndex={0}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate('/account#notifications');
-                                }}
-                                className="text-action hover:text-action"
-                            >
-                                Manage alerts
-                            </span>
-                        </>
-                    )}
                 </p>
             </>
         );
@@ -533,9 +549,11 @@ export default function NotificationRow({
     if (isPanel) {
         return (
             <li>
-                <button
-                    type="button"
+                <div
+                    role="button"
+                    tabIndex={0}
                     onClick={handleNavigate}
+                    onKeyDown={handleRowKeyDown}
                     className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-canvas ${isUnread ? 'bg-blue-50/40' : 'bg-surface'}`}
                 >
                     {typeIcon}
@@ -553,7 +571,7 @@ export default function NotificationRow({
                             aria-label="Unread"
                         />
                     )}
-                </button>
+                </div>
             </li>
         );
     }
@@ -566,13 +584,15 @@ export default function NotificationRow({
             {!isMulti && avatarNode}
             <div className="min-w-0 flex-1">
                 {isMulti && avatarNode && <div className="mb-1.5">{avatarNode}</div>}
-                <button
-                    type="button"
+                <div
+                    role="button"
+                    tabIndex={0}
                     onClick={handleNavigate}
+                    onKeyDown={handleRowKeyDown}
                     className="block w-full text-left"
                 >
                     {body}
-                </button>
+                </div>
             </div>
             {thumbNode}
             <div className="shrink-0 flex flex-col items-end gap-2">

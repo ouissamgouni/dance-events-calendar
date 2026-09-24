@@ -143,6 +143,6 @@ describe('YourNextEventsRail', () => {
         );
         expect(screen.getByText('No upcoming events')).toBeInTheDocument();
         expect(screen.getByText('Find your next dance event')).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Explore →' })).toHaveAttribute('href', '/');
+        expect(screen.getByRole('link', { name: 'Browse →' })).toHaveAttribute('href', '/browse');
     });
 });

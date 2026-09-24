@@ -965,6 +965,59 @@ def test_activity_digest_batches_into_one_email(session, monkeypatch):
     assert len(calls[0][1]) == 2  # both notifications in one digest
 
 
+def test_activity_digest_suppresses_follower_and_carries_grouping_data(
+    session, monkeypatch
+):
+    calls: list[list[dict]] = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda _recipient, sections, **_: calls.append(sections) or True,
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    alice = _make_user(session, "alice@example.com", "alice")
+    event = _make_event(session, "ev-match", title="Matched Social")
+    event.image_url = "https://cdn.test/matched.webp"
+    session.add(event)
+    session.commit()
+    old = datetime.utcnow() - timedelta(minutes=5)
+    follower = _notif(
+        session, recipient=bob, actor=alice, kind="new_follower", created_at=old
+    )
+    friendship = _notif(
+        session,
+        recipient=bob,
+        actor=alice,
+        kind="new_friend",
+        created_at=old + timedelta(seconds=1),
+    )
+    matched = _notif(
+        session,
+        recipient=bob,
+        actor=bob,
+        kind="interest_event",
+        event_id="ev-match",
+        created_at=old,
+    )
+
+    stats = activity_email.run_once(force=True)
+
+    assert stats["digests"] == 1
+    by_feature = {section["feature"]: section for section in calls[0]}
+    social_entries = by_feature["social_activity"]["entries"]
+    assert len(social_entries) == 1
+    assert social_entries[0]["kind"] == "new_friend"
+    assert social_entries[0]["group_key"] == str(alice.id)
+    interest_entry = by_feature["interest_matches"]["entries"][0]
+    assert interest_entry["event_image_url"] == "https://cdn.test/matched.webp"
+
+    for row in (follower, friendship, matched):
+        session.refresh(row)
+        assert row.emailed_at is not None
+
+
 def test_activity_digest_groups_friend_milestone_batch(session, monkeypatch):
     email_entries: list[str] = []
     push_calls: list[dict] = []
