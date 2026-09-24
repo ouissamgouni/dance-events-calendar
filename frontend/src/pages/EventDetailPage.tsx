@@ -16,6 +16,7 @@ import EventSummary, { type EventDetailTab } from '../components/EventSummary';
 import EventDetailTabsBar from '../components/EventDetailTabsBar';
 import SummaryHeader from '../components/event-summary/SummaryHeader';
 import EventActionDock from '../components/EventActionDock';
+import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import AboutTab from '../components/event-tabs/AboutTab';
 import LocationTab from '../components/event-tabs/LocationTab';
 import PeopleTab from '../components/event-tabs/PeopleTab';
@@ -37,6 +38,7 @@ export default function EventDetailPage() {
 
     // Edit mode — admin must explicitly activate inline editing
     const [editMode, setEditMode] = useState(false);
+    const [adminEditorEventId, setAdminEditorEventId] = useState<string | null>(null);
 
     // Suggest tags
     const [showSuggestTags, setShowSuggestTags] = useState(false);
@@ -194,6 +196,13 @@ export default function EventDetailPage() {
     };
 
     const handleTagsUpdated = () => {
+        if (!eventId) return;
+        fetchEvent(eventId, { fresh: true })
+            .then((e) => { setEvent(e); setTitleValue(e.title); })
+            .catch(() => { });
+    };
+
+    const handleAdminEventUpdated = () => {
         if (!eventId) return;
         fetchEvent(eventId, { fresh: true })
             .then((e) => { setEvent(e); setTitleValue(e.title); })
@@ -422,6 +431,7 @@ export default function EventDetailPage() {
                                             if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
                                             setShowSuggestTags(true);
                                         }}
+                                        onAdminEdit={user?.is_admin ? () => setAdminEditorEventId(event.event_id) : undefined}
                                     />
                                 </aside>
                             </div>
@@ -438,6 +448,11 @@ export default function EventDetailPage() {
                             onClose={() => setShowSuggestTags(false)}
                         />
                     )}
+                    <AdminEventDetailPanel
+                        eventId={adminEditorEventId}
+                        onClose={() => setAdminEditorEventId(null)}
+                        onEventUpdated={handleAdminEventUpdated}
+                    />
                 </div>
 
                 {/* Spacer so the dock never overlaps page content. Matches the

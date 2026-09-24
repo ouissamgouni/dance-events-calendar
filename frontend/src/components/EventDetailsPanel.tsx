@@ -29,6 +29,7 @@ interface Props {
 export default function EventDetailsPanel({
     event,
     onClose,
+    onEdit,
     surface = 'card',
     className = '',
     bodyClassName = '',
@@ -134,6 +135,7 @@ export default function EventDetailsPanel({
                         canReviewInline={isPast}
                         shareUrl={shareUrl}
                         onPostMessage={() => goToTab('discussion')}
+                        onAdminEdit={onEdit ? () => onEdit(event) : undefined}
                     />
                 </div>
             </div>

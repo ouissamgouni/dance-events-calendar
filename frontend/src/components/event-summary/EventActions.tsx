@@ -21,6 +21,8 @@ interface Props {
     onPostMessage: () => void;
     /** Optional "Suggest an edit" affordance. */
     onSuggestEdit?: () => void;
+    /** Optional admin-only event editor affordance. */
+    onAdminEdit?: () => void;
 }
 
 /**
@@ -39,6 +41,7 @@ export default function EventActions({
     eventHasReviews,
     onPostMessage,
     onSuggestEdit,
+    onAdminEdit,
 }: Props) {
     const { showRatings } = useFeatureFlags();
     const [menuOpen, setMenuOpen] = useState(false);
@@ -136,6 +139,16 @@ export default function EventActions({
                                 className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
                             >
                                 Suggest an edit
+                            </button>
+                        )}
+                        {onAdminEdit && (
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => { setMenuOpen(false); onAdminEdit(); }}
+                                className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
+                            >
+                                Admin Edit
                             </button>
                         )}
                     </div>
