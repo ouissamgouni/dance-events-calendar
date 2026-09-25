@@ -346,10 +346,6 @@ export async function fetchScheduleImportSchema(eventId: string): Promise<{ sche
     return scheduleRequest<{ schema: object; example: ScheduleImportDocument }>(eventId, '/import-schema', 'GET');
 }
 
-export async function applyScheduleDancePreset(eventId: string): Promise<{ created: number }> {
-    return scheduleRequest<{ created: number }>(eventId, '/presets/dance-taxonomy', 'POST');
-}
-
 export async function previewScheduleImport(eventId: string, mode: 'merge' | 'replace', document: ScheduleImportDocument): Promise<ScheduleImportPreview> {
     return scheduleRequest<ScheduleImportPreview>(eventId, '/import-preview', 'POST', { mode, document });
 }

@@ -14,7 +14,6 @@ import {
     deleteScheduleSession,
     deleteScheduleVenue,
     applyScheduleImport,
-    applyScheduleDancePreset,
     duplicateScheduleSession,
     exportEventSchedule,
     fetchAdminEventSchedule,
@@ -63,8 +62,6 @@ export default function AdminEventSchedulePage() {
     const [showPreview, setShowPreview] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [presetBusy, setPresetBusy] = useState(false);
-    const [presetMessage, setPresetMessage] = useState<string | null>(null);
     const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS);
     const [positionRequest, setPositionRequest] = useState(0);
 
@@ -109,7 +106,7 @@ export default function AdminEventSchedulePage() {
             <div className="flex min-h-full items-center justify-center bg-canvas p-6">
                 <div className="max-w-md rounded-card border border-card-line bg-surface p-6 text-center shadow-sm">
                     <h1 className="text-xl font-bold text-ink">Create {event.title}'s program</h1>
-                    <p className="mt-2 text-sm leading-6 text-ink-soft">This creates a private draft with default activity types. Nothing is visible to attendees until you publish.</p>
+                    <p className="mt-2 text-sm leading-6 text-ink-soft">This creates a private draft with default activity types and Dance levels. Nothing is visible to attendees until you publish.</p>
                     {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
                     <button type="button" onClick={createSchedule} className="mt-5 rounded-field bg-action px-4 py-3 text-sm font-semibold text-white">Create schedule</button>
                 </div>
@@ -167,7 +164,7 @@ export default function AdminEventSchedulePage() {
                     ) : null}
                     {section === 'sessions' ? <SessionsTable schedule={filteredSchedule} day={sessionsDay} onEdit={setEditingSession} /> : null}
                     {section === 'locations' ? <ConfigLists schedule={schedule} kinds={['venue', 'room']} onEdit={(kind, item) => setEditingConfig({ kind, item })} /> : null}
-                    {section === 'taxonomy' ? <ConfigLists schedule={schedule} kinds={['level', 'activity']} onEdit={(kind, item) => setEditingConfig({ kind, item })} intro={<div className="mb-6 flex flex-wrap items-center justify-between gap-3 bg-canvas p-4"><div><h2 className="text-sm font-bold text-ink">Dance level preset</h2><p className="mt-1 text-xs text-ink-soft">Add any missing Open Level, Beginner, Intermediate, and Advanced levels.</p>{presetMessage ? <p className="mt-2 text-xs font-semibold text-success">{presetMessage}</p> : null}</div><button type="button" disabled={presetBusy} onClick={async () => { setPresetBusy(true); setPresetMessage(null); setError(null); try { const result = await applyScheduleDancePreset(event.event_id); await reload(); setPresetMessage(result.created ? `Added ${result.created} ${result.created === 1 ? 'level' : 'levels'}.` : 'Dance levels are already complete.'); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not apply the Dance preset'); } finally { setPresetBusy(false); } }} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink disabled:opacity-50">{presetBusy ? 'Applying…' : 'Apply Dance preset'}</button></div>} /> : null}
+                    {section === 'taxonomy' ? <ConfigLists schedule={schedule} kinds={['level', 'activity']} onEdit={(kind, item) => setEditingConfig({ kind, item })} /> : null}
                     {section === 'settings' ? <SettingsPanel schedule={schedule} eventId={event.event_id} onSaved={setSchedule} /> : null}
                 </main>
             </div>
@@ -205,9 +202,9 @@ function SessionsTable({ schedule, day, onEdit }: { schedule: AdminEventSchedule
     );
 }
 
-function ConfigLists({ schedule, kinds, onEdit, intro }: { schedule: AdminEventSchedule; kinds: ConfigKind[]; onEdit: (kind: ConfigKind, item?: ConfigEntity) => void; intro?: React.ReactNode }) {
+function ConfigLists({ schedule, kinds, onEdit }: { schedule: AdminEventSchedule; kinds: ConfigKind[]; onEdit: (kind: ConfigKind, item?: ConfigEntity) => void }) {
     const rows = (kind: ConfigKind): ConfigEntity[] => kind === 'venue' ? schedule.venues : kind === 'room' ? schedule.rooms : kind === 'level' ? schedule.levels : schedule.activity_types;
-    return <div className="overflow-y-auto p-4"><div className="mx-auto max-w-3xl space-y-6">{intro}{kinds.map((kind) => (
+    return <div className="overflow-y-auto p-4"><div className="mx-auto max-w-3xl space-y-6">{kinds.map((kind) => (
         <section key={kind}>
             <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold capitalize text-ink">{kind === 'activity' ? 'Activity types' : `${kind}s`}</h2><button type="button" onClick={() => onEdit(kind)} className="flex items-center gap-1 text-sm font-semibold text-action"><Plus size={16} />Add</button></div>
             <div className="overflow-hidden rounded-card border border-card-line bg-surface">{rows(kind).map((item) => (

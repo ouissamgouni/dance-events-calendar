@@ -53,14 +53,13 @@ from backend.db.models import (
     UserPlanSession,
 )
 from backend.services.schedules import (
-    apply_dance_level_preset,
     build_snapshot,
     compute_diff,
     compute_issues,
     default_schedule_days,
     latest_publication,
     seed_default_activity_types,
-    seed_dance_level_preset,
+    seed_default_dance_levels,
     session_snapshot,
     to_utc_naive,
     validate_timezone,
@@ -296,7 +295,7 @@ def create_admin_schedule(
     session.add(schedule)
     session.flush()
     seed_default_activity_types(session, schedule.id)
-    seed_dance_level_preset(session, schedule.id)
+    seed_default_dance_levels(session, schedule.id)
     session.commit()
     session.refresh(schedule)
     return _admin_payload(session, schedule)
@@ -602,12 +601,6 @@ def get_schedule_import_schema(event_id: str, session: Session = Depends(get_ses
         "schema": ScheduleImportDocument.model_json_schema(),
         "example": build_schedule_import_example(schedule),
     }
-
-
-@admin_router.post("/presets/dance-taxonomy")
-def apply_dance_taxonomy_preset(event_id: str, session: Session = Depends(get_session)):
-    schedule = _schedule_for_event(session, event_id)
-    return {"created": apply_dance_level_preset(session, schedule.id)}
 
 
 @admin_router.get("/planners", response_model=list[SchedulePlannerResponse])

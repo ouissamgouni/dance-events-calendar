@@ -327,7 +327,7 @@ def test_schedule_json_import_preview_merge_and_replace(client, schedule_event):
         json={"mode": "merge", "document": document},
     )
     assert preview.status_code == 200
-    assert preview.json()["operations"]["created"] == 4
+    assert preview.json()["operations"]["created"] == 3
     assert (
         client.get("/api/admin/events/back-2-mambo-2026/schedule").json()["sessions"]
         == []
@@ -338,7 +338,7 @@ def test_schedule_json_import_preview_merge_and_replace(client, schedule_event):
         json={"mode": "merge", "document": document},
     )
     assert applied.status_code == 200
-    assert applied.json()["operations"]["created"] == 4
+    assert applied.json()["operations"]["created"] == 3
     exported = client.get("/api/admin/events/back-2-mambo-2026/schedule/export")
     assert exported.status_code == 200
     assert exported.json()["sessions"][0]["start"] == "2026-10-16T14:00:00"
@@ -396,57 +396,6 @@ def test_schedule_json_import_rejects_unknown_reference_without_writes(
         client.get("/api/admin/events/back-2-mambo-2026/schedule").json()["sessions"]
         == []
     )
-
-
-def test_dance_taxonomy_preset_is_idempotent_and_preserves_custom_levels(
-    client, schedule_event
-):
-    _login(client, "admin@example.com")
-    created = client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule",
-        json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
-    )
-    assert created.status_code == 201
-    beginner = next(
-        row for row in created.json()["levels"] if row["label"] == "Beginner"
-    )
-    assert (
-        client.put(
-            f"/api/admin/events/back-2-mambo-2026/schedule/levels/{beginner['id']}",
-            json={"label": "Beginner", "notation": "Intro", "sort_order": 9},
-        ).status_code
-        == 200
-    )
-    assert (
-        client.post(
-            "/api/admin/events/back-2-mambo-2026/schedule/levels",
-            json={"label": "Invitational", "notation": None, "sort_order": 10},
-        ).status_code
-        == 201
-    )
-
-    first = client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule/presets/dance-taxonomy"
-    )
-    assert first.status_code == 200
-    assert first.json() == {"created": 0}
-    levels = client.get("/api/admin/events/back-2-mambo-2026/schedule").json()["levels"]
-    assert {row["label"] for row in levels} == {
-        "Open Level",
-        "Beginner",
-        "Intermediate",
-        "Advanced",
-        "Invitational",
-    }
-    assert (
-        next(row for row in levels if row["label"] == "Beginner")["notation"] == "Intro"
-    )
-
-    second = client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule/presets/dance-taxonomy"
-    )
-    assert second.status_code == 200
-    assert second.json() == {"created": 0}
 
 
 def test_publish_announces_first_program_and_optionally_broadcasts_updates(

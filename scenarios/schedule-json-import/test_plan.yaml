@@ -2,7 +2,7 @@ test_plan:
   name: "Reviewed JSON schedule import"
   description: >
     Starts with an empty private schedule draft. The checked-in schedule-import.json
-    exercises examples, taxonomy presets, preview, merge, replace, stable external
+    exercises examples, default taxonomies, preview, merge, replace, stable external
     IDs, separate publishing, and selected-attendee Program announcements.
 
   preconditions:
@@ -21,32 +21,25 @@ test_plan:
         to the empty current draft. Neither action changes the draft until Preview and Apply.
 
     - id: 2
-      title: "Apply the optional Dance taxonomy preset"
-      description: "Open Taxonomy and click Apply Dance preset twice."
-      expected: >
-        The first click adds Open Level, Beginner, Intermediate, and Advanced. The
-        second reports that Dance levels are already complete and creates no duplicates.
-
-    - id: 3
       title: "Preview a merge import"
       description: "Choose schedule-import.json, keep Merge selected, and click Preview import."
       expected: >
         The preview reports the prospective creates and no schedule warnings. The
         schedule grid remains empty because preview rolls the transaction back.
 
-    - id: 4
+    - id: 3
       title: "Apply only after preview"
       description: "Click Apply to draft after the preview completes."
       expected: >
         The private draft refreshes with Kulturhaus, two rooms, Open Level, Workshop,
         and two Friday sessions. Nothing is public yet.
 
-    - id: 5
+    - id: 4
       title: "Verify idempotent merge"
       description: "Preview and apply the same JSON again."
       expected: "No duplicate rows are created; the import reports unchanged records."
 
-    - id: 6
+    - id: 5
       title: "Verify replace semantics"
       description: >
         Remove fri-partnerwork from the JSON text, choose Replace missing sessions,
@@ -55,7 +48,7 @@ test_plan:
         Preview reports one removal. Applying soft-deletes Partnerwork Lab while
         preserving configuration rows such as Studio Two and Open Level.
 
-    - id: 7
+    - id: 6
       title: "Publish and choose the notification audience"
       description: >
         Open Publish, review the diff, and confirm publication. Review the delivery
@@ -66,7 +59,7 @@ test_plan:
         Impacted planners are reported as notified automatically; the second action
         sends the publication announcement only to remaining signed-in Going attendees.
 
-    - id: 8
+    - id: 7
       title: "Preview the attendee Program in place"
       description: "Click Preview in the schedule header."
       expected: >
