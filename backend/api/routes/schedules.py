@@ -23,6 +23,8 @@ from backend.api.schemas import (
     ScheduleProgramNotifyRequest,
     ScheduleProgramNotifyResponse,
     ScheduleProgramNotifyResult,
+    SchedulePlannerResponse,
+    SchedulePublishRequest,
     SchedulePublishResponse,
     ScheduleLevelRequest,
     ScheduleLevelResponse,
@@ -606,6 +608,79 @@ def apply_dance_taxonomy_preset(event_id: str, session: Session = Depends(get_se
     return {"created": apply_dance_level_preset(session, schedule.id)}
 
 
+@admin_router.get("/planners", response_model=list[SchedulePlannerResponse])
+def get_schedule_planners(event_id: str, session: Session = Depends(get_session)):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    current_sessions = {
+        row["id"]: row
+        for row in (publication.snapshot.get("sessions", []) if publication else [])
+    }
+    plans = session.exec(
+        select(UserPlanSession).where(UserPlanSession.event_id == event_id)
+    ).all()
+    if not plans:
+        return []
+    user_ids = {plan.user_id for plan in plans}
+    users = session.exec(
+        select(User).where(User.id.in_(user_ids), User.deleted_at.is_(None))
+    ).all()
+    going_ids = set(
+        session.exec(
+            select(UserEventAttendance.user_id).where(
+                UserEventAttendance.event_id == event_id,
+                UserEventAttendance.user_id.in_(user_ids),
+            )
+        ).all()
+    )
+    plans_by_user: dict[UUID, list[UserPlanSession]] = {}
+    for plan in plans:
+        plans_by_user.setdefault(plan.user_id, []).append(plan)
+    return sorted(
+        [
+            SchedulePlannerResponse(
+                user_id=user.id,
+                email=user.email,
+                name=user.display_name,
+                handle=user.handle,
+                going=user.id in going_ids,
+                planned_session_count=len(plans_by_user[user.id]),
+                sessions=[
+                    {
+                        "session_id": plan.session_id,
+                        "title": current_sessions.get(
+                            str(plan.session_id), plan.last_known_session
+                        ).get("title", "Session"),
+                        "start": current_sessions.get(
+                            str(plan.session_id), plan.last_known_session
+                        )["start"],
+                        "end": current_sessions.get(
+                            str(plan.session_id), plan.last_known_session
+                        )["end"],
+                        "status": (
+                            "removed"
+                            if str(plan.session_id) not in current_sessions
+                            else "cancelled"
+                            if current_sessions[str(plan.session_id)].get(
+                                "is_cancelled"
+                            )
+                            else "active"
+                        ),
+                    }
+                    for plan in sorted(
+                        plans_by_user[user.id],
+                        key=lambda row: current_sessions.get(
+                            str(row.session_id), row.last_known_session
+                        )["start"],
+                    )
+                ],
+            )
+            for user in users
+        ],
+        key=lambda planner: planner.email.casefold(),
+    )
+
+
 @admin_router.get(
     "/notify-program-candidates", response_model=list[ScheduleProgramCandidate]
 )
@@ -840,6 +915,7 @@ def import_schedule(
 @admin_router.post("/publish", response_model=SchedulePublishResponse)
 def publish_schedule(
     event_id: str,
+    body: SchedulePublishRequest = SchedulePublishRequest(),
     admin: dict = Depends(require_admin),
     session: Session = Depends(get_session),
 ):
@@ -938,25 +1014,26 @@ def publish_schedule(
             )
         ).all()
     )
+    broad_result = ScheduleProgramNotifyResponse(
+        emailed=0, pushed=0, in_app_created=0, results=[]
+    )
+    if version == 1 or body.notify_all_going:
+        broad_result = _notify_publication_going_attendees(event_id, version, session)
     snapshot["notification_summary"] = {
         "impacted_planners": len(impacted_user_ids),
-        "in_app_created": len(impacted_notifications),
-        "emailed": emailed,
-        "pushed": pushed,
+        "going_attendees_notified": len(broad_result.results),
+        "in_app_created": len(impacted_notifications) + broad_result.in_app_created,
+        "emailed": emailed + broad_result.emailed,
+        "pushed": pushed + broad_result.pushed,
         "going_attendees": len(going_ids),
-        "remaining_going_attendees": len(going_ids - impacted_user_ids),
     }
     return snapshot
 
 
-@admin_router.post(
-    "/publications/{version}/notify-going",
-    response_model=ScheduleProgramNotifyResponse,
-)
-def notify_publication_going_attendees(
+def _notify_publication_going_attendees(
     event_id: str,
     version: int,
-    session: Session = Depends(get_session),
+    session: Session,
 ):
     from backend.services.email import (
         send_schedule_program_available_email,
@@ -1128,6 +1205,18 @@ def notify_publication_going_attendees(
         in_app_created=in_app_created,
         results=results,
     )
+
+
+@admin_router.post(
+    "/publications/{version}/notify-going",
+    response_model=ScheduleProgramNotifyResponse,
+)
+def notify_publication_going_attendees(
+    event_id: str,
+    version: int,
+    session: Session = Depends(get_session),
+):
+    return _notify_publication_going_attendees(event_id, version, session)
 
 
 def _save_config_row(session: Session, row):

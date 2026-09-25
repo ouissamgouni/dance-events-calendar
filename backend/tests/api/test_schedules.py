@@ -220,6 +220,12 @@ def test_schedule_publish_and_my_plan_lifecycle(
     assert saved.json()["status"] == "active"
 
     _login(client, "admin@example.com")
+    planners = client.get("/api/admin/events/back-2-mambo-2026/schedule/planners")
+    assert planners.status_code == 200
+    assert planners.json()[0]["email"] == "dancer@example.com"
+    assert planners.json()[0]["going"] is False
+    assert planners.json()[0]["planned_session_count"] == 1
+    assert planners.json()[0]["sessions"][0]["title"] == "Shines / Partnerwork"
     assert (
         client.delete(
             f"/api/admin/events/back-2-mambo-2026/schedule/sessions/{session_id}"
@@ -230,11 +236,11 @@ def test_schedule_publish_and_my_plan_lifecycle(
     assert republished.status_code == 200
     assert republished.json()["notification_summary"] == {
         "impacted_planners": 1,
+        "going_attendees_notified": 0,
         "in_app_created": 1,
         "emailed": 1,
         "pushed": 1,
         "going_attendees": 0,
-        "remaining_going_attendees": 0,
     }
     assert emailed == ["dancer@example.com"]
     assert len(pushed) == 1
@@ -439,13 +445,17 @@ def test_dance_taxonomy_preset_is_idempotent_and_preserves_custom_levels(
     assert second.json() == {"created": 0}
 
 
-def test_program_announcement_targets_going_users_and_respects_opt_outs(
+def test_publish_announces_first_program_and_optionally_broadcasts_updates(
     client, engine, schedule_event, monkeypatch
 ):
     emailed: list[str] = []
     monkeypatch.setattr(
         "backend.services.email.send_schedule_program_available_email",
         lambda user, event, session_count: emailed.append(user.email) or True,
+    )
+    monkeypatch.setattr(
+        "backend.services.email.send_schedule_program_updated_email",
+        lambda user, event: emailed.append(user.email) or True,
     )
     monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
 
@@ -487,63 +497,36 @@ def test_program_announcement_targets_going_users_and_respects_opt_outs(
         quiet_id = quiet.id
 
     _login(client, "admin@example.com")
-    unpublished = client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule/notify-program",
-        json={"user_ids": [str(dancer_id)]},
+    first_publish = client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule/publish", json={}
     )
-    assert unpublished.status_code == 409
-    assert (
-        client.post("/api/admin/events/back-2-mambo-2026/schedule/publish").status_code
-        == 200
-    )
-
-    candidates = client.get(
-        "/api/admin/events/back-2-mambo-2026/schedule/notify-program-candidates"
-    )
-    assert candidates.status_code == 200
-    candidate_by_email = {row["email"]: row for row in candidates.json()}
-    assert set(candidate_by_email) == {"dancer@example.com", "quiet@example.com"}
-    assert candidate_by_email["quiet@example.com"]["email_enabled"] is False
-
-    sent = client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule/notify-program",
-        json={"user_ids": [str(dancer_id), str(quiet_id)]},
-    )
-    assert sent.status_code == 200, sent.text
-    assert sent.json()["in_app_created"] == 2
-    assert sent.json()["emailed"] == 1
-    result_by_email = {row["email"]: row for row in sent.json()["results"]}
-    assert result_by_email["dancer@example.com"]["email_status"] == "sent"
-    assert result_by_email["quiet@example.com"]["email_status"] == "disabled"
-    assert result_by_email["quiet@example.com"]["push_status"] == "disabled"
+    assert first_publish.status_code == 200
+    assert first_publish.json()["notification_summary"] == {
+        "impacted_planners": 0,
+        "going_attendees_notified": 2,
+        "in_app_created": 2,
+        "emailed": 1,
+        "pushed": 0,
+        "going_attendees": 2,
+    }
     assert emailed == ["dancer@example.com"]
 
-    repeated = client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule/notify-program",
-        json={"user_ids": [str(dancer_id), str(quiet_id)]},
+    silent_update = client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule/publish", json={}
     )
-    assert repeated.status_code == 200
-    assert repeated.json()["in_app_created"] == 0
-    assert repeated.json()["emailed"] == 0
+    assert silent_update.status_code == 200
+    assert silent_update.json()["notification_summary"]["going_attendees_notified"] == 0
+    assert silent_update.json()["notification_summary"]["in_app_created"] == 0
 
-    publication_send = client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule/publications/1/notify-going"
+    broad_update = client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule/publish",
+        json={"notify_all_going": True},
     )
-    assert publication_send.status_code == 200
-    assert publication_send.json()["in_app_created"] == 2
-    assert publication_send.json()["emailed"] == 1
-    publication_results = {
-        row["email"]: row for row in publication_send.json()["results"]
-    }
-    assert publication_results["quiet@example.com"]["email_status"] == "disabled"
-    assert publication_results["quiet@example.com"]["push_status"] == "disabled"
-
-    publication_repeated = client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule/publications/1/notify-going"
-    )
-    assert publication_repeated.status_code == 200
-    assert publication_repeated.json()["in_app_created"] == 0
-    assert publication_repeated.json()["emailed"] == 0
+    assert broad_update.status_code == 200
+    assert broad_update.json()["notification_summary"]["going_attendees_notified"] == 2
+    assert broad_update.json()["notification_summary"]["in_app_created"] == 2
+    assert broad_update.json()["notification_summary"]["emailed"] == 1
+    assert emailed == ["dancer@example.com", "dancer@example.com"]
 
     with Session(engine) as session:
         deliveries = session.exec(select(NotificationDelivery)).all()
@@ -562,4 +545,8 @@ def test_program_announcement_targets_going_users_and_respects_opt_outs(
     assert (
         item["description"]
         == "The program is live. Browse sessions and build your plan."
+    )
+    assert any(
+        row["kind"] == "schedule_program_updated"
+        for row in notifications.json()["items"]
     )

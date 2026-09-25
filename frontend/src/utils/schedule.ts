@@ -61,7 +61,7 @@ export function formatTime(value: string | Date, timeZone: string): string {
     }).format(typeof value === 'string' ? new Date(value) : value);
 }
 
-export function formatTimeRange(session: ScheduleSession, timeZone: string): string {
+export function formatTimeRange(session: Pick<ScheduleSession, 'start' | 'end'>, timeZone: string): string {
     return `${formatTime(session.start, timeZone)}–${formatTime(session.end, timeZone)}`;
 }
 
@@ -89,6 +89,20 @@ export function formatDayLabel(day: string, long = false): string {
     return new Intl.DateTimeFormat(undefined, long
         ? { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }
         : { timeZone: 'UTC', weekday: 'short', day: 'numeric' }).format(date);
+}
+
+export function formatDayDateLabel(day: string): string {
+    return new Intl.DateTimeFormat(undefined, {
+        timeZone: 'UTC',
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+    }).format(new Date(`${day}T12:00:00Z`));
+}
+
+export function scheduleInstructors(sessions: ScheduleSession[]): string[] {
+    return [...new Set(sessions.map((session) => session.instructors?.trim()).filter((value): value is string => Boolean(value)))]
+        .sort((left, right) => left.localeCompare(right));
 }
 
 export function sessionsForDay(
@@ -162,6 +176,11 @@ export function sessionsAtHour(
     });
 }
 
+export function sessionsOverlap(left: ScheduleSession, right: ScheduleSession): boolean {
+    return new Date(left.start).getTime() < new Date(right.end).getTime()
+        && new Date(right.start).getTime() < new Date(left.end).getTime();
+}
+
 export function findPlanConflicts(entries: MyPlanEntry[]): Map<string, string[]> {
     const active = entries.filter((entry) => entry.status === 'active');
     const conflicts = new Map<string, string[]>();
@@ -169,8 +188,7 @@ export function findPlanConflicts(entries: MyPlanEntry[]): Map<string, string[]>
         const left = active[leftIndex];
         for (let rightIndex = leftIndex + 1; rightIndex < active.length; rightIndex += 1) {
             const right = active[rightIndex];
-            if (new Date(left.session.start) < new Date(right.session.end)
-                && new Date(right.session.start) < new Date(left.session.end)) {
+            if (sessionsOverlap(left.session, right.session)) {
                 conflicts.set(left.session_id, [...(conflicts.get(left.session_id) ?? []), right.session.title]);
                 conflicts.set(right.session_id, [...(conflicts.get(right.session_id) ?? []), left.session.title]);
             }

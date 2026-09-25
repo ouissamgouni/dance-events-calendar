@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { BookmarkCheck, BookmarkPlus, CalendarDays, Clock, MapPin } from 'lucide-react';
+import { BookmarkPlus, CalendarDays, Clock, MapPin, Trash2 } from 'lucide-react';
 import BottomSheet from '../BottomSheet';
 import SignInNudge, { useSignInNudge } from '../SignInNudge';
 import { useAuth } from '../../context/AuthContext';
@@ -50,9 +50,9 @@ export function SessionDetailsSheet({ schedule, session, planned, preview, onClo
                 type="button"
                 disabled={busy}
                 onClick={toggle}
-                className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-field px-4 text-sm font-semibold disabled:opacity-50 ${planned ? 'border border-line bg-surface text-ink' : 'bg-action text-white hover:opacity-90'}`}
+                className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-field px-4 text-sm font-semibold disabled:opacity-50 ${planned ? 'border border-danger/30 bg-danger/5 text-danger' : 'bg-action text-white hover:opacity-90'}`}
             >
-                {planned ? <BookmarkCheck size={18} /> : <BookmarkPlus size={18} />}
+                {planned ? <Trash2 size={18} /> : <BookmarkPlus size={18} />}
                 {busy ? 'Updating…' : planned ? 'In My Plan · Remove' : 'Add to My Plan'}
             </button>
             {showNudge ? <SignInNudge anchorRef={actionRef} trigger="save" onClose={() => { nudge.dismiss(); setShowNudge(false); }} /> : null}

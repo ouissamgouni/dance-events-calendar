@@ -1,0 +1,18 @@
+attendances:
+  # Going planner on the primary published event.
+  - event_id: back-2-mambo-2026
+    email: dancer@example.com
+    share_audience: public
+
+  # Going attendees without plans; Sara opts out of external schedule updates.
+  - event_id: back-2-mambo-2026
+    email: going-no-plan@example.com
+    share_audience: public
+  - event_id: back-2-mambo-2026
+    email: quiet-going@example.com
+    share_audience: public
+
+  # Going planner on the additional published program.
+  - event_id: prague-salsa-weekender
+    email: weekender-planner@example.com
+    share_audience: public

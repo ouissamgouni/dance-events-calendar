@@ -9,7 +9,7 @@ import { SessionDetailsSheet, TimeSlotSheet } from '../components/program/Sessio
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, EventSchedule, MyPlanEntry, ScheduleSession } from '../types';
-import { filterScheduleSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
+import { filterScheduleSessions, firstDayWithSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
 
 const EMPTY_FILTERS: ScheduleFilters = { instructor: '', levelIds: [], activityTypeIds: [] };
 
@@ -23,8 +23,10 @@ export default function EventProgramPage() {
     const flagsReady = useFeatureFlagsReady();
     const initialSearchParams = useRef(searchParams);
     const preview = searchParams.get('preview') === 'draft';
+    const embeddedProgram = preview && searchParams.get('embed') === 'program';
     const unavailable = flagsReady && !eventScheduleEnabled && !preview;
     const activeTab = location.pathname.endsWith('/plan') ? 'plan' : 'program';
+    const fromEventDetail = Boolean((location.state as { fromEventDetail?: boolean } | null)?.fromEventDetail);
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [schedule, setSchedule] = useState<EventSchedule | null>(null);
     const [plan, setPlan] = useState<MyPlanEntry[]>([]);
@@ -32,6 +34,7 @@ export default function EventProgramPage() {
     const [selectedSession, setSelectedSession] = useState<ScheduleSession | null>(null);
     const [selectedHour, setSelectedHour] = useState<number | null>(null);
     const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS);
+    const [positionRequest, setPositionRequest] = useState(0);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -90,6 +93,7 @@ export default function EventProgramPage() {
 
     const selectDay = (day: string) => {
         setSelectedDay(day);
+        setPositionRequest((value) => value + 1);
         if (eventId) sessionStorage.setItem(`program:${eventId}:day`, day);
         const next = new URLSearchParams(searchParams);
         next.set('day', day);
@@ -97,6 +101,14 @@ export default function EventProgramPage() {
     };
     const updateFilters = (next: ScheduleFilters) => {
         setFilters(next);
+        if (schedule) {
+            const matches = filterScheduleSessions(schedule.sessions, next);
+            if (!sessionsForDay(matches, selectedDay, schedule.timezone, schedule.day_start_hour).length) {
+                const firstMatchingDay = firstDayWithSessions(schedule.days, matches, schedule.timezone, schedule.day_start_hour);
+                if (firstMatchingDay) selectDay(firstMatchingDay);
+            }
+        }
+        setPositionRequest((value) => value + 1);
         if (eventId) sessionStorage.setItem(`program:${eventId}:filters`, JSON.stringify(next));
     };
     const openSession = (session: ScheduleSession) => {
@@ -146,36 +158,41 @@ export default function EventProgramPage() {
             setPlan(previous);
         }
     };
+    const backToEvent = () => {
+        if (fromEventDetail && window.history.length > 1) navigate(-1);
+        else navigate(`/event/${eventId}`, { replace: true });
+    };
+    const navigateProgramTab = (path: string) => navigate(path, { replace: true, state: location.state });
 
-    if (unavailable) return <ProgramState title="Program unavailable" detail="The event program is not available." onBack={() => navigate(`/event/${eventId}`)} />;
-    if (error) return <ProgramState title="Program unavailable" detail={error} onBack={() => navigate(`/event/${eventId}`)} />;
-    if (!event || !schedule) return <ProgramState title="Loading program…" onBack={() => navigate(`/event/${eventId}`)} />;
+    if (unavailable) return <ProgramState title="Program unavailable" detail="The event program is not available." onBack={backToEvent} />;
+    if (error) return <ProgramState title="Program unavailable" detail={error} onBack={backToEvent} />;
+    if (!event || !schedule) return <ProgramState title="Loading program…" onBack={backToEvent} />;
 
     return (
         <div className="flex h-full min-h-0 flex-col bg-canvas">
-            {preview ? <div className="shrink-0 bg-amber-50 px-4 py-2 text-center text-xs font-semibold text-amber-900">Draft preview · changes are not visible to attendees</div> : null}
-            <header className="shrink-0 bg-surface px-3 py-3">
+            {preview && !embeddedProgram ? <div className="shrink-0 bg-amber-50 px-4 py-2 text-center text-xs font-semibold text-amber-900">Draft preview · changes are not visible to attendees</div> : null}
+            {!embeddedProgram ? <header className="shrink-0 bg-surface px-3 py-3">
                 <div className="mx-auto flex max-w-5xl items-center gap-3">
-                    <button type="button" onClick={() => navigate(`/event/${event.event_id}`)} aria-label="Back to event" className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft"><ChevronLeft size={24} /></button>
+                    <button type="button" onClick={backToEvent} aria-label="Back to event" className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft"><ChevronLeft size={24} /></button>
                     <div className="min-w-0">
                         <h1 className="truncate text-base font-bold text-ink">{event.title}</h1>
                         <p className="truncate text-xs text-ink-soft">{event.city ?? event.location ?? 'Event program'}</p>
                     </div>
                 </div>
-            </header>
+            </header> : null}
 
             <div className="shrink-0 border-b border-line bg-surface px-3">
-                <div className="mx-auto grid max-w-5xl grid-cols-2 gap-1 bg-canvas p-1">
-                    <ProgramTab active={activeTab === 'program'} onClick={() => navigate(`/event/${event.event_id}/program${searchParams.toString() ? `?${searchParams}` : ''}`)}>Program</ProgramTab>
-                    <ProgramTab active={activeTab === 'plan'} onClick={() => navigate(`/event/${event.event_id}/program/plan${searchParams.toString() ? `?${searchParams}` : ''}`)}>My Plan{plan.length ? ` (${plan.length})` : ''}</ProgramTab>
-                </div>
+                {!embeddedProgram ? <div className="mx-auto grid max-w-5xl grid-cols-2 gap-1 bg-canvas p-1">
+                    <ProgramTab active={activeTab === 'program'} onClick={() => navigateProgramTab(`/event/${event.event_id}/program${searchParams.toString() ? `?${searchParams}` : ''}`)}>Program</ProgramTab>
+                    <ProgramTab active={activeTab === 'plan'} onClick={() => navigateProgramTab(`/event/${event.event_id}/program/plan${searchParams.toString() ? `?${searchParams}` : ''}`)}>My Plan{plan.length ? ` (${plan.length})` : ''}</ProgramTab>
+                </div> : null}
                 {activeTab === 'program' ? <ProgramFilters schedule={schedule} filters={filters} onChange={updateFilters} /> : null}
                 {activeTab === 'program' ? <ProgramDayPicker schedule={schedule} sessions={filteredSessions} selectedDay={selectedDay} filtersActive={Boolean(filters.instructor || filters.levelIds.length || filters.activityTypeIds.length)} onSelect={selectDay} /> : null}
             </div>
 
             <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col">
                 {activeTab === 'program' ? (
-                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} />
+                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} />
                 ) : user ? (
                     <MyPlanList schedule={schedule} entries={plan} onOpen={openSession} onRemove={removePlanEntry} onProgram={() => navigate(`/event/${event.event_id}/program`)} />
                 ) : (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayLabel, isSessionActive, minuteOfProgramDay, programDayOf, toZonedInput, zonedInputToIso } from './schedule';
+import { filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayDateLabel, formatDayLabel, isSessionActive, minuteOfProgramDay, programDayOf, scheduleInstructors, sessionsOverlap, toZonedInput, zonedInputToIso } from './schedule';
 import type { MyPlanEntry, ScheduleSession } from '../types';
 
 const session = (id: string, start: string, end: string): ScheduleSession => ({
@@ -33,6 +33,13 @@ describe('schedule time helpers', () => {
         expect(findPlanConflicts(entries).has('c')).toBe(false);
     });
 
+    it('does not treat equivalent mixed-precision boundaries as overlapping', () => {
+        const first = session('Crazy Partnerwork', '2026-10-17T12:00:00Z', '2026-10-17T13:00:00Z');
+        const second = session('Latin Salsa Fusion', '2026-10-17T13:00:00.000Z', '2026-10-17T14:00:00.000Z');
+
+        expect(sessionsOverlap(first, second)).toBe(false);
+    });
+
     it('round-trips an event-local wall clock through UTC', () => {
         const iso = zonedInputToIso('2026-10-16T14:00', 'Europe/Prague');
         expect(iso).toBe('2026-10-16T12:00:00.000Z');
@@ -41,6 +48,7 @@ describe('schedule time helpers', () => {
 
     it('formats a program-day key without shifting its calendar date', () => {
         expect(formatDayLabel('2026-10-16')).toContain('16');
+        expect(formatDayDateLabel('2026-10-16')).toMatch(/Fri.*16|16.*Fri/);
     });
 
     it('finds the first configured day containing sessions', () => {
@@ -56,6 +64,7 @@ describe('schedule time helpers', () => {
         const alexis = { ...session('Alexis', '2026-10-16T12:00:00Z', '2026-10-16T13:00:00Z'), instructors: 'Alexis Ruiz', level_id: 2, activity_type_id: 4 };
         const maya = { ...session('Maya', '2026-10-16T13:00:00Z', '2026-10-16T14:00:00Z'), instructors: 'Maya', level_id: 1, activity_type_id: 4 };
         expect(filterScheduleSessions([alexis, maya], { instructor: 'ruiz', levelIds: [2], activityTypeIds: [4] })).toEqual([alexis]);
+        expect(scheduleInstructors([alexis, maya, { ...alexis, id: 'duplicate' }])).toEqual(['Alexis Ruiz', 'Maya']);
     });
 
     it('treats the end timestamp as no longer active', () => {
