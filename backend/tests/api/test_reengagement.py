@@ -1599,6 +1599,44 @@ def test_activity_digest_gates_on_scheduled_slot(session, monkeypatch):
     assert n.pushed_at is not None
 
 
+def test_activity_digest_and_push_skip_anonymous_review(session, monkeypatch):
+    email_calls: list = []
+    push_calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda *args, **kwargs: email_calls.append((args, kwargs)) or True,
+    )
+    monkeypatch.setattr(
+        activity_email,
+        "send_push",
+        lambda *args, **kwargs: push_calls.append((args, kwargs)) or 1,
+    )
+    bob = _make_user(session, "bob@example.com", "bob")
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(
+        session,
+        "ev-anon-review",
+        start=datetime.utcnow() - timedelta(days=2),
+    )
+    _rate(session, alice, "ev-anon-review", is_anonymous=True)
+    notification = _notif(
+        session,
+        recipient=bob,
+        actor=alice,
+        kind="subscription_review",
+        event_id="ev-anon-review",
+    )
+
+    stats = activity_email.run_once(force=True)
+    assert stats == {"digests": 0, "pushed": 0}
+    assert email_calls == []
+    assert push_calls == []
+    session.refresh(notification)
+    assert notification.emailed_at is None
+    assert notification.pushed_at is None
+
+
 def test_activity_digest_delivers_in_scheduled_slot(session, monkeypatch):
     """When ``now`` matches the user's local slot the digest ships."""
     calls: list = []
@@ -2126,6 +2164,43 @@ def test_activity_instant_noop_when_feature_is_digest(session, monkeypatch):
     session.refresh(n)
     assert n.instant_emailed_at is None
     assert n.emailed_at is None
+
+
+def test_activity_instant_skips_withdrawn_review(session, monkeypatch):
+    from backend.services import activity_instant
+
+    calls: list = []
+    monkeypatch.setattr(
+        activity_instant,
+        "send_activity_digest_email",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or True,
+    )
+    session.add(SiteSetting(key="friend_reviews_email_instant", value="true"))
+    session.commit()
+    bob = _make_user(session, "bob@example.com", "bob")
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(session, "ev-withdrawn-review")
+    notification = _notif(
+        session,
+        recipient=bob,
+        actor=alice,
+        kind="subscription_review",
+        event_id="ev-withdrawn-review",
+    )
+    notification.context = "anon"
+    session.add(notification)
+    session.commit()
+
+    stats = activity_instant.dispatch_activity_instant(
+        session,
+        kind="subscription_review",
+        actor=alice,
+        event_id="ev-withdrawn-review",
+    )
+    assert stats == {"emails": 0}
+    assert calls == []
+    session.refresh(notification)
+    assert notification.instant_emailed_at is None
 
 
 def test_activity_instant_social_scoped_by_recipient(session, monkeypatch):

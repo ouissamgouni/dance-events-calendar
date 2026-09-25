@@ -1588,7 +1588,10 @@ def purge_user_account(session: Session, user_id) -> None:
     user_ratings = session.exec(
         select(EventRating).where(EventRating.user_id == user_id)
     ).all()
+    from backend.services.notifications import withdraw_review_notifications
+
     for rating in user_ratings:
+        withdraw_review_notifications(session, user_id, rating.event_id)
         rating.user_id = None
         rating.is_anonymous = True
         session.add(rating)

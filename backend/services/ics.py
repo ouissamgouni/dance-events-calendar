@@ -16,6 +16,35 @@ def ics_escape(text: str) -> str:
     )
 
 
+def fold_ics_line(line: str, limit: int = 75) -> list[str]:
+    parts: list[str] = []
+    remaining = line
+    first = True
+    while remaining:
+        prefix = "" if first else " "
+        available = limit - len(prefix.encode("utf-8"))
+        end = 0
+        size = 0
+        for end, character in enumerate(remaining, start=1):
+            character_size = len(character.encode("utf-8"))
+            if size + character_size > available:
+                end -= 1
+                break
+            size += character_size
+        if end == 0:
+            end = 1
+        parts.append(f"{prefix}{remaining[:end]}")
+        remaining = remaining[end:]
+        first = False
+    return parts or [""]
+
+
+def render_ics(lines: list[str]) -> str:
+    return (
+        "\r\n".join(folded for line in lines for folded in fold_ics_line(line)) + "\r\n"
+    )
+
+
 def build_ics(
     events: list[CachedEvent],
     *,
@@ -60,4 +89,4 @@ def build_ics(
             lines.append(f"DESCRIPTION:{ics_escape(e.description)}")
         lines.append("END:VEVENT")
     lines.append("END:VCALENDAR")
-    return "\r\n".join(lines)
+    return render_ics(lines)

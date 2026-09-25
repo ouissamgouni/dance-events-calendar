@@ -27,6 +27,7 @@ from backend.db.models import (
     CachedEvent,
     CalendarSubscription,
     EventMessage,
+    EventRating,
     Notification,
     User,
     UserEventAttendance,
@@ -67,6 +68,97 @@ EVENT_MESSAGE_REPLY = "event_message_reply"
 # A user reported a message; delivered to the site admin only (in-app).
 EVENT_MESSAGE_REPORTED = "event_message_reported"
 PLANNED_SESSION_CHANGED = "planned_session_changed"
+
+
+def withdraw_review_notifications(
+    session: Session, actor_user_id: UUID, event_id: str
+) -> int:
+    rows = session.exec(
+        select(Notification)
+        .where(Notification.kind == SUBSCRIPTION_REVIEW)
+        .where(Notification.actor_user_id == actor_user_id)
+        .where(Notification.event_id == event_id)
+    ).all()
+    for row in rows:
+        row.context = "anon"
+        session.add(row)
+    return len(rows)
+
+
+def filter_privacy_safe_notifications(
+    session: Session, rows: list[Notification]
+) -> list[Notification]:
+    """Remove actor-linked activity that could identify an anonymous reviewer."""
+    if not rows:
+        return []
+
+    sensitive_rows = [
+        row for row in rows if row.kind in {SUBSCRIPTION_REVIEW, SUBSCRIPTION_MILESTONE}
+    ]
+    if not sensitive_rows:
+        return rows
+
+    actor_ids = {row.actor_user_id for row in sensitive_rows}
+    deleted_actor_ids = set(
+        session.exec(
+            select(User.id)
+            .where(col(User.id).in_(actor_ids))
+            .where(User.deleted_at.is_not(None))  # type: ignore[union-attr]
+        ).all()
+    )
+
+    review_rows = [
+        row
+        for row in sensitive_rows
+        if row.kind == SUBSCRIPTION_REVIEW and row.event_id is not None
+    ]
+    anonymous_review_pairs: set[tuple[UUID, str]] = set()
+    if review_rows:
+        review_actor_ids = {row.actor_user_id for row in review_rows}
+        review_event_ids = {row.event_id for row in review_rows if row.event_id}
+        anonymous_review_pairs = set(
+            session.exec(
+                select(EventRating.user_id, EventRating.event_id)
+                .where(col(EventRating.user_id).in_(review_actor_ids))
+                .where(col(EventRating.event_id).in_(review_event_ids))
+                .where(col(EventRating.is_anonymous).is_(True))
+            ).all()
+        )
+
+    from backend.services import passport
+
+    review_milestones = {
+        key: milestone
+        for key, milestone in passport.MILESTONES_BY_KEY.items()
+        if milestone.category == "reviews"
+    }
+    milestone_actor_ids = {
+        row.actor_user_id
+        for row in sensitive_rows
+        if row.kind == SUBSCRIPTION_MILESTONE and row.subject_key in review_milestones
+    }
+    public_review_counts = passport.public_review_counts(session, milestone_actor_ids)
+
+    safe: list[Notification] = []
+    for row in rows:
+        if row.kind == SUBSCRIPTION_REVIEW:
+            if row.context == "anon" or row.actor_user_id in deleted_actor_ids:
+                continue
+            if (row.actor_user_id, row.event_id) in anonymous_review_pairs:
+                continue
+        elif row.kind == SUBSCRIPTION_MILESTONE:
+            milestone = review_milestones.get(row.subject_key)
+            if milestone is not None and (
+                row.actor_user_id in deleted_actor_ids
+                or public_review_counts.get(row.actor_user_id, 0) < milestone.threshold
+            ):
+                continue
+        safe.append(row)
+    return safe
+
+
+def notification_is_privacy_safe(session: Session, notification: Notification) -> bool:
+    return bool(filter_privacy_safe_notifications(session, [notification]))
 
 
 def notify_planned_session_changes(
@@ -333,15 +425,16 @@ def fan_out_review(
     """Notify subscribers that ``actor`` reviewed ``event_id``.
 
     Reviews only exist on past events, so the past-event guard is skipped.
-    Anonymous reviews still fan out but tag ``context='anon'`` so renderers
-    mask the reviewer's identity.
+    Anonymous reviews never fan out because even a masked activity row can
+    correlate the review with its author through notification metadata.
     """
+    if anonymous:
+        return 0
     return _fan_out(
         session,
         actor,
         event_id,
         SUBSCRIPTION_REVIEW,
-        context="anon" if anonymous else None,
         skip_past_guard=True,
     )
 

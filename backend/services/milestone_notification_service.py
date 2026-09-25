@@ -155,6 +155,7 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
             .where(Notification.kind == MILESTONE_UNLOCKED)
         ).all()
     }
+    public_review_count = passport.public_reviews_written(session, user.id)
     group_key = uuid4().hex
     created = 0
     for key in unlocked_keys:
@@ -162,7 +163,8 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
         if milestone is None:
             continue
         notif = existing.get(key)
-        if notif is None:
+        created_now = notif is None
+        if created_now:
             notif = Notification(
                 recipient_user_id=user.id,
                 actor_user_id=user.id,  # self: no external actor
@@ -176,9 +178,11 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
             session.flush()
             record_delivery(session, notif.id, "app")
             created += 1
-            # A freshly-unlocked milestone also fans out to the user's
-            # subscribers as a "friend milestone" activity notification,
-            # gated by the actor's passport visibility (private → no fan-out).
+        if milestone.category == "reviews":
+            should_fan_out = public_review_count >= milestone.threshold
+        else:
+            should_fan_out = created_now
+        if should_fan_out:
             fan_out_milestone(
                 session,
                 user,

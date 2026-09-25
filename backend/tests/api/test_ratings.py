@@ -42,12 +42,14 @@ from backend.api.routes import ratings as ratings_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
     CachedEvent,
+    CalendarSubscription,
     EventRating,
     EventRatingAspectScore,
     EventRatingAspectTag,
     EventSeries,
     EventSeriesMember,
     EventTag,
+    Notification,
     SiteSetting,
     Tag,
     TagGroup,
@@ -785,6 +787,72 @@ def test_anonymity_reviewer_label(client, session, event):
 
 
 @pytest.mark.unit
+def test_changing_review_to_anonymous_withdraws_follower_activity(
+    client, session, event
+):
+    assert _login(client, email="reviewer@example.com").status_code == 200
+    reviewer = session.exec(
+        select(User).where(User.email == "reviewer@example.com")
+    ).one()
+    follower = User(
+        email="follower@example.com",
+        display_name="Follower",
+        handle="follower",
+        provider="google",
+        provider_subject="mock|follower@example.com",
+    )
+    session.add(follower)
+    session.commit()
+    session.refresh(follower)
+    session.add(
+        CalendarSubscription(
+            subscriber_id=follower.id,
+            target_user_id=reviewer.id,
+            notify_new_events=True,
+        )
+    )
+    session.commit()
+
+    public_body = {
+        "overall_sentiment": "amazing",
+        "is_anonymous": False,
+        "tag_suggestions": [],
+    }
+    assert (
+        client.post(
+            f"/api/events/{event.event_id}/feedback", json=public_body
+        ).status_code
+        == 201
+    )
+    notification = session.exec(
+        select(Notification).where(Notification.kind == "subscription_review")
+    ).one()
+    assert notification.context is None
+
+    anonymous_body = {**public_body, "is_anonymous": True}
+    assert (
+        client.post(
+            f"/api/events/{event.event_id}/feedback", json=anonymous_body
+        ).status_code
+        == 201
+    )
+    session.refresh(notification)
+    assert notification.context == "anon"
+
+    assert (
+        client.post(
+            f"/api/events/{event.event_id}/feedback", json=public_body
+        ).status_code
+        == 201
+    )
+    rows = session.exec(
+        select(Notification).where(Notification.kind == "subscription_review")
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].context == "anon"
+
+
+@pytest.mark.unit
 def test_user_rate_limit(client, session, event):
     """The per-user hourly cap should kick in well before slowapi's IP cap."""
     ratings_module._HOUR_LIMIT = 2
@@ -823,6 +891,25 @@ def test_account_deletion_preserves_aggregate(client, session, event):
         f"/api/events/{event.event_id}/feedback",
         json={"overall_sentiment": "great", "tag_suggestions": []},
     )
+    reviewer = session.exec(select(User).where(User.email == "user@example.com")).one()
+    viewer = User(
+        email="viewer@example.com",
+        display_name="Viewer",
+        handle="viewer",
+        provider="google",
+        provider_subject="mock|viewer@example.com",
+    )
+    session.add(viewer)
+    session.commit()
+    session.refresh(viewer)
+    review_notification = Notification(
+        recipient_user_id=viewer.id,
+        actor_user_id=reviewer.id,
+        kind="subscription_review",
+        event_id=event.event_id,
+    )
+    session.add(review_notification)
+    session.commit()
 
     # Delete the account
     resp = client.delete("/api/auth/me")
@@ -839,6 +926,8 @@ def test_account_deletion_preserves_aggregate(client, session, event):
     rating = session.exec(select(EventRating)).one()
     assert rating.user_id is None
     assert rating.is_anonymous is True
+    session.refresh(review_notification)
+    assert review_notification.context == "anon"
 
 
 @pytest.mark.unit

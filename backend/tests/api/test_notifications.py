@@ -35,6 +35,7 @@ from backend.db.models import (  # noqa: E402
     CachedEvent,
     CalendarSetting,
     CalendarSubscription,
+    EventRating,
     EventSuggestion,
     Notification,
     User,
@@ -530,6 +531,74 @@ def test_list_returns_only_own_notifications(client, session):
     assert item["actor"]["handle"] == "alice"
     assert item["event_title"] == "Salsa Night"
     assert item["created_at"].endswith("Z")
+
+
+def test_anonymous_review_activity_is_hidden_from_feed_and_direct_read(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-anon-review")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    session.add(
+        EventRating(
+            event_id="ev-anon-review",
+            user_id=alice.id,
+            stars=5,
+            is_anonymous=True,
+        )
+    )
+    session.commit()
+    notification = _seed_one_notif(
+        session,
+        bob,
+        alice,
+        kind="subscription_review",
+        event_id="ev-anon-review",
+    )
+
+    _login(client, "bob@example.com")
+    response = client.get("/api/notifications")
+    assert response.status_code == 200
+    assert response.json()["items"] == []
+    assert response.json()["total"] == 0
+    assert response.json()["unread_count"] == 0
+    assert client.get("/api/notifications/unread-count").json() == {"count": 0}
+    assert client.post(f"/api/notifications/{notification.id}/read").status_code == 404
+
+
+def test_review_milestone_requires_public_review_threshold(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-review-milestone")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    rating = EventRating(
+        event_id="ev-review-milestone",
+        user_id=alice.id,
+        stars=5,
+        is_anonymous=True,
+    )
+    session.add(rating)
+    session.commit()
+    notification = Notification(
+        recipient_user_id=bob.id,
+        actor_user_id=alice.id,
+        kind="subscription_milestone",
+        subject_key="first_review",
+        context="Reviewer",
+    )
+    session.add(notification)
+    session.commit()
+
+    _login(client, "bob@example.com")
+    assert client.get("/api/notifications").json()["items"] == []
+
+    rating.is_anonymous = False
+    session.add(rating)
+    session.commit()
+    response = client.get("/api/notifications")
+    assert response.status_code == 200
+    assert [item["kind"] for item in response.json()["items"]] == [
+        "subscription_milestone"
+    ]
 
 
 def test_filter_by_kind(client, session):
@@ -1446,7 +1515,7 @@ def test_fan_out_review_notifies_subscribers_for_past_event(session):
     assert _count_notifs(session, alice) == 0
 
 
-def test_fan_out_review_anonymous_sets_context(session):
+def test_fan_out_review_anonymous_notifies_nobody(session):
     from backend.services.notifications import fan_out_review
 
     _make_calendar(session)
@@ -1455,12 +1524,13 @@ def test_fan_out_review_anonymous_sets_context(session):
     bob = _make_user(session, "bob@example.com", "bob")
     _subscribe(session, bob, alice)
 
-    fan_out_review(session, alice, "ev-rev", anonymous=True)
+    inserted = fan_out_review(session, alice, "ev-rev", anonymous=True)
     session.commit()
-    row = session.exec(
+    rows = session.exec(
         select(Notification).where(Notification.recipient_user_id == bob.id)
-    ).one()
-    assert row.context == "anon"
+    ).all()
+    assert inserted == 0
+    assert rows == []
 
 
 def test_fan_out_review_is_deduped(session):

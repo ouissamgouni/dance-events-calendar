@@ -10,6 +10,7 @@ from sqlmodel import Session
 from backend.api.main import app
 from backend.db.database import get_session
 from backend.db.models import CachedEvent, CalendarSetting
+from backend.services.ics import build_ics
 
 
 def _make_mock_session(events=None, calendars=None):
@@ -153,6 +154,21 @@ class TestBatchFetchEvents:
 
 @pytest.mark.unit
 class TestExportIcs:
+    def test_export_ics_folds_utf8_lines_at_75_octets(self):
+        content = build_ics([_sample_event(title="É" * 50)])
+
+        assert content.endswith("\r\n")
+        assert all(len(line.encode("utf-8")) <= 75 for line in content.split("\r\n"))
+        assert (
+            "SUMMARY:"
+            + "".join(
+                line[1:] if line.startswith(" ") else line
+                for line in content.split("\r\n")
+                if line.startswith(("SUMMARY:", " "))
+            ).removeprefix("SUMMARY:")
+            == "SUMMARY:" + "É" * 50
+        )
+
     def test_export_ics_returns_calendar_file(self):
         event = _sample_event()
         mock_session = _make_mock_session(events=[event])

@@ -1,19 +1,32 @@
 from datetime import datetime
+import re
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from slowapi import Limiter
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from backend.api.deps import require_admin, require_flag, require_user
+from backend.api.rate_limit import client_ip
+from backend.api.deps import (
+    get_current_user_optional,
+    is_admin_user,
+    require_admin,
+    require_flag,
+    require_user,
+)
 from backend.api.schemas import (
     AdminEventScheduleResponse,
     EventScheduleCreateRequest,
+    EventScheduleEditorAccessResponse,
+    EventScheduleEditorCreateRequest,
+    EventScheduleEditorResponse,
     EventScheduleResponse,
     EventScheduleUpdateRequest,
     MyPlanEntryResponse,
     MyPlanResponse,
+    ProgramExportResponse,
     ScheduleActivityTypeRequest,
     ScheduleActivityTypeResponse,
     ScheduleImportDocument,
@@ -40,6 +53,7 @@ from backend.db.database import get_session
 from backend.db.models import (
     CachedEvent,
     EventSchedule,
+    EventScheduleEditor,
     Notification,
     PushSubscription,
     ScheduleActivityType,
@@ -70,9 +84,48 @@ from backend.services.schedule_import import (
     export_schedule_document,
 )
 from backend.services.notifications import notify_planned_session_changes
+from backend.services.program_exports import (
+    build_program_projection,
+    render_program_csv,
+    render_program_ics,
+)
 
 
 logger = logging.getLogger(__name__)
+limiter = Limiter(key_func=client_ip)
+
+
+def _can_edit_schedule(session: Session, event_id: str, user: User | None) -> bool:
+    if user is None:
+        return False
+    if is_admin_user(user):
+        return True
+    schedule_id = session.exec(
+        select(EventSchedule.id).where(EventSchedule.event_id == event_id)
+    ).first()
+    if schedule_id is None:
+        return False
+    return (
+        session.exec(
+            select(EventScheduleEditor.id).where(
+                EventScheduleEditor.schedule_id == schedule_id,
+                EventScheduleEditor.user_id == user.id,
+            )
+        ).first()
+        is not None
+    )
+
+
+def require_schedule_editor(
+    event_id: str,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> User:
+    if not _can_edit_schedule(session, event_id, user):
+        raise HTTPException(
+            status_code=403, detail="Event schedule editor access required"
+        )
+    return user
 
 
 public_router = APIRouter(
@@ -83,7 +136,7 @@ public_router = APIRouter(
 admin_router = APIRouter(
     prefix="/api/admin/events/{event_id}/schedule",
     tags=["admin-event-schedules"],
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_schedule_editor)],
 )
 
 
@@ -94,6 +147,38 @@ def _schedule_for_event(session: Session, event_id: str) -> EventSchedule:
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
     return schedule
+
+
+def _published_projection(
+    session: Session,
+    event_id: str,
+    *,
+    days: list[str] | None = None,
+    include_cancelled: bool = True,
+    selected_sessions: list[tuple[dict, str]] | None = None,
+) -> dict:
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    event = session.get(CachedEvent, event_id)
+    if event is None or event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    try:
+        return build_program_projection(
+            event,
+            publication,
+            days=days,
+            include_cancelled=include_cancelled,
+            selected_sessions=selected_sessions,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _export_filename(title: str, event_id: str, suffix: str) -> str:
+    stem = re.sub(r"[^a-z0-9]+", "-", title.casefold()).strip("-") or event_id
+    return f"{stem}-{suffix}"
 
 
 def _row_for_schedule(session: Session, model, row_id: int, schedule_id: int):
@@ -154,6 +239,17 @@ def get_published_schedule(
     return publication.snapshot
 
 
+@public_router.get(
+    "/schedule/editor-access", response_model=EventScheduleEditorAccessResponse
+)
+def get_schedule_editor_access(
+    event_id: str,
+    user: User | None = Depends(get_current_user_optional),
+    session: Session = Depends(get_session),
+):
+    return {"can_edit": _can_edit_schedule(session, event_id, user)}
+
+
 @public_router.get("/my-plan", response_model=MyPlanResponse)
 def get_my_plan(
     event_id: str,
@@ -188,6 +284,54 @@ def get_my_plan(
             }
         )
     return {"entries": entries}
+
+
+@public_router.get("/my-plan/ics")
+@limiter.limit("10/minute")
+def export_my_plan_ics(
+    event_id: str,
+    request: Request,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    current = {
+        row["id"]: row for row in publication.snapshot.get("sessions", [])
+    }
+    plan_rows = session.exec(
+        select(UserPlanSession)
+        .where(
+            UserPlanSession.user_id == user.id,
+            UserPlanSession.event_id == event_id,
+        )
+        .order_by(UserPlanSession.added_at)
+    ).all()
+    selected_sessions = []
+    for row in plan_rows:
+        item = current.get(str(row.session_id))
+        item_status = "removed"
+        if item is not None:
+            item_status = "cancelled" if item.get("is_cancelled") else "active"
+        selected_sessions.append((item or row.last_known_session, item_status))
+    projection = _published_projection(
+        session,
+        event_id,
+        selected_sessions=selected_sessions,
+    )
+    filename = _export_filename(
+        projection["event_title"], event_id, "my-plan.ics"
+    )
+    return Response(
+        render_program_ics(projection, my_plan=True).encode("utf-8"),
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @public_router.put(
@@ -260,6 +404,87 @@ def remove_from_my_plan(
 @admin_router.get("", response_model=AdminEventScheduleResponse)
 def get_admin_schedule(event_id: str, session: Session = Depends(get_session)):
     return _admin_payload(session, _schedule_for_event(session, event_id))
+
+
+def _editor_response(grant: EventScheduleEditor, user: User) -> dict:
+    return {
+        "user_id": user.id,
+        "email": user.email,
+        "name": user.display_name,
+        "handle": user.handle,
+        "granted_at": grant.granted_at,
+    }
+
+
+@admin_router.get("/editors", response_model=list[EventScheduleEditorResponse])
+def list_schedule_editors(
+    event_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    schedule = _schedule_for_event(session, event_id)
+    rows = session.exec(
+        select(EventScheduleEditor, User)
+        .join(User, User.id == EventScheduleEditor.user_id)
+        .where(
+            EventScheduleEditor.schedule_id == schedule.id,
+            User.deleted_at.is_(None),
+        )
+        .order_by(User.email)
+    ).all()
+    return [_editor_response(grant, user) for grant, user in rows]
+
+
+@admin_router.post(
+    "/editors",
+    response_model=EventScheduleEditorResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_schedule_editor(
+    event_id: str,
+    body: EventScheduleEditorCreateRequest,
+    admin: User = Depends(require_user),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    schedule = _schedule_for_event(session, event_id)
+    user = session.get(User, body.user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="User not found")
+    grant = EventScheduleEditor(
+        schedule_id=schedule.id,
+        user_id=user.id,
+        granted_by_user_id=admin.id,
+    )
+    session.add(grant)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409, detail="User is already an editor"
+        ) from exc
+    session.refresh(grant)
+    return _editor_response(grant, user)
+
+
+@admin_router.delete("/editors/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_schedule_editor(
+    event_id: str,
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    schedule = _schedule_for_event(session, event_id)
+    grant = session.exec(
+        select(EventScheduleEditor).where(
+            EventScheduleEditor.schedule_id == schedule.id,
+            EventScheduleEditor.user_id == user_id,
+        )
+    ).first()
+    if grant is not None:
+        session.delete(grant)
+        session.commit()
 
 
 @admin_router.post(
@@ -885,6 +1110,69 @@ def export_schedule(event_id: str, session: Session = Depends(get_session)):
     return export_schedule_document(session, _schedule_for_event(session, event_id))
 
 
+@admin_router.get("/published-export", response_model=ProgramExportResponse)
+@limiter.limit("10/minute")
+def get_published_export(
+    event_id: str,
+    request: Request,
+    days: list[str] | None = Query(default=None),
+    include_cancelled: bool = True,
+    session: Session = Depends(get_session),
+):
+    return _published_projection(
+        session,
+        event_id,
+        days=days,
+        include_cancelled=include_cancelled,
+    )
+
+
+@admin_router.get("/published-export/ics")
+@limiter.limit("10/minute")
+def export_published_schedule_ics(
+    event_id: str,
+    request: Request,
+    days: list[str] | None = Query(default=None),
+    include_cancelled: bool = True,
+    session: Session = Depends(get_session),
+):
+    projection = _published_projection(
+        session,
+        event_id,
+        days=days,
+        include_cancelled=include_cancelled,
+    )
+    filename = _export_filename(projection["event_title"], event_id, "program.ics")
+    return Response(
+        render_program_ics(projection).encode("utf-8"),
+        media_type="text/calendar; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@admin_router.get("/published-export/csv")
+@limiter.limit("10/minute")
+def export_published_schedule_csv(
+    event_id: str,
+    request: Request,
+    days: list[str] | None = Query(default=None),
+    include_cancelled: bool = True,
+    session: Session = Depends(get_session),
+):
+    projection = _published_projection(
+        session,
+        event_id,
+        days=days,
+        include_cancelled=include_cancelled,
+    )
+    filename = _export_filename(projection["event_title"], event_id, "program.csv")
+    return Response(
+        render_program_csv(projection),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @admin_router.post("/import-preview", response_model=ScheduleImportPreviewResponse)
 def preview_schedule_import(
     event_id: str,
@@ -911,7 +1199,7 @@ def import_schedule(
 def publish_schedule(
     event_id: str,
     body: SchedulePublishRequest = SchedulePublishRequest(),
-    admin: dict = Depends(require_admin),
+    editor: User = Depends(require_schedule_editor),
     session: Session = Depends(get_session),
 ):
     schedule = _schedule_for_event(session, event_id)
@@ -921,27 +1209,24 @@ def publish_schedule(
     snapshot = build_snapshot(session, schedule)
     snapshot["version"] = version
     snapshot["published_at"] = published_at.isoformat()
-    raw_user_id = admin.get("user_id")
     publication = SchedulePublication(
         schedule_id=schedule.id,
         version=version,
         snapshot=snapshot,
         published_at=published_at,
-        published_by_user_id=UUID(raw_user_id) if raw_user_id else None,
+        published_by_user_id=editor.id,
     )
     session.add(publication)
     impacted_notifications = []
-    if latest is not None and raw_user_id:
-        actor = session.get(User, UUID(raw_user_id))
-        if actor is not None:
-            impacted_notifications = notify_planned_session_changes(
-                session,
-                actor,
-                event_id,
-                version,
-                latest.snapshot,
-                snapshot,
-            )
+    if latest is not None:
+        impacted_notifications = notify_planned_session_changes(
+            session,
+            editor,
+            event_id,
+            version,
+            latest.snapshot,
+            snapshot,
+        )
     session.commit()
 
     event = session.get(CachedEvent, event_id)

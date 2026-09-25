@@ -17,7 +17,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
-from sqlmodel import Session, col, func, select
+from sqlmodel import Session, col, select
 
 from backend.api.deps import require_user
 from backend.api.schemas import (
@@ -39,6 +39,10 @@ from backend.services.user_avatars import resolve_user_avatar
 from backend.services.event_visibility import (
     event_is_user_facing,
     show_pending_events_enabled,
+)
+from backend.services.notifications import (
+    filter_privacy_safe_notifications,
+    notification_is_privacy_safe,
 )
 
 
@@ -292,43 +296,40 @@ def list_notifications(
         raise HTTPException(status_code=400, detail="Invalid kind")
 
     base = select(Notification).where(Notification.recipient_user_id == user.id)
-    count_base = select(func.count(Notification.id)).where(
-        Notification.recipient_user_id == user.id
-    )
     if kind is not None:
         base = base.where(Notification.kind == kind)
-        count_base = count_base.where(Notification.kind == kind)
     if unread_only:
         base = base.where(Notification.read_at.is_(None))
-        count_base = count_base.where(Notification.read_at.is_(None))
 
     base = _apply_visibility(base, session)
-    count_base = _apply_visibility(count_base, session)
-
-    total = session.exec(count_base).one()
     unread_statement = (
-        select(func.count(Notification.id))
+        select(Notification)
         .where(Notification.recipient_user_id == user.id)
         .where(Notification.read_at.is_(None))
     )
     unread_statement = _apply_visibility(unread_statement, session)
-    unread = session.exec(unread_statement).one()
+    unread_rows = filter_privacy_safe_notifications(
+        session, list(session.exec(unread_statement).all())
+    )
 
     # Scan a capped newest-first window, aggregate collapsible rows into
     # multi-actor items, then paginate the grouped result. ``total`` becomes
     # the grouped count so the feed's "has more" math matches what renders.
-    rows = session.exec(
-        base.order_by(col(Notification.created_at).desc()).limit(AGGREGATION_WINDOW)
-    ).all()
-    aggregated = _hydrate(session, list(rows), viewer_id=user.id)
-    grouped_total = len(aggregated) if len(rows) < AGGREGATION_WINDOW else int(total)
+    rows = filter_privacy_safe_notifications(
+        session,
+        list(
+            session.exec(
+                base.order_by(col(Notification.created_at).desc()).limit(
+                    AGGREGATION_WINDOW
+                )
+            ).all()
+        ),
+    )
+    aggregated = _hydrate(session, rows, viewer_id=user.id)
+    grouped_total = len(aggregated)
     page = aggregated[offset : offset + limit]
 
-    grouped_unread = (
-        sum(item.read_at is None for item in aggregated)
-        if len(rows) < AGGREGATION_WINDOW
-        else int(unread)
-    )
+    grouped_unread = len({_aggregation_key(row) for row in unread_rows})
     return NotificationListResponse(
         items=page,
         total=grouped_total,
@@ -349,7 +350,9 @@ def unread_count(
         .where(Notification.read_at.is_(None))
     )
     statement = _apply_visibility(statement, session)
-    rows = session.exec(statement).all()
+    rows = filter_privacy_safe_notifications(
+        session, list(session.exec(statement).all())
+    )
     return UnreadCountResponse(count=len({_aggregation_key(row) for row in rows}))
 
 
@@ -362,6 +365,8 @@ def mark_read(
     row = session.get(Notification, notification_id)
     if row is None or row.recipient_user_id != user.id:
         # 404 (not 403) so we don't leak existence of others' rows.
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if not notification_is_privacy_safe(session, row):
         raise HTTPException(status_code=404, detail="Notification not found")
     if row.event_id is not None:
         event = session.get(CachedEvent, row.event_id)

@@ -1,18 +1,20 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchMyPlan } from '../api';
+import { downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan } from '../api';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, EventSchedule } from '../types';
 import EventProgramPage from './EventProgramPage';
+import { saveDownload } from '../utils/download';
 
 const authState = vi.hoisted(() => ({ user: null as object | null }));
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchMyPlan: vi.fn() };
+    return { ...actual, downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn() };
 });
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user, loading: false }) }));
+vi.mock('../utils/download', () => ({ saveDownload: vi.fn() }));
 
 const event: CalendarEvent = {
     event_id: 'movida-2026', calendar_id: 'calendar-1', title: 'Movida 2026', description: null,
@@ -58,7 +60,9 @@ describe('EventProgramPage', () => {
             diff: { added_session_ids: [], removed_session_ids: [], changed_sessions: {}, configuration_changed: false },
         });
         vi.mocked(fetchEventSchedule).mockResolvedValue(schedule);
+        vi.mocked(fetchEventScheduleEditorAccess).mockResolvedValue({ can_edit: false });
         vi.mocked(fetchMyPlan).mockResolvedValue({ entries: [] });
+        vi.mocked(downloadMyPlanIcs).mockResolvedValue({ blob: new Blob(['calendar']), filename: 'movida-2026-my-plan.ics' });
     });
     afterEach(() => vi.useRealTimers());
 
@@ -200,6 +204,10 @@ describe('EventProgramPage', () => {
         expect(screen.getByText('Friday Session').closest('article')).toHaveAttribute('aria-current', 'time');
         expect(screen.queryByRole('button', { name: 'Filter schedule' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { current: 'date' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Export published program' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Download My Plan (.ics)' }));
+        await waitFor(() => expect(downloadMyPlanIcs).toHaveBeenCalledWith('movida-2026'));
+        expect(saveDownload).toHaveBeenCalledWith(expect.objectContaining({ filename: 'movida-2026-my-plan.ics' }));
     });
 
     it('hides attendee chrome in the embedded draft preview', async () => {
@@ -210,6 +218,29 @@ describe('EventProgramPage', () => {
         expect(screen.queryByRole('button', { name: 'Back to event' })).not.toBeInTheDocument();
         expect(screen.queryByText(/Draft preview/)).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'My Plan' })).not.toBeInTheDocument();
+    });
+
+    it('offers editor navigation only to an authorized signed-in user', async () => {
+        authState.user = { id: 'editor' };
+        vi.mocked(fetchEventScheduleEditorAccess).mockResolvedValue({ can_edit: true });
+        render(
+            <MemoryRouter initialEntries={['/event/movida-2026/program']}>
+                <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, eventScheduleEnabled: true }, updateFlag: vi.fn(), ready: true }}>
+                    <LocationProbe />
+                    <Routes>
+                        <Route path="/event/:eventId/program" element={<EventProgramPage />} />
+                        <Route path="/event/:eventId/program/edit" element={<p>Program editor destination</p>} />
+                        <Route path="/event/:eventId/program/export" element={<p>Program export destination</p>} />
+                    </Routes>
+                </FeatureFlagsContext.Provider>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByRole('button', { name: 'Export published program' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Edit program' }));
+
+        expect(screen.getByText('Program editor destination')).toBeInTheDocument();
+        expect(screen.getByTestId('location')).toHaveTextContent('/event/movida-2026/program/edit');
     });
 
     it('returns a direct Program visit to Event without adding a loop', async () => {
