@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, Download, Pencil } from 'lucide-react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchMyPlan, removeFromMyPlan } from '../api';
+import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, removeFromMyPlan } from '../api';
 import ScheduleGrid from '../components/program/ScheduleGrid';
 import MyPlanList from '../components/program/MyPlanList';
 import { AttendeeProgramFilters, ProgramDayPicker } from '../components/program/ProgramControls';
@@ -9,6 +9,7 @@ import { SessionDetailsSheet, TimeSlotSheet } from '../components/program/Sessio
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, EventSchedule, MyPlanEntry, ScheduleSession } from '../types';
+import { saveDownload } from '../utils/download';
 import { filterScheduleSessions, firstDayWithSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
 
 const EMPTY_FILTERS: ScheduleFilters = { instructor: '', levelIds: [], activityTypeIds: [] };
@@ -36,6 +37,8 @@ export default function EventProgramPage() {
     const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS);
     const [positionRequest, setPositionRequest] = useState(0);
     const [error, setError] = useState<string | null>(null);
+    const [canEdit, setCanEdit] = useState(false);
+    const [planExportStatus, setPlanExportStatus] = useState<'idle' | 'busy' | 'error'>('idle');
 
     useEffect(() => {
         if (!eventId || !flagsReady || unavailable) return;
@@ -73,6 +76,18 @@ export default function EventProgramPage() {
     useEffect(() => {
         if (!eventId || authLoading || !user || preview) return;
         fetchMyPlan(eventId).then((value) => setPlan(value.entries)).catch(() => setPlan([]));
+    }, [authLoading, eventId, preview, user]);
+
+    useEffect(() => {
+        if (!eventId || authLoading || !user || preview) {
+            setCanEdit(false);
+            return;
+        }
+        let cancelled = false;
+        fetchEventScheduleEditorAccess(eventId)
+            .then((value) => { if (!cancelled) setCanEdit(value.can_edit); })
+            .catch(() => { if (!cancelled) setCanEdit(false); });
+        return () => { cancelled = true; };
     }, [authLoading, eventId, preview, user]);
 
     const plannedIds = useMemo(() => new Set(user ? plan.filter((entry) => entry.status !== 'removed').map((entry) => entry.session_id) : []), [plan, user]);
@@ -158,6 +173,16 @@ export default function EventProgramPage() {
             setPlan(previous);
         }
     };
+    const exportMyPlan = async () => {
+        if (!eventId) return;
+        setPlanExportStatus('busy');
+        try {
+            saveDownload(await downloadMyPlanIcs(eventId));
+            setPlanExportStatus('idle');
+        } catch {
+            setPlanExportStatus('error');
+        }
+    };
     const backToEvent = () => {
         if (fromEventDetail && window.history.length > 1) navigate(-1);
         else navigate(`/event/${eventId}`, { replace: true });
@@ -175,6 +200,10 @@ export default function EventProgramPage() {
                 <div className="mx-auto flex max-w-5xl items-center gap-3">
                     <button type="button" onClick={backToEvent} aria-label="Back to event" className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft"><ChevronLeft size={24} /></button>
                     <h1 className="min-w-0 truncate text-base font-bold text-ink">{event.title}</h1>
+                    {canEdit ? <div className="ml-auto flex shrink-0 items-center gap-1">
+                        <button type="button" onClick={() => navigate(`/event/${event.event_id}/program/export`)} aria-label="Export published program" className="flex min-h-10 items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink"><Download size={16} /><span className="hidden sm:inline">Export</span></button>
+                        <button type="button" onClick={() => navigate(`/event/${event.event_id}/program/edit`)} aria-label="Edit program" className="flex min-h-10 items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink"><Pencil size={16} /><span className="hidden sm:inline">Edit program</span></button>
+                    </div> : null}
                 </div>
             </header> : null}
 
@@ -191,7 +220,13 @@ export default function EventProgramPage() {
                 {activeTab === 'program' ? (
                     <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} compactHeader />
                 ) : user ? (
-                    <MyPlanList schedule={schedule} entries={plan} onOpen={openSession} onRemove={removePlanEntry} onProgram={() => navigate(`/event/${event.event_id}/program`)} />
+                    <div className="flex min-h-0 flex-1 flex-col">
+                        {plan.length ? <div className="shrink-0 border-b border-line bg-surface px-4 py-2 text-right">
+                            <button type="button" disabled={planExportStatus === 'busy'} onClick={exportMyPlan} className="inline-flex items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink disabled:opacity-50"><CalendarPlus size={17} />{planExportStatus === 'busy' ? 'Downloading…' : 'Download My Plan (.ics)'}</button>
+                            {planExportStatus === 'error' ? <p className="mt-1 text-sm text-danger">Could not download My Plan.</p> : null}
+                        </div> : null}
+                        <MyPlanList schedule={schedule} entries={plan} onOpen={openSession} onRemove={removePlanEntry} onProgram={() => navigate(`/event/${event.event_id}/program`)} />
+                    </div>
                 ) : (
                     <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
                         <h2 className="text-lg font-bold text-ink">Sign in to build My Plan</h2>

@@ -57,6 +57,7 @@ from backend.services.email import (
     send_activity_digest_v2_email,
 )
 from backend.services.notification_delivery import record_delivery
+from backend.services.notifications import filter_privacy_safe_notifications
 from backend.services.event_visibility import eligible_event_ids
 from backend.services.event_images import resolve_event_image
 from backend.services.push_service import send_push
@@ -558,6 +559,7 @@ def run_once(
         pending = [
             n for n in pending if n.event_id is None or n.event_id in visible_event_ids
         ]
+        pending = filter_privacy_safe_notifications(session, list(pending))
         if not pending:
             logger.debug(
                 "Activity digest run: no matching notifications (user_ids=%s kinds=%s resend=%s)",

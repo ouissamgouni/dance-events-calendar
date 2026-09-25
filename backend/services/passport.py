@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from backend.db.models import (
     CachedEvent,
@@ -169,6 +169,26 @@ def reviews_written(session: Session, user_id: UUID) -> int:
     )
     statement = apply_event_visibility(statement, session)
     return int(session.exec(statement).one())
+
+
+def public_review_counts(session: Session, user_ids: set[UUID]) -> dict[UUID, int]:
+    if not user_ids:
+        return {}
+    statement = (
+        select(EventRating.user_id, func.count())
+        .select_from(EventRating)
+        .join(CachedEvent, CachedEvent.event_id == EventRating.event_id)
+        .where(col(EventRating.user_id).in_(user_ids))
+        .where(EventRating.status != "rejected")
+        .where(col(EventRating.is_anonymous).is_(False))
+        .group_by(EventRating.user_id)
+    )
+    statement = apply_event_visibility(statement, session)
+    return {user_id: int(count) for user_id, count in session.exec(statement).all()}
+
+
+def public_reviews_written(session: Session, user_id: UUID) -> int:
+    return public_review_counts(session, {user_id}).get(user_id, 0)
 
 
 def events_last_30_days(events: list[CachedEvent]) -> int:

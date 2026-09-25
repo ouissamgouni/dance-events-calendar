@@ -90,7 +90,7 @@ from backend.services.event_visibility import (
 )
 from backend.services.ip_geolocation import geolocate_ip
 from backend.services import activity_instant
-from backend.services.notifications import fan_out_review
+from backend.services.notifications import fan_out_review, withdraw_review_notifications
 from backend.services.passport import attended_events
 from backend.services.profanity import contains_profanity
 from backend.services.review_prompt_service import (
@@ -720,6 +720,8 @@ def submit_feedback(
     session.flush()
     _replace_aspect_scores(session, rating.id, valid_aspect_scores)
     _replace_aspect_tags(session, rating.id, aspect_tag_pairs)
+    if body.is_anonymous:
+        withdraw_review_notifications(session, user.id, event_id)
 
     # Linked tag suggestions (optional). Decoupled moderation: each row gets
     # the same feedback_submission_id but its own status="pending".
@@ -750,9 +752,9 @@ def submit_feedback(
     # Fan a "friend reviewed" activity notification out to the reviewer's
     # subscribers, but only for a first-time review (not an edit) so
     # re-submitting doesn't re-notify. Best-effort: never break submission.
-    if existing is None:
+    if existing is None and not body.is_anonymous:
         try:
-            fan_out_review(session, user, event_id, anonymous=body.is_anonymous)
+            fan_out_review(session, user, event_id)
             session.commit()
             # Deliver the friend-review emails now when that feature is in
             # instant mode (otherwise the digest tick picks them up).

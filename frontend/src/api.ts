@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanEntry, MyPlanResponse, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 
 declare const __VITE_API_URL__: string;
@@ -212,6 +212,14 @@ export async function fetchEventSchedule(eventId: string): Promise<EventSchedule
     return parseJsonResponse<EventSchedule>(res, 'Failed to load the event program');
 }
 
+export async function fetchEventScheduleEditorAccess(eventId: string): Promise<{ can_edit: boolean }> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/schedule/editor-access`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return parseJsonResponse<{ can_edit: boolean }>(res, 'Failed to check program editor access');
+}
+
 export async function fetchAdminEventSchedule(eventId: string): Promise<AdminEventSchedule> {
     const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/schedule`, {
         credentials: 'include',
@@ -338,8 +346,78 @@ export async function fetchSchedulePlanners(eventId: string): Promise<SchedulePl
     return scheduleRequest<SchedulePlanner[]>(eventId, '/planners', 'GET');
 }
 
+export interface EventScheduleEditor {
+    user_id: string;
+    email: string;
+    name: string | null;
+    handle: string | null;
+    granted_at: string;
+}
+
+export async function fetchScheduleEditors(eventId: string): Promise<EventScheduleEditor[]> {
+    return scheduleRequest<EventScheduleEditor[]>(eventId, '/editors', 'GET');
+}
+
+export async function addScheduleEditor(eventId: string, userId: string): Promise<EventScheduleEditor> {
+    return scheduleRequest<EventScheduleEditor>(eventId, '/editors', 'POST', { user_id: userId });
+}
+
+export async function removeScheduleEditor(eventId: string, userId: string): Promise<void> {
+    return scheduleRequest<void>(eventId, `/editors/${encodeURIComponent(userId)}`, 'DELETE');
+}
+
 export async function exportEventSchedule(eventId: string): Promise<ScheduleImportDocument> {
     return scheduleRequest<ScheduleImportDocument>(eventId, '/export', 'GET');
+}
+
+export interface ProgramExportOptions {
+    days?: string[];
+    includeCancelled?: boolean;
+}
+
+export interface FileDownload {
+    blob: Blob;
+    filename: string;
+}
+
+function programExportQuery(options?: ProgramExportOptions): string {
+    const params = new URLSearchParams();
+    options?.days?.forEach((day) => params.append('days', day));
+    if (options?.includeCancelled === false) params.set('include_cancelled', 'false');
+    const query = params.toString();
+    return query ? `?${query}` : '';
+}
+
+function responseFilename(response: Response, fallback: string): string {
+    const disposition = response.headers.get('content-disposition') ?? '';
+    const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    if (encoded) return decodeURIComponent(encoded);
+    return disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? fallback;
+}
+
+async function fileDownload(response: Response, fallbackFilename: string, fallbackMessage: string): Promise<FileDownload> {
+    if (!response.ok) await parseJsonResponse<never>(response, fallbackMessage);
+    return { blob: await response.blob(), filename: responseFilename(response, fallbackFilename) };
+}
+
+export async function fetchPublishedProgramExport(eventId: string, options?: ProgramExportOptions): Promise<ProgramExport> {
+    return scheduleRequest<ProgramExport>(eventId, `/published-export${programExportQuery(options)}`, 'GET');
+}
+
+export async function downloadPublishedProgramExport(eventId: string, format: 'ics' | 'csv', options?: ProgramExportOptions): Promise<FileDownload> {
+    const response = await fetch(
+        `${BASE}/admin/events/${encodeURIComponent(eventId)}/schedule/published-export/${format}${programExportQuery(options)}`,
+        { credentials: 'include' },
+    );
+    return fileDownload(response, `${eventId}-program.${format}`, `Failed to download the program ${format.toUpperCase()}`);
+}
+
+export async function downloadMyPlanIcs(eventId: string): Promise<FileDownload> {
+    const response = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/my-plan/ics`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return fileDownload(response, `${eventId}-my-plan.ics`, 'Failed to download My Plan');
 }
 
 export async function fetchScheduleImportSchema(eventId: string): Promise<{ schema: object; example: ScheduleImportDocument }> {

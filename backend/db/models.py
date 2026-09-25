@@ -471,6 +471,23 @@ class EventSchedule(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class EventScheduleEditor(SQLModel, table=True):
+    __tablename__ = "event_schedule_editors"
+    __table_args__ = (
+        UniqueConstraint("schedule_id", "user_id", name="uq_event_schedule_editor"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    schedule_id: int = Field(
+        foreign_key="event_schedules.id", index=True, nullable=False
+    )
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    granted_by_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+    granted_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class ScheduleVenue(SQLModel, table=True):
     __tablename__ = "schedule_venues"
     __table_args__ = (

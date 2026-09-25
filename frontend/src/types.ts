@@ -245,6 +245,38 @@ export interface MyPlanResponse {
     entries: MyPlanEntry[];
 }
 
+export interface ProgramExportSession {
+    id: string;
+    title: string;
+    instructors: string | null;
+    start: string;
+    end: string;
+    program_day: string;
+    local_date: string;
+    local_start_time: string;
+    local_end_time: string;
+    venue: string | null;
+    room: string | null;
+    address: string | null;
+    level: string | null;
+    activity_type: string | null;
+    attendee_note: string | null;
+    status: 'active' | 'cancelled' | 'removed';
+}
+
+export interface ProgramExport {
+    event_id: string;
+    event_title: string;
+    program_url: string;
+    timezone: string;
+    day_start_hour: number;
+    available_days: string[];
+    selected_days: string[];
+    version: number;
+    published_at: string;
+    sessions: ProgramExportSession[];
+}
+
 export interface ScheduleImportDocument {
     schema_version: 1;
     event_id?: string | null;

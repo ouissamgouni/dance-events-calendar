@@ -20,6 +20,8 @@ from backend.db import database as database_module  # noqa: E402
 from backend.db.models import (  # noqa: E402
     CachedEvent,
     CalendarSetting,
+    CalendarSubscription,
+    EventRating,
     Notification,
     NotificationDelivery,
     SiteSetting,
@@ -190,6 +192,63 @@ def test_later_milestone_evaluation_gets_a_new_group(session):
     ).one()
     assert fifth.group_key is not None
     assert fifth.group_key != first.group_key
+
+
+def test_review_milestone_fans_out_only_after_public_threshold(session):
+    alice = _make_user(
+        session,
+        "alice@example.com",
+        "alice",
+        passport_visibility="public",
+    )
+    bob = _make_user(session, "bob@example.com", "bob")
+    _attend_past_event(session, alice, "ev-review", days_ago=10)
+    rating = EventRating(
+        event_id="ev-review",
+        user_id=alice.id,
+        stars=5,
+        is_anonymous=True,
+    )
+    session.add(rating)
+    session.add(
+        CalendarSubscription(
+            subscriber_id=bob.id,
+            target_user_id=alice.id,
+            notify_new_events=True,
+        )
+    )
+    session.commit()
+
+    milestone_notification_service.run_once()
+    personal_review_milestones = session.exec(
+        select(Notification).where(
+            Notification.recipient_user_id == alice.id,
+            Notification.kind == "milestone_unlocked",
+            Notification.subject_key == "first_review",
+        )
+    ).all()
+    follower_review_milestones = session.exec(
+        select(Notification).where(
+            Notification.recipient_user_id == bob.id,
+            Notification.kind == "subscription_milestone",
+            Notification.subject_key == "first_review",
+        )
+    ).all()
+    assert len(personal_review_milestones) == 1
+    assert follower_review_milestones == []
+
+    rating.is_anonymous = False
+    session.add(rating)
+    session.commit()
+    milestone_notification_service.run_once()
+    follower_review_milestones = session.exec(
+        select(Notification).where(
+            Notification.recipient_user_id == bob.id,
+            Notification.kind == "subscription_milestone",
+            Notification.subject_key == "first_review",
+        )
+    ).all()
+    assert len(follower_review_milestones) == 1
 
 
 def test_multiple_milestones_combined_into_one_email(session, monkeypatch):

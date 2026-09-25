@@ -175,6 +175,7 @@ if _os.getenv("RATE_LIMIT_ENABLED", "true").lower() in ("false", "0", "no"):
         "event_messages",
         "sharing",
         "social",
+        "schedules",
         "suggestions",
         "promo_codes",
         "tags",
@@ -194,7 +195,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
-    expose_headers=["X-Has-More", "X-Total-Count"],
+    expose_headers=["X-Has-More", "X-Total-Count", "Content-Disposition"],
 )
 
 

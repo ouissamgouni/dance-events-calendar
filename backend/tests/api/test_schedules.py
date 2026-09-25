@@ -17,6 +17,7 @@ from backend.db.models import (  # noqa: E402
     CachedEvent,
     CalendarSetting,
     NotificationDelivery,
+    SchedulePublication,
     SiteSetting,
     User,
     UserEventAttendance,
@@ -82,6 +83,153 @@ def _login(client: TestClient, email: str) -> None:
         json={"credential": "ignored", "mock_email": email},
     )
     assert response.status_code == 200
+
+
+def test_event_schedule_editor_grants_are_scoped_and_revocable(
+    client, engine, schedule_event
+):
+    with Session(engine) as session:
+        session.add(
+            CachedEvent(
+                event_id="other-festival-2026",
+                calendar_id="festivals",
+                title="Other Festival 2026",
+                location="Vienna, Austria",
+                start=datetime(2026, 11, 1, 8),
+                end=datetime(2026, 11, 2, 3),
+                review_status="reviewed",
+            )
+        )
+        session.commit()
+
+    for email in (
+        "editor@example.com",
+        "second-editor@example.com",
+        "outsider@example.com",
+    ):
+        _login(client, email)
+    with Session(engine) as session:
+        users = {
+            user.email: user.id
+            for user in session.exec(
+                select(User).where(
+                    User.email.in_(
+                        [
+                            "editor@example.com",
+                            "second-editor@example.com",
+                            "outsider@example.com",
+                        ]
+                    )
+                )
+            ).all()
+        }
+
+    client.cookies.clear()
+    assert client.get(
+        "/api/events/back-2-mambo-2026/schedule/editor-access"
+    ).json() == {"can_edit": False}
+    assert client.get("/api/admin/events/back-2-mambo-2026/schedule").status_code == 401
+
+    _login(client, "admin@example.com")
+    for event_id in ("back-2-mambo-2026", "other-festival-2026"):
+        assert (
+            client.post(
+                f"/api/admin/events/{event_id}/schedule",
+                json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
+            ).status_code
+            == 201
+        )
+    assert client.get(
+        "/api/events/back-2-mambo-2026/schedule/editor-access"
+    ).json() == {"can_edit": True}
+
+    for email in ("editor@example.com", "second-editor@example.com"):
+        granted = client.post(
+            "/api/admin/events/back-2-mambo-2026/schedule/editors",
+            json={"user_id": str(users[email])},
+        )
+        assert granted.status_code == 201
+        assert granted.json()["email"] == email
+    assert (
+        client.post(
+            "/api/admin/events/back-2-mambo-2026/schedule/editors",
+            json={"user_id": str(users["editor@example.com"])},
+        ).status_code
+        == 409
+    )
+    listed = client.get("/api/admin/events/back-2-mambo-2026/schedule/editors")
+    assert [row["email"] for row in listed.json()] == [
+        "editor@example.com",
+        "second-editor@example.com",
+    ]
+    assert (
+        client.delete(
+            "/api/admin/events/back-2-mambo-2026/schedule/editors/"
+            f"{users['second-editor@example.com']}"
+        ).status_code
+        == 204
+    )
+
+    _login(client, "editor@example.com")
+    assert client.get(
+        "/api/events/back-2-mambo-2026/schedule/editor-access"
+    ).json() == {"can_edit": True}
+    assert client.get("/api/admin/events/back-2-mambo-2026/schedule").status_code == 200
+    assert (
+        client.get("/api/admin/events/back-2-mambo-2026/schedule/editors").status_code
+        == 403
+    )
+    assert (
+        client.get("/api/admin/events/other-festival-2026/schedule").status_code == 403
+    )
+    created_session = client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule/sessions",
+        json={
+            "title": "Delegated workshop",
+            "start": "2026-10-16T12:00:00Z",
+            "end": "2026-10-16T13:00:00Z",
+        },
+    )
+    assert created_session.status_code == 201
+    published = client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule/publish", json={}
+    )
+    assert published.status_code == 200
+    assert (
+        client.get(
+            "/api/admin/events/back-2-mambo-2026/schedule/published-export"
+        ).status_code
+        == 200
+    )
+    with Session(engine) as session:
+        publication = session.exec(select(SchedulePublication)).one()
+        assert publication.published_by_user_id == users["editor@example.com"]
+
+    _login(client, "outsider@example.com")
+    assert client.get(
+        "/api/events/back-2-mambo-2026/schedule/editor-access"
+    ).json() == {"can_edit": False}
+    assert client.get("/api/admin/events/back-2-mambo-2026/schedule").status_code == 403
+    assert (
+        client.get(
+            "/api/admin/events/back-2-mambo-2026/schedule/published-export/ics"
+        ).status_code
+        == 403
+    )
+
+    _login(client, "admin@example.com")
+    assert (
+        client.delete(
+            "/api/admin/events/back-2-mambo-2026/schedule/editors/"
+            f"{users['editor@example.com']}"
+        ).status_code
+        == 204
+    )
+    _login(client, "editor@example.com")
+    assert client.get(
+        "/api/events/back-2-mambo-2026/schedule/editor-access"
+    ).json() == {"can_edit": False}
+    assert client.get("/api/admin/events/back-2-mambo-2026/schedule").status_code == 403
 
 
 def test_schedule_publish_and_my_plan_lifecycle(
@@ -196,6 +344,38 @@ def test_schedule_publish_and_my_plan_lifecycle(
     )
     assert public_session["title"] == "Shines / Partnerwork"
     assert public_session["start"] == "2026-10-16T12:00:00Z"
+    published_export = client.get(
+        "/api/admin/events/back-2-mambo-2026/schedule/published-export",
+        params={"days": "2026-10-16"},
+    )
+    assert published_export.status_code == 200
+    exported_session = next(
+        row for row in published_export.json()["sessions"] if row["id"] == session_id
+    )
+    assert exported_session["title"] == "Shines / Partnerwork"
+    assert published_export.json()["timezone"] == "Europe/Prague"
+    program_ics = client.get(
+        "/api/admin/events/back-2-mambo-2026/schedule/published-export/ics"
+    )
+    assert program_ics.status_code == 200
+    assert program_ics.headers["content-type"].startswith("text/calendar")
+    assert f"UID:{session_id}@program.joinmovida.com" in program_ics.text
+    assert "back-2-mambo-2026-program.ics" in program_ics.headers[
+        "content-disposition"
+    ]
+    program_csv = client.get(
+        "/api/admin/events/back-2-mambo-2026/schedule/published-export/csv"
+    )
+    assert program_csv.status_code == 200
+    assert program_csv.content.startswith(b"\xef\xbb\xbf")
+    assert b"Shines / Partnerwork" in program_csv.content
+    assert (
+        client.get(
+            "/api/admin/events/back-2-mambo-2026/schedule/published-export",
+            params={"days": "2026-10-20"},
+        ).status_code
+        == 422
+    )
 
     legacy_export = client.get(
         "/api/admin/events/back-2-mambo-2026/schedule/export"
@@ -217,10 +397,19 @@ def test_schedule_publish_and_my_plan_lifecycle(
 
     client.cookies.clear()
     assert client.get("/api/events/back-2-mambo-2026/my-plan").status_code == 401
+    assert client.get("/api/events/back-2-mambo-2026/my-plan/ics").status_code == 401
     _login(client, "dancer@example.com")
     saved = client.put(f"/api/events/back-2-mambo-2026/my-plan/{session_id}")
     assert saved.status_code == 201
     assert saved.json()["status"] == "active"
+    my_plan_ics = client.get("/api/events/back-2-mambo-2026/my-plan/ics")
+    assert my_plan_ics.status_code == 200
+    assert f"UID:{session_id}@program.joinmovida.com" in my_plan_ics.text
+    assert "STATUS:CANCELLED" not in my_plan_ics.text
+    assert my_plan_ics.headers["cache-control"] == "private, no-store"
+    assert "back-2-mambo-2026-my-plan.ics" in my_plan_ics.headers[
+        "content-disposition"
+    ]
 
     _login(client, "admin@example.com")
     planners = client.get("/api/admin/events/back-2-mambo-2026/schedule/planners")
@@ -253,12 +442,22 @@ def test_schedule_publish_and_my_plan_lifecycle(
     assert plan.status_code == 200
     assert plan.json()["entries"][0]["status"] == "removed"
     assert plan.json()["entries"][0]["session"]["title"] == "Shines / Partnerwork"
+    removed_plan_ics = client.get("/api/events/back-2-mambo-2026/my-plan/ics")
+    assert removed_plan_ics.status_code == 200
+    assert f"UID:{session_id}@program.joinmovida.com" in removed_plan_ics.text
+    assert "STATUS:CANCELLED" in removed_plan_ics.text
     notifications = client.get("/api/notifications").json()["items"]
     schedule_notice = next(
         row for row in notifications if row["kind"] == "planned_session_changed"
     )
     assert schedule_notice["schedule_session_id"] == session_id
     assert "removed from the program" in schedule_notice["description"]
+
+    _login(client, "other-dancer@example.com")
+    empty_plan_ics = client.get("/api/events/back-2-mambo-2026/my-plan/ics")
+    assert empty_plan_ics.status_code == 200
+    assert "BEGIN:VEVENT" not in empty_plan_ics.text
+    assert session_id not in empty_plan_ics.text
 
 
 def test_schedule_json_import_preview_merge_and_replace(client, schedule_event):

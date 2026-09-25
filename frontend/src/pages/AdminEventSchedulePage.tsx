@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from 'react';
-import { ChevronLeft, ExternalLink, Eye, Plus, Search, Send, Trash2, Users, X } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { ChevronLeft, Download, ExternalLink, Eye, Plus, Search, Send, Trash2, Users, X } from 'lucide-react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+    addScheduleEditor,
     createAdminEventSchedule,
     createScheduleActivityType,
     createScheduleLevel,
@@ -17,12 +18,16 @@ import {
     duplicateScheduleSession,
     exportEventSchedule,
     fetchAdminEventSchedule,
+    fetchAdminUsers,
     fetchEvent,
+    fetchEventScheduleEditorAccess,
     fetchOptionalAdminEventSchedule,
     fetchSchedulePlanners,
+    fetchScheduleEditors,
     publishEventSchedule,
     fetchScheduleImportSchema,
     previewScheduleImport,
+    removeScheduleEditor,
     updateAdminEventSchedule,
     updateScheduleActivityType,
     updateScheduleLevel,
@@ -32,6 +37,8 @@ import {
     type ScheduleSessionInput,
     type SchedulePlanner,
     type SchedulePublishResponse,
+    type AdminUserRow,
+    type EventScheduleEditor,
 } from '../api';
 import ScheduleGrid from '../components/program/ScheduleGrid';
 import { ProgramDayPicker, ProgramFilters } from '../components/program/ProgramControls';
@@ -51,6 +58,8 @@ const defaultScheduleDay = (value: AdminEventSchedule, eventStart?: string) => f
 export default function AdminEventSchedulePage() {
     const { eventId } = useParams<{ eventId: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
+    const isAdminRoute = location.pathname.startsWith('/admin/');
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [schedule, setSchedule] = useState<AdminEventSchedule | null>(null);
     const [section, setSection] = useState<Section>('schedule');
@@ -61,6 +70,7 @@ export default function AdminEventSchedulePage() {
     const [showPublish, setShowPublish] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [accessDenied, setAccessDenied] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS);
     const [positionRequest, setPositionRequest] = useState(0);
@@ -74,15 +84,26 @@ export default function AdminEventSchedulePage() {
 
     useEffect(() => {
         if (!eventId) return;
-        Promise.all([fetchEvent(eventId, { fresh: true }), fetchOptionalAdminEventSchedule(eventId)])
-            .then(([eventValue, scheduleValue]) => {
+        const access = isAdminRoute
+            ? Promise.resolve({ can_edit: true })
+            : fetchEventScheduleEditorAccess(eventId);
+        access.then((value) => {
+            if (!value.can_edit) {
+                setAccessDenied(true);
+                return null;
+            }
+            return Promise.all([fetchEvent(eventId, { fresh: true }), fetchOptionalAdminEventSchedule(eventId)]);
+        })
+            .then((values) => {
+                if (!values) return;
+                const [eventValue, scheduleValue] = values;
                 setEvent(eventValue);
                 setSchedule(scheduleValue);
                 if (scheduleValue) setSelectedDay(defaultScheduleDay(scheduleValue, eventValue.start));
             })
             .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Schedule unavailable'))
             .finally(() => setLoading(false));
-    }, [eventId]);
+    }, [eventId, isAdminRoute]);
 
     const createSchedule = async () => {
         if (!eventId || !event) return;
@@ -100,6 +121,7 @@ export default function AdminEventSchedulePage() {
     };
 
     if (loading) return <AdminState text="Loading schedule…" />;
+    if (accessDenied) return <ProgramEditorAccessDenied onBack={() => navigate(`/event/${eventId}/program`)} />;
     if (!event) return <AdminState text={error ?? 'Event not found'} />;
     if (!schedule) {
         return (
@@ -134,11 +156,12 @@ export default function AdminEventSchedulePage() {
         <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col bg-canvas">
             <header className="shrink-0 border-b border-line bg-surface px-4 py-3">
                 <div className="flex items-center gap-3">
-                    <button type="button" onClick={() => navigate('/admin')} aria-label="Back to admin" className="flex h-11 w-11 items-center justify-center text-ink-soft"><ChevronLeft /></button>
+                    <button type="button" onClick={() => navigate(isAdminRoute ? '/admin' : `/event/${event.event_id}/program`)} aria-label={isAdminRoute ? 'Back to admin' : 'Back to program'} className="flex h-11 w-11 items-center justify-center text-ink-soft"><ChevronLeft /></button>
                     <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold uppercase text-ink-soft">Event schedule</p>
                         <h1 className="truncate text-lg font-bold text-ink">{event.title}</h1>
                     </div>
+                    <button type="button" disabled={schedule.version == null} title={schedule.version == null ? 'Publish the program before exporting' : 'Export published program'} onClick={() => navigate(`/event/${event.event_id}/program/export`)} className="hidden items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink disabled:opacity-50 sm:flex"><Download size={17} />Export</button>
                     <button type="button" onClick={() => setShowPreview(true)} className="hidden items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink sm:flex"><Eye size={17} />Preview</button>
                     <button type="button" onClick={() => setShowPublish(true)} className="flex items-center gap-2 rounded-field bg-action px-3 py-2 text-sm font-semibold text-white"><Send size={17} />Publish{changeCount ? ` (${changeCount})` : ''}</button>
                 </div>
@@ -165,7 +188,7 @@ export default function AdminEventSchedulePage() {
                     {section === 'sessions' ? <SessionsTable schedule={filteredSchedule} day={sessionsDay} onEdit={setEditingSession} /> : null}
                     {section === 'locations' ? <ConfigLists schedule={schedule} kinds={['venue', 'room']} onEdit={(kind, item) => setEditingConfig({ kind, item })} /> : null}
                     {section === 'taxonomy' ? <ConfigLists schedule={schedule} kinds={['level', 'activity']} onEdit={(kind, item) => setEditingConfig({ kind, item })} /> : null}
-                    {section === 'settings' ? <SettingsPanel schedule={schedule} eventId={event.event_id} onSaved={setSchedule} /> : null}
+                    {section === 'settings' ? <SettingsPanel schedule={schedule} eventId={event.event_id} canManageEditors={isAdminRoute} onSaved={setSchedule} /> : null}
                 </main>
             </div>
 
@@ -218,7 +241,7 @@ function ConfigLists({ schedule, kinds, onEdit }: { schedule: AdminEventSchedule
     ))}</div></div>;
 }
 
-function SettingsPanel({ schedule, eventId, onSaved }: { schedule: AdminEventSchedule; eventId: string; onSaved: (value: AdminEventSchedule) => void }) {
+function SettingsPanel({ schedule, eventId, canManageEditors, onSaved }: { schedule: AdminEventSchedule; eventId: string; canManageEditors: boolean; onSaved: (value: AdminEventSchedule) => void }) {
     const [timezone, setTimezone] = useState(schedule.timezone);
     const [cutoff, setCutoff] = useState(schedule.day_start_hour);
     const [busy, setBusy] = useState(false);
@@ -230,9 +253,98 @@ function SettingsPanel({ schedule, eventId, onSaved }: { schedule: AdminEventSch
             <label className="block text-sm font-semibold text-ink">Program day changes at<select value={cutoff} onChange={(event) => setCutoff(Number(event.target.value))} className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 font-normal">{Array.from({ length: 12 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}</select></label>
             <button disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save settings'}</button>
         </form>
+        {canManageEditors ? <ProgramEditorsPanel eventId={eventId} /> : null}
         <PlannerRoster eventId={eventId} schedule={schedule} />
         <ScheduleImportPanel eventId={eventId} onApplied={async () => onSaved(await fetchAdminEventSchedule(eventId))} />
     </div>;
+}
+
+function ProgramEditorsPanel({ eventId }: { eventId: string }) {
+    const [editors, setEditors] = useState<EventScheduleEditor[]>([]);
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState<AdminUserRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [busyUserId, setBusyUserId] = useState<string | null>(null);
+    const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetchScheduleEditors(eventId)
+            .then((value) => { if (!cancelled) setEditors(value); })
+            .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not load program editors'); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [eventId]);
+
+    useEffect(() => {
+        const value = query.trim();
+        if (!value) {
+            setResults([]);
+            return;
+        }
+        let cancelled = false;
+        const timeout = window.setTimeout(() => {
+            fetchAdminUsers({ q: value, limit: 20 })
+                .then((response) => { if (!cancelled) setResults(response.items); })
+                .catch(() => { if (!cancelled) setResults([]); });
+        }, 250);
+        return () => { cancelled = true; window.clearTimeout(timeout); };
+    }, [query]);
+
+    const availableUsers = results.filter((user) => !user.is_admin && !user.deleted_at && !editors.some((editor) => editor.user_id === user.user_id));
+    const addEditor = async (user: AdminUserRow) => {
+        setBusyUserId(user.user_id);
+        setError(null);
+        try {
+            const editor = await addScheduleEditor(eventId, user.user_id);
+            setEditors((current) => [...current, editor].sort((left, right) => left.email.localeCompare(right.email)));
+            setQuery('');
+            setResults([]);
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : 'Could not add program editor');
+        } finally {
+            setBusyUserId(null);
+        }
+    };
+    const removeEditor = async (editor: EventScheduleEditor) => {
+        if (confirmRemove !== editor.user_id) {
+            setConfirmRemove(editor.user_id);
+            return;
+        }
+        setBusyUserId(editor.user_id);
+        setError(null);
+        try {
+            await removeScheduleEditor(eventId, editor.user_id);
+            setEditors((current) => current.filter((row) => row.user_id !== editor.user_id));
+            setConfirmRemove(null);
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : 'Could not remove program editor');
+        } finally {
+            setBusyUserId(null);
+        }
+    };
+
+    return <section className="border-t border-line pt-6">
+        <h2 className="text-lg font-bold text-ink">Program editors</h2>
+        <p className="mt-1 text-sm text-ink-soft">Editors can change and publish this program. Only admins can manage access.</p>
+        <label className="mt-4 block text-sm font-semibold text-ink">Add an editor
+            <span className="relative mt-2 block">
+                <Search size={17} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search email, name, or handle" className={`${FIELD_CLASS} pl-10`} />
+            </span>
+        </label>
+        {query.trim() ? <div className="mt-2 divide-y divide-card-line border-y border-line">
+            {availableUsers.map((user) => <button key={user.user_id} type="button" disabled={busyUserId === user.user_id} onClick={() => addEditor(user)} className="flex min-h-11 w-full items-center justify-between gap-3 px-2 py-2 text-left disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-ink">{user.display_name || user.handle || user.email}</span><span className="block truncate text-xs text-ink-soft">{user.email}</span></span><span className="text-sm font-semibold text-action">Add</span></button>)}
+            {!availableUsers.length ? <p className="px-2 py-3 text-sm text-ink-soft">No available users found.</p> : null}
+        </div> : null}
+        {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+        {loading ? <p className="mt-4 text-sm text-ink-soft">Loading editors…</p> : null}
+        {!loading ? <div className="mt-4 divide-y divide-card-line border-y border-line">
+            {editors.map((editor) => <div key={editor.user_id} className="flex min-h-14 items-center gap-3 py-2"><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">{editor.name || editor.handle || editor.email}</span><span className="block truncate text-xs text-ink-soft">{editor.email}</span></span><button type="button" disabled={busyUserId === editor.user_id} onClick={() => removeEditor(editor)} className="shrink-0 rounded-field px-3 py-2 text-sm font-semibold text-danger disabled:opacity-50">{confirmRemove === editor.user_id ? 'Confirm remove' : 'Remove'}</button></div>)}
+            {!editors.length ? <p className="py-3 text-sm text-ink-soft">No delegated editors.</p> : null}
+        </div> : null}
+    </section>;
 }
 
 function TimezoneCombobox({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
@@ -449,3 +561,4 @@ function Modal({ title, onClose, wide = false, sheetOnMobile = false, children }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block text-sm font-semibold text-ink">{label}<div className="mt-1">{children}</div></label>; }
 function DiffCount({ value, label }: { value: number; label: string }) { return <div className="bg-canvas p-3"><p className="text-xl font-bold text-ink">{value}</p><p className="text-xs text-ink-soft">{label}</p></div>; }
 function AdminState({ text }: { text: string }) { return <div className="flex min-h-full items-center justify-center bg-canvas p-6 text-sm text-ink-soft">{text}</div>; }
+function ProgramEditorAccessDenied({ onBack }: { onBack: () => void }) { return <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-canvas p-6 text-center"><h1 className="text-lg font-bold text-ink">Program editor access required</h1><p className="text-sm text-ink-soft">You no longer have permission to edit this event program.</p><button type="button" onClick={onBack} className="text-sm font-semibold text-action">Back to program</button></div>; }

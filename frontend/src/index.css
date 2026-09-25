@@ -142,6 +142,41 @@ body {
   overflow: hidden;
 }
 
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body,
+  #root {
+    position: static;
+    height: auto;
+    overflow: visible;
+    background: #ffffff;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .program-export-print,
+  .program-export-print * {
+    visibility: visible;
+  }
+
+  .program-export-print {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    color: #000000;
+  }
+
+  .program-export-session {
+    break-inside: avoid;
+  }
+}
+
 /* ── Leaflet — undo Tailwind preflight on tiles ──── */
 .leaflet-container {
   z-index: 0;

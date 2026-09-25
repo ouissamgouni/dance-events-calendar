@@ -40,6 +40,7 @@ from backend.services.app_settings import get_feature_email_instant
 from backend.services.email import send_activity_digest_email
 from backend.services.event_visibility import eligible_event_ids
 from backend.services.notification_delivery import record_delivery
+from backend.services.notifications import filter_privacy_safe_notifications
 from backend.services.user_avatars import resolve_user_avatar
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,7 @@ def dispatch_activity_instant(
         stmt = stmt.where(Notification.event_id.is_(None))  # type: ignore[union-attr]
 
     rows = session.exec(stmt).all()
+    rows = filter_privacy_safe_notifications(session, list(rows))
     event_ids = {n.event_id for n in rows if n.event_id}
     visible_event_ids = eligible_event_ids(session, event_ids)
     rows = [n for n in rows if n.event_id is None or n.event_id in visible_event_ids]

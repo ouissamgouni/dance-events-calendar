@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyScheduleImport, createAdminEventSchedule, exportEventSchedule, fetchAdminEventSchedule, fetchEvent, fetchOptionalAdminEventSchedule, fetchScheduleImportSchema, fetchSchedulePlanners, previewScheduleImport, publishEventSchedule } from '../api';
+import { addScheduleEditor, applyScheduleImport, createAdminEventSchedule, exportEventSchedule, fetchAdminEventSchedule, fetchAdminUsers, fetchEvent, fetchEventScheduleEditorAccess, fetchOptionalAdminEventSchedule, fetchScheduleEditors, fetchScheduleImportSchema, fetchSchedulePlanners, previewScheduleImport, publishEventSchedule, removeScheduleEditor, type AdminUserRow } from '../api';
 import type { AdminEventSchedule, CalendarEvent } from '../types';
 import AdminEventSchedulePage from './AdminEventSchedulePage';
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn() };
+    return { ...actual, addScheduleEditor: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchAdminUsers: vi.fn(), fetchEvent: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleEditors: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn(), removeScheduleEditor: vi.fn() };
 });
 
 const event: CalendarEvent = {
@@ -53,9 +53,13 @@ const exampleDocument = { ...importDocument, sessions: [{ external_id: 'sample-s
 
 describe('AdminEventSchedulePage', () => {
     beforeEach(() => {
+        vi.clearAllMocks();
         vi.mocked(fetchEvent).mockResolvedValue(event);
         vi.mocked(fetchAdminEventSchedule).mockResolvedValue(schedule);
+        vi.mocked(fetchEventScheduleEditorAccess).mockResolvedValue({ can_edit: true });
         vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue(schedule);
+        vi.mocked(fetchScheduleEditors).mockResolvedValue([]);
+        vi.mocked(fetchAdminUsers).mockResolvedValue({ items: [], total: 0 });
         vi.mocked(exportEventSchedule).mockResolvedValue(importDocument);
         vi.mocked(fetchScheduleImportSchema).mockResolvedValue({ schema: {}, example: exampleDocument });
         vi.mocked(fetchSchedulePlanners).mockResolvedValue([{ user_id: 'user-1', email: 'dancer@example.com', name: 'Dancer', handle: 'dancer', going: true, planned_session_count: 1, sessions: [{ session_id: 'session-1', title: 'Musicality', start: '2026-10-16T12:00:00Z', end: '2026-10-16T13:00:00Z', status: 'active' }] }]);
@@ -197,6 +201,7 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.queryByRole('option', { name: 'UTC' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('option', { name: 'Europe/Prague' }));
         expect(timezone).toHaveValue('Europe/Prague');
+        expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled();
         expect(screen.queryByText('dancer@example.com')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
         expect(screen.getByTitle('Draft attendee preview')).toHaveAttribute('src', '/event/movida-2026/program?preview=draft&embed=program');
@@ -247,7 +252,70 @@ describe('AdminEventSchedulePage', () => {
 
         fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
 
+        expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
         expect(screen.getByText(/Publishing makes this program visible and announces it/)).toBeInTheDocument();
         expect(screen.queryByRole('checkbox', { name: /Also notify all Going attendees/ })).not.toBeInTheDocument();
+    });
+
+    it('shows a denied state when delegated editor access was revoked', async () => {
+        vi.mocked(fetchEventScheduleEditorAccess).mockResolvedValue({ can_edit: false });
+        render(
+            <MemoryRouter initialEntries={['/event/movida-2026/program/edit']}>
+                <Routes><Route path="/event/:eventId/program/edit" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByRole('heading', { name: 'Program editor access required' })).toBeInTheDocument();
+        expect(fetchOptionalAdminEventSchedule).not.toHaveBeenCalled();
+    });
+
+    it('loads the delegated editor without access-management controls', async () => {
+        render(
+            <MemoryRouter initialEntries={['/event/movida-2026/program/edit']}>
+                <Routes><Route path="/event/:eventId/program/edit" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByRole('button', { name: 'Back to program' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'settings' }));
+        await waitFor(() => expect(screen.getByLabelText('Schedule JSON document')).toHaveValue(JSON.stringify(importDocument, null, 2)));
+        expect(screen.queryByRole('heading', { name: 'Program editors' })).not.toBeInTheDocument();
+        expect(fetchScheduleEditors).not.toHaveBeenCalled();
+    });
+
+    it('lets an admin add and revoke program editors', async () => {
+        const candidate = {
+            user_id: 'editor-1',
+            email: 'editor@example.com',
+            handle: 'editor',
+            display_name: 'Event Editor',
+            is_admin: false,
+            deleted_at: null,
+        } as AdminUserRow;
+        const editor = {
+            user_id: candidate.user_id,
+            email: candidate.email,
+            name: candidate.display_name,
+            handle: candidate.handle,
+            granted_at: '2026-09-25T12:00:00Z',
+        };
+        vi.mocked(fetchAdminUsers).mockResolvedValue({ items: [candidate], total: 1 });
+        vi.mocked(addScheduleEditor).mockResolvedValue(editor);
+        vi.mocked(removeScheduleEditor).mockResolvedValue(undefined);
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'settings' }));
+        expect(await screen.findByRole('heading', { name: 'Program editors' })).toBeInTheDocument();
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Add an editor' }), { target: { value: 'editor' } });
+        await waitFor(() => expect(fetchAdminUsers).toHaveBeenCalledWith({ q: 'editor', limit: 20 }));
+        fireEvent.click(await screen.findByRole('button', { name: /Event Editor.*editor@example.com.*Add/ }));
+        await waitFor(() => expect(addScheduleEditor).toHaveBeenCalledWith(event.event_id, candidate.user_id));
+        fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Confirm remove' }));
+        await waitFor(() => expect(removeScheduleEditor).toHaveBeenCalledWith(event.event_id, candidate.user_id));
     });
 });

@@ -193,6 +193,54 @@ class AdminEventScheduleResponse(EventScheduleResponse):
     diff: ScheduleDiffResponse
 
 
+class EventScheduleEditorAccessResponse(BaseModel):
+    can_edit: bool
+
+
+class EventScheduleEditorCreateRequest(BaseModel):
+    user_id: UUID
+
+
+class EventScheduleEditorResponse(BaseModel):
+    user_id: UUID
+    email: str
+    name: Optional[str] = None
+    handle: Optional[str] = None
+    granted_at: datetime
+
+
+class ProgramExportSessionResponse(BaseModel):
+    id: str
+    title: str
+    instructors: Optional[str] = None
+    start: datetime
+    end: datetime
+    program_day: date
+    local_date: date
+    local_start_time: str
+    local_end_time: str
+    venue: Optional[str] = None
+    room: Optional[str] = None
+    address: Optional[str] = None
+    level: Optional[str] = None
+    activity_type: Optional[str] = None
+    attendee_note: Optional[str] = None
+    status: Literal["active", "cancelled", "removed"]
+
+
+class ProgramExportResponse(BaseModel):
+    event_id: str
+    event_title: str
+    program_url: str
+    timezone: str
+    day_start_hour: int
+    available_days: list[date]
+    selected_days: list[date]
+    version: int
+    published_at: datetime
+    sessions: list[ProgramExportSessionResponse]
+
+
 class SchedulePublishNotificationSummary(BaseModel):
     impacted_planners: int = 0
     going_attendees_notified: int = 0

@@ -33,6 +33,7 @@ const Login = lazy(() => import('./pages/Login'));
 const Account = lazy(() => import('./pages/Account'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const EventProgramPage = lazy(() => import('./pages/EventProgramPage'));
+const EventProgramExportPage = lazy(() => import('./pages/EventProgramExportPage'));
 const SeriesPage = lazy(() => import('./pages/SeriesPage'));
 const MyCalendar = lazy(() => import('./pages/MyCalendar'));
 const PassportPage = lazy(() => import('./pages/PassportPage'));
@@ -209,6 +210,8 @@ function AppShell() {
                 <Route path="/event/:eventId" element={<EventDetailPage />} />
                 <Route path="/event/:eventId/program" element={<EventProgramPage />} />
                 <Route path="/event/:eventId/program/plan" element={<EventProgramPage />} />
+                <Route path="/event/:eventId/program/edit" element={<ProtectedRoute><AdminEventSchedulePage /></ProtectedRoute>} />
+                <Route path="/event/:eventId/program/export" element={<ProtectedRoute><EventProgramExportPage /></ProtectedRoute>} />
                 <Route path="/event/:eventId/review" element={<EventDetailPage />} />
                 <Route path="/event/:eventId/ask" element={<EventDetailPage />} />
                 <Route path="/series/:seriesId" element={<SeriesPage />} />
