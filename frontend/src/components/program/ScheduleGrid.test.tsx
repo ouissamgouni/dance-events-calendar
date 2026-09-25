@@ -29,4 +29,17 @@ describe('ScheduleGrid', () => {
         expect(screen.getByLabelText('Current time 02:30')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Late Night Afterparty.*Now/ })).toHaveAttribute('aria-current', 'time');
     });
+
+    it('positions the first available session once for each user action request', () => {
+        const { rerender } = render(<ScheduleGrid schedule={schedule} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} positionRequest={1} />);
+        const grid = screen.getByTestId('schedule-grid');
+        expect(grid.scrollTop).toBeGreaterThan(0);
+
+        grid.scrollTop = 5;
+        rerender(<ScheduleGrid schedule={{ ...schedule }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} positionRequest={1} />);
+        expect(grid.scrollTop).toBe(5);
+
+        rerender(<ScheduleGrid schedule={{ ...schedule }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} positionRequest={2} />);
+        expect(grid.scrollTop).toBeGreaterThan(5);
+    });
 });

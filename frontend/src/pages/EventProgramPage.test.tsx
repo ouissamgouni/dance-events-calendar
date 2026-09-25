@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchEvent, fetchEventSchedule, fetchMyPlan } from '../api';
+import { fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchMyPlan } from '../api';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, EventSchedule } from '../types';
 import EventProgramPage from './EventProgramPage';
@@ -10,7 +10,7 @@ const authState = vi.hoisted(() => ({ user: null as object | null }));
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchMyPlan: vi.fn() };
+    return { ...actual, fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchMyPlan: vi.fn() };
 });
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user, loading: false }) }));
 
@@ -41,12 +41,22 @@ function renderPage(path = '/event/movida-2026/program') {
     );
 }
 
+function LocationProbe() {
+    const location = useLocation();
+    return <output data-testid="location">{location.pathname}</output>;
+}
+
 describe('EventProgramPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         sessionStorage.clear();
         authState.user = null;
         vi.mocked(fetchEvent).mockResolvedValue(event);
+        vi.mocked(fetchAdminEventSchedule).mockResolvedValue({
+            ...schedule,
+            issues: [],
+            diff: { added_session_ids: [], removed_session_ids: [], changed_sessions: {}, configuration_changed: false },
+        });
         vi.mocked(fetchEventSchedule).mockResolvedValue(schedule);
         vi.mocked(fetchMyPlan).mockResolvedValue({ entries: [] });
     });
@@ -79,11 +89,32 @@ describe('EventProgramPage', () => {
     it('filters program sessions by instructor and level', async () => {
         renderPage('/event/movida-2026/program?day=2026-10-16');
         expect(await screen.findByRole('button', { name: /Friday Session/ })).toBeInTheDocument();
-        fireEvent.change(screen.getByRole('searchbox', { name: 'Search instructors' }), { target: { value: 'maya' } });
+        fireEvent.change(screen.getByLabelText('Search instructors'), { target: { value: 'maya' } });
         expect(screen.queryByRole('button', { name: /Friday Session/ })).not.toBeInTheDocument();
-        fireEvent.change(screen.getByRole('searchbox', { name: 'Search instructors' }), { target: { value: '' } });
+        expect(screen.getByRole('button', { name: /Thursday Session/ })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Search instructors' })).toHaveAttribute('aria-autocomplete', 'list');
+        expect(screen.getByRole('option', { name: 'Maya' })).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Search instructors'), { target: { value: '' } });
         fireEvent.click(screen.getByRole('button', { name: 'Open' }));
         expect(screen.queryByRole('button', { name: /Friday Session/ })).not.toBeInTheDocument();
+    });
+
+    it('shows every instructor when the search opens', async () => {
+        vi.mocked(fetchEventSchedule).mockResolvedValue({
+            ...schedule,
+            sessions: Array.from({ length: 10 }, (_, index) => ({
+                ...schedule.sessions[0],
+                id: `session-${index}`,
+                title: `Session ${index}`,
+                instructors: `Instructor ${index}`,
+            })),
+        });
+        renderPage();
+
+        fireEvent.focus(await screen.findByLabelText('Search instructors'));
+
+        expect(screen.getAllByRole('option')).toHaveLength(10);
+        expect(screen.getByRole('option', { name: 'Instructor 9' })).toBeInTheDocument();
     });
 
     it('shows the complete plan without program date or filter controls', async () => {
@@ -102,7 +133,34 @@ describe('EventProgramPage', () => {
         expect(screen.getByText('Friday Session')).toBeInTheDocument();
         expect(screen.getByText('Now')).toBeInTheDocument();
         expect(screen.getByText('Friday Session').closest('article')).toHaveAttribute('aria-current', 'time');
-        expect(screen.queryByRole('searchbox', { name: 'Search instructors' })).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Search instructors')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { current: 'date' })).not.toBeInTheDocument();
+    });
+
+    it('hides attendee chrome in the embedded draft preview', async () => {
+        renderPage('/event/movida-2026/program?preview=draft&embed=program');
+
+        expect(await screen.findByRole('button', { name: /Thursday Session/ })).toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: event.title })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Back to event' })).not.toBeInTheDocument();
+        expect(screen.queryByText(/Draft preview/)).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'My Plan' })).not.toBeInTheDocument();
+    });
+
+    it('returns a direct Program visit to Event without adding a loop', async () => {
+        render(
+            <MemoryRouter initialEntries={['/event/movida-2026/program']}>
+                <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, eventScheduleEnabled: true }, updateFlag: vi.fn(), ready: true }}>
+                    <LocationProbe />
+                    <Routes>
+                        <Route path="/event/:eventId/program/*" element={<EventProgramPage />} />
+                        <Route path="/event/:eventId" element={<p>Event detail destination</p>} />
+                    </Routes>
+                </FeatureFlagsContext.Provider>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Back to event' }));
+        await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/event/movida-2026'));
     });
 });

@@ -7,3 +7,25 @@ users:
     name: Maya Dancer
     handle: maya
     account_visibility: public
+  - email: going-no-plan@example.com
+    name: Leo Going
+    handle: leo-going
+    account_visibility: public
+  - email: planner-only@example.com
+    name: Noor Planner
+    handle: noor-planner
+    account_visibility: public
+  - email: weekender-planner@example.com
+    name: Lina Weekender
+    handle: lina-weekender
+    account_visibility: public
+  - email: quiet-going@example.com
+    name: Sara Quiet
+    handle: sara-quiet
+    account_visibility: public
+    email_schedule_updates_enabled: false
+    push_schedule_updates_enabled: false
+  - email: unrelated@example.com
+    name: Omar Observer
+    handle: omar-observer
+    account_visibility: public

@@ -2,12 +2,15 @@ test_plan:
   name: "Event schedule – Program, My Plan and admin publishing"
   description: >
     Covers the mobile attendee program and the full admin schedule workflow
-    using the real five-day Back 2 Mambo 2026 first-weekend program (66
+    across four events. The primary fixture uses the real five-day Back 2
+    Mambo 2026 first-weekend program (66
     sessions transcribed from the official poster). The published attendee
     snapshot has three simultaneous Friday 14:00 workshops, multi-hour
     bootcamps, combined-hall socials/shows, cross-midnight night parties, a
     roomless Monday afterparty and one cancelled session. The draft changes
     the first workshop title so publication isolation is visible immediately.
+    Additional fixtures cover a published compact program, an admin-only draft,
+    and an event without a schedule, with Going, planner and notification-opt-out users.
 
   preconditions:
     - "task start:scenario SCENARIO=event-schedule"
@@ -71,7 +74,62 @@ test_plan:
 
     - id: 8
       title: "Publish reviewed changes"
-      description: "Open Publish, review the diff and confirm. Refresh the attendee Program."
+      description: "Open Publish, leave the broad Going update unchecked, review the diff and confirm. Refresh the attendee Program."
       expected: >
         A new publication version is created and the attendee route now shows
         the updated title and any intentionally saved overlapping session.
+        Impacted planners are notified automatically, while other Going users
+        receive no broad update unless the checkbox is selected before publishing.
+
+    - id: 9
+      title: "Inspect planners"
+      description: "Open Program Settings and expand People with plans."
+      expected: >
+        Maya and Noor appear with plan counts and expandable session titles.
+        Maya is marked Going; Noor demonstrates that a planner need not be Going.
+        Leo, Sara and Omar do not appear because they have no planned sessions.
+
+    - id: 10
+      title: "Check session list tools"
+      description: "Open Sessions, choose a date, filter by instructor, level and type, then clear the filters."
+      expected: >
+        The same controls as the calendar are available. The first table column
+        contains weekday and date, only matching rows remain, and the calendar
+        and list advance to the earliest day with a result when necessary.
+
+    - id: 11
+      title: "Check calendar positioning and autocomplete"
+      description: "Scroll late in a day, then change a date or filter and choose an instructor suggestion."
+      expected: >
+        The grid positions the first matching session instead of retaining the
+        previous late timeslot. Instructor search offers names from the program.
+
+    - id: 12
+      title: "Check schedule states across events"
+      description: "Open Prague Salsa Weekender, Brno Bachata Lab and Vienna Social Night as attendee and admin."
+      expected: >
+        Prague has a distinct published Program and Lina has a plan. Brno has
+        an editable draft but no attendee Program action. Vienna offers Create
+        schedule to admin and has no attendee Program action.
+
+    - id: 13
+      title: "Check Settings and preview"
+      description: "Select a timezone from Event timezone, save it, then open Preview."
+      expected: >
+        Timezones are searchable/selectable IANA values. The embedded preview
+        begins at filters and date pills without the full app header or tabs.
+
+    - id: 14
+      title: "Check remove actions and back navigation"
+      description: "Remove a My Plan row with its cross, inspect the session-sheet remove action, and navigate Event → Program → Event → Back."
+      expected: >
+        The row uses a cross rather than a menu. The sheet action has subtle red
+        text and border. Back returns through Event to the original surface and
+        never loops between Event and Program.
+
+    - id: 15
+      title: "Check adjacent session boundaries"
+      description: "Edit Latin Salsa Fusion and compare it with Crazy Partnerwork."
+      expected: >
+        No Scheduling conflict appears because Crazy Partnerwork ends exactly
+        when Latin Salsa Fusion starts; real overlaps still produce a warning.

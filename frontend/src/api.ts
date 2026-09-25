@@ -297,16 +297,36 @@ export async function duplicateScheduleSession(eventId: string, id: string): Pro
 export interface SchedulePublishResponse extends EventSchedule {
     notification_summary: {
         impacted_planners: number;
+        going_attendees_notified: number;
         in_app_created: number;
         emailed: number;
         pushed: number;
         going_attendees: number;
-        remaining_going_attendees: number;
     };
 }
 
-export async function publishEventSchedule(eventId: string): Promise<SchedulePublishResponse> {
-    return scheduleRequest<SchedulePublishResponse>(eventId, '/publish', 'POST');
+export async function publishEventSchedule(eventId: string, notifyAllGoing = false): Promise<SchedulePublishResponse> {
+    return scheduleRequest<SchedulePublishResponse>(eventId, '/publish', 'POST', { notify_all_going: notifyAllGoing });
+}
+
+export interface SchedulePlanner {
+    user_id: string;
+    email: string;
+    name: string | null;
+    handle: string | null;
+    going: boolean;
+    planned_session_count: number;
+    sessions: Array<{
+        session_id: string;
+        title: string;
+        start: string;
+        end: string;
+        status: 'active' | 'cancelled' | 'removed';
+    }>;
+}
+
+export async function fetchSchedulePlanners(eventId: string): Promise<SchedulePlanner[]> {
+    return scheduleRequest<SchedulePlanner[]>(eventId, '/planners', 'GET');
 }
 
 export async function exportEventSchedule(eventId: string): Promise<ScheduleImportDocument> {
@@ -319,44 +339,6 @@ export async function fetchScheduleImportSchema(eventId: string): Promise<{ sche
 
 export async function applyScheduleDancePreset(eventId: string): Promise<{ created: number }> {
     return scheduleRequest<{ created: number }>(eventId, '/presets/dance-taxonomy', 'POST');
-}
-
-export interface ScheduleProgramCandidate {
-    user_id: string;
-    email: string;
-    name: string | null;
-    handle: string | null;
-    email_enabled: boolean;
-    push_enabled: boolean;
-    has_push_subscription: boolean;
-    already_notified: boolean;
-}
-
-export interface ScheduleProgramNotifyResult {
-    user_id: string;
-    email: string;
-    status: string;
-    email_status: string;
-    push_status: string;
-}
-
-export interface ScheduleProgramNotifyResponse {
-    emailed: number;
-    pushed: number;
-    in_app_created: number;
-    results: ScheduleProgramNotifyResult[];
-}
-
-export async function fetchScheduleProgramCandidates(eventId: string): Promise<ScheduleProgramCandidate[]> {
-    return scheduleRequest<ScheduleProgramCandidate[]>(eventId, '/notify-program-candidates', 'GET');
-}
-
-export async function notifyScheduleProgram(eventId: string, userIds: string[], resend = false): Promise<ScheduleProgramNotifyResponse> {
-    return scheduleRequest<ScheduleProgramNotifyResponse>(eventId, '/notify-program', 'POST', { user_ids: userIds, resend });
-}
-
-export async function notifySchedulePublicationGoing(eventId: string, version: number): Promise<ScheduleProgramNotifyResponse> {
-    return scheduleRequest<ScheduleProgramNotifyResponse>(eventId, `/publications/${version}/notify-going`, 'POST');
 }
 
 export async function previewScheduleImport(eventId: string, mode: 'merge' | 'replace', document: ScheduleImportDocument): Promise<ScheduleImportPreview> {

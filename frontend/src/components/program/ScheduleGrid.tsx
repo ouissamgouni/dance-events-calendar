@@ -9,14 +9,16 @@ interface Props {
     plannedSessionIds?: Set<string>;
     onSessionClick: (session: ScheduleSession) => void;
     onTimeClick: (minute: number) => void;
+    positionRequest?: number;
 }
 
 const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 22;
 
-export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick }: Props) {
+export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0 }: Props) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const positionedDays = useRef(new Set<string>());
+    const handledPositionRequest = useRef(0);
     const [now, setNow] = useState(() => new Date());
     useEffect(() => {
         const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -47,6 +49,15 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
         scrollRef.current.scrollTop = Math.max(0, ((nowMinute - axisStart) / SLOT_MINUTES) * SLOT_HEIGHT - 88);
         positionedDays.current.add(day);
     }, [axisStart, day, nowMinute, showNow]);
+
+    useEffect(() => {
+        if (!positionRequest || !scrollRef.current || handledPositionRequest.current === positionRequest) return;
+        const firstMinute = sessions.length
+            ? Math.min(...sessions.map((session) => minuteOfProgramDay(session.start, schedule.timezone, schedule.day_start_hour)))
+            : axisStart;
+        scrollRef.current.scrollTop = Math.max(0, ((firstMinute - axisStart) / SLOT_MINUTES) * SLOT_HEIGHT - 48);
+        handledPositionRequest.current = positionRequest;
+    }, [axisStart, positionRequest, schedule.day_start_hour, schedule.timezone, sessions]);
 
     const roomColumn = (roomId: number | null): string => {
         if (roomId == null) return `2 / ${rooms.length + 2}`;

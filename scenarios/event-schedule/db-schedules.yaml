@@ -653,3 +653,101 @@ schedules:
         session_id: "10000000-0000-4000-8000-000000001602"
       - email: dancer@example.com
         session_id: "10000000-0000-4000-8000-000000001717"
+      - email: planner-only@example.com
+        session_id: "10000000-0000-4000-8000-000000001708"
+
+  - event_id: prague-salsa-weekender
+    timezone: Europe/Prague
+    day_start_hour: 6
+    days:
+      - "2026-11-06"
+      - "2026-11-07"
+    venues:
+      - name: Dance House
+        address: Prague
+    rooms:
+      - name: Riverside Room
+        venue: Dance House
+        color: blue
+      - name: Loft Room
+        venue: Dance House
+        color: emerald
+    levels:
+      - label: Beginner
+      - label: Advanced
+    activity_types:
+      - name: Workshop
+        color: blue
+      - name: Social
+        color: emerald
+    sessions:
+      - id: "20000000-0000-4000-8000-000000000001"
+        title: Salsa Foundations
+        instructors: Ana & Luis
+        start: "2026-11-06T17:00:00Z"
+        end: "2026-11-06T18:00:00Z"
+        room: Riverside Room
+        venue: Dance House
+        level: Beginner
+        activity_type: Workshop
+      - id: "20000000-0000-4000-8000-000000000002"
+        title: Advanced Partnerwork
+        instructors: Carla Mendes
+        start: "2026-11-07T10:00:00Z"
+        end: "2026-11-07T11:30:00Z"
+        room: Loft Room
+        venue: Dance House
+        level: Advanced
+        activity_type: Workshop
+      - id: "20000000-0000-4000-8000-000000000003"
+        title: Saturday Social
+        start: "2026-11-07T20:00:00Z"
+        end: "2026-11-08T02:00:00Z"
+        room: Riverside Room
+        venue: Dance House
+        activity_type: Social
+    published: true
+    plans:
+      - email: weekender-planner@example.com
+        session_id: "20000000-0000-4000-8000-000000000002"
+
+  - event_id: brno-bachata-lab
+    timezone: Europe/Prague
+    day_start_hour: 6
+    days:
+      - "2026-11-13"
+      - "2026-11-14"
+    venues:
+      - name: Studio Tempo
+        address: Brno
+    rooms:
+      - name: Main Studio
+        venue: Studio Tempo
+        color: pink
+    levels:
+      - label: Open Level
+    activity_types:
+      - name: Workshop
+        color: pink
+      - name: Practica
+        color: amber
+    sessions:
+      - id: "30000000-0000-4000-8000-000000000001"
+        title: Bachata Flow Lab
+        instructors: Sofia Reyes
+        start: "2026-11-13T18:00:00Z"
+        end: "2026-11-13T19:30:00Z"
+        room: Main Studio
+        venue: Studio Tempo
+        level: Open Level
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000000002"
+        title: Guided Practica
+        instructors: Mateo Cruz
+        start: "2026-11-14T16:00:00Z"
+        end: "2026-11-14T18:00:00Z"
+        room: Main Studio
+        venue: Studio Tempo
+        level: Open Level
+        activity_type: Practica
+    published: false

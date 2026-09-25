@@ -82,10 +82,10 @@ test('supports live program filters, details and an all-days plan', async ({ pag
     await expect(page.getByText('14:00–15:00')).toBeVisible();
     await page.getByRole('dialog', { name: 'Session details' }).getByRole('button', { name: 'Close' }).click();
 
-    await page.getByRole('searchbox', { name: 'Search instructors' }).fill('Maya');
+    await page.getByLabel('Search instructors').fill('Maya');
     await expect(page.getByRole('button', { name: /Shines \/ Partnerwork/ })).toHaveCount(0);
-    await page.getByRole('button', { name: /My Plan/ }).click();
+    await page.getByRole('button', { name: /^My Plan/ }).click();
     await expect(page.getByText('Thursday Foundations')).toBeVisible();
     await expect(page.getByText('Shines / Partnerwork')).toBeVisible();
-    await expect(page.getByRole('searchbox', { name: 'Search instructors' })).toHaveCount(0);
+    await expect(page.getByLabel('Search instructors')).toHaveCount(0);
 });

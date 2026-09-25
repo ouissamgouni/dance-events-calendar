@@ -103,7 +103,7 @@ def notify_planned_session_changes(
         )
     )
     if not changed_ids:
-        return 0
+        return []
     changed_session_ids = [UUID(session_id) for session_id in changed_ids]
     plan_rows = session.exec(
         select(UserPlanSession).where(

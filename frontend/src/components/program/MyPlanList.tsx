@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CalendarPlus, MoreVertical } from 'lucide-react';
+import { AlertTriangle, CalendarPlus, X } from 'lucide-react';
 import type { EventSchedule, MyPlanEntry, ScheduleSession } from '../../types';
 import { findPlanConflicts, focusedPlanEntry, formatDayLabel, formatTimeRange, programDayOf } from '../../utils/schedule';
 import RoomPill from './RoomPill';
@@ -64,7 +64,7 @@ export default function MyPlanList({ schedule, entries, onOpen, onRemove, onProg
                                                 {entry.session.instructors ? <p className="mt-2 font-bold text-ink">{entry.session.instructors}</p> : null}
                                                 <p className="text-sm text-ink">{entry.session.title}</p>
                                             </button>
-                                            <button type="button" aria-label={`Remove ${entry.session.title} from My Plan`} onClick={() => onRemove(entry.session_id)} className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft"><MoreVertical size={20} /></button>
+                                            <button type="button" aria-label={`Remove ${entry.session.title} from My Plan`} onClick={() => onRemove(entry.session_id)} className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft hover:text-danger"><X size={20} /></button>
                                         </div>
                                         {overlap?.length ? <p className="mt-2 inline-flex max-w-full items-start gap-1 rounded-field bg-amber-50 px-2 py-1 text-[10px] font-medium leading-4 text-amber-900"><AlertTriangle size={12} className="mt-0.5 shrink-0" /><span><span className="font-semibold">Time conflict</span> with {overlap.join(', ')}</span></p> : null}
                                         {entry.status !== 'active' ? <p className="mt-3 text-xs font-medium text-danger">This session was {entry.status} by the organizer. Remove it when you are ready.</p> : null}

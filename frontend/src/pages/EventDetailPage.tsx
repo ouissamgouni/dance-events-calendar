@@ -77,7 +77,7 @@ export default function EventDetailPage() {
 
     const goToTab = (tab: EventDetailTab, opts?: { anchor?: string }) => {
         if (tab === 'program') {
-            navigate(`/event/${eventId}/program`);
+            navigate(`/event/${eventId}/program`, { state: { fromEventDetail: true } });
             return;
         }
         setActiveTab(tab);

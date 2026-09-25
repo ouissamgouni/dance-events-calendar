@@ -195,15 +195,19 @@ class AdminEventScheduleResponse(EventScheduleResponse):
 
 class SchedulePublishNotificationSummary(BaseModel):
     impacted_planners: int = 0
+    going_attendees_notified: int = 0
     in_app_created: int = 0
     emailed: int = 0
     pushed: int = 0
     going_attendees: int = 0
-    remaining_going_attendees: int = 0
 
 
 class SchedulePublishResponse(EventScheduleResponse):
     notification_summary: SchedulePublishNotificationSummary
+
+
+class SchedulePublishRequest(BaseModel):
+    notify_all_going: bool = False
 
 
 class ScheduleImportVenue(BaseModel):
@@ -316,6 +320,24 @@ class ScheduleImportPreviewResponse(BaseModel):
     operations: ScheduleImportOperations
     issues: list[ScheduleIssueResponse] = []
     diff: ScheduleDiffResponse
+
+
+class SchedulePlannerSessionResponse(BaseModel):
+    session_id: UUID
+    title: str
+    start: datetime
+    end: datetime
+    status: Literal["active", "cancelled", "removed"]
+
+
+class SchedulePlannerResponse(BaseModel):
+    user_id: UUID
+    email: str
+    name: Optional[str] = None
+    handle: Optional[str] = None
+    going: bool = False
+    planned_session_count: int = 0
+    sessions: list[SchedulePlannerSessionResponse]
 
 
 class ScheduleProgramCandidate(BaseModel):

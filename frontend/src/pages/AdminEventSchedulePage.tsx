@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ChevronLeft, ExternalLink, Eye, Plus, Send, Trash2 } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
+import { ChevronLeft, ExternalLink, Eye, Plus, Search, Send, Trash2, Users, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     createAdminEventSchedule,
@@ -19,9 +19,7 @@ import {
     exportEventSchedule,
     fetchAdminEventSchedule,
     fetchEvent,
-    fetchScheduleProgramCandidates,
-    notifyScheduleProgram,
-    notifySchedulePublicationGoing,
+    fetchSchedulePlanners,
     publishEventSchedule,
     fetchScheduleImportSchema,
     previewScheduleImport,
@@ -32,15 +30,14 @@ import {
     updateScheduleSession,
     updateScheduleVenue,
     type ScheduleSessionInput,
-    type ScheduleProgramCandidate,
-    type ScheduleProgramNotifyResponse,
+    type SchedulePlanner,
     type SchedulePublishResponse,
 } from '../api';
 import ScheduleGrid from '../components/program/ScheduleGrid';
 import { ProgramDayPicker, ProgramFilters } from '../components/program/ProgramControls';
 import { ROOM_COLORS, roomColor } from '../components/program/RoomPill';
 import type { AdminEventSchedule, CalendarEvent, ScheduleActivityType, ScheduleImportDocument, ScheduleImportPreview, ScheduleLevel, ScheduleRoom, ScheduleSession, ScheduleVenue } from '../types';
-import { filterScheduleSessions, firstDayWithSessions, formatTimeRange, programDayOf, toZonedInput, zonedInputToIso, type ScheduleFilters } from '../utils/schedule';
+import { filterScheduleSessions, firstDayWithSessions, formatDayDateLabel, formatTimeRange, programDayOf, sessionsForDay, sessionsOverlap, toZonedInput, zonedInputToIso, type ScheduleFilters } from '../utils/schedule';
 
 type Section = 'schedule' | 'sessions' | 'locations' | 'taxonomy' | 'settings';
 type ConfigEntity = ScheduleVenue | ScheduleRoom | ScheduleLevel | ScheduleActivityType;
@@ -58,6 +55,7 @@ export default function AdminEventSchedulePage() {
     const [schedule, setSchedule] = useState<AdminEventSchedule | null>(null);
     const [section, setSection] = useState<Section>('schedule');
     const [selectedDay, setSelectedDay] = useState('');
+    const [sessionsDay, setSessionsDay] = useState('');
     const [editingSession, setEditingSession] = useState<ScheduleSession | 'new' | null>(null);
     const [editingConfig, setEditingConfig] = useState<{ kind: ConfigKind; item?: ConfigEntity } | null>(null);
     const [showPublish, setShowPublish] = useState(false);
@@ -67,6 +65,7 @@ export default function AdminEventSchedulePage() {
     const [presetBusy, setPresetBusy] = useState(false);
     const [presetMessage, setPresetMessage] = useState<string | null>(null);
     const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS);
+    const [positionRequest, setPositionRequest] = useState(0);
 
     const reload = async () => {
         if (!eventId) return;
@@ -120,6 +119,19 @@ export default function AdminEventSchedulePage() {
     const changeCount = schedule.diff.added_session_ids.length + schedule.diff.removed_session_ids.length + Object.keys(schedule.diff.changed_sessions).length + (schedule.diff.configuration_changed ? 1 : 0);
     const filteredSessions = filterScheduleSessions(schedule.sessions, filters);
     const filteredSchedule = { ...schedule, sessions: filteredSessions };
+    const selectDay = (day: string) => {
+        setSelectedDay(day);
+        setPositionRequest((value) => value + 1);
+    };
+    const updateFilters = (next: ScheduleFilters) => {
+        const matches = filterScheduleSessions(schedule.sessions, next);
+        setFilters(next);
+        if (!sessionsForDay(matches, selectedDay, schedule.timezone, schedule.day_start_hour).length) {
+            const firstMatchingDay = firstDayWithSessions(schedule.days, matches, schedule.timezone, schedule.day_start_hour);
+            if (firstMatchingDay) setSelectedDay(firstMatchingDay);
+        }
+        setPositionRequest((value) => value + 1);
+    };
     return (
         <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col bg-canvas">
             <header className="shrink-0 border-b border-line bg-surface px-4 py-3">
@@ -141,16 +153,18 @@ export default function AdminEventSchedulePage() {
                 </nav>
                 <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     {error ? <div className="border-b border-line bg-rose-50 px-4 py-2 text-sm text-danger">{error}</div> : null}
+                    {section === 'schedule' || section === 'sessions' ? (
+                        <div className="shrink-0 border-b border-line bg-surface px-3">
+                            <ProgramFilters schedule={schedule} filters={filters} onChange={updateFilters} />
+                            <ProgramDayPicker schedule={schedule} sessions={filteredSessions} selectedDay={section === 'sessions' ? sessionsDay : selectedDay} includeAll={section === 'sessions'} filtersActive={Boolean(filters.instructor || filters.levelIds.length || filters.activityTypeIds.length)} onSelect={section === 'sessions' ? setSessionsDay : selectDay} endSlot={section === 'schedule' ? <button type="button" onClick={() => setEditingSession('new')} className="ml-auto flex shrink-0 items-center gap-2 rounded-field bg-action px-3 py-2 text-xs font-semibold text-white"><Plus size={15} />Add session</button> : undefined} />
+                        </div>
+                    ) : null}
                     {section === 'schedule' ? (
                         <>
-                            <div className="shrink-0 border-b border-line bg-surface px-3">
-                                <ProgramFilters schedule={schedule} filters={filters} onChange={setFilters} />
-                                <ProgramDayPicker schedule={schedule} sessions={filteredSessions} selectedDay={selectedDay} filtersActive={Boolean(filters.instructor || filters.levelIds.length || filters.activityTypeIds.length)} onSelect={setSelectedDay} endSlot={<button type="button" onClick={() => setEditingSession('new')} className="ml-auto flex shrink-0 items-center gap-2 rounded-field bg-action px-3 py-2 text-xs font-semibold text-white"><Plus size={15} />Add session</button>} />
-                            </div>
-                            <ScheduleGrid schedule={filteredSchedule} day={selectedDay} onSessionClick={setEditingSession} onTimeClick={() => setEditingSession('new')} />
+                            <ScheduleGrid schedule={filteredSchedule} day={selectedDay} onSessionClick={setEditingSession} onTimeClick={() => setEditingSession('new')} positionRequest={positionRequest} />
                         </>
                     ) : null}
-                    {section === 'sessions' ? <SessionsTable schedule={schedule} onEdit={setEditingSession} /> : null}
+                    {section === 'sessions' ? <SessionsTable schedule={filteredSchedule} day={sessionsDay} onEdit={setEditingSession} /> : null}
                     {section === 'locations' ? <ConfigLists schedule={schedule} kinds={['venue', 'room']} onEdit={(kind, item) => setEditingConfig({ kind, item })} /> : null}
                     {section === 'taxonomy' ? <ConfigLists schedule={schedule} kinds={['level', 'activity']} onEdit={(kind, item) => setEditingConfig({ kind, item })} intro={<div className="mb-6 flex flex-wrap items-center justify-between gap-3 bg-canvas p-4"><div><h2 className="text-sm font-bold text-ink">Dance level preset</h2><p className="mt-1 text-xs text-ink-soft">Add any missing Open Level, Beginner, Intermediate, and Advanced levels.</p>{presetMessage ? <p className="mt-2 text-xs font-semibold text-success">{presetMessage}</p> : null}</div><button type="button" disabled={presetBusy} onClick={async () => { setPresetBusy(true); setPresetMessage(null); setError(null); try { const result = await applyScheduleDancePreset(event.event_id); await reload(); setPresetMessage(result.created ? `Added ${result.created} ${result.created === 1 ? 'level' : 'levels'}.` : 'Dance levels are already complete.'); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not apply the Dance preset'); } finally { setPresetBusy(false); } }} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink disabled:opacity-50">{presetBusy ? 'Applying…' : 'Apply Dance preset'}</button></div>} /> : null}
                     {section === 'settings' ? <SettingsPanel schedule={schedule} eventId={event.event_id} onSaved={setSchedule} /> : null}
@@ -166,21 +180,24 @@ export default function AdminEventSchedulePage() {
     );
 }
 
-function SessionsTable({ schedule, onEdit }: { schedule: AdminEventSchedule; onEdit: (session: ScheduleSession) => void }) {
+function SessionsTable({ schedule, day, onEdit }: { schedule: AdminEventSchedule; day: string; onEdit: (session: ScheduleSession) => void }) {
+    const sessions = (day ? sessionsForDay(schedule.sessions, day, schedule.timezone, schedule.day_start_hour) : [...schedule.sessions])
+        .sort((left, right) => left.start.localeCompare(right.start));
     return (
         <div className="overflow-auto p-4">
             <div className="mx-auto max-w-5xl overflow-hidden rounded-card border border-card-line bg-surface">
                 <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="bg-canvas text-xs uppercase text-ink-soft"><tr><th className="p-3">Time</th><th className="p-3">Room</th><th className="p-3">Title</th><th className="p-3">Instructor</th><th className="p-3">Type</th></tr></thead>
-                    <tbody>{[...schedule.sessions].sort((a, b) => a.start.localeCompare(b.start)).map((session) => (
+                    <thead className="bg-canvas text-xs uppercase text-ink-soft"><tr><th className="p-3">Date</th><th className="p-3">Time</th><th className="p-3">Room</th><th className="p-3">Title</th><th className="p-3">Instructor</th><th className="p-3">Type</th></tr></thead>
+                    <tbody>{sessions.map((session) => (
                         <tr key={session.id} onClick={() => onEdit(session)} className="cursor-pointer border-t border-card-line hover:bg-canvas">
+                            <td className="p-3 text-ink-soft">{formatDayDateLabel(programDayOf(session.start, schedule.timezone, schedule.day_start_hour))}</td>
                             <td className="p-3 font-medium text-ink">{formatTimeRange(session, schedule.timezone)}</td>
                             <td className="p-3 text-ink-soft">{schedule.rooms.find((room) => room.id === session.room_id)?.name ?? 'Event-wide'}</td>
                             <td className="p-3 font-semibold text-ink">{session.title}</td>
                             <td className="p-3 text-ink-soft">{session.instructors ?? '—'}</td>
                             <td className="p-3 text-ink-soft">{schedule.activity_types.find((type) => type.id === session.activity_type_id)?.name ?? '—'}</td>
                         </tr>
-                    ))}</tbody>
+                    ))}{!sessions.length ? <tr><td colSpan={6} className="p-8 text-center text-sm text-ink-soft">No sessions match this date and filter.</td></tr> : null}</tbody>
                 </table>
             </div>
         </div>
@@ -207,66 +224,83 @@ function SettingsPanel({ schedule, eventId, onSaved }: { schedule: AdminEventSch
     const [timezone, setTimezone] = useState(schedule.timezone);
     const [cutoff, setCutoff] = useState(schedule.day_start_hour);
     const [busy, setBusy] = useState(false);
+    const timezoneOptions = supportedTimezones(schedule.timezone);
     return <div className="mx-auto w-full max-w-2xl space-y-8 overflow-y-auto p-6">
         <form className="space-y-5" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { onSaved(await updateAdminEventSchedule(eventId, { timezone, day_start_hour: cutoff })); } finally { setBusy(false); } }}>
             <h2 className="text-lg font-bold text-ink">Schedule settings</h2>
-            <label className="block text-sm font-semibold text-ink">Event timezone<input value={timezone} onChange={(event) => setTimezone(event.target.value)} required className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 font-normal" /></label>
+            <TimezoneCombobox value={timezone} options={timezoneOptions} onChange={setTimezone} />
             <label className="block text-sm font-semibold text-ink">Program day changes at<select value={cutoff} onChange={(event) => setCutoff(Number(event.target.value))} className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 font-normal">{Array.from({ length: 12 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}</select></label>
             <button disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save settings'}</button>
         </form>
-        <ProgramAnnouncementPanel eventId={eventId} published={Boolean(schedule.published_at)} />
+        <PlannerRoster eventId={eventId} schedule={schedule} />
         <ScheduleImportPanel eventId={eventId} onApplied={async () => onSaved(await fetchAdminEventSchedule(eventId))} />
     </div>;
 }
 
-function ProgramAnnouncementPanel({ eventId, published }: { eventId: string; published: boolean }) {
+function TimezoneCombobox({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
+    const inputId = useId();
+    const listId = useId();
     const [open, setOpen] = useState(false);
-    return <section className="border-t border-line pt-6">
-        <h2 className="text-lg font-bold text-ink">Announce program</h2>
-        <p className="mt-1 text-sm text-ink-soft">Notify selected Going attendees that the program is ready. In-app is always included; email and push respect each attendee's preferences.</p>
-        {!published ? <p className="mt-3 text-sm font-medium text-ink-soft">Publish the program before notifying attendees.</p> : null}
-        <button type="button" disabled={!published} onClick={() => setOpen(true)} className="mt-4 flex items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink disabled:opacity-50"><Send size={16} />Notify attendees</button>
-        {open ? <ProgramAnnouncementDialog eventId={eventId} onClose={() => setOpen(false)} /> : null}
+    const [filtering, setFiltering] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const query = value.trim().toLocaleLowerCase();
+    const matches = filtering ? options.filter((option) => !query || option.toLocaleLowerCase().includes(query)) : options;
+    const select = (option: string) => { onChange(option); setFiltering(false); setOpen(false); };
+    return <div>
+        <label htmlFor={inputId} className="block text-sm font-semibold text-ink">Event timezone</label>
+        <div className="relative mt-2" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
+            <Search size={17} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+            <input id={inputId} type="text" inputMode="search" role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={open && matches.length > 0} aria-controls={listId} aria-activedescendant={open && matches[activeIndex] ? `${listId}-${activeIndex}` : undefined} value={value} onFocus={() => { setFiltering(false); setActiveIndex(0); setOpen(true); }} onChange={(event) => { onChange(event.target.value); setFiltering(true); setActiveIndex(0); setOpen(true); }} onKeyDown={(event) => {
+                if (event.key === 'Escape') { setOpen(false); return; }
+                if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); setActiveIndex((index) => Math.min(index + 1, matches.length - 1)); }
+                if (event.key === 'ArrowUp') { event.preventDefault(); setActiveIndex((index) => Math.max(index - 1, 0)); }
+                if (event.key === 'Enter' && open && matches[activeIndex]) { event.preventDefault(); select(matches[activeIndex]); }
+            }} required className="min-h-11 w-full rounded-field border border-line bg-surface py-2 pl-10 pr-10 font-normal text-ink outline-none focus:border-action" />
+            {value ? <button type="button" onClick={() => { onChange(''); setFiltering(false); setActiveIndex(0); setOpen(true); }} aria-label="Clear event timezone" className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center text-muted hover:text-ink"><X size={17} /></button> : null}
+            {open && matches.length ? <div id={listId} role="listbox" aria-label="Timezone suggestions" className="absolute inset-x-0 top-[calc(100%+0.375rem)] z-[12000] max-h-64 overflow-y-auto rounded-card border border-card-line bg-surface p-1.5 shadow-xl">
+                {matches.map((option, index) => <button key={option} id={`${listId}-${index}`} type="button" role="option" aria-selected={index === activeIndex} onMouseDown={(event) => event.preventDefault()} onClick={() => select(option)} className={`flex min-h-11 w-full items-center px-3 text-left text-sm font-medium ${index === activeIndex ? 'bg-action/10 text-action' : 'text-ink hover:bg-canvas'}`}>{option}</button>)}
+            </div> : null}
+        </div>
+    </div>;
+}
+
+function PlannerRoster({ eventId, schedule }: { eventId: string; schedule: AdminEventSchedule }) {
+    const [open, setOpen] = useState(false);
+    return <section className="flex items-center gap-4 border-t border-line pt-6">
+        <Users size={20} className="shrink-0 text-ink-soft" />
+        <div className="min-w-0 flex-1"><h2 className="text-base font-bold text-ink">People with plans</h2><p className="mt-1 text-sm text-ink-soft">Review attendees who added sessions from this program.</p></div>
+        <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="shrink-0 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:border-action hover:text-action">View people</button>
+        {open ? <PlannerRosterDialog eventId={eventId} schedule={schedule} onClose={() => setOpen(false)} /> : null}
     </section>;
 }
 
-function ProgramAnnouncementDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) {
-    const [candidates, setCandidates] = useState<ScheduleProgramCandidate[]>([]);
-    const [selected, setSelected] = useState<Set<string>>(new Set());
-    const [query, setQuery] = useState('');
-    const [resend, setResend] = useState(false);
+function PlannerRosterDialog({ eventId, schedule, onClose }: { eventId: string; schedule: AdminEventSchedule; onClose: () => void }) {
+    const [planners, setPlanners] = useState<SchedulePlanner[]>([]);
     const [loading, setLoading] = useState(true);
-    const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [result, setResult] = useState<ScheduleProgramNotifyResponse | null>(null);
     useEffect(() => {
         let cancelled = false;
-        fetchScheduleProgramCandidates(eventId)
-            .then((value) => { if (!cancelled) setCandidates(value); })
-            .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not load attendees'); })
+        fetchSchedulePlanners(eventId)
+            .then((value) => { if (!cancelled) setPlanners(value); })
+            .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not load planners'); })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [eventId]);
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    const visible = candidates.filter((candidate) => !normalizedQuery || [candidate.email, candidate.name, candidate.handle].some((value) => value?.toLocaleLowerCase().includes(normalizedQuery)));
-    const toggle = (userId: string) => setSelected((current) => { const next = new Set(current); if (next.has(userId)) next.delete(userId); else next.add(userId); return next; });
-    const send = async () => {
-        setBusy(true); setError(null); setResult(null);
-        try { setResult(await notifyScheduleProgram(eventId, [...selected], resend)); }
-        catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not notify attendees'); }
-        finally { setBusy(false); }
-    };
-    return <Modal title="Notify attendees" onClose={onClose}><div className="space-y-4">
-        <p className="text-sm text-ink-soft">Send “Program now available” to selected Going attendees.</p>
-        <label className="block text-sm font-semibold text-ink">Search attendees<input value={query} onChange={(event) => setQuery(event.target.value)} className={`${FIELD_CLASS} mt-2`} placeholder="Name, handle, or email" /></label>
-        <div className="flex items-center justify-between text-xs"><span className="font-semibold text-ink">{selected.size} selected</span><span className="flex gap-3"><button type="button" onClick={() => setSelected(new Set(visible.map((candidate) => candidate.user_id)))} className="font-semibold text-action">Select all</button><button type="button" onClick={() => setSelected(new Set())} className="font-semibold text-action">Clear</button></span></div>
-        <div className="max-h-64 overflow-y-auto border-y border-line">
-            {loading ? <p className="p-4 text-sm text-ink-soft">Loading attendees…</p> : visible.length ? visible.map((candidate) => <label key={candidate.user_id} className="flex cursor-pointer items-start gap-3 border-b border-card-line px-2 py-3 last:border-b-0 hover:bg-canvas"><input type="checkbox" checked={selected.has(candidate.user_id)} onChange={() => toggle(candidate.user_id)} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">{candidate.name || candidate.handle || candidate.email}</span><span className="block truncate text-xs text-ink-soft">{candidate.email}</span><span className="mt-1 block text-xs text-ink-soft">Email {candidate.email_enabled ? 'on' : 'off'} · Push {candidate.push_enabled && candidate.has_push_subscription ? 'ready' : candidate.push_enabled ? 'not registered' : 'off'}{candidate.already_notified ? ' · Already notified' : ''}</span></span></label>) : <p className="p-4 text-sm text-ink-soft">No Going attendees found.</p>}
-        </div>
-        <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={resend} onChange={(event) => setResend(event.target.checked)} />Resend to already notified attendees</label>
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
-        {result ? <div className="bg-canvas p-3 text-sm text-ink"><p className="font-semibold">{result.in_app_created} in-app · {result.emailed} email · {result.pushed} push</p><ul className="mt-2 space-y-1 text-xs text-ink-soft">{result.results.map((row) => <li key={row.user_id}>{row.email || row.user_id}: {row.status} · email {row.email_status} · push {row.push_status}</li>)}</ul></div> : null}
-        <div className="flex justify-end gap-2 border-t border-line pt-4"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Close</button><button type="button" disabled={busy || selected.size === 0} onClick={send} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Sending…' : `Notify ${selected.size} ${selected.size === 1 ? 'attendee' : 'attendees'}`}</button></div>
+    return <Modal title="People with plans" onClose={onClose} sheetOnMobile><div>
+        <p className="text-sm text-ink-soft">People who added at least one session from this program.</p>
+        {loading ? <p className="py-8 text-center text-sm text-ink-soft">Loading planners…</p> : null}
+        {error ? <p className="mt-4 text-sm text-danger">{error}</p> : null}
+        {!loading && !error && !planners.length ? <p className="py-8 text-center text-sm text-ink-soft">No one has added sessions yet.</p> : null}
+        {planners.length ? <div className="mt-4 divide-y divide-card-line border-y border-line">{planners.map((planner) => (
+            <details key={planner.user_id} className="group py-3">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3">
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">{planner.name || planner.handle || planner.email}</span><span className="block truncate text-xs text-ink-soft">{planner.email}</span></span>
+                    {planner.going ? <span className="rounded-field bg-emerald-50 px-2 py-1 text-xs font-semibold text-success">Going</span> : null}
+                    <span className="text-xs font-semibold text-ink-soft">{planner.planned_session_count} {planner.planned_session_count === 1 ? 'session' : 'sessions'}</span>
+                </summary>
+                <ul className="mt-3 space-y-2 pl-4">{planner.sessions.map((session) => <li key={session.session_id} className="text-sm text-ink"><span className={session.status !== 'active' ? 'line-through text-ink-soft' : ''}>{session.title}</span><span className="ml-2 text-xs text-ink-soft">{formatDayDateLabel(programDayOf(session.start, schedule.timezone, schedule.day_start_hour))} · {formatTimeRange(session, schedule.timezone)}</span></li>)}</ul>
+            </details>
+        ))}</div> : null}
     </div></Modal>;
 }
 
@@ -349,7 +383,8 @@ function SessionEditor({ schedule, day, session, eventId, onClose, onSaved, onEr
     const [confirmDelete, setConfirmDelete] = useState(false);
     const startIso = form.start ? zonedInputToIso(form.start, schedule.timezone) : '';
     const endIso = form.end ? zonedInputToIso(form.end, schedule.timezone) : '';
-    const conflicts = schedule.sessions.filter((row) => row.id !== session?.id && form.room_id && row.room_id === Number(form.room_id) && startIso < row.end && row.start < endIso);
+    const draftSession = { ...session, id: session?.id ?? 'draft', start: startIso, end: endIso } as ScheduleSession;
+    const conflicts = schedule.sessions.filter((row) => row.id !== session?.id && form.room_id && row.room_id === Number(form.room_id) && sessionsOverlap(draftSession, row));
     const submit = async (event: React.FormEvent) => {
         event.preventDefault(); setBusy(true); onError(null);
         const body: ScheduleSessionInput = { title: form.title, instructors: form.instructors || null, start: startIso, end: endIso, room_id: form.room_id ? Number(form.room_id) : null, venue_id: form.venue_id ? Number(form.venue_id) : null, level_id: form.level_id ? Number(form.level_id) : null, activity_type_id: form.activity_type_id ? Number(form.activity_type_id) : null, attendee_note: form.attendee_note || null, allow_plan: form.allow_plan, is_cancelled: form.is_cancelled };
@@ -392,23 +427,27 @@ function ConfigEditor({ schedule, eventId, kind, item, onClose, onSaved, onError
 function PublishDialog({ schedule, eventId, onClose, onPublished, onError }: { schedule: AdminEventSchedule; eventId: string; onClose: () => void; onPublished: () => Promise<void>; onError: (message: string | null) => void }) {
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState<SchedulePublishResponse | null>(null);
-    const [notifyResult, setNotifyResult] = useState<ScheduleProgramNotifyResponse | null>(null);
+    const [notifyAllGoing, setNotifyAllGoing] = useState(false);
+    const firstPublish = schedule.version == null;
     if (result) {
         const summary = result.notification_summary;
         return <Modal title="Schedule published" onClose={onClose}><div className="space-y-4">
             <p className="text-sm text-success">Version {result.version} is live.</p>
-            <div className="bg-canvas p-4 text-sm text-ink"><p className="font-semibold">{summary.impacted_planners} impacted {summary.impacted_planners === 1 ? 'planner' : 'planners'} notified automatically</p><p className="mt-1 text-xs text-ink-soft">{summary.in_app_created} in-app · {summary.emailed} email · {summary.pushed} push</p></div>
-            {summary.remaining_going_attendees ? <p className="text-sm text-ink-soft">Notify the remaining {summary.remaining_going_attendees} Going {summary.remaining_going_attendees === 1 ? 'attendee' : 'attendees'} about this program {result.version === 1 ? 'publication' : 'update'}?</p> : <p className="text-sm text-ink-soft">All eligible Going attendees were already covered.</p>}
-            {notifyResult ? <p className="bg-canvas p-3 text-sm font-semibold text-ink">{notifyResult.in_app_created} in-app · {notifyResult.emailed} email · {notifyResult.pushed} push</p> : null}
-            <div className="flex justify-end gap-2 border-t border-line pt-4"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Done</button>{summary.remaining_going_attendees && !notifyResult ? <button type="button" disabled={busy || result.version == null} onClick={async () => { if (result.version == null) return; setBusy(true); try { setNotifyResult(await notifySchedulePublicationGoing(eventId, result.version)); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not notify attendees'); } finally { setBusy(false); } }} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Notifying…' : 'Notify all Going attendees'}</button> : null}</div>
+            <div className="bg-canvas p-4 text-sm text-ink"><p className="font-semibold">{result.version === 1 ? `${summary.going_attendees_notified} Going attendees announced` : `${summary.impacted_planners} impacted ${summary.impacted_planners === 1 ? 'planner' : 'planners'} notified`}</p>{result.version !== 1 && summary.going_attendees_notified ? <p className="mt-1 text-xs text-ink-soft">{summary.going_attendees_notified} additional Going {summary.going_attendees_notified === 1 ? 'attendee' : 'attendees'} notified</p> : null}<p className="mt-1 text-xs text-ink-soft">{summary.in_app_created} in-app · {summary.emailed} email · {summary.pushed} push</p></div>
+            <div className="flex justify-end border-t border-line pt-4"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Done</button></div>
         </div></Modal>;
     }
-    return <Modal title="Publish schedule" onClose={onClose}><div className="space-y-4"><p className="text-sm text-ink-soft">Publishing replaces the attendee program with this reviewed draft. People whose My Plan is affected will be notified automatically.</p><div className="grid grid-cols-3 gap-2 text-center"><DiffCount value={schedule.diff.added_session_ids.length} label="Added" /><DiffCount value={schedule.diff.removed_session_ids.length} label="Removed" /><DiffCount value={Object.keys(schedule.diff.changed_sessions).length} label="Changed" /></div>{schedule.issues.length ? <div><h3 className="text-sm font-bold text-ink">Warnings</h3><ul className="mt-2 space-y-2">{schedule.issues.map((issue, index) => <li key={`${issue.code}-${index}`} className="border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{issue.message}</li>)}</ul></div> : <p className="text-sm font-medium text-success">No schedule warnings.</p>}<div className="flex justify-end gap-2 border-t border-line pt-4"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Cancel</button><button type="button" disabled={busy} onClick={async () => { setBusy(true); try { const value = await publishEventSchedule(eventId); await onPublished(); setResult(value); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Publish failed'); } finally { setBusy(false); } }} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Publishing…' : 'Publish'}</button></div></div></Modal>;
+    return <Modal title="Publish schedule" onClose={onClose}><div className="space-y-4"><p className="text-sm text-ink-soft">{firstPublish ? 'Publishing makes this program visible and announces it to signed-in Going attendees.' : 'Publishing replaces the attendee program with this reviewed draft. People whose My Plan is affected will be notified automatically.'}</p><div className="grid grid-cols-3 gap-2 text-center"><DiffCount value={schedule.diff.added_session_ids.length} label="Added" /><DiffCount value={schedule.diff.removed_session_ids.length} label="Removed" /><DiffCount value={Object.keys(schedule.diff.changed_sessions).length} label="Changed" /></div>{schedule.issues.length ? <div><h3 className="text-sm font-bold text-ink">Warnings</h3><ul className="mt-2 space-y-2">{schedule.issues.map((issue, index) => <li key={`${issue.code}-${index}`} className="border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{issue.message}</li>)}</ul></div> : <p className="text-sm font-medium text-success">No schedule warnings.</p>}{!firstPublish ? <label className="flex items-start gap-3 bg-canvas p-3 text-sm text-ink"><input type="checkbox" checked={notifyAllGoing} onChange={(event) => setNotifyAllGoing(event.target.checked)} className="mt-0.5" /><span><span className="block font-semibold">Also notify all Going attendees</span><span className="mt-1 block text-xs text-ink-soft">Send a general Program updated message in addition to specific My Plan changes.</span></span></label> : null}<div className="flex justify-end gap-2 border-t border-line pt-4"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Cancel</button><button type="button" disabled={busy} onClick={async () => { setBusy(true); try { const value = await publishEventSchedule(eventId, notifyAllGoing); await onPublished(); setResult(value); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Publish failed'); } finally { setBusy(false); } }} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Publishing…' : 'Publish'}</button></div></div></Modal>;
 }
 
-function PreviewDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) { const url = `/event/${eventId}/program?preview=draft`; return <Modal title="Preview as attendee" onClose={onClose} wide><div className="flex flex-col items-center gap-3"><iframe title="Draft attendee preview" src={url} className="h-[68vh] w-[390px] max-w-full border border-line bg-surface" /><a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-semibold text-action">Open in new tab <ExternalLink size={15} /></a></div></Modal>; }
+function PreviewDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) { const url = `/event/${eventId}/program?preview=draft&embed=program`; return <Modal title="Preview as attendee" onClose={onClose} wide><div className="flex flex-col items-center gap-3"><iframe title="Draft attendee preview" src={url} className="h-[68vh] w-[390px] max-w-full border border-line bg-surface" /><a href={`/event/${eventId}/program?preview=draft`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-semibold text-action">Open in new tab <ExternalLink size={15} /></a></div></Modal>; }
 
-function Modal({ title, onClose, wide = false, children }: { title: string; onClose: () => void; wide?: boolean; children: React.ReactNode }) { return <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/50 p-4" onClick={onClose}><div role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()} className={`max-h-[92vh] overflow-y-auto rounded-card bg-surface p-5 shadow-2xl ${wide ? 'w-auto max-w-4xl' : 'w-full max-w-xl'}`}><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-bold text-ink">{title}</h2><button type="button" onClick={onClose} className="h-11 w-11 text-ink-soft" aria-label="Close">×</button></div>{children}</div></div>; }
+function supportedTimezones(current: string): string[] {
+    const values = (Intl as typeof Intl & { supportedValuesOf?: (key: 'timeZone') => string[] }).supportedValuesOf?.('timeZone') ?? [];
+    return [...new Set(['UTC', current, ...values])].sort((left, right) => left.localeCompare(right));
+}
+
+function Modal({ title, onClose, wide = false, sheetOnMobile = false, children }: { title: string; onClose: () => void; wide?: boolean; sheetOnMobile?: boolean; children: React.ReactNode }) { return <div className={`fixed inset-0 z-[11000] flex bg-black/50 ${sheetOnMobile ? 'items-end justify-center p-0 sm:items-center sm:p-4' : 'items-center justify-center p-4'}`} onClick={onClose}><div role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()} className={`${sheetOnMobile ? 'max-h-[85dvh] rounded-t-card sm:max-h-[92vh] sm:rounded-card' : 'max-h-[92vh] rounded-card'} overflow-y-auto bg-surface p-5 shadow-2xl ${wide ? 'w-auto max-w-4xl' : 'w-full max-w-xl'}`}><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-bold text-ink">{title}</h2><button type="button" onClick={onClose} className="h-11 w-11 text-ink-soft" aria-label="Close">×</button></div>{children}</div></div>; }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block text-sm font-semibold text-ink">{label}<div className="mt-1">{children}</div></label>; }
 function DiffCount({ value, label }: { value: number; label: string }) { return <div className="bg-canvas p-3"><p className="text-xl font-bold text-ink">{value}</p><p className="text-xs text-ink-soft">{label}</p></div>; }
 function AdminState({ text }: { text: string }) { return <div className="flex min-h-full items-center justify-center bg-canvas p-6 text-sm text-ink-soft">{text}</div>; }
