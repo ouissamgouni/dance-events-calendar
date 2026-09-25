@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanEntry, MyPlanResponse, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 
 declare const __VITE_API_URL__: string;
@@ -205,6 +205,202 @@ export async function fetchEvent(eventId: string, opts?: { fresh?: boolean }): P
     return res.json();
 }
 
+export async function fetchEventSchedule(eventId: string): Promise<EventSchedule> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/schedule`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventSchedule>(res, 'Failed to load the event program');
+}
+
+export async function fetchAdminEventSchedule(eventId: string): Promise<AdminEventSchedule> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/schedule`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return parseJsonResponse<AdminEventSchedule>(res, 'Failed to load the draft program');
+}
+
+export async function createAdminEventSchedule(eventId: string, body: { timezone: string; day_start_hour: number; days?: string[] }): Promise<AdminEventSchedule> {
+    return scheduleRequest<AdminEventSchedule>(eventId, '', 'POST', body);
+}
+
+export async function updateAdminEventSchedule(eventId: string, body: { timezone?: string; day_start_hour?: number; days?: string[] }): Promise<AdminEventSchedule> {
+    return scheduleRequest<AdminEventSchedule>(eventId, '', 'PATCH', body);
+}
+
+export async function createScheduleVenue(eventId: string, body: Omit<ScheduleVenue, 'id'>): Promise<ScheduleVenue> {
+    return scheduleRequest<ScheduleVenue>(eventId, '/venues', 'POST', body);
+}
+
+export async function updateScheduleVenue(eventId: string, id: number, body: Omit<ScheduleVenue, 'id'>): Promise<ScheduleVenue> {
+    return scheduleRequest<ScheduleVenue>(eventId, `/venues/${id}`, 'PUT', body);
+}
+
+export async function deleteScheduleVenue(eventId: string, id: number): Promise<void> {
+    return scheduleRequest<void>(eventId, `/venues/${id}`, 'DELETE');
+}
+
+export async function createScheduleRoom(eventId: string, body: Omit<ScheduleRoom, 'id'>): Promise<ScheduleRoom> {
+    return scheduleRequest<ScheduleRoom>(eventId, '/rooms', 'POST', body);
+}
+
+export async function updateScheduleRoom(eventId: string, id: number, body: Omit<ScheduleRoom, 'id'>): Promise<ScheduleRoom> {
+    return scheduleRequest<ScheduleRoom>(eventId, `/rooms/${id}`, 'PUT', body);
+}
+
+export async function deleteScheduleRoom(eventId: string, id: number): Promise<void> {
+    return scheduleRequest<void>(eventId, `/rooms/${id}`, 'DELETE');
+}
+
+export async function createScheduleLevel(eventId: string, body: Omit<ScheduleLevel, 'id'>): Promise<ScheduleLevel> {
+    return scheduleRequest<ScheduleLevel>(eventId, '/levels', 'POST', body);
+}
+
+export async function updateScheduleLevel(eventId: string, id: number, body: Omit<ScheduleLevel, 'id'>): Promise<ScheduleLevel> {
+    return scheduleRequest<ScheduleLevel>(eventId, `/levels/${id}`, 'PUT', body);
+}
+
+export async function deleteScheduleLevel(eventId: string, id: number): Promise<void> {
+    return scheduleRequest<void>(eventId, `/levels/${id}`, 'DELETE');
+}
+
+export async function createScheduleActivityType(eventId: string, body: Omit<ScheduleActivityType, 'id'>): Promise<ScheduleActivityType> {
+    return scheduleRequest<ScheduleActivityType>(eventId, '/activity-types', 'POST', body);
+}
+
+export async function updateScheduleActivityType(eventId: string, id: number, body: Omit<ScheduleActivityType, 'id'>): Promise<ScheduleActivityType> {
+    return scheduleRequest<ScheduleActivityType>(eventId, `/activity-types/${id}`, 'PUT', body);
+}
+
+export async function deleteScheduleActivityType(eventId: string, id: number): Promise<void> {
+    return scheduleRequest<void>(eventId, `/activity-types/${id}`, 'DELETE');
+}
+
+export type ScheduleSessionInput = Omit<ScheduleSession, 'id'>;
+
+export async function createScheduleSession(eventId: string, body: ScheduleSessionInput): Promise<ScheduleSession> {
+    return scheduleRequest<ScheduleSession>(eventId, '/sessions', 'POST', body);
+}
+
+export async function updateScheduleSession(eventId: string, id: string, body: Partial<ScheduleSessionInput>): Promise<ScheduleSession> {
+    return scheduleRequest<ScheduleSession>(eventId, `/sessions/${id}`, 'PATCH', body);
+}
+
+export async function deleteScheduleSession(eventId: string, id: string): Promise<void> {
+    return scheduleRequest<void>(eventId, `/sessions/${id}`, 'DELETE');
+}
+
+export async function duplicateScheduleSession(eventId: string, id: string): Promise<ScheduleSession> {
+    return scheduleRequest<ScheduleSession>(eventId, `/sessions/${id}/duplicate`, 'POST');
+}
+
+export interface SchedulePublishResponse extends EventSchedule {
+    notification_summary: {
+        impacted_planners: number;
+        in_app_created: number;
+        emailed: number;
+        pushed: number;
+        going_attendees: number;
+        remaining_going_attendees: number;
+    };
+}
+
+export async function publishEventSchedule(eventId: string): Promise<SchedulePublishResponse> {
+    return scheduleRequest<SchedulePublishResponse>(eventId, '/publish', 'POST');
+}
+
+export async function exportEventSchedule(eventId: string): Promise<ScheduleImportDocument> {
+    return scheduleRequest<ScheduleImportDocument>(eventId, '/export', 'GET');
+}
+
+export async function fetchScheduleImportSchema(eventId: string): Promise<{ schema: object; example: ScheduleImportDocument }> {
+    return scheduleRequest<{ schema: object; example: ScheduleImportDocument }>(eventId, '/import-schema', 'GET');
+}
+
+export async function applyScheduleDancePreset(eventId: string): Promise<{ created: number }> {
+    return scheduleRequest<{ created: number }>(eventId, '/presets/dance-taxonomy', 'POST');
+}
+
+export interface ScheduleProgramCandidate {
+    user_id: string;
+    email: string;
+    name: string | null;
+    handle: string | null;
+    email_enabled: boolean;
+    push_enabled: boolean;
+    has_push_subscription: boolean;
+    already_notified: boolean;
+}
+
+export interface ScheduleProgramNotifyResult {
+    user_id: string;
+    email: string;
+    status: string;
+    email_status: string;
+    push_status: string;
+}
+
+export interface ScheduleProgramNotifyResponse {
+    emailed: number;
+    pushed: number;
+    in_app_created: number;
+    results: ScheduleProgramNotifyResult[];
+}
+
+export async function fetchScheduleProgramCandidates(eventId: string): Promise<ScheduleProgramCandidate[]> {
+    return scheduleRequest<ScheduleProgramCandidate[]>(eventId, '/notify-program-candidates', 'GET');
+}
+
+export async function notifyScheduleProgram(eventId: string, userIds: string[], resend = false): Promise<ScheduleProgramNotifyResponse> {
+    return scheduleRequest<ScheduleProgramNotifyResponse>(eventId, '/notify-program', 'POST', { user_ids: userIds, resend });
+}
+
+export async function notifySchedulePublicationGoing(eventId: string, version: number): Promise<ScheduleProgramNotifyResponse> {
+    return scheduleRequest<ScheduleProgramNotifyResponse>(eventId, `/publications/${version}/notify-going`, 'POST');
+}
+
+export async function previewScheduleImport(eventId: string, mode: 'merge' | 'replace', document: ScheduleImportDocument): Promise<ScheduleImportPreview> {
+    return scheduleRequest<ScheduleImportPreview>(eventId, '/import-preview', 'POST', { mode, document });
+}
+
+export async function applyScheduleImport(eventId: string, mode: 'merge' | 'replace', document: ScheduleImportDocument): Promise<ScheduleImportPreview> {
+    return scheduleRequest<ScheduleImportPreview>(eventId, '/import', 'POST', { mode, document });
+}
+
+async function scheduleRequest<T>(eventId: string, path: string, method: string, body?: object): Promise<T> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/schedule${path}`, {
+        method,
+        credentials: 'include',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+    });
+    return parseJsonResponse<T>(res, 'Schedule update failed');
+}
+
+export async function fetchMyPlan(eventId: string): Promise<MyPlanResponse> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/my-plan`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return parseJsonResponse<MyPlanResponse>(res, 'Failed to load My Plan');
+}
+
+export async function addToMyPlan(eventId: string, sessionId: string): Promise<MyPlanEntry> {
+    const res = await fetch(
+        `${BASE}/events/${encodeURIComponent(eventId)}/my-plan/${encodeURIComponent(sessionId)}`,
+        { method: 'PUT', credentials: 'include' },
+    );
+    return parseJsonResponse<MyPlanEntry>(res, 'Failed to add this session to My Plan');
+}
+
+export async function removeFromMyPlan(eventId: string, sessionId: string): Promise<void> {
+    const res = await fetch(
+        `${BASE}/events/${encodeURIComponent(eventId)}/my-plan/${encodeURIComponent(sessionId)}`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    if (!res.ok) await parseJsonResponse(res, 'Failed to remove this session from My Plan');
+}
+
 export interface SiteSettings {
     since_date: string;
     sync_since_date: string;
@@ -230,8 +426,10 @@ export interface SiteSettings {
     tag_sort_mode: 'group' | 'event_count';
     default_explorer_period?: DateRangePresetKey;
     going_button_icon_variant?: 'hand' | 'person';
+    show_pending_events?: boolean;
     promo_codes_enabled?: boolean;
     organizer_claims_enabled?: boolean;
+    event_schedule_enabled?: boolean;
     duplicate_auto_detect_enabled?: boolean;
     network_going_snapshot_enabled?: boolean;
     my_events_route_enabled?: boolean;
@@ -754,6 +952,8 @@ export interface AuthUser {
     push_event_messages_enabled?: boolean;
     email_suggested_events_enabled?: boolean;
     push_suggested_events_enabled?: boolean;
+    email_schedule_updates_enabled?: boolean;
+    push_schedule_updates_enabled?: boolean;
     digest_email_enabled?: boolean;
     /** Legacy four-flag aliases returned for one release so older
      *  clients keep working. Derived from the six new flags on the
@@ -948,6 +1148,8 @@ export interface NotificationPreferences {
     push_event_messages_enabled: boolean;
     email_suggested_events_enabled: boolean;
     push_suggested_events_enabled: boolean;
+    email_schedule_updates_enabled: boolean;
+    push_schedule_updates_enabled: boolean;
     /** Legacy mirror kept for one release. */
     reminder_email_enabled: boolean;
     activity_email_enabled: boolean;
@@ -980,6 +1182,8 @@ export interface UpdateNotificationPreferencesPayload {
     push_event_messages_enabled?: boolean;
     email_suggested_events_enabled?: boolean;
     push_suggested_events_enabled?: boolean;
+    email_schedule_updates_enabled?: boolean;
+    push_schedule_updates_enabled?: boolean;
     /** Master opt-out for the combined activity digest email (v2). */
     digest_email_enabled?: boolean;
     /** Legacy aliases accepted for one release — server writes through
@@ -1881,7 +2085,10 @@ export type NotificationKind =
     | 'milestone_unlocked'
     | 'event_message'
     | 'event_message_reply'
-    | 'event_message_reported';
+    | 'event_message_reported'
+    | 'planned_session_changed'
+    | 'schedule_program_available'
+    | 'schedule_program_updated';
 
 export interface NotificationActor {
     handle: string;
@@ -1930,6 +2137,7 @@ export interface NotificationItem {
     /** Milestone key for `milestone_unlocked` rows (links to the passport).
      *  Null for kinds that don't use it. */
     subject_key?: string | null;
+    schedule_session_id?: string | null;
     /** True when the viewer is also attending `event_id` (drives the
      *  "You and X are going to ..." phrasing on subscription_going rows). */
     also_going?: boolean;

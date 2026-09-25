@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlmodel import Session, col, func, or_, select
 
@@ -31,12 +32,10 @@ from backend.db.models import (
     UserEventAttendance,
     UserEventMute,
     UserSavedEvent,
+    UserPlanSession,
 )
 from backend.services.notification_delivery import record_delivery
-
-if TYPE_CHECKING:  # pragma: no cover
-    from uuid import UUID  # noqa: F401
-
+from backend.services.event_visibility import eligible_event_ids
 
 SUBSCRIPTION_GOING = "subscription_going"
 # A followee saved (marked interested in) an event; fanned out to their
@@ -67,6 +66,121 @@ EVENT_MESSAGE = "event_message"
 EVENT_MESSAGE_REPLY = "event_message_reply"
 # A user reported a message; delivered to the site admin only (in-app).
 EVENT_MESSAGE_REPORTED = "event_message_reported"
+PLANNED_SESSION_CHANGED = "planned_session_changed"
+
+
+def notify_planned_session_changes(
+    session: Session,
+    actor: User,
+    event_id: str,
+    version: int,
+    previous: dict,
+    current: dict,
+) -> list[Notification]:
+    previous_sessions = {row["id"]: row for row in previous.get("sessions", [])}
+    current_sessions = {row["id"]: row for row in current.get("sessions", [])}
+    relevant_fields = {
+        "title",
+        "instructors",
+        "start",
+        "end",
+        "room_id",
+        "venue_id",
+        "level_id",
+        "activity_type_id",
+        "attendee_note",
+        "allow_plan",
+        "is_cancelled",
+    }
+    changed_ids = set(previous_sessions) - set(current_sessions)
+    changed_ids.update(
+        session_id
+        for session_id in previous_sessions.keys() & current_sessions.keys()
+        if any(
+            previous_sessions[session_id].get(field)
+            != current_sessions[session_id].get(field)
+            for field in relevant_fields
+        )
+    )
+    if not changed_ids:
+        return 0
+    changed_session_ids = [UUID(session_id) for session_id in changed_ids]
+    plan_rows = session.exec(
+        select(UserPlanSession).where(
+            UserPlanSession.event_id == event_id,
+            col(UserPlanSession.session_id).in_(changed_session_ids),
+        )
+    ).all()
+    changes_by_user: dict[
+        UUID, list[tuple[UserPlanSession, dict, dict | None, list[str]]]
+    ] = {}
+    for plan in plan_rows:
+        session_id = str(plan.session_id)
+        before = previous_sessions.get(session_id, plan.last_known_session)
+        after = current_sessions.get(session_id)
+        changes = []
+        if after is None:
+            changes.append("was removed from the program")
+        else:
+            if before.get("start") != after.get("start") or before.get(
+                "end"
+            ) != after.get("end"):
+                changes.append("has a new time")
+            if before.get("room_id") != after.get("room_id") or before.get(
+                "venue_id"
+            ) != after.get("venue_id"):
+                changes.append("has a new location")
+            if not before.get("is_cancelled") and after.get("is_cancelled"):
+                changes.append("was cancelled")
+            if any(
+                before.get(field) != after.get(field)
+                for field in relevant_fields
+                - {"start", "end", "room_id", "venue_id", "is_cancelled"}
+            ):
+                changes.append("has updated details")
+        if not changes:
+            continue
+        changes_by_user.setdefault(plan.user_id, []).append(
+            (plan, before, after, changes)
+        )
+        if after is not None:
+            plan.last_known_session = after
+            session.add(plan)
+
+    notifications: list[Notification] = []
+    for user_id, plan_changes in changes_by_user.items():
+        details = [
+            f"{before.get('title') or (after or {}).get('title')}: {', '.join(changes)}"
+            for _plan, before, after, changes in plan_changes
+        ]
+        description = (
+            f"{details[0]}."
+            if len(details) == 1
+            else f"{len(details)} sessions in your plan changed: "
+            + "; ".join(details)
+            + "."
+        )
+        single_plan = plan_changes[0][0] if len(plan_changes) == 1 else None
+        notification = Notification(
+            recipient_user_id=user_id,
+            actor_user_id=actor.id,
+            kind=PLANNED_SESSION_CHANGED,
+            event_id=event_id,
+            subject_key=f"publication:{version}",
+            group_key=str(single_plan.session_id) if single_plan else None,
+            context=(
+                plan_changes[0][1].get("title")
+                or (plan_changes[0][2] or {}).get("title")
+                if len(plan_changes) == 1
+                else f"{len(plan_changes)} planned sessions"
+            ),
+            description=description[:255],
+        )
+        session.add(notification)
+        session.flush()
+        record_delivery(session, notification.id, "app")
+        notifications.append(notification)
+    return notifications
 
 
 def _event_is_past(session: Session, event_id: str) -> bool:
@@ -106,6 +220,8 @@ def _fan_out(
     that are inherently about past events (reviews) or carry no event.
     """
     if audience == "private":
+        return 0
+    if event_id is not None and event_id not in eligible_event_ids(session, [event_id]):
         return 0
     # Marking a past event (already ended) as attended must not notify
     # followers — it isn't live activity worth surfacing.
@@ -628,6 +744,8 @@ def fan_out_event_message(
     (``subject_key``). Returns the created notifications so callers can
     dispatch instant email/push. Caller owns the transaction.
     """
+    if event_id not in eligible_event_ids(session, [event_id]):
+        return []
     recipients = _engaged_user_ids(session, event_id, exclude=author.id)
     recipients |= {aid for aid in _admin_user_ids(session) if aid != author.id}
     recipients -= _muted_user_ids(session, event_id)
@@ -666,6 +784,8 @@ def notify_thread_reply(
     notifications so callers can dispatch instant email/push. Caller owns the
     transaction.
     """
+    if event_id not in eligible_event_ids(session, [event_id]):
+        return []
     root_author = session.exec(
         select(EventMessage.author_user_id).where(EventMessage.id == root_message_id)
     ).first()

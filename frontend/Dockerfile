@@ -32,10 +32,11 @@ RUN printf 'server {\n\
     # Security headers\n\
     add_header X-Frame-Options "DENY" always;\n\
     add_header X-Content-Type-Options "nosniff" always;\n\
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;\n\
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;\n\
-    add_header X-Permitted-Cross-Domain-Policies "none" always;\n\
-    \n\
+    add_header X-Frame-Options "SAMEORIGIN" always;
+add_header X-Permitted-Cross-Domain-Policies "none" always;\n\
+    add_header Content-Security-Policy "frame-ancestors '\''self'\''" always;
+\n\
     gzip on;\n\
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;\n\
     gzip_min_length 256;\n\

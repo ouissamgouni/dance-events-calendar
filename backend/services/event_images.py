@@ -228,3 +228,14 @@ def fetch_remote_image(url: str) -> tuple[bytes, str]:
             raise ImageValidationError("Could not download the image URL") from exc
 
     raise ImageValidationError("Image URL has too many redirects")
+
+
+def replace_event_image_from_url(
+    event_id: str,
+    url: str,
+    previous_key: Optional[str] = None,
+) -> str:
+    data, content_type = fetch_remote_image(url)
+    key = store_event_image(event_id, data, content_type)
+    delete_event_image(previous_key)
+    return key

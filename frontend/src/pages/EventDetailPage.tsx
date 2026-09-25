@@ -34,7 +34,7 @@ export default function EventDetailPage() {
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
     const { user, loading: authLoading } = useAuth();
-    const { showRatings } = useFeatureFlags();
+    const { eventScheduleEnabled, showRatings } = useFeatureFlags();
 
     // Edit mode — admin must explicitly activate inline editing
     const [editMode, setEditMode] = useState(false);
@@ -76,6 +76,10 @@ export default function EventDetailPage() {
     const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
 
     const goToTab = (tab: EventDetailTab, opts?: { anchor?: string }) => {
+        if (tab === 'program') {
+            navigate(`/event/${eventId}/program`);
+            return;
+        }
         setActiveTab(tab);
         setPendingAnchor(opts?.anchor ?? null);
     };
@@ -373,6 +377,7 @@ export default function EventDetailPage() {
                                         <EventDetailTabsBar
                                             active={activeTab}
                                             onSelect={(t) => goToTab(t)}
+                                            showProgram={eventScheduleEnabled && Boolean(event.schedule_published)}
                                         />
                                     </div>
 

@@ -32,6 +32,8 @@ Idempotency / rejection memory
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import datetime, timedelta
 
@@ -58,7 +60,9 @@ class TagSuggestionStage(EnrichmentStage):
 
     def should_process(self, event: CachedEvent) -> bool:
         # Need *some* text to match against.
-        if not (event.title or event.description or event.location):
+        if not (
+            event.title or event.description or event.location or _extractor_tags(event)
+        ):
             return False
         # The actual "no auto-source rows yet for this event" check is done inside
         # ``process_with_session`` because it requires DB access.
@@ -69,18 +73,20 @@ class TagSuggestionStage(EnrichmentStage):
         # Admins can run the bulk "Suggest tags" action after the sync.
         return True
 
-    def process_with_session(
-        self, session: Session, event: CachedEvent
-    ) -> bool:
-        # Skip if any auto suggestion already exists for this event (idempotent).
+    def process_with_session(self, session: Session, event: CachedEvent) -> bool:
+        source_tags = _extractor_tags(event)
+        fingerprint = _input_fingerprint(event, source_tags)
         already = session.exec(
             select(TagSuggestion.id)
             .where(TagSuggestion.event_id == event.event_id)
             .where(TagSuggestion.source == "heuristic")
             .limit(1)
         ).first()
-        if already is not None:
+        state = dict(event.extractor_state or {})
+        if already is not None and state.get("tag_input_fingerprint") == fingerprint:
             return True
+        if state.get("tag_input_fingerprint") != fingerprint:
+            delete_pending_ai_suggestions(session, event.event_id)
 
         snapshot = load_taxonomy(session)
         excluded = excluded_tag_ids_for_event(session, event.event_id)
@@ -89,10 +95,30 @@ class TagSuggestionStage(EnrichmentStage):
             title=event.title,
             description=event.description,
             location=event.location,
+            source_tags=source_tags,
             excluded_tag_ids=excluded,
         )
         persist_suggestions(session, event.event_id, candidates)
+        state["tag_input_fingerprint"] = fingerprint
+        event.extractor_state = state
+        session.add(event)
         return True
+
+
+def _extractor_tags(event: CachedEvent) -> list[str]:
+    state = event.extractor_state or {}
+    payload = state.get("payload") or {}
+    tags = payload.get("tags") or []
+    return [tag for tag in tags if isinstance(tag, str)]
+
+
+def _input_fingerprint(event: CachedEvent, source_tags: list[str]) -> str:
+    value = json.dumps(
+        [event.title, event.description, event.location, source_tags],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(value.encode()).hexdigest()
 
 
 def excluded_tag_ids_for_event(session: Session, event_id: str) -> set[int]:

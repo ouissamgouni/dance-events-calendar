@@ -18,7 +18,7 @@ import {
  * that flips all six channel flags to false in a single PATCH.
  */
 
-type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked' | 'event_messages' | 'suggested_events';
+type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked' | 'event_messages' | 'suggested_events' | 'schedule_updates';
 type Channel = 'email' | 'push';
 type FlagKey =
     | 'email_event_reminders_enabled'
@@ -42,7 +42,9 @@ type FlagKey =
     | 'email_event_messages_enabled'
     | 'push_event_messages_enabled'
     | 'email_suggested_events_enabled'
-    | 'push_suggested_events_enabled';
+    | 'push_suggested_events_enabled'
+    | 'email_schedule_updates_enabled'
+    | 'push_schedule_updates_enabled';
 
 const FEATURES: {
     key: FeatureKey;
@@ -55,6 +57,12 @@ const FEATURES: {
             label: 'Event reminders',
             description: "Before events I've RSVP'd to.",
             anchor: 'notify-event-reminders',
+        },
+        {
+            key: 'schedule_updates',
+            label: 'Program updates',
+            description: "When a program is announced for an event I'm going to.",
+            anchor: 'notify-schedule-updates',
         },
         {
             key: 'social_activity',

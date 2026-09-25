@@ -28,9 +28,11 @@ import Home from './pages/Home';
 // account/profile bundles, etc.) is fetched on demand instead of bloating the
 // initial bundle downloaded on first paint.
 const Admin = lazy(() => import('./pages/Admin'));
+const AdminEventSchedulePage = lazy(() => import('./pages/AdminEventSchedulePage'));
 const Login = lazy(() => import('./pages/Login'));
 const Account = lazy(() => import('./pages/Account'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
+const EventProgramPage = lazy(() => import('./pages/EventProgramPage'));
 const SeriesPage = lazy(() => import('./pages/SeriesPage'));
 const MyCalendar = lazy(() => import('./pages/MyCalendar'));
 const PassportPage = lazy(() => import('./pages/PassportPage'));
@@ -127,6 +129,7 @@ function AppShell() {
   const mainRef = useRef<HTMLElement | null>(null);
   const backgroundLocation = (location.state as ModalLocationState | null)?.backgroundLocation;
   const isMyEvents = location.pathname === '/my-events' || location.pathname === '/mine/calendar';
+  const isProgram = /^\/event\/[^/]+\/program/.test(location.pathname);
 
   // Full-screen flows (auth, onboarding) and leaf detail pages (event/series,
   // admin, notifications, shared views) suppress the primary bottom nav.
@@ -188,7 +191,7 @@ function AppShell() {
           <SignUpBanner />
           <ShareReferralBanner />
           <OnboardingGate />
-          <main ref={mainRef} className={`flex-1 ${isMyEvents ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-auto'}`}>
+          <main ref={mainRef} className={`flex-1 ${isMyEvents || isProgram ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-auto'}`}>
             <Suspense fallback={null}>
               <Routes location={backgroundLocation ?? location}>
                 <Route path="/" element={<ForYouPage />} />
@@ -204,6 +207,8 @@ function AppShell() {
                 <Route path="/explore" element={<LegacyRedirect to="/" />} />
                 <Route path="/for-you" element={<LegacyRedirect to="/" />} />
                 <Route path="/event/:eventId" element={<EventDetailPage />} />
+                <Route path="/event/:eventId/program" element={<EventProgramPage />} />
+                <Route path="/event/:eventId/program/plan" element={<EventProgramPage />} />
                 <Route path="/event/:eventId/review" element={<EventDetailPage />} />
                 <Route path="/event/:eventId/ask" element={<EventDetailPage />} />
                 <Route path="/series/:seriesId" element={<SeriesPage />} />
@@ -252,6 +257,14 @@ function AppShell() {
                 />
                 <Route path="/u/:handle" element={<ProfilePage />} />
                 <Route path="/suggest" element={<SuggestEventRoute />} />
+                <Route
+                  path="/admin/events/:eventId/schedule"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminEventSchedulePage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/admin"
                   element={

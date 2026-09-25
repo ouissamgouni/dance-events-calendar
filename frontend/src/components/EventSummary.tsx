@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { CalendarEvent } from '../types';
-import { currencySymbol } from '../utils/currency';
 import { fetchEventMessages } from '../api';
 import { useCommunityExperience } from '../hooks/useCommunityExperience';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -16,9 +15,10 @@ import SeriesRow from './event-summary/SeriesRow';
 import EventActions from './event-summary/EventActions';
 import ExpandableDescription from './ExpandableDescription';
 import { cleanEventDescription } from '../utils/eventDescription';
+import { formatEventPrice } from '../utils/eventPrice';
 
 /** Detail tabs the summary can deep-link into. */
-export type EventDetailTab = 'overview' | 'about' | 'location' | 'people' | 'reviews' | 'discussion';
+export type EventDetailTab = 'overview' | 'program' | 'about' | 'location' | 'people' | 'reviews' | 'discussion';
 
 interface Props {
     event: CalendarEvent;
@@ -42,16 +42,6 @@ interface Props {
     /** Omit the identity header (image + date/title/time/location). The full
      * page renders that header above the tabs itself. Defaults to false. */
     omitHeader?: boolean;
-}
-
-function priceCompact(event: CalendarEvent): string | null {
-    if (event.price_is_free) return 'Free';
-    if (event.price_min == null || !event.price_currency) return null;
-    const s = currencySymbol(event.price_currency);
-    if (event.price_max != null && event.price_max !== event.price_min) {
-        return `${s}${event.price_min}–${event.price_max}`;
-    }
-    return `${s}${event.price_min}`;
 }
 
 /**
@@ -91,7 +81,7 @@ export default function EventSummary({
     }, [event.event_id]);
 
     const priceVisible = isPriceSectionVisible(event, showPrices);
-    const price = priceVisible ? priceCompact(event) : null;
+    const price = priceVisible ? formatEventPrice(event) : null;
     const hasPromo = event.has_active_promo_codes;
     const description = cleanEventDescription(event.description ?? '');
 

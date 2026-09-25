@@ -74,6 +74,7 @@ from backend.db.models import (
     UserSavedEvent,
 )
 from backend.services.email import send_login_code_email, send_new_user_notification
+from backend.services.event_visibility import eligible_event_ids
 from backend.services.follows import ensure_approved_follow_with_subscription
 from backend.services.image_processing import ImageValidationError
 from backend.services.user_bootstrap import ensure_default_interest_profile
@@ -931,6 +932,8 @@ def get_me(
         "push_event_messages_enabled": user.push_event_messages_enabled,
         "email_suggested_events_enabled": user.email_suggested_events_enabled,
         "push_suggested_events_enabled": user.push_suggested_events_enabled,
+        "email_schedule_updates_enabled": user.email_schedule_updates_enabled,
+        "push_schedule_updates_enabled": user.push_schedule_updates_enabled,
         "digest_email_enabled": user.digest_email_enabled,
         # Legacy aliases derived from the new flags. Kept for one release so
         # older frontend clients still work (Phase G §G.9 step 5 drops them).
@@ -1081,6 +1084,8 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     push_event_messages_enabled: Optional[bool] = None
     email_suggested_events_enabled: Optional[bool] = None
     push_suggested_events_enabled: Optional[bool] = None
+    email_schedule_updates_enabled: Optional[bool] = None
+    push_schedule_updates_enabled: Optional[bool] = None
     digest_email_enabled: Optional[bool] = None
     # Legacy aliases — removed in the cleanup PR (§G.9 step 5).
     reminder_email_enabled: Optional[bool] = None
@@ -1143,6 +1148,8 @@ _NEW_FLAGS: tuple[str, ...] = (
     "push_event_messages_enabled",
     "email_suggested_events_enabled",
     "push_suggested_events_enabled",
+    "email_schedule_updates_enabled",
+    "push_schedule_updates_enabled",
     "digest_email_enabled",
 )
 
@@ -1204,6 +1211,8 @@ def update_notification_preferences(
         "push_event_messages_enabled": user.push_event_messages_enabled,
         "email_suggested_events_enabled": user.email_suggested_events_enabled,
         "push_suggested_events_enabled": user.push_suggested_events_enabled,
+        "email_schedule_updates_enabled": user.email_schedule_updates_enabled,
+        "push_schedule_updates_enabled": user.push_schedule_updates_enabled,
         "digest_email_enabled": user.digest_email_enabled,
         # Legacy mirror (removed in cleanup PR).
         "reminder_email_enabled": user.email_event_reminders_enabled,
@@ -1635,11 +1644,14 @@ def get_my_saved_events(
                 UserSavedEvent.user_id == user.id
             )
         ).all()
+        visible_ids = eligible_event_ids(session, (row[0] for row in rows))
         # Collapse cross-device rows to one entry per event_id; most-permissive
         # audience wins on collapse (public > friends > private).
         order = {"private": 0, "friends": 1, "public": 2}
         by_event: dict[str, str] = {}
         for event_id, audience in rows:
+            if event_id not in visible_ids:
+                continue
             current = by_event.get(event_id, "private")
             incoming = audience or "private"
             if order.get(incoming, 0) > order.get(current, 0):
@@ -1662,7 +1674,7 @@ def get_my_saved_events(
             UserSavedEvent.user_id.is_(None),
         )
     ).all()
-    event_ids = sorted({r for r in rows})
+    event_ids = sorted(eligible_event_ids(session, rows))
     events = [{"event_id": eid, "audience": "private"} for eid in event_ids]
     return {"event_ids": event_ids, "events": events}
 
@@ -1691,11 +1703,14 @@ def get_my_attending_events(
                 UserEventAttendance.share_audience,
             ).where(UserEventAttendance.user_id == user.id)
         ).all()
+        visible_ids = eligible_event_ids(session, (row[0] for row in rows))
         # A user may have rows on multiple devices for the same event; collapse
         # to one entry per event_id, treating share_publicly=True on any device
         # as the canonical state (since one row gating visibility is enough).
         by_event: dict[str, dict] = {}
         for event_id, share_publicly, share_audience in rows:
+            if event_id not in visible_ids:
+                continue
             entry = by_event.setdefault(
                 event_id, {"share_publicly": False, "share_audience": "private"}
             )
@@ -1730,8 +1745,11 @@ def get_my_attending_events(
             UserEventAttendance.user_id.is_(None),
         )
     ).all()
+    visible_ids = eligible_event_ids(session, (row[0] for row in rows))
     by_event: dict[str, bool] = {}
     for event_id, share_publicly in rows:
+        if event_id not in visible_ids:
+            continue
         by_event[event_id] = by_event.get(event_id, False) or bool(share_publicly)
     events = [
         {"event_id": eid, "share_publicly": share, "share_audience": "private"}

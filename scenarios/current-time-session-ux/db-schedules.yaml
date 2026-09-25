@@ -1,0 +1,87 @@
+schedules:
+  - event_id: live-program-now
+    timezone: UTC
+    day_start_hour: 6
+    days:
+      - today
+      - tomorrow
+    venues:
+      - external_id: live-arts-center
+        name: Live Arts Center
+        address: 1 Current Street, London
+        sort_order: 0
+    rooms:
+      - external_id: studio-a
+        name: Studio A
+        venue: Live Arts Center
+        color: emerald
+        sort_order: 0
+      - external_id: studio-b
+        name: Studio B
+        venue: Live Arts Center
+        color: amber
+        sort_order: 1
+    levels:
+      - external_id: open
+        label: Open Level
+        notation: "*"
+        sort_order: 0
+      - external_id: intermediate
+        label: Intermediate
+        notation: "**"
+        sort_order: 1
+    activity_types:
+      - external_id: workshop
+        name: Workshop
+        color: blue
+        sort_order: 0
+      - external_id: social
+        name: Social
+        color: emerald
+        sort_order: 1
+    sessions:
+      - id: "20000000-0000-4000-8000-000000000001"
+        external_id: just-ended
+        title: Just Ended Warm-up
+        instructors: Elena
+        start: now-90m
+        end: now-60m
+        room: Studio A
+        venue: Live Arts Center
+        level: Open Level
+        activity_type: Workshop
+      - id: "20000000-0000-4000-8000-000000000002"
+        external_id: active-musicality
+        title: Musicality in Motion
+        instructors: Alexis Ruiz
+        start: now-45m
+        end: now+45m
+        room: Studio A
+        venue: Live Arts Center
+        level: Intermediate
+        activity_type: Workshop
+      - id: "20000000-0000-4000-8000-000000000003"
+        external_id: active-partnerwork
+        title: Live Partnerwork Lab
+        instructors: Maya Chen
+        start: now-20m
+        end: now+60m
+        room: Studio B
+        venue: Live Arts Center
+        level: Open Level
+        activity_type: Workshop
+      - id: "20000000-0000-4000-8000-000000000004"
+        external_id: upcoming-social
+        title: Next Up Social
+        start: now+75m
+        end: now+135m
+        room: Studio A
+        venue: Live Arts Center
+        activity_type: Social
+    published: true
+    refresh_publication: true
+    plans:
+      - email: dancer@example.com
+        session_id: "20000000-0000-4000-8000-000000000002"
+      - email: dancer@example.com
+        session_id: "20000000-0000-4000-8000-000000000004"

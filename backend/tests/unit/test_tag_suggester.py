@@ -116,6 +116,35 @@ def test_no_match_returns_empty():
     assert out == []
 
 
+def test_structured_source_tag_matches_existing_taxonomy():
+    snap = _snap(_tag(1, "mambo", "Mambo"))
+
+    out = suggest_tags(
+        snap,
+        title="Friday Party",
+        description=None,
+        source_tags=["MAMBO festival"],
+    )
+
+    assert len(out) == 1
+    assert out[0].tag_id == 1
+    assert out[0].confidence == SCORE_EXACT
+
+
+def test_unknown_structured_source_tag_does_not_create_candidate():
+    snap = _snap(_tag(1, "salsa", "Salsa"))
+
+    assert (
+        suggest_tags(
+            snap,
+            title=None,
+            description=None,
+            source_tags=["romantic atmosphere"],
+        )
+        == []
+    )
+
+
 def test_excluded_tag_ids_skipped():
     snap = _snap(
         _tag(1, "salsa", "Salsa"),

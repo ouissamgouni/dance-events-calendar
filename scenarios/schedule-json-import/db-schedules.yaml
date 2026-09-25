@@ -1,0 +1,13 @@
+schedules:
+  - event_id: schedule-import-lab
+    timezone: Europe/Berlin
+    day_start_hour: 6
+    days:
+      - "2026-10-16"
+      - "2026-10-17"
+    venues: []
+    rooms: []
+    levels: []
+    activity_types: []
+    sessions: []
+    published: false

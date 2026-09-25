@@ -10,6 +10,7 @@ the backend uses as the dedupe key for anonymous writers.
 """
 
 import os
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -23,7 +24,7 @@ from backend.api.anon_id import ANON_COOKIE_NAME  # noqa: E402
 from backend.api.main import app  # noqa: E402
 from backend.api.routes import tracking as tracking_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
-from backend.db.models import UserEventAttendance, UserSavedEvent  # noqa: E402
+from backend.db.models import CachedEvent, UserEventAttendance, UserSavedEvent  # noqa: E402
 
 
 @pytest.fixture
@@ -34,6 +35,22 @@ def engine():
         poolclass=StaticPool,
     )
     SQLModel.metadata.create_all(eng)
+    with Session(eng) as session:
+        start = datetime.utcnow() + timedelta(days=1)
+        session.add_all(
+            [
+                CachedEvent(
+                    event_id=event_id,
+                    calendar_id="cal-1",
+                    title=event_id,
+                    start=start,
+                    end=start + timedelta(hours=2),
+                    review_status="reviewed",
+                )
+                for event_id in ("evt-1", "evt-X", "evt-Y", "evt-Z", "evt-T")
+            ]
+        )
+        session.commit()
     yield eng
     SQLModel.metadata.drop_all(eng)
 
@@ -116,9 +133,7 @@ def test_anonymous_going_dedupes_across_device_id_changes(client, engine):
 
     with Session(engine) as s:
         rows = s.exec(
-            select(UserEventAttendance).where(
-                UserEventAttendance.event_id == "evt-Y"
-            )
+            select(UserEventAttendance).where(UserEventAttendance.event_id == "evt-Y")
         ).all()
     assert len(rows) == 1
 
@@ -126,6 +141,7 @@ def test_anonymous_going_dedupes_across_device_id_changes(client, engine):
 @pytest.mark.unit
 def test_anonymous_dedupes_independently_per_browser(engine):
     """Two separate clients (different cookie jars) → two separate anon ids → 2 rows."""
+
     def _override():
         with Session(engine) as s:
             yield s

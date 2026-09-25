@@ -49,6 +49,12 @@ describe('resolveNotificationDestination — reminder ask deep-link', () => {
         const dest = resolveNotificationDestination(item({ kind: 'event_message' }));
         expect(dest).toBe('/event/evt-1#messages');
     });
+
+    it('routes a Program announcement directly to the Program', () => {
+        expect(resolveNotificationDestination(item({ kind: 'schedule_program_available' }))).toBe(
+            '/event/evt-1/program',
+        );
+    });
 });
 
 describe('subscription_saved', () => {
@@ -68,6 +74,7 @@ describe('notificationCategory', () => {
         expect(notificationCategory('subscription_going')).toBe('events');
         expect(notificationCategory('subscription_saved')).toBe('events');
         expect(notificationCategory('event_reminder')).toBe('events');
+        expect(notificationCategory('schedule_program_available')).toBe('events');
     });
 
     it('maps follow/friend kinds to "network"', () => {

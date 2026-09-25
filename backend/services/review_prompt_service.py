@@ -167,7 +167,9 @@ def _due_pairs(session: Session, now: datetime, delay_hours: int, lookback_hours
     """
     window_start = now - timedelta(hours=delay_hours + lookback_hours)
     window_end = now - timedelta(hours=delay_hours)
-    rows = session.exec(
+    from backend.services.event_visibility import apply_event_visibility
+
+    statement = (
         select(User, CachedEvent)
         .join(
             UserEventAttendance,
@@ -180,7 +182,9 @@ def _due_pairs(session: Session, now: datetime, delay_hours: int, lookback_hours
         .where(CachedEvent.is_hidden == False)  # noqa: E712
         .where(CachedEvent.end > window_start)
         .where(CachedEvent.end <= window_end)
-    ).all()
+    )
+    statement = apply_event_visibility(statement, session)
+    rows = session.exec(statement).all()
     if not rows:
         return []
 

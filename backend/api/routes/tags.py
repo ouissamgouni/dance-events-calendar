@@ -37,6 +37,11 @@ from backend.db.models import (
     TagSuggestion,
     TagSynonym,
 )
+from backend.services.event_visibility import (
+    apply_event_visibility,
+    event_is_user_facing,
+    show_pending_events_enabled,
+)
 from backend.services.reach import assign_event_tag
 
 logger = logging.getLogger(__name__)
@@ -267,6 +272,7 @@ def list_tag_groups(
         .join(CachedEvent, CachedEvent.event_id == EventTag.event_id)
         .where(CachedEvent.deleted_at == None)  # noqa: E711
     )
+    count_q = apply_event_visibility(count_q, session)
     if start_date:
         try:
             dt_start = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
@@ -290,7 +296,9 @@ def list_tag_groups(
             tag_resp.event_count = count_map.get(tag_resp.id, 0)
 
     response = JSONResponse(content=[d.model_dump(mode="json") for d in data])
-    response.headers["Cache-Control"] = "public, max-age=30"
+    response.headers["Cache-Control"] = (
+        "no-store" if show_pending_events_enabled(session) else "public, max-age=30"
+    )
     return response
 
 
@@ -306,6 +314,10 @@ def submit_tag_suggestion(
     session: Session = Depends(get_session),
 ):
     """Public: suggest a tag for an existing event."""
+    event = session.get(CachedEvent, body.event_id)
+    if event is None or not event_is_user_facing(session, event):
+        raise HTTPException(status_code=404, detail="Event not found")
+
     # Honeypot
     if body.website:
         from datetime import datetime
@@ -323,11 +335,6 @@ def submit_tag_suggestion(
             status_code=400,
             detail="Either tag_id or free_text is required",
         )
-
-    # Validate event exists
-    event = session.get(CachedEvent, body.event_id)
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
 
     # Validate tag_id if provided
     if body.tag_id:

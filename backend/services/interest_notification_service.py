@@ -56,6 +56,7 @@ from backend.db.models import (
     UserInterestProfile,
     UserInterestProfileTag,
 )
+from backend.services.event_visibility import apply_event_visibility
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ def _candidate_events(
     session: Session, since: datetime, now: datetime
 ) -> list[CachedEvent]:
     """Recently ingested/updated, visible, future, geolocated events."""
-    return session.exec(
+    statement = (
         select(CachedEvent)
         .where(CachedEvent.deleted_at.is_(None))  # type: ignore[union-attr]
         .where(CachedEvent.is_hidden == False)  # noqa: E712
@@ -110,7 +111,9 @@ def _candidate_events(
         .where(CachedEvent.start > now)
         .where(CachedEvent.latitude.is_not(None))  # type: ignore[union-attr]
         .where(CachedEvent.longitude.is_not(None))  # type: ignore[union-attr]
-    ).all()
+    )
+    statement = apply_event_visibility(statement, session)
+    return session.exec(statement).all()
 
 
 def _load_event_tag_ids(session: Session, event_ids: list[str]) -> dict[str, set[int]]:

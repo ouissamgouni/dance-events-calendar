@@ -7,6 +7,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'program', label: 'Program' },
     { id: 'about', label: 'Details' },
     { id: 'location', label: 'Location' },
     { id: 'people', label: 'People' },
@@ -20,6 +21,7 @@ interface Props {
     /** `entry` = overview entry-point bar (thin separators, not sticky);
      * `section` = the bar shown under the section header. */
     variant?: 'entry' | 'section';
+    showProgram?: boolean;
 }
 
 /**
@@ -28,7 +30,7 @@ interface Props {
  * tabs. Stickiness is owned by the caller so it can pin the section header and
  * tabs together.
  */
-export default function EventDetailTabsBar({ active, onSelect, variant = 'section' }: Props) {
+export default function EventDetailTabsBar({ active, onSelect, variant = 'section', showProgram = false }: Props) {
     return (
         <div className={`bg-surface ${variant === 'entry' ? 'border-y border-line' : 'border-b border-line'}`}>
             <div
@@ -36,7 +38,7 @@ export default function EventDetailTabsBar({ active, onSelect, variant = 'sectio
                 aria-label="Event details"
                 className="flex flex-nowrap gap-1 overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-                {TABS.map((tab) => {
+                {TABS.filter((tab) => tab.id !== 'program' || showProgram).map((tab) => {
                     const isActive = tab.id === active;
                     return (
                         <button

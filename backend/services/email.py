@@ -456,6 +456,94 @@ def send_event_review_prompt_email(user, event, friend_proof=None) -> bool:
     return _send_email(user.email, subject, html, "review prompt")
 
 
+def send_schedule_program_available_email(user, event, session_count: int) -> bool:
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    event_url = f"{app}/event/{escape(str(event.event_id))}/program"
+    title = escape(event.title or "the event")
+    session_copy = (
+        f" Browse {session_count} sessions and build your plan."
+        if session_count
+        else " Browse the schedule and build your plan."
+    )
+    body = f"""
+    <p>The program for <strong>{title}</strong> is now available.</p>
+    <p style="color:#374151;margin:8px 0">{session_copy}</p>
+    <p style="margin:20px 0">
+      <a href="{event_url}"
+         style="background:#3b82f6;color:#fff;text-decoration:none;
+                padding:10px 18px;display:inline-block">
+        View program
+      </a>
+    </p>
+    {_engagement_ctas_html(f"{app}/account#notifications")}
+    """
+    footer = _unsubscribe_footer(user.id, "schedule_updates", "program updates")
+    html = _email_shell("Program now available", body, footer)
+    return _send_email(
+        user.email,
+        f"{event.title or 'Event'}: program now available",
+        html,
+        "program available",
+    )
+
+
+def send_schedule_plan_changed_email(user, event, description: str) -> bool:
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    event_url = f"{app}/event/{escape(str(event.event_id))}/program/plan"
+    title = escape(event.title or "the event")
+    body = f"""
+    <p>Your plan for <strong>{title}</strong> has changed.</p>
+    <p style="color:#374151;margin:8px 0">{escape(description)}</p>
+    <p style="margin:20px 0">
+      <a href="{event_url}"
+         style="background:#3b82f6;color:#fff;text-decoration:none;
+                padding:10px 18px;display:inline-block">
+        Review My Plan
+      </a>
+    </p>
+    {_engagement_ctas_html(f"{app}/account#notifications")}
+    """
+    footer = _unsubscribe_footer(user.id, "schedule_updates", "program updates")
+    html = _email_shell("Your plan changed", body, footer)
+    return _send_email(
+        user.email,
+        f"{event.title or 'Event'}: your plan changed",
+        html,
+        "planned session changed",
+    )
+
+
+def send_schedule_program_updated_email(user, event) -> bool:
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    event_url = f"{app}/event/{escape(str(event.event_id))}/program"
+    title = escape(event.title or "the event")
+    body = f"""
+    <p>The program for <strong>{title}</strong> has been updated.</p>
+    <p style="margin:20px 0">
+      <a href="{event_url}"
+         style="background:#3b82f6;color:#fff;text-decoration:none;
+                padding:10px 18px;display:inline-block">
+        Review program
+      </a>
+    </p>
+    {_engagement_ctas_html(f"{app}/account#notifications")}
+    """
+    footer = _unsubscribe_footer(user.id, "schedule_updates", "program updates")
+    html = _email_shell("Program updated", body, footer)
+    return _send_email(
+        user.email,
+        f"{event.title or 'Event'}: program updated",
+        html,
+        "program updated",
+    )
+
+
 def send_milestone_instant_email(user, milestones) -> bool:
     """Email a user that they unlocked one or more Dance Passport milestones
     (see ``services/milestone_notification_service.py``). ``milestones`` is a
@@ -811,7 +899,7 @@ def _card_avatar_html(entry: dict) -> str:
     )
 
 
-def _render_card(entry: dict) -> str:
+def _render_card(entry: dict, more_href: str | None = None) -> str:
     """Render one structured digest entry as an HTML card.
 
     ``entry`` keys: ``kind``, ``primary_html`` (the already-escaped linked
@@ -821,6 +909,7 @@ def _render_card(entry: dict) -> str:
     """
     children = entry.get("entries") or [entry]
     avatar = _card_avatar_html(children[0])
+    group_header_html = children[0].get("group_header_html")
     child_blocks: list[str] = []
     for index, child in enumerate(children):
         subline = child.get("subline")
@@ -832,21 +921,31 @@ def _render_card(entry: dict) -> str:
         child_blocks.append(
             f'<div style="color:#111827;font-size:14px;line-height:1.4;'
             f'margin-top:{"6px" if index else "0"}">'
-            f"{child.get('primary_html', '')}{subline_html}</div>"
+            f"{child.get('group_item_html') or child.get('primary_html', '')}"
+            f"{subline_html}</div>"
         )
     more_count = entry.get("more", 0) + sum(
         child.get("more_count", 0) for child in children
     )
-    more_html = (
-        f'<div style="color:#6b7280;font-size:12px;margin-top:6px">and {more_count} more</div>'
-        if more_count
-        else ""
-    )
+    if more_count and more_href:
+        more_html = (
+            f'<div style="font-size:12px;margin-top:8px"><a href="{escape(more_href)}" '
+            'style="color:#1d4ed8;text-decoration:underline">'
+            f"and {more_count} more</a></div>"
+        )
+    elif more_count:
+        more_html = (
+            f'<div style="color:#6b7280;font-size:12px;margin-top:8px">'
+            f"and {more_count} more</div>"
+        )
+    else:
+        more_html = ""
     return f"""
     <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0">
       <tr>
         <td style="width:40px;vertical-align:top;padding-right:10px">{avatar}</td>
         <td style="vertical-align:top">
+                    {f'<div style="color:#111827;font-size:14px;line-height:1.4;margin-bottom:4px">{group_header_html}</div>' if group_header_html else ""}
           {"".join(child_blocks)}
           {more_html}
         </td>
@@ -942,32 +1041,34 @@ def send_activity_digest_v2_email(
     card_count = 0
     for s in section_data:
         cards: list[str] = []
-        for kind, b in s["buckets"].items():
-            for e in b["entries"]:
-                cards.append(_render_card(e))
-                card_count += 1
-            if b["more"] > 0:
-                cards.append(
-                    '<div style="color:#6b7280;font-size:12px;margin:0 0 8px 50px">'
-                    f"and {b['more']} more</div>"
-                )
-        if not cards:
-            continue
         icon, label, href = _SECTION_META.get(
             s["feature"], ("🔔", "Recent activity", "/notifications")
         )
-        cta = (
-            f'<a href="{app}{href}" style="color:#1d4ed8;text-decoration:underline;'
-            f'font-size:12px">See all &rarr;</a>'
-            if href
-            else ""
-        )
+        section_href = f"{app}{href}" if href else None
+        for kind, b in s["buckets"].items():
+            for e in b["entries"]:
+                cards.append(_render_card(e, section_href))
+                card_count += 1
+            if b["more"] > 0:
+                more_text = f"and {b['more']} more"
+                cards.append(
+                    '<div style="font-size:12px;margin:8px 0 12px 50px">'
+                    + (
+                        f'<a href="{escape(section_href)}" '
+                        'style="color:#1d4ed8;text-decoration:underline">'
+                        f"{more_text}</a>"
+                        if section_href
+                        else f'<span style="color:#6b7280">{more_text}</span>'
+                    )
+                    + "</div>"
+                )
+        if not cards:
+            continue
         blocks.append(
             f"""
-    <div style="margin:20px 0 8px">
-            <h3 style="font-size:18px;color:#111827;margin:0 0 8px">{icon} {escape(label)}</h3>
+    <div style="padding:24px 0 12px">
+            <h3 style="font-size:18px;color:#111827;margin:0 0 12px">{icon} {escape(label)}</h3>
       {"".join(cards)}
-      {cta}
     </div>
     """
         )

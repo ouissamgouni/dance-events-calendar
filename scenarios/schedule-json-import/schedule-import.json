@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "event_id": "schedule-import-lab",
+  "timezone": "Europe/Berlin",
+  "day_start_hour": 6,
+  "days": [
+    "2026-10-16",
+    "2026-10-17"
+  ],
+  "venues": [
+    {
+      "external_id": "kulturhaus",
+      "name": "Kulturhaus",
+      "address": "Alexanderplatz 1, Berlin",
+      "sort_order": 0
+    }
+  ],
+  "rooms": [
+    {
+      "external_id": "main-hall",
+      "venue_external_id": "kulturhaus",
+      "name": "Main Hall",
+      "color": "amber",
+      "sort_order": 0
+    },
+    {
+      "external_id": "studio-two",
+      "venue_external_id": "kulturhaus",
+      "name": "Studio Two",
+      "color": "emerald",
+      "sort_order": 1
+    }
+  ],
+  "levels": [
+    {
+      "external_id": "open",
+      "label": "Open Level",
+      "notation": "*",
+      "sort_order": 0
+    }
+  ],
+  "activity_types": [
+    {
+      "external_id": "workshop",
+      "name": "Workshop",
+      "color": "blue",
+      "sort_order": 0
+    }
+  ],
+  "sessions": [
+    {
+      "external_id": "fri-musicality",
+      "title": "Musicality Foundations",
+      "instructors": "Maya Chen",
+      "start": "2026-10-16T14:00:00",
+      "end": "2026-10-16T15:00:00",
+      "room_external_id": "main-hall",
+      "venue_external_id": "kulturhaus",
+      "level_external_id": "open",
+      "activity_type_external_id": "workshop",
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "fri-partnerwork",
+      "title": "Partnerwork Lab",
+      "instructors": "Alexis Ruiz",
+      "start": "2026-10-16T15:15:00",
+      "end": "2026-10-16T16:15:00",
+      "room_external_id": "studio-two",
+      "venue_external_id": "kulturhaus",
+      "level_external_id": "open",
+      "activity_type_external_id": "workshop",
+      "allow_plan": true,
+      "is_cancelled": false
+    }
+  ]
+}

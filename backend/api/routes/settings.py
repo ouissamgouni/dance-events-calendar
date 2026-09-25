@@ -172,6 +172,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         sync_interval_minutes=_get_sync_interval(session),
         auto_sync_enabled=_get_auto_sync_enabled(session),
         auto_sync_mode=_get_auto_sync_mode(session),
+        show_pending_events=_get_bool_setting(session, "show_pending_events"),
         show_prices=_get_bool_setting(session, "show_prices"),
         show_popularity=_get_bool_setting(session, "show_popularity", default=True),
         show_ratings=_get_bool_setting(session, "show_ratings"),
@@ -194,6 +195,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         going_button_icon_variant=_get_going_button_icon_variant(session),
         promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
         organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
+        event_schedule_enabled=_get_bool_setting(session, "event_schedule_enabled"),
         network_going_snapshot_enabled=_get_bool_setting(
             session, "network_going_snapshot_enabled", default=False
         ),
@@ -395,6 +397,9 @@ def update_settings(
             row = SiteSetting(key="auto_sync_mode", value=body.auto_sync_mode)
         session.add(row)
 
+    if body.show_pending_events is not None:
+        _set_bool_setting(session, "show_pending_events", body.show_pending_events)
+
     if body.show_prices is not None:
         _set_bool_setting(session, "show_prices", body.show_prices)
 
@@ -513,6 +518,11 @@ def update_settings(
     if body.organizer_claims_enabled is not None:
         _set_bool_setting(
             session, "organizer_claims_enabled", body.organizer_claims_enabled
+        )
+
+    if body.event_schedule_enabled is not None:
+        _set_bool_setting(
+            session, "event_schedule_enabled", body.event_schedule_enabled
         )
 
     if body.duplicate_auto_detect_enabled is not None:

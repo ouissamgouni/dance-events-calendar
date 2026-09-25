@@ -26,6 +26,7 @@ from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.api.routes import tracking as tracking_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
+    CachedEvent,
     EventSuggestion,
     User,
     UserEventAttendance,
@@ -88,6 +89,21 @@ def _make_user(session: Session, email: str, name: str) -> User:
     return u
 
 
+def _ensure_reviewed_event(session: Session, event_id: str) -> None:
+    if session.get(CachedEvent, event_id) is None:
+        session.add(
+            CachedEvent(
+                event_id=event_id,
+                calendar_id="test-calendar",
+                title=event_id,
+                start=datetime(2026, 1, 1),
+                end=datetime(2026, 1, 2),
+                review_status="reviewed",
+            )
+        )
+        session.commit()
+
+
 def _seed(
     session: Session,
     *,
@@ -96,6 +112,7 @@ def _seed(
     device_id: str,
     share_publicly: bool,
 ):
+    _ensure_reviewed_event(session, event_id)
     session.add(
         UserEventAttendance(
             event_id=event_id,
@@ -247,6 +264,7 @@ def test_track_event_attendance_persists_share_publicly(client, session):
     ignored for logged-out callers (their rows always have user_id=NULL)."""
     _make_user(session, "alice@example.com", "Alice")
     event_id = "evt-1"
+    _ensure_reviewed_event(session, event_id)
 
     _login(client, "alice@example.com", device_id="d-alice")
     r = client.post(
@@ -337,6 +355,7 @@ def test_track_event_attendance_updates_admin_curated_row(client, session):
     admin = _make_user(session, "admin@example.com", "Admin")
     alice = _make_user(session, "alice@example.com", "Alice")
     event_id = "evt-curated-going"
+    _ensure_reviewed_event(session, event_id)
     session.add(
         UserEventAttendance(
             event_id=event_id,
@@ -376,6 +395,7 @@ def test_track_event_attendance_updates_admin_curated_row(client, session):
 
 
 def _save(session: Session, *, event_id: str, device_id: str, user: User | None = None):
+    _ensure_reviewed_event(session, event_id)
     session.add(
         UserSavedEvent(
             event_id=event_id,
@@ -428,6 +448,7 @@ def test_attendance_summary_includes_total_saved_authenticated(client, session):
 def test_attendance_summary_total_saved_zero_when_no_saves(client, session):
     """total_saved defaults to 0 when there are no UserSavedEvent rows."""
     event_id = "evt-saved-empty"
+    _ensure_reviewed_event(session, event_id)
     r = client.get(f"/api/events/{event_id}/attendance-summary")
     assert r.status_code == 200
     data = r.json()
@@ -449,6 +470,7 @@ def test_attendance_summary_batch_includes_total_saved(client, session):
     _save(session, event_id=event_a, device_id="d-sa1")
     _save(session, event_id=event_b, device_id="d-sb1")
     _save(session, event_id=event_b, device_id="d-sb2")
+    _ensure_reviewed_event(session, event_c)
 
     r = client.post(
         "/api/events/attendance-summary",

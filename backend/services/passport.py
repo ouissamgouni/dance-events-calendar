@@ -24,6 +24,7 @@ from backend.db.models import (
     UserEventAttendance,
     UserMilestone,
 )
+from backend.services.event_visibility import apply_event_visibility
 
 
 # --- Consistency achievements (recurring) ---------------------------------
@@ -60,7 +61,7 @@ def attended_events(session: Session, user_id: UUID) -> list[CachedEvent]:
     Deduplicated by ``event_id`` and ordered newest-first.
     """
     now = datetime.utcnow()
-    rows = session.exec(
+    statement = (
         select(CachedEvent)
         .join(
             UserEventAttendance,
@@ -70,7 +71,9 @@ def attended_events(session: Session, user_id: UUID) -> list[CachedEvent]:
         .where(CachedEvent.start < now)
         .where(CachedEvent.deleted_at.is_(None))
         .order_by(CachedEvent.start.desc())
-    ).all()
+    )
+    statement = apply_event_visibility(statement, session)
+    rows = session.exec(statement).all()
     seen: set[str] = set()
     unique: list[CachedEvent] = []
     for event in rows:
@@ -157,14 +160,15 @@ def rolling_active_count(
 
 
 def reviews_written(session: Session, user_id: UUID) -> int:
-    return int(
-        session.exec(
-            select(func.count())
-            .select_from(EventRating)
-            .where(EventRating.user_id == user_id)
-            .where(EventRating.status != "rejected")
-        ).one()
+    statement = (
+        select(func.count())
+        .select_from(EventRating)
+        .join(CachedEvent, CachedEvent.event_id == EventRating.event_id)
+        .where(EventRating.user_id == user_id)
+        .where(EventRating.status != "rejected")
     )
+    statement = apply_event_visibility(statement, session)
+    return int(session.exec(statement).one())
 
 
 def events_last_30_days(events: list[CachedEvent]) -> int:
@@ -297,12 +301,15 @@ def timeline_milestone_markers(events: list[CachedEvent]) -> list[dict]:
 
 def review_timeline_markers(session: Session, user_id: UUID) -> list[dict]:
     """Review milestones placed at the review that crossed each threshold."""
-    reviews = session.exec(
+    statement = (
         select(EventRating)
+        .join(CachedEvent, CachedEvent.event_id == EventRating.event_id)
         .where(EventRating.user_id == user_id)
         .where(EventRating.status != "rejected")
         .order_by(EventRating.created_at, EventRating.id)
-    ).all()
+    )
+    statement = apply_event_visibility(statement, session)
+    reviews = session.exec(statement).all()
     markers: list[dict] = []
     for milestone in MILESTONES:
         if milestone.category != "reviews" or len(reviews) < milestone.threshold:

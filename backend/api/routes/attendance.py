@@ -32,7 +32,14 @@ from backend.api.schemas import (
     GoingWedgeResponse,
 )
 from backend.db.database import get_session
-from backend.db.models import User, UserEventAttendance, UserFollow, UserSavedEvent
+from backend.db.models import (
+    CachedEvent,
+    User,
+    UserEventAttendance,
+    UserFollow,
+    UserSavedEvent,
+)
+from backend.services.event_visibility import eligible_event_ids, event_is_user_facing
 from backend.services.user_avatars import resolve_user_avatar
 
 router = APIRouter(prefix="/api/events", tags=["attendance"])
@@ -40,6 +47,12 @@ router = APIRouter(prefix="/api/events", tags=["attendance"])
 _PREVIEW_LIMIT = 3
 _WEDGE_FRIENDS_LIMIT = 12
 _WEDGE_FOF_LIMIT = 5
+
+
+def _require_user_facing_event(session: Session, event_id: str) -> None:
+    event = session.get(CachedEvent, event_id)
+    if event is None or not event_is_user_facing(session, event):
+        raise HTTPException(status_code=404, detail="Event not found")
 
 
 def _row_visible_to(
@@ -128,6 +141,7 @@ def get_attendance_summary(
     session: Session = Depends(get_session),
     viewer: Optional[User] = Depends(get_current_user_optional),
 ):
+    _require_user_facing_event(session, event_id)
     return _summarize_for_event(session, event_id, viewer)
 
 
@@ -139,9 +153,10 @@ def get_attendance_summary_batch(
 ):
     """Batch variant used by the event list to populate avatar stacks in a
     single round-trip (avoids N+1 fetches on /attendance-summary)."""
+    visible_event_ids = eligible_event_ids(session, payload.event_ids)
     rows = session.exec(
         select(UserEventAttendance).where(
-            UserEventAttendance.event_id.in_(payload.event_ids)
+            UserEventAttendance.event_id.in_(visible_event_ids)
         )
     ).all()
     by_event: dict[str, list[UserEventAttendance]] = defaultdict(list)
@@ -149,7 +164,7 @@ def get_attendance_summary_batch(
         by_event[r.event_id].append(r)
 
     saved_rows = session.exec(
-        select(UserSavedEvent).where(UserSavedEvent.event_id.in_(payload.event_ids))
+        select(UserSavedEvent).where(UserSavedEvent.event_id.in_(visible_event_ids))
     ).all()
     saved_count_by_event: dict[str, int] = defaultdict(int)
     for r in saved_rows:
@@ -169,6 +184,8 @@ def get_attendance_summary_batch(
 
     results: list[AttendanceSummaryResponse] = []
     for event_id in payload.event_ids:
+        if event_id not in visible_event_ids:
+            continue
         event_rows = by_event.get(event_id, [])
         total = len(event_rows)
         saved_count = saved_count_by_event.get(event_id, 0)
@@ -233,6 +250,7 @@ def get_event_attendees(
     """
     if viewer is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    _require_user_facing_event(session, event_id)
 
     rows = session.exec(
         select(UserEventAttendance)
@@ -392,6 +410,7 @@ def get_going_wedge(
     Anonymous callers are rejected by ``require_user`` — anon viewers
     see only the aggregate ``going_count`` on the public event endpoint.
     """
+    _require_user_facing_event(session, event_id)
     rows = session.exec(
         select(UserEventAttendance).where(
             UserEventAttendance.event_id == event_id,

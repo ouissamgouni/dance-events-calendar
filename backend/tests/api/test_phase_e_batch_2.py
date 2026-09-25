@@ -13,6 +13,7 @@ Covers:
 """
 
 import os
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -30,6 +31,7 @@ from backend.api.routes import social as social_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
     CalendarSubscription,
+    CachedEvent,
     Tag,
     TagGroup,
     User,
@@ -77,6 +79,23 @@ def client(engine):
 
 
 # --- helpers ----------------------------------------------------------------
+
+
+def _ensure_event(session: Session, event_id: str) -> None:
+    if session.get(CachedEvent, event_id) is not None:
+        return
+    start = datetime.utcnow() + timedelta(days=1)
+    session.add(
+        CachedEvent(
+            event_id=event_id,
+            calendar_id="cal-e",
+            title=event_id,
+            start=start,
+            end=start + timedelta(hours=2),
+            review_status="reviewed",
+        )
+    )
+    session.commit()
 
 
 def _login(client: TestClient, email: str) -> None:
@@ -467,6 +486,7 @@ def _set_last_visit(session: Session, user: User, when) -> None:
 
 
 def _attend(session: Session, user: User, event_id: str) -> None:
+    _ensure_event(session, event_id)
     session.add(
         UserEventAttendance(
             device_id=f"dev-{user.handle}-{event_id}",
@@ -910,6 +930,7 @@ def _attend(
 ) -> None:
     from backend.db.models import UserEventAttendance
 
+    _ensure_event(session, event_id)
     session.add(
         UserEventAttendance(
             device_id=f"dev-{user.id}",
@@ -929,6 +950,7 @@ def test_e5_wedge_requires_auth(client, session):
 
 def test_e5_wedge_empty_when_no_attendees(client, session):
     _make_user(session, "viewer@example.com", "viewer")
+    _ensure_event(session, "evt-empty")
     _login(client, "viewer@example.com")
     r = client.get("/api/events/evt-empty/going-wedge")
     assert r.status_code == 200
@@ -1077,6 +1099,7 @@ def test_e5_wedge_anonymous_attendee_never_named(client, session):
     from backend.db.models import UserEventAttendance
 
     _make_user(session, "viewer@example.com", "viewer")
+    _ensure_event(session, "evt-1")
     session.add(
         UserEventAttendance(
             device_id="dev-anon",

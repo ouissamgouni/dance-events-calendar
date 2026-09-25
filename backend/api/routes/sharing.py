@@ -26,6 +26,10 @@ from backend.db.models import (
     UserEventAttendance,
     UserSavedEvent,
 )
+from backend.services.event_visibility import (
+    apply_event_visibility,
+    show_pending_events_enabled,
+)
 from backend.services.ics import build_ics
 
 router = APIRouter(prefix="/api/share", tags=["sharing"])
@@ -186,15 +190,15 @@ def get_calendar_feed(
         ).all()
         if visible_calendars:
             scoped_ids = set(event_ids)
+            statement = select(CachedEvent).where(
+                CachedEvent.event_id.in_(event_ids),
+                CachedEvent.calendar_id.in_(visible_calendars),
+                CachedEvent.deleted_at == None,
+            )
+            statement = apply_event_visibility(statement, session)
             events = [
                 event
-                for event in session.exec(
-                    select(CachedEvent).where(
-                        CachedEvent.event_id.in_(event_ids),
-                        CachedEvent.calendar_id.in_(visible_calendars),
-                        CachedEvent.deleted_at == None,
-                    )
-                ).all()
+                for event in session.exec(statement).all()
                 if event.event_id in scoped_ids
             ]
 
@@ -228,7 +232,9 @@ def get_calendar_feed(
         media_type="text/calendar; charset=utf-8",
         headers={
             "Content-Disposition": "inline; filename=movida.ics",
-            "Cache-Control": "max-age=3600",
+            "Cache-Control": (
+                "no-store" if show_pending_events_enabled(session) else "max-age=3600"
+            ),
         },
     )
 
@@ -306,13 +312,13 @@ def get_shared_calendar(
     if not calendar_ids:
         return SharedCalendarResponse(events=[], owner_display_name=owner_display_name)
 
-    events = session.exec(
-        select(CachedEvent).where(
-            CachedEvent.event_id.in_(event_ids),
-            CachedEvent.calendar_id.in_(calendar_ids),
-            CachedEvent.deleted_at == None,
-        )
-    ).all()
+    statement = select(CachedEvent).where(
+        CachedEvent.event_id.in_(event_ids),
+        CachedEvent.calendar_id.in_(calendar_ids),
+        CachedEvent.deleted_at == None,
+    )
+    statement = apply_event_visibility(statement, session)
+    events = session.exec(statement).all()
 
     # Filter by date for upcoming/past views
     if view in ("upcoming", "past"):

@@ -1,0 +1,15 @@
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public
+  - email: dancer@example.com
+    name: Import Preview Dancer
+    handle: import-dancer
+    account_visibility: public
+  - email: quiet-dancer@example.com
+    name: Quiet Program Dancer
+    handle: quiet-program-dancer
+    account_visibility: public
+    email_schedule_updates_enabled: false
+    push_schedule_updates_enabled: false

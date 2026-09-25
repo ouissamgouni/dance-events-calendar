@@ -1,103 +1,113 @@
-# Enrichment Pipeline Scenario — QA Test Plan
-# =============================================
-# Validates that events are fetched and displayed immediately,
-# then enriched progressively through the pipeline stages
-# (link extraction → price extraction → geocoding).
-
 test_plan:
-  name: "Enrichment Pipeline — Progressive Enrichment QA"
-  description: >
-    Verify that after a sync, events appear on the calendar right away
-    (without waiting for enrichment), then the pipeline stages run in
-    order — link extraction, price extraction, and finally geocoding —
-    gradually adding metadata to events. The admin panel should show
-    enrichment progress and allow retrying failed geocoding.
+  name: "Enrichment Pipeline — Structured Extractor QA"
+  description: |
+    Verify that calendar events enter through the sync pipeline, structured
+    extractor metadata is applied once by the owning handlers, and the raw
+    calendar source remains available to administrators for auditing.
+
+    The fixture also retains prose-only prices and links on older events to
+    prove those legacy heuristics no longer populate structured fields.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=enrichment-pipeline RESET=1"
+    - "Sign in as Dev Admin for admin-panel checks."
 
   steps:
     - id: 1
-      title: "Trigger sync and verify events appear immediately"
-      description: >
-        Open the admin panel, trigger a manual sync. Switch to the
-        public calendar view. All 10 events should appear right away,
-        even though enrichment hasn't finished yet.
-      expected: >
-        Calendar shows all 10 events with titles and times.
-        Events with locations show the location text.
-        No coordinates on the map yet (pins appear later).
-      verification: "10 events in calendar view, 0 map pins initially"
+      title: "Sync the mock calendars"
+      description: |
+        Open the admin Calendars section and trigger a full sync. Wait for
+        enrichment to finish, then return to the public event list.
+      expected: |
+        All 16 mock calendar events are imported. The latest sync finishes
+        without a failed extractor_image, geocoding, or tag_suggestion stage.
+      verification: "16 events imported; enrichment_status=completed"
 
     - id: 2
-      title: "Verify link extraction runs first"
-      description: >
-        After sync completes, check the sync log enrichment progress
-        in the admin panel. Link extraction should complete quickly.
-      expected: >
-        Sync log shows link_extraction stage: 4 processed (enrich-001,
-        002, 007, 008), 6 skipped (rest). Events 001, 002, 007, 008
-        now have extracted links visible in the event detail.
-      verification: "link_extraction: 4 processed, 6 skipped, 0 failed"
+      title: "Extractor envelope is removed from displayed copy"
+      description: |
+        Open "Extractor Metadata Showcase" from the public event list.
+      expected: |
+        The description contains only "This human-readable introduction is
+        the only copy visitors should see." No extractor marker or JSON is
+        visible on the card or event detail.
+      verification: "description is clean; EXTRACTOR_JSON is absent"
 
     - id: 3
-      title: "Verify price extraction runs second"
-      description: >
-        Check enrichment progress for the price_extraction stage.
-      expected: >
-        price_extraction: 5 processed (enrich-001, 002, 007, 008, 009),
-        5 skipped. Events now show price badges (e.g. "45€" on 001).
-      verification: "price_extraction: 5 processed, 5 skipped, 0 failed"
+      title: "Structured links and price are applied"
+      description: |
+        Inspect the same event's details and price display.
+      expected: |
+        The event has links to example.com/extractor-showcase and
+        example.com/extractor-tickets. Its price range is EUR 12-18.
+      verification: "2 links; price_min=12; price_max=18; currency=EUR"
 
     - id: 4
-      title: "Verify geocoding runs last (slowest stage)"
-      description: >
-        Geocoding processes at ~1 req/sec. Watch the enrichment progress
-        update. Events with locations should gradually get coordinates.
-        Locations use street addresses / well-known places for reliable
-        Nominatim resolution.
-      expected: >
-        geocoding: 6 processed (enrich-001 through 006), 4 skipped
-        (007-010 have no location). Map pins appear one by one as
-        each event gets geocoded.
-      verification: "geocoding: 6 processed, 4 skipped, 0 failed"
+      title: "All extractor price formats are normalized"
+      description: |
+        Open each event whose title begins with "Extractor" and compare its
+        displayed price with price_range in the Calendar source section.
+      expected: |
+        Metadata Showcase displays EUR 12–18. Minimum Price (EUR 120+)
+        displays EUR 120+. Fixed Price (EUR 15) displays EUR 15. Extended
+        Price Range (EUR 100-300+) displays EUR 100–300. Free Event (EUR 0)
+        displays Free. Unavailable Tickets (empty string) displays no price.
+      verification: |
+        Values are respectively 12/18/EUR, 120/null/EUR, 15/15/EUR,
+        100/300/EUR, 0/0/free, and null/null/null.
 
     - id: 5
-      title: "Verify enrichment progress in sync history"
-      description: >
-        In the admin panel, open the sync history. The latest sync log
-        should show enrichment_status and per-stage progress.
-      expected: >
-        Status shows "completed". Progress shows all three stages with
-        processed/skipped/failed counts. The "enriching…" animation
-        should have stopped.
-      verification: "enrichment_status=completed, all stages shown"
+      title: "Extractor image uses managed image storage"
+      description: |
+        Check the showcase card and event detail, then open the event in the
+        admin editor's Picture section.
+      expected: |
+        A picture appears on the card and detail page. The admin preview also
+        shows it as a managed event image, using the same controls as an image
+        imported by URL in the event editor.
+      verification: "managed image_key set; thumb and full image URLs render"
 
     - id: 6
-      title: "Verify ungeolocated events panel (before geocoding)"
-      description: >
-        If geocoding fails for some events (e.g. due to rate limiting
-        or network issues), the ungeolocated panel should list them.
-        Click 'Retry' on an individual event or 'Retry All'.
-      expected: >
-        Panel shows events with location but no coordinates.
-        Single retry geocodes one event. Bulk retry processes all.
-        After successful retry, events disappear from the panel.
-      verification: "Retry updates coordinates, event leaves the list"
+      title: "Extractor tags create taxonomy suggestions"
+      description: |
+        In Admin, open Tag Suggestions and filter or scan for "Extractor
+        Metadata Showcase".
+      expected: |
+        Pending heuristic suggestions include Salsa, Social, and
+        Beginner-Friendly. Their matched terms include values supplied by
+        the extractor payload, even though the displayed description does not
+        contain those words.
+      verification: "pending Salsa, Social, and Beginner-Friendly suggestions"
 
     - id: 7
-      title: "Verify event detail shows enriched data"
-      description: >
-        Click on enrich-001 (Salsa Congress – Paris). Check that it
-        has: coordinates (map pin), extracted price, and extracted links.
-      expected: >
-        Event detail shows location on map, price badge (~45€),
-        and clickable links to example.com and facebook.com.
-      verification: "All three enrichment fields populated"
+      title: "Administrator can audit the raw calendar source"
+      description: |
+        Open the showcase event in the admin event detail. Compare the
+        Displayed description with the collapsed Calendar source section.
+      expected: |
+        Displayed description contains only the human-readable introduction.
+        Calendar source contains that introduction plus the complete extractor
+        envelope, including links, image, tags, and price_range.
+      verification: "source_description retains the complete source payload"
 
     - id: 8
-      title: "Verify skip-all event is untouched"
-      description: >
-        Click on enrich-010 (TBD – Details Coming Soon). It has no
-        location and no description, so all stages should skip it.
-      expected: >
-        Event shows only title and time. No price, no links, no map pin.
-        Enrichment progress counts it as skipped in every stage.
-      verification: "No enrichment metadata on the event"
+      title: "Legacy prose inference remains disabled"
+      description: |
+        Open "Salsa Congress – Paris" and "Online Salsa Masterclass". Their
+        source descriptions contain prose prices and URLs but no extractor
+        envelope.
+      expected: |
+        Neither event receives structured links or prices from its prose.
+        Their description text remains unchanged.
+      verification: "links and price fields remain empty on enrich-001 and enrich-007"
+
+    - id: 9
+      title: "Administrator edits are preserved on later syncs"
+      description: |
+        In the showcase event editor, replace the displayed description and
+        picture. Save, then trigger another full calendar sync.
+      expected: |
+        The administrator's description and managed picture remain unchanged.
+        Calendar source still reflects the calendar payload, and the event is
+        not reverted merely because the extractor payload is unchanged.
+      verification: "admin-owned description and image survive full re-sync"

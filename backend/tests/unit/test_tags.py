@@ -68,6 +68,7 @@ def _make_event(event_id="evt-001"):
         title="Test Event",
         start="2025-01-01T20:00:00",
         end="2025-01-01T23:00:00",
+        review_status="reviewed",
     )
 
 
@@ -155,6 +156,7 @@ class TestListTags:
 class TestSubmitTagSuggestion:
     def test_submit_suggestion_honeypot_rejects(self, client):
         c, session = client
+        session.get.return_value = _make_event()
         resp = c.post(
             "/api/tags/suggestions",
             json={

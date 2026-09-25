@@ -93,6 +93,7 @@ export interface CalendarEvent {
     calendar_id: string;
     title: string;
     description: string | null;
+    source_description?: string | null;
     image_url?: string | null;
     /** Cropped 16:9 variant, present only when the picture is managed by
      * object storage. Cards should prefer this over ``image_url``. */
@@ -110,6 +111,7 @@ export interface CalendarEvent {
     going_count?: number;
     /** Distinct savers (UserSavedEvent rows). 0 when not surfaced by the endpoint. */
     saved_count?: number;
+    schedule_published?: boolean;
     /**
      * Commitment-weighted, time-decayed popularity score. Set by the server
      * when ``trending_enabled`` is on; otherwise 0. Use this (not
@@ -153,6 +155,127 @@ export interface CalendarEvent {
     show_promo_override?: boolean | null;
     /** Approved organizer claim for this event (or null). */
     organizer?: EventOrganizerMini | null;
+}
+
+export interface ScheduleVenue {
+    id: number;
+    name: string;
+    address: string | null;
+    sort_order: number;
+}
+
+export interface ScheduleRoom {
+    id: number;
+    venue_id: number | null;
+    name: string;
+    color: string;
+    sort_order: number;
+}
+
+export interface ScheduleLevel {
+    id: number;
+    label: string;
+    notation: string | null;
+    sort_order: number;
+}
+
+export interface ScheduleActivityType {
+    id: number;
+    name: string;
+    color: string;
+    sort_order: number;
+}
+
+export interface ScheduleSession {
+    id: string;
+    external_id?: string | null;
+    title: string;
+    instructors: string | null;
+    start: string;
+    end: string;
+    room_id: number | null;
+    venue_id: number | null;
+    level_id: number | null;
+    activity_type_id: number | null;
+    attendee_note: string | null;
+    allow_plan: boolean;
+    is_cancelled: boolean;
+}
+
+export interface EventSchedule {
+    event_id: string;
+    timezone: string;
+    day_start_hour: number;
+    days: string[];
+    venues: ScheduleVenue[];
+    rooms: ScheduleRoom[];
+    levels: ScheduleLevel[];
+    activity_types: ScheduleActivityType[];
+    sessions: ScheduleSession[];
+    version: number | null;
+    published_at: string | null;
+}
+
+export interface ScheduleIssue {
+    code: string;
+    severity: 'warning' | 'error';
+    message: string;
+    session_ids: string[];
+}
+
+export interface ScheduleDiff {
+    added_session_ids: string[];
+    removed_session_ids: string[];
+    changed_sessions: Record<string, string[]>;
+    configuration_changed: boolean;
+}
+
+export interface AdminEventSchedule extends EventSchedule {
+    issues: ScheduleIssue[];
+    diff: ScheduleDiff;
+}
+
+export interface MyPlanEntry {
+    session_id: string;
+    status: 'active' | 'cancelled' | 'removed';
+    session: ScheduleSession;
+}
+
+export interface MyPlanResponse {
+    entries: MyPlanEntry[];
+}
+
+export interface ScheduleImportDocument {
+    schema_version: 1;
+    event_id?: string | null;
+    timezone: string;
+    day_start_hour: number;
+    days: string[];
+    venues: Array<{ external_id: string; name: string; address?: string | null; sort_order?: number }>;
+    rooms: Array<{ external_id: string; name: string; venue_external_id?: string | null; color?: string; sort_order?: number }>;
+    levels: Array<{ external_id: string; label: string; notation?: string | null; sort_order?: number }>;
+    activity_types: Array<{ external_id: string; name: string; color?: string; sort_order?: number }>;
+    sessions: Array<{
+        external_id: string;
+        title: string;
+        instructors?: string | null;
+        start: string;
+        end: string;
+        room_external_id?: string | null;
+        venue_external_id?: string | null;
+        level_external_id?: string | null;
+        activity_type_external_id?: string | null;
+        attendee_note?: string | null;
+        allow_plan?: boolean;
+        is_cancelled?: boolean;
+    }>;
+}
+
+export interface ScheduleImportPreview {
+    document: ScheduleImportDocument;
+    operations: { created: number; updated: number; removed: number; unchanged: number };
+    issues: ScheduleIssue[];
+    diff: ScheduleDiff;
 }
 
 export interface EventOrganizerMini {

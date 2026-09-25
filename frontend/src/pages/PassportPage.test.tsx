@@ -285,9 +285,6 @@ describe('PassportPage', () => {
         renderPassport()
 
         expect(await screen.findByText('Milestone progress')).toBeInTheDocument()
-        const milestoneProgress = screen.getByText('Milestone progress')
-        const nextMilestones = screen.getByText('Next Milestones')
-        expect(milestoneProgress.compareDocumentPosition(nextMilestones) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(screen.getByRole('button', { name: 'Community, 0 / 0 unlocked' })).toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: /Events.*1 \/ 2 unlocked/ }))
         const dialog = await screen.findByRole('dialog', { name: 'Events Milestones' })

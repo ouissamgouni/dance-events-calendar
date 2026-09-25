@@ -179,6 +179,7 @@ def _make_event(
         title=title,
         start=start,
         end=start + timedelta(hours=2),
+        review_status="reviewed",
     )
     session.add(ev)
     session.commit()

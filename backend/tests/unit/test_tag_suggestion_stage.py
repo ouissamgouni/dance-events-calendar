@@ -55,8 +55,9 @@ def _seed_taxonomy(session: Session) -> dict[str, int]:
     return {t.slug: t.id for t in tags}
 
 
-def _seed_event(session: Session, *, event_id="evt-1", title="Salsa Night",
-                description=None) -> CachedEvent:
+def _seed_event(
+    session: Session, *, event_id="evt-1", title="Salsa Night", description=None
+) -> CachedEvent:
     cal = CalendarSetting(calendar_id="cal-1", name="Test Cal", enabled=True)
     session.add(cal)
     session.flush()
@@ -159,6 +160,53 @@ def test_process_with_session_idempotent_when_ai_rows_exist(session):
     assert ids  # silence unused
 
 
+def test_extractor_tags_generate_taxonomy_suggestions(session):
+    ids = _seed_taxonomy(session)
+    ev = _seed_event(session, title="Friday Party")
+    ev.extractor_state = {"payload": {"tags": ["bachata festival"]}}
+
+    TagSuggestionStage().process_with_session(session, ev)
+
+    rows = session.exec(
+        TagSuggestion.__table__.select().where(
+            TagSuggestion.__table__.c.event_id == ev.event_id
+        )
+    ).all()
+    assert ids["bachata"] in {row.tag_id for row in rows}
+
+
+def test_changed_extractor_tags_replace_only_pending_suggestions(session):
+    ids = _seed_taxonomy(session)
+    ev = _seed_event(session, title="Friday Party")
+    ev.extractor_state = {"payload": {"tags": ["salsa"]}}
+    stage = TagSuggestionStage()
+    stage.process_with_session(session, ev)
+    reviewed = TagSuggestion(
+        event_id=ev.event_id,
+        tag_id=ids["kizomba"],
+        status="rejected",
+        source="heuristic",
+        reviewed_at=datetime.utcnow(),
+    )
+    session.add(reviewed)
+    session.flush()
+
+    state = dict(ev.extractor_state or {})
+    state["payload"] = {"tags": ["bachata"]}
+    ev.extractor_state = state
+    stage.process_with_session(session, ev)
+
+    rows = session.exec(
+        TagSuggestion.__table__.select().where(
+            TagSuggestion.__table__.c.event_id == ev.event_id
+        )
+    ).all()
+    pending_ids = {row.tag_id for row in rows if row.status == "pending"}
+    assert ids["salsa"] not in pending_ids
+    assert ids["bachata"] in pending_ids
+    assert any(row.id == reviewed.id for row in rows)
+
+
 # ---------------------------------------------------------------------------
 # Exclusions
 # ---------------------------------------------------------------------------
@@ -177,13 +225,15 @@ def test_excluded_tag_ids_includes_already_applied(session):
 def test_excluded_tag_ids_includes_recently_rejected(session):
     ids = _seed_taxonomy(session)
     ev = _seed_event(session, title="Salsa Night")
-    session.add(TagSuggestion(
-        event_id=ev.event_id,
-        tag_id=ids["bachata"],
-        status="rejected",
-        source="heuristic",
-        reviewed_at=datetime.utcnow() - timedelta(days=1),
-    ))
+    session.add(
+        TagSuggestion(
+            event_id=ev.event_id,
+            tag_id=ids["bachata"],
+            status="rejected",
+            source="heuristic",
+            reviewed_at=datetime.utcnow() - timedelta(days=1),
+        )
+    )
     session.flush()
 
     excluded = excluded_tag_ids_for_event(session, ev.event_id)
@@ -193,13 +243,16 @@ def test_excluded_tag_ids_includes_recently_rejected(session):
 def test_excluded_tag_ids_ignores_old_rejections(session):
     ids = _seed_taxonomy(session)
     ev = _seed_event(session, title="Salsa Night")
-    session.add(TagSuggestion(
-        event_id=ev.event_id,
-        tag_id=ids["bachata"],
-        status="rejected",
-        source="heuristic",
-        reviewed_at=datetime.utcnow() - timedelta(days=REJECTION_SUPPRESSION_DAYS + 5),
-    ))
+    session.add(
+        TagSuggestion(
+            event_id=ev.event_id,
+            tag_id=ids["bachata"],
+            status="rejected",
+            source="heuristic",
+            reviewed_at=datetime.utcnow()
+            - timedelta(days=REJECTION_SUPPRESSION_DAYS + 5),
+        )
+    )
     session.flush()
 
     excluded = excluded_tag_ids_for_event(session, ev.event_id)
@@ -210,13 +263,15 @@ def test_excluded_tag_ids_ignores_user_rejections(session):
     """Only auto-source rejections suppress future auto suggestions."""
     ids = _seed_taxonomy(session)
     ev = _seed_event(session, title="Salsa Night")
-    session.add(TagSuggestion(
-        event_id=ev.event_id,
-        tag_id=ids["bachata"],
-        status="rejected",
-        source="user",
-        reviewed_at=datetime.utcnow() - timedelta(days=1),
-    ))
+    session.add(
+        TagSuggestion(
+            event_id=ev.event_id,
+            tag_id=ids["bachata"],
+            status="rejected",
+            source="user",
+            reviewed_at=datetime.utcnow() - timedelta(days=1),
+        )
+    )
     session.flush()
 
     excluded = excluded_tag_ids_for_event(session, ev.event_id)
@@ -233,19 +288,29 @@ def test_persist_suggestions_skips_existing_pending(session):
 
     ids = _seed_taxonomy(session)
     ev = _seed_event(session, title="Salsa Night")
-    session.add(TagSuggestion(
-        event_id=ev.event_id,
-        tag_id=ids["salsa"],
-        status="pending",
-        source="heuristic",
-        confidence=0.9,
-    ))
+    session.add(
+        TagSuggestion(
+            event_id=ev.event_id,
+            tag_id=ids["salsa"],
+            status="pending",
+            source="heuristic",
+            confidence=0.9,
+        )
+    )
     session.flush()
 
-    inserted = persist_suggestions(session, ev.event_id, [
-        TagCandidate(tag_id=ids["salsa"], confidence=0.95, matched_terms=("salsa",)),
-        TagCandidate(tag_id=ids["bachata"], confidence=0.8, matched_terms=("bachata",)),
-    ])
+    inserted = persist_suggestions(
+        session,
+        ev.event_id,
+        [
+            TagCandidate(
+                tag_id=ids["salsa"], confidence=0.95, matched_terms=("salsa",)
+            ),
+            TagCandidate(
+                tag_id=ids["bachata"], confidence=0.8, matched_terms=("bachata",)
+            ),
+        ],
+    )
     assert len(inserted) == 1
     assert inserted[0].tag_id == ids["bachata"]
 
@@ -259,14 +324,30 @@ def test_persist_suggestions_empty_candidates_returns_empty(session):
 def test_delete_pending_ai_suggestions_only_removes_pending_ai(session):
     ids = _seed_taxonomy(session)
     ev = _seed_event(session, title="Salsa Night")
-    session.add_all([
-        TagSuggestion(event_id=ev.event_id, tag_id=ids["salsa"], status="pending",
-                      source="heuristic", confidence=0.9),
-        TagSuggestion(event_id=ev.event_id, tag_id=ids["bachata"], status="approved",
-                      source="heuristic", confidence=0.8),
-        TagSuggestion(event_id=ev.event_id, tag_id=ids["kizomba"], status="pending",
-                      source="user"),
-    ])
+    session.add_all(
+        [
+            TagSuggestion(
+                event_id=ev.event_id,
+                tag_id=ids["salsa"],
+                status="pending",
+                source="heuristic",
+                confidence=0.9,
+            ),
+            TagSuggestion(
+                event_id=ev.event_id,
+                tag_id=ids["bachata"],
+                status="approved",
+                source="heuristic",
+                confidence=0.8,
+            ),
+            TagSuggestion(
+                event_id=ev.event_id,
+                tag_id=ids["kizomba"],
+                status="pending",
+                source="user",
+            ),
+        ]
+    )
     session.flush()
 
     removed = delete_pending_ai_suggestions(session, ev.event_id)

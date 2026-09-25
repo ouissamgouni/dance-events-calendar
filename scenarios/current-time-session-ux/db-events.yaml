@@ -1,0 +1,21 @@
+base_week: 0
+events:
+  - id: live-program-now
+    calendar_id: live-program
+    title: Live Program UX Lab
+    description: Runtime-relative program fixture for current-session positioning and highlighting.
+    location: Live Arts Center, London, United Kingdom
+    city: London
+    country: United Kingdom
+    country_code: GB
+    latitude: 51.5074
+    longitude: -0.1278
+    start: w0 Mon 00:00
+    end: w0 Sun 23:59
+    price_is_free: true
+    tags:
+      - dance-style:salsa
+      - format:festival
+      - level:all-levels
+      - venue:indoor
+      - reach:local

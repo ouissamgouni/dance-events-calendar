@@ -64,6 +64,7 @@ describe('NotificationSettings', () => {
     // Twelve switches: six features x two channels.
     for (const feature of [
       'Event reminders',
+      'Program updates',
       'Friends & social',
       'Interest matches',
       'Promo codes',
@@ -149,6 +150,8 @@ describe('NotificationSettings', () => {
         push_event_messages_enabled: false,
         email_suggested_events_enabled: false,
         push_suggested_events_enabled: false,
+        email_schedule_updates_enabled: false,
+        push_schedule_updates_enabled: false,
       }),
     )
   })

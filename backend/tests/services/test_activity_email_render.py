@@ -147,6 +147,135 @@ def test_render_card_uses_interest_image_or_gradient_fallback():
     assert "linear-gradient(135deg" in fallback
 
 
+def test_render_card_shows_one_group_header_with_event_only_children():
+    html = email_service._render_card(
+        {
+            "entries": [
+                {
+                    "kind": "subscription_going",
+                    "group_header_html": '<a href="/u/alice">Alice</a> is going to',
+                    "group_item_html": f'<a href="/event/{index}">Event {index}</a>',
+                    "primary_html": f"Alice is going to Event {index}",
+                }
+                for index in range(3)
+            ]
+        }
+    )
+
+    assert html.count("Alice") == 1
+    assert html.count("is going to") == 1
+    assert all(f">Event {index}</a>" in html for index in range(3))
+
+
+def test_render_card_shows_one_suggester_header_with_event_only_children():
+    html = email_service._render_card(
+        {
+            "entries": [
+                {
+                    "kind": "subscription_suggested",
+                    "group_header_html": '<a href="/u/alice">Alice</a> suggested',
+                    "group_item_html": f'<a href="/event/{index}">Event {index}</a>',
+                    "primary_html": f"Alice suggested Event {index}",
+                }
+                for index in range(3)
+            ]
+        }
+    )
+
+    assert html.count("Alice") == 1
+    assert html.count("suggested") == 1
+    assert all(f">Event {index}</a>" in html for index in range(3))
+
+
+def test_render_line_uses_total_milestone_count_with_preview_names():
+    user = _make_user(handle="alice", display="Alice")
+    line = activity_email._render_line(
+        "subscription_milestone",
+        user,
+        None,
+        milestone_names=["First Steps", "City Starter", "Passport Stamped"],
+        milestone_count=11,
+    )
+
+    assert "reached 11 milestones" in line
+    assert "First Steps, City Starter, Passport Stamped" in line
+    assert "reached 3 milestones" not in line
+
+
+def test_milestone_card_renders_names_as_muted_details_and_linked_overflow():
+    html = email_service._render_card(
+        {
+            "entries": [
+                {
+                    "kind": "subscription_milestone",
+                    "primary_html": "Alice reached 11 milestones",
+                    "subline": "First Steps, City Starter, Passport Stamped",
+                    "more_count": 8,
+                }
+            ]
+        },
+        "https://example.test/notifications",
+    )
+
+    assert "Alice reached 11 milestones" in html
+    assert "color:#6b7280;font-size:12px" in html
+    assert "First Steps, City Starter, Passport Stamped" in html
+    assert '<a href="https://example.test/notifications"' in html
+    assert "and 8 more</a>" in html
+
+
+def test_interest_alert_summary_orders_dance_reach_and_area():
+    assert (
+        activity_email._interest_alert_summary(
+            ["Salsa", "Bachata"], "international", "Paris"
+        )
+        == "Salsa, Bachata · International · Paris"
+    )
+
+
+def test_balance_sections_groups_interest_entries_by_alert():
+    entries = [
+        {
+            "kind": "interest_event",
+            "group_key": "alert:Salsa · International · Paris",
+            "primary_html": f"Event {index}",
+            "created_at": datetime(2026, 1, index + 1),
+        }
+        for index in range(4)
+    ]
+    balanced = email_service._balance_sections(
+        [{"feature": "interest_matches", "entries": entries}],
+        per_kind_cap=5,
+        max_items=20,
+    )
+
+    card = balanced[0]["buckets"]["interest_event"]["entries"][0]
+    assert len(card["entries"]) == 3
+    assert card["more"] == 1
+
+
+def test_render_card_shows_one_clickable_alert_header():
+    html = email_service._render_card(
+        {
+            "entries": [
+                {
+                    "kind": "interest_event",
+                    "group_header_html": (
+                        '<a href="/saved-searches">Salsa · International · Paris</a>'
+                    ),
+                    "group_item_html": f'<a href="/event/{index}">Event {index}</a>',
+                    "primary_html": f"Event {index} matched your alert",
+                }
+                for index in range(3)
+            ]
+        }
+    )
+
+    assert html.count("Salsa · International · Paris") == 1
+    assert html.count('href="/saved-searches"') == 1
+    assert all(f">Event {index}</a>" in html for index in range(3))
+
+
 def test_digest_renders_icon_headings_in_relevance_order(monkeypatch):
     captured: list[str] = []
     monkeypatch.setattr(
@@ -176,4 +305,34 @@ def test_digest_renders_icon_headings_in_relevance_order(monkeypatch):
         "Your social activity"
     )
     assert "font-size:18px" in html
-    assert "https://example.test/saved-searches" in html
+    assert "See all" not in html
+
+
+def test_digest_linked_overflow_replaces_see_all_and_spaces_sections(monkeypatch):
+    captured: list[str] = []
+    monkeypatch.setattr(
+        email_service,
+        "_send_email",
+        lambda _to, _subject, html, _label: captured.append(html) or True,
+    )
+    user = _make_user()
+    entries = [
+        {
+            "kind": "subscription_going",
+            "group_key": "alice",
+            "primary_html": f"Event {index}",
+            "created_at": datetime(2026, 1, index + 1),
+        }
+        for index in range(4)
+    ]
+
+    assert email_service.send_activity_digest_v2_email(
+        user, [{"feature": "friends_going", "entries": entries}]
+    )
+
+    html = captured[0]
+    assert 'href="https://example.test/notifications"' in html
+    assert "and 1 more</a>" in html
+    assert "See all" not in html
+    assert 'style="padding:24px 0 12px"' in html
+    assert "margin:0 0 12px" in html

@@ -1,0 +1,105 @@
+test_plan:
+  name: "Reviewed JSON schedule import"
+  description: >
+    Starts with an empty private schedule draft. The checked-in schedule-import.json
+    exercises examples, taxonomy presets, preview, merge, replace, stable external
+    IDs, separate publishing, and selected-attendee Program announcements.
+
+  preconditions:
+    - "Run: SCENARIO=schedule-json-import task start:scenario RESET_BROWSER=1"
+    - "Sign in as Dev Admin and open Schedule Import Lab > Schedule > Settings."
+    - "Use scenarios/schedule-json-import/schedule-import.json as the upload file."
+
+  steps:
+    - id: 1
+      title: "Compare example and current draft"
+      description: >
+        In Settings, click Load example, inspect the sample venue/session external IDs,
+        then click Reset to current draft.
+      expected: >
+        Load example shows a populated standalone Sample document while Reset returns
+        to the empty current draft. Neither action changes the draft until Preview and Apply.
+
+    - id: 2
+      title: "Apply the optional Dance taxonomy preset"
+      description: "Open Taxonomy and click Apply Dance preset twice."
+      expected: >
+        The first click adds Open Level, Beginner, Intermediate, and Advanced. The
+        second reports that Dance levels are already complete and creates no duplicates.
+
+    - id: 3
+      title: "Preview a merge import"
+      description: "Choose schedule-import.json, keep Merge selected, and click Preview import."
+      expected: >
+        The preview reports the prospective creates and no schedule warnings. The
+        schedule grid remains empty because preview rolls the transaction back.
+
+    - id: 4
+      title: "Apply only after preview"
+      description: "Click Apply to draft after the preview completes."
+      expected: >
+        The private draft refreshes with Kulturhaus, two rooms, Open Level, Workshop,
+        and two Friday sessions. Nothing is public yet.
+
+    - id: 5
+      title: "Verify idempotent merge"
+      description: "Preview and apply the same JSON again."
+      expected: "No duplicate rows are created; the import reports unchanged records."
+
+    - id: 6
+      title: "Verify replace semantics"
+      description: >
+        Remove fri-partnerwork from the JSON text, choose Replace missing sessions,
+        preview, then apply.
+      expected: >
+        Preview reports one removal. Applying soft-deletes Partnerwork Lab while
+        preserving configuration rows such as Studio Two and Open Level.
+
+    - id: 7
+      title: "Publish and choose the notification audience"
+      description: >
+        Open Publish, review the diff, and confirm publication. Review the delivery
+        result, then choose Notify all Going attendees.
+      expected: >
+        A new immutable publication is created only now. The attendee Program shows
+        the imported draft state, with Berlin local wall-clock times preserved.
+        Impacted planners are reported as notified automatically; the second action
+        sends the publication announcement only to remaining signed-in Going attendees.
+
+    - id: 8
+      title: "Preview the attendee Program in place"
+      description: "Click Preview in the schedule header."
+      expected: >
+        The draft Program renders inside the modal without a blocked-content message.
+        Open in new tab remains available as a fallback.
+
+    - id: 9
+      title: "Announce the published Program"
+      description: >
+        In Settings > Announce program, select Import Preview Dancer and Quiet Program
+        Dancer, then click Notify 2 attendees.
+      expected: >
+        Two in-app notifications are created. Import Preview Dancer is eligible for
+        email; Quiet Program Dancer reports email and push disabled. No preference is bypassed.
+
+    - id: 10
+      title: "Verify impacted-only and idempotent delivery"
+      description: >
+        Publish a change to a session in Import Preview Dancer's My Plan and choose
+        Done in the result. Reopen the manual Announce program tool and send to both
+        attendees again without Resend, then enable Resend and send once more.
+      expected: >
+        The impacted planner receives one aggregated in-app, email, and push attempt
+        automatically for that publication. Done sends nothing to remaining Going
+        attendees. The manual second send creates no duplicate in-app rows and reports
+        already sent where applicable. Resend attempts enabled external channels again
+        while still respecting opt-outs.
+
+    - id: 11
+      title: "Verify attendee entry points"
+      description: >
+        Sign in as Import Preview Dancer. Open the announcement from Notifications,
+        then inspect the event modal, Explorer card, and Mine > Next up card.
+      expected: >
+        The notification opens the Program directly. Published events show Program actions
+        in all three surfaces; a currently running event remains in Next up and says Happening now.

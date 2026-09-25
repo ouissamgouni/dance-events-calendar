@@ -60,11 +60,19 @@ test_plan:
         social activity; Reviews from people you follow; Milestones from
         people you follow; Suggested events; Event conversations; People you
         may want to follow. The saved-search event uses its picture when one
-        exists and a gradient tile otherwise; its alert name and "See all"
-        link both open `/saved-searches`. Alice's activity is grouped into one
-        avatar block per section, with at most 3 child items followed by "and
-        N more". If the same actor has both follower and friendship activity,
-        only "You and Alice are now friends" is shown. Carol receives 0 emails.
+        exists and a gradient tile otherwise. Saved-search matches are grouped
+        under one header per alert: the clickable alert name opens
+        `/saved-searches`, followed by its dance styles, event reach, and area.
+        Friends-going activity is grouped under one linked actor header per
+        person. Suggested events are likewise grouped under one linked actor
+        header. Each group has event-only child rows, with at most 3 shown
+        before "and N more". Milestone titles state the total milestone count;
+        up to 3 milestone names appear below as muted details, matching event
+        date/location styling. Any "and N more" is the linked section CTA and
+        replaces "See all". Sections have clear space above their headers and
+        between each header and its content. If the same actor has both follower
+        and friendship activity, only "You and Alice are now friends" is shown.
+        Carol receives 0 emails.
 
     - id: 3
       title: "Push channel remains silent"

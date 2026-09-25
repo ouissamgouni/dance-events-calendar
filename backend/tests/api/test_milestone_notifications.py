@@ -93,6 +93,7 @@ def _attend_past_event(
             start=start,
             end=start + timedelta(hours=2),
             all_day=False,
+            review_status="reviewed",
         )
     )
     session.add(

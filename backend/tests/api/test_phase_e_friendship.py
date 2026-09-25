@@ -140,6 +140,7 @@ def _make_event(
         start=datetime.utcnow() + timedelta(days=days_offset),
         end=datetime.utcnow() + timedelta(days=days_offset, hours=2),
         all_day=False,
+        review_status="reviewed",
     )
     session.add(e)
     session.commit()
@@ -390,6 +391,7 @@ def test_e9_leaderboard_period_filters_by_window(client, session):
         start=datetime.utcnow() + timedelta(days=2),
         end=datetime.utcnow() + timedelta(days=2, hours=2),
         all_day=False,
+        review_status="reviewed",
     )
     outside = CachedEvent(
         event_id="outside",
@@ -398,6 +400,7 @@ def test_e9_leaderboard_period_filters_by_window(client, session):
         start=datetime.utcnow() - timedelta(days=20),
         end=datetime.utcnow() - timedelta(days=20, hours=-2),
         all_day=False,
+        review_status="reviewed",
     )
     session.add(inside)
     session.add(outside)
@@ -506,6 +509,7 @@ def test_following_most_active_period_filters_by_window(client, session):
         start=datetime.utcnow() - timedelta(days=100),
         end=datetime.utcnow() - timedelta(days=100, hours=-2),
         all_day=False,
+        review_status="reviewed",
     )
     outside = CachedEvent(
         event_id="outside",
@@ -514,6 +518,7 @@ def test_following_most_active_period_filters_by_window(client, session):
         start=datetime.utcnow() - timedelta(days=300),
         end=datetime.utcnow() - timedelta(days=300, hours=-2),
         all_day=False,
+        review_status="reviewed",
     )
     session.add(inside)
     session.add(outside)

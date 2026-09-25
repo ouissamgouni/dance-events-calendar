@@ -83,6 +83,11 @@ from backend.services.experience_aspects import (
     get_aspect_slugs,
     mood_metrics_from_averages,
 )
+from backend.services.event_visibility import (
+    apply_event_visibility,
+    eligible_event_ids,
+    event_is_user_facing,
+)
 from backend.services.ip_geolocation import geolocate_ip
 from backend.services import activity_instant
 from backend.services.notifications import fan_out_review
@@ -100,6 +105,13 @@ limiter = Limiter(key_func=client_ip)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
+
+def _require_user_facing_event(session: Session, event_id: str) -> CachedEvent:
+    event = session.get(CachedEvent, event_id)
+    if event is None or not event_is_user_facing(session, event):
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event
 
 
 def _tag_to_response(tag: Tag, group: TagGroup | None = None) -> TagResponse:
@@ -446,7 +458,8 @@ def _series_rollup(session: Session, series: EventSeries) -> SeriesRatingRollup:
             EventSeriesMember.series_id == series.id
         )
     ).all()
-    event_ids = [m for m in members]
+    visible_ids = eligible_event_ids(session, members)
+    event_ids = [event_id for event_id in members if event_id in visible_ids]
 
     events: dict[str, CachedEvent] = {}
     if event_ids:
@@ -613,6 +626,8 @@ def submit_feedback(
     ``comment_status='pending'``. If the user already reviewed this event the
     existing row is updated in place.
     """
+    event = _require_user_facing_event(session, event_id)
+
     # Honeypot — silent accept (return synthetic ids so bots can't probe).
     if body.website:
         synth_id = uuid4()
@@ -634,10 +649,6 @@ def submit_feedback(
             ),
             tag_suggestion_ids=[],
         )
-
-    event = session.get(CachedEvent, event_id)
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
 
     # Upcoming editions can't be reviewed — reviews open only after the event ends.
     if event.end and event.end > datetime.utcnow():
@@ -774,6 +785,7 @@ def get_my_rating(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
+    _require_user_facing_event(session, event_id)
     rating = session.exec(
         select(EventRating).where(
             EventRating.user_id == user.id, EventRating.event_id == event_id
@@ -822,6 +834,7 @@ def get_rating_aggregate(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
+    _require_user_facing_event(session, event_id)
     return _aggregate_for_event(session, event_id)
 
 
@@ -836,6 +849,7 @@ def get_event_series_rollup(
 ) -> SeriesRatingRollup | None:
     """Cross-edition rating roll-up for the resolved series this event belongs
     to, or ``null`` if the event isn't part of a resolved series."""
+    _require_user_facing_event(session, event_id)
     series = _resolved_series_for_event(session, event_id)
     if series is None:
         return None
@@ -863,6 +877,16 @@ def get_rating_aggregates_batch(
     session: Session = Depends(get_session),
     user: User | None = Depends(get_current_user_optional),
 ):
+    existing_ids = set(
+        session.exec(
+            select(CachedEvent.event_id).where(
+                col(CachedEvent.event_id).in_(body.event_ids)
+            )
+        ).all()
+    )
+    visible_ids = eligible_event_ids(session, body.event_ids)
+    hidden_ids = existing_ids - visible_ids
+    requested_event_ids = [eid for eid in body.event_ids if eid not in hidden_ids]
     min_reviews = get_review_mood_headline_min_reviews(session)
     results: dict[str, EventRatingAggregate] = {}
 
@@ -872,7 +896,7 @@ def get_rating_aggregates_batch(
         ev_id
         for ev_id, end in session.exec(
             select(CachedEvent.event_id, CachedEvent.end).where(
-                col(CachedEvent.event_id).in_(body.event_ids)
+                col(CachedEvent.event_id).in_(requested_event_ids)
             )
         ).all()
         if end is not None and end > now
@@ -908,6 +932,10 @@ def get_rating_aggregates_batch(
                 col(EventSeriesMember.series_id).in_(resolved_series_ids)
             )
         ).all()
+        visible_member_ids = eligible_event_ids(
+            session, [event_id for _series_id, event_id in all_members]
+        )
+        all_members = [row for row in all_members if row[1] in visible_member_ids]
         member_event_ids = [ev_id for _sid, ev_id in all_members]
 
         # Compute mood per edition in the series
@@ -953,7 +981,7 @@ def get_rating_aggregates_batch(
 
     # Process remaining events (past, non-series, or non-resolved series)
     processed = set(results.keys())
-    remaining = [eid for eid in body.event_ids if eid not in processed]
+    remaining = [eid for eid in requested_event_ids if eid not in processed]
 
     for event_id in remaining:
         total, sentiment_dist, *_ = _aggregate_core(session, [event_id])
@@ -967,7 +995,8 @@ def get_rating_aggregates_batch(
         )
 
     return [
-        results.get(eid, EventRatingAggregate(event_id=eid)) for eid in body.event_ids
+        results.get(eid, EventRatingAggregate(event_id=eid))
+        for eid in requested_event_ids
     ]
 
 
@@ -1033,6 +1062,7 @@ def list_reviews(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
+    event = _require_user_facing_event(session, event_id)
     base = select(EventRating).where(
         EventRating.event_id == event_id, EventRating.status != "rejected"
     )
@@ -1044,8 +1074,7 @@ def list_reviews(
     base = _sort_review_query(base, sort)
     rows = session.exec(base.offset(offset).limit(limit)).all()
 
-    event = session.get(CachedEvent, event_id)
-    events_by_id = {event_id: event} if event else {}
+    events_by_id = {event_id: event}
     items = _reviews_to_public(session, rows, events_by_id)
 
     return EventReviewsListResponse(items=items, total=int(total or 0))
@@ -1072,7 +1101,8 @@ def list_series_reviews(
             EventSeriesMember.series_id == series_id
         )
     ).all()
-    event_ids = [m for m in members]
+    visible_ids = eligible_event_ids(session, members)
+    event_ids = [event_id for event_id in members if event_id in visible_ids]
     if not event_ids:
         return EventReviewsListResponse(items=[], total=0)
 
@@ -1119,11 +1149,16 @@ def list_following_reviews(
     if not followee_ids:
         return EventReviewsListResponse(items=[], total=0)
 
-    base = select(EventRating).where(
-        col(EventRating.user_id).in_(followee_ids),
-        EventRating.status != "rejected",
-        col(EventRating.is_anonymous).is_(False),
+    base = (
+        select(EventRating)
+        .join(CachedEvent, CachedEvent.event_id == EventRating.event_id)
+        .where(
+            col(EventRating.user_id).in_(followee_ids),
+            EventRating.status != "rejected",
+            col(EventRating.is_anonymous).is_(False),
+        )
     )
+    base = apply_event_visibility(base, session)
 
     total = session.exec(select(func.count()).select_from(base.subquery())).one()
     if isinstance(total, tuple):
@@ -1156,11 +1191,14 @@ def list_my_ratings(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    rows = session.exec(
+    statement = (
         select(EventRating)
+        .join(CachedEvent, CachedEvent.event_id == EventRating.event_id)
         .where(EventRating.user_id == user.id)
         .order_by(col(EventRating.created_at).desc())
-    ).all()
+    )
+    statement = apply_event_visibility(statement, session)
+    rows = session.exec(statement).all()
     event_ids = list({r.event_id for r in rows})
     events = (
         session.exec(

@@ -1,0 +1,9 @@
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public
+  - email: dancer@example.com
+    name: Live Program Dancer
+    handle: live-dancer
+    account_visibility: public

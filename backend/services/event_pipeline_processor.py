@@ -25,6 +25,10 @@ from backend.db.database import get_engine
 from backend.db.models import CachedEvent, EventCalendarSource, EventTag
 from backend.services.calendar.base import CalendarEvent
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
+from backend.services.event_extractor import (
+    apply_calendar_description,
+    apply_extractor_image,
+)
 from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.reach import assign_event_tag, sync_event_reach
 from backend.services.pipeline.base import EnrichmentPipeline
@@ -96,8 +100,6 @@ class JobLogHandler(logging.Handler):
 class PipelineStage(str, Enum):
     """High-level stages an event flows through inside an enrichment worker."""
 
-    LINK_EXTRACTION = "link_extraction"
-    PRICE_EXTRACTION = "price_extraction"
     GEOCODING = "geocoding"
     TAG_SUGGESTION = "tag_suggestion"
     PERSISTENCE = "persistence"
@@ -113,9 +115,7 @@ class FailureType(str, Enum):
 
 # Maps the enrichment stage that produced a `failed` StageResult to its
 # user-facing failure type. Only stages whose `failed` count represents an
-# actual problem belong here. Link/price extraction stages no longer report
-# `failed` for "nothing to extract" — those are normal outcomes — so they
-# are intentionally absent.
+# actual problem belong here.
 _STAGE_FAILURE_TYPE: dict[str, FailureType] = {
     PipelineStage.GEOCODING.value: FailureType.UNGEOLOCATED,
 }
@@ -123,8 +123,6 @@ _STAGE_FAILURE_TYPE: dict[str, FailureType] = {
 
 # Stages that come from the EnrichmentPipeline (used to preallocate stage_stats).
 _ENRICHMENT_STAGE_NAMES = (
-    PipelineStage.LINK_EXTRACTION.value,
-    PipelineStage.PRICE_EXTRACTION.value,
     PipelineStage.GEOCODING.value,
     PipelineStage.TAG_SUGGESTION.value,
 )
@@ -498,7 +496,7 @@ class EventPipelineProcessor:
         cal_event = task.calendar_event
 
         # Tag this thread so stdlib log records emitted by helpers
-        # (geocoding, link_extraction, etc.) get routed to this calendar.
+        # (geocoding, tag suggestion, etc.) get routed to this calendar.
         set_current_calendar_id(task.calendar_id)
 
         # Mark this event as in-flight so the UI can show its current stage.
@@ -523,7 +521,6 @@ class EventPipelineProcessor:
             event_id=cal_event.event_id,
             calendar_id=cal_event.calendar_id,
             title=cal_event.title,
-            description=cal_event.description,
             location=cal_event.location,
             start=cal_event.start,
             end=cal_event.end,
@@ -532,6 +529,7 @@ class EventPipelineProcessor:
                 cal_event.title, cal_event.start, cal_event.location
             ),
         )
+        apply_calendar_description(buffer, cal_event.description, is_new=True)
 
         # ------------------------------------------------------------------
         # Step 2 — Run enrichment stages on the buffer (no DB writes).
@@ -625,6 +623,17 @@ class EventPipelineProcessor:
             with DBSession(engine) as session:
                 db_event, action = self._persist_with_dedup(session, task, buffer)
                 session.commit()
+                if action != "deduped":
+                    try:
+                        if apply_extractor_image(db_event):
+                            session.add(db_event)
+                            session.commit()
+                    except Exception:
+                        session.rollback()
+                        logger.exception(
+                            "Extractor image import failed for event %s",
+                            cal_event.event_id,
+                        )
                 # Auto-detect near-duplicates for new/updated events. No-op
                 # unless ``duplicate_auto_detect_enabled`` site setting is on.
                 if action in ("new", "updated"):
@@ -791,26 +800,32 @@ class EventPipelineProcessor:
         if existing:
             # Detect whether this re-pull actually changes anything.
             content_unchanged = existing.content_hash == buffer.content_hash
+            source_unchanged = existing.source_description == buffer.source_description
             new_geocode = existing.latitude is None and buffer.latitude is not None
-            new_price = existing.price_min is None and buffer.price_min is not None
             new_links = existing.links is None and buffer.links is not None
-            if content_unchanged and not (new_geocode or new_price or new_links):
+            if (
+                content_unchanged
+                and source_unchanged
+                and not (new_geocode or new_links)
+            ):
                 # No-op re-pull from upstream — still upsert calendar source link
                 # (cheap, idempotent) but skip the row write.
                 _upsert_calendar_source(session, buffer.event_id, task.calendar_id)
                 return existing, "unchanged"
 
             # Known event ID — update fields (including any enriched columns)
+            extractor_changed = apply_calendar_description(
+                existing, buffer.source_description, is_new=False
+            )
             fields_changed = (
                 existing.title != buffer.title
-                or existing.description != buffer.description
                 or existing.location != buffer.location
                 or existing.start != buffer.start
                 or existing.end != buffer.end
                 or existing.all_day != buffer.all_day
+                or extractor_changed
             )
             existing.title = buffer.title
-            existing.description = buffer.description
             existing.location = buffer.location
             existing.start = buffer.start
             existing.end = buffer.end
@@ -824,11 +839,6 @@ class EventPipelineProcessor:
                 existing.longitude = buffer.longitude
                 existing.geocode_query = buffer.geocode_query
                 existing.geocode_provider = buffer.geocode_provider
-            if existing.price_min is None and buffer.price_min is not None:
-                existing.price_min = buffer.price_min
-                existing.price_max = buffer.price_max
-                existing.price_currency = buffer.price_currency
-                existing.price_is_free = buffer.price_is_free
             if existing.links is None and buffer.links is not None:
                 existing.links = buffer.links
             if fields_changed:

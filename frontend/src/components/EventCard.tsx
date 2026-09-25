@@ -123,6 +123,7 @@ export default function EventCard({
     actionsTestId,
 }: EventCardProps) {
     const {
+        showPrices,
         tagsPerCard,
         eventCardImgoingLocationBottomEnabled,
         eventCardImgoingShowStatsEnabled,
@@ -149,7 +150,7 @@ export default function EventCard({
     if (wantsSave) topActions.push('save');
     if (wantsGoing && !eventCardImgoingLocationBottomEnabled) topActions.push('going');
     const bottomGoing = wantsGoing && eventCardImgoingLocationBottomEnabled;
-    const priceVisible = showPrice && isPriceSectionVisible(event, false);
+    const priceVisible = showPrice && isPriceSectionVisible(event, showPrices);
     const priceContent = priceVisible && (event.price_is_free || event.price_min != null);
     const location = shortLocation(event.location) ?? event.location;
 

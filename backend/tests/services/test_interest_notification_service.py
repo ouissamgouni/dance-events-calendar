@@ -129,6 +129,7 @@ def _make_event(
         reach=reach,
         is_hidden=is_hidden,
         deleted_at=deleted_at,
+        review_status="reviewed",
     )
     if updated_at is not None:
         e.updated_at = updated_at

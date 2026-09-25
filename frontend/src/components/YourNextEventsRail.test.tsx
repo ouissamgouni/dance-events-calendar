@@ -36,7 +36,7 @@ const event: CalendarEvent = {
 };
 
 function renderRail(events: CalendarEvent[], onEventClick = vi.fn(), loading = false) {
-    const flags = { ...defaultFlags, eventCardPlaceholderStyle: 'gradient' as const };
+    const flags = { ...defaultFlags, eventCardPlaceholderStyle: 'gradient' as const, eventScheduleEnabled: true };
     return {
         onEventClick,
         ...render(
@@ -85,6 +85,22 @@ describe('YourNextEventsRail', () => {
         );
 
         expect(screen.getByTestId('your-next-event-card')).toHaveAttribute('href', '/event/evt-next-1');
+    });
+
+    it('shows a Program action and marks an active event as happening now', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2027-09-05T21:00:00'));
+        renderRail([{ ...event, schedule_published: true }]);
+
+        expect(screen.getByTestId('next-up-countdown')).toHaveTextContent('Happening now');
+        expect(screen.getByRole('link', { name: 'Program' })).toHaveAttribute('href', '/event/evt-next-1/program');
+        vi.useRealTimers();
+    });
+
+    it('hides the Program action when the schedule is not published', () => {
+        renderRail([event]);
+
+        expect(screen.queryByRole('link', { name: 'Program' })).not.toBeInTheDocument();
     });
 
     it.each([

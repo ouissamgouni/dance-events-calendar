@@ -1,96 +1,103 @@
 name: CI
 
 on:
-    pull_request:
-        branches: [develop, main]
-    push:
-        branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
 
 jobs:
-    test:
-        name: Test
-        runs-on: ubuntu-latest
+  test:
+    name: Test
+    runs-on: ubuntu-latest
 
-        services:
-            postgres:
-                image: postgres:16-alpine
-                env:
-                    POSTGRES_USER: calendar_user
-                    POSTGRES_PASSWORD: calendar_password
-                    POSTGRES_DB: calendar_db_test
-                ports:
-                    # Matches POSTGRES_PORT in config/test.env so the Taskfile
-                    # can load its dotenv without CI-specific overrides.
-                    - 5434:5432
-                options: >-
-                    --health-cmd "pg_isready -U calendar_user" --health-interval
-                    5s --health-timeout 5s --health-retries 5
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: calendar_user
+          POSTGRES_PASSWORD: calendar_password
+          POSTGRES_DB: calendar_db_test
+        ports:
+          # Matches POSTGRES_PORT in config/test.env so the Taskfile
+          # can load its dotenv without CI-specific overrides.
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U calendar_user" --health-interval
+          5s --health-timeout 5s --health-retries 5
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.14"
-                  cache: pip
-                  cache-dependency-path: backend/requirements.txt
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  cache: npm
-                  cache-dependency-path: frontend/package-lock.json
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-            - name: Pin npm (match lockfile / packageManager)
-              run: npm install -g npm@11.6.2
+      - name: Pin npm (match lockfile / packageManager)
+        run: npm install -g npm@11.6.2
 
-            - name: Install Task
-              uses: arduino/setup-task@v2
-              with:
-                  version: 3.x
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Create backend venv (Taskfile expects .venv/bin/pytest)
-              run: |
-                  python -m venv .venv
-                  .venv/bin/pip install --upgrade pip
+      - name: Create backend venv (Taskfile expects .venv/bin/pytest)
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
 
-            - name: Install backend dependencies
-              run: task install:backend
+      - name: Install backend dependencies
+        run: task install:backend
 
-            - name: Install frontend dependencies
-              run: task install:frontend
+      - name: Install frontend dependencies
+        run: task install:frontend
 
-            - name: Run backend unit tests
-              env:
-                  # Extras not covered by config/base.env or config/test.env
-                  # but required by the test suite.
-                  GOOGLE_CLIENT_ID: test-client-id
-                  ADMIN_EMAIL: admin@example.com
-              run: task test:unit:backend
+      - name: Run backend unit tests
+        env:
+          # Extras not covered by config/base.env or config/test.env
+          # but required by the test suite.
+          GOOGLE_CLIENT_ID: test-client-id
+          ADMIN_EMAIL: admin@example.com
+        run: task test:unit:backend
 
-            - name: Run frontend checks (type check + unit tests + build)
-              run: task test:unit:frontend
+      - name: Run frontend checks (type check + unit tests + build)
+        run: task test:unit:frontend
 
-            - name: Email CI result to owner
-              if: always()
-              uses: dawidd6/action-send-mail@v3
-              with:
-                  server_address: smtp-relay.brevo.com
-                  server_port: 587
-                  username: ${{ secrets.SMTP_USER }}
-                  password: ${{ secrets.SMTP_PASSWORD }}
-                  from: Movida CI <noreply@joinmovida.com>
-                  to: ${{ secrets.CI_NOTIFY_EMAIL }}
-                  subject: "${{ job.status == 'success' && '✅' || '❌' }} CI ${{ job.status }} — ${{ github.ref_name }} (${{ github.event_name }})"
-                  body: |
-                      CI run: ${{ job.status }}
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
 
-                      Repo:   ${{ github.repository }}
-                      Ref:    ${{ github.ref_name }}
-                      Event:  ${{ github.event_name }}
-                      Commit: ${{ github.event.head_commit.message || github.sha }}
-                      Actor:  ${{ github.actor }}
-                      Run:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - name: Run focused schedule E2E
+        run: task test:e2e:schedule
+
+      - name: Email CI result to owner
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp-relay.brevo.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          from: Movida CI <noreply@joinmovida.com>
+          to: ${{ secrets.CI_NOTIFY_EMAIL }}
+          subject: "${{ job.status == 'success' && '✅' || '❌' }} CI ${{ job.status }} — ${{ github.ref_name }} (${{ github.event_name }})"
+          body: |
+            CI run: ${{ job.status }}
+
+            Repo:   ${{ github.repository }}
+            Ref:    ${{ github.ref_name }}
+            Event:  ${{ github.event_name }}
+            Commit: ${{ github.event.head_commit.message || github.sha }}
+            Actor:  ${{ github.actor }}
+            Run:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

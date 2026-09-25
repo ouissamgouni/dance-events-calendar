@@ -1,0 +1,20 @@
+events:
+  - id: schedule-import-lab
+    calendar_id: import-lab
+    title: Schedule Import Lab
+    description: Private draft fixture for reviewed JSON schedule imports.
+    location: Kulturhaus, Berlin, Germany
+    city: Berlin
+    country: Germany
+    country_code: DE
+    latitude: 52.5200
+    longitude: 13.4050
+    start: "2026-10-16T08:00:00+00:00"
+    end: "2026-10-18T04:00:00+00:00"
+    price_is_free: false
+    tags:
+      - dance-style:salsa
+      - format:festival
+      - level:all-levels
+      - venue:indoor
+      - reach:regional

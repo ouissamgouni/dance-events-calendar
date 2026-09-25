@@ -110,6 +110,22 @@ class TestHealthEndpoint:
 
 @pytest.mark.unit
 class TestSettingsEndpoint:
+    def test_show_pending_events_defaults_off_and_can_be_enabled(self, sqlite_client):
+        client, engine = sqlite_client
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["show_pending_events"] is False
+
+        resp = client.put("/api/settings", json={"show_pending_events": True})
+        assert resp.status_code == 200
+        assert resp.json()["show_pending_events"] is True
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "show_pending_events")
+            assert row is not None
+            assert row.value == "true"
+
     def test_settings_returns_trending_banner_default_true(self, sqlite_client):
         client, _engine = sqlite_client
         resp = client.get("/api/settings")
@@ -461,6 +477,53 @@ class TestSettingsEndpoint:
 
 @pytest.mark.unit
 class TestEventsEndpoint:
+    def test_pending_events_follow_visibility_setting(self, sqlite_client):
+        client, engine = sqlite_client
+        now = datetime.now(UTC).replace(tzinfo=None)
+        with Session(engine) as session:
+            session.add(
+                CalendarSetting(
+                    calendar_id="cal-1",
+                    name="Test Calendar",
+                    enabled=True,
+                    color="#ff0000",
+                )
+            )
+            session.add_all(
+                [
+                    CachedEvent(
+                        event_id="reviewed",
+                        calendar_id="cal-1",
+                        title="Reviewed Event",
+                        start=now + timedelta(days=1),
+                        end=now + timedelta(days=1, hours=2),
+                        review_status="reviewed",
+                    ),
+                    CachedEvent(
+                        event_id="pending",
+                        calendar_id="cal-1",
+                        title="Pending Event",
+                        start=now + timedelta(days=2),
+                        end=now + timedelta(days=2, hours=2),
+                        review_status="pending",
+                    ),
+                ]
+            )
+            session.commit()
+
+        response = client.get("/api/events")
+        assert [row["event_id"] for row in response.json()] == ["reviewed"]
+        assert client.get("/api/events/pending").status_code == 404
+
+        client.put("/api/settings", json={"show_pending_events": True})
+        response = client.get("/api/events")
+        assert [row["event_id"] for row in response.json()] == [
+            "reviewed",
+            "pending",
+        ]
+        assert response.headers["cache-control"] == "no-store"
+        assert client.get("/api/events/pending").status_code == 200
+
     def test_get_events_returns_list(self, sample_calendar, sample_events):
         mock_session = make_session_with_data(
             calendars=[sample_calendar],
@@ -614,6 +677,7 @@ class TestEventsEndpoint:
                         end=now + timedelta(hours=2),
                         all_day=False,
                         is_hidden=False,
+                        review_status="reviewed",
                     ),
                     CachedEvent(
                         event_id="evt-future-1",
@@ -624,6 +688,7 @@ class TestEventsEndpoint:
                         end=now + timedelta(days=2, hours=3),
                         all_day=False,
                         is_hidden=False,
+                        review_status="reviewed",
                     ),
                     CachedEvent(
                         event_id="evt-future-2",
@@ -634,6 +699,7 @@ class TestEventsEndpoint:
                         end=now + timedelta(days=7, hours=3),
                         all_day=False,
                         is_hidden=False,
+                        review_status="reviewed",
                     ),
                     CachedEvent(
                         event_id="evt-hidden",
@@ -644,6 +710,7 @@ class TestEventsEndpoint:
                         end=now + timedelta(days=3, hours=3),
                         all_day=False,
                         is_hidden=True,
+                        review_status="reviewed",
                     ),
                     CachedEvent(
                         event_id="evt-deleted",
@@ -655,6 +722,7 @@ class TestEventsEndpoint:
                         all_day=False,
                         is_hidden=False,
                         deleted_at=now,
+                        review_status="reviewed",
                     ),
                     CachedEvent(
                         event_id="evt-past",
@@ -665,6 +733,7 @@ class TestEventsEndpoint:
                         end=now - timedelta(days=2, hours=-3),
                         all_day=False,
                         is_hidden=False,
+                        review_status="reviewed",
                     ),
                 ]
             )
@@ -740,6 +809,7 @@ class TestEventsEndpoint:
                         country="France",
                         start=now + timedelta(days=3),
                         end=now + timedelta(days=3, hours=2),
+                        review_status="reviewed",
                     ),
                     CachedEvent(
                         event_id="evt-place-tag",
@@ -749,6 +819,7 @@ class TestEventsEndpoint:
                         country="France",
                         start=now + timedelta(days=1),
                         end=now + timedelta(days=1, hours=2),
+                        review_status="reviewed",
                     ),
                     CachedEvent(
                         event_id="evt-disabled-tag",
@@ -758,6 +829,7 @@ class TestEventsEndpoint:
                         country="Germany",
                         start=now + timedelta(days=2),
                         end=now + timedelta(days=2, hours=2),
+                        review_status="reviewed",
                     ),
                 ]
             )
@@ -813,6 +885,7 @@ class TestEventsEndpoint:
                         end=now + timedelta(days=i, hours=3),
                         all_day=False,
                         is_hidden=False,
+                        review_status="reviewed",
                     )
                     for i in range(3)
                 ]
@@ -858,6 +931,7 @@ class TestEventsEndpoint:
                         end=now + timedelta(days=1, hours=3),
                         is_hidden=False,
                         show_promo_override=True,
+                        review_status="reviewed",
                     ),
                     CachedEvent(
                         event_id="evt-default",
@@ -866,6 +940,7 @@ class TestEventsEndpoint:
                         start=now + timedelta(days=2),
                         end=now + timedelta(days=2, hours=3),
                         is_hidden=False,
+                        review_status="reviewed",
                     ),
                 ]
             )
@@ -915,6 +990,7 @@ class TestEventsEndpoint:
                     end=now + timedelta(days=1, hours=3),
                     is_hidden=False,
                     show_promo_override=True,
+                    review_status="reviewed",
                 )
             )
             session.commit()

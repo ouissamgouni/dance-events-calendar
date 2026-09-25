@@ -26,6 +26,7 @@ from backend.db.models import (
 )
 from backend.services.event_images import event_image_fields
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
+from backend.services.schedules import published_schedule_event_ids
 from backend.services.user_avatars import resolve_user_avatar
 
 
@@ -68,6 +69,7 @@ def serialize_events(
 
     event_ids = [e.event_id for e in events_list]
     calendar_ids = list({e.calendar_id for e in events_list})
+    published_schedule_ids = published_schedule_event_ids(session, event_ids)
 
     color_rows = session.exec(
         select(CalendarSetting.calendar_id, CalendarSetting.color).where(
@@ -198,6 +200,7 @@ def serialize_events(
             organizer=organizer_by_event.get(e.event_id),
             show_price_override=e.show_price_override,
             show_promo_override=e.show_promo_override,
+            schedule_published=e.event_id in published_schedule_ids,
         )
         for e in events_list
     ]

@@ -37,9 +37,13 @@ from backend.db.models import (  # noqa: E402
     Notification,
     PushSubscription,
     SiteSetting,
+    Tag,
+    TagGroup,
     User,
     UserEventAttendance,
     UserFollow,
+    UserInterestProfile,
+    UserInterestProfileTag,
 )
 from backend.services import (
     activity_email,
@@ -135,6 +139,7 @@ def _make_event(
         all_day=False,
         is_hidden=is_hidden,
         deleted_at=deleted_at,
+        review_status="reviewed",
     )
     session.add(e)
     session.commit()
@@ -980,6 +985,7 @@ def test_activity_digest_suppresses_follower_and_carries_grouping_data(
     alice = _make_user(session, "alice@example.com", "alice")
     event = _make_event(session, "ev-match", title="Matched Social")
     event.image_url = "https://cdn.test/matched.webp"
+    suggested_event = _make_event(session, "ev-suggested", title="Suggested Social")
     session.add(event)
     session.commit()
     old = datetime.utcnow() - timedelta(minutes=5)
@@ -1001,6 +1007,17 @@ def test_activity_digest_suppresses_follower_and_carries_grouping_data(
         event_id="ev-match",
         created_at=old,
     )
+    matched.context = "Salsa · International · Paris"
+    session.add(matched)
+    suggested = _notif(
+        session,
+        recipient=bob,
+        actor=alice,
+        kind="subscription_suggested",
+        event_id=suggested_event.event_id,
+        created_at=old,
+    )
+    session.commit()
 
     stats = activity_email.run_once(force=True)
 
@@ -1011,24 +1028,102 @@ def test_activity_digest_suppresses_follower_and_carries_grouping_data(
     assert social_entries[0]["kind"] == "new_friend"
     assert social_entries[0]["group_key"] == str(alice.id)
     interest_entry = by_feature["interest_matches"]["entries"][0]
+    assert interest_entry["group_key"] == "alert:Salsa · International · Paris"
+    assert "Salsa · International · Paris" in interest_entry["group_header_html"]
+    assert "/saved-searches" in interest_entry["group_header_html"]
+    assert ">Matched Social</a>" in interest_entry["group_item_html"]
     assert interest_entry["event_image_url"] == "https://cdn.test/matched.webp"
+    suggested_entry = by_feature["suggested_events"]["entries"][0]
+    assert suggested_entry["group_key"] == str(alice.id)
+    assert "Alice" in suggested_entry["group_header_html"]
+    assert "suggested" in suggested_entry["group_header_html"]
+    assert ">Suggested Social</a>" in suggested_entry["group_item_html"]
 
-    for row in (follower, friendship, matched):
+    for row in (follower, friendship, matched, suggested):
         session.refresh(row)
         assert row.emailed_at is not None
 
 
+def test_activity_digest_expands_multi_profile_match_into_alert_groups(
+    session, monkeypatch
+):
+    calls: list[list[dict]] = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda _recipient, sections, **_: calls.append(sections) or True,
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    event = _make_event(session, "ev-match", title="Matched Social")
+    dance_group = TagGroup(slug="dance-style", label="Dance styles")
+    session.add(dance_group)
+    session.commit()
+    session.refresh(dance_group)
+    salsa = Tag(group_id=dance_group.id, slug="salsa", label="Salsa")
+    session.add(salsa)
+    session.commit()
+    session.refresh(salsa)
+    profiles = [
+        UserInterestProfile(
+            user_id=bob.id,
+            label="Home",
+            area_label="Paris",
+            min_lat=48,
+            min_lng=2,
+            max_lat=49,
+            max_lng=3,
+            reach_filter="international",
+        ),
+        UserInterestProfile(
+            user_id=bob.id,
+            label="Trip",
+            area_label="Berlin",
+            min_lat=52,
+            min_lng=13,
+            max_lat=53,
+            max_lng=14,
+            reach_filter="regional_plus",
+        ),
+    ]
+    session.add_all(profiles)
+    session.commit()
+    for profile in profiles:
+        session.refresh(profile)
+        session.add(UserInterestProfileTag(profile_id=profile.id, tag_id=salsa.id))
+    notification = _notif(
+        session,
+        recipient=bob,
+        actor=bob,
+        kind="interest_event",
+        event_id=event.event_id,
+        created_at=datetime.utcnow() - timedelta(minutes=5),
+    )
+    notification.context = "Home, Trip"
+    session.add(notification)
+    session.commit()
+
+    assert activity_email.run_once(force=True)["digests"] == 1
+
+    section = next(
+        section for section in calls[0] if section["feature"] == "interest_matches"
+    )
+    entries = {entry["group_key"]: entry for entry in section["entries"]}
+    assert set(entries) == {"alert:Home", "alert:Trip"}
+    assert "Salsa · International · Paris" in entries["alert:Home"]["group_header_html"]
+    assert "Salsa · Regional+ · Berlin" in entries["alert:Trip"]["group_header_html"]
+
+
 def test_activity_digest_groups_friend_milestone_batch(session, monkeypatch):
-    email_entries: list[str] = []
+    email_entries: list[dict] = []
     push_calls: list[dict] = []
     monkeypatch.setattr(
         activity_email,
         "send_activity_digest_v2_email",
         lambda _recipient, sections, **_: (
             email_entries.extend(
-                entry["primary_html"]
-                for section in sections
-                for entry in section["entries"]
+                entry for section in sections for entry in section["entries"]
             )
             or True
         ),
@@ -1073,9 +1168,9 @@ def test_activity_digest_groups_friend_milestone_batch(session, monkeypatch):
 
     assert stats["digests"] == 1
     assert len(email_entries) == 1
-    assert "2 milestones" in email_entries[0]
-    assert "First Steps" in email_entries[0]
-    assert "Regular" in email_entries[0]
+    assert "2 milestones" in email_entries[0]["primary_html"]
+    assert "First Steps" not in email_entries[0]["primary_html"]
+    assert email_entries[0]["subline"] == "First Steps, Regular"
     assert len(push_calls) == 1
     assert "2 milestones" in push_calls[0]["body"]
     assert "First Steps" in push_calls[0]["body"]

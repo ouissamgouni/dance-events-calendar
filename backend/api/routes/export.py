@@ -12,6 +12,7 @@ from backend.api.deps import get_current_user_optional
 from backend.api.schemas import ExportRequest
 from backend.db.database import get_session
 from backend.db.models import CachedEvent, User, UserEventAttendance, UserSavedEvent
+from backend.services.event_visibility import apply_event_visibility
 from backend.services.ics import build_ics, ics_escape
 
 router = APIRouter(prefix="/api/events/export", tags=["export"])
@@ -23,14 +24,12 @@ def _fetch_events(session: Session, event_ids: list[str]) -> list[CachedEvent]:
     """Fetch events by IDs, filtering out deleted ones."""
     if not event_ids:
         return []
-    return list(
-        session.exec(
-            select(CachedEvent).where(
-                CachedEvent.event_id.in_(event_ids),
-                CachedEvent.deleted_at == None,
-            )
-        ).all()
+    statement = select(CachedEvent).where(
+        CachedEvent.event_id.in_(event_ids),
+        CachedEvent.deleted_at == None,
     )
+    statement = apply_event_visibility(statement, session)
+    return list(session.exec(statement).all())
 
 
 def _build_ics(events: list[CachedEvent]) -> str:

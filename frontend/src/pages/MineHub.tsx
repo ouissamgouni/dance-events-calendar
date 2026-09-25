@@ -137,7 +137,7 @@ export default function MineHub() {
                 if (cancelled) return;
                 const now = Date.now();
                 setGoingEvents(events
-                    .filter((event) => new Date(event.start).getTime() > now)
+                    .filter((event) => new Date(event.end).getTime() > now)
                     .sort((left, right) => new Date(left.start).getTime() - new Date(right.start).getTime()));
             })
             .catch(() => { if (!cancelled) setGoingEvents([]); });

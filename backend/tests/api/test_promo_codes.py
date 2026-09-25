@@ -95,6 +95,7 @@ def event(session):
         longitude=None,
         start=datetime(2099, 1, 1, 20, 0, 0),
         end=datetime(2099, 1, 2, 1, 0, 0),
+        review_status="reviewed",
     )
     session.add(ev)
     session.commit()
@@ -335,6 +336,7 @@ def test_admin_list_filter_by_event_id(client, session, event, flag_on):
         title="Other Event",
         start=datetime(2099, 1, 3, 20, 0, 0),
         end=datetime(2099, 1, 3, 23, 0, 0),
+        review_status="reviewed",
     )
     session.add(other_event)
     session.commit()

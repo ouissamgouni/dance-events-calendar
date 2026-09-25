@@ -1,0 +1,4 @@
+calendars:
+  - id: live-program
+    name: Live Program Lab
+    color: "#16715f"
