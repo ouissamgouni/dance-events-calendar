@@ -19,6 +19,7 @@ import {
     exportEventSchedule,
     fetchAdminEventSchedule,
     fetchEvent,
+    fetchOptionalAdminEventSchedule,
     fetchSchedulePlanners,
     publishEventSchedule,
     fetchScheduleImportSchema,
@@ -76,11 +77,11 @@ export default function AdminEventSchedulePage() {
 
     useEffect(() => {
         if (!eventId) return;
-        Promise.all([fetchEvent(eventId, { fresh: true }), fetchAdminEventSchedule(eventId)])
+        Promise.all([fetchEvent(eventId, { fresh: true }), fetchOptionalAdminEventSchedule(eventId)])
             .then(([eventValue, scheduleValue]) => {
                 setEvent(eventValue);
                 setSchedule(scheduleValue);
-                setSelectedDay(defaultScheduleDay(scheduleValue, eventValue.start));
+                if (scheduleValue) setSelectedDay(defaultScheduleDay(scheduleValue, eventValue.start));
             })
             .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Schedule unavailable'))
             .finally(() => setLoading(false));

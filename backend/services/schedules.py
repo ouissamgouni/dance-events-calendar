@@ -84,7 +84,7 @@ def seed_default_activity_types(session: Session, schedule_id: int) -> None:
         )
 
 
-def apply_dance_level_preset(session: Session, schedule_id: int) -> int:
+def seed_dance_level_preset(session: Session, schedule_id: int) -> int:
     existing_rows = session.exec(
         select(ScheduleLevel).where(ScheduleLevel.schedule_id == schedule_id)
     ).all()
@@ -108,6 +108,11 @@ def apply_dance_level_preset(session: Session, schedule_id: int) -> int:
             )
         )
         created += 1
+    return created
+
+
+def apply_dance_level_preset(session: Session, schedule_id: int) -> int:
+    created = seed_dance_level_preset(session, schedule_id)
     session.commit()
     return created
 

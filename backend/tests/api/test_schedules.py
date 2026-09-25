@@ -114,6 +114,12 @@ def test_schedule_publish_and_my_plan_lifecycle(
         "Bootcamp",
         "Social",
     ]
+    assert [row["label"] for row in created.json()["levels"]] == [
+        "Open Level",
+        "Beginner",
+        "Intermediate",
+        "Advanced",
+    ]
     assert client.get("/api/events/back-2-mambo-2026/schedule").status_code == 404
 
     venue = client.post(
@@ -124,10 +130,7 @@ def test_schedule_publish_and_my_plan_lifecycle(
         "/api/admin/events/back-2-mambo-2026/schedule/rooms",
         json={"name": "Grand Hall", "venue_id": venue["id"], "color": "amber"},
     ).json()
-    level = client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule/levels",
-        json={"label": "Open Level", "notation": "*"},
-    ).json()
+    level = created.json()["levels"][0]
     activity_type_id = created.json()["activity_types"][0]["id"]
 
     first = client.post(
@@ -399,19 +402,20 @@ def test_dance_taxonomy_preset_is_idempotent_and_preserves_custom_levels(
     client, schedule_event
 ):
     _login(client, "admin@example.com")
-    assert (
-        client.post(
-            "/api/admin/events/back-2-mambo-2026/schedule",
-            json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
-        ).status_code
-        == 201
+    created = client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule",
+        json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
+    )
+    assert created.status_code == 201
+    beginner = next(
+        row for row in created.json()["levels"] if row["label"] == "Beginner"
     )
     assert (
-        client.post(
-            "/api/admin/events/back-2-mambo-2026/schedule/levels",
+        client.put(
+            f"/api/admin/events/back-2-mambo-2026/schedule/levels/{beginner['id']}",
             json={"label": "Beginner", "notation": "Intro", "sort_order": 9},
         ).status_code
-        == 201
+        == 200
     )
     assert (
         client.post(
@@ -425,7 +429,7 @@ def test_dance_taxonomy_preset_is_idempotent_and_preserves_custom_levels(
         "/api/admin/events/back-2-mambo-2026/schedule/presets/dance-taxonomy"
     )
     assert first.status_code == 200
-    assert first.json() == {"created": 3}
+    assert first.json() == {"created": 0}
     levels = client.get("/api/admin/events/back-2-mambo-2026/schedule").json()["levels"]
     assert {row["label"] for row in levels} == {
         "Open Level",

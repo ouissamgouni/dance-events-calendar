@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchMyPlan } from '../api';
@@ -22,8 +22,8 @@ const event: CalendarEvent = {
 };
 const schedule: EventSchedule = {
     event_id: event.event_id, timezone: 'Europe/Prague', day_start_hour: 6, days: ['2026-10-15', '2026-10-16'],
-    venues: [], rooms: [], levels: [{ id: 1, label: 'Open', notation: null, sort_order: 0 }, { id: 2, label: 'Advanced', notation: null, sort_order: 1 }],
-    activity_types: [{ id: 1, name: 'Workshop', color: 'blue', sort_order: 0 }],
+    venues: [], rooms: [], levels: [{ id: 1, label: 'Open Level', notation: null, sort_order: 0 }, { id: 2, label: 'Intermediate', notation: null, sort_order: 1 }, { id: 3, label: 'Advanced', notation: null, sort_order: 2 }, { id: 4, label: 'Beginner', notation: null, sort_order: 3 }],
+    activity_types: [{ id: 1, name: 'Workshop', color: 'blue', sort_order: 0 }, { id: 2, name: 'Social', color: 'green', sort_order: 1 }, { id: 3, name: 'Afterparty', color: 'slate', sort_order: 2 }],
     sessions: [
         { id: 'thursday', title: 'Thursday Session', instructors: 'Maya', start: '2026-10-15T12:00:00Z', end: '2026-10-15T13:00:00Z', room_id: null, venue_id: null, level_id: 1, activity_type_id: 1, attendee_note: null, allow_plan: true, is_cancelled: false },
         { id: 'friday', title: 'Friday Session', instructors: 'Alexis Ruiz', start: '2026-10-16T12:00:00Z', end: '2026-10-16T13:00:00Z', room_id: null, venue_id: null, level_id: 2, activity_type_id: 1, attendee_note: null, allow_plan: true, is_cancelled: false },
@@ -86,20 +86,81 @@ describe('EventProgramPage', () => {
         expect(screen.queryByRole('button', { name: /Thursday Session/ })).not.toBeInTheDocument();
     });
 
-    it('filters program sessions by instructor and level', async () => {
+    it('applies draft filters from a compact sheet and summarizes them', async () => {
         renderPage('/event/movida-2026/program?day=2026-10-16');
         expect(await screen.findByRole('button', { name: /Friday Session/ })).toBeInTheDocument();
-        fireEvent.change(screen.getByLabelText('Search instructors'), { target: { value: 'maya' } });
+        expect(screen.getByRole('button', { name: 'Filter schedule' })).toBeInTheDocument();
+        expect(screen.queryByLabelText('Search instructors')).not.toBeInTheDocument();
+        expect(screen.queryByText('Prague')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Filter schedule' }));
+        let sheet = screen.getByRole('dialog', { name: 'Filter schedule' });
+        expect(within(sheet).getByRole('button', { name: 'Open Level' })).toBeInTheDocument();
+        expect(within(sheet).getByRole('button', { name: 'Intermediate' })).toBeInTheDocument();
+        expect(within(sheet).getByRole('button', { name: 'Advanced' })).toBeInTheDocument();
+        expect(within(sheet).queryByRole('button', { name: 'Beginner' })).not.toBeInTheDocument();
+        expect(within(sheet).queryByRole('button', { name: 'Afterparty' })).not.toBeInTheDocument();
+
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Open Level' }));
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Workshop' }));
+        fireEvent.click(within(sheet).getByRole('button', { name: 'All instructors' }));
+        const instructorSheet = screen.getByRole('dialog', { name: 'Select instructor' });
+        expect(within(instructorSheet).getByRole('radio', { name: 'All instructors' })).toBeInTheDocument();
+        fireEvent.change(within(instructorSheet).getByLabelText('Search instructors'), { target: { value: 'may' } });
+        expect(within(instructorSheet).getByRole('radio', { name: 'All instructors' })).toBeInTheDocument();
+        fireEvent.click(within(instructorSheet).getByRole('radio', { name: 'Maya' }));
+        sheet = screen.getByRole('dialog', { name: 'Filter schedule' });
+        expect(within(sheet).getByRole('button', { name: 'Maya' })).toBeInTheDocument();
+        expect(within(sheet).getByRole('button', { name: 'Show 1 session' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Friday Session/ })).toBeInTheDocument();
+
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Show 1 session' }));
         expect(screen.queryByRole('button', { name: /Friday Session/ })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Thursday Session/ })).toBeInTheDocument();
-        expect(screen.getByRole('combobox', { name: 'Search instructors' })).toHaveAttribute('aria-autocomplete', 'list');
-        expect(screen.getByRole('option', { name: 'Maya' })).toBeInTheDocument();
-        fireEvent.change(screen.getByLabelText('Search instructors'), { target: { value: '' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Open' }));
-        expect(screen.queryByRole('button', { name: /Friday Session/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Open Level · Workshop · +1' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '15 Thu · 1' })).toBeInTheDocument();
     });
 
-    it('shows every instructor when the search opens', async () => {
+    it('preserves dismissed drafts and supports reset and direct clear', async () => {
+        renderPage('/event/movida-2026/program?day=2026-10-16');
+        await screen.findByRole('button', { name: /Friday Session/ });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Filter schedule' }));
+        let sheet = screen.getByRole('dialog', { name: 'Filter schedule' });
+        expect(within(sheet).getByRole('button', { name: 'Reset' })).toBeDisabled();
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Intermediate' }));
+        expect(within(sheet).getByRole('button', { name: 'Reset' })).toBeEnabled();
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }));
+        expect(screen.getByRole('button', { name: 'Filter schedule' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Friday Session/ })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Filter schedule' }));
+        sheet = screen.getByRole('dialog', { name: 'Filter schedule' });
+        expect(within(sheet).getByRole('button', { name: 'Intermediate' })).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Reset' }));
+        expect(within(sheet).getByRole('button', { name: 'Intermediate' })).toHaveAttribute('aria-pressed', 'false');
+        expect(within(sheet).getByRole('button', { name: 'Reset' })).toBeDisabled();
+        expect(within(sheet).getByRole('button', { name: 'Show 2 sessions' })).toBeInTheDocument();
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Intermediate' }));
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Show 1 session' }));
+
+        expect(screen.getByRole('button', { name: 'Intermediate' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Clear schedule filters' }));
+        expect(screen.getByRole('button', { name: 'Filter schedule' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Clear schedule filters' })).not.toBeInTheDocument();
+    });
+
+    it('disables the apply action when no sessions match', async () => {
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Filter schedule' }));
+        const sheet = screen.getByRole('dialog', { name: 'Filter schedule' });
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Advanced' }));
+
+        expect(within(sheet).getByRole('button', { name: 'No sessions match' })).toBeDisabled();
+    });
+
+    it('searches every instructor in the nested picker', async () => {
         vi.mocked(fetchEventSchedule).mockResolvedValue({
             ...schedule,
             sessions: Array.from({ length: 10 }, (_, index) => ({
@@ -111,10 +172,14 @@ describe('EventProgramPage', () => {
         });
         renderPage();
 
-        fireEvent.focus(await screen.findByLabelText('Search instructors'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Filter schedule' }));
+        fireEvent.click(screen.getByRole('button', { name: 'All instructors' }));
+        const sheet = screen.getByRole('dialog', { name: 'Select instructor' });
 
-        expect(screen.getAllByRole('option')).toHaveLength(10);
-        expect(screen.getByRole('option', { name: 'Instructor 9' })).toBeInTheDocument();
+        expect(within(sheet).getAllByRole('radio')).toHaveLength(11);
+        fireEvent.change(within(sheet).getByLabelText('Search instructors'), { target: { value: 'Instructor 9' } });
+        expect(within(sheet).getAllByRole('radio')).toHaveLength(2);
+        expect(within(sheet).getByRole('radio', { name: 'Instructor 9' })).toBeInTheDocument();
     });
 
     it('shows the complete plan without program date or filter controls', async () => {
@@ -133,7 +198,7 @@ describe('EventProgramPage', () => {
         expect(screen.getByText('Friday Session')).toBeInTheDocument();
         expect(screen.getByText('Now')).toBeInTheDocument();
         expect(screen.getByText('Friday Session').closest('article')).toHaveAttribute('aria-current', 'time');
-        expect(screen.queryByLabelText('Search instructors')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Filter schedule' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { current: 'date' })).not.toBeInTheDocument();
     });
 
