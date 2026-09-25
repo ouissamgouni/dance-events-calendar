@@ -233,6 +233,7 @@ export default function Admin() {
     const [showPendingEvents, setShowPendingEvents] = useState(false);
     const [promoCodesEnabled, setPromoCodesEnabled] = useState(false);
     const [organizerClaimsEnabled, setOrganizerClaimsEnabled] = useState(false);
+    const [eventScheduleEnabled, setEventScheduleEnabled] = useState(false);
     const [networkGoingSnapshotEnabled, setNetworkGoingSnapshotEnabled] = useState(true);
     const [myEventsRouteEnabled, setMyEventsRouteEnabled] = useState(false);
     const [myEventsNavEnabled, setMyEventsNavEnabled] = useState(true);
@@ -422,6 +423,7 @@ export default function Admin() {
             setShowPendingEvents(s.show_pending_events ?? false);
             setPromoCodesEnabled(s.promo_codes_enabled ?? false);
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
+            setEventScheduleEnabled(s.event_schedule_enabled ?? false);
             setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? false);
             setMyEventsRouteEnabled(s.my_events_route_enabled ?? false);
             setMyEventsNavEnabled(s.my_events_nav_enabled ?? true);
@@ -998,6 +1000,18 @@ export default function Admin() {
         } catch {
             setOrganizerClaimsEnabled(!newVal);
             setMessage('Failed to update organizer claims toggle.');
+        }
+    };
+
+    const handleToggleEventSchedule = async () => {
+        const newVal = !eventScheduleEnabled;
+        setEventScheduleEnabled(newVal);
+        try {
+            await updateSettings({ event_schedule_enabled: newVal });
+            setMessage(`Event programs ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventScheduleEnabled(!newVal);
+            setMessage('Failed to update event programs toggle.');
         }
     };
 
@@ -2492,6 +2506,20 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showPendingEvents ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${showPendingEvents ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Event programs</span>
+                                        <p className="text-[10px] text-muted">Show published schedules and My Plan on event pages.</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleEventSchedule}
+                                        aria-label="Toggle event programs"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventScheduleEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventScheduleEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 
