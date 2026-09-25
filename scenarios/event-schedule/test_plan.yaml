@@ -18,12 +18,27 @@ test_plan:
 
   steps:
     - id: 1
-      title: "Open the published mobile program"
-      description: "Open Back 2 Mambo 2026 and choose Program. Select Friday 16 October."
+      title: "Open and filter the published mobile program"
+      description: >
+        Open Back 2 Mambo 2026 and choose Program. Select Friday 16 October,
+        then open Filter schedule and inspect the Level, Activity type and
+        Instructor controls. Open the Instructor picker, search for a name,
+        select it, close and reopen the filter sheet, and try a combination
+        with no matching sessions.
       expected: >
-        Program and My Plan are above the day selector. The grid shows only
-        rooms used Friday, with time labels fixed while rooms scroll. The
-        published title is "Shines / Partnerwork", not the draft-only title.
+        Program and My Plan are above a compact Filter schedule bar, followed
+        immediately by the day selector. The grid shows only rooms used Friday,
+        with time labels fixed while rooms scroll. The published title is
+        "Shines / Partnerwork", not the draft-only title. The three Level pills
+        remain on one row, Activity type pills wrap, and all controls have
+        comfortable mobile tap targets. Instructor opens a nested sheet with a
+        stable header, search and single-select radio rows; choosing one returns
+        to the filter sheet. Reset is disabled with no draft filters and enabled
+        after a selection. Unapplied drafts survive closing and reopening without
+        changing the grid. The result count updates immediately, the bottom CTA
+        stays fixed while content scrolls, and zero matches shows a disabled
+        "No sessions match" action. Applied filters appear only in the compact
+        summary bar.
 
     - id: 2
       title: "Compare simultaneous choices"

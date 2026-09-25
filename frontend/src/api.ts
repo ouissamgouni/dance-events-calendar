@@ -220,6 +220,15 @@ export async function fetchAdminEventSchedule(eventId: string): Promise<AdminEve
     return parseJsonResponse<AdminEventSchedule>(res, 'Failed to load the draft program');
 }
 
+export async function fetchOptionalAdminEventSchedule(eventId: string): Promise<AdminEventSchedule | null> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/schedule`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    if (res.status === 404) return null;
+    return parseJsonResponse<AdminEventSchedule>(res, 'Failed to load the draft program');
+}
+
 export async function createAdminEventSchedule(eventId: string, body: { timezone: string; day_start_hour: number; days?: string[] }): Promise<AdminEventSchedule> {
     return scheduleRequest<AdminEventSchedule>(eventId, '', 'POST', body);
 }

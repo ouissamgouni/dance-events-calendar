@@ -3,6 +3,9 @@ import { useEffect, type ReactNode } from 'react';
 interface Props {
     title: string;
     onClose: () => void;
+    headerLeading?: ReactNode;
+    headerAction?: ReactNode;
+    showClose?: boolean;
     /** Sticky footer content, typically a primary confirm button. */
     footer?: ReactNode;
     children: ReactNode;
@@ -14,7 +17,7 @@ interface Props {
  * footer clear of the iOS home indicator. The body scrolls independently so the
  * sheet never grows past 85% of the viewport height.
  */
-export default function BottomSheet({ title, onClose, footer, children }: Props) {
+export default function BottomSheet({ title, onClose, headerLeading, headerAction, showClose = true, footer, children }: Props) {
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
@@ -44,15 +47,23 @@ export default function BottomSheet({ title, onClose, footer, children }: Props)
                 className="flex max-h-[85dvh] w-full max-w-lg flex-col bg-surface shadow-2xl animate-slide-up sm:rounded-t-card"
             >
                 <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
-                    <h3 className="text-base font-bold text-ink">{title}</h3>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        aria-label="Close"
-                        className="-mr-2 flex h-11 w-11 items-center justify-center text-muted transition hover:bg-canvas hover:text-ink-soft"
-                    >
-                        ✕
-                    </button>
+                    <div className="flex min-w-0 items-center gap-1">
+                        {headerLeading}
+                        <h3 className="truncate text-base font-bold text-ink">{title}</h3>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        {headerAction}
+                        {showClose ? (
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                aria-label="Close"
+                                className="-mr-2 flex h-11 w-11 items-center justify-center text-muted transition hover:bg-canvas hover:text-ink-soft"
+                            >
+                                ✕
+                            </button>
+                        ) : null}
+                    </div>
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>

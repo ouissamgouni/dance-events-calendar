@@ -60,6 +60,7 @@ from backend.services.schedules import (
     default_schedule_days,
     latest_publication,
     seed_default_activity_types,
+    seed_dance_level_preset,
     session_snapshot,
     to_utc_naive,
     validate_timezone,
@@ -295,6 +296,7 @@ def create_admin_schedule(
     session.add(schedule)
     session.flush()
     seed_default_activity_types(session, schedule.id)
+    seed_dance_level_preset(session, schedule.id)
     session.commit()
     session.refresh(schedule)
     return _admin_payload(session, schedule)

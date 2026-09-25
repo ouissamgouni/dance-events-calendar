@@ -20,12 +20,12 @@ describe('TextSearchPage', () => {
 
     it('shows a limited query preview and routes to query-only full results', async () => {
         vi.mocked(searchEventsPage).mockResolvedValue({
-            results: [{ event_id: 'prague-1', title: 'Prague Salsa Marathon', start: '2026-09-24T18:00:00Z', location: 'Palace Hall', city: 'Prague', country: 'Czechia', matched_fields: ['title'], matched_tags: [] }],
+            results: [{ event_id: 'prague-1', title: 'Prague Salsa Marathon', start: '2099-09-24T18:00:00Z', location: 'Palace Hall', city: 'Prague', country: 'Czechia', matched_fields: ['title'], matched_tags: [] }],
             total: 12,
             hasMore: true,
         });
         vi.mocked(fetchEventsByIds).mockResolvedValue([{
-            event_id: 'prague-1', calendar_id: 'calendar-1', title: 'Prague Salsa Marathon', description: null, image_url: '/prague.jpg', location: 'Palace Hall', city: 'Prague', country: 'Czechia', latitude: null, longitude: null, start: '2026-09-24T18:00:00Z', end: '2026-09-25T02:00:00Z', all_day: false, color: null, view_count: 0, price_min: null, price_max: null, price_currency: null, price_is_free: false, links: null, tags: [],
+            event_id: 'prague-1', calendar_id: 'calendar-1', title: 'Prague Salsa Marathon', description: null, image_url: '/prague.jpg', location: 'Palace Hall', city: 'Prague', country: 'Czechia', latitude: null, longitude: null, start: '2099-09-24T18:00:00Z', end: '2099-09-25T02:00:00Z', all_day: false, color: null, view_count: 0, price_min: null, price_max: null, price_currency: null, price_is_free: false, links: null, tags: [],
         }]);
         render(
             <MemoryRouter initialEntries={['/search?q=prague']}>
@@ -49,12 +49,12 @@ describe('TextSearchPage', () => {
 
     it('uses the rich browser card composition on the full-results route', async () => {
         vi.mocked(searchEventsPage).mockResolvedValue({
-            results: [{ event_id: 'prague-1', title: 'Prague Salsa Marathon', start: '2026-09-24T18:00:00Z', location: 'Palace Hall', city: 'Prague', country: 'Czechia', matched_fields: ['title'], matched_tags: [] }],
+            results: [{ event_id: 'prague-1', title: 'Prague Salsa Marathon', start: '2099-09-24T18:00:00Z', location: 'Palace Hall', city: 'Prague', country: 'Czechia', matched_fields: ['title'], matched_tags: [] }],
             total: 1,
             hasMore: false,
         });
         vi.mocked(fetchEventsByIds).mockResolvedValue([{
-            event_id: 'prague-1', calendar_id: 'calendar-1', title: 'Prague Salsa Marathon', description: null, image_url: '/prague.jpg', location: 'Palace Hall', city: 'Prague', country: 'Czechia', latitude: null, longitude: null, start: '2026-09-24T18:00:00Z', end: '2026-09-25T02:00:00Z', all_day: false, color: null, view_count: 0, price_min: null, price_max: null, price_currency: null, price_is_free: false, links: null, tags: [],
+            event_id: 'prague-1', calendar_id: 'calendar-1', title: 'Prague Salsa Marathon', description: null, image_url: '/prague.jpg', location: 'Palace Hall', city: 'Prague', country: 'Czechia', latitude: null, longitude: null, start: '2099-09-24T18:00:00Z', end: '2099-09-25T02:00:00Z', all_day: false, color: null, view_count: 0, price_min: null, price_max: null, price_currency: null, price_is_free: false, links: null, tags: [],
         }]);
         render(
             <MemoryRouter initialEntries={['/search/results?q=prague']}>

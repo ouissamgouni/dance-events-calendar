@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyScheduleDancePreset, applyScheduleImport, exportEventSchedule, fetchAdminEventSchedule, fetchEvent, fetchScheduleImportSchema, fetchSchedulePlanners, previewScheduleImport, publishEventSchedule } from '../api';
+import { applyScheduleDancePreset, applyScheduleImport, createAdminEventSchedule, exportEventSchedule, fetchAdminEventSchedule, fetchEvent, fetchOptionalAdminEventSchedule, fetchScheduleImportSchema, fetchSchedulePlanners, previewScheduleImport, publishEventSchedule } from '../api';
 import type { AdminEventSchedule, CalendarEvent } from '../types';
 import AdminEventSchedulePage from './AdminEventSchedulePage';
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, applyScheduleDancePreset: vi.fn(), applyScheduleImport: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn() };
+    return { ...actual, applyScheduleDancePreset: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn() };
 });
 
 const event: CalendarEvent = {
@@ -55,6 +55,7 @@ describe('AdminEventSchedulePage', () => {
     beforeEach(() => {
         vi.mocked(fetchEvent).mockResolvedValue(event);
         vi.mocked(fetchAdminEventSchedule).mockResolvedValue(schedule);
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue(schedule);
         vi.mocked(exportEventSchedule).mockResolvedValue(importDocument);
         vi.mocked(fetchScheduleImportSchema).mockResolvedValue({ schema: {}, example: exampleDocument });
         vi.mocked(applyScheduleDancePreset).mockResolvedValue({ created: 3 });
@@ -64,6 +65,27 @@ describe('AdminEventSchedulePage', () => {
             version: 2,
             notification_summary: { impacted_planners: 1, going_attendees_notified: 2, in_app_created: 3, emailed: 1, pushed: 0, going_attendees: 3 },
         });
+    });
+
+    it('offers to create a program when the event has no schedule', async () => {
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue(null);
+        vi.mocked(createAdminEventSchedule).mockResolvedValue({ ...schedule, version: null, published_at: null });
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByRole('heading', { name: "Create Movida 2026's program" })).toBeInTheDocument();
+        expect(screen.queryByText('Schedule not found')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Create schedule' }));
+
+        await waitFor(() => expect(createAdminEventSchedule).toHaveBeenCalledWith(event.event_id, {
+            timezone: expect.any(String),
+            day_start_hour: 6,
+        }));
+        expect(await screen.findByRole('heading', { name: event.title })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
     });
 
     it('opens a populated session editor from the schedule grid', async () => {
@@ -112,7 +134,7 @@ describe('AdminEventSchedulePage', () => {
         expect(apply).toBeEnabled();
         fireEvent.click(apply);
         await waitFor(() => expect(applyScheduleImport).toHaveBeenCalledWith(event.event_id, 'merge', expect.any(Object)));
-        await waitFor(() => expect(fetchAdminEventSchedule).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(fetchAdminEventSchedule).toHaveBeenCalledTimes(1));
     });
 
     it('loads a standalone example and can reset to the current draft', async () => {
@@ -146,11 +168,11 @@ describe('AdminEventSchedulePage', () => {
 
         await waitFor(() => expect(applyScheduleDancePreset).toHaveBeenCalledWith(event.event_id));
         expect(await screen.findByText('Added 3 levels.')).toBeInTheDocument();
-        expect(fetchAdminEventSchedule).toHaveBeenCalledTimes(2);
+        expect(fetchAdminEventSchedule).toHaveBeenCalledTimes(1);
     });
 
     it('reuses Program controls in the dated Sessions list', async () => {
-        vi.mocked(fetchAdminEventSchedule).mockResolvedValue({
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({
             ...schedule,
             sessions: [
                 { ...schedule.sessions[0], id: 'session-0', title: 'Thursday Basics', start: '2026-10-15T12:00:00Z', end: '2026-10-15T13:00:00Z' },
@@ -232,7 +254,7 @@ describe('AdminEventSchedulePage', () => {
     });
 
     it('announces the first publication without offering a broad-update option', async () => {
-        vi.mocked(fetchAdminEventSchedule).mockResolvedValue({ ...schedule, version: null, published_at: null });
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({ ...schedule, version: null, published_at: null });
         render(
             <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
                 <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>

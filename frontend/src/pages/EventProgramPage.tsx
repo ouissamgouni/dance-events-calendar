@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchMyPlan, removeFromMyPlan } from '../api';
 import ScheduleGrid from '../components/program/ScheduleGrid';
 import MyPlanList from '../components/program/MyPlanList';
-import { ProgramDayPicker, ProgramFilters } from '../components/program/ProgramControls';
+import { AttendeeProgramFilters, ProgramDayPicker } from '../components/program/ProgramControls';
 import { SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
@@ -174,10 +174,7 @@ export default function EventProgramPage() {
             {!embeddedProgram ? <header className="shrink-0 bg-surface px-3 py-3">
                 <div className="mx-auto flex max-w-5xl items-center gap-3">
                     <button type="button" onClick={backToEvent} aria-label="Back to event" className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft"><ChevronLeft size={24} /></button>
-                    <div className="min-w-0">
-                        <h1 className="truncate text-base font-bold text-ink">{event.title}</h1>
-                        <p className="truncate text-xs text-ink-soft">{event.city ?? event.location ?? 'Event program'}</p>
-                    </div>
+                    <h1 className="min-w-0 truncate text-base font-bold text-ink">{event.title}</h1>
                 </div>
             </header> : null}
 
@@ -186,13 +183,13 @@ export default function EventProgramPage() {
                     <ProgramTab active={activeTab === 'program'} onClick={() => navigateProgramTab(`/event/${event.event_id}/program${searchParams.toString() ? `?${searchParams}` : ''}`)}>Program</ProgramTab>
                     <ProgramTab active={activeTab === 'plan'} onClick={() => navigateProgramTab(`/event/${event.event_id}/program/plan${searchParams.toString() ? `?${searchParams}` : ''}`)}>My Plan{plan.length ? ` (${plan.length})` : ''}</ProgramTab>
                 </div> : null}
-                {activeTab === 'program' ? <ProgramFilters schedule={schedule} filters={filters} onChange={updateFilters} /> : null}
-                {activeTab === 'program' ? <ProgramDayPicker schedule={schedule} sessions={filteredSessions} selectedDay={selectedDay} filtersActive={Boolean(filters.instructor || filters.levelIds.length || filters.activityTypeIds.length)} onSelect={selectDay} /> : null}
+                {activeTab === 'program' ? <AttendeeProgramFilters schedule={schedule} filters={filters} onChange={updateFilters} /> : null}
+                {activeTab === 'program' ? <ProgramDayPicker schedule={schedule} sessions={filteredSessions} selectedDay={selectedDay} filtersActive={Boolean(filters.instructor || filters.levelIds.length || filters.activityTypeIds.length)} softSelection onSelect={selectDay} /> : null}
             </div>
 
             <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col">
                 {activeTab === 'program' ? (
-                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} />
+                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} compactHeader />
                 ) : user ? (
                     <MyPlanList schedule={schedule} entries={plan} onOpen={openSession} onRemove={removePlanEntry} onProgram={() => navigate(`/event/${event.event_id}/program`)} />
                 ) : (

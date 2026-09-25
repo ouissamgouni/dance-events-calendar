@@ -10,12 +10,13 @@ interface Props {
     onSessionClick: (session: ScheduleSession) => void;
     onTimeClick: (minute: number) => void;
     positionRequest?: number;
+    compactHeader?: boolean;
 }
 
 const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 22;
 
-export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0 }: Props) {
+export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0, compactHeader = false }: Props) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const positionedDays = useRef(new Set<string>());
     const handledPositionRequest = useRef(0);
@@ -79,7 +80,7 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                 className="relative grid min-w-max"
                 style={{
                     gridTemplateColumns: `48px repeat(${Math.max(rooms.length, 1)}, minmax(144px, 1fr))`,
-                    gridTemplateRows: `48px repeat(${rowCount}, ${SLOT_HEIGHT}px)`,
+                    gridTemplateRows: `${compactHeader ? 40 : 48}px repeat(${rowCount}, ${SLOT_HEIGHT}px)`,
                     minWidth: `${48 + Math.max(rooms.length, 1) * 144}px`,
                 }}
             >
@@ -87,8 +88,8 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                 {rooms.length ? rooms.map((room, index) => (
                     <RoomHeader key={room.id} room={room} column={index + 2} />
                 )) : (
-                    <div className="sticky top-0 z-20 flex items-center justify-center border-b border-line bg-canvas px-2 text-xs font-semibold text-ink-soft" style={{ gridColumn: 2, gridRow: 1 }}>
-                        Event-wide
+                    <div className="sticky top-0 z-20 flex min-w-0 items-center justify-center border-b border-line bg-canvas px-2 text-xs font-semibold text-ink-soft" style={{ gridColumn: 2, gridRow: 1 }}>
+                        <span className="truncate">Event-wide</span>
                     </div>
                 )}
 
@@ -152,8 +153,8 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
 function RoomHeader({ room, column }: { room: ScheduleRoom; column: number }) {
     const color = roomColor(room.color);
     return (
-        <div className={`sticky top-0 z-20 flex items-center justify-center border-b border-line px-2 text-center text-xs font-semibold ${color.header}`} style={{ gridColumn: column, gridRow: 1 }}>
-            {room.name}
+        <div className={`sticky top-0 z-20 flex min-w-0 items-center justify-center border-b border-line px-2 text-center text-xs font-semibold ${color.header}`} style={{ gridColumn: column, gridRow: 1 }}>
+            <span className="truncate">{room.name}</span>
         </div>
     );
 }
