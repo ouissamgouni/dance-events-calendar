@@ -133,6 +133,7 @@ def world(session):
                 start=base + timedelta(days=offset),
                 end=base + timedelta(days=offset, hours=2),
                 all_day=False,
+                review_status="reviewed",
             )
         )
     session.commit()

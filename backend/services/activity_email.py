@@ -44,8 +44,12 @@ from backend.db.database import get_engine
 from backend.db.models import (
     CachedEvent,
     Notification,
+    Tag,
+    TagGroup,
     User,
     UserEventAttendance,
+    UserInterestProfile,
+    UserInterestProfileTag,
 )
 from backend.services.email import (
     event_message_action_phrase,
@@ -53,6 +57,7 @@ from backend.services.email import (
     send_activity_digest_v2_email,
 )
 from backend.services.notification_delivery import record_delivery
+from backend.services.event_visibility import eligible_event_ids
 from backend.services.event_images import resolve_event_image
 from backend.services.push_service import send_push
 from backend.services.user_avatars import resolve_user_avatar
@@ -136,6 +141,20 @@ _ACTOR_GROUPED_FEATURES = frozenset(
 # Event-less kinds (milestones, follows) are exempt automatically since they
 # resolve to no event.
 _PAST_GUARD_EXEMPT_KINDS = frozenset({"subscription_review"})
+_REACH_LABELS = {
+    "any": "Any reach",
+    "regional_plus": "Regional+",
+    "international": "International",
+}
+
+
+def _interest_alert_summary(
+    dance_styles: list[str], reach_filter: str, area_label: str
+) -> str:
+    dances = ", ".join(dance_styles) if dance_styles else "Any dance style"
+    reach = _REACH_LABELS.get(reach_filter, reach_filter.replace("_", " ").title())
+    return f"{dances} · {reach} · {area_label}"
+
 
 # Don't email notifications older than this window. With a twice-a-week
 # cadence the maximum realistic gap is ~3.5 days; 14 days is a safe cap
@@ -253,6 +272,7 @@ def _render_line(
     subject_key: str | None = None,
     description: str | None = None,
     milestone_names: list[str] | None = None,
+    milestone_count: int | None = None,
 ) -> str:
     """Return an escaped HTML snippet describing one notification.
 
@@ -299,12 +319,15 @@ def _render_line(
     if kind == "subscription_review":
         return f"<strong>{who}</strong> shared their experience of {title}"
     if kind == "subscription_milestone":
-        if milestone_names and len(milestone_names) > 1:
-            names = ", ".join(escape(name) for name in milestone_names)
-            return (
-                f"<strong>{who}</strong> reached {len(milestone_names)} "
-                f"milestones: <strong>{names}</strong>"
-            )
+        total_milestones = milestone_count or len(milestone_names or [])
+        if total_milestones > 1:
+            title = f"<strong>{who}</strong> reached {total_milestones} milestones"
+            if milestone_names:
+                names = ", ".join(escape(name) for name in milestone_names)
+                return f"{title}: <strong>{names}</strong>"
+            return title
+        if milestone_count == 1:
+            return f"<strong>{who}</strong> reached a milestone"
         if context:
             return (
                 f"<strong>{who}</strong> reached a milestone: "
@@ -314,9 +337,15 @@ def _render_line(
     if kind == "subscription_suggested":
         return f"<strong>{who}</strong> suggested the event {title}"
     if kind == "milestone_unlocked":
-        if milestone_names and len(milestone_names) > 1:
-            names = ", ".join(escape(name) for name in milestone_names)
-            return f"\U0001f389 You unlocked {len(milestone_names)} milestones: {names}"
+        total_milestones = milestone_count or len(milestone_names or [])
+        if total_milestones > 1:
+            title = f"\U0001f389 You unlocked {total_milestones} milestones"
+            if milestone_names:
+                names = ", ".join(escape(name) for name in milestone_names)
+                return f"{title}: {names}"
+            return title
+        if milestone_count == 1:
+            return "\U0001f389 You unlocked a milestone"
         name_text = escape(context) if context else "a new achievement"
         name = (
             f'<a href="{app}/mine/passport" '
@@ -524,6 +553,11 @@ def run_once(
         if user_ids is not None:
             stmt = stmt.where(Notification.recipient_user_id.in_(user_ids))  # type: ignore[union-attr]
         pending = session.exec(stmt).all()
+        event_ids = {n.event_id for n in pending if n.event_id}
+        visible_event_ids = eligible_event_ids(session, event_ids)
+        pending = [
+            n for n in pending if n.event_id is None or n.event_id in visible_event_ids
+        ]
         if not pending:
             logger.debug(
                 "Activity digest run: no matching notifications (user_ids=%s kinds=%s resend=%s)",
@@ -550,6 +584,38 @@ def run_once(
             ).all()
             if event_ids
         }
+        interest_recipient_ids = {
+            n.recipient_user_id for n in pending if n.kind == "interest_event"
+        }
+        interest_profiles = (
+            session.exec(
+                select(UserInterestProfile).where(
+                    UserInterestProfile.user_id.in_(interest_recipient_ids)  # type: ignore[union-attr]
+                )
+            ).all()
+            if interest_recipient_ids
+            else []
+        )
+        profile_dances: dict[int, list[str]] = {}
+        profile_ids = [profile.id for profile in interest_profiles if profile.id]
+        if profile_ids:
+            for profile_id, tag_label, group_slug in session.exec(
+                select(UserInterestProfileTag.profile_id, Tag.label, TagGroup.slug)
+                .join(Tag, Tag.id == UserInterestProfileTag.tag_id)  # type: ignore[arg-type]
+                .join(TagGroup, TagGroup.id == Tag.group_id)  # type: ignore[arg-type]
+                .where(UserInterestProfileTag.profile_id.in_(profile_ids))  # type: ignore[union-attr]
+            ).all():
+                if group_slug != "reach":
+                    profile_dances.setdefault(profile_id, []).append(tag_label)
+        alerts_by_user: dict[object, dict[str, str]] = {}
+        for profile in interest_profiles:
+            alerts_by_user.setdefault(profile.user_id, {})[profile.label] = (
+                _interest_alert_summary(
+                    profile_dances.get(profile.id, []),
+                    profile.reach_filter,
+                    profile.area_label,
+                )
+            )
 
         # Past-event guard: resolve which loaded events have already ended so
         # digest email + push grouping can drop notifications about them before
@@ -724,33 +790,92 @@ def run_once(
                 bits.append(event.location)
             return " · ".join(bits) if bits else None
 
-        def _build_entry(group: list[Notification]) -> dict:
+        def _interest_alert_names(notification: Notification) -> list[str]:
+            context = notification.context or "Saved search"
+            known_alerts = alerts_by_user.get(notification.recipient_user_id, {})
+            if context in known_alerts:
+                return [context]
+            matched = [
+                label
+                for label in known_alerts
+                if label in {part.strip() for part in context.split(",")}
+            ]
+            return matched or [context]
+
+        def _build_entry(
+            group: list[Notification], alert_name: str | None = None
+        ) -> dict:
             n = group[-1]
             actor = users.get(n.actor_user_id)
             event = events.get(n.event_id) if n.event_id else None
+            feature = FEATURE_BY_KIND.get(n.kind)
+            render_context = alert_name if feature == "interest_matches" else n.context
             anon = n.kind == "subscription_review" and n.context == "anon"
             milestone_names = [item.context or "a new achievement" for item in group]
+            milestone_details = (
+                ", ".join(milestone_names[:3]) if n.kind in _MILESTONE_KINDS else None
+            )
             image_url = None
             if event is not None:
                 full_image_url, thumb_image_url = resolve_event_image(event)
                 image_url = thumb_image_url or full_image_url
+            group_header_html = None
+            group_item_html = None
+            if feature in {"friends_going", "suggested_events"} and actor is not None:
+                actor_name = escape(
+                    actor.display_name
+                    or (f"@{actor.handle}" if actor.handle else "Someone")
+                )
+                actor_html = (
+                    f'<a href="{get_public_app_url().rstrip("/")}/u/{escape(actor.handle)}" '
+                    f'style="color:#1d4ed8;text-decoration:underline">{actor_name}</a>'
+                    if actor.handle
+                    else actor_name
+                )
+                action = "is going to" if feature == "friends_going" else "suggested"
+                group_header_html = f"<strong>{actor_html}</strong> {action}"
+            elif feature == "interest_matches":
+                alert_label = escape(alert_name or "Saved search")
+                alert_summary = alerts_by_user.get(n.recipient_user_id, {}).get(
+                    alert_name or ""
+                )
+                group_header_html = (
+                    f'<a href="{get_public_app_url().rstrip("/")}/saved-searches" '
+                    'style="color:#1d4ed8;text-decoration:underline">'
+                    f"<strong>{alert_label}</strong></a>"
+                    + (f": {escape(alert_summary)}" if alert_summary else "")
+                )
+            if group_header_html is not None and event is not None and event.title:
+                event_title = escape(event.title)
+                group_item_html = (
+                    f'<a href="{get_public_app_url().rstrip("/")}/event/'
+                    f'{escape(str(event.event_id))}" '
+                    f'style="color:#1d4ed8;text-decoration:underline">{event_title}</a>'
+                )
             return {
                 "kind": n.kind,
                 "primary_html": _render_line(
                     n.kind,
                     actor,
                     event,
-                    n.context,
+                    render_context,
                     also_going=_also_going(n),
                     subject_key=n.subject_key,
                     description=n.description,
-                    milestone_names=milestone_names[:3],
+                    milestone_names=(
+                        None if n.kind in _MILESTONE_KINDS else milestone_names[:3]
+                    ),
+                    milestone_count=len(milestone_names),
                 ),
                 "group_key": (
                     str(n.actor_user_id)
-                    if FEATURE_BY_KIND.get(n.kind) in _ACTOR_GROUPED_FEATURES
+                    if feature in _ACTOR_GROUPED_FEATURES
+                    else f"alert:{alert_name or 'Saved search'}"
+                    if feature == "interest_matches"
                     else None
                 ),
+                "group_header_html": group_header_html,
+                "group_item_html": group_item_html,
                 "avatar_url": (
                     resolve_user_avatar(actor)
                     if actor is not None and not anon
@@ -761,7 +886,7 @@ def run_once(
                     if actor is not None and not anon
                     else None
                 ),
-                "subline": _card_subline(event),
+                "subline": _card_subline(event) or milestone_details,
                 "event_image_url": image_url,
                 "anon": anon,
                 "more_count": max(0, len(milestone_names) - 3),
@@ -820,8 +945,13 @@ def run_once(
                         {
                             "feature": feature,
                             "entries": [
-                                _build_entry(group)
+                                _build_entry(group, alert_name)
                                 for group in _digest_groups(feature, visible)
+                                for alert_name in (
+                                    _interest_alert_names(group[-1])
+                                    if feature == "interest_matches"
+                                    else [None]
+                                )
                             ],
                         }
                     )

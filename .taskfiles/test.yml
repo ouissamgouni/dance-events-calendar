@@ -59,6 +59,12 @@ tasks:
       - npx playwright install --with-deps chromium
       - npm run test:e2e
 
+  e2e:schedule:
+    desc: Focused schedule and My Plan Playwright test
+    dir: frontend
+    cmds:
+      - npx playwright test e2e/event-schedule.spec.ts --project=chromium
+
   ci:
     desc: Simulate CI pipeline locally (requires act)
     cmds:

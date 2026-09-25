@@ -2,9 +2,11 @@ import type { ReactNode } from 'react';
 import { ChevronRight, MapPin, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { CalendarEvent, FriendMini } from '../types';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useEventCardImage } from '../hooks/useEventCardImage';
 import { firstNameOf } from '../utils/displayName';
 import { shortLocation } from '../utils/locationShort';
+import ProgramAction from './ProgramAction';
 
 interface NextUpEventCardProps {
     event: CalendarEvent;
@@ -14,8 +16,11 @@ interface NextUpEventCardProps {
     to?: string;
 }
 
-function countdownLabel(startIso: string): string {
-    const milliseconds = new Date(startIso).getTime() - Date.now();
+function countdownLabel(startIso: string, endIso: string): string {
+    const now = Date.now();
+    const start = new Date(startIso).getTime();
+    if (start <= now && now < new Date(endIso).getTime()) return 'Happening now';
+    const milliseconds = start - now;
     const days = Math.ceil(milliseconds / 86_400_000);
     if (days <= 0) return 'Today';
     if (days === 1) return 'Tomorrow';
@@ -125,7 +130,7 @@ function CardContent({ event, friendsVariant }: Pick<NextUpEventCardProps, 'even
                 )}
                 <span className="mt-3 flex min-w-0 items-center gap-2 text-xs">
                     <span className="shrink-0 bg-brand/10 px-2 py-1 font-semibold text-brand" data-testid="next-up-countdown">
-                        {countdownLabel(event.start)}
+                        {countdownLabel(event.start, event.end)}
                     </span>
                     <FriendsGoing event={event} variant={friendsVariant ?? 'count'} />
                 </span>
@@ -144,26 +149,39 @@ export default function NextUpEventCard({
     testId = 'next-up-event-card',
     to,
 }: NextUpEventCardProps) {
+    const { eventScheduleEnabled } = useFeatureFlags();
     const label = `Open ${event.title} event details`;
     const content: ReactNode = <CardContent event={event} friendsVariant={friendsVariant} />;
+    const programAction = eventScheduleEnabled && event.schedule_published ? (
+        <div className="absolute right-4 bottom-3 z-[2]">
+            <ProgramAction event={event} />
+        </div>
+    ) : null;
+    const detailsClassName = `${cardClassName} ${programAction ? 'pb-12' : ''}`;
 
     if (to) {
         return (
-            <Link to={to} className={cardClassName} aria-label={label} data-testid={testId}>
-                {content}
-            </Link>
+            <div className="relative">
+                <Link to={to} className={detailsClassName} aria-label={label} data-testid={testId}>
+                    {content}
+                </Link>
+                {programAction}
+            </div>
         );
     }
 
     return (
-        <button
-            type="button"
-            onClick={() => onClick?.(event)}
-            className={cardClassName}
-            aria-label={label}
-            data-testid={testId}
-        >
-            {content}
-        </button>
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => onClick?.(event)}
+                className={detailsClassName}
+                aria-label={label}
+                data-testid={testId}
+            >
+                {content}
+            </button>
+            {programAction}
+        </div>
     );
 }

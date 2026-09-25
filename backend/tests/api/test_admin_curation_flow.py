@@ -110,6 +110,7 @@ def _seed(session: Session) -> dict:
             start=start + timedelta(days=i),
             end=start + timedelta(days=i, hours=2),
             calendar_id="cal-1",
+            review_status="reviewed",
         )
         for i in range(3)
     ]

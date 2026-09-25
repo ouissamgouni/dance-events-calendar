@@ -378,6 +378,13 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                     {event && (
                         <>
                             <EventImageEditor event={event} onChange={handleImageChange} />
+                            <Link
+                                to={`/admin/events/${encodeURIComponent(event.event_id)}/schedule`}
+                                onClick={onClose}
+                                className="mb-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                            >
+                                Manage schedule
+                            </Link>
                             <AdminEventDetailContent
                                 event={event}
                                 onFieldSave={handleFieldSave}

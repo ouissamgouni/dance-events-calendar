@@ -1,7 +1,7 @@
 import type { CalendarEvent } from '../../types';
-import { currencySymbol } from '../../utils/currency';
 import { useFeatureFlags } from '../../context/FeatureFlagsContext';
 import { isPriceSectionVisible } from '../../utils/sectionVisibility';
+import { formatEventPrice } from '../../utils/eventPrice';
 import TagBadges from '../TagBadges';
 import ExpandableDescription from '../ExpandableDescription';
 import EventSeriesLink from '../EventSeriesLink';
@@ -14,20 +14,10 @@ interface Props {
     promoRefreshToken?: number;
 }
 
-export function priceRange(event: CalendarEvent): string | null {
-    if (event.price_is_free) return 'Free';
-    if (event.price_min == null || !event.price_currency) return null;
-    const s = currencySymbol(event.price_currency);
-    if (event.price_max != null && event.price_max !== event.price_min) {
-        return `${s}${event.price_min}–${event.price_max}`;
-    }
-    return `${s}${event.price_min}`;
-}
-
 /** Details tab: description, tags, links, series, price & promo codes. */
 export default function AboutTab({ event, promoRefreshToken }: Props) {
     const { showPrices } = useFeatureFlags();
-    const price = isPriceSectionVisible(event, showPrices) ? priceRange(event) : null;
+    const price = isPriceSectionVisible(event, showPrices) ? formatEventPrice(event) : null;
     const description = cleanEventDescription(event.description ?? '');
     const hasLinks = collectEventLinks(event.links, event.description).length > 0;
 

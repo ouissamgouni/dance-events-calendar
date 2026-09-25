@@ -13,8 +13,10 @@ write paths.
 
 from datetime import UTC, datetime
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlmodel import Session, col, func, select
 
 from backend.api.deps import require_user
@@ -34,6 +36,10 @@ from backend.db.models import (
     UserEventAttendance,
 )
 from backend.services.user_avatars import resolve_user_avatar
+from backend.services.event_visibility import (
+    event_is_user_facing,
+    show_pending_events_enabled,
+)
 
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
@@ -60,6 +66,9 @@ VALID_KINDS = {
     "event_message",
     "event_message_reply",
     "event_message_reported",
+    "planned_session_changed",
+    "schedule_program_available",
+    "schedule_program_updated",
 }
 
 
@@ -86,6 +95,20 @@ ACTOR_PREVIEW_CAP = 12
 # feed has no deep pagination, so a generous window keeps grouping correct
 # without a GROUP BY round-trip.
 AGGREGATION_WINDOW = 200
+
+
+def _apply_visibility(statement, session: Session):
+    if show_pending_events_enabled(session):
+        return statement
+    visible_event_ids = select(CachedEvent.event_id).where(
+        CachedEvent.review_status != "pending"
+    )
+    return statement.where(
+        or_(
+            Notification.event_id.is_(None),
+            Notification.event_id.in_(visible_event_ids),
+        )
+    )
 
 
 def _aggregation_key(notification: Notification) -> tuple:
@@ -236,6 +259,11 @@ def _hydrate(
                 ],
                 context=rep.context,
                 subject_key=rep.subject_key,
+                schedule_session_id=(
+                    UUID(rep.group_key)
+                    if rep.kind == "planned_session_changed" and rep.group_key
+                    else None
+                ),
                 description=rep.description,
                 also_going=(
                     rep.kind == "subscription_going"
@@ -274,12 +302,17 @@ def list_notifications(
         base = base.where(Notification.read_at.is_(None))
         count_base = count_base.where(Notification.read_at.is_(None))
 
+    base = _apply_visibility(base, session)
+    count_base = _apply_visibility(count_base, session)
+
     total = session.exec(count_base).one()
-    unread = session.exec(
+    unread_statement = (
         select(func.count(Notification.id))
         .where(Notification.recipient_user_id == user.id)
         .where(Notification.read_at.is_(None))
-    ).one()
+    )
+    unread_statement = _apply_visibility(unread_statement, session)
+    unread = session.exec(unread_statement).one()
 
     # Scan a capped newest-first window, aggregate collapsible rows into
     # multi-actor items, then paginate the grouped result. ``total`` becomes
@@ -310,11 +343,13 @@ def unread_count(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    rows = session.exec(
+    statement = (
         select(Notification)
         .where(Notification.recipient_user_id == user.id)
         .where(Notification.read_at.is_(None))
-    ).all()
+    )
+    statement = _apply_visibility(statement, session)
+    rows = session.exec(statement).all()
     return UnreadCountResponse(count=len({_aggregation_key(row) for row in rows}))
 
 
@@ -328,6 +363,10 @@ def mark_read(
     if row is None or row.recipient_user_id != user.id:
         # 404 (not 403) so we don't leak existence of others' rows.
         raise HTTPException(status_code=404, detail="Notification not found")
+    if row.event_id is not None:
+        event = session.get(CachedEvent, row.event_id)
+        if event is None or not event_is_user_facing(session, event):
+            raise HTTPException(status_code=404, detail="Notification not found")
     now = datetime.utcnow()
     # Collapsible rows render as one aggregated group, so marking the
     # representative read clears every sibling (same kind + event) too.

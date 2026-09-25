@@ -4,6 +4,7 @@ import type { GeocodeSuggestion } from '../api';
 import { fetchAdminCalendars, retryGeocodingSingle } from '../api';
 import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
+import { formatEventPrice } from '../utils/eventPrice';
 import AddressAutocomplete from './AddressAutocomplete';
 import AdminAutoTagSuggestions from './AdminAutoTagSuggestions';
 import AdminEventPromoCodes from './AdminEventPromoCodes';
@@ -415,6 +416,7 @@ export default function AdminEventDetailContent({
             />
 
             {/* Description */}
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Displayed description</p>
             {editingField === 'description' ? (
                 <div>
                     <textarea
@@ -442,6 +444,17 @@ export default function AdminEventDetailContent({
                     className="cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded-lg px-3 py-2 transition"
                     onClick={() => startEdit('description', '')}
                 >+ Add description</div>
+            )}
+
+            {event.source_description && (
+                <details className="border-t border-card-line pt-3">
+                    <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted">
+                        Calendar source
+                    </summary>
+                    <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-ink-soft">
+                        {event.source_description}
+                    </pre>
+                </details>
             )}
 
             {/* Links */}
@@ -549,9 +562,7 @@ export default function AdminEventDetailContent({
                                 </span>
                             ) : event.price_min != null ? (
                                 <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                                    {event.price_max != null && event.price_max !== event.price_min
-                                        ? `${event.price_currency ?? ''} ${event.price_min}\u2013${event.price_max}`
-                                        : `${event.price_currency ?? ''} ${event.price_min}`}
+                                    {formatEventPrice(event, { currencyDisplay: 'code' })}
                                 </span>
                             ) : (
                                 <span className="text-[11px] text-muted italic">not set</span>
@@ -579,9 +590,7 @@ export default function AdminEventDetailContent({
                                     )}
                                     {!event.price_is_free && event.price_min != null && (
                                         <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                                            {event.price_max != null && event.price_max !== event.price_min
-                                                ? `${event.price_currency ?? ''} ${event.price_min}\u2013${event.price_max}`
-                                                : `${event.price_currency ?? ''} ${event.price_min}`}
+                                            {formatEventPrice(event, { currencyDisplay: 'code' })}
                                         </span>
                                     )}
                                     <EditHint />

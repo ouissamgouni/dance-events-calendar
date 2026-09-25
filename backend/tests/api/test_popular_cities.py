@@ -84,6 +84,7 @@ def _event(
             longitude=longitude,
             is_hidden=is_hidden,
             deleted_at=deleted_at,
+            review_status="reviewed",
         )
     )
     session.commit()

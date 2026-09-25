@@ -104,6 +104,7 @@ def _seed_curator_with_events(session: Session) -> dict:
         start=start,
         end=start + timedelta(hours=2),
         calendar_id="cal-1",
+        review_status="reviewed",
     )
     e_self = CachedEvent(
         event_id="evt-self",
@@ -111,6 +112,7 @@ def _seed_curator_with_events(session: Session) -> dict:
         start=start + timedelta(days=1),
         end=start + timedelta(days=1, hours=2),
         calendar_id="cal-1",
+        review_status="reviewed",
     )
     session.add_all([e_curated, e_self])
     session.commit()

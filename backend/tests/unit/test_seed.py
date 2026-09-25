@@ -105,6 +105,18 @@ class TestResolveRelativeDt:
 
 @pytest.mark.unit
 class TestDatabaseSeeder:
+    def test_schedule_relative_times_share_a_reference_clock(self):
+        now = datetime(2026, 9, 24, 17, 30)
+
+        assert DatabaseSeeder._schedule_datetime("now-45m", now) == datetime(
+            2026, 9, 24, 16, 45
+        )
+        assert DatabaseSeeder._schedule_datetime("now+2h", now) == datetime(
+            2026, 9, 24, 19, 30
+        )
+        assert DatabaseSeeder._schedule_day("today", now) == "2026-09-24"
+        assert DatabaseSeeder._schedule_day("tomorrow", now) == "2026-09-25"
+
     def test_seed_device_id_stays_within_column_limit(self):
         event_id = "6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74"
         identity = "viewer@example.com"
@@ -241,6 +253,8 @@ class TestDatabaseSeeder:
             "    name: Bob\n"
             "    email_review_prompt_enabled: false\n"
             "    push_review_prompt_enabled: false\n"
+            "    email_schedule_updates_enabled: false\n"
+            "    push_schedule_updates_enabled: false\n"
         )
         monkeypatch.setattr(
             "backend.config.loader.get_calendar_service_type", lambda: "mock"
@@ -257,6 +271,8 @@ class TestDatabaseSeeder:
         assert user is not None
         assert user.email_review_prompt_enabled is False
         assert user.push_review_prompt_enabled is False
+        assert user.email_schedule_updates_enabled is False
+        assert user.push_schedule_updates_enabled is False
 
     def test_seed_mock_users_auto_onboard_by_default(self, tmp_path, monkeypatch):
         """Phase G — scenarios that don't set ``auto_onboard`` (the vast

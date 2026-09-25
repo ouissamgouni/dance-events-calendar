@@ -485,6 +485,7 @@ def test_profile_passport_includes_monthly_activity_without_timeline(client, ses
             title="Profile activity",
             start=attended_at,
             end=attended_at + timedelta(hours=3),
+            review_status="reviewed",
         )
     )
     session.add(

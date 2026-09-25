@@ -194,11 +194,13 @@ def _score_tag(
     norm_title: str,
     norm_description: str,
     norm_location: str,
+    norm_source_tags: tuple[str, ...],
 ) -> Optional[TagCandidate]:
     """Return the best (highest-confidence) match for a single tag, or None."""
     matched_in_title: list[str] = []
     matched_in_description: list[str] = []
     matched_in_location: list[str] = []
+    matched_in_source: list[str] = []
     matched_synonym = False
     canonical_terms = {_normalise(indexed.slug), _normalise(indexed.label)}
 
@@ -206,7 +208,10 @@ def _score_tag(
         in_title = _match_term(term, is_phrase, norm_title)
         in_desc = _match_term(term, is_phrase, norm_description)
         in_loc = _match_term(term, is_phrase, norm_location)
-        if not (in_title or in_desc or in_loc):
+        in_source = any(
+            _match_term(term, is_phrase, source_tag) for source_tag in norm_source_tags
+        )
+        if not (in_title or in_desc or in_loc or in_source):
             continue
         if in_title:
             matched_in_title.append(term)
@@ -214,16 +219,26 @@ def _score_tag(
             matched_in_description.append(term)
         if in_loc:
             matched_in_location.append(term)
+        if in_source:
+            matched_in_source.append(term)
         if term not in canonical_terms:
             matched_synonym = True
 
-    all_matched = matched_in_title + matched_in_description + matched_in_location
+    all_matched = (
+        matched_in_title
+        + matched_in_description
+        + matched_in_location
+        + matched_in_source
+    )
     if not all_matched:
         return None
 
     has_canonical_hit = any(t in canonical_terms for t in all_matched)
-    in_anywhere = bool(matched_in_title or matched_in_location) or bool(
-        matched_in_description
+    in_anywhere = bool(
+        matched_in_title
+        or matched_in_location
+        or matched_in_description
+        or matched_in_source
     )
 
     if has_canonical_hit and in_anywhere:
@@ -257,6 +272,7 @@ def suggest_tags(
     title: Optional[str],
     description: Optional[str],
     location: Optional[str] = None,
+    source_tags: Sequence[str] = (),
     excluded_tag_ids: Iterable[int] = (),
 ) -> list[TagCandidate]:
     """Score every tag in ``snapshot`` against the event text and return the
@@ -269,7 +285,12 @@ def suggest_tags(
     norm_title = _normalise(title or "")
     norm_description = _normalise(description or "")
     norm_location = _normalise(location or "")
-    if not (norm_title or norm_description or norm_location):
+    norm_source_tags = tuple(
+        normalized
+        for source_tag in source_tags
+        if (normalized := _normalise(source_tag))
+    )
+    if not (norm_title or norm_description or norm_location or norm_source_tags):
         return []
 
     excluded = set(excluded_tag_ids)
@@ -277,7 +298,13 @@ def suggest_tags(
     for indexed in snapshot.tags:
         if indexed.tag_id in excluded:
             continue
-        candidate = _score_tag(indexed, norm_title, norm_description, norm_location)
+        candidate = _score_tag(
+            indexed,
+            norm_title,
+            norm_description,
+            norm_location,
+            norm_source_tags,
+        )
         if candidate is None or candidate.confidence < MIN_CONFIDENCE:
             continue
         scored.append((indexed, candidate))
@@ -329,6 +356,7 @@ class TagSuggester:
         title: Optional[str],
         description: Optional[str],
         location: Optional[str] = None,
+        source_tags: Sequence[str] = (),
         excluded_tag_ids: Sequence[int] = (),
     ) -> list[TagCandidate]:
         return suggest_tags(
@@ -336,5 +364,6 @@ class TagSuggester:
             title=title,
             description=description,
             location=location,
+            source_tags=source_tags,
             excluded_tag_ids=excluded_tag_ids,
         )

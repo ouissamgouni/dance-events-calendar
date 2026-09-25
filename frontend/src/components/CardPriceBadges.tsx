@@ -1,29 +1,17 @@
 import type { CalendarEvent } from '../types';
-import { currencySymbol } from '../utils/currency';
+import { formatEventPrice } from '../utils/eventPrice';
 
 /** Compact price chip for event cards (free / single / range). */
 export function PriceBadge({ event }: { event: CalendarEvent }) {
-    if (event.price_is_free) {
-        return (
-            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-ink-soft">
-                <img src="/price-tag.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
-                Free
-            </span>
-        );
-    }
-    if (event.price_min != null && event.price_currency) {
-        const sign = currencySymbol(event.price_currency);
-        const priceText = event.price_max != null && event.price_max !== event.price_min
-            ? `${sign}${event.price_min}–${sign}${event.price_max}`
-            : `${sign}${event.price_min}`;
-        return (
-            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-ink-soft">
-                <img src="/price-tag.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
-                {priceText}
-            </span>
-        );
-    }
-    return null;
+    const price = formatEventPrice(event, { repeatCurrency: true });
+    if (!price) return null;
+
+    return (
+        <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-ink-soft">
+            <img src="/price-tag.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
+            {price}
+        </span>
+    );
 }
 
 /** Marker chip shown when an event has active promo codes. */

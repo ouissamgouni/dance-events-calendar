@@ -46,6 +46,7 @@ def _event(session, event_id, start, *, city=None, country=None):
         end=start + timedelta(hours=3),
         city=city,
         country=country,
+        review_status="reviewed",
     )
     session.add(evt)
     return evt
@@ -418,6 +419,7 @@ class TestConsistencyPersistence:
             title="e",
             start=dt,
             end=dt,
+            review_status="reviewed",
         )
         session.add(event)
         session.add(

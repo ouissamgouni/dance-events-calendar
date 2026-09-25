@@ -54,6 +54,7 @@ from backend.db.models import (
 from backend.services.event_message_instant import (
     dispatch_event_message_instant,
 )
+from backend.services.event_visibility import eligible_event_ids, event_is_user_facing
 from backend.services.notifications import (
     fan_out_event_message,
     notify_message_reported,
@@ -65,6 +66,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["event-messages"])
 limiter = Limiter(key_func=client_ip)
+
+
+def _require_user_facing_event(session: Session, event_id: str) -> CachedEvent:
+    event = session.get(CachedEvent, event_id)
+    if event is None or not event_is_user_facing(session, event):
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event
 
 
 def _ensure_author_engaged(session: Session, user: User, event_id: str) -> None:
@@ -154,6 +162,7 @@ def list_messages(
     session: Session = Depends(get_session),
     viewer: User | None = Depends(get_current_user_optional),
 ):
+    _require_user_facing_event(session, event_id)
     viewer_is_admin = is_admin_user(viewer)
     muted = viewer is not None and (
         session.exec(
@@ -288,10 +297,11 @@ def message_counts_batch(
     batch. Counts visible top-level posts (not replies, deleted, or hidden) so
     it matches the "Messages · N" header on the event detail page.
     """
-    counts: dict[str, int] = {eid: 0 for eid in body.event_ids}
+    visible_event_ids = eligible_event_ids(session, body.event_ids)
+    counts: dict[str, int] = {eid: 0 for eid in visible_event_ids}
     rows = session.exec(
         select(EventMessage.event_id, func.count(EventMessage.id))
-        .where(col(EventMessage.event_id).in_(body.event_ids))
+        .where(col(EventMessage.event_id).in_(visible_event_ids))
         .where(col(EventMessage.parent_id).is_(None))
         .where(col(EventMessage.deleted_at).is_(None))
         .where(EventMessage.is_hidden == False)  # noqa: E712
@@ -301,7 +311,9 @@ def message_counts_batch(
         if eid in counts:
             counts[eid] = int(n)
     return [
-        EventMessageCount(event_id=eid, count=counts[eid]) for eid in body.event_ids
+        EventMessageCount(event_id=eid, count=counts[eid])
+        for eid in body.event_ids
+        if eid in visible_event_ids
     ]
 
 
@@ -319,8 +331,8 @@ def create_message(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    event = session.get(CachedEvent, event_id)
-    if not event or event.deleted_at is not None:
+    event = _require_user_facing_event(session, event_id)
+    if event.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Event not found")
 
     # The board closes once the event is over — attendee coordination
@@ -452,6 +464,7 @@ def report_message(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
+    _require_user_facing_event(session, event_id)
     msg = session.get(EventMessage, message_id)
     if msg is None or msg.event_id != event_id or msg.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Message not found")
@@ -489,8 +502,8 @@ def mute_event(
     user: User = Depends(require_user),
 ):
     """Mute event-message notifications for this event (idempotent)."""
-    event = session.get(CachedEvent, event_id)
-    if not event or event.deleted_at is not None:
+    event = _require_user_facing_event(session, event_id)
+    if event.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Event not found")
     existing = session.exec(
         select(UserEventMute.id)

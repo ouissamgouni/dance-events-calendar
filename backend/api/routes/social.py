@@ -123,6 +123,7 @@ from backend.services.follows import (
     ensure_approved_follow_with_subscription,
     ensure_calendar_subscription,
 )
+from backend.services.event_visibility import apply_event_visibility, eligible_event_ids
 from backend.services.user_avatars import delete_user_avatar, resolve_user_avatar
 from backend.api.deps import get_admin_user_id, is_admin_user
 from backend.config.loader import get_current_onboarding_version
@@ -320,20 +321,20 @@ def _going_count_30d(session: Session, user_id: UUID) -> int:
     gating (this function does not check ``can_view``).
     """
     cutoff = datetime.utcnow() - timedelta(days=30)
-    return int(
-        session.exec(
-            select(func.count(UserEventAttendance.id))
-            .join(
-                CachedEvent,
-                CachedEvent.event_id == UserEventAttendance.event_id,
-            )
-            .where(UserEventAttendance.user_id == user_id)
-            .where(UserEventAttendance.share_publicly == True)  # noqa: E712
-            .where(CachedEvent.start >= cutoff)
-            .where(CachedEvent.deleted_at.is_(None))
-            .where(CachedEvent.is_hidden == False)  # noqa: E712
-        ).one()
+    statement = (
+        select(func.count(UserEventAttendance.id))
+        .join(
+            CachedEvent,
+            CachedEvent.event_id == UserEventAttendance.event_id,
+        )
+        .where(UserEventAttendance.user_id == user_id)
+        .where(UserEventAttendance.share_publicly == True)  # noqa: E712
+        .where(CachedEvent.start >= cutoff)
+        .where(CachedEvent.deleted_at.is_(None))
+        .where(CachedEvent.is_hidden == False)  # noqa: E712
     )
+    statement = apply_event_visibility(statement, session)
+    return int(session.exec(statement).one())
 
 
 def _mutual_subscribers(
@@ -584,7 +585,7 @@ def users_interest_summary(
             items.append(InterestSummaryItem(handle=h))
             continue
 
-        going_rows = session.exec(
+        going_statement = (
             select(
                 UserEventAttendance.event_id,
                 UserEventAttendance.share_audience,
@@ -593,14 +594,18 @@ def users_interest_summary(
             .where(UserEventAttendance.user_id == owner.id)
             .where(CachedEvent.start >= now)
             .where(CachedEvent.deleted_at.is_(None))
-        ).all()
-        saved_rows = session.exec(
+        )
+        going_statement = apply_event_visibility(going_statement, session)
+        going_rows = session.exec(going_statement).all()
+        saved_statement = (
             select(UserSavedEvent.event_id, UserSavedEvent.audience)
             .join(CachedEvent, CachedEvent.event_id == UserSavedEvent.event_id)
             .where(UserSavedEvent.user_id == owner.id)
             .where(CachedEvent.start >= now)
             .where(CachedEvent.deleted_at.is_(None))
-        ).all()
+        )
+        saved_statement = apply_event_visibility(saved_statement, session)
+        saved_rows = session.exec(saved_statement).all()
 
         going_visible = sum(
             1
@@ -1475,7 +1480,7 @@ def friends_leaderboard(
     # (viewer is a friend of every row in the leaderboard by definition,
     # so we admit ``public`` + ``friends`` and exclude ``private``).
     going_count_col = func.count(UserEventAttendance.id).label("going_count")
-    rows = session.exec(
+    statement = (
         select(User, going_count_col)
         .join(friends_sub, friends_sub.c.followee_id == User.id)
         .join(
@@ -1494,7 +1499,9 @@ def friends_leaderboard(
         .group_by(User.id)
         .order_by(going_count_col.desc(), User.handle.asc())
         .limit(limit)
-    ).all()
+    )
+    statement = apply_event_visibility(statement, session)
+    rows = session.exec(statement).all()
 
     items: list[FriendsLeaderboardEntry] = []
     for idx, row in enumerate(rows, start=1):
@@ -1563,7 +1570,7 @@ def following_most_active(
     ).scalar_subquery()
 
     going_count_col = func.count(UserEventAttendance.id).label("going_count")
-    rows = session.exec(
+    statement = (
         select(User, going_count_col)
         .join(following_sub, following_sub.c.followee_id == User.id)
         .join(
@@ -1588,7 +1595,9 @@ def following_most_active(
         .group_by(User.id)
         .order_by(going_count_col.desc(), User.handle.asc())
         .limit(limit)
-    ).all()
+    )
+    statement = apply_event_visibility(statement, session)
+    rows = session.exec(statement).all()
 
     items: list[FriendsLeaderboardEntry] = []
     for idx, row in enumerate(rows, start=1):
@@ -1796,6 +1805,7 @@ def _hydrate_profile_events(
         .where(CachedEvent.deleted_at.is_(None))
         .where(CachedEvent.is_hidden == False)  # noqa: E712
     )
+    stmt = apply_event_visibility(stmt, session)
     if not include_past:
         stmt = stmt.where(CachedEvent.start >= now)
     rows = list(session.exec(stmt).all())
@@ -2223,6 +2233,7 @@ def _events_in_common_counts(
             )
         ).all()
     )
+    viewer_event_ids = eligible_event_ids(session, viewer_event_ids)
     if not viewer_event_ids:
         return {}
     rows = session.exec(
@@ -4146,16 +4157,16 @@ def list_subscribed_events(
         ).all()
     }
     now = datetime.utcnow()
-    events = list(
-        session.exec(
-            select(CachedEvent)
-            .where(col(CachedEvent.event_id).in_(list(via_map.keys())))
-            .where(CachedEvent.end >= now)
-            .where(CachedEvent.deleted_at.is_(None))
-            .where(CachedEvent.is_hidden == False)  # noqa: E712
-            .where(CachedEvent.calendar_id.in_(enabled_calendar_ids))
-        ).all()
+    event_statement = (
+        select(CachedEvent)
+        .where(col(CachedEvent.event_id).in_(list(via_map.keys())))
+        .where(CachedEvent.end >= now)
+        .where(CachedEvent.deleted_at.is_(None))
+        .where(CachedEvent.is_hidden == False)  # noqa: E712
+        .where(CachedEvent.calendar_id.in_(enabled_calendar_ids))
     )
+    event_statement = apply_event_visibility(event_statement, session)
+    events = list(session.exec(event_statement).all())
     events.sort(key=lambda e: e.start, reverse=True)
     total = len(events)
     page = events[offset : offset + limit]

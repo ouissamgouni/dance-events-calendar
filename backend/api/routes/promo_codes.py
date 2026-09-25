@@ -48,6 +48,7 @@ from backend.services.email import (
     send_promo_code_notification,
 )
 from backend.services.notification_delivery import record_delivery
+from backend.services.event_visibility import event_is_user_facing
 from backend.services.user_avatars import resolve_user_avatar
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,13 @@ PROMO_CODE_ADDED = "promo_code_added"
 
 
 # --- helpers ---
+
+
+def _require_user_facing_event(session: Session, event_id: str) -> CachedEvent:
+    event = session.get(CachedEvent, event_id)
+    if event is None or not event_is_user_facing(session, event):
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event
 
 
 def _submitter_payload(user: User) -> PromoCodeSubmitter:
@@ -136,6 +144,10 @@ def _notify_admin_promo(promo_id: UUID) -> None:
 
 def _notify_submitter(session: Session, promo: EventPromoCode, kind: str) -> None:
     """Insert an in-app notification row for the submitter. No commit."""
+    from backend.services.event_visibility import eligible_event_ids
+
+    if promo.event_id not in eligible_event_ids(session, [promo.event_id]):
+        return
     notif = Notification(
         recipient_user_id=promo.submitter_user_id,
         actor_user_id=promo.submitter_user_id,
@@ -153,6 +165,10 @@ def _fan_out_saved_event_promo_code(
     commit — caller owns the transaction. Returns newly-notified user ids
     (for the caller to enqueue email/push delivery).
     """
+    from backend.services.event_visibility import eligible_event_ids
+
+    if promo.event_id not in eligible_event_ids(session, [promo.event_id]):
+        return []
     saved_user_ids = set(
         session.exec(
             select(UserSavedEvent.user_id)
@@ -260,6 +276,7 @@ def list_event_promo_codes(
     current_user: User | None = Depends(get_current_user_optional),
 ):
     """Approved + non-expired codes, plus the viewer's own pending rows."""
+    _require_user_facing_event(session, event_id)
     now = datetime.utcnow()
     conditions = [
         (EventPromoCode.status == "approved")
@@ -311,9 +328,7 @@ def submit_promo_code(
     user: User = Depends(require_user),
 ):
     """Authenticated submission of a new promo code (admin-moderated)."""
-    event = session.get(CachedEvent, event_id)
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
+    _require_user_facing_event(session, event_id)
 
     # Reject duplicate non-rejected codes for the same event (matches the
     # partial unique index; check up-front for a friendlier error than 500).
@@ -364,6 +379,7 @@ def update_promo_code(
     user: User = Depends(require_user),
 ):
     """Owner or admin edit. Owner edits revert status to pending."""
+    _require_user_facing_event(session, event_id)
     promo = session.get(EventPromoCode, promo_id)
     if not promo or promo.event_id != event_id:
         raise HTTPException(status_code=404, detail="Promo code not found")

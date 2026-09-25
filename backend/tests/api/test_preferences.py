@@ -354,6 +354,7 @@ def events_with_coords(session):
             end=now,
             latitude=48.85,
             longitude=2.35,
+            review_status="reviewed",
         ),
         CachedEvent(
             event_id="berlin",
@@ -363,6 +364,7 @@ def events_with_coords(session):
             end=now,
             latitude=52.52,
             longitude=13.40,
+            review_status="reviewed",
         ),
         CachedEvent(
             event_id="madrid",
@@ -372,6 +374,7 @@ def events_with_coords(session):
             end=now,
             latitude=40.42,
             longitude=-3.70,
+            review_status="reviewed",
         ),
         CachedEvent(
             event_id="no-coords",
@@ -381,6 +384,7 @@ def events_with_coords(session):
             end=now,
             latitude=None,
             longitude=None,
+            review_status="reviewed",
         ),
     ]
     for r in rows:
@@ -467,6 +471,7 @@ def test_events_bbox_outside_default_returns_events_in_view(client, session):
             end=now,
             latitude=35.68,
             longitude=139.69,
+            review_status="reviewed",
         )
     )
     session.add(
@@ -478,6 +483,7 @@ def test_events_bbox_outside_default_returns_events_in_view(client, session):
             end=now,
             latitude=48.85,
             longitude=2.35,
+            review_status="reviewed",
         )
     )
     session.commit()

@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function ProtectedRoute({
@@ -9,6 +9,7 @@ export default function ProtectedRoute({
     requireAdmin?: boolean;
 }) {
     const { user, loading } = useAuth();
+    const location = useLocation();
 
     if (loading) {
         return (
@@ -19,7 +20,8 @@ export default function ProtectedRoute({
     }
 
     if (!user) {
-        return <Navigate to="/login" replace />;
+        const next = encodeURIComponent(`${location.pathname}${location.search}${location.hash}`);
+        return <Navigate to={`/login?next=${next}`} replace />;
     }
 
     if (requireAdmin && user.is_admin !== true) {

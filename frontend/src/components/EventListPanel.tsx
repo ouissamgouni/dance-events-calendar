@@ -14,6 +14,7 @@ import CardActionCluster from './CardActionCluster';
 import CardReviewsLine from './CardReviewsLine';
 import EventCard from './EventCard';
 import { useEventCardImage } from '../hooks/useEventCardImage';
+import ProgramAction from './ProgramAction';
 
 interface MapBounds {
     north: number;
@@ -202,7 +203,7 @@ export function EventListCard({
     timeline = false,
     tribeLayout = false,
 }: EventListCardProps) {
-    const { tagsPerCard, eventCardImgoingLocationBottomEnabled, eventCardImgoingShowStatsEnabled, eventCardSaveShowStatsEnabled, explorerEventCardCardStyleEnabled } = useFeatureFlags();
+    const { tagsPerCard, eventCardImgoingLocationBottomEnabled, eventCardImgoingShowStatsEnabled, eventCardSaveShowStatsEnabled, explorerEventCardCardStyleEnabled, eventScheduleEnabled } = useFeatureFlags();
     const { node: imageSlot } = useEventCardImage(event, {
         show: !isPast,
         className: 'event-card-image',
@@ -257,6 +258,7 @@ export function EventListCard({
                             goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
                         />
                     ) : undefined}
+                    bottomSlot={eventScheduleEnabled && event.schedule_published ? <ProgramAction event={event} /> : undefined}
                     testId="event-list-card"
                 />
             </div>
@@ -385,6 +387,11 @@ export function EventListCard({
                         </div>
                     )}
                     <CardReviewsLine eventId={event.event_id} showRatings={showRatings} />
+                    {eventScheduleEnabled && event.schedule_published ? (
+                        <div className="mt-2" onClick={(clickEvent) => clickEvent.stopPropagation()} onKeyDown={(keyEvent) => keyEvent.stopPropagation()}>
+                            <ProgramAction event={event} />
+                        </div>
+                    ) : null}
                     <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
                         <CardActionCluster
                             eventId={event.event_id}

@@ -109,6 +109,7 @@ def event(session):
         longitude=None,
         start=datetime(2020, 1, 1, 20, 0, 0),
         end=datetime(2020, 1, 2, 1, 0, 0),
+        review_status="reviewed",
     )
     session.add(ev)
     session.commit()
@@ -220,6 +221,7 @@ def test_submit_feedback_rejected_for_upcoming_event(client, session):
         title="Future Social",
         start=datetime(2099, 1, 1, 20, 0, 0),
         end=datetime(2099, 1, 2, 1, 0, 0),
+        review_status="reviewed",
     )
     session.add(ev)
     session.commit()
@@ -592,6 +594,7 @@ def series_events(session):
         title="Weekly Milonga",
         start=datetime(2020, 1, 1, 20, 0, 0),
         end=datetime(2020, 1, 2, 1, 0, 0),
+        review_status="reviewed",
     )
     ev2 = CachedEvent(
         event_id="evt-series-2",
@@ -599,6 +602,7 @@ def series_events(session):
         title="Weekly Milonga",
         start=datetime(2020, 1, 8, 20, 0, 0),
         end=datetime(2020, 1, 9, 1, 0, 0),
+        review_status="reviewed",
     )
     session.add(ev1)
     session.add(ev2)
@@ -795,6 +799,7 @@ def test_user_rate_limit(client, session, event):
                 title=f"Event {i}",
                 start=datetime(2020, 1, 1, 20, 0, 0),
                 end=datetime(2020, 1, 1, 22, 0, 0),
+                review_status="reviewed",
             )
             session.add(ev)
         session.commit()
@@ -871,6 +876,7 @@ def test_batch_aggregate_pools_series_count_for_upcoming_edition(client, session
         title="Weekly Milonga",
         start=datetime(2020, 1, 1, 20, 0, 0),
         end=datetime(2020, 1, 2, 1, 0, 0),
+        review_status="reviewed",
     )
     upcoming = CachedEvent(
         event_id="evt-pool-upcoming",
@@ -878,6 +884,7 @@ def test_batch_aggregate_pools_series_count_for_upcoming_edition(client, session
         title="Weekly Milonga",
         start=datetime(2099, 1, 1, 20, 0, 0),
         end=datetime(2099, 1, 2, 1, 0, 0),
+        review_status="reviewed",
     )
     session.add(past)
     session.add(upcoming)
@@ -1084,6 +1091,7 @@ def _past_event(
         title=title,
         start=start,
         end=start + timedelta(hours=4),
+        review_status="reviewed",
     )
     session.add(ev)
     session.commit()

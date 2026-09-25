@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import EventSummary, { type EventDetailTab } from './EventSummary';
 import EventActions from './event-summary/EventActions';
+import ProgramAction from './ProgramAction';
 
 interface Props {
     event: CalendarEvent;
@@ -38,6 +40,7 @@ export default function EventDetailsPanel({
     onPermanentlyRemove,
 }: Props) {
     const navigate = useNavigate();
+    const { eventScheduleEnabled } = useFeatureFlags();
     const [confirmRemove, setConfirmRemove] = useState(false);
     const surfaceClassName = surface === 'card'
         ? 'rounded-card bg-surface shadow-2xl border border-line'
@@ -119,7 +122,10 @@ export default function EventDetailsPanel({
                 />
             </div>
             <div className="border-t border-card-line bg-surface">
-                <div className="flex justify-end px-4 py-3">
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    {eventScheduleEnabled && event.schedule_published ? (
+                        <ProgramAction event={event} variant="full" onNavigate={onClose} />
+                    ) : <span />}
                     <Link
                         to={detailPath}
                         onClick={() => onClose?.()}

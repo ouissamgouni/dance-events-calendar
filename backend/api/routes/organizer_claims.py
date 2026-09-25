@@ -37,6 +37,7 @@ from backend.db.models import (
     User,
 )
 from backend.services.email import send_organizer_claim_notification
+from backend.services.event_visibility import apply_event_visibility
 from backend.services.user_avatars import resolve_user_avatar
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ def _has_social(user: User) -> bool:
 
 
 def _load_events_for_claim(
-    session: Session, claim_id: UUID
+    session: Session, claim_id: UUID, *, include_pending: bool = False
 ) -> list[OrganizerClaimEventOut]:
     rows = session.exec(
         select(OrganizerClaimEvent).where(OrganizerClaimEvent.claim_id == claim_id)
@@ -62,12 +63,10 @@ def _load_events_for_claim(
     if not rows:
         return []
     event_ids = {r.event_id for r in rows}
-    events = {
-        e.event_id: e
-        for e in session.exec(
-            select(CachedEvent).where(col(CachedEvent.event_id).in_(event_ids))
-        ).all()
-    }
+    statement = select(CachedEvent).where(col(CachedEvent.event_id).in_(event_ids))
+    if not include_pending:
+        statement = apply_event_visibility(statement, session)
+    events = {e.event_id: e for e in session.exec(statement).all()}
     return [
         OrganizerClaimEventOut(
             event_id=r.event_id,
@@ -76,6 +75,7 @@ def _load_events_for_claim(
             decision=r.decision,
         )
         for r in rows
+        if r.event_id in events
     ]
 
 
@@ -105,7 +105,7 @@ def _to_admin_out(
         reviewed_at=claim.reviewed_at,
         reviewed_by=claim.reviewed_by,
         created_at=claim.created_at,
-        events=_load_events_for_claim(session, claim.id),
+        events=_load_events_for_claim(session, claim.id, include_pending=True),
         user_handle=user.handle if user else None,
         user_display_name=user.display_name if user else None,
         user_email=user.email if user else None,
@@ -215,9 +215,9 @@ def submit_organizer_claim(
                 status_code=422,
                 detail="At least one event is required for an events claim",
             )
-        existing = session.exec(
-            select(CachedEvent).where(col(CachedEvent.event_id).in_(event_ids))
-        ).all()
+        statement = select(CachedEvent).where(col(CachedEvent.event_id).in_(event_ids))
+        statement = apply_event_visibility(statement, session)
+        existing = session.exec(statement).all()
         if len(existing) != len(event_ids):
             raise HTTPException(
                 status_code=404,

@@ -26,6 +26,7 @@ import ExpandableDescription from './ExpandableDescription';
 import ShareButton from './ShareButton';
 import { EventPromoCodes } from './EventPromoCodes';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
+import { formatEventPrice } from '../utils/eventPrice';
 import { useCommunityExperience } from '../hooks/useCommunityExperience';
 
 interface Props {
@@ -331,9 +332,7 @@ export default function EventDetailContent({
                                 )}
                                 {priceVisible && !event.price_is_free && event.price_min != null && event.price_currency && (
                                     <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                                        {event.price_max != null && event.price_max !== event.price_min
-                                            ? `${event.price_currency} ${event.price_min}\u2013${event.price_max}`
-                                            : `${event.price_currency} ${event.price_min}`}
+                                        {formatEventPrice(event, { currencyDisplay: 'code' })}
                                     </span>
                                 )}
                                 {showPopularity && event.view_count > 0 && (

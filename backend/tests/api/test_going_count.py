@@ -73,6 +73,7 @@ def _seed(session: Session) -> tuple[str, str]:
             title="Popular night",
             start=start,
             end=start + timedelta(hours=3),
+            review_status="reviewed",
         )
     )
     session.add(
@@ -82,6 +83,7 @@ def _seed(session: Session) -> tuple[str, str]:
             title="Quiet night",
             start=start + timedelta(days=1),
             end=start + timedelta(days=1, hours=3),
+            review_status="reviewed",
         )
     )
     session.commit()

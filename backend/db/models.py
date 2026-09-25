@@ -220,6 +220,8 @@ class User(SQLModel, table=True):
     # the broader social-activity bucket so users control it independently.
     email_suggested_events_enabled: bool = Field(default=True, nullable=False)
     push_suggested_events_enabled: bool = Field(default=True, nullable=False)
+    email_schedule_updates_enabled: bool = Field(default=True, nullable=False)
+    push_schedule_updates_enabled: bool = Field(default=True, nullable=False)
     # Master opt-out for the combined activity digest email (v2). Independent
     # of the per-feature email flags: unchecking it silences the whole digest
     # regardless of which feature sections are enabled. In-app/push unaffected.
@@ -389,6 +391,8 @@ class CachedEvent(SQLModel, table=True):
     calendar_id: str = Field(index=True)
     title: str = Field(default="")
     description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    source_description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    extractor_state: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     image_url: Optional[str] = Field(default=None)
     # Base key of an admin-managed picture in object storage (variants live at
     # ``{image_key}/thumb.webp`` / ``/full.webp``). Takes precedence over the
@@ -445,6 +449,183 @@ class CachedEvent(SQLModel, table=True):
     suggestion_id: Optional[UUID] = Field(
         default=None, foreign_key="event_suggestions.id", index=True
     )
+
+
+class EventSchedule(SQLModel, table=True):
+    __tablename__ = "event_schedules"
+    __table_args__ = (
+        CheckConstraint(
+            "day_start_hour >= 0 AND day_start_hour <= 23",
+            name="ck_event_schedules_day_start_hour",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: str = Field(
+        foreign_key="cached_events.event_id", unique=True, index=True, nullable=False
+    )
+    timezone: str = Field(max_length=64, nullable=False)
+    day_start_hour: int = Field(default=6, nullable=False)
+    days: list = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ScheduleVenue(SQLModel, table=True):
+    __tablename__ = "schedule_venues"
+    __table_args__ = (
+        UniqueConstraint("schedule_id", "name", name="uq_schedule_venue_name"),
+        UniqueConstraint(
+            "schedule_id", "external_id", name="uq_schedule_venue_external_id"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    external_id: Optional[str] = Field(default=None, max_length=120, index=True)
+    schedule_id: int = Field(
+        foreign_key="event_schedules.id", index=True, nullable=False
+    )
+    name: str = Field(max_length=120, nullable=False)
+    address: Optional[str] = Field(default=None, max_length=300)
+    sort_order: int = Field(default=0, nullable=False)
+
+
+class ScheduleRoom(SQLModel, table=True):
+    __tablename__ = "schedule_rooms"
+    __table_args__ = (
+        UniqueConstraint("schedule_id", "name", name="uq_schedule_room_name"),
+        UniqueConstraint(
+            "schedule_id", "external_id", name="uq_schedule_room_external_id"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    external_id: Optional[str] = Field(default=None, max_length=120, index=True)
+    schedule_id: int = Field(
+        foreign_key="event_schedules.id", index=True, nullable=False
+    )
+    venue_id: Optional[int] = Field(
+        default=None, foreign_key="schedule_venues.id", index=True
+    )
+    name: str = Field(max_length=120, nullable=False)
+    color: str = Field(default="blue", max_length=24, nullable=False)
+    sort_order: int = Field(default=0, nullable=False)
+
+
+class ScheduleLevel(SQLModel, table=True):
+    __tablename__ = "schedule_levels"
+    __table_args__ = (
+        UniqueConstraint("schedule_id", "label", name="uq_schedule_level_label"),
+        UniqueConstraint(
+            "schedule_id", "external_id", name="uq_schedule_level_external_id"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    external_id: Optional[str] = Field(default=None, max_length=120, index=True)
+    schedule_id: int = Field(
+        foreign_key="event_schedules.id", index=True, nullable=False
+    )
+    label: str = Field(max_length=80, nullable=False)
+    notation: Optional[str] = Field(default=None, max_length=20)
+    sort_order: int = Field(default=0, nullable=False)
+
+
+class ScheduleActivityType(SQLModel, table=True):
+    __tablename__ = "schedule_activity_types"
+    __table_args__ = (
+        UniqueConstraint("schedule_id", "name", name="uq_schedule_activity_type_name"),
+        UniqueConstraint(
+            "schedule_id", "external_id", name="uq_schedule_activity_type_external_id"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    external_id: Optional[str] = Field(default=None, max_length=120, index=True)
+    schedule_id: int = Field(
+        foreign_key="event_schedules.id", index=True, nullable=False
+    )
+    name: str = Field(max_length=80, nullable=False)
+    color: str = Field(default="blue", max_length=24, nullable=False)
+    sort_order: int = Field(default=0, nullable=False)
+
+
+class ScheduleSession(SQLModel, table=True):
+    __tablename__ = "schedule_sessions"
+    __table_args__ = (
+        CheckConstraint('"end" > "start"', name="ck_schedule_sessions_valid_time"),
+        Index("ix_schedule_sessions_schedule_start", "schedule_id", "start"),
+        UniqueConstraint(
+            "schedule_id", "external_id", name="uq_schedule_session_external_id"
+        ),
+    )
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    external_id: Optional[str] = Field(default=None, max_length=120, index=True)
+    schedule_id: int = Field(
+        foreign_key="event_schedules.id", index=True, nullable=False
+    )
+    title: str = Field(max_length=200, nullable=False)
+    instructors: Optional[str] = Field(default=None, max_length=300)
+    start: datetime
+    end: datetime
+    room_id: Optional[int] = Field(
+        default=None, foreign_key="schedule_rooms.id", index=True
+    )
+    venue_id: Optional[int] = Field(
+        default=None, foreign_key="schedule_venues.id", index=True
+    )
+    level_id: Optional[int] = Field(
+        default=None, foreign_key="schedule_levels.id", index=True
+    )
+    activity_type_id: Optional[int] = Field(
+        default=None, foreign_key="schedule_activity_types.id", index=True
+    )
+    attendee_note: Optional[str] = Field(default=None, sa_column=Column(Text))
+    allow_plan: bool = Field(default=True, nullable=False)
+    is_cancelled: bool = Field(default=False, nullable=False)
+    deleted_at: Optional[datetime] = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class SchedulePublication(SQLModel, table=True):
+    __tablename__ = "schedule_publications"
+    __table_args__ = (
+        UniqueConstraint(
+            "schedule_id", "version", name="uq_schedule_publication_version"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    schedule_id: int = Field(
+        foreign_key="event_schedules.id", index=True, nullable=False
+    )
+    version: int = Field(nullable=False)
+    snapshot: dict = Field(sa_column=Column(JSON, nullable=False))
+    published_at: datetime = Field(default_factory=datetime.utcnow)
+    published_by_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+
+
+class UserPlanSession(SQLModel, table=True):
+    __tablename__ = "user_plan_sessions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "session_id", name="uq_user_plan_session"),
+        Index("ix_user_plan_sessions_user_event", "user_id", "event_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    session_id: UUID = Field(
+        foreign_key="schedule_sessions.id", index=True, nullable=False
+    )
+    event_id: str = Field(
+        foreign_key="cached_events.event_id", index=True, nullable=False
+    )
+    last_known_session: dict = Field(sa_column=Column(JSON, nullable=False))
+    added_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class BlockedEvent(SQLModel, table=True):
@@ -1496,8 +1677,19 @@ class Notification(SQLModel, table=True):
             "actor_user_id",
             "event_id",
             unique=True,
-            postgresql_where=text("event_id IS NOT NULL"),
-            sqlite_where=text("event_id IS NOT NULL"),
+            postgresql_where=text("event_id IS NOT NULL AND subject_key IS NULL"),
+            sqlite_where=text("event_id IS NOT NULL AND subject_key IS NULL"),
+        ),
+        Index(
+            "uq_notif_event_subject",
+            "recipient_user_id",
+            "kind",
+            "actor_user_id",
+            "event_id",
+            "subject_key",
+            unique=True,
+            postgresql_where=text("event_id IS NOT NULL AND subject_key IS NOT NULL"),
+            sqlite_where=text("event_id IS NOT NULL AND subject_key IS NOT NULL"),
         ),
         Index(
             "uq_notif_no_event",

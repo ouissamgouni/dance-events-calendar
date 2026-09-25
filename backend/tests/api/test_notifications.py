@@ -144,6 +144,7 @@ def _make_event(
         start=datetime.utcnow() + timedelta(days=1),
         end=datetime.utcnow() + timedelta(days=1, hours=2),
         all_day=False,
+        review_status="reviewed",
     )
     session.add(e)
     session.commit()
@@ -220,6 +221,7 @@ def test_going_past_event_does_not_fan_out(client, session):
         start=datetime.utcnow() - timedelta(days=1, hours=2),
         end=datetime.utcnow() - timedelta(days=1),
         all_day=False,
+        review_status="reviewed",
     )
     session.add(past)
     session.commit()
@@ -282,9 +284,7 @@ def test_anonymous_going_does_not_fan_out(client, session):
     assert _count_notifs(session, bob) == 0
 
 
-def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(
-    client, session
-):
+def test_signed_in_suggestion_submit_does_not_fan_out_pending_event(client, session):
     _make_user(session, "admin@example.com", "admin")
     alice = _make_user(session, "alice@example.com", "alice")
     bob = _make_user(session, "bob@example.com", "bob")
@@ -330,9 +330,7 @@ def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(
     notifs = session.exec(
         select(Notification).where(Notification.recipient_user_id == bob.id)
     ).all()
-    assert len(notifs) == 1
-    assert notifs[0].kind == "subscription_going"
-    assert notifs[0].event_id == event_id
+    assert notifs == []
 
 
 def test_going_repeat_is_idempotent(client, session):
@@ -497,7 +495,7 @@ def _seed_one_notif(
     actor: User,
     *,
     kind: str = "subscription_going",
-    event_id: str = "ev-1",
+    event_id: str | None = "ev-1",
 ) -> Notification:
     n = Notification(
         recipient_user_id=recipient.id,
@@ -878,8 +876,8 @@ def test_mark_read_clears_all_milestones_for_actor_and_kind(client, session):
 def test_friendship_suppresses_follower_in_feed_and_read_state(client, session):
     alice = _make_user(session, "alice@example.com", "alice")
     bob = _make_user(session, "bob@example.com", "bob")
-    follower = _seed_one_notif(session, bob, alice, kind="new_follower")
-    friendship = _seed_one_notif(session, bob, alice, kind="new_friend")
+    follower = _seed_one_notif(session, bob, alice, kind="new_follower", event_id=None)
+    friendship = _seed_one_notif(session, bob, alice, kind="new_friend", event_id=None)
     follower.created_at = friendship.created_at + timedelta(seconds=1)
     session.add(follower)
     session.commit()
@@ -1414,6 +1412,7 @@ def _make_past_event(session: Session, event_id: str) -> CachedEvent:
         start=datetime.utcnow() - timedelta(days=2, hours=2),
         end=datetime.utcnow() - timedelta(days=2),
         all_day=False,
+        review_status="reviewed",
     )
     session.add(e)
     session.commit()

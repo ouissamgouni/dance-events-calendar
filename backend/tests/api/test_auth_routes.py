@@ -28,6 +28,7 @@ from backend.db.database import get_session  # noqa: E402
 from backend.db import seed as seed_module  # noqa: E402
 from backend.db.models import (  # noqa: E402
     BlockedUserIdentity,
+    CachedEvent,
     CalendarSubscription,
     EmailLoginCode,
     ShareToken,
@@ -94,6 +95,21 @@ def _login(client: TestClient, *, email: str, device_id: str | None = None):
     if device_id is not None:
         body["device_id"] = device_id
     return client.post("/api/auth/google", json=body)
+
+
+def _add_reviewed_events(session: Session, *event_ids: str) -> None:
+    for event_id in event_ids:
+        session.add(
+            CachedEvent(
+                event_id=event_id,
+                calendar_id="test-calendar",
+                title=event_id,
+                start=datetime(2026, 1, 1),
+                end=datetime(2026, 1, 2),
+                review_status="reviewed",
+            )
+        )
+    session.commit()
 
 
 @pytest.mark.unit
@@ -487,6 +503,7 @@ def test_saved_events_route_uses_user_when_authed(client, session, monkeypatch):
     login_resp = _login(client, email="alice@example.com", device_id=device_a)
     assert login_resp.status_code == 200
     user_id = UUID(login_resp.json()["user_id"])
+    _add_reviewed_events(session, "evt-1", "evt-2")
 
     # Saves from two different devices, both linked to the same user.
     # Force ``audience='public'`` so the existing assertion remains the
@@ -530,6 +547,7 @@ def test_saves_persist_across_logout_and_relogin(client, session, monkeypatch):
     """
     monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
     device_a = "dev-A"
+    _add_reviewed_events(session, "evt-acct-001", "evt-acct-002")
 
     # Step 1: anonymous saves on device A.
     for evt in ["evt-acct-001", "evt-acct-002"]:
@@ -607,6 +625,7 @@ def test_share_link_includes_saved_and_attending_events(client, session, monkeyp
                 title=evt,
                 start=now,
                 end=now + timedelta(hours=2),
+                review_status="reviewed",
             )
         )
     session.add(
@@ -713,6 +732,8 @@ def test_logout_clears_anon_id_cookie(client, session, monkeypatch):
     monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
     from backend.api.anon_id import ANON_COOKIE_NAME
 
+    _add_reviewed_events(session, "evt-cookie-clear")
+
     # Mint the cookie via an anonymous save first.
     r = client.post(
         "/api/track/event-save",
@@ -749,6 +770,8 @@ def test_delete_me_clears_anon_id_cookie(client, session, monkeypatch):
     monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
     from backend.api.anon_id import ANON_COOKIE_NAME
 
+    _add_reviewed_events(session, "evt-delete-me")
+
     login = _login(client, email="dev-user@example.com", device_id="dev-delete-me")
     assert login.status_code == 200
     # Trigger cookie mint via any tracked write.
@@ -782,6 +805,8 @@ def test_anonymous_get_saved_events_returns_cookie_identity(client, session):
     requiring a sign-in first."""
     from backend.api.anon_id import ANON_COOKIE_NAME
 
+    _add_reviewed_events(session, "evt-anon-read")
+
     # Anonymous save mints the cookie.
     r = client.post(
         "/api/track/event-save",
@@ -812,6 +837,8 @@ def test_anonymous_get_saved_events_empty_without_cookie(client, session):
 def test_anonymous_get_attending_events_returns_cookie_identity(client, session):
     """Same anon-read contract for attending events."""
     from backend.api.anon_id import ANON_COOKIE_NAME
+
+    _add_reviewed_events(session, "evt-anon-attending")
 
     r = client.post(
         "/api/track/event-attendance",

@@ -1,0 +1,57 @@
+test_plan:
+  name: "Current-time program positioning and active-session UX"
+  description: >
+    Runtime-relative schedule fixture. Seed time is captured once, so two sessions
+    are active whenever the scenario starts and nearby ended/upcoming sessions make
+    current-line positioning visible.
+
+  preconditions:
+    - "Run: SCENARIO=current-time-session-ux task start:scenario RESET_BROWSER=1"
+    - "Open Live Program UX Lab and choose Program."
+
+  steps:
+    - id: 1
+      title: "Open directly on today"
+      description: "Open the attendee Program without a day query parameter."
+      expected: >
+        Today's date is selected and marked as the current date. The grid scrolls
+        once to the current-time region instead of opening at the top.
+
+    - id: 2
+      title: "Inspect the live time marker"
+      description: "Look across Studio A and Studio B around the current-time line."
+      expected: >
+        A current-time line shows the current UTC time. Musicality in Motion and
+        Live Partnerwork Lab both have a visible Now badge and active treatment.
+        Just Ended Warm-up and Next Up Social are not marked Now.
+
+    - id: 3
+      title: "Verify manual browsing is stable"
+      description: "Scroll away from the current time and wait at least one minute."
+      expected: >
+        The current-time label advances, but the page does not force-scroll back
+        and interrupt manual browsing.
+
+    - id: 4
+      title: "Filter the active program"
+      description: "Search instructors for Maya, then clear it and choose Intermediate."
+      expected: >
+        Maya leaves only Live Partnerwork Lab. Intermediate leaves only Musicality
+        in Motion, and day match counts update while filters are active.
+
+    - id: 5
+      title: "Focus the current My Plan session"
+      description: "Sign in as Live Program Dancer and open My Plan."
+      expected: >
+        Musicality in Motion and Next Up Social are both listed together. The day
+        selector and Program filters are absent from My Plan. Musicality in Motion
+        is scrolled into view once, highlighted, and marked Now. Next Up Social is
+        not highlighted while the planned Musicality session is active.
+
+    - id: 6
+      title: "Keep manual My Plan browsing stable"
+      description: "Scroll away from Musicality in Motion and wait at least one minute."
+      expected: >
+        The time-based state refreshes without forcing the list back to the focused
+        card. If no planned session is active, the earliest future active-plan entry
+        is highlighted as Next; removed or cancelled entries never receive focus.

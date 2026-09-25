@@ -1,0 +1,77 @@
+test_plan:
+  name: "Event schedule – Program, My Plan and admin publishing"
+  description: >
+    Covers the mobile attendee program and the full admin schedule workflow
+    using the real five-day Back 2 Mambo 2026 first-weekend program (66
+    sessions transcribed from the official poster). The published attendee
+    snapshot has three simultaneous Friday 14:00 workshops, multi-hour
+    bootcamps, combined-hall socials/shows, cross-midnight night parties, a
+    roomless Monday afterparty and one cancelled session. The draft changes
+    the first workshop title so publication isolation is visible immediately.
+
+  preconditions:
+    - "task start:scenario SCENARIO=event-schedule"
+    - "Sign in as Maya Dancer for attendee checks or Dev Admin for admin checks."
+
+  steps:
+    - id: 1
+      title: "Open the published mobile program"
+      description: "Open Back 2 Mambo 2026 and choose Program. Select Friday 16 October."
+      expected: >
+        Program and My Plan are above the day selector. The grid shows only
+        rooms used Friday, with time labels fixed while rooms scroll. The
+        published title is "Shines / Partnerwork", not the draft-only title.
+
+    - id: 2
+      title: "Compare simultaneous choices"
+      description: "Tap the 14:00 time label."
+      expected: >
+        A sheet shows three sessions in Grand Hall, Lounge Hall and Nyx (Jemis &
+        Dyanna, Joana Coimbra, Alexis Ruiz) plus the Main Hall Afternoon Social
+        Party. Room, venue, instructor, title and level are readable without
+        fabricated copy.
+
+    - id: 3
+      title: "Open details and toggle My Plan"
+      description: "Open Musicality Intro, add it to My Plan, then remove it."
+      expected: >
+        The details sheet has one primary plan action whose saved state updates
+        immediately. Returning to the grid preserves the scroll position.
+
+    - id: 4
+      title: "Inspect seeded conflicts and cancellation"
+      description: "Switch to My Plan while signed in as Maya Dancer."
+      expected: >
+        Friday's two 14:00 workshops show a subtle overlap warning. Saturday's
+        cancelled Groovy ChaCha Partnerwork (Rumen & Yulia, Nyx 20:00) remains
+        visible and explicitly says it was cancelled.
+
+    - id: 5
+      title: "Check late-night grouping"
+      description: "Return to Friday's Program and scroll past midnight."
+      expected: >
+        Shows (00:00) and Mambo Night Party (01:00–07:00) remain grouped under
+        Friday because the schedule day cutoff is 06:00. The grid extends into
+        Saturday morning. Shows Rehearsals cannot be added to My Plan.
+
+    - id: 6
+      title: "Inspect the unpublished admin draft"
+      description: "Sign in as Dev Admin and open the event Schedule editor."
+      expected: >
+        The draft grid shows "Shines / Partnerwork – Updated draft" and the
+        Publish action reports one changed session. Preview as attendee displays
+        the draft banner and updated title while the normal attendee route does not.
+
+    - id: 7
+      title: "Create a warning without blocking save"
+      description: "Create a session overlapping an existing Grand Hall session."
+      expected: >
+        The editor warns about the room conflict and offers Cancel or Save anyway.
+        Saving intentionally is allowed and the issue appears in the publish review.
+
+    - id: 8
+      title: "Publish reviewed changes"
+      description: "Open Publish, review the diff and confirm. Refresh the attendee Program."
+      expected: >
+        A new publication version is created and the attendee route now shows
+        the updated title and any intentionally saved overlapping session.

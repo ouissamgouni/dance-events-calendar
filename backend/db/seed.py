@@ -23,6 +23,7 @@ from backend.db.models import (
     EventRating,
     EventRatingAspectScore,
     EventRatingAspectTag,
+    EventSchedule,
     EventSeries,
     EventSeriesMember,
     EventTag,
@@ -30,6 +31,12 @@ from backend.db.models import (
     OrganizerClaim,
     OrganizerClaimEvent,
     SiteSetting,
+    ScheduleActivityType,
+    ScheduleLevel,
+    SchedulePublication,
+    ScheduleRoom,
+    ScheduleSession,
+    ScheduleVenue,
     Tag,
     TagGroup,
     TagSuggestion,
@@ -41,17 +48,20 @@ from backend.db.models import (
     UserInterestProfileTag,
     UserPreferredTag,
     UserSavedEvent,
+    UserPlanSession,
 )
 from backend.services.experience_aspects import SENTIMENT_TO_SCORE
 from backend.services.follows import (
     ensure_approved_follow_with_subscription,
     ensure_calendar_subscription,
 )
+from backend.services.schedules import build_snapshot, session_snapshot, to_utc_naive
 
 WEEKDAYS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 RELATIVE_RE = re.compile(
     r"^w(-?\d+)\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{2}):(\d{2})$"
 )
+SCHEDULE_NOW_RE = re.compile(r"^now(?:([+-])(\d+)([mh]))?$")
 
 
 def resolve_relative_dt(
@@ -146,6 +156,7 @@ class DatabaseSeeder:
         self._seed_attendances(scenario_dir / "db-attendances.yaml")
         self._seed_user_saved_events(scenario_dir / "db-events.yaml")
         self._seed_user_saved_events(scenario_dir / "db-saves.yaml")
+        self._seed_event_schedules(scenario_dir / "db-schedules.yaml")
         self._seed_ratings(scenario_dir / "db-events.yaml")
         # Event message board: must come AFTER users + events (FKs on both).
         self._seed_event_messages(scenario_dir / "db-events.yaml")
@@ -1037,6 +1048,8 @@ class DatabaseSeeder:
                 # Event message board — per-channel toggles for the
                 # "questions & requests" notifications.
                 "email_event_messages_enabled",
+                "email_schedule_updates_enabled",
+                "push_schedule_updates_enabled",
                 "push_event_messages_enabled",
                 # Suggested-event approval fan-out toggles.
                 "email_suggested_events_enabled",
@@ -2275,6 +2288,7 @@ class DatabaseSeeder:
                         rating_id=rating.id, aspect_slug=slug, score=int(score)
                     )
                 )
+
             for tid, aspect_slug in aspect_tag_pairs:
                 self.session.add(
                     EventRatingAspectTag(
@@ -2302,6 +2316,230 @@ class DatabaseSeeder:
             seeded += 1
         if seeded:
             logger.info("Seeded %d EventRating rows", seeded)
+
+    def _seed_event_schedules(self, path: Path) -> None:
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        schedule_now = datetime.utcnow().replace(second=0, microsecond=0)
+        for entry in data.get("schedules", []) or []:
+            event_id = entry["event_id"]
+            event = self.session.get(CachedEvent, event_id)
+            if event is None:
+                logger.warning("Skipping schedule: event %s not found", event_id)
+                continue
+            schedule = self.session.exec(
+                select(EventSchedule).where(EventSchedule.event_id == event_id)
+            ).first()
+            if schedule is None:
+                schedule = EventSchedule(
+                    event_id=event_id,
+                    timezone=entry["timezone"],
+                    day_start_hour=entry.get("day_start_hour", 6),
+                    days=[
+                        self._schedule_day(day, schedule_now)
+                        for day in entry.get("days", [])
+                    ],
+                )
+                self.session.add(schedule)
+                self.session.flush()
+            else:
+                schedule.timezone = entry["timezone"]
+                schedule.day_start_hour = entry.get("day_start_hour", 6)
+                schedule.days = [
+                    self._schedule_day(day, schedule_now)
+                    for day in entry.get("days", [])
+                ]
+                schedule.updated_at = datetime.utcnow()
+                self.session.add(schedule)
+
+            venues = self._seed_schedule_named_rows(
+                ScheduleVenue, schedule.id, entry.get("venues", [])
+            )
+            rooms = self._seed_schedule_named_rows(
+                ScheduleRoom,
+                schedule.id,
+                [
+                    {
+                        **row,
+                        "venue_id": venues[row["venue"]].id
+                        if row.get("venue")
+                        else None,
+                    }
+                    for row in entry.get("rooms", [])
+                ],
+                drop_keys=("venue",),
+            )
+            levels = self._seed_schedule_named_rows(
+                ScheduleLevel,
+                schedule.id,
+                [{**row, "name": row["label"]} for row in entry.get("levels", [])],
+                identity_field="label",
+                drop_keys=("name",),
+            )
+            activity_types = self._seed_schedule_named_rows(
+                ScheduleActivityType,
+                schedule.id,
+                entry.get("activity_types", []),
+            )
+
+            for row in entry.get("sessions", []) or []:
+                session_id = UUID(str(row["id"]))
+                schedule_session = self.session.get(ScheduleSession, session_id)
+                values = {
+                    "schedule_id": schedule.id,
+                    "external_id": row.get("external_id"),
+                    "title": row["title"],
+                    "instructors": row.get("instructors"),
+                    "start": self._schedule_datetime(row["start"], schedule_now),
+                    "end": self._schedule_datetime(row["end"], schedule_now),
+                    "room_id": rooms[row["room"]].id if row.get("room") else None,
+                    "venue_id": venues[row["venue"]].id if row.get("venue") else None,
+                    "level_id": levels[row["level"]].id if row.get("level") else None,
+                    "activity_type_id": (
+                        activity_types[row["activity_type"]].id
+                        if row.get("activity_type")
+                        else None
+                    ),
+                    "attendee_note": row.get("attendee_note"),
+                    "allow_plan": row.get("allow_plan", True),
+                    "is_cancelled": row.get("is_cancelled", False),
+                    "deleted_at": None,
+                    "updated_at": datetime.utcnow(),
+                }
+                if schedule_session is None:
+                    schedule_session = ScheduleSession(id=session_id, **values)
+                else:
+                    for key, value in values.items():
+                        setattr(schedule_session, key, value)
+                self.session.add(schedule_session)
+
+            self.session.flush()
+            publication = self.session.exec(
+                select(SchedulePublication)
+                .where(SchedulePublication.schedule_id == schedule.id)
+                .order_by(SchedulePublication.version.desc())
+            ).first()
+            if entry.get("published", False) and (
+                publication is None or entry.get("refresh_publication", False)
+            ):
+                published_at = datetime.utcnow()
+                snapshot = build_snapshot(self.session, schedule)
+                snapshot["version"] = publication.version if publication else 1
+                snapshot["published_at"] = published_at.isoformat()
+                if publication is None:
+                    publication = SchedulePublication(
+                        schedule_id=schedule.id,
+                        version=1,
+                        snapshot=snapshot,
+                        published_at=published_at,
+                    )
+                else:
+                    publication.snapshot = snapshot
+                    publication.published_at = published_at
+                self.session.add(publication)
+                self.session.flush()
+
+            for update in entry.get("draft_updates", []) or []:
+                row = self.session.get(ScheduleSession, UUID(str(update["session_id"])))
+                if row is None or row.schedule_id != schedule.id:
+                    continue
+                for key, value in update.items():
+                    if key != "session_id":
+                        setattr(row, key, value)
+                row.updated_at = datetime.utcnow()
+                self.session.add(row)
+
+            if publication is None:
+                continue
+            published_sessions = {
+                row["id"]: row for row in publication.snapshot.get("sessions", [])
+            }
+            for plan in entry.get("plans", []) or []:
+                user = self.session.exec(
+                    select(User).where(User.email == plan["email"].strip().lower())
+                ).first()
+                session_id = UUID(str(plan["session_id"]))
+                schedule_session = self.session.get(ScheduleSession, session_id)
+                if user is None or schedule_session is None:
+                    continue
+                existing = self.session.exec(
+                    select(UserPlanSession).where(
+                        UserPlanSession.user_id == user.id,
+                        UserPlanSession.session_id == session_id,
+                    )
+                ).first()
+                if existing is None:
+                    self.session.add(
+                        UserPlanSession(
+                            user_id=user.id,
+                            session_id=session_id,
+                            event_id=event_id,
+                            last_known_session=published_sessions.get(
+                                str(session_id), session_snapshot(schedule_session)
+                            ),
+                        )
+                    )
+
+    def _seed_schedule_named_rows(
+        self,
+        model,
+        schedule_id: int,
+        entries: list[dict],
+        identity_field: str = "name",
+        drop_keys: tuple[str, ...] = (),
+    ) -> dict[str, Any]:
+        existing = self.session.exec(
+            select(model).where(model.schedule_id == schedule_id)
+        ).all()
+        by_name = {getattr(row, identity_field): row for row in existing}
+        for entry in entries or []:
+            identity = entry[identity_field]
+            values = {
+                key: value
+                for key, value in entry.items()
+                if key not in drop_keys and key != identity_field
+            }
+            row = by_name.get(identity)
+            if row is None:
+                row = model(
+                    schedule_id=schedule_id, **{identity_field: identity}, **values
+                )
+            else:
+                for key, value in values.items():
+                    setattr(row, key, value)
+            self.session.add(row)
+            self.session.flush()
+            by_name[identity] = row
+        return by_name
+
+    @staticmethod
+    def _schedule_datetime(
+        value: str | datetime, reference_now: Optional[datetime] = None
+    ) -> datetime:
+        if isinstance(value, datetime):
+            return to_utc_naive(value)
+        match = SCHEDULE_NOW_RE.match(value)
+        if match:
+            result = reference_now or datetime.utcnow()
+            if match.group(1):
+                amount = int(match.group(2)) * (60 if match.group(3) == "h" else 1)
+                result += timedelta(
+                    minutes=amount if match.group(1) == "+" else -amount
+                )
+            return result.replace(tzinfo=None)
+        return to_utc_naive(datetime.fromisoformat(value.replace("Z", "+00:00")))
+
+    @staticmethod
+    def _schedule_day(value: str, reference_now: datetime) -> str:
+        if value == "today":
+            return reference_now.date().isoformat()
+        if value == "tomorrow":
+            return (reference_now.date() + timedelta(days=1)).isoformat()
+        return value
 
     def _seed_promo_codes(self, path: Path) -> None:
         """Pre-seed EventPromoCode rows from db-promo-codes.yaml.

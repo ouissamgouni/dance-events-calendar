@@ -1,0 +1,655 @@
+schedules:
+  - event_id: back-2-mambo-2026
+    timezone: Europe/Prague
+    day_start_hour: 6
+    days:
+      - "2026-10-15"
+      - "2026-10-16"
+      - "2026-10-17"
+      - "2026-10-18"
+      - "2026-10-19"
+    venues:
+      - name: Slovanský dům
+        address: Na Příkopě 22, Prague
+        sort_order: 0
+    rooms:
+      - name: Grand Hall
+        venue: Slovanský dům
+        color: amber
+        sort_order: 0
+      - name: Lounge Hall
+        venue: Slovanský dům
+        color: pink
+        sort_order: 1
+      - name: Nyx
+        venue: Slovanský dům
+        color: brown
+        sort_order: 2
+      - name: Main Hall
+        venue: Slovanský dům
+        color: violet
+        sort_order: 3
+    levels:
+      - label: Open Level
+        notation: "*"
+        sort_order: 0
+      - label: Intermediate
+        notation: "**"
+        sort_order: 1
+      - label: Advanced
+        notation: "***"
+        sort_order: 2
+    activity_types:
+      - name: Workshop
+        color: blue
+        sort_order: 0
+      - name: Bootcamp
+        color: violet
+        sort_order: 1
+      - name: Social
+        color: amber
+        sort_order: 2
+      - name: Show
+        color: pink
+        sort_order: 3
+      - name: Rehearsal
+        color: orange
+        sort_order: 4
+      - name: Party
+        color: emerald
+        sort_order: 5
+      - name: Afterparty
+        color: indigo
+        sort_order: 6
+      - name: Other
+        color: slate
+        sort_order: 7
+    # Transcribed from the official "Back 2 Mambo Program – First Weekend" poster.
+    # Poster times are Europe/Prague (UTC+2 on these dates); values below are UTC.
+    # Session ids encode the program day and a sequence: 1000…-0000-0000-00DD-0000000000NN.
+    # "Main Hall" = Grand Hall + Lounge Hall opened as one space.
+    sessions:
+      # ── Thursday 15 Oct ──────────────────────────────────────────────
+      - id: "10000000-0000-4000-8000-000000001501"
+        title: Mambo Preparty
+        start: "2026-10-15T21:00:00Z"
+        end: "2026-10-16T05:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        activity_type: Party
+        attendee_note: Registration open Thursday 22:00–05:00.
+
+      # ── Friday 16 Oct ────────────────────────────────────────────────
+      - id: "10000000-0000-4000-8000-000000001601"
+        title: Shines / Partnerwork
+        instructors: Jemis & Dyanna
+        start: "2026-10-16T12:00:00Z"
+        end: "2026-10-16T13:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001602"
+        title: Clinical Pilates for Dancers – Mobility & Strength
+        instructors: Joana Coimbra
+        start: "2026-10-16T12:00:00Z"
+        end: "2026-10-16T13:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001603"
+        title: Musicality Intro
+        instructors: Alexis Ruiz
+        start: "2026-10-16T12:00:00Z"
+        end: "2026-10-16T13:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001604"
+        title: Musicality Bootcamp
+        instructors: Alexis Ruiz
+        start: "2026-10-16T13:00:00Z"
+        end: "2026-10-16T14:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        activity_type: Bootcamp
+      - id: "10000000-0000-4000-8000-000000001605"
+        title: Afternoon Social Party
+        start: "2026-10-16T13:00:00Z"
+        end: "2026-10-16T18:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Social
+      - id: "10000000-0000-4000-8000-000000001606"
+        title: ChaCha Bootcamp
+        instructors: Ella Jouk
+        start: "2026-10-16T14:00:00Z"
+        end: "2026-10-16T15:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        activity_type: Bootcamp
+      - id: "10000000-0000-4000-8000-000000001607"
+        title: Ladies Styling
+        instructors: Jay Lee
+        start: "2026-10-16T15:00:00Z"
+        end: "2026-10-16T16:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001608"
+        title: Shines / Partnerwork
+        instructors: Luigi & Elena
+        start: "2026-10-16T17:00:00Z"
+        end: "2026-10-16T18:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001609"
+        title: Secrets to Social Dancing
+        instructors: Angel & Stephany
+        start: "2026-10-16T18:00:00Z"
+        end: "2026-10-16T19:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001610"
+        title: Contemporary Fusion
+        instructors: Angelo & Tania
+        start: "2026-10-16T18:00:00Z"
+        end: "2026-10-16T19:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001611"
+        title: Partnerwork Connection
+        instructors: Talia & Pacho
+        start: "2026-10-16T18:00:00Z"
+        end: "2026-10-16T19:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001612"
+        title: Flavor and Flow
+        instructors: Michelle Morales
+        start: "2026-10-16T19:00:00Z"
+        end: "2026-10-16T20:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001613"
+        title: Pachanga
+        instructors: Samuel & Lisa
+        start: "2026-10-16T19:00:00Z"
+        end: "2026-10-16T20:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001614"
+        title: Partner Bootcamp
+        instructors: Terry & Cecile
+        start: "2026-10-16T19:00:00Z"
+        end: "2026-10-16T21:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        activity_type: Bootcamp
+      - id: "10000000-0000-4000-8000-000000001615"
+        title: Partnerwork
+        instructors: Ernesto & Denisse
+        start: "2026-10-16T20:00:00Z"
+        end: "2026-10-16T21:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001616"
+        title: "From the Ground Up: Technique & Body Awareness"
+        instructors: Karel Flores
+        start: "2026-10-16T20:00:00Z"
+        end: "2026-10-16T21:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001617"
+        title: Shows Rehearsals
+        start: "2026-10-16T21:00:00Z"
+        end: "2026-10-16T22:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        activity_type: Rehearsal
+        allow_plan: false
+      - id: "10000000-0000-4000-8000-000000001618"
+        title: Keys for Social Dancing
+        instructors: Samuel Funflow
+        start: "2026-10-16T21:00:00Z"
+        end: "2026-10-16T22:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001619"
+        title: Shows
+        start: "2026-10-16T22:00:00Z"
+        end: "2026-10-16T23:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Show
+      - id: "10000000-0000-4000-8000-000000001620"
+        title: Mambo Night Party
+        start: "2026-10-16T23:00:00Z"
+        end: "2026-10-17T05:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Party
+
+      # ── Saturday 17 Oct ──────────────────────────────────────────────
+      - id: "10000000-0000-4000-8000-000000001701"
+        title: Energetic Old School Mambo Shines
+        instructors: Jacopo & Linda
+        start: "2026-10-17T09:00:00Z"
+        end: "2026-10-17T10:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001702"
+        title: Musicality
+        instructors: Angelo Rito
+        start: "2026-10-17T10:00:00Z"
+        end: "2026-10-17T11:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001703"
+        title: Partnerwork – Simple Meets Tricky
+        instructors: Ouissam & Martina
+        start: "2026-10-17T10:00:00Z"
+        end: "2026-10-17T11:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001704"
+        title: New York Style Spinning
+        instructors: Angel & Stephany
+        start: "2026-10-17T11:00:00Z"
+        end: "2026-10-17T12:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001705"
+        title: Shines and Body Movement
+        instructors: Michelle Morales
+        start: "2026-10-17T11:00:00Z"
+        end: "2026-10-17T12:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001706"
+        title: Musicality Bootcamp
+        instructors: Alexis Ruiz
+        start: "2026-10-17T11:00:00Z"
+        end: "2026-10-17T13:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        activity_type: Bootcamp
+      - id: "10000000-0000-4000-8000-000000001707"
+        title: Isolation and Arms
+        instructors: Tania Cannarsa
+        start: "2026-10-17T12:00:00Z"
+        end: "2026-10-17T13:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001708"
+        title: Crazy Partnerwork
+        instructors: Samuel Funflow
+        start: "2026-10-17T12:00:00Z"
+        end: "2026-10-17T13:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001709"
+        title: Partnerwork
+        instructors: Ernesto & Denisse
+        start: "2026-10-17T13:00:00Z"
+        end: "2026-10-17T14:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Advanced
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001710"
+        title: Latin Salsa Fusion
+        instructors: Emma Velkova
+        start: "2026-10-17T13:00:00Z"
+        end: "2026-10-17T14:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001711"
+        title: ChaCha Bootcamp
+        instructors: Ella Jouk
+        start: "2026-10-17T13:00:00Z"
+        end: "2026-10-17T15:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        activity_type: Bootcamp
+      - id: "10000000-0000-4000-8000-000000001712"
+        title: Afternoon Social Party
+        start: "2026-10-17T14:00:00Z"
+        end: "2026-10-17T18:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Social
+      - id: "10000000-0000-4000-8000-000000001713"
+        title: Mambo Fusion
+        instructors: Jay Lee
+        start: "2026-10-17T15:00:00Z"
+        end: "2026-10-17T16:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001714"
+        title: Clinical Pilates for Dancers – Stability
+        instructors: Joana Coimbra
+        start: "2026-10-17T17:00:00Z"
+        end: "2026-10-17T18:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001715"
+        title: AfroMambo
+        instructors: Bersy
+        start: "2026-10-17T18:00:00Z"
+        end: "2026-10-17T19:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001716"
+        title: Body Movement and Styling
+        instructors: Angelo Rito
+        start: "2026-10-17T18:00:00Z"
+        end: "2026-10-17T19:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001717"
+        title: Groovy ChaCha Partnerwork
+        instructors: Rumen & Yulia
+        start: "2026-10-17T18:00:00Z"
+        end: "2026-10-17T19:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+        # QA fixture: one cancelled session so attendees can see the cancelled state.
+        is_cancelled: true
+        attendee_note: This session was cancelled by the organizer.
+      - id: "10000000-0000-4000-8000-000000001718"
+        title: Smooth Partnerwork
+        instructors: Samuel & Lisa
+        start: "2026-10-17T19:00:00Z"
+        end: "2026-10-17T20:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001719"
+        title: AfroMambo
+        instructors: Bersy
+        start: "2026-10-17T19:00:00Z"
+        end: "2026-10-17T20:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Advanced
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001720"
+        title: Partner Bootcamp
+        instructors: Terry & Cecile
+        start: "2026-10-17T19:00:00Z"
+        end: "2026-10-17T21:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        activity_type: Bootcamp
+      - id: "10000000-0000-4000-8000-000000001721"
+        title: Shows Rehearsals
+        start: "2026-10-17T20:00:00Z"
+        end: "2026-10-17T22:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        activity_type: Rehearsal
+        allow_plan: false
+      - id: "10000000-0000-4000-8000-000000001722"
+        title: Mambo Jazz
+        instructors: Jacopo & Linda
+        start: "2026-10-17T20:00:00Z"
+        end: "2026-10-17T21:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001723"
+        title: Shines Choreo
+        instructors: Karel Flores
+        start: "2026-10-17T21:00:00Z"
+        end: "2026-10-17T22:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001724"
+        title: Shows
+        start: "2026-10-17T22:00:00Z"
+        end: "2026-10-17T23:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Show
+      - id: "10000000-0000-4000-8000-000000001725"
+        title: Mambo Night Party
+        start: "2026-10-17T23:00:00Z"
+        end: "2026-10-18T05:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Party
+
+      # ── Sunday 18 Oct ────────────────────────────────────────────────
+      - id: "10000000-0000-4000-8000-000000001801"
+        title: Mambo Fusion
+        instructors: Tania Cannarsa
+        start: "2026-10-18T09:00:00Z"
+        end: "2026-10-18T11:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001802"
+        title: Pachanga Funk
+        instructors: Samuel Funflow
+        start: "2026-10-18T10:00:00Z"
+        end: "2026-10-18T11:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001803"
+        title: Cool and Crazy Partnerwork Moves
+        instructors: Jacopo & Linda
+        start: "2026-10-18T11:00:00Z"
+        end: "2026-10-18T12:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Advanced
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001804"
+        title: Technique Meets Expression
+        instructors: Michelle Morales
+        start: "2026-10-18T11:00:00Z"
+        end: "2026-10-18T12:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001805"
+        title: Musicality Bootcamp
+        instructors: Alexis Ruiz
+        start: "2026-10-18T11:00:00Z"
+        end: "2026-10-18T13:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        activity_type: Bootcamp
+      - id: "10000000-0000-4000-8000-000000001806"
+        title: Shines
+        instructors: Ernesto & Denisse
+        start: "2026-10-18T12:00:00Z"
+        end: "2026-10-18T13:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Advanced
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001807"
+        title: Son
+        instructors: Samuel & Lisa
+        start: "2026-10-18T12:00:00Z"
+        end: "2026-10-18T13:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001808"
+        title: Hand Flicks and Tosses
+        instructors: Angel & Stephany
+        start: "2026-10-18T13:00:00Z"
+        end: "2026-10-18T14:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        level: Intermediate
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001809"
+        title: Boogaloo
+        instructors: Bersy
+        start: "2026-10-18T13:00:00Z"
+        end: "2026-10-18T14:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001810"
+        title: ChaCha Bootcamp
+        instructors: Ella Jouk
+        start: "2026-10-18T13:00:00Z"
+        end: "2026-10-18T15:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        activity_type: Bootcamp
+      - id: "10000000-0000-4000-8000-000000001811"
+        title: Shows Rehearsals
+        start: "2026-10-18T14:00:00Z"
+        end: "2026-10-18T15:00:00Z"
+        room: Grand Hall
+        venue: Slovanský dům
+        activity_type: Rehearsal
+        allow_plan: false
+      - id: "10000000-0000-4000-8000-000000001812"
+        title: Body Movement & Footwork
+        instructors: Karel Flores
+        start: "2026-10-18T14:00:00Z"
+        end: "2026-10-18T15:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001813"
+        title: Clinical Pilates for Dancers – Recovery
+        instructors: Joana Coimbra
+        start: "2026-10-18T15:00:00Z"
+        end: "2026-10-18T16:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        level: Open Level
+        activity_type: Workshop
+      - id: "10000000-0000-4000-8000-000000001814"
+        title: Partner Bootcamp
+        instructors: Terry & Cecile
+        start: "2026-10-18T15:00:00Z"
+        end: "2026-10-18T16:00:00Z"
+        room: Nyx
+        venue: Slovanský dům
+        activity_type: Bootcamp
+      - id: "10000000-0000-4000-8000-000000001815"
+        title: Afternoon Social Party
+        start: "2026-10-18T15:00:00Z"
+        end: "2026-10-18T18:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Social
+      - id: "10000000-0000-4000-8000-000000001816"
+        title: Bootcamps Rehearsals
+        start: "2026-10-18T18:00:00Z"
+        end: "2026-10-18T19:00:00Z"
+        room: Lounge Hall
+        venue: Slovanský dům
+        activity_type: Rehearsal
+        allow_plan: false
+      - id: "10000000-0000-4000-8000-000000001817"
+        title: Shows
+        start: "2026-10-18T19:00:00Z"
+        end: "2026-10-18T20:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Show
+      - id: "10000000-0000-4000-8000-000000001818"
+        title: The Language of Salsa – A Collaborative Musicality Masterclass
+        instructors: Alexis Ruiz, Angelo Rito, Terry Salsalianza
+        start: "2026-10-18T20:00:00Z"
+        end: "2026-10-18T22:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Workshop
+        attendee_note: Three Maestros. Three Styles. One Language.
+      - id: "10000000-0000-4000-8000-000000001819"
+        title: Mambo Night Party
+        start: "2026-10-18T22:00:00Z"
+        end: "2026-10-19T05:00:00Z"
+        room: Main Hall
+        venue: Slovanský dům
+        activity_type: Party
+
+      # ── Monday 19 Oct ────────────────────────────────────────────────
+      - id: "10000000-0000-4000-8000-000000001901"
+        title: AfterParty
+        start: "2026-10-19T20:00:00Z"
+        end: "2026-10-19T23:00:00Z"
+        venue: Slovanský dům
+        activity_type: Afterparty
+    published: true
+    # QA fixture: unpublished draft edit so publication isolation is visible.
+    draft_updates:
+      - session_id: "10000000-0000-4000-8000-000000001601"
+        title: Shines / Partnerwork – Updated draft
+    # QA fixture: Maya's plan has two overlapping Friday 14:00 workshops and the cancelled Saturday session.
+    plans:
+      - email: dancer@example.com
+        session_id: "10000000-0000-4000-8000-000000001601"
+      - email: dancer@example.com
+        session_id: "10000000-0000-4000-8000-000000001602"
+      - email: dancer@example.com
+        session_id: "10000000-0000-4000-8000-000000001717"

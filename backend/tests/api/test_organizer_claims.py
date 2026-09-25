@@ -94,6 +94,7 @@ def events(session):
             longitude=None,
             start=datetime(2099, 1, i, 20, 0, 0),
             end=datetime(2099, 1, i, 23, 0, 0),
+            review_status="reviewed",
         )
         session.add(ev)
         rows.append(ev)
@@ -240,6 +241,45 @@ def test_submit_rejects_unknown_event(client, session, flag_on):
         json={"kind": "events", "event_ids": ["evt-does-not-exist"]},
     )
     assert resp.status_code == 404
+
+
+@pytest.mark.unit
+def test_submit_rejects_pending_event_when_hidden(client, session, events, flag_on):
+    assert _login(client, email="org@example.com").status_code == 200
+    _set_profile(session, "org@example.com", verified=True)
+    events[0].review_status = "pending"
+    session.add(events[0])
+    session.commit()
+
+    resp = client.post(
+        "/api/me/organizer-claims",
+        json={"kind": "events", "event_ids": [events[0].event_id]},
+    )
+
+    assert resp.status_code == 404
+
+
+@pytest.mark.unit
+def test_claim_hydration_hides_pending_from_user_but_not_admin(
+    client, session, events, flag_on
+):
+    assert _login(client, email="org@example.com").status_code == 200
+    _set_profile(session, "org@example.com", verified=True)
+    created = client.post(
+        "/api/me/organizer-claims",
+        json={"kind": "events", "event_ids": [events[0].event_id]},
+    )
+    assert created.status_code == 201
+
+    events[0].review_status = "pending"
+    session.add(events[0])
+    session.commit()
+    assert client.get("/api/me/organizer-claims").json()[0]["events"] == []
+
+    assert _login(client, email="admin@example.com").status_code == 200
+    admin_claims = client.get("/api/admin/organizer-claims")
+    assert admin_claims.status_code == 200
+    assert admin_claims.json()[0]["events"][0]["event_id"] == events[0].event_id
 
 
 @pytest.mark.unit

@@ -70,6 +70,8 @@ export function getNotificationVerb(item: NotificationItem): string {
                 : 'replied to a message on';
         case 'event_message_reported':
             return 'reported a message on';
+        case 'planned_session_changed':
+            return 'updated your planned session for';
         default:
             return 'updated';
     }
@@ -100,6 +102,11 @@ export function resolveNotificationDestination(item: NotificationItem): string {
         case 'event_message_reply':
         case 'event_message_reported':
             return `/event/${item.event_id}#messages`;
+        case 'planned_session_changed':
+            return `/event/${item.event_id}/program/plan${item.schedule_session_id ? `?session=${item.schedule_session_id}` : ''}`;
+        case 'schedule_program_available':
+        case 'schedule_program_updated':
+            return `/event/${item.event_id}/program`;
         default:
             return `/event/${item.event_id}`;
     }
@@ -146,6 +153,9 @@ const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> =
     event_message: 'others',
     event_message_reply: 'others',
     event_message_reported: 'others',
+    planned_session_changed: 'events',
+    schedule_program_available: 'events',
+    schedule_program_updated: 'events',
 };
 
 /** Which filter-pill category a notification kind belongs to. */

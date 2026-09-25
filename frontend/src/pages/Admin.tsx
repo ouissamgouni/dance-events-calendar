@@ -230,6 +230,7 @@ export default function Admin() {
     const [trendingFloorGoing, setTrendingFloorGoing] = useState(3);
     const [trendingTopN, setTrendingTopN] = useState(3);
     const [trendingTopPercent, setTrendingTopPercent] = useState(100);
+    const [showPendingEvents, setShowPendingEvents] = useState(false);
     const [promoCodesEnabled, setPromoCodesEnabled] = useState(false);
     const [organizerClaimsEnabled, setOrganizerClaimsEnabled] = useState(false);
     const [networkGoingSnapshotEnabled, setNetworkGoingSnapshotEnabled] = useState(true);
@@ -418,6 +419,7 @@ export default function Admin() {
             setTrendingFloorGoing(s.trending_floor_going ?? 3);
             setTrendingTopN(s.trending_top_n ?? 3);
             setTrendingTopPercent(s.trending_top_percent ?? 100);
+            setShowPendingEvents(s.show_pending_events ?? false);
             setPromoCodesEnabled(s.promo_codes_enabled ?? false);
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
             setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? false);
@@ -972,6 +974,18 @@ export default function Admin() {
         } catch {
             setPromoCodesEnabled(!newVal);
             setMessage('Failed to update promo codes toggle.');
+        }
+    };
+
+    const handleToggleShowPendingEvents = async () => {
+        const newVal = !showPendingEvents;
+        setShowPendingEvents(newVal);
+        try {
+            await updateSettings({ show_pending_events: newVal });
+            setMessage(`Pending events ${newVal ? 'shown' : 'hidden'} across user-facing features.`);
+        } catch {
+            setShowPendingEvents(!newVal);
+            setMessage('Failed to update pending event visibility.');
         }
     };
 
@@ -2464,6 +2478,20 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${onboardingProfileStepEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${onboardingProfileStepEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Show pending events</span>
+                                        <p className="text-[10px] text-muted">Include pending events in user-facing discovery, engagement, and notifications.</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleShowPendingEvents}
+                                        aria-label="Toggle pending event visibility"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showPendingEvents ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${showPendingEvents ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

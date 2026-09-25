@@ -31,6 +31,7 @@ from backend.services.app_settings import (
 from backend.db.database import get_engine
 from backend.db.models import CachedEvent, Notification, User, UserEventAttendance
 from backend.services.email import send_event_reminder_email
+from backend.services.event_visibility import apply_event_visibility
 from backend.services.notification_delivery import record_delivery
 from backend.services.push_service import send_push
 
@@ -54,7 +55,7 @@ def _format_when(start: datetime, tz_name: str) -> str:
 def _due_pairs(session: Session, now: datetime, lead_hours: int):
     """Return (user, event) pairs that are due a reminder and have none yet."""
     window_end = now + timedelta(hours=lead_hours)
-    rows = session.exec(
+    statement = (
         select(User, CachedEvent)
         .join(
             UserEventAttendance,
@@ -67,7 +68,9 @@ def _due_pairs(session: Session, now: datetime, lead_hours: int):
         .where(CachedEvent.is_hidden == False)  # noqa: E712
         .where(CachedEvent.start > now)
         .where(CachedEvent.start <= window_end)
-    ).all()
+    )
+    statement = apply_event_visibility(statement, session)
+    rows = session.exec(statement).all()
     if not rows:
         return []
 

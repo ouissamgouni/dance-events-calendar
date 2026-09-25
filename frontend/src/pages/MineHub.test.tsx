@@ -197,6 +197,19 @@ describe('MineHub', () => {
         expect(screen.getByTestId('your-next-event-image')).toHaveAttribute('src', '/event.jpg');
     });
 
+    it('keeps an in-progress Going event in Next up until it ends', async () => {
+        vi.mocked(fetchEventsByIds).mockResolvedValue([
+            event('later', 'Later Social', 20),
+            event('active', 'Sunday Matinee', -0.01),
+        ]);
+
+        renderMineHub();
+
+        expect(await screen.findByText('Sunday Matinee')).toBeInTheDocument();
+        expect(screen.getByText('Happening now')).toBeInTheDocument();
+        expect(screen.queryByText('Later Social')).not.toBeInTheDocument();
+    });
+
     it('renders the shared next-event empty state', async () => {
         vi.mocked(fetchEventsByIds).mockResolvedValue([]);
 

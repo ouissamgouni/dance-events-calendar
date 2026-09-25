@@ -56,6 +56,9 @@ const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: strin
     event_message: { Icon: MessageCircle, cls: 'bg-sky-100 text-sky-600' },
     event_message_reply: { Icon: MessageCircle, cls: 'bg-sky-100 text-sky-600' },
     event_message_reported: { Icon: Flag, cls: 'bg-sky-100 text-sky-600' },
+    planned_session_changed: { Icon: Clock, cls: 'bg-amber-100 text-amber-700' },
+    schedule_program_available: { Icon: CalendarCheck, cls: 'bg-blue-100 text-action' },
+    schedule_program_updated: { Icon: CalendarCheck, cls: 'bg-blue-100 text-action' },
 };
 
 /** Kinds that carry a real person and render an avatar next to the type icon.
@@ -427,6 +430,28 @@ export default function NotificationRow({
                     <span className="font-medium text-ink">
                         {item.context || 'a new achievement'}
                     </span>
+                </p>
+                {item.description && <p className={descClass}>{item.description}</p>}
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
+    } else if (item.kind === 'planned_session_changed') {
+        body = (
+            <>
+                <p className={specialTitle}>
+                    <span className="font-medium text-ink">Program update</span>
+                    {item.event_title && <span className="text-ink-soft"> · {item.event_title}</span>}
+                </p>
+                {item.description && <p className={descClass}>{item.description}</p>}
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
+    } else if (item.kind === 'schedule_program_available' || item.kind === 'schedule_program_updated') {
+        body = (
+            <>
+                <p className={specialTitle}>
+                    <span className="font-medium text-ink">{item.kind === 'schedule_program_available' ? 'Program now available' : 'Program updated'}</span>
+                    {item.event_title && <span className="text-ink-soft"> · {item.event_title}</span>}
                 </p>
                 {item.description && <p className={descClass}>{item.description}</p>}
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>

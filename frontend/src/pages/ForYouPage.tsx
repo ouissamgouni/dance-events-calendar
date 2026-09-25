@@ -416,7 +416,7 @@ export default function ForYouPage() {
                             emptyContent={(
                                 <>
                                     Save a few dance styles in your profile to see recommendations here.{' '}
-                                    <Link to="/account#preferences" className="font-semibold text-action hover:text-action">
+                                    <Link to="/saved-searches" className="font-semibold text-action hover:text-action">
                                         Update your preferences
                                     </Link>
                                 </>

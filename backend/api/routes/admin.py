@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 from backend.api.deps import require_admin
 from backend.api.schemas import (
+    AdminEventResponse,
     AdminBulkEngagementItem,
     AdminBulkEngagementRequest,
     AdminBulkEngagementResponse,
@@ -30,7 +31,6 @@ from backend.api.schemas import (
     EventFilterOptionsResponse,
     EventIdsResponse,
     EventImageFromUrlRequest,
-    EventResponse,
     EventUpdateRequest,
     FilterOption,
     ForceInterestMatchSendRequest,
@@ -82,9 +82,10 @@ from backend.services.event_images import (
     ImageValidationError,
     delete_event_image,
     event_image_fields,
-    fetch_remote_image,
+    replace_event_image_from_url,
     store_event_image,
 )
+from backend.services.event_visibility import event_is_user_facing
 from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.geocoding import (
     geocode_location,
@@ -171,8 +172,6 @@ def _run_sync_job_worker(
     )
     from backend.services.pipeline.base import EnrichmentPipeline
     from backend.services.pipeline.stages.geocoding import GeocodingStage
-    from backend.services.pipeline.stages.link_extraction import LinkExtractionStage
-    from backend.services.pipeline.stages.price_extraction import PriceExtractionStage
 
     engine = get_engine()
     job_service.heartbeat(job_id)
@@ -275,8 +274,6 @@ def _run_sync_job_worker(
     # --- Create pipeline (one instance, shared across workers — stages are stateless) ---
     pipeline = EnrichmentPipeline(
         [
-            LinkExtractionStage(),
-            PriceExtractionStage(),
             GeocodingStage(),
         ]
     )
@@ -1166,7 +1163,11 @@ def review_prompt_send_now(
     from backend.services.notification_delivery import record_delivery
 
     event = session.get(CachedEvent, body.event_id)
-    if event is None or event.deleted_at is not None:
+    if (
+        event is None
+        or event.deleted_at is not None
+        or not event_is_user_facing(session, event)
+    ):
         raise HTTPException(status_code=404, detail="Event not found")
 
     users = {
@@ -1756,11 +1757,12 @@ def list_admin_events(
     tags_map = get_event_tags(session, event_ids)
 
     items = [
-        EventResponse(
+        AdminEventResponse(
             event_id=e.event_id,
             calendar_id=e.calendar_id,
             title=e.title,
             description=e.description,
+            source_description=e.source_description,
             **event_image_fields(e),
             location=e.location,
             start=e.start,
@@ -1785,7 +1787,7 @@ def list_admin_events(
     return PaginatedEventsResponse(items=items, total=total)
 
 
-@router.patch("/events/{event_id}", response_model=EventResponse)
+@router.patch("/events/{event_id}", response_model=AdminEventResponse)
 def update_event(
     event_id: str,
     body: EventUpdateRequest,
@@ -1870,11 +1872,12 @@ def update_event(
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return EventResponse(
+    return AdminEventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
+        source_description=event.source_description,
         **event_image_fields(event),
         location=event.location,
         start=event.start,
@@ -1897,14 +1900,15 @@ def update_event(
     )
 
 
-def _event_image_response(session: Session, event: CachedEvent) -> EventResponse:
+def _event_image_response(session: Session, event: CachedEvent) -> AdminEventResponse:
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event.event_id])
-    return EventResponse(
+    return AdminEventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
+        source_description=event.source_description,
         **event_image_fields(event),
         location=event.location,
         start=event.start,
@@ -1929,7 +1933,7 @@ def _event_image_response(session: Session, event: CachedEvent) -> EventResponse
 
 def _apply_event_image(
     session: Session, event: CachedEvent, data: bytes, content_type: Optional[str]
-) -> EventResponse:
+) -> AdminEventResponse:
     from datetime import datetime as dt
 
     previous_key = event.image_key
@@ -1946,7 +1950,7 @@ def _apply_event_image(
     return _event_image_response(session, event)
 
 
-@router.post("/events/{event_id}/image", response_model=EventResponse)
+@router.post("/events/{event_id}/image", response_model=AdminEventResponse)
 async def upload_event_image(
     event_id: str,
     file: UploadFile = File(...),
@@ -1960,7 +1964,7 @@ async def upload_event_image(
     return _apply_event_image(session, event, await file.read(), file.content_type)
 
 
-@router.post("/events/{event_id}/image/from-url", response_model=EventResponse)
+@router.post("/events/{event_id}/image/from-url", response_model=AdminEventResponse)
 def set_event_image_from_url(
     event_id: str,
     body: EventImageFromUrlRequest,
@@ -1972,13 +1976,23 @@ def set_event_image_from_url(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     try:
-        data, content_type = fetch_remote_image(str(body.url))
+        event.image_key = replace_event_image_from_url(
+            event.event_id,
+            str(body.url),
+            event.image_key,
+        )
     except ImageValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _apply_event_image(session, event, data, content_type)
+    from datetime import datetime as dt
+
+    event.updated_at = dt.utcnow()
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+    return _event_image_response(session, event)
 
 
-@router.delete("/events/{event_id}/image", response_model=EventResponse)
+@router.delete("/events/{event_id}/image", response_model=AdminEventResponse)
 def remove_event_image(
     event_id: str,
     session: Session = Depends(get_session),
@@ -2152,7 +2166,7 @@ def event_filter_options(
     )
 
 
-@router.post("/events/{event_id}/review", response_model=EventResponse)
+@router.post("/events/{event_id}/review", response_model=AdminEventResponse)
 def review_event(
     event_id: str,
     session: Session = Depends(get_session),
@@ -2170,11 +2184,12 @@ def review_event(
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return EventResponse(
+    return AdminEventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
+        source_description=event.source_description,
         **event_image_fields(event),
         location=event.location,
         start=event.start,
@@ -2580,7 +2595,7 @@ def get_sync_log_progress(
     }
 
 
-@router.get("/events/{event_id}", response_model=EventResponse)
+@router.get("/events/{event_id}", response_model=AdminEventResponse)
 def get_admin_event(
     event_id: str,
     session: Session = Depends(get_session),
@@ -2593,11 +2608,12 @@ def get_admin_event(
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return EventResponse(
+    return AdminEventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
+        source_description=event.source_description,
         **event_image_fields(event),
         location=event.location,
         start=event.start,
@@ -2620,7 +2636,7 @@ def get_admin_event(
     )
 
 
-@router.post("/events/{event_id}/block", response_model=EventResponse)
+@router.post("/events/{event_id}/block", response_model=AdminEventResponse)
 def block_event(
     event_id: str,
     session: Session = Depends(get_session),
@@ -2649,11 +2665,12 @@ def block_event(
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return EventResponse(
+    return AdminEventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
+        source_description=event.source_description,
         **event_image_fields(event),
         location=event.location,
         start=event.start,
@@ -2674,7 +2691,7 @@ def block_event(
     )
 
 
-@router.delete("/events/{event_id}/block", response_model=EventResponse)
+@router.delete("/events/{event_id}/block", response_model=AdminEventResponse)
 def unblock_event(
     event_id: str,
     session: Session = Depends(get_session),
@@ -2704,11 +2721,12 @@ def unblock_event(
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return EventResponse(
+    return AdminEventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
+        source_description=event.source_description,
         **event_image_fields(event),
         location=event.location,
         start=event.start,

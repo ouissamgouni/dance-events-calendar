@@ -40,8 +40,14 @@ from backend.db.models import (
     UserSavedEvent,
 )
 from backend.services.event_images import event_image_fields
+from backend.services.event_visibility import (
+    apply_event_visibility,
+    eligible_event_ids,
+    show_pending_events_enabled,
+)
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
 from backend.services.profile_geography import profile_contains_point
+from backend.services.schedules import published_schedule_event_ids
 from backend.services.user_avatars import resolve_user_avatar
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -124,8 +130,13 @@ def _set_event_list_cache_headers(
     current_user: Optional[User],
     interest_source: Optional[str],
     interest_user_handles: Optional[list[str]],
+    show_pending_events: bool,
 ) -> None:
-    if current_user is not None or interest_source is not None or interest_user_handles:
+    if show_pending_events:
+        response.headers["Cache-Control"] = "no-store"
+    elif (
+        current_user is not None or interest_source is not None or interest_user_handles
+    ):
         response.headers["Cache-Control"] = "private, max-age=0"
         response.headers["Vary"] = "Cookie"
     else:
@@ -327,6 +338,7 @@ def _profiles_filtered_event_ids(
             CachedEvent.longitude >= profile.min_lng,
             CachedEvent.longitude <= profile.max_lng,
         )
+        q = apply_event_visibility(q, session)
         if dance_ids:
             q = q.where(
                 CachedEvent.event_id.in_(
@@ -473,11 +485,11 @@ def _interest_filtered_event_ids(
     # AND only makes sense for an explicit multi-person selection; a
     # scope-only pool ("anyone I follow") always unions.
     if interest_match == "all" and interest_user_handles and len(per_owner) > 1:
-        return list(set.intersection(*per_owner.values()))
+        return list(eligible_event_ids(session, set.intersection(*per_owner.values())))
     union: set[str] = set()
     for events in per_owner.values():
         union |= events
-    return list(union)
+    return list(eligible_event_ids(session, union))
 
 
 @router.get("/calendars", response_model=list[CalendarSettingResponse])
@@ -633,6 +645,7 @@ def get_events(
         CachedEvent.is_hidden == False,
         CachedEvent.end >= effective_start,
     )
+    query = apply_event_visibility(query, session)
     if end_date:
         end_dt = datetime.fromisoformat(end_date)
         # Include full end day
@@ -702,6 +715,7 @@ def get_events(
                 current_user=current_user,
                 interest_source=interest_source,
                 interest_user_handles=interest_user_handle,
+                show_pending_events=show_pending_events_enabled(session),
             )
             return response
         query = query.where(CachedEvent.event_id.in_(interest_event_ids))
@@ -753,6 +767,7 @@ def get_events(
 
     # Batch-fetch view counts to avoid N+1
     event_ids = [e.event_id for e in events]
+    published_schedule_ids = published_schedule_event_ids(session, event_ids)
     view_counts: dict[str, int] = {}
     if event_ids:
         rows = session.exec(
@@ -880,6 +895,7 @@ def get_events(
             has_active_promo_codes=e.event_id in events_with_promos,
             show_price_override=e.show_price_override,
             show_promo_override=e.show_promo_override,
+            schedule_published=e.event_id in published_schedule_ids,
         )
         for e in events
     ]
@@ -895,6 +911,7 @@ def get_events(
         current_user=current_user,
         interest_source=interest_source,
         interest_user_handles=interest_user_handle,
+        show_pending_events=show_pending_events_enabled(session),
     )
     return response
 
@@ -983,6 +1000,7 @@ def search_events(
         .where(CachedEvent.is_hidden.is_(False))  # type: ignore[union-attr]
         .where(*token_predicates)
     )
+    stmt = apply_event_visibility(stmt, session)
     if exclude_attended and current_user is not None:
         attended_ids = session.exec(
             select(UserEventAttendance.event_id).where(
@@ -1032,6 +1050,8 @@ def search_events(
     rows = rows[:limit]
     response.headers["X-Total-Count"] = str(total_count)
     response.headers["X-Has-More"] = "true" if has_more else "false"
+    if show_pending_events_enabled(session):
+        response.headers["Cache-Control"] = "no-store"
 
     tags_by_event = get_event_tags(session, [event.event_id for event in rows])
     lowered_tokens = [token.casefold() for token in tokens]
@@ -1079,6 +1099,7 @@ def search_events(
 @limiter.limit("60/minute")
 def popular_cities(
     request: Request,
+    response: Response,
     limit: int = Query(default=8, ge=1, le=20),
     session: Session = Depends(get_session),
 ):
@@ -1089,7 +1110,7 @@ def popular_cities(
     centers the map without a geocoder round-trip. Cities missing a name or
     coordinates are excluded so a pill can never resolve to an empty map."""
     now = datetime.now(UTC).replace(tzinfo=None)
-    rows = session.exec(
+    statement = (
         select(
             CachedEvent.city,
             CachedEvent.country,
@@ -1107,7 +1128,11 @@ def popular_cities(
         .group_by(col(CachedEvent.city), col(CachedEvent.country))
         .order_by(func.count(col(CachedEvent.event_id)).desc())
         .limit(limit)
-    ).all()
+    )
+    statement = apply_event_visibility(statement, session)
+    rows = session.exec(statement).all()
+    if show_pending_events_enabled(session):
+        response.headers["Cache-Control"] = "no-store"
     return [
         {
             "city": r[0],
@@ -1138,16 +1163,17 @@ def get_events_by_ids(
     if not calendar_ids:
         return []
 
-    events = session.exec(
-        select(CachedEvent).where(
-            CachedEvent.event_id.in_(payload.event_ids),
-            CachedEvent.calendar_id.in_(calendar_ids),
-            CachedEvent.deleted_at == None,
-            CachedEvent.is_hidden == False,
-        )
-    ).all()
+    statement = select(CachedEvent).where(
+        CachedEvent.event_id.in_(payload.event_ids),
+        CachedEvent.calendar_id.in_(calendar_ids),
+        CachedEvent.deleted_at == None,
+        CachedEvent.is_hidden == False,
+    )
+    statement = apply_event_visibility(statement, session)
+    events = session.exec(statement).all()
 
     event_ids = [e.event_id for e in events]
+    published_schedule_ids = published_schedule_event_ids(session, event_ids)
     view_counts: dict[str, int] = {}
     if event_ids:
         rows = session.exec(
@@ -1246,6 +1272,7 @@ def get_events_by_ids(
             has_active_promo_codes=e.event_id in events_with_promos,
             show_price_override=e.show_price_override,
             show_promo_override=e.show_promo_override,
+            schedule_published=e.event_id in published_schedule_ids,
         )
         for e in events
     ]
@@ -1259,13 +1286,13 @@ def get_event(
     session: Session = Depends(get_session),
 ):
     """Public single-event endpoint for shareable event pages."""
-    event = session.exec(
-        select(CachedEvent).where(
-            CachedEvent.event_id == event_id,
-            CachedEvent.deleted_at == None,
-            CachedEvent.is_hidden == False,
-        )
-    ).first()
+    statement = select(CachedEvent).where(
+        CachedEvent.event_id == event_id,
+        CachedEvent.deleted_at == None,
+        CachedEvent.is_hidden == False,
+    )
+    statement = apply_event_visibility(statement, session)
+    event = session.exec(statement).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
@@ -1331,6 +1358,8 @@ def get_event(
             is not None
         )
 
+    schedule_published = event_id in published_schedule_event_ids(session, [event_id])
+
     data = EventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
@@ -1359,9 +1388,12 @@ def get_event(
         show_price_override=event.show_price_override,
         show_promo_override=event.show_promo_override,
         has_active_promo_codes=has_active_promo_codes,
+        schedule_published=schedule_published,
     )
     response = JSONResponse(content=data.model_dump(mode="json"))
-    response.headers["Cache-Control"] = "public, max-age=60"
+    response.headers["Cache-Control"] = (
+        "no-store" if show_pending_events_enabled(session) else "public, max-age=60"
+    )
     return response
 
 
@@ -1380,13 +1412,13 @@ def get_event_og_meta(
     crawler's tight timeout budgets. Returned fields mirror the OG/SEO
     surface only.
     """
-    event = session.exec(
-        select(CachedEvent).where(
-            CachedEvent.event_id == event_id,
-            CachedEvent.deleted_at == None,  # noqa: E711 (SQLAlchemy comparison)
-            CachedEvent.is_hidden == False,  # noqa: E712
-        )
-    ).first()
+    statement = select(CachedEvent).where(
+        CachedEvent.event_id == event_id,
+        CachedEvent.deleted_at == None,  # noqa: E711 (SQLAlchemy comparison)
+        CachedEvent.is_hidden == False,  # noqa: E712
+    )
+    statement = apply_event_visibility(statement, session)
+    event = session.exec(statement).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
@@ -1421,7 +1453,11 @@ def get_event_og_meta(
     response = JSONResponse(content=payload)
     # Cache aggressively — bots re-fetch frequently and event metadata
     # changes rarely. 5min browser, 1h shared cache (CDN).
-    response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600"
+    response.headers["Cache-Control"] = (
+        "no-store"
+        if show_pending_events_enabled(session)
+        else "public, max-age=300, s-maxage=3600"
+    )
     return response
 
 
@@ -1444,13 +1480,13 @@ def get_sitemap(
     if not calendar_ids:
         events = []
     else:
-        events = session.exec(
-            select(CachedEvent).where(
-                CachedEvent.calendar_id.in_(calendar_ids),
-                CachedEvent.deleted_at == None,
-                CachedEvent.is_hidden == False,
-            )
-        ).all()
+        statement = select(CachedEvent).where(
+            CachedEvent.calendar_id.in_(calendar_ids),
+            CachedEvent.deleted_at == None,
+            CachedEvent.is_hidden == False,
+        )
+        statement = apply_event_visibility(statement, session)
+        events = session.exec(statement).all()
 
     urls = [
         f"  <url>\n    <loc>{base_url}/</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>"
@@ -1475,4 +1511,7 @@ def get_sitemap(
         + "\n".join(urls)
         + "\n</urlset>"
     )
-    return Response(content=xml, media_type="application/xml")
+    headers = (
+        {"Cache-Control": "no-store"} if show_pending_events_enabled(session) else None
+    )
+    return Response(content=xml, media_type="application/xml", headers=headers)

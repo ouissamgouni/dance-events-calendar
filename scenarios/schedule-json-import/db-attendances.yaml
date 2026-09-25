@@ -1,0 +1,7 @@
+attendances:
+  - event_id: schedule-import-lab
+    email: dancer@example.com
+    share_publicly: true
+  - event_id: schedule-import-lab
+    email: quiet-dancer@example.com
+    share_publicly: true

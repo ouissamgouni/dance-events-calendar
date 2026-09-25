@@ -30,12 +30,15 @@ def compute_content_hash(title: str, start: datetime, location: str | None) -> s
 
 from backend.services.calendar.base import BaseCalendarService
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
+from backend.services.event_extractor import (
+    apply_calendar_description,
+    extractor_image_needed,
+)
 from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.reach import assign_event_tag, sync_event_reach
 from backend.services.pipeline.base import EnrichmentPipeline
+from backend.services.pipeline.stages.extractor_image import ExtractorImageStage
 from backend.services.pipeline.stages.geocoding import GeocodingStage
-from backend.services.pipeline.stages.link_extraction import LinkExtractionStage
-from backend.services.pipeline.stages.price_extraction import PriceExtractionStage
 from backend.services.pipeline.stages.tag_suggestion import TagSuggestionStage
 
 logger = logging.getLogger(__name__)
@@ -46,9 +49,8 @@ class SyncService:
         self.calendar_service = calendar_service
         self.pipeline = EnrichmentPipeline(
             [
-                LinkExtractionStage(),
-                PriceExtractionStage(),
                 GeocodingStage(),
+                ExtractorImageStage(),
                 # auto tag suggestions run last: cheap, depends only on text
                 # already present on the event. Skipped silently in the
                 # parallel processor path (no session); admins can run it
@@ -432,16 +434,21 @@ class SyncService:
             existing = session.get(CachedEvent, event.event_id)
             if existing:
                 # --- Known Google event ID: normal upsert ---
+                title_or_start_changed = (
+                    existing.title != event.title or existing.start != event.start
+                )
+                extractor_changed = apply_calendar_description(
+                    existing, event.description, is_new=False
+                )
                 fields_changed = (
                     existing.title != event.title
-                    or existing.description != event.description
                     or existing.location != event.location
                     or existing.start != event.start
                     or existing.end != event.end
                     or existing.all_day != event.all_day
+                    or extractor_changed
                 )
                 existing.title = event.title
-                existing.description = event.description
                 existing.location = event.location
                 existing.start = event.start
                 existing.end = event.end
@@ -453,15 +460,15 @@ class SyncService:
                     existing.review_status = "pending"
                 if (
                     (event.location and existing.latitude is None)
-                    or (event.description and existing.price_min is None)
-                    or (event.description and existing.links is None)
+                    or extractor_changed
+                    or extractor_image_needed(existing)
                 ):
                     needs_enrichment.append(event.event_id)
                 session.add(existing)
                 # Track this calendar as a source (ignore if already recorded)
                 _upsert_calendar_source(session, event.event_id, cal.calendar_id)
                 upserted += 1
-                if existing.title != event.title or existing.start != event.start:
+                if title_or_start_changed:
                     duplicate_scan_event_ids.append(event.event_id)
             else:
                 # --- Unknown Google event ID: check for content-hash duplicate ---
@@ -508,12 +515,14 @@ class SyncService:
                         event_id=event.event_id,
                         calendar_id=event.calendar_id,
                         title=event.title,
-                        description=event.description,
                         location=event.location,
                         start=event.start,
                         end=event.end,
                         all_day=event.all_day,
                         content_hash=content_hash,
+                    )
+                    apply_calendar_description(
+                        new_event, event.description, is_new=True
                     )
                     session.add(new_event)
                     sync_event_reach(session, new_event, default_tag_ids)

@@ -139,7 +139,7 @@ export default function PricingPage({ state, patch, onClose }: Props) {
                             ))}
                         </select>
                     </div>
-                    <p className={helpCls}>Leave the maximum empty for a single fixed price.</p>
+                    <p className={helpCls}>Leave the maximum empty to show this as a minimum price with +. Use the same value twice for a fixed price.</p>
                 </div>
             ) : null}
 

@@ -25,6 +25,7 @@ from backend.services.email import (
     event_message_action_phrase,
     send_event_message_instant_email,
 )
+from backend.services.event_visibility import event_is_user_facing
 from backend.services.notification_delivery import record_delivery
 from backend.services.push_service import send_push, webpush_configured
 
@@ -58,6 +59,8 @@ def dispatch_event_message_instant(
     skips them. Returns ``{"emails": int, "pushes": int}``. Commits.
     """
     if not notifs or event is None:
+        return {"emails": 0, "pushes": 0}
+    if not event_is_user_facing(session, event):
         return {"emails": 0, "pushes": 0}
     if not get_feature_email_instant(FEATURE, session):
         return {"emails": 0, "pushes": 0}

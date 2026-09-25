@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { AuthProvider, useAuth } from './AuthContext'
 import ProtectedRoute from '../components/ProtectedRoute'
@@ -62,9 +62,14 @@ describe('AuthContext', () => {
 })
 
 describe('ProtectedRoute', () => {
+    const LoginLocation = () => {
+        const location = useLocation()
+        return <p>login page {location.search}</p>
+    }
+
     it('redirects unauthenticated visitors to /login', async () => {
         render(
-            <MemoryRouter initialEntries={['/secret']}>
+            <MemoryRouter initialEntries={['/secret?tab=one#details']}>
                 <AuthProvider>
                     <Routes>
                         <Route
@@ -75,13 +80,14 @@ describe('ProtectedRoute', () => {
                                 </ProtectedRoute>
                             }
                         />
-                        <Route path="/login" element={<p>login page</p>} />
+                        <Route path="/login" element={<LoginLocation />} />
                     </Routes>
                 </AuthProvider>
             </MemoryRouter>,
         )
 
-        await waitFor(() => expect(screen.getByText('login page')).toBeInTheDocument())
+        await waitFor(() => expect(screen.getByText('login page', { exact: false })).toBeInTheDocument())
+        expect(screen.getByText(/next=%2Fsecret%3Ftab%3Done%23details/)).toBeInTheDocument()
         expect(screen.queryByText('secret content')).not.toBeInTheDocument()
     })
 

@@ -1,4 +1,11 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+)
 from slowapi import Limiter
 from backend.api.rate_limit import client_ip
 from sqlmodel import Session, select
@@ -18,6 +25,7 @@ from backend.api.schemas import (
 from backend.config.loader import get_admin_email, get_analytics_enabled
 from backend.db.database import get_session
 from backend.db.models import (
+    CachedEvent,
     EventAttendance,
     EventSave,
     EventSuggestion,
@@ -30,6 +38,7 @@ from backend.db.models import (
     UserSavedEvent,
     ShareToken,
 )
+from backend.services.event_visibility import event_is_user_facing
 from backend.services.ip_geolocation import geolocate_ip
 from backend.services import milestone_notification_service
 from backend.services import passport as passport_service
@@ -46,6 +55,12 @@ router = APIRouter(prefix="/api", tags=["tracking"])
 limiter = Limiter(key_func=client_ip)
 
 logger = logging.getLogger(__name__)
+
+
+def _require_user_facing_event(session: Session, event_id: str) -> None:
+    event = session.get(CachedEvent, event_id)
+    if event is None or not event_is_user_facing(session, event):
+        raise HTTPException(status_code=404, detail="Event not found")
 
 
 def _is_admin(user: User | None) -> bool:
@@ -102,6 +117,7 @@ async def track_event_view(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
+    _require_user_facing_event(session, payload.event_id)
     if not get_analytics_enabled():
         return {"status": "disabled"}
     if _is_admin(current_user):
@@ -128,6 +144,8 @@ def track_event_save(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
+    if payload.action == "save":
+        _require_user_facing_event(session, payload.event_id)
     if (
         payload.record_analytics
         and not _is_admin(current_user)
@@ -286,6 +304,8 @@ def track_event_attendance(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
+    if payload.action == "going":
+        _require_user_facing_event(session, payload.event_id)
     if (
         payload.record_analytics
         and not _is_admin(current_user)
@@ -506,6 +526,7 @@ async def track_link_click(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
+    _require_user_facing_event(session, payload.event_id)
     if not get_analytics_enabled():
         return {"status": "disabled"}
     if _is_admin(current_user):
@@ -563,6 +584,7 @@ def track_share(
       landing). We accept it as-is — worst case is an invalid code that
       simply produces an unattributable row.
     """
+    _require_user_facing_event(session, payload.event_id)
     if not get_analytics_enabled():
         return {"status": "disabled"}
     if _is_admin(current_user):

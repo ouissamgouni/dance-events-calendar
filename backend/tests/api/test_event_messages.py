@@ -77,6 +77,7 @@ def event(session):
         title="Salsa Social",
         start=datetime(2099, 1, 1, 20, 0, 0),
         end=datetime(2099, 1, 2, 1, 0, 0),
+        review_status="reviewed",
     )
     session.add(ev)
     session.commit()
@@ -348,6 +349,7 @@ def test_post_blocked_on_past_event(client, session):
         title="Last Week's Social",
         start=datetime(2000, 1, 1, 20, 0, 0),
         end=datetime(2000, 1, 1, 23, 0, 0),
+        review_status="reviewed",
     )
     session.add(ev)
     session.commit()
@@ -553,6 +555,7 @@ def test_message_counts_batch(client, session, event):
         title="Bachata Night",
         start=datetime(2099, 2, 1, 20, 0, 0),
         end=datetime(2099, 2, 2, 1, 0, 0),
+        review_status="reviewed",
     )
     session.add(ev2)
     session.commit()

@@ -66,6 +66,7 @@ def _seed_going(engine, user_id, event_id, start, *, city=None, country=None):
                 end=start + timedelta(hours=3),
                 city=city,
                 country=country,
+                review_status="reviewed",
             )
         )
         s.add(

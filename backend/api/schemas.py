@@ -108,6 +108,326 @@ class EventResponse(BaseModel):
     # OrganizerClaimEvent maps this event to a user. Gated by the
     # ``organizer_claims_enabled`` site setting (always None when off).
     organizer: Optional["EventOrganizerMini"] = None
+    schedule_published: bool = False
+
+
+class ScheduleVenueResponse(BaseModel):
+    id: int
+    external_id: Optional[str] = None
+    name: str
+    address: Optional[str] = None
+    sort_order: int = 0
+
+
+class ScheduleRoomResponse(BaseModel):
+    id: int
+    external_id: Optional[str] = None
+    venue_id: Optional[int] = None
+    name: str
+    color: str
+    sort_order: int = 0
+
+
+class ScheduleLevelResponse(BaseModel):
+    id: int
+    external_id: Optional[str] = None
+    label: str
+    notation: Optional[str] = None
+    sort_order: int = 0
+
+
+class ScheduleActivityTypeResponse(BaseModel):
+    id: int
+    external_id: Optional[str] = None
+    name: str
+    color: str
+    sort_order: int = 0
+
+
+class ScheduleSessionResponse(BaseModel):
+    id: UUID
+    external_id: Optional[str] = None
+    title: str
+    instructors: Optional[str] = None
+    start: datetime
+    end: datetime
+    room_id: Optional[int] = None
+    venue_id: Optional[int] = None
+    level_id: Optional[int] = None
+    activity_type_id: Optional[int] = None
+    attendee_note: Optional[str] = None
+    allow_plan: bool = True
+    is_cancelled: bool = False
+
+
+class EventScheduleResponse(BaseModel):
+    event_id: str
+    timezone: str
+    day_start_hour: int
+    days: list[date]
+    venues: list[ScheduleVenueResponse]
+    rooms: list[ScheduleRoomResponse]
+    levels: list[ScheduleLevelResponse]
+    activity_types: list[ScheduleActivityTypeResponse]
+    sessions: list[ScheduleSessionResponse]
+    version: Optional[int] = None
+    published_at: Optional[datetime] = None
+
+
+class ScheduleIssueResponse(BaseModel):
+    code: str
+    severity: Literal["warning", "error"]
+    message: str
+    session_ids: list[UUID] = []
+
+
+class ScheduleDiffResponse(BaseModel):
+    added_session_ids: list[UUID] = []
+    removed_session_ids: list[UUID] = []
+    changed_sessions: dict[str, list[str]] = {}
+    configuration_changed: bool = False
+
+
+class AdminEventScheduleResponse(EventScheduleResponse):
+    issues: list[ScheduleIssueResponse] = []
+    diff: ScheduleDiffResponse
+
+
+class SchedulePublishNotificationSummary(BaseModel):
+    impacted_planners: int = 0
+    in_app_created: int = 0
+    emailed: int = 0
+    pushed: int = 0
+    going_attendees: int = 0
+    remaining_going_attendees: int = 0
+
+
+class SchedulePublishResponse(EventScheduleResponse):
+    notification_summary: SchedulePublishNotificationSummary
+
+
+class ScheduleImportVenue(BaseModel):
+    external_id: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Stable import key, unique among venues and preserved across reimports.",
+    )
+    name: str = Field(min_length=1, max_length=120)
+    address: Optional[str] = Field(default=None, max_length=300)
+    sort_order: int = 0
+
+
+class ScheduleImportRoom(BaseModel):
+    external_id: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Stable import key, unique among rooms and preserved across reimports.",
+    )
+    name: str = Field(min_length=1, max_length=120)
+    venue_external_id: Optional[str] = Field(default=None, max_length=120)
+    color: str = Field(default="blue", max_length=24)
+    sort_order: int = 0
+
+
+class ScheduleImportLevel(BaseModel):
+    external_id: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Stable import key, unique among levels and preserved across reimports.",
+    )
+    label: str = Field(min_length=1, max_length=80)
+    notation: Optional[str] = Field(default=None, max_length=20)
+    sort_order: int = 0
+
+
+class ScheduleImportActivityType(BaseModel):
+    external_id: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Stable import key, unique among activity types and preserved across reimports.",
+    )
+    name: str = Field(min_length=1, max_length=80)
+    color: str = Field(default="blue", max_length=24)
+    sort_order: int = 0
+
+
+class ScheduleImportSession(BaseModel):
+    external_id: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Stable import key, unique among sessions and preserved across reimports.",
+    )
+    title: str = Field(min_length=1, max_length=200)
+    instructors: Optional[str] = Field(default=None, max_length=300)
+    start: datetime
+    end: datetime
+    room_external_id: Optional[str] = Field(default=None, max_length=120)
+    venue_external_id: Optional[str] = Field(default=None, max_length=120)
+    level_external_id: Optional[str] = Field(default=None, max_length=120)
+    activity_type_external_id: Optional[str] = Field(default=None, max_length=120)
+    attendee_note: Optional[str] = Field(default=None, max_length=500)
+    allow_plan: bool = True
+    is_cancelled: bool = False
+
+
+class ScheduleImportDocument(BaseModel):
+    """Reviewed schedule import using stable external keys rather than database IDs."""
+
+    schema_version: Literal[1] = 1
+    event_id: Optional[str] = None
+    timezone: str = Field(min_length=1, max_length=64)
+    day_start_hour: int = Field(default=6, ge=0, le=23)
+    days: list[date]
+    venues: list[ScheduleImportVenue] = []
+    rooms: list[ScheduleImportRoom] = []
+    levels: list[ScheduleImportLevel] = []
+    activity_types: list[ScheduleImportActivityType] = []
+    sessions: list[ScheduleImportSession] = []
+
+    @model_validator(mode="after")
+    def validate_external_ids(self):
+        for label, rows in (
+            ("venue", self.venues),
+            ("room", self.rooms),
+            ("level", self.levels),
+            ("activity type", self.activity_types),
+            ("session", self.sessions),
+        ):
+            values = [row.external_id for row in rows]
+            if len(values) != len(set(values)):
+                raise ValueError(f"Duplicate {label} external_id")
+        return self
+
+
+class ScheduleImportRequest(BaseModel):
+    mode: Literal["merge", "replace"] = "merge"
+    document: ScheduleImportDocument
+
+
+class ScheduleImportOperations(BaseModel):
+    created: int = 0
+    updated: int = 0
+    removed: int = 0
+    unchanged: int = 0
+
+
+class ScheduleImportPreviewResponse(BaseModel):
+    document: ScheduleImportDocument
+    operations: ScheduleImportOperations
+    issues: list[ScheduleIssueResponse] = []
+    diff: ScheduleDiffResponse
+
+
+class ScheduleProgramCandidate(BaseModel):
+    user_id: UUID
+    email: str
+    name: Optional[str] = None
+    handle: Optional[str] = None
+    email_enabled: bool = True
+    push_enabled: bool = True
+    has_push_subscription: bool = False
+    already_notified: bool = False
+
+
+class ScheduleProgramNotifyRequest(BaseModel):
+    user_ids: list[UUID] = Field(..., min_length=1, max_length=200)
+    resend: bool = False
+
+    @model_validator(mode="after")
+    def validate_unique_user_ids(self):
+        if len(self.user_ids) != len(set(self.user_ids)):
+            raise ValueError("Duplicate user_id")
+        return self
+
+
+class ScheduleProgramNotifyResult(BaseModel):
+    user_id: UUID
+    email: str
+    status: str
+    email_status: str
+    push_status: str
+
+
+class ScheduleProgramNotifyResponse(BaseModel):
+    emailed: int = 0
+    pushed: int = 0
+    in_app_created: int = 0
+    results: list[ScheduleProgramNotifyResult]
+
+
+class EventScheduleCreateRequest(BaseModel):
+    timezone: str
+    days: Optional[list[date]] = None
+    day_start_hour: int = Field(default=6, ge=0, le=23)
+
+
+class EventScheduleUpdateRequest(BaseModel):
+    timezone: Optional[str] = None
+    days: Optional[list[date]] = None
+    day_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
+
+
+class ScheduleVenueRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    address: Optional[str] = Field(default=None, max_length=300)
+    sort_order: int = 0
+
+
+class ScheduleRoomRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    venue_id: Optional[int] = None
+    color: str = Field(default="blue", max_length=24)
+    sort_order: int = 0
+
+
+class ScheduleLevelRequest(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    notation: Optional[str] = Field(default=None, max_length=20)
+    sort_order: int = 0
+
+
+class ScheduleActivityTypeRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    color: str = Field(default="blue", max_length=24)
+    sort_order: int = 0
+
+
+class ScheduleSessionCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    instructors: Optional[str] = Field(default=None, max_length=300)
+    start: datetime
+    end: datetime
+    room_id: Optional[int] = None
+    venue_id: Optional[int] = None
+    level_id: Optional[int] = None
+    activity_type_id: Optional[int] = None
+    attendee_note: Optional[str] = Field(default=None, max_length=500)
+    allow_plan: bool = True
+    is_cancelled: bool = False
+
+
+class ScheduleSessionUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    instructors: Optional[str] = Field(default=None, max_length=300)
+    start: Optional[datetime] = None
+    end: Optional[datetime] = None
+    room_id: Optional[int] = None
+    venue_id: Optional[int] = None
+    level_id: Optional[int] = None
+    activity_type_id: Optional[int] = None
+    attendee_note: Optional[str] = Field(default=None, max_length=500)
+    allow_plan: Optional[bool] = None
+    is_cancelled: Optional[bool] = None
+
+
+class MyPlanEntryResponse(BaseModel):
+    session_id: UUID
+    status: Literal["active", "cancelled", "removed"]
+    session: ScheduleSessionResponse
+
+
+class MyPlanResponse(BaseModel):
+    entries: list[MyPlanEntryResponse]
 
 
 class EventOrganizerMini(BaseModel):
@@ -738,6 +1058,7 @@ class SiteSettingsResponse(BaseModel):
     sync_interval_minutes: int
     auto_sync_enabled: bool = False
     auto_sync_mode: str = "incremental"  # "incremental" | "reseed"
+    show_pending_events: bool = False
     show_prices: bool = False
     show_popularity: bool = True
     show_ratings: bool = False
@@ -780,6 +1101,7 @@ class SiteSettingsResponse(BaseModel):
     # admin-moderated). When False, the Account application section
     # and event "Organized by" pill are hidden.
     organizer_claims_enabled: bool = False
+    event_schedule_enabled: bool = False
     # Tribe > Calendars "Your Network" snapshot of upcoming events people
     # you follow are going to. When False, the snapshot is hidden.
     network_going_snapshot_enabled: bool = False
@@ -1059,6 +1381,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     auto_sync_mode: Optional[str] = Field(
         default=None, pattern="^(incremental|reseed)$"
     )
+    show_pending_events: Optional[bool] = None
     show_prices: Optional[bool] = None
     show_popularity: Optional[bool] = None
     show_ratings: Optional[bool] = None
@@ -1079,6 +1402,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     going_button_icon_variant: Optional[GoingButtonIconVariant] = None
     promo_codes_enabled: Optional[bool] = None
     organizer_claims_enabled: Optional[bool] = None
+    event_schedule_enabled: Optional[bool] = None
     network_going_snapshot_enabled: Optional[bool] = None
     my_events_route_enabled: Optional[bool] = None
     my_events_nav_enabled: Optional[bool] = None
@@ -1539,8 +1863,12 @@ class BulkTagSuggestionRunResponse(BaseModel):
 # --- Admin Events: Paginated List & Filter Options ---
 
 
+class AdminEventResponse(EventResponse):
+    source_description: Optional[str] = None
+
+
 class PaginatedEventsResponse(BaseModel):
-    items: list[EventResponse]
+    items: list[AdminEventResponse]
     total: int
 
 
@@ -2372,6 +2700,7 @@ class NotificationItem(BaseModel):
     context: Optional[str] = None
 
     subject_key: Optional[str] = None
+    schedule_session_id: Optional[UUID] = None
     # Optional narrative field for kinds that benefit from additional context
     # beyond name/context. Used in milestone notifications.
     description: Optional[str] = None

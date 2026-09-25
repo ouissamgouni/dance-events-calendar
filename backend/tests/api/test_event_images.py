@@ -144,6 +144,12 @@ def admin_client():
                 event_id="evt-1",
                 calendar_id="cal-1",
                 title="Picture Event",
+                description="Public description",
+                source_description=(
+                    "Public description\n<<<EXTRACTOR_JSON>>>"
+                    '{"image":"https://example.com/a.jpg"}'
+                    "<<<END_EXTRACTOR_JSON>>>"
+                ),
                 start=START,
                 end=END,
             )
@@ -182,6 +188,15 @@ def test_upload_event_image_stores_key_and_returns_urls(admin_client):
 
     with Session(engine) as session:
         assert session.get(CachedEvent, "evt-1").image_key == "events/evt-1/new"
+
+
+def test_admin_event_response_includes_raw_source_description(admin_client):
+    client, _ = admin_client
+
+    response = client.get("/api/admin/events/evt-1")
+
+    assert response.status_code == 200
+    assert "<<<EXTRACTOR_JSON>>>" in response.json()["source_description"]
 
 
 def test_upload_event_image_rejects_invalid_file(admin_client):
@@ -227,15 +242,9 @@ def test_set_event_image_from_url_rejects_unsafe_url(admin_client):
 def test_set_event_image_from_url_happy_path(admin_client):
     client, engine = admin_client
 
-    with (
-        patch(
-            "backend.api.routes.admin.fetch_remote_image",
-            return_value=(_png_bytes(800, 600), "image/png"),
-        ),
-        patch(
-            "backend.api.routes.admin.store_event_image",
-            return_value="events/evt-1/from-url",
-        ),
+    with patch(
+        "backend.api.routes.admin.replace_event_image_from_url",
+        return_value="events/evt-1/from-url",
     ):
         res = client.post(
             "/api/admin/events/evt-1/image/from-url",

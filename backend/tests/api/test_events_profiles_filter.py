@@ -137,6 +137,7 @@ def world(session):
                 latitude=lat,
                 longitude=lng,
                 reach=reach,
+                review_status="reviewed",
             )
         )
         session.commit()

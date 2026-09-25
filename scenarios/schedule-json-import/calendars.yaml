@@ -1,0 +1,4 @@
+calendars:
+  - id: import-lab
+    name: Schedule Import Lab
+    color: "#b04b31"
