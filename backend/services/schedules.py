@@ -26,7 +26,7 @@ DEFAULT_ACTIVITY_TYPES = (
     ("Other", "slate"),
 )
 
-DANCE_LEVEL_PRESET = (
+DEFAULT_DANCE_LEVELS = (
     ("open-level", "Open Level", None),
     ("beginner", "Beginner", "*"),
     ("intermediate", "Intermediate", "**"),
@@ -84,20 +84,8 @@ def seed_default_activity_types(session: Session, schedule_id: int) -> None:
         )
 
 
-def seed_dance_level_preset(session: Session, schedule_id: int) -> int:
-    existing_rows = session.exec(
-        select(ScheduleLevel).where(ScheduleLevel.schedule_id == schedule_id)
-    ).all()
-    by_external_id = {row.external_id: row for row in existing_rows if row.external_id}
-    by_label = {row.label.casefold(): row for row in existing_rows}
-    created = 0
-    for sort_order, (external_id, label, notation) in enumerate(DANCE_LEVEL_PRESET):
-        row = by_external_id.get(external_id) or by_label.get(label.casefold())
-        if row is not None:
-            if row.external_id is None:
-                row.external_id = external_id
-                session.add(row)
-            continue
+def seed_default_dance_levels(session: Session, schedule_id: int) -> None:
+    for sort_order, (external_id, label, notation) in enumerate(DEFAULT_DANCE_LEVELS):
         session.add(
             ScheduleLevel(
                 schedule_id=schedule_id,
@@ -107,14 +95,6 @@ def seed_dance_level_preset(session: Session, schedule_id: int) -> int:
                 sort_order=sort_order,
             )
         )
-        created += 1
-    return created
-
-
-def apply_dance_level_preset(session: Session, schedule_id: int) -> int:
-    created = seed_dance_level_preset(session, schedule_id)
-    session.commit()
-    return created
 
 
 def latest_publication(
