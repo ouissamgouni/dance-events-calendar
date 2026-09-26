@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Download, Share } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import BottomSheet from './BottomSheet';
 import { usePwaInstall } from '../context/PwaInstallContext';
 import { useAuth } from '../context/AuthContext';
 import { useConsent } from '../context/ConsentContext';
 import { usePush } from '../hooks/usePush';
-import { reportAppInstalled } from '../api';
+import { reportAppInstalled, updateNotificationPreferences } from '../api';
+import { programInstallDismissedKey, programPushOptInKey } from '../utils/installPromptStorage';
 import { trackInstallPromptViewed } from '../utils/tracking';
 
 /**
@@ -35,8 +38,8 @@ import { trackInstallPromptViewed } from '../utils/tracking';
  * to prompting before sign-in — it would just create a device subscription
  * with no account attached.
  *
- * iOS Safari has no `beforeinstallprompt`, so the banner simply never shows
- * there — Add-to-Home-Screen remains available via the share sheet.
+ * iOS Safari has no `beforeinstallprompt`, so the install action opens concise
+ * Add-to-Home-Screen instructions instead of trying to invoke a native prompt.
  */
 const SNOOZE_KEY = 'movida:install-snooze-until';
 const SNOOZE_DAYS = 14;
@@ -74,14 +77,31 @@ function snoozePush() {
 }
 
 export default function InstallPrompt() {
-    const { canInstall, isStandalone, promptInstall } = usePwaInstall();
-    const { user } = useAuth();
+    const {
+        canInstall,
+        isStandalone,
+        isIos,
+        isIosSafari,
+        invitation,
+        clearInstallInvitation,
+        promptInstall,
+    } = usePwaInstall();
+    const { user, refreshUser } = useAuth();
     const { consentResolved } = useConsent();
     const location = useLocation();
     const push = usePush(user?.user_id);
     const [snoozed, setSnoozed] = useState(isSnoozed());
     const [justInstalled, setJustInstalled] = useState(false);
     const [pushSnoozed, setPushSnoozed] = useState(isPushSnoozed());
+    const [installing, setInstalling] = useState(false);
+    const [enablingPush, setEnablingPush] = useState(false);
+    const [pushActionError, setPushActionError] = useState<string | null>(null);
+    const [showIosHelp, setShowIosHelp] = useState(false);
+    const pendingProgramKey = user?.user_id ? programPushOptInKey(user.user_id) : null;
+    const programInvitation = invitation?.source === 'program';
+    const programContext = invitation?.source === 'program' || Boolean(
+        pendingProgramKey && localStorage.getItem(pendingProgramKey),
+    );
 
     // Re-check snooze expiry each time canInstall flips true (e.g. a fresh
     // beforeinstallprompt fired this session).
@@ -113,15 +133,23 @@ export default function InstallPrompt() {
     const dismiss = () => {
         snooze();
         setSnoozed(true);
+        if (programInvitation && user?.user_id) {
+            localStorage.setItem(programInstallDismissedKey(user.user_id, invitation.eventId), '1');
+        }
+        clearInstallInvitation();
     };
 
     const install = async () => {
-        const outcome = await promptInstall();
-        if (outcome === 'accepted') {
-            setJustInstalled(true);
-        } else if (outcome === 'dismissed') {
-            snooze();
-            setSnoozed(true);
+        setInstalling(true);
+        try {
+            const outcome = await promptInstall();
+            if (outcome === 'accepted') {
+                setJustInstalled(true);
+            } else if (outcome === 'dismissed') {
+                dismiss();
+            }
+        } finally {
+            setInstalling(false);
         }
     };
 
@@ -129,6 +157,38 @@ export default function InstallPrompt() {
         snoozePush();
         setPushSnoozed(true);
         setJustInstalled(false);
+        setPushActionError(null);
+        clearInstallInvitation();
+    };
+
+    const enableNotifications = async () => {
+        setEnablingPush(true);
+        setPushActionError(null);
+        try {
+            const enabled = push.status === 'on' || await push.enable();
+            if (!enabled) {
+                if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+                    snoozePush();
+                    setPushSnoozed(true);
+                    setJustInstalled(false);
+                    clearInstallInvitation();
+                    return;
+                }
+                setPushActionError('Notifications were not enabled. Please try again.');
+                return;
+            }
+            if (programContext) {
+                await updateNotificationPreferences({ push_schedule_updates_enabled: true });
+                await refreshUser();
+                if (pendingProgramKey) localStorage.removeItem(pendingProgramKey);
+            }
+            setJustInstalled(false);
+            clearInstallInvitation();
+        } catch (reason) {
+            setPushActionError(reason instanceof Error ? reason.message : 'Could not enable notifications');
+        } finally {
+            setEnablingPush(false);
+        }
     };
 
     // Admin override (Admin → Users → "Force push"): lets support
@@ -137,13 +197,14 @@ export default function InstallPrompt() {
     // not the other conditions below (e.g. it still won't show if push is
     // already on/unsupported/disabled).
     const forceEnablePush = Boolean(user?.force_enable_push_prompt);
+    const needsProgramPreference = programContext && user?.push_schedule_updates_enabled === false;
 
     const showPushOptIn =
         Boolean(user) &&
         push.resolved &&
         (justInstalled || isStandalone) &&
         (!pushSnoozed || forceEnablePush) &&
-        push.status !== 'on' &&
+        (push.status !== 'on' || needsProgramPreference || enablingPush || Boolean(pushActionError)) &&
         push.status !== 'unsupported' &&
         push.status !== 'disabled';
 
@@ -157,38 +218,36 @@ export default function InstallPrompt() {
     // install/enable push — those prompts belong on the explorer afterwards.
     if (location.pathname.startsWith('/onboarding') || user?.needs_onboarding) return null;
 
+    if (showIosHelp) {
+        return (
+            <BottomSheet title="Install Movida" onClose={() => setShowIosHelp(false)} footer={(
+                <button type="button" onClick={() => setShowIosHelp(false)} className="min-h-11 w-full rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                    Done
+                </button>
+            )}>
+                <IosInstallInstructions isSafari={isIosSafari} />
+            </BottomSheet>
+        );
+    }
+
     if (showPushOptIn) {
         return (
-            <div
-                className="fixed inset-x-0 bottom-0 z-[8500] flex justify-center px-3 pb-3"
-                style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-            >
-                <div className="w-full sm:max-w-md flex flex-col gap-3 border-2 border-orange-500 bg-orange-400 px-6 py-5 shadow-2xl rounded-lg">
-                    <div>
-                        <p className="text-base font-bold text-white">Stay in the loop!</p>
-                        <p className="text-sm text-orange-100 mt-1">Get notified about reminders and activity on this device.</p>
-                    </div>
-                    <div className="flex gap-3">
-                        <button
-                            type="button"
-                            onClick={dismissPush}
-                            className="text-xs font-medium text-orange-700 bg-surface/30 hover:bg-surface/50 px-3 py-2 rounded transition"
-                        >
-                            Not now
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                push.enable();
-                                setJustInstalled(false);
-                            }}
-                            className="flex-1 text-sm font-bold bg-violet-500 text-white hover:bg-violet-600 px-4 py-3 rounded transition shadow-md"
-                        >
-                            Enable Notifications
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <PromptPosition>
+                <CampaignPromptCard
+                    appearance="toast"
+                    title={programContext
+                        ? needsProgramPreference ? 'Turn on program updates' : 'Turn on notifications'
+                        : 'Stay in the loop!'}
+                    message={programContext
+                        ? 'Get notified when sessions in My Plan change or are cancelled.'
+                        : 'Get notified about reminders and activity on this device.'}
+                    actionLabel={enablingPush ? 'Turning on…' : 'Turn on notifications'}
+                    onAction={enableNotifications}
+                    onDismiss={dismissPush}
+                    busy={enablingPush || push.busy}
+                    error={pushActionError ?? push.error}
+                />
+            </PromptPosition>
         );
     }
 
@@ -199,19 +258,106 @@ export default function InstallPrompt() {
 
     // Only offered to signed-in users — anonymous visitors get prompted to
     // sign in first elsewhere; installing before that just adds friction.
-    if (!user || !canInstall || isStandalone || (snoozed && !forceInstall)) return null;
+    if (!user || (!canInstall && !isIos) || isStandalone || (snoozed && !forceInstall && !programInvitation)) return null;
+
+    const installSurface = programContext ? 'program-toast' : 'toast';
 
     return (
+        <PromptPosition>
+            <InstallPromptCard
+                key={installSurface}
+                surface={installSurface}
+                title={programContext ? 'Keep your plan up to date' : 'Install Movida'}
+                message={programContext
+                    ? 'Install Movida for quick access, then turn on notifications when sessions in My Plan change or are cancelled.'
+                    : 'Add to your home screen for faster access and notifications.'}
+                actionLabel={isIos ? 'How to install' : 'Install app'}
+                onInstall={isIos ? () => setShowIosHelp(true) : install}
+                onDismiss={forceInstall ? undefined : dismiss}
+                installing={installing}
+            />
+        </PromptPosition>
+    );
+}
+
+function PromptPosition({ children }: { children: ReactNode }) {
+    return (
         <div
-            className="fixed inset-x-0 bottom-0 z-[8500] flex justify-center px-3 pb-3"
+            className="fixed inset-x-0 bottom-0 z-[12000] flex justify-center px-3 pb-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-            <InstallPromptCard
-                surface="toast"
-                onInstall={install}
-                onDismiss={forceInstall ? undefined : dismiss}
-            />
+            {children}
         </div>
+    );
+}
+
+function CampaignPromptCard({
+    appearance,
+    icon,
+    title,
+    message,
+    actionLabel,
+    onAction,
+    onDismiss,
+    busy = false,
+    error,
+}: {
+    appearance: 'toast' | 'page';
+    icon?: ReactNode;
+    title: string;
+    message: string;
+    actionLabel: string;
+    onAction: () => void;
+    onDismiss?: () => void;
+    busy?: boolean;
+    error?: string | null;
+}) {
+    if (appearance === 'toast') {
+        return (
+            <section aria-label={title} className="flex w-full flex-col gap-4 rounded-field border-2 border-orange-500 bg-orange-400 px-6 py-5 shadow-2xl sm:max-w-md">
+                <div className={icon ? 'flex items-center gap-4' : undefined}>
+                    {icon}
+                    <div className="min-w-0 flex-1">
+                        <p className="text-base font-bold text-white">{title}</p>
+                        <p className="mt-1 text-sm text-orange-100">{message}</p>
+                    </div>
+                </div>
+                {error ? <p role="alert" className="rounded-field bg-surface/30 px-3 py-2 text-xs text-orange-950">{error}</p> : null}
+                <div className="flex gap-3">
+                    {onDismiss ? (
+                        <button type="button" onClick={onDismiss} className="rounded-field bg-surface/30 px-3 py-2 text-xs font-medium text-orange-700 transition hover:bg-surface/50">
+                            Not now
+                        </button>
+                    ) : null}
+                    <button type="button" disabled={busy} onClick={onAction} className="flex-1 rounded-field bg-violet-500 px-4 py-3 text-sm font-bold text-white shadow-md transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60">
+                        {actionLabel}
+                    </button>
+                </div>
+            </section>
+        );
+    }
+
+    return (
+        <section aria-label={title} className="w-full rounded-card border border-brand-strong bg-brand px-4 py-4 text-white shadow-2xl sm:max-w-md">
+            <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-field bg-surface/15" aria-hidden="true">{icon}</span>
+                <div className="min-w-0 flex-1">
+                    <p className="text-base font-bold leading-5">{title}</p>
+                    <p className="mt-1 text-sm leading-5 text-white/85">{message}</p>
+                </div>
+            </div>
+            {error ? <p role="alert" className="mt-3 rounded-field bg-surface/15 px-3 py-2 text-xs text-white">{error}</p> : null}
+            <div className="mt-4 flex items-center gap-2">
+                {onDismiss ? (
+                    <button type="button" onClick={onDismiss} className="min-h-11 px-3 text-sm font-semibold text-white/85 hover:text-white">
+                        Not now
+                    </button>
+                ) : null}
+                <button type="button" disabled={busy} onClick={onAction} className="min-h-11 flex-1 rounded-field bg-action px-4 py-2 text-sm font-bold text-white shadow-md hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+                    {actionLabel}
+                </button>
+            </div>
+        </section>
     );
 }
 
@@ -228,10 +374,18 @@ export function InstallPromptCard({
     surface,
     onInstall,
     onDismiss,
+    title = 'Install Movida',
+    message = 'Add to your home screen for faster access and notifications.',
+    actionLabel = 'Install app',
+    installing = false,
 }: {
-    surface: 'toast' | 'page';
+    surface: 'toast' | 'program-toast' | 'page';
     onInstall: () => void;
     onDismiss?: () => void;
+    title?: string;
+    message?: string;
+    actionLabel?: string;
+    installing?: boolean;
 }) {
     useEffect(() => {
         trackInstallPromptViewed(surface);
@@ -240,32 +394,28 @@ export function InstallPromptCard({
     }, []);
 
     return (
-        <div className="w-full sm:max-w-md flex flex-col gap-4 border-2 border-orange-500 bg-orange-400 px-6 py-5 shadow-2xl rounded-lg">
-            <div className="flex items-center gap-4">
-                <img src="/icons/icon-192.png" alt="" className="h-12 w-12 shrink-0" />
-                <div className="min-w-0 flex-1">
-                    <p className="text-base font-bold text-white">Install Movida</p>
-                    <p className="text-sm text-orange-100">Add to your home screen for faster access and notifications.</p>
-                </div>
-            </div>
-            <div className="flex gap-3">
-                {onDismiss && (
-                    <button
-                        type="button"
-                        onClick={onDismiss}
-                        className="text-xs font-medium text-orange-700 bg-surface/30 hover:bg-surface/50 px-3 py-2 rounded transition"
-                    >
-                        Not now
-                    </button>
-                )}
-                <button
-                    type="button"
-                    onClick={onInstall}
-                    className="flex-1 text-sm font-bold bg-violet-500 text-white hover:bg-violet-600 px-4 py-3 rounded transition shadow-md"
-                >
-                    Install App
-                </button>
-            </div>
+        <CampaignPromptCard
+            appearance={surface === 'page' ? 'page' : 'toast'}
+            icon={<img src="/icons/icon-192.png" alt="" className={surface === 'page' ? 'h-10 w-10' : 'h-12 w-12 shrink-0'} />}
+            title={title}
+            message={message}
+            actionLabel={installing ? 'Installing…' : actionLabel}
+            onAction={onInstall}
+            onDismiss={onDismiss}
+            busy={installing}
+        />
+    );
+}
+
+export function IosInstallInstructions({ isSafari }: { isSafari: boolean }) {
+    return (
+        <div className="space-y-4 text-sm leading-6 text-ink">
+            {!isSafari ? <p className="rounded-field bg-blue-50 p-3 text-action">Open this page in Safari to install Movida on your Home Screen.</p> : null}
+            <ol className="space-y-4">
+                <li className="flex gap-3"><Share size={20} className="mt-0.5 shrink-0 text-action" /><span><strong>1. Tap Share</strong><br /><span className="text-ink-soft">Use the Share button in Safari’s toolbar.</span></span></li>
+                <li className="flex gap-3"><Download size={20} className="mt-0.5 shrink-0 text-action" /><span><strong>2. Add to Home Screen</strong><br /><span className="text-ink-soft">Scroll through the actions and choose Add to Home Screen.</span></span></li>
+                <li className="flex gap-3"><img src="/icons/icon-192.png" alt="" className="mt-0.5 h-5 w-5 shrink-0" /><span><strong>3. Tap Add</strong><br /><span className="text-ink-soft">Open Movida from your Home Screen, then turn on notifications.</span></span></li>
+            </ol>
         </div>
     );
 }

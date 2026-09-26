@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan } from '../api';
+import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan } from '../api';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, EventSchedule } from '../types';
 import EventProgramPage from './EventProgramPage';
@@ -9,12 +9,16 @@ import { saveDownload } from '../utils/download';
 import { trackProgramViewed } from '../utils/tracking';
 
 const authState = vi.hoisted(() => ({ user: null as object | null }));
+const requestInstallInvitation = vi.hoisted(() => vi.fn());
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn() };
+    return { ...actual, addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn() };
 });
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user, loading: false }) }));
+vi.mock('../context/PwaInstallContext', () => ({
+    usePwaInstall: () => ({ requestInstallInvitation }),
+}));
 vi.mock('../utils/download', () => ({ saveDownload: vi.fn() }));
 vi.mock('../utils/tracking', () => ({ trackProgramViewed: vi.fn() }));
 
@@ -53,6 +57,7 @@ function LocationProbe() {
 describe('EventProgramPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        localStorage.clear();
         sessionStorage.clear();
         authState.user = null;
         vi.mocked(fetchEvent).mockResolvedValue(event);
@@ -64,6 +69,11 @@ describe('EventProgramPage', () => {
         vi.mocked(fetchEventSchedule).mockResolvedValue(schedule);
         vi.mocked(fetchEventScheduleEditorAccess).mockResolvedValue({ can_edit: false });
         vi.mocked(fetchMyPlan).mockResolvedValue({ entries: [] });
+        vi.mocked(addToMyPlan).mockImplementation(async (_eventId, sessionId) => ({
+            session_id: sessionId,
+            status: 'active',
+            session: schedule.sessions.find((item) => item.id === sessionId)!,
+        }));
         vi.mocked(downloadMyPlanIcs).mockResolvedValue({ blob: new Blob(['calendar']), filename: 'movida-2026-my-plan.ics' });
     });
     afterEach(() => vi.useRealTimers());
@@ -97,6 +107,61 @@ describe('EventProgramPage', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Program' }));
         await waitFor(() => expect(trackProgramViewed).toHaveBeenCalledTimes(2));
+    });
+
+    it('requests an install invitation after confirmed My Plan saves until it is dismissed', async () => {
+        authState.user = { user_id: 'dancer' };
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /Thursday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        await waitFor(() => expect(requestInstallInvitation).toHaveBeenCalledWith({
+            source: 'program',
+            eventId: event.event_id,
+            eventTitle: event.title,
+        }));
+        expect(screen.queryByRole('dialog', { name: 'Session details' })).not.toBeInTheDocument();
+        expect(localStorage.getItem('movida:program-push-optin-pending:dancer')).toBe(event.event_id);
+
+        fireEvent.click(screen.getByRole('button', { name: '16 Fri' }));
+        fireEvent.click(await screen.findByRole('button', { name: /Friday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        await waitFor(() => expect(addToMyPlan).toHaveBeenCalledTimes(2));
+        expect(requestInstallInvitation).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores stale invitation markers and prompts an existing-plan user on the next save', async () => {
+        authState.user = { user_id: 'dancer' };
+        localStorage.setItem(`movida:program-install-invited:${event.event_id}`, '1');
+        vi.mocked(fetchMyPlan).mockResolvedValue({
+            entries: [{ session_id: 'thursday', status: 'active', session: schedule.sessions[0] }],
+        });
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: '16 Fri' }));
+        fireEvent.click(await screen.findByRole('button', { name: /Friday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        await waitFor(() => expect(requestInstallInvitation).toHaveBeenCalledWith({
+            source: 'program',
+            eventId: event.event_id,
+            eventTitle: event.title,
+        }));
+    });
+
+    it('does not request another invitation after contextual dismissal for that user and event', async () => {
+        authState.user = { user_id: 'dancer' };
+        localStorage.setItem(`movida:program-install-dismissed:dancer:${event.event_id}`, '1');
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /Thursday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        await waitFor(() => expect(addToMyPlan).toHaveBeenCalledTimes(1));
+        expect(requestInstallInvitation).not.toHaveBeenCalled();
+        expect(localStorage.getItem('movida:program-push-optin-pending:dancer')).toBeNull();
     });
 
     it('does not track direct My Plan or draft preview visits', async () => {

@@ -165,7 +165,7 @@ export function trackAttendance(
 
 /** The "Install Movida" card was shown, either as the bottom toast or
  *  embedded in the dedicated `/install` page. */
-export function trackInstallPromptViewed(surface: 'toast' | 'page'): void {
+export function trackInstallPromptViewed(surface: 'toast' | 'program-toast' | 'page'): void {
     if (!readConsent().analytics) return;
     umamiTrack('install_prompt_viewed', { surface });
 }

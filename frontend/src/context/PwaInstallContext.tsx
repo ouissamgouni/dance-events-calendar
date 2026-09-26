@@ -19,11 +19,34 @@ interface BeforeInstallPromptEvent extends Event {
     userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+function detectIos(): boolean {
+    return /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function detectIosSafari(): boolean {
+    return detectIos() && /Safari/i.test(navigator.userAgent) &&
+        !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(navigator.userAgent);
+}
+
+export interface InstallInvitation {
+    source: 'program';
+    eventId: string;
+    eventTitle: string;
+}
+
 interface PwaInstallContextValue {
     /** True once the browser has offered install and we haven't consumed it yet. */
     canInstall: boolean;
     /** True when already running as an installed PWA. */
     isStandalone: boolean;
+    /** iPhone/iPad browsers need manual Add to Home Screen guidance. */
+    isIos: boolean;
+    isIosSafari: boolean;
+    /** Optional high-intent context for the otherwise global install prompt. */
+    invitation: InstallInvitation | null;
+    requestInstallInvitation: (invitation: InstallInvitation) => void;
+    clearInstallInvitation: () => void;
     /** Replays the deferred native prompt. Resolves to the outcome, or null if unavailable. */
     promptInstall: () => Promise<'accepted' | 'dismissed' | null>;
 }
@@ -31,11 +54,19 @@ interface PwaInstallContextValue {
 const PwaInstallContext = createContext<PwaInstallContextValue>({
     canInstall: false,
     isStandalone: false,
+    isIos: false,
+    isIosSafari: false,
+    invitation: null,
+    requestInstallInvitation: () => { },
+    clearInstallInvitation: () => { },
     promptInstall: async () => null,
 });
 
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
     const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+    const [invitation, setInvitation] = useState<InstallInvitation | null>(null);
+    const [isIos] = useState(detectIos);
+    const [isIosSafari] = useState(detectIosSafari);
     // Lazy-initialized (not set in an effect) so the very first render
     // already reflects reality — an effect-based initial value is briefly
     // wrong (defaults to `false`) which previously let the install banner
@@ -72,8 +103,25 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
         return outcome;
     }, [deferred]);
 
+    const requestInstallInvitation = useCallback((next: InstallInvitation) => {
+        setInvitation(next);
+    }, []);
+
+    const clearInstallInvitation = useCallback(() => {
+        setInvitation(null);
+    }, []);
+
     return (
-        <PwaInstallContext.Provider value={{ canInstall: !!deferred, isStandalone, promptInstall }}>
+        <PwaInstallContext.Provider value={{
+            canInstall: !!deferred,
+            isStandalone,
+            isIos,
+            isIosSafari,
+            invitation,
+            requestInstallInvitation,
+            clearInstallInvitation,
+            promptInstall,
+        }}>
             {children}
         </PwaInstallContext.Provider>
     );
