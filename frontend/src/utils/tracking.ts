@@ -170,6 +170,12 @@ export function trackInstallPromptViewed(surface: 'toast' | 'page'): void {
     umamiTrack('install_prompt_viewed', { surface });
 }
 
+/** A published event program was successfully loaded and viewed. */
+export function trackProgramViewed(): void {
+    if (!readConsent().analytics) return;
+    umamiTrack('program_viewed');
+}
+
 // ── Auth funnel (Umami only — backend already records sessions) ──────────
 
 export type AuthMethod = 'google' | 'dev' | 'email';

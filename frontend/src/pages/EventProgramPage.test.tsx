@@ -6,6 +6,7 @@ import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContex
 import type { CalendarEvent, EventSchedule } from '../types';
 import EventProgramPage from './EventProgramPage';
 import { saveDownload } from '../utils/download';
+import { trackProgramViewed } from '../utils/tracking';
 
 const authState = vi.hoisted(() => ({ user: null as object | null }));
 
@@ -15,6 +16,7 @@ vi.mock('../api', async (importOriginal) => {
 });
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user, loading: false }) }));
 vi.mock('../utils/download', () => ({ saveDownload: vi.fn() }));
+vi.mock('../utils/tracking', () => ({ trackProgramViewed: vi.fn() }));
 
 const event: CalendarEvent = {
     event_id: 'movida-2026', calendar_id: 'calendar-1', title: 'Movida 2026', description: null,
@@ -77,6 +79,35 @@ describe('EventProgramPage', () => {
 
         expect(await screen.findByText('The event program is not available.')).toBeInTheDocument();
         expect(fetchEventSchedule).not.toHaveBeenCalled();
+    });
+
+    it('tracks each successful public Program tab view once', async () => {
+        authState.user = { id: 'dancer' };
+        renderPage();
+
+        await screen.findByRole('button', { name: /Thursday Session/ });
+        expect(trackProgramViewed).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(screen.getByRole('button', { name: '16 Fri' }));
+        expect(await screen.findByRole('button', { name: /Friday Session/ })).toBeInTheDocument();
+        expect(trackProgramViewed).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(screen.getByRole('button', { name: 'My Plan' }));
+        expect(trackProgramViewed).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Program' }));
+        await waitFor(() => expect(trackProgramViewed).toHaveBeenCalledTimes(2));
+    });
+
+    it('does not track direct My Plan or draft preview visits', async () => {
+        const { unmount } = renderPage('/event/movida-2026/program/plan');
+        await screen.findByText('Sign in to build My Plan');
+        expect(trackProgramViewed).not.toHaveBeenCalled();
+
+        unmount();
+        renderPage('/event/movida-2026/program?preview=draft&embed=program');
+        await screen.findByRole('button', { name: /Thursday Session/ });
+        expect(trackProgramViewed).not.toHaveBeenCalled();
     });
 
     it('opens on the current program day even when an older day was stored', async () => {

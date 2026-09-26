@@ -11,6 +11,7 @@ import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsCo
 import type { CalendarEvent, EventSchedule, MyPlanEntry, ScheduleSession } from '../types';
 import { saveDownload } from '../utils/download';
 import { filterScheduleSessions, firstDayWithSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
+import { trackProgramViewed } from '../utils/tracking';
 
 const EMPTY_FILTERS: ScheduleFilters = { instructor: '', levelIds: [], activityTypeIds: [] };
 
@@ -39,6 +40,7 @@ export default function EventProgramPage() {
     const [error, setError] = useState<string | null>(null);
     const [canEdit, setCanEdit] = useState(false);
     const [planExportStatus, setPlanExportStatus] = useState<'idle' | 'busy' | 'error'>('idle');
+    const trackedProgramEventId = useRef<string | null>(null);
 
     useEffect(() => {
         if (!eventId || !flagsReady || unavailable) return;
@@ -89,6 +91,16 @@ export default function EventProgramPage() {
             .catch(() => { if (!cancelled) setCanEdit(false); });
         return () => { cancelled = true; };
     }, [authLoading, eventId, preview, user]);
+
+    useEffect(() => {
+        if (activeTab !== 'program') {
+            trackedProgramEventId.current = null;
+            return;
+        }
+        if (preview || !eventId || schedule?.event_id !== eventId || trackedProgramEventId.current === eventId) return;
+        trackedProgramEventId.current = eventId;
+        trackProgramViewed();
+    }, [activeTab, eventId, preview, schedule]);
 
     const plannedIds = useMemo(() => new Set(user ? plan.filter((entry) => entry.status !== 'removed').map((entry) => entry.session_id) : []), [plan, user]);
     const filteredSessions = useMemo(
