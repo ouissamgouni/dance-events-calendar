@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
@@ -39,7 +39,7 @@ def test_seed_tags_rewrites_existing_synonyms_without_unique_violation(
         TagSynonym(
             tag_id=social.id,
             term="social dance",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
     )
     session.commit()

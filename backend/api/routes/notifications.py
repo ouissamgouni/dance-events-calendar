@@ -11,7 +11,7 @@ Notifications are produced by the fan-out helpers in
 write paths.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -372,7 +372,7 @@ def mark_read(
         event = session.get(CachedEvent, row.event_id)
         if event is None or not event_is_user_facing(session, event):
             raise HTTPException(status_code=404, detail="Notification not found")
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     # Collapsible rows render as one aggregated group, so marking the
     # representative read clears every sibling (same kind + event) too.
     if row.kind in MILESTONE_KINDS:
@@ -415,7 +415,7 @@ def mark_all_read(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     rows = session.exec(
         select(Notification)
         .where(Notification.recipient_user_id == user.id)

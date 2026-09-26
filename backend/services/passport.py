@@ -8,7 +8,7 @@ owner is the only viewer of their passport.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import func
@@ -60,7 +60,7 @@ def attended_events(session: Session, user_id: UUID) -> list[CachedEvent]:
 
     Deduplicated by ``event_id`` and ordered newest-first.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     statement = (
         select(CachedEvent)
         .join(
@@ -193,7 +193,7 @@ def public_reviews_written(session: Session, user_id: UUID) -> int:
 
 def events_last_30_days(events: list[CachedEvent]) -> int:
     """Attended events whose start falls in the trailing 30 days."""
-    cutoff = datetime.utcnow() - timedelta(days=30)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     return sum(1 for e in events if e.start >= cutoff)
 
 
@@ -217,7 +217,7 @@ def build_stats_context(session: Session, user) -> dict:
     cities = {(e.city, e.country) for e in events if e.city}
     countries = {e.country for e in events if e.country}
     styles = _style_slugs(session, event_ids)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     months = active_month_indices(events)
     return {
         "events": events,
@@ -783,7 +783,7 @@ def acknowledge_milestones(session: Session, user, keys: list[str]) -> int:
         .where(UserMilestone.milestone_key.in_(keys))
         .where(UserMilestone.seen_at.is_(None))
     ).all()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for row in rows:
         row.seen_at = now
     if rows:
@@ -877,7 +877,7 @@ def consistency_context(events: list[CachedEvent], now: datetime | None = None) 
     lifetime story (strongest level + recurrence) for the all-time card, and
     ``by_year`` classifies each calendar year independently for the yearly card.
     """
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     months = active_month_indices(events)
     now_index = _month_index(now)
     active_now = rolling_active_count(months, now_index)
@@ -1003,7 +1003,7 @@ def consistency_timeline_markers(
     """Upward consistency reaches for the timeline — one per (level, period),
     anchored to the latest attended event in the reach month. Recurs: the same
     level appears again for a later period (keys carry the period start)."""
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     months = active_month_indices(events)
     now_index = _month_index(now)
     latest_by_month = _latest_event_records_by_month(events)
@@ -1046,7 +1046,7 @@ def evaluate_and_persist_consistency(
     decline never changes the recorded months, so historical achievements are
     only ever removed by a genuine correction, never by quietening down.
     Idempotent. Returns the newly-recorded reaches (for the toast path)."""
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     events = attended_events(session, user.id)
     months = active_month_indices(events)
     now_index = _month_index(now)
@@ -1099,7 +1099,7 @@ def consistency_view(
     session: Session, user, events: list[CachedEvent] | None = None, now=None
 ) -> dict:
     """Consistency context plus the unseen reaches (``new``) for the toast."""
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     if events is None:
         events = attended_events(session, user.id)
     ctx = consistency_context(events, now)
@@ -1136,7 +1136,7 @@ def acknowledge_consistency(session: Session, user, idents: list[str]) -> int:
         .where(UserConsistencyAchievement.user_id == user.id)
         .where(UserConsistencyAchievement.seen_at.is_(None))
     ).all()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     marked = 0
     for row in rows:
         if (row.level_key, row.period_start) in wanted:

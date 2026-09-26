@@ -8,7 +8,7 @@ Covers auth gates, posting + flattened replies (reply-to-reply with an
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import pytest
@@ -75,8 +75,8 @@ def event(session):
         event_id="evt-msg-1",
         calendar_id="cal-1",
         title="Salsa Social",
-        start=datetime(2099, 1, 1, 20, 0, 0),
-        end=datetime(2099, 1, 2, 1, 0, 0),
+        start=datetime(2099, 1, 1, 20, 0, 0, tzinfo=timezone.utc),
+        end=datetime(2099, 1, 2, 1, 0, 0, tzinfo=timezone.utc),
         review_status="reviewed",
     )
     session.add(ev)
@@ -126,7 +126,7 @@ def test_post_and_list_with_reply(client, session, event):
     assert data["can_delete"] is True
     parent_id = data["id"]
 
-    # A second user replies; reply inherits the parent category.
+    # A second user replies, timezone; reply inherits the parent category.
     assert _login(client, email="bob@example.com").status_code == 200
     reply = client.post(
         f"/api/events/{event.event_id}/messages",
@@ -250,7 +250,7 @@ def test_post_fans_out_to_going_user(client, session, event):
             device_id="dev-bob",
             event_id=event.event_id,
             user_id=bob.id,
-            attending_since=datetime.utcnow(),
+            attending_since=datetime.now(timezone.utc),
         )
     )
     session.commit()
@@ -323,7 +323,7 @@ def test_post_does_not_auto_engage_when_already_going(client, session, event):
             device_id="dev-bob",
             event_id=event.event_id,
             user_id=bob.id,
-            attending_since=datetime.utcnow(),
+            attending_since=datetime.now(timezone.utc),
         )
     )
     session.commit()
@@ -347,8 +347,8 @@ def test_post_blocked_on_past_event(client, session):
         event_id="evt-past-1",
         calendar_id="cal-1",
         title="Last Week's Social",
-        start=datetime(2000, 1, 1, 20, 0, 0),
-        end=datetime(2000, 1, 1, 23, 0, 0),
+        start=datetime(2000, 1, 1, 20, 0, 0, tzinfo=timezone.utc),
+        end=datetime(2000, 1, 1, 23, 0, 0, tzinfo=timezone.utc),
         review_status="reviewed",
     )
     session.add(ev)
@@ -399,7 +399,7 @@ def test_instant_delivery_fires_at_post_time(client, session, event, monkeypatch
             device_id="dev-bob",
             event_id=event.event_id,
             user_id=bob.id,
-            attending_since=datetime.utcnow(),
+            attending_since=datetime.now(timezone.utc),
         )
     )
     session.commit()
@@ -449,7 +449,7 @@ def test_instant_delivery_skipped_when_admin_toggle_off(
             device_id="dev-bob",
             event_id=event.event_id,
             user_id=bob.id,
-            attending_since=datetime.utcnow(),
+            attending_since=datetime.now(timezone.utc),
         )
     )
     session.commit()
@@ -482,7 +482,7 @@ def test_mute_suppresses_fan_out(client, session, event):
             device_id="dev-bob",
             event_id=event.event_id,
             user_id=bob.id,
-            attending_since=datetime.utcnow(),
+            attending_since=datetime.now(timezone.utc),
         )
     )
     session.commit()
@@ -553,8 +553,8 @@ def test_message_counts_batch(client, session, event):
         event_id="evt-msg-2",
         calendar_id="cal-1",
         title="Bachata Night",
-        start=datetime(2099, 2, 1, 20, 0, 0),
-        end=datetime(2099, 2, 2, 1, 0, 0),
+        start=datetime(2099, 2, 1, 20, 0, 0, tzinfo=timezone.utc),
+        end=datetime(2099, 2, 2, 1, 0, 0, tzinfo=timezone.utc),
         review_status="reviewed",
     )
     session.add(ev2)

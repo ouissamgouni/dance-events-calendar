@@ -4,7 +4,7 @@ GET /api/events.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import pytest
@@ -180,7 +180,7 @@ def test_patch_preferences_partial_omit_leaves_untouched(client, session, tags):
             "preferred_tag_ids": [t1.id],
         },
     )
-    # Update only share_attendance_default; area + tags must stay.
+    # Update only share_attendance_default, timezone; area + tags must stay.
     resp = client.patch(
         "/api/auth/preferences", json={"share_attendance_default": False}
     )
@@ -344,7 +344,7 @@ def events_with_coords(session):
     """Three events spread across Europe + one without coords (excluded)."""
     cal = CalendarSetting(calendar_id="cal-1", name="Cal", enabled=True, color="#000")
     session.add(cal)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     rows = [
         CachedEvent(
             event_id="paris",
@@ -461,7 +461,7 @@ def test_events_bbox_outside_default_returns_events_in_view(client, session):
     """
     cal = CalendarSetting(calendar_id="cal-1", name="Cal", enabled=True, color="#000")
     session.add(cal)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     session.add(
         CachedEvent(
             event_id="tokyo",

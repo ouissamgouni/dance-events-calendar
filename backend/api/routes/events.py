@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -856,7 +856,7 @@ def get_events(
             .where(EventPromoCode.status == "approved")
             .where(
                 (EventPromoCode.expires_at.is_(None))
-                | (EventPromoCode.expires_at > datetime.utcnow())
+                | (EventPromoCode.expires_at > datetime.now(timezone.utc))
             )
             .group_by(EventPromoCode.event_id)
         ).all()
@@ -1233,7 +1233,7 @@ def get_events_by_ids(
             .where(EventPromoCode.status == "approved")
             .where(
                 (EventPromoCode.expires_at.is_(None))
-                | (EventPromoCode.expires_at > datetime.utcnow())
+                | (EventPromoCode.expires_at > datetime.now(timezone.utc))
             )
             .group_by(EventPromoCode.event_id)
         ).all()
@@ -1352,7 +1352,7 @@ def get_event(
                 .where(EventPromoCode.status == "approved")
                 .where(
                     (EventPromoCode.expires_at.is_(None))
-                    | (EventPromoCode.expires_at > datetime.utcnow())
+                    | (EventPromoCode.expires_at > datetime.now(timezone.utc))
                 )
             ).first()
             is not None

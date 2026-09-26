@@ -10,7 +10,7 @@ See plan in [docs] memory and reference pattern in
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -237,7 +237,7 @@ def _send_promo_code_added_notifications(
         ).all()
         notif_by_user = {n.recipient_user_id: n for n in notifs}
         users = session.exec(select(User).where(col(User.id).in_(recipient_ids))).all()
-        stamp_now = datetime.utcnow()
+        stamp_now = datetime.now(timezone.utc)
         for user in users:
             notif = notif_by_user.get(user.id)
             if notif is None:
@@ -277,7 +277,7 @@ def list_event_promo_codes(
 ):
     """Approved + non-expired codes, plus the viewer's own pending rows."""
     _require_user_facing_event(session, event_id)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     conditions = [
         (EventPromoCode.status == "approved")
         & (
@@ -414,7 +414,7 @@ def update_promo_code(
     for field, value in data.items():
         setattr(promo, field, value)
 
-    promo.updated_at = datetime.utcnow()
+    promo.updated_at = datetime.now(timezone.utc)
 
     re_review = False
     if is_owner and not is_admin and promo.status == "approved":
@@ -460,7 +460,7 @@ def delete_promo_code(
     else:
         promo.status = "rejected"
         promo.admin_notes = (promo.admin_notes or "") + "\n[revoked by admin]"
-        promo.reviewed_at = datetime.utcnow()
+        promo.reviewed_at = datetime.now(timezone.utc)
         promo.reviewed_by = user.email
         session.add(promo)
     session.commit()
@@ -541,9 +541,9 @@ def admin_approve_promo_code(
         raise HTTPException(status_code=400, detail="Already approved")
     promo.status = "approved"
     promo.admin_notes = None
-    promo.reviewed_at = datetime.utcnow()
+    promo.reviewed_at = datetime.now(timezone.utc)
     promo.reviewed_by = admin.get("email")
-    promo.updated_at = datetime.utcnow()
+    promo.updated_at = datetime.now(timezone.utc)
     session.add(promo)
     _notify_submitter(session, promo, "promo_code_approved")
     recipient_ids = _fan_out_saved_event_promo_code(session, promo)
@@ -579,9 +579,9 @@ def admin_reject_promo_code(
         raise HTTPException(status_code=400, detail="Already rejected")
     promo.status = "rejected"
     promo.admin_notes = body.admin_notes
-    promo.reviewed_at = datetime.utcnow()
+    promo.reviewed_at = datetime.now(timezone.utc)
     promo.reviewed_by = admin.get("email")
-    promo.updated_at = datetime.utcnow()
+    promo.updated_at = datetime.now(timezone.utc)
     session.add(promo)
     _notify_submitter(session, promo, "promo_code_rejected")
     session.commit()
@@ -627,7 +627,7 @@ def admin_update_promo_code(
         data.pop("code")
     for field, value in data.items():
         setattr(promo, field, value)
-    promo.updated_at = datetime.utcnow()
+    promo.updated_at = datetime.now(timezone.utc)
     session.add(promo)
     session.commit()
     session.refresh(promo)

@@ -516,7 +516,7 @@ def test_cancel_my_pending_claim(client, session, events, flag_on):
     assert resp.status_code == 204
     remaining = session.exec(select(OrganizerClaim)).all()
     assert remaining == []
-    # NOTE: line items cascade-delete via FK in Postgres; SQLite ignores
+    # NOTE: line items cascade-delete via FK in Postgres, timezone; SQLite ignores
     # ON DELETE CASCADE unless ``PRAGMA foreign_keys=ON`` is set on the
     # connection, so we don't assert on OrganizerClaimEvent here.
 

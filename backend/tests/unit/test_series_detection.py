@@ -93,7 +93,7 @@ def _make_event(
 @pytest.mark.unit
 class TestFindCandidateMatches:
     def test_matches_similar_title_in_same_calendar_different_week(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(
             session,
@@ -105,14 +105,14 @@ class TestFindCandidateMatches:
         assert {m.event_id for m in matches} == {"evt-b"}
 
     def test_ignores_dissimilar_title(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Bachata Workshop", start + timedelta(days=7))
         matches = find_candidate_matches(session, a)
         assert matches == []
 
     def test_ignores_different_calendar(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(
             session, "evt-a", "Weekly Salsa Social", start, calendar_id="cal-1"
         )
@@ -129,14 +129,14 @@ class TestFindCandidateMatches:
     def test_ignores_near_duplicate_same_occurrence(self, session):
         """Two events an hour apart are the SAME occurrence — that's
         duplicate-detection territory, not a different series occurrence."""
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(hours=1))
         matches = find_candidate_matches(session, a)
         assert matches == []
 
     def test_ignores_events_outside_window(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(
             session, "evt-b", "Weekly Salsa Social", start + timedelta(days=200)
@@ -145,7 +145,7 @@ class TestFindCandidateMatches:
         assert matches == []
 
     def test_location_mismatch_excludes_when_both_set(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(
             session, "evt-a", "Weekly Salsa Social", start, location="The Warehouse"
         )
@@ -160,7 +160,7 @@ class TestFindCandidateMatches:
         assert matches == []
 
     def test_location_similarity_included_when_similar(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(
             session,
             "evt-a",
@@ -182,7 +182,7 @@ class TestFindCandidateMatches:
 @pytest.mark.unit
 class TestDetectSeriesForEvent:
     def test_creates_series_and_logs_scan(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
 
@@ -202,7 +202,7 @@ class TestDetectSeriesForEvent:
         assert {m.event_id for m in members} == {"evt-a", "evt-b"}
 
     def test_logs_scan_even_when_no_match_found(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
 
         log = detect_series_for_event(session, "evt-a")
@@ -213,7 +213,7 @@ class TestDetectSeriesForEvent:
         assert session.exec(select(EventSeries)).all() == []
 
     def test_third_occurrence_joins_existing_pending_series(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
@@ -227,7 +227,7 @@ class TestDetectSeriesForEvent:
         assert {m.event_id for m in members} == {"evt-a", "evt-b", "evt-c"}
 
     def test_does_not_recreate_series_for_resolved_pair(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
 
@@ -240,7 +240,7 @@ class TestDetectSeriesForEvent:
         assert len(series_rows) == 1
 
     def test_does_not_recreate_series_for_dismissed_pair(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
 
@@ -257,7 +257,7 @@ class TestDetectSeriesForEvent:
 @pytest.mark.unit
 class TestMaybeDetectSeriesForEvent:
     def test_noop_when_flag_disabled(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
 
@@ -270,7 +270,7 @@ class TestMaybeDetectSeriesForEvent:
         session.add(SiteSetting(key="series_auto_detect_enabled", value="true"))
         session.commit()
 
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
 
@@ -283,7 +283,7 @@ class TestMaybeDetectSeriesForEvent:
 @pytest.mark.unit
 class TestApproveDismissSplit:
     def test_approve_resolves_without_hiding_any_member(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         detect_series_for_event(session, "evt-a")
@@ -303,7 +303,7 @@ class TestApproveDismissSplit:
         assert session.get(CachedEvent, "evt-b").is_hidden is False
 
     def test_dismiss_marks_dismissed(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         detect_series_for_event(session, "evt-a")
@@ -315,7 +315,7 @@ class TestApproveDismissSplit:
         assert result.resolved_by_admin == "admin@example.com"
 
     def test_split_removes_only_membership_not_event(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
@@ -331,7 +331,7 @@ class TestApproveDismissSplit:
         assert session.get(CachedEvent, "evt-b") is not None
 
     def test_split_dissolves_series_below_two_members(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         series = create_manual_series(session, ["evt-a", "evt-b"])
@@ -345,7 +345,7 @@ class TestApproveDismissSplit:
         assert session.get(CachedEvent, "evt-b") is not None
 
     def test_split_unknown_member_raises(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         detect_series_for_event(session, "evt-a")
@@ -358,7 +358,7 @@ class TestApproveDismissSplit:
 @pytest.mark.unit
 class TestManualGroupingAndFullScan:
     def test_manual_grouping_always_creates_new_series(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(
             session, "evt-b", "Totally Different Title", start + timedelta(days=7)
@@ -379,7 +379,7 @@ class TestManualGroupingAndFullScan:
         assert {m.event_id for m in members} == {"evt-a", "evt-b"}
 
     def test_manual_grouping_rejects_event_already_in_series(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
@@ -390,7 +390,7 @@ class TestManualGroupingAndFullScan:
         assert "evt-b" in exc.value.conflicts
 
     def test_add_events_to_series_appends_members(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
@@ -404,7 +404,7 @@ class TestManualGroupingAndFullScan:
         assert {m.event_id for m in members} == {"evt-a", "evt-b", "evt-c"}
 
     def test_add_events_to_series_rejects_conflict(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
@@ -416,7 +416,7 @@ class TestManualGroupingAndFullScan:
             add_events_to_series(session, series.id, ["evt-c"])
 
     def test_rename_series_updates_title(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         series = create_manual_series(session, ["evt-a", "evt-b"])
@@ -426,7 +426,7 @@ class TestManualGroupingAndFullScan:
         assert updated.canonical_title == "Tuesday Milonga"
 
     def test_full_scan_dedups_pairs(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
@@ -443,7 +443,7 @@ class TestManualGroupingAndFullScan:
 @pytest.mark.unit
 class TestGetSeriesForEvent:
     def test_returns_only_pending_series(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
         detect_series_for_event(session, "evt-a")

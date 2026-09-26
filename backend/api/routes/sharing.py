@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -204,7 +204,7 @@ def get_calendar_feed(
 
     # Filter by date for upcoming/past views
     if view in ("upcoming", "past"):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if view == "upcoming":
             events = [e for e in events if e.start > now]
         elif view == "past":
@@ -322,9 +322,9 @@ def get_shared_calendar(
 
     # Filter by date for upcoming/past views
     if view in ("upcoming", "past"):
-        from datetime import datetime
+        from datetime import datetime, timezone
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if view == "upcoming":
             events = [e for e in events if e.start > now]
         elif view == "past":

@@ -2,7 +2,7 @@ import json
 import hashlib
 import logging
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from itertools import cycle
 from pathlib import Path
 from typing import Any, Optional
@@ -673,7 +673,7 @@ class DatabaseSeeder:
                 existing.price_is_free = evt_data.get(
                     "price_is_free", existing.price_is_free
                 )
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = datetime.now(timezone.utc)
                 existing.deleted_at = None
                 existing.review_status = "reviewed"
                 if "is_hidden" in evt_data:
@@ -928,7 +928,7 @@ class DatabaseSeeder:
 
             status = entry.get("status") or "resolved"
             source = entry.get("source") or "manual"
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             series = EventSeries(
                 status=status,
                 source=source,
@@ -1108,7 +1108,7 @@ class DatabaseSeeder:
             # is preserved because ``entry[key] is not None`` above skips
             # it, so we only stamp defaults here if the key is missing.
             if auto_onboard_default and "onboarded_at" not in entry:
-                user_kwargs["onboarded_at"] = datetime.utcnow()
+                user_kwargs["onboarded_at"] = datetime.now(timezone.utc)
                 user_kwargs.setdefault("onboarding_version", current_onboarding_version)
             # Phase G legacy aliases — accepted for one release, written
             # through to the corresponding new flags. Emits a stderr
@@ -1177,7 +1177,7 @@ class DatabaseSeeder:
             self.session.add(UserPreferredTag(user_id=user.id, tag_id=tag_id))
             seeded += 1
         if seeded:
-            user.preferences_set_at = datetime.utcnow()
+            user.preferences_set_at = datetime.now(timezone.utc)
             self.session.add(user)
 
     def _seed_generated_events(self, path: Path) -> None:
@@ -1279,7 +1279,7 @@ class DatabaseSeeder:
                 existing.review_status = "reviewed"
                 existing.deleted_at = None
                 existing.is_hidden = False
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = datetime.now(timezone.utc)
                 self.session.add(existing)
             else:
                 self.session.add(
@@ -2260,7 +2260,7 @@ class DatabaseSeeder:
             )
 
             status = entry.get("status") or "approved"
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             rating = EventRating(
                 id=uuid4(),
                 event_id=event_id,
@@ -2324,7 +2324,7 @@ class DatabaseSeeder:
         with open(path) as f:
             data = yaml.safe_load(f) or {}
 
-        schedule_now = datetime.utcnow().replace(second=0, microsecond=0)
+        schedule_now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
         for entry in data.get("schedules", []) or []:
             event_id = entry["event_id"]
             event = self.session.get(CachedEvent, event_id)
@@ -2353,7 +2353,7 @@ class DatabaseSeeder:
                     self._schedule_day(day, schedule_now)
                     for day in entry.get("days", [])
                 ]
-                schedule.updated_at = datetime.utcnow()
+                schedule.updated_at = datetime.now(timezone.utc)
                 self.session.add(schedule)
 
             venues = self._seed_schedule_named_rows(
@@ -2408,7 +2408,7 @@ class DatabaseSeeder:
                     "allow_plan": row.get("allow_plan", True),
                     "is_cancelled": row.get("is_cancelled", False),
                     "deleted_at": None,
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": datetime.now(timezone.utc),
                 }
                 if schedule_session is None:
                     schedule_session = ScheduleSession(id=session_id, **values)
@@ -2426,7 +2426,7 @@ class DatabaseSeeder:
             if entry.get("published", False) and (
                 publication is None or entry.get("refresh_publication", False)
             ):
-                published_at = datetime.utcnow()
+                published_at = datetime.now(timezone.utc)
                 snapshot = build_snapshot(self.session, schedule)
                 snapshot["version"] = publication.version if publication else 1
                 snapshot["published_at"] = published_at.isoformat()
@@ -2450,7 +2450,7 @@ class DatabaseSeeder:
                 for key, value in update.items():
                     if key != "session_id":
                         setattr(row, key, value)
-                row.updated_at = datetime.utcnow()
+                row.updated_at = datetime.now(timezone.utc)
                 self.session.add(row)
 
             if publication is None:
@@ -2524,7 +2524,7 @@ class DatabaseSeeder:
             return to_utc_naive(value)
         match = SCHEDULE_NOW_RE.match(value)
         if match:
-            result = reference_now or datetime.utcnow()
+            result = reference_now or datetime.now(timezone.utc)
             if match.group(1):
                 amount = int(match.group(2)) * (60 if match.group(3) == "h" else 1)
                 result += timedelta(
@@ -2586,7 +2586,7 @@ class DatabaseSeeder:
             if existing:
                 continue
             status = entry.get("status") or "pending"
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             expires_at_raw = entry.get("expires_at")
             expires_at = None
             if expires_at_raw:
@@ -2691,7 +2691,7 @@ class DatabaseSeeder:
             grant_badge = bool(
                 entry.get("grant_badge", True if kind == "badge" else False)
             )
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             claim = OrganizerClaim(
                 user_id=user.id,
                 kind=kind,

@@ -16,7 +16,7 @@ notification rows land atomically with the source-of-truth row.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -284,7 +284,7 @@ def _event_is_past(session: Session, event_id: str) -> bool:
     end = session.exec(
         select(CachedEvent.end).where(CachedEvent.event_id == event_id)
     ).first()
-    return end is not None and end < datetime.utcnow()
+    return end is not None and end < datetime.now(timezone.utc)
 
 
 def _fan_out(

@@ -11,7 +11,7 @@ Covers:
 import os
 
 import pytest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
@@ -477,7 +477,7 @@ def test_profile_passport_includes_monthly_activity_without_timeline(client, ses
         session, "alice@example.com", "alice", account_visibility="public"
     )
     _set_passport(session, "alice@example.com", passport_visibility="public")
-    attended_at = datetime.utcnow() - timedelta(days=5)
+    attended_at = datetime.now(timezone.utc) - timedelta(days=5)
     session.add(
         CachedEvent(
             event_id="profile-activity",

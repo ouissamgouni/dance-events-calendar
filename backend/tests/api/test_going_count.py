@@ -59,13 +59,13 @@ def client(engine):
 
 
 def _seed(session: Session) -> tuple[str, str]:
-    """Seed a calendar plus two future events; return their IDs."""
+    """Seed a calendar plus two future events, timezone; return their IDs."""
     session.add(
         CalendarSetting(calendar_id="cal-1", name="Salsa", enabled=True, color="#fff")
     )
     # Use start times far enough in the future that the route's
     # ``effective_start`` since-date filter never excludes them.
-    start = datetime.utcnow() + timedelta(days=7)
+    start = datetime.now(timezone.utc) + timedelta(days=7)
     session.add(
         CachedEvent(
             event_id="evt-popular",

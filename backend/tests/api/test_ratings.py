@@ -24,7 +24,7 @@ Covers:
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -109,8 +109,8 @@ def event(session):
         location=None,
         latitude=None,
         longitude=None,
-        start=datetime(2020, 1, 1, 20, 0, 0),
-        end=datetime(2020, 1, 2, 1, 0, 0),
+        start=datetime(2020, 1, 1, 20, 0, 0, tzinfo=timezone.utc),
+        end=datetime(2020, 1, 2, 1, 0, 0, tzinfo=timezone.utc),
         review_status="reviewed",
     )
     session.add(ev)
@@ -221,8 +221,8 @@ def test_submit_feedback_rejected_for_upcoming_event(client, session):
         event_id="evt-upcoming",
         calendar_id="cal-1",
         title="Future Social",
-        start=datetime(2099, 1, 1, 20, 0, 0),
-        end=datetime(2099, 1, 2, 1, 0, 0),
+        start=datetime(2099, 1, 1, 20, 0, 0, tzinfo=timezone.utc),
+        end=datetime(2099, 1, 2, 1, 0, 0, tzinfo=timezone.utc),
         review_status="reviewed",
     )
     session.add(ev)
@@ -306,7 +306,7 @@ def test_submit_feedback_creates_review_and_linked_suggestion(
     assert body["rating"]["aspect_scores"] == {"music": 5}
     assert body["rating"]["aspect_tag_ids"] == [pos.id]
     assert body["rating"]["audience_tag_ids"] == [aud1.id]
-    # Structured data counts live; only the comment is pending moderation.
+    # Structured data counts live, timezone; only the comment is pending moderation.
     assert body["rating"]["status"] == "approved"
     assert body["rating"]["comment_status"] == "pending"
     assert len(body["tag_suggestion_ids"]) == 1
@@ -594,16 +594,16 @@ def series_events(session):
         event_id="evt-series-1",
         calendar_id="cal-1",
         title="Weekly Milonga",
-        start=datetime(2020, 1, 1, 20, 0, 0),
-        end=datetime(2020, 1, 2, 1, 0, 0),
+        start=datetime(2020, 1, 1, 20, 0, 0, tzinfo=timezone.utc),
+        end=datetime(2020, 1, 2, 1, 0, 0, tzinfo=timezone.utc),
         review_status="reviewed",
     )
     ev2 = CachedEvent(
         event_id="evt-series-2",
         calendar_id="cal-1",
         title="Weekly Milonga",
-        start=datetime(2020, 1, 8, 20, 0, 0),
-        end=datetime(2020, 1, 9, 1, 0, 0),
+        start=datetime(2020, 1, 8, 20, 0, 0, tzinfo=timezone.utc),
+        end=datetime(2020, 1, 9, 1, 0, 0, tzinfo=timezone.utc),
         review_status="reviewed",
     )
     session.add(ev1)
@@ -865,8 +865,8 @@ def test_user_rate_limit(client, session, event):
                 event_id=f"evt-rl-{i}",
                 calendar_id="cal-1",
                 title=f"Event {i}",
-                start=datetime(2020, 1, 1, 20, 0, 0),
-                end=datetime(2020, 1, 1, 22, 0, 0),
+                start=datetime(2020, 1, 1, 20, 0, 0, tzinfo=timezone.utc),
+                end=datetime(2020, 1, 1, 22, 0, 0, tzinfo=timezone.utc),
                 review_status="reviewed",
             )
             session.add(ev)
@@ -963,16 +963,16 @@ def test_batch_aggregate_pools_series_count_for_upcoming_edition(client, session
         event_id="evt-pool-past",
         calendar_id="cal-1",
         title="Weekly Milonga",
-        start=datetime(2020, 1, 1, 20, 0, 0),
-        end=datetime(2020, 1, 2, 1, 0, 0),
+        start=datetime(2020, 1, 1, 20, 0, 0, tzinfo=timezone.utc),
+        end=datetime(2020, 1, 2, 1, 0, 0, tzinfo=timezone.utc),
         review_status="reviewed",
     )
     upcoming = CachedEvent(
         event_id="evt-pool-upcoming",
         calendar_id="cal-1",
         title="Weekly Milonga",
-        start=datetime(2099, 1, 1, 20, 0, 0),
-        end=datetime(2099, 1, 2, 1, 0, 0),
+        start=datetime(2099, 1, 1, 20, 0, 0, tzinfo=timezone.utc),
+        end=datetime(2099, 1, 2, 1, 0, 0, tzinfo=timezone.utc),
         review_status="reviewed",
     )
     session.add(past)
@@ -1173,7 +1173,7 @@ def _me(session: Session, email: str) -> User:
 def _past_event(
     session: Session, event_id: str, *, days_ago: int, title: str
 ) -> CachedEvent:
-    start = datetime.utcnow() - timedelta(days=days_ago)
+    start = datetime.now(timezone.utc) - timedelta(days=days_ago)
     ev = CachedEvent(
         event_id=event_id,
         calendar_id="cal-1",

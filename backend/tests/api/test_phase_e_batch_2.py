@@ -84,7 +84,7 @@ def client(engine):
 def _ensure_event(session: Session, event_id: str) -> None:
     if session.get(CachedEvent, event_id) is not None:
         return
-    start = datetime.utcnow() + timedelta(days=1)
+    start = datetime.now(timezone.utc) + timedelta(days=1)
     session.add(
         CachedEvent(
             event_id=event_id,
@@ -134,7 +134,7 @@ def _make_user(
     if deleted:
         from datetime import datetime
 
-        u.deleted_at = datetime.utcnow()
+        u.deleted_at = datetime.now(timezone.utc)
     session.add(u)
     session.commit()
     session.refresh(u)
@@ -178,7 +178,7 @@ def test_e3_auth_google_includes_onboarded_at_field(client, session):
 
 def test_e3_onboarding_suggestions_prioritises_verified_organizers(client, session):
     _make_user(session, "viewer@example.com", "viewer")
-    # 2 verified organizers + 2 ordinary popular accounts; the
+    # 2 verified organizers + 2 ordinary popular accounts, timezone; the
     # organizers must come first regardless of followers count.
     org1 = _make_user(session, "org1@example.com", "org1", is_verified_organizer=True)
     org2 = _make_user(session, "org2@example.com", "org2", is_verified_organizer=True)
@@ -527,7 +527,7 @@ def test_fof_blend_breaks_mutual_tie_via_interest_and_activity(client, session):
     privatepop = _make_user(session, "privatepop@example.com", "privatepop")
     _follow(session, friend, pop3)
     _follow(session, friend, privatepop)
-    # privatepop shares salsa + is more recently active; pop3 has neither.
+    # privatepop shares salsa + is more recently active, timezone; pop3 has neither.
     _set_interests(session, privatepop, salsa)
     _set_last_visit(session, privatepop, datetime(2026, 8, 7, 8, 0, 0))
     _set_last_visit(session, pop3, datetime(2026, 6, 1, 12, 0, 0))
@@ -751,7 +751,7 @@ def test_e7_redeem_double_redemption_idempotent(client, session):
 
 def _share_code_for(session: Session, email: str) -> str:
     """Trigger lazy share_code allocation by fetching /auth/me as ``email``."""
-    # Caller is expected to be logged in as ``email`` already; reads share_code
+    # Caller is expected to be logged in as ``email`` already, timezone; reads share_code
     # straight from the DB after the read path mints it.
     user = session.exec(select(User).where(User.email == email)).first()
     assert user is not None
@@ -912,7 +912,7 @@ def test_d2_redeem_share_follow_idempotent(client, session):
         json={"share_code": code, "consent": True},
     )
     assert r2.status_code == 200
-    # Second call is a no-op; edge already exists.
+    # Second call is a no-op, timezone; edge already exists.
     assert r2.json()["follow_created"] is False
 
 
@@ -1151,7 +1151,7 @@ def test_e8_follow_public_target_is_immediately_approved(client, session):
 
 
 def test_e8_follow_friends_only_target_creates_pending(client, session):
-    """Friends-visibility target → pending; no follower visibility granted."""
+    """Friends-visibility target → pending, timezone; no follower visibility granted."""
     os.environ["FEATURE_FRIEND_REQUESTS"] = "true"
     _make_user(session, "viewer@example.com", "viewer")
     _make_friends_user(session, "secret@example.com", "secret")

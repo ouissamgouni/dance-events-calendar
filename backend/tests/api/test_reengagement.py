@@ -134,8 +134,8 @@ def _make_event(
         event_id=event_id,
         calendar_id="cal",
         title=title,
-        start=start or (datetime.utcnow() + timedelta(hours=6)),
-        end=(start or (datetime.utcnow() + timedelta(hours=6))) + timedelta(hours=2),
+        start=start or (datetime.now(timezone.utc) + timedelta(hours=6)),
+        end=(start or (datetime.now(timezone.utc) + timedelta(hours=6))) + timedelta(hours=2),
         all_day=False,
         is_hidden=is_hidden,
         deleted_at=deleted_at,
@@ -153,7 +153,7 @@ def _going(session: Session, user: User, event_id: str) -> None:
             device_id=str(user.id).replace("-", "")[:24] + event_id[:8],
             user_id=user.id,
             event_id=event_id,
-            attending_since=datetime.utcnow(),
+            attending_since=datetime.now(timezone.utc),
         )
     )
     session.commit()
@@ -173,7 +173,7 @@ def _notif(
         actor_user_id=actor.id,
         kind=kind,
         event_id=event_id,
-        created_at=created_at or datetime.utcnow(),
+        created_at=created_at or datetime.now(timezone.utc),
     )
     session.add(n)
     session.commit()
@@ -194,7 +194,7 @@ def test_reminder_created_for_due_going_event(session, monkeypatch):
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
     alice = _make_user(session, "alice@example.com", "alice")
-    _make_event(session, "ev-soon", start=datetime.utcnow() + timedelta(hours=3))
+    _make_event(session, "ev-soon", start=datetime.now(timezone.utc) + timedelta(hours=3))
     _going(session, alice, "ev-soon")
 
     stats = reminder_service.run_once()
@@ -226,7 +226,7 @@ def test_reminder_ask_cta_gated_by_going_threshold(session, monkeypatch):
 
     # Popular event: 3 Going attendees → CTA on.
     popular = _make_event(
-        session, "ev-popular", start=datetime.utcnow() + timedelta(hours=3)
+        session, "ev-popular", start=datetime.now(timezone.utc) + timedelta(hours=3)
     )
     for i in range(3):
         u = _make_user(session, f"pop{i}@example.com", f"pop{i}")
@@ -234,7 +234,7 @@ def test_reminder_ask_cta_gated_by_going_threshold(session, monkeypatch):
 
     # Quiet event: single Going attendee → CTA off.
     quiet = _make_event(
-        session, "ev-quiet", start=datetime.utcnow() + timedelta(hours=3)
+        session, "ev-quiet", start=datetime.now(timezone.utc) + timedelta(hours=3)
     )
     solo = _make_user(session, "solo@example.com", "solo")
     _going(session, solo, quiet.event_id)
@@ -262,7 +262,7 @@ def test_reminder_is_idempotent(session, monkeypatch):
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
     alice = _make_user(session, "alice@example.com", "alice")
-    _make_event(session, "ev-soon", start=datetime.utcnow() + timedelta(hours=3))
+    _make_event(session, "ev-soon", start=datetime.now(timezone.utc) + timedelta(hours=3))
     _going(session, alice, "ev-soon")
 
     assert reminder_service.run_once()["reminders"] == 1
@@ -286,7 +286,7 @@ def test_reminder_email_optout_keeps_inapp(session, monkeypatch):
     alice = _make_user(
         session, "alice@example.com", "alice", email_event_reminders_enabled=False
     )
-    _make_event(session, "ev-soon", start=datetime.utcnow() + timedelta(hours=3))
+    _make_event(session, "ev-soon", start=datetime.now(timezone.utc) + timedelta(hours=3))
     _going(session, alice, "ev-soon")
 
     stats = reminder_service.run_once()
@@ -314,7 +314,7 @@ def test_reminder_excludes_hidden_deleted_and_out_of_window(session, monkeypatch
     _make_event(
         session,
         "ev-hidden",
-        start=datetime.utcnow() + timedelta(hours=3),
+        start=datetime.now(timezone.utc) + timedelta(hours=3),
         is_hidden=True,
     )
     _going(session, alice, "ev-hidden")
@@ -322,12 +322,12 @@ def test_reminder_excludes_hidden_deleted_and_out_of_window(session, monkeypatch
     _make_event(
         session,
         "ev-deleted",
-        start=datetime.utcnow() + timedelta(hours=3),
-        deleted_at=datetime.utcnow(),
+        start=datetime.now(timezone.utc) + timedelta(hours=3),
+        deleted_at=datetime.now(timezone.utc),
     )
     _going(session, alice, "ev-deleted")
     # Far-future event beyond the 24h lead — excluded.
-    _make_event(session, "ev-far", start=datetime.utcnow() + timedelta(days=5))
+    _make_event(session, "ev-far", start=datetime.now(timezone.utc) + timedelta(days=5))
     _going(session, alice, "ev-far")
 
     assert reminder_service.run_once() == {"reminders": 0}
@@ -340,9 +340,9 @@ def test_reminder_excludes_deleted_user(session, monkeypatch):
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
     ghost = _make_user(
-        session, "ghost@example.com", "ghost", deleted_at=datetime.utcnow()
+        session, "ghost@example.com", "ghost", deleted_at=datetime.now(timezone.utc)
     )
-    _make_event(session, "ev-soon", start=datetime.utcnow() + timedelta(hours=3))
+    _make_event(session, "ev-soon", start=datetime.now(timezone.utc) + timedelta(hours=3))
     _going(session, ghost, "ev-soon")
 
     assert reminder_service.run_once() == {"reminders": 0}
@@ -362,7 +362,7 @@ def test_review_prompt_created_for_ended_going_event(session, monkeypatch):
 
     alice = _make_user(session, "alice@example.com", "alice")
     # Ended 4h ago — past the default 3h delay.
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _going(session, alice, "ev-past")
 
     stats = review_prompt_service.run_once()
@@ -382,7 +382,7 @@ def test_notifications_filter_by_review_prompt_kind(client, session):
     """GET /api/notifications?kind=event_review_prompt must be accepted (200),
     not rejected as an invalid kind (400)."""
     alice = _make_user(session, "alice@example.com", "alice")
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _notif(
         session,
         recipient=alice,
@@ -409,7 +409,7 @@ def test_review_prompt_is_idempotent(session, monkeypatch):
     monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
 
     alice = _make_user(session, "alice@example.com", "alice")
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _going(session, alice, "ev-past")
 
     assert review_prompt_service.run_once()["prompts"] == 1
@@ -431,7 +431,7 @@ def test_review_prompt_skips_already_rated(session, monkeypatch):
     monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
 
     alice = _make_user(session, "alice@example.com", "alice")
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _going(session, alice, "ev-past")
     session.add(
         EventRating(
@@ -459,7 +459,7 @@ def test_review_prompt_email_optout_keeps_inapp(session, monkeypatch):
     alice = _make_user(
         session, "alice@example.com", "alice", email_review_prompt_enabled=False
     )
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _going(session, alice, "ev-past")
 
     stats = review_prompt_service.run_once()
@@ -490,7 +490,7 @@ def test_review_prompt_backfills_email_after_toggle(session, monkeypatch):
     bob = _make_user(
         session, "bob@example.com", "bob", email_review_prompt_enabled=False
     )
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _going(session, bob, "ev-past")
 
     # First tick: in-app prompt created, no email (opted out).
@@ -534,7 +534,7 @@ def test_review_prompt_no_backfill_once_rated(session, monkeypatch):
     bob = _make_user(
         session, "bob@example.com", "bob", email_review_prompt_enabled=False
     )
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _going(session, bob, "ev-past")
 
     assert review_prompt_service.run_once()["prompts"] == 1
@@ -560,13 +560,13 @@ def test_review_prompt_excludes_too_recent_hidden_and_deleted(session, monkeypat
 
     alice = _make_user(session, "alice@example.com", "alice")
     # Ended too recently — still inside the configured delay window.
-    _make_event(session, "ev-just-ended", start=datetime.utcnow() - timedelta(hours=1))
+    _make_event(session, "ev-just-ended", start=datetime.now(timezone.utc) - timedelta(hours=1))
     _going(session, alice, "ev-just-ended")
     # Hidden event — excluded.
     _make_event(
         session,
         "ev-hidden",
-        start=datetime.utcnow() - timedelta(hours=6),
+        start=datetime.now(timezone.utc) - timedelta(hours=6),
         is_hidden=True,
     )
     _going(session, alice, "ev-hidden")
@@ -574,8 +574,8 @@ def test_review_prompt_excludes_too_recent_hidden_and_deleted(session, monkeypat
     _make_event(
         session,
         "ev-deleted",
-        start=datetime.utcnow() - timedelta(hours=6),
-        deleted_at=datetime.utcnow(),
+        start=datetime.now(timezone.utc) - timedelta(hours=6),
+        deleted_at=datetime.now(timezone.utc),
     )
     _going(session, alice, "ev-deleted")
 
@@ -597,7 +597,7 @@ def test_review_prompt_lookback_hours_widens_scan_window(session, monkeypatch):
     # is [3h, 27h] ago. `start` is 30h ago and `_make_event` sets
     # `end = start + 2h`, so this event's `end` is 28h ago — just outside
     # the default window.
-    _make_event(session, "ev-old", start=datetime.utcnow() - timedelta(hours=30))
+    _make_event(session, "ev-old", start=datetime.now(timezone.utc) - timedelta(hours=30))
     _going(session, alice, "ev-old")
 
     assert review_prompt_service.run_once() == {"prompts": 0}
@@ -648,7 +648,7 @@ def test_friend_review_proof_names_and_others(session):
     dan = _make_user(session, "dan@example.com", "dan")
     erin = _make_user(session, "erin@example.com", "erin")
     flo = _make_user(session, "flo@example.com", "flo")
-    _make_event(session, "ev1", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev1", start=datetime.now(timezone.utc) - timedelta(hours=6))
     for reviewer in (carol, dan, erin, flo):
         _follow(session, alice, reviewer)
     _rate(session, carol, "ev1")
@@ -669,7 +669,7 @@ def test_friend_review_proof_none_when_only_anon_or_rejected(session):
     alice = _make_user(session, "alice@example.com", "alice")
     carol = _make_user(session, "carol@example.com", "carol")
     dan = _make_user(session, "dan@example.com", "dan")
-    _make_event(session, "ev1", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev1", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _follow(session, alice, carol)
     _follow(session, alice, dan)
     _rate(session, carol, "ev1", is_anonymous=True)  # no name
@@ -683,7 +683,7 @@ def test_friend_review_proof_is_directional(session):
     reviewed the event does not produce social proof for the recipient."""
     alice = _make_user(session, "alice@example.com", "alice")
     carol = _make_user(session, "carol@example.com", "carol")
-    _make_event(session, "ev1", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev1", start=datetime.now(timezone.utc) - timedelta(hours=6))
     # Carol follows Alice (reverse direction), and Carol reviewed the event.
     _follow(session, carol, alice)
     _rate(session, carol, "ev1")
@@ -694,7 +694,7 @@ def test_friend_review_proof_is_directional(session):
 def test_friend_review_proof_ignores_pending_follows(session):
     alice = _make_user(session, "alice@example.com", "alice")
     carol = _make_user(session, "carol@example.com", "carol")
-    _make_event(session, "ev1", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev1", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _follow(session, alice, carol, status="pending")
     _rate(session, carol, "ev1")
 
@@ -726,7 +726,7 @@ def test_run_once_sets_friend_context_and_email_variant(session, monkeypatch):
 
     alice = _make_user(session, "alice@example.com", "alice")
     carol = _make_user(session, "carol@example.com", "carol")
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _going(session, alice, "ev-past")
     _follow(session, alice, carol)
     _rate(session, carol, "ev-past")
@@ -754,7 +754,7 @@ def test_review_prompt_send_now_per_user_statuses(client, session, monkeypatch):
     )
     monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
 
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     gina = _make_user(
         session,
         "gina@example.com",
@@ -803,7 +803,7 @@ def test_review_prompt_send_now_resend(client, session, monkeypatch):
     )
     monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
 
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     alice = _make_user(
         session, "alice@example.com", "alice", push_review_prompt_enabled=False
     )
@@ -842,7 +842,7 @@ def test_review_prompt_send_now_friend_variant(client, session, monkeypatch):
     )
     monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
 
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     alice = _make_user(
         session, "alice@example.com", "alice", push_review_prompt_enabled=False
     )
@@ -868,7 +868,7 @@ def test_review_prompt_send_now_friend_variant(client, session, monkeypatch):
 
 
 def test_review_prompt_send_now_requires_admin(client, session):
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     plain = _make_user(session, "plain@example.com", "plain")
     _login(client, "plain@example.com")
     r = client.post(
@@ -891,7 +891,7 @@ def test_review_prompt_send_now_missing_event(client, session):
 
 
 def test_review_prompt_candidates_lists_only_attendees(client, session):
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     gina = _make_user(session, "gina@example.com", "gina")
     carol = _make_user(session, "carol@example.com", "carol")
     _make_user(session, "ned@example.com", "ned")  # not an attendee
@@ -909,7 +909,7 @@ def test_review_prompt_candidates_lists_only_attendees(client, session):
 
 
 def test_review_prompt_candidates_requires_admin(client, session):
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
     _make_user(session, "plain@example.com", "plain")
     _login(client, "plain@example.com")
     r = client.get("/api/admin/events/ev-past/review-prompt-candidates")
@@ -926,7 +926,7 @@ def test_search_events_include_past(client, session):
     _make_event(
         session,
         "ev-past",
-        start=datetime.utcnow() - timedelta(days=3),
+        start=datetime.now(timezone.utc) - timedelta(days=3),
         title="Rooftop Salsa Social",
     )
     # Default search excludes past events.
@@ -957,7 +957,7 @@ def test_activity_digest_batches_into_one_email(session, monkeypatch):
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
     a2 = _make_user(session, "a2@example.com", "a2")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
     _notif(session, recipient=bob, actor=a2, kind="new_friend", created_at=old)
 
@@ -988,7 +988,7 @@ def test_activity_digest_suppresses_follower_and_carries_grouping_data(
     suggested_event = _make_event(session, "ev-suggested", title="Suggested Social")
     session.add(event)
     session.commit()
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     follower = _notif(
         session, recipient=bob, actor=alice, kind="new_follower", created_at=old
     )
@@ -1098,7 +1098,7 @@ def test_activity_digest_expands_multi_profile_match_into_alert_groups(
         actor=bob,
         kind="interest_event",
         event_id=event.event_id,
-        created_at=datetime.utcnow() - timedelta(minutes=5),
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
     )
     notification.context = "Home, Trip"
     session.add(notification)
@@ -1136,7 +1136,7 @@ def test_activity_digest_groups_friend_milestone_batch(session, monkeypatch):
 
     bob = _make_user(session, "bob@example.com", "bob")
     alice = _make_user(session, "alice@example.com", "alice")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     rows = (
         Notification(
             recipient_user_id=bob.id,
@@ -1204,9 +1204,9 @@ def test_activity_digest_drops_past_event_but_stamps_it(session, monkeypatch):
 
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
-    _make_event(session, "ev-future", start=datetime.utcnow() + timedelta(hours=6))
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
-    old = datetime.utcnow() - timedelta(minutes=5)
+    _make_event(session, "ev-future", start=datetime.now(timezone.utc) + timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     future = _notif(
         session,
         recipient=bob,
@@ -1259,8 +1259,8 @@ def test_activity_digest_keeps_review_on_past_event(session, monkeypatch):
 
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
-    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
-    old = datetime.utcnow() - timedelta(minutes=5)
+    _make_event(session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6))
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     _notif(
         session,
         recipient=bob,
@@ -1301,7 +1301,7 @@ def test_milestone_delivered_via_activity_digest(session, monkeypatch):
     )
 
     bob = _make_user(session, "bob@example.com", "bob")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     n = _notif(
         session, recipient=bob, actor=bob, kind="milestone_unlocked", created_at=old
     )
@@ -1338,7 +1338,7 @@ def test_milestone_not_sent_instantly_by_activity_email(session, monkeypatch):
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
     bob = _make_user(session, "bob@example.com", "bob")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     n = _notif(
         session, recipient=bob, actor=bob, kind="milestone_unlocked", created_at=old
     )
@@ -1368,7 +1368,7 @@ def test_activity_digest_kinds_filter_scopes_to_one_feature(session, monkeypatch
 
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     reviewed = _notif(
         session, recipient=bob, actor=a1, kind="subscription_review", created_at=old
     )
@@ -1399,7 +1399,7 @@ def test_activity_digest_emailed_at_is_idempotent(session, monkeypatch):
 
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
 
     activity_email.run_once(force=True)
@@ -1429,7 +1429,7 @@ def test_activity_email_instant_mode_sends_without_schedule(session, monkeypatch
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
     _make_event(session, "ev-going")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     n = _notif(
         session,
         recipient=bob,
@@ -1480,7 +1480,7 @@ def test_instant_feature_never_also_digests(session, monkeypatch):
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
     _make_event(session, "ev-going")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     n = _notif(
         session,
         recipient=bob,
@@ -1516,7 +1516,7 @@ def test_activity_digest_optout_skips_email_but_stamps(session, monkeypatch):
         session, "bob@example.com", "bob", email_social_activity_enabled=False
     )
     a1 = _make_user(session, "a1@example.com", "a1")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     n = _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
 
     stats = activity_email.run_once(force=True)
@@ -1542,7 +1542,7 @@ def test_activity_digest_skips_notifs_older_than_max_age(session, monkeypatch):
         actor=a1,
         kind="new_friend",
         event_id=None,
-        created_at=datetime.utcnow() - timedelta(days=30),
+        created_at=datetime.now(timezone.utc) - timedelta(days=30),
     )
 
     assert activity_email.run_once(force=True) == {"digests": 0, "pushed": 0}
@@ -1573,7 +1573,7 @@ def test_activity_digest_gates_on_scheduled_slot(session, monkeypatch):
 
     bob = _make_user(session, "bob@example.com", "bob", timezone="UTC")
     a1 = _make_user(session, "a1@example.com", "a1")
-    old = datetime.utcnow() - timedelta(minutes=5)
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
     n = _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
 
     class _FakeDateTime:
@@ -1617,7 +1617,7 @@ def test_activity_digest_and_push_skip_anonymous_review(session, monkeypatch):
     _make_event(
         session,
         "ev-anon-review",
-        start=datetime.utcnow() - timedelta(days=2),
+        start=datetime.now(timezone.utc) - timedelta(days=2),
     )
     _rate(session, alice, "ev-anon-review", is_anonymous=True)
     notification = _notif(
@@ -1658,7 +1658,7 @@ def test_activity_digest_delivers_in_scheduled_slot(session, monkeypatch):
         recipient=bob,
         actor=a1,
         kind="new_follower",
-        created_at=datetime.utcnow() - timedelta(minutes=5),
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
     )
 
     class _FakeDateTime:
@@ -1697,14 +1697,14 @@ def test_activity_digest_per_user_timezone(session, monkeypatch):
         recipient=paris,
         actor=a1,
         kind="new_follower",
-        created_at=datetime.utcnow() - timedelta(minutes=5),
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
     )
     _notif(
         session,
         recipient=tokyo,
         actor=a1,
         kind="new_follower",
-        created_at=datetime.utcnow() - timedelta(minutes=5),
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
     )
 
     # Tuesday 07:00 UTC → 09:00 Europe/Paris (in slot), but 16:00 in Tokyo

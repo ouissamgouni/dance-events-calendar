@@ -17,7 +17,7 @@ Conventions inherited from ``test_social_routes.py``:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -172,7 +172,7 @@ def _make_event(
     days_from_now: int = 7,
 ) -> CachedEvent:
     """Create a CachedEvent at ``now + days_from_now``. Negative = past."""
-    start = datetime.utcnow() + timedelta(days=days_from_now)
+    start = datetime.now(timezone.utc) + timedelta(days=days_from_now)
     ev = CachedEvent(
         event_id=str(uuid4()),
         calendar_id=calendar_id,

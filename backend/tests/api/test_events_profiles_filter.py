@@ -6,7 +6,7 @@ UserInterestProfile rows on all three axes: bbox, dance_tag_ids
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -115,7 +115,7 @@ def world(session):
     for t in (salsa, bachata, local, intl):
         session.refresh(t)
 
-    base = datetime(2030, 1, 1, 20, 0, 0)
+    base = datetime(2030, 1, 1, 20, 0, 0, tzinfo=timezone.utc)
 
     def _add_event(
         eid: str,

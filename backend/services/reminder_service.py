@@ -95,7 +95,7 @@ def run_once() -> dict:
         return {"skipped": "reminders_disabled"}
 
     lead_hours = get_reminder_lead_hours()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     to_email: list[tuple] = []
     to_push: list[tuple] = []
     # (recipient_user_id, event_id) -> Notification.id, so the admin
@@ -174,7 +174,7 @@ def run_once() -> dict:
     # NotificationDelivery audit row per actually-delivered channel.
     if emailed_ids or pushed_ids:
         with Session(get_engine()) as session:
-            stamp_now = datetime.utcnow()
+            stamp_now = datetime.now(timezone.utc)
             if emailed_ids:
                 session.exec(
                     update(Notification)

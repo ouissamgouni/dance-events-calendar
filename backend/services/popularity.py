@@ -19,7 +19,7 @@ endpoints).
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 from sqlalchemy import func
@@ -92,7 +92,7 @@ def compute_popularity_scores(
     if not events_list:
         return {}
 
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     since = now - timedelta(days=window_days)
 
     event_ids = [e.event_id for e in events_list]

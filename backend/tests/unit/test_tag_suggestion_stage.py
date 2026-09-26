@@ -4,7 +4,7 @@ Uses an in-memory SQLite session to verify DB interaction (idempotency,
 exclusions, rejection-suppression, persistence).
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
@@ -104,7 +104,7 @@ def test_should_process_true_with_title():
 
 
 def test_process_without_session_is_noop():
-    """Parallel-pipeline path has no session; stage must not raise."""
+    """Parallel-pipeline path has no session, timezone; stage must not raise."""
     stage = TagSuggestionStage()
     ev = _bare_event(title="Salsa")
     assert stage.process(ev) is True
@@ -186,7 +186,7 @@ def test_changed_extractor_tags_replace_only_pending_suggestions(session):
         tag_id=ids["kizomba"],
         status="rejected",
         source="heuristic",
-        reviewed_at=datetime.utcnow(),
+        reviewed_at=datetime.now(timezone.utc),
     )
     session.add(reviewed)
     session.flush()
@@ -231,7 +231,7 @@ def test_excluded_tag_ids_includes_recently_rejected(session):
             tag_id=ids["bachata"],
             status="rejected",
             source="heuristic",
-            reviewed_at=datetime.utcnow() - timedelta(days=1),
+            reviewed_at=datetime.now(timezone.utc) - timedelta(days=1),
         )
     )
     session.flush()
@@ -249,7 +249,7 @@ def test_excluded_tag_ids_ignores_old_rejections(session):
             tag_id=ids["bachata"],
             status="rejected",
             source="heuristic",
-            reviewed_at=datetime.utcnow()
+            reviewed_at=datetime.now(timezone.utc)
             - timedelta(days=REJECTION_SUPPRESSION_DAYS + 5),
         )
     )
@@ -269,7 +269,7 @@ def test_excluded_tag_ids_ignores_user_rejections(session):
             tag_id=ids["bachata"],
             status="rejected",
             source="user",
-            reviewed_at=datetime.utcnow() - timedelta(days=1),
+            reviewed_at=datetime.now(timezone.utc) - timedelta(days=1),
         )
     )
     session.flush()

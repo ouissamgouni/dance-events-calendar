@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
@@ -31,7 +31,7 @@ ALLOWED_GOING_BUTTON_ICON_VARIANTS = {"hand", "person"}
 
 
 def _default_since_date() -> str:
-    return (datetime.utcnow() - timedelta(days=DEFAULT_SINCE_DAYS)).strftime("%Y-%m-%d")
+    return (datetime.now(timezone.utc) - timedelta(days=DEFAULT_SINCE_DAYS)).strftime("%Y-%m-%d")
 
 
 def _get_since_date(session: Session) -> str:

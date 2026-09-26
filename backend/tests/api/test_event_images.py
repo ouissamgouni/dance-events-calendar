@@ -1,7 +1,7 @@
 """Tests for the event picture pipeline and the admin picture routes."""
 
 import io
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -23,7 +23,7 @@ def _png_bytes(width: int, height: int) -> bytes:
     return buf.getvalue()
 
 
-START = datetime(2030, 1, 1, 20, 0, 0)
+START = datetime(2030, 1, 1, 20, 0, 0, tzinfo=timezone.utc)
 END = START + timedelta(hours=4)
 
 

@@ -7,7 +7,7 @@ they gracefully fall back to plain text when those fields are missing.
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 os.environ.setdefault("SESSION_SECRET", "test-secret-activity-email-render")
@@ -31,7 +31,7 @@ def _make_user(*, handle: str | None = "alice", display: str | None = "Alice R")
 def _make_event(
     *, event_id: str = "evt-123", title: str = "Salsa Friday"
 ) -> CachedEvent:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return CachedEvent(
         event_id=event_id,
         calendar_id="cal-1",

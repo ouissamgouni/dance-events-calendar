@@ -7,7 +7,7 @@ Both behaviors were added together to fix the staging admin UX bugs:
    explicit 404/400/409 contracts instead of overloading POST /sync-jobs.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -66,7 +66,7 @@ def _seed_calendar(engine, *, calendar_id="cal-1", enabled=True, name="Test Cal"
 
 
 def _seed_events(engine):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     past = CachedEvent(
         event_id="evt-past",
         calendar_id="cal-1",

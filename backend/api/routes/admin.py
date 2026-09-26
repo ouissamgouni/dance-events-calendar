@@ -117,7 +117,7 @@ def _apply_upcoming_filter(
     so existing clients/tests that pass it don't change behaviour.
     Uses ``CachedEvent.end > now`` so events in progress remain visible.
     """
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, timezone
 
     # Legacy explicit param wins.
     if future_only is True:
@@ -163,7 +163,7 @@ def _run_sync_job_worker(
     """
     import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, timezone
 
     from backend.services.calendar_sync_worker import CalendarSyncWorker
     from backend.services.event_pipeline_processor import (
@@ -1151,7 +1151,7 @@ def review_prompt_send_now(
     recipient have already reviewed the event, the social-proof variant of the
     copy is used across all three channels.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     from backend.services.review_prompt_service import (
         EVENT_REVIEW_PROMPT,
         friend_review_proof,
@@ -1193,7 +1193,7 @@ def review_prompt_send_now(
 
     results: list[ForceSendUserResult] = []
     emailed = pushed = in_app_created = 0
-    stamp_now = datetime.utcnow()
+    stamp_now = datetime.now(timezone.utc)
 
     for uid in body.user_ids:
         user = users.get(uid)
@@ -1840,7 +1840,7 @@ def update_event(
             else:
                 event.city = event.country = event.country_code = None
 
-    from datetime import datetime as dt
+    from datetime import datetime as dt, timezone
 
     event.updated_at = dt.utcnow()
     session.add(event)
@@ -1934,7 +1934,7 @@ def _event_image_response(session: Session, event: CachedEvent) -> AdminEventRes
 def _apply_event_image(
     session: Session, event: CachedEvent, data: bytes, content_type: Optional[str]
 ) -> AdminEventResponse:
-    from datetime import datetime as dt
+    from datetime import datetime as dt, timezone
 
     previous_key = event.image_key
     try:
@@ -1983,7 +1983,7 @@ def set_event_image_from_url(
         )
     except ImageValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    from datetime import datetime as dt
+    from datetime import datetime as dt, timezone
 
     event.updated_at = dt.utcnow()
     session.add(event)
@@ -2003,7 +2003,7 @@ def remove_event_image(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    from datetime import datetime as dt
+    from datetime import datetime as dt, timezone
 
     delete_event_image(event.image_key)
     event.image_key = None
@@ -2652,7 +2652,7 @@ def block_event(
         raise HTTPException(status_code=404, detail="Event not found")
 
     event.is_hidden = True
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, timezone
 
     event.updated_at = _dt.utcnow()
     session.add(event)
@@ -2712,7 +2712,7 @@ def unblock_event(
         session.delete(blocked)
 
     event.is_hidden = False
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, timezone
 
     event.updated_at = _dt.utcnow()
     session.add(event)

@@ -198,7 +198,7 @@ def _link_occurrences_to_series(
             status="resolved",
             source="manual",
             canonical_title=suggestion.title[:200],
-            resolved_at=datetime.utcnow(),
+            resolved_at=datetime.now(timezone.utc),
             resolved_by_admin=admin_email,
         )
         session.add(series)
@@ -409,7 +409,7 @@ def submit_suggestion(
             latitude=body.latitude,
             longitude=body.longitude,
             limit=PREVIEW_OCCURRENCE_LIMIT,
-            horizon_end=datetime.utcnow() + timedelta(days=PREVIEW_HORIZON_DAYS),
+            horizon_end=datetime.now(timezone.utc) + timedelta(days=PREVIEW_HORIZON_DAYS),
         )
         cached_event = cached_events[0]
         for occurrence in cached_events:
@@ -691,7 +691,7 @@ def approve_suggestion(
     suggestion.status = "approved"
     suggestion.assigned_calendar_id = body.calendar_id
     suggestion.created_event_id = event_id
-    suggestion.reviewed_at = datetime.utcnow()
+    suggestion.reviewed_at = datetime.now(timezone.utc)
     suggestion.reviewed_by = admin.get("email")
     session.add(suggestion)
 
@@ -764,7 +764,7 @@ def reject_suggestion(
 
     suggestion.status = "rejected"
     suggestion.admin_notes = body.admin_notes or suggestion.admin_notes
-    suggestion.reviewed_at = datetime.utcnow()
+    suggestion.reviewed_at = datetime.now(timezone.utc)
     suggestion.reviewed_by = admin.get("email")
     events = list(
         session.exec(

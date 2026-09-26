@@ -231,7 +231,7 @@ def apply_import_document(
     schedule.timezone = document.timezone
     schedule.day_start_hour = document.day_start_hour
     schedule.days = [day.isoformat() for day in document.days]
-    schedule.updated_at = datetime.utcnow()
+    schedule.updated_at = datetime.now(timezone.utc)
     session.add(schedule)
 
     venues, vc, vu, vn = _upsert_named(
@@ -383,7 +383,7 @@ def apply_import_document(
             row.external_id = item.external_id
             for key, value in values.items():
                 setattr(row, key, value)
-            row.updated_at = datetime.utcnow()
+            row.updated_at = datetime.now(timezone.utc)
             session.add(row)
             updated += int(changed)
             unchanged += int(not changed)
@@ -392,7 +392,7 @@ def apply_import_document(
     if mode == "replace":
         for external_id, row in existing_sessions.items():
             if external_id not in imported_ids and row.deleted_at is None:
-                row.deleted_at = datetime.utcnow()
+                row.deleted_at = datetime.now(timezone.utc)
                 session.add(row)
                 removed += 1
     session.flush()

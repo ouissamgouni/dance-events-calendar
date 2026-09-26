@@ -190,9 +190,9 @@ def test_admin_list_users_sort_by_followers_count(client, session):
 def test_admin_list_users_excludes_deleted_by_default(client, session):
     users = _seed_users(session)
     # Soft-delete Carol the same way the auth flow would.
-    from datetime import datetime
+    from datetime import datetime, timezone
 
-    users["carol"].deleted_at = datetime.utcnow()
+    users["carol"].deleted_at = datetime.now(timezone.utc)
     session.add(users["carol"])
     session.commit()
 
@@ -266,7 +266,7 @@ def test_admin_reset_onboarding_retriggers_without_touching_data(client, session
 
     users = _seed_users(session)
     alice = users["alice"]
-    alice.onboarded_at = datetime.utcnow()
+    alice.onboarded_at = datetime.now(timezone.utc)
     alice.onboarding_version = get_current_onboarding_version()
     alice.preferred_area_label = "Europe"
     session.add(alice)

@@ -14,7 +14,7 @@ Covers:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.pool import StaticPool
@@ -85,7 +85,7 @@ def _make_event(
 @pytest.mark.unit
 class TestFindCandidateMatches:
     def test_matches_similar_title_within_window(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Salsa Night at the Warehouse", start)
         _make_event(
             session,
@@ -97,21 +97,21 @@ class TestFindCandidateMatches:
         assert {m.event_id for m in matches} == {"evt-b"}
 
     def test_ignores_dissimilar_title(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Bachata Workshop", start + timedelta(hours=1))
         matches = find_candidate_matches(session, a)
         assert matches == []
 
     def test_ignores_events_outside_window(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=48))
         matches = find_candidate_matches(session, a)
         assert matches == []
 
     def test_ignores_hidden_events(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Salsa Night", start)
         b = _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
         b.is_hidden = True
@@ -121,9 +121,9 @@ class TestFindCandidateMatches:
         assert matches == []
 
     def test_ignores_past_events(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Salsa Night", start)
-        past_start = datetime.utcnow() - timedelta(days=10)
+        past_start = datetime.now(timezone.utc) - timedelta(days=10)
         _make_event(
             session,
             "evt-b",
@@ -137,7 +137,7 @@ class TestFindCandidateMatches:
 @pytest.mark.unit
 class TestDetectDuplicatesForEvent:
     def test_creates_group_and_logs_scan(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
 
@@ -156,7 +156,7 @@ class TestDetectDuplicatesForEvent:
         assert {m.event_id for m in members} == {"evt-a", "evt-b"}
 
     def test_logs_scan_even_when_no_match_found(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
 
         log = detect_duplicates_for_event(session, "evt-a")
@@ -167,7 +167,7 @@ class TestDetectDuplicatesForEvent:
         assert session.exec(select(EventDuplicateGroup)).all() == []
 
     def test_third_match_joins_existing_pending_group(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
         _make_event(session, "evt-c", "Salsa Night", start + timedelta(hours=2))
@@ -181,7 +181,7 @@ class TestDetectDuplicatesForEvent:
         assert {m.event_id for m in members} == {"evt-a", "evt-b", "evt-c"}
 
     def test_does_not_recreate_group_for_resolved_pair(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
 
@@ -195,7 +195,7 @@ class TestDetectDuplicatesForEvent:
         assert len(groups) == 1
 
     def test_does_not_recreate_group_for_dismissed_pair(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
 
@@ -212,7 +212,7 @@ class TestDetectDuplicatesForEvent:
 @pytest.mark.unit
 class TestMaybeDetectDuplicatesForEvent:
     def test_noop_when_flag_disabled(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
 
@@ -225,7 +225,7 @@ class TestMaybeDetectDuplicatesForEvent:
         session.add(SiteSetting(key="duplicate_auto_detect_enabled", value="true"))
         session.commit()
 
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
 
@@ -238,7 +238,7 @@ class TestMaybeDetectDuplicatesForEvent:
 @pytest.mark.unit
 class TestKeepEvent:
     def test_keeps_one_and_rejects_others(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
         detect_duplicates_for_event(session, "evt-a")
@@ -263,7 +263,7 @@ class TestKeepEvent:
             keep_event(session, 999, "evt-a")
 
     def test_raises_when_keep_id_not_a_member(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
         detect_duplicates_for_event(session, "evt-a")
@@ -276,7 +276,7 @@ class TestKeepEvent:
 @pytest.mark.unit
 class TestDismissGroup:
     def test_marks_dismissed_without_hiding_events(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
         detect_duplicates_for_event(session, "evt-a")
@@ -293,7 +293,7 @@ class TestDismissGroup:
 @pytest.mark.unit
 class TestCreateManualGroup:
     def test_creates_group_regardless_of_prior_dismissal(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Bachata Workshop", start + timedelta(hours=1))
 
@@ -318,7 +318,7 @@ class TestCreateManualGroup:
 @pytest.mark.unit
 class TestRunFullScan:
     def test_dedups_pairs_across_all_events(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
         _make_event(session, "evt-c", "Unrelated Workshop", start + timedelta(hours=2))
@@ -334,7 +334,7 @@ class TestRunFullScan:
 @pytest.mark.unit
 class TestGetGroupsForEvent:
     def test_returns_only_pending_groups_for_event(self, session):
-        start = datetime.utcnow() + timedelta(days=3)
+        start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
         _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
         detect_duplicates_for_event(session, "evt-a")

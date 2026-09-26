@@ -1,6 +1,6 @@
 """API tests for the Dance Passport endpoints."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +19,7 @@ from backend.db.models import (
     UserEventAttendance,
 )
 
-NOW = datetime.utcnow()
+NOW = datetime.now(timezone.utc)
 
 
 @pytest.fixture

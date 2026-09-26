@@ -52,7 +52,7 @@ class TestDatabaseModels:
         assert fetched.color == "#123456"
 
     def test_create_cached_event(self, session):
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         cal = CalendarSetting(calendar_id="test-cal-2", name="Cal2", enabled=True)
         session.add(cal)
@@ -88,7 +88,7 @@ class TestDatabaseModels:
             session.add(evt)
             session.commit()
 
-        evt.deleted_at = datetime.utcnow()
+        evt.deleted_at = datetime.now(timezone.utc)
         session.add(evt)
         session.commit()
 

@@ -1,6 +1,6 @@
 """Shared iCalendar (RFC 5545) rendering for downloads and live feeds."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from backend.db.models import CachedEvent
 
@@ -58,7 +58,7 @@ def build_ics(
     clients (Apple/Google) use when a URL is *subscribed* to rather than
     imported once: a human-readable name and a polling hint.
     """
-    now = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",

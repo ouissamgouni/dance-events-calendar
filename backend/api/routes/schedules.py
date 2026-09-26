@@ -549,7 +549,7 @@ def update_admin_schedule(
         schedule.days = [value.isoformat() for value in data["days"]]
     if data.get("day_start_hour") is not None:
         schedule.day_start_hour = data["day_start_hour"]
-    schedule.updated_at = datetime.utcnow()
+    schedule.updated_at = datetime.now(timezone.utc)
     session.add(schedule)
     session.commit()
     session.refresh(schedule)
@@ -755,7 +755,7 @@ def update_session(
     }
     merged = _validated_session_data(session, schedule, merged)
     _apply(row, merged)
-    row.updated_at = datetime.utcnow()
+    row.updated_at = datetime.now(timezone.utc)
     session.add(row)
     session.commit()
     session.refresh(row)
@@ -770,8 +770,8 @@ def delete_session(
     row = session.get(ScheduleSession, session_id)
     if row is None or row.schedule_id != schedule.id or row.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Session not found")
-    row.deleted_at = datetime.utcnow()
-    row.updated_at = datetime.utcnow()
+    row.deleted_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(timezone.utc)
     session.add(row)
     session.commit()
 
@@ -1005,7 +1005,7 @@ def notify_program_available(
         ).all()
     }
     session_count = len(publication.snapshot.get("sessions", []))
-    stamp_now = datetime.utcnow()
+    stamp_now = datetime.now(timezone.utc)
     emailed = pushed = in_app_created = 0
     results: list[ScheduleProgramNotifyResult] = []
 
@@ -1205,7 +1205,7 @@ def publish_schedule(
     schedule = _schedule_for_event(session, event_id)
     latest = latest_publication(session, schedule.id)
     version = 1 if latest is None else latest.version + 1
-    published_at = datetime.utcnow()
+    published_at = datetime.now(timezone.utc)
     snapshot = build_snapshot(session, schedule)
     snapshot["version"] = version
     snapshot["published_at"] = published_at.isoformat()
@@ -1248,7 +1248,7 @@ def publish_schedule(
     from backend.services.notification_delivery import record_delivery
 
     emailed = pushed = 0
-    delivered_at = datetime.utcnow()
+    delivered_at = datetime.now(timezone.utc)
     if event is not None:
         for notification in impacted_notifications:
             user = users.get(notification.recipient_user_id)
@@ -1381,7 +1381,7 @@ def _notify_publication_going_attendees(
         if recipient_ids
         else {}
     )
-    delivered_at = datetime.utcnow()
+    delivered_at = datetime.now(timezone.utc)
     emailed = pushed = in_app_created = 0
     results: list[ScheduleProgramNotifyResult] = []
     session_count = len(publication.snapshot.get("sessions", []))

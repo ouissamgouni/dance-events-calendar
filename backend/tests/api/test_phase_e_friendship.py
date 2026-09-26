@@ -137,8 +137,8 @@ def _make_event(
         event_id=event_id or f"evt-{uuid4().hex[:8]}",
         calendar_id=cal_id,
         title="Salsa Night",
-        start=datetime.utcnow() + timedelta(days=days_offset),
-        end=datetime.utcnow() + timedelta(days=days_offset, hours=2),
+        start=datetime.now(timezone.utc) + timedelta(days=days_offset),
+        end=datetime.now(timezone.utc) + timedelta(days=days_offset, hours=2),
         all_day=False,
         review_status="reviewed",
     )
@@ -297,7 +297,7 @@ def test_e10_mutual_friends_who_follow_counts_viewer_friends_following_organizer
     _mutual(session, viewer, f1)
     _mutual(session, viewer, f2)
     _mutual(session, viewer, f3)
-    # Two of the viewer's friends follow the organizer; one does not.
+    # Two of the viewer's friends follow the organizer, timezone; one does not.
     _follow(session, f1, organizer)
     _follow(session, f2, organizer)
 
@@ -388,8 +388,8 @@ def test_e9_leaderboard_period_filters_by_window(client, session):
         event_id="inside",
         calendar_id="cal-e",
         title="Inside",
-        start=datetime.utcnow() + timedelta(days=2),
-        end=datetime.utcnow() + timedelta(days=2, hours=2),
+        start=datetime.now(timezone.utc) + timedelta(days=2),
+        end=datetime.now(timezone.utc) + timedelta(days=2, hours=2),
         all_day=False,
         review_status="reviewed",
     )
@@ -397,8 +397,8 @@ def test_e9_leaderboard_period_filters_by_window(client, session):
         event_id="outside",
         calendar_id="cal-e",
         title="Outside",
-        start=datetime.utcnow() - timedelta(days=20),
-        end=datetime.utcnow() - timedelta(days=20, hours=-2),
+        start=datetime.now(timezone.utc) - timedelta(days=20),
+        end=datetime.now(timezone.utc) - timedelta(days=20, hours=-2),
         all_day=False,
         review_status="reviewed",
     )
@@ -506,8 +506,8 @@ def test_following_most_active_period_filters_by_window(client, session):
         event_id="inside",
         calendar_id="cal-e",
         title="Inside",
-        start=datetime.utcnow() - timedelta(days=100),
-        end=datetime.utcnow() - timedelta(days=100, hours=-2),
+        start=datetime.now(timezone.utc) - timedelta(days=100),
+        end=datetime.now(timezone.utc) - timedelta(days=100, hours=-2),
         all_day=False,
         review_status="reviewed",
     )
@@ -515,8 +515,8 @@ def test_following_most_active_period_filters_by_window(client, session):
         event_id="outside",
         calendar_id="cal-e",
         title="Outside",
-        start=datetime.utcnow() - timedelta(days=300),
-        end=datetime.utcnow() - timedelta(days=300, hours=-2),
+        start=datetime.now(timezone.utc) - timedelta(days=300),
+        end=datetime.now(timezone.utc) - timedelta(days=300, hours=-2),
         all_day=False,
         review_status="reviewed",
     )

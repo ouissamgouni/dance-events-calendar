@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import difflib
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
@@ -96,7 +96,7 @@ def find_candidate_matches(
 ) -> list[CachedEvent]:
     """Active, upcoming events (any calendar) with a similar title and a
     start time within ``CANDIDATE_WINDOW_HOURS`` of ``event.start``."""
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     window = timedelta(hours=CANDIDATE_WINDOW_HOURS)
 
     narrowed = session.exec(
@@ -184,7 +184,7 @@ def detect_duplicates_for_event(
             event is not None
             and event.deleted_at is None
             and not event.is_hidden
-            and event.end > datetime.utcnow()
+            and event.end > datetime.now(timezone.utc)
         ):
             matches = find_candidate_matches(session, event)
             candidates_found = len(matches)
@@ -199,7 +199,7 @@ def detect_duplicates_for_event(
         log.status = "failed"
         raise
     finally:
-        log.finished_at = datetime.utcnow()
+        log.finished_at = datetime.now(timezone.utc)
         log.candidates_found = candidates_found
         log.groups_created = groups_created
         session.add(log)
@@ -228,7 +228,7 @@ def run_full_scan(
     groups_created = 0
     candidates_found = 0
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         events = session.exec(
             select(CachedEvent)
             .where(
@@ -258,7 +258,7 @@ def run_full_scan(
         log.status = "failed"
         raise
     finally:
-        log.finished_at = datetime.utcnow()
+        log.finished_at = datetime.now(timezone.utc)
         log.candidates_found = candidates_found
         log.groups_created = groups_created
         session.add(log)
@@ -284,7 +284,7 @@ def create_manual_group(
         scan_type="manual_pair",
         triggered_by_admin=triggered_by_admin,
         status="completed",
-        finished_at=datetime.utcnow(),
+        finished_at=datetime.now(timezone.utc),
         candidates_found=len(event_ids),
         groups_created=1,
     )
@@ -326,14 +326,14 @@ def keep_event(
             continue
         event.is_hidden = True
         event.rejected_duplicate_reason = f"Duplicate of {keep_event_id} — {kept_title}"
-        event.updated_at = datetime.utcnow()
+        event.updated_at = datetime.now(timezone.utc)
         session.add(event)
         if not session.get(BlockedEvent, event_id):
             session.add(BlockedEvent(event_id=event_id))
 
     group.status = "resolved"
     group.kept_event_id = keep_event_id
-    group.resolved_at = datetime.utcnow()
+    group.resolved_at = datetime.now(timezone.utc)
     group.resolved_by_admin = admin_email
     session.add(group)
     session.commit()
@@ -350,7 +350,7 @@ def dismiss_group(
     if group is None:
         raise ValueError("Duplicate group not found")
     group.status = "dismissed"
-    group.resolved_at = datetime.utcnow()
+    group.resolved_at = datetime.now(timezone.utc)
     group.resolved_by_admin = admin_email
     session.add(group)
     session.commit()

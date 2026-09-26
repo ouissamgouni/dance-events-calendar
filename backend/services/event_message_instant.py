@@ -15,7 +15,7 @@ failure can never break posting.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
@@ -65,7 +65,7 @@ def dispatch_event_message_instant(
     if not get_feature_email_instant(FEATURE, session):
         return {"emails": 0, "pushes": 0}
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     recipient_ids = {n.recipient_user_id for n in notifs if n.recipient_user_id}
     recipients = {
         u.id: u

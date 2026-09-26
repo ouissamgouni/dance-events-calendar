@@ -326,7 +326,7 @@ def submit_tag_suggestion(
             id=0,
             event_id=body.event_id,
             status="pending",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
     # Validate: at least one of tag_id or free_text
@@ -843,7 +843,7 @@ def approve_tag_suggestion(
     assign_event_tag(session, event, tag)
 
     suggestion.status = "approved"
-    suggestion.reviewed_at = datetime.utcnow()
+    suggestion.reviewed_at = datetime.now(timezone.utc)
     session.add(suggestion)
     session.commit()
     session.refresh(suggestion)
@@ -879,7 +879,7 @@ def reject_tag_suggestion(
 
     suggestion.status = "rejected"
     suggestion.admin_notes = body.admin_notes or suggestion.admin_notes
-    suggestion.reviewed_at = datetime.utcnow()
+    suggestion.reviewed_at = datetime.now(timezone.utc)
     session.add(suggestion)
     session.commit()
     session.refresh(suggestion)
@@ -921,7 +921,7 @@ def bulk_review_tag_suggestions(
         select(TagSuggestion).where(TagSuggestion.id.in_(body.ids))
     ).all()
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     ok = 0
     skipped = 0
 
