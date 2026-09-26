@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { usePwaInstall } from '../context/PwaInstallContext';
 import { useAuth } from '../context/AuthContext';
-import { InstallPromptCard } from '../components/InstallPrompt';
+import BottomSheet from '../components/BottomSheet';
+import { InstallPromptCard, IosInstallInstructions } from '../components/InstallPrompt';
 
 /**
  * Dedicated, linkable "Install Movida" page — the destination for the
@@ -16,8 +18,9 @@ import { InstallPromptCard } from '../components/InstallPrompt';
  * `beforeinstallprompt` support, e.g. iOS Safari).
  */
 export default function InstallPage() {
-    const { canInstall, isStandalone, promptInstall } = usePwaInstall();
+    const { canInstall, isStandalone, isIos, isIosSafari, promptInstall } = usePwaInstall();
     const { user, loading } = useAuth();
+    const [showIosHelp, setShowIosHelp] = useState(false);
 
     const install = () => {
         promptInstall();
@@ -51,9 +54,13 @@ export default function InstallPage() {
                             Sign in
                         </Link>
                     </div>
-                ) : canInstall ? (
+                ) : canInstall || isIos ? (
                     <div className="w-full flex justify-center">
-                        <InstallPromptCard surface="page" onInstall={install} />
+                        <InstallPromptCard
+                            surface="page"
+                            onInstall={isIos ? () => setShowIosHelp(true) : install}
+                            actionLabel={isIos ? 'How to install' : 'Install app'}
+                        />
                     </div>
                 ) : (
                     <div className="w-full border border-line bg-canvas px-6 py-5 text-sm text-ink text-left space-y-2">
@@ -64,6 +71,15 @@ export default function InstallPage() {
                     </div>
                 )}
             </div>
+            {showIosHelp ? (
+                <BottomSheet title="Install Movida" onClose={() => setShowIosHelp(false)} footer={(
+                    <button type="button" onClick={() => setShowIosHelp(false)} className="min-h-11 w-full rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                        Done
+                    </button>
+                )}>
+                    <IosInstallInstructions isSafari={isIosSafari} />
+                </BottomSheet>
+            ) : null}
         </>
     );
 }

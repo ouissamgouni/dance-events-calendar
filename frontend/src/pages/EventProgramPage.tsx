@@ -8,9 +8,12 @@ import { AttendeeProgramFilters, ProgramDayPicker } from '../components/program/
 import { SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
+import { usePwaInstall } from '../context/PwaInstallContext';
 import type { CalendarEvent, EventSchedule, MyPlanEntry, ScheduleSession } from '../types';
 import { saveDownload } from '../utils/download';
+import { programInstallDismissedKey, programPushOptInKey } from '../utils/installPromptStorage';
 import { filterScheduleSessions, firstDayWithSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
+import { trackProgramViewed } from '../utils/tracking';
 
 const EMPTY_FILTERS: ScheduleFilters = { instructor: '', levelIds: [], activityTypeIds: [] };
 
@@ -20,6 +23,7 @@ export default function EventProgramPage() {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const { user, loading: authLoading } = useAuth();
+    const { requestInstallInvitation } = usePwaInstall();
     const { eventScheduleEnabled } = useFeatureFlags();
     const flagsReady = useFeatureFlagsReady();
     const initialSearchParams = useRef(searchParams);
@@ -39,6 +43,7 @@ export default function EventProgramPage() {
     const [error, setError] = useState<string | null>(null);
     const [canEdit, setCanEdit] = useState(false);
     const [planExportStatus, setPlanExportStatus] = useState<'idle' | 'busy' | 'error'>('idle');
+    const trackedProgramEventId = useRef<string | null>(null);
 
     useEffect(() => {
         if (!eventId || !flagsReady || unavailable) return;
@@ -89,6 +94,16 @@ export default function EventProgramPage() {
             .catch(() => { if (!cancelled) setCanEdit(false); });
         return () => { cancelled = true; };
     }, [authLoading, eventId, preview, user]);
+
+    useEffect(() => {
+        if (activeTab !== 'program') {
+            trackedProgramEventId.current = null;
+            return;
+        }
+        if (preview || !eventId || schedule?.event_id !== eventId || trackedProgramEventId.current === eventId) return;
+        trackedProgramEventId.current = eventId;
+        trackProgramViewed();
+    }, [activeTab, eventId, preview, schedule]);
 
     const plannedIds = useMemo(() => new Set(user ? plan.filter((entry) => entry.status !== 'removed').map((entry) => entry.session_id) : []), [plan, user]);
     const filteredSessions = useMemo(
@@ -157,6 +172,11 @@ export default function EventProgramPage() {
             try {
                 const saved = await addToMyPlan(eventId, session.id);
                 setPlan((rows) => rows.map((entry) => entry.session_id === session.id ? saved : entry));
+                if (user?.user_id && !localStorage.getItem(programInstallDismissedKey(user.user_id, eventId))) {
+                    localStorage.setItem(programPushOptInKey(user.user_id), eventId);
+                    requestInstallInvitation({ source: 'program', eventId, eventTitle: event?.title ?? 'this event' });
+                    closeSession();
+                }
             } catch (reason) {
                 setPlan(previous);
                 throw reason;

@@ -181,25 +181,27 @@ export function usePush(userId?: string | null) {
 
     const enable = useCallback(async () => {
         console.log("enable() called");
-        if (busy || !isSupported()) return;
+        if (busy || !isSupported()) return false;
         setBusy(true);
         setError(null);
         try {
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
                 setStatus(permission === 'denied' ? 'denied' : 'off');
-                return;
+                return false;
             }
             const key = await fetchVapidPublicKey();
             if (!key) {
                 setStatus('disabled');
-                return;
+                return false;
             }
             const reg = await navigator.serviceWorker.ready;
             await subscribeAndRegister(reg, key);
             setStatus('on');
+            return true;
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to enable notifications');
+            return false;
         } finally {
             setBusy(false);
         }
