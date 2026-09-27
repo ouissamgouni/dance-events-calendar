@@ -23,7 +23,7 @@ function renderAt(path: string, browseNavEnabled = false) {
 describe('BottomNav', () => {
     it('renders the four primary destinations', () => {
         renderAt('/')
-        expect(screen.getByRole('link', { name: 'Explore' })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'My Events' })).toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'Tribe' })).toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'Passport' })).toBeInTheDocument()
@@ -32,9 +32,9 @@ describe('BottomNav', () => {
         expect(screen.queryByRole('link', { name: 'MyDance' })).not.toBeInTheDocument()
     })
 
-    it('marks Explore active on the root route', () => {
+    it('marks Home active on the root route', () => {
         renderAt('/')
-        expect(screen.getByRole('link', { name: 'Explore' })).toHaveAttribute('aria-current', 'page')
+        expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
         expect(screen.getByRole('link', { name: 'Passport' })).not.toHaveAttribute('aria-current')
     })
 
@@ -55,16 +55,16 @@ describe('BottomNav', () => {
         expect(screen.getByRole('link', { name: 'Passport' })).toHaveAttribute('aria-current', 'page')
     })
 
-    it('inserts Browse after Explore and gives it ownership of Browse routes when enabled', () => {
+    it('inserts Browse after Home and gives it ownership of Browse routes when enabled', () => {
         renderAt('/browse', true)
         const links = screen.getAllByRole('link')
-        expect(links.map((link) => link.textContent)).toEqual(['Explore', 'Browse', 'My Events', 'Tribe', 'Passport'])
+        expect(links.map((link) => link.textContent)).toEqual(['Home', 'Browse', 'My Events', 'Tribe', 'Passport'])
         expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('aria-current', 'page')
-        expect(screen.getByRole('link', { name: 'Explore' })).not.toHaveAttribute('aria-current')
+        expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
     })
 
-    it('keeps Browse routes under Explore while Browse navigation is disabled', () => {
+    it('keeps Browse routes under Home while Browse navigation is disabled', () => {
         renderAt('/browse')
-        expect(screen.getByRole('link', { name: 'Explore' })).toHaveAttribute('aria-current', 'page')
+        expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
     })
 })

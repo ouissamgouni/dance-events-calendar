@@ -55,7 +55,7 @@ from backend.services.follows import (
     ensure_approved_follow_with_subscription,
     ensure_calendar_subscription,
 )
-from backend.services.schedules import build_snapshot, session_snapshot, to_utc_naive
+from backend.services.schedules import build_snapshot, session_snapshot, to_utc
 
 WEEKDAYS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 RELATIVE_RE = re.compile(
@@ -165,9 +165,10 @@ class DatabaseSeeder:
         self._seed_suggested_notifications(scenario_dir / "db-events.yaml")
         self._seed_promo_codes(scenario_dir / "db-promo-codes.yaml")
         self._seed_organizer_claims(scenario_dir / "db-organizer-claims.yaml")
-        self._seed_site_settings(
-            scenario_file_with_default(scenario_dir, "settings.yaml")
-        )
+        default_settings_path = SCENARIOS_DIR / "default" / "settings.yaml"
+        if scenario_dir.resolve() != default_settings_path.parent.resolve():
+            self._seed_site_settings(default_settings_path)
+        self._seed_site_settings(scenario_dir / "settings.yaml")
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
         self._seed_event_images(scenario_dir)
@@ -2521,7 +2522,7 @@ class DatabaseSeeder:
         value: str | datetime, reference_now: Optional[datetime] = None
     ) -> datetime:
         if isinstance(value, datetime):
-            return to_utc_naive(value)
+            return to_utc(value)
         match = SCHEDULE_NOW_RE.match(value)
         if match:
             result = reference_now or datetime.now(timezone.utc)
@@ -2530,8 +2531,8 @@ class DatabaseSeeder:
                 result += timedelta(
                     minutes=amount if match.group(1) == "+" else -amount
                 )
-            return result.replace(tzinfo=None)
-        return to_utc_naive(datetime.fromisoformat(value.replace("Z", "+00:00")))
+            return result
+        return to_utc(datetime.fromisoformat(value.replace("Z", "+00:00")))
 
     @staticmethod
     def _schedule_day(value: str, reference_now: datetime) -> str:

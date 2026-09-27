@@ -276,7 +276,7 @@ def notify_planned_session_changes(
 
 
 def _event_is_past(session: Session, event_id: str) -> bool:
-    """True when the event has already ended (end < now, naive UTC).
+    """True when the event has already ended (end < now, aware UTC).
 
     Unknown events (no CachedEvent row) are treated as not-past so we
     preserve the existing fan-out behaviour.

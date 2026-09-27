@@ -7,7 +7,7 @@ under test is mostly about what ends up in the tables.
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.pool import StaticPool
@@ -35,8 +35,8 @@ from backend.api.routes.suggestions import (  # noqa: E402
 )
 from backend.services import recurrence_extension  # noqa: E402
 
-START = datetime(2026, 3, 2, 20, 0)  # a Monday
-END = datetime(2026, 3, 2, 23, 0)
+START = datetime(2026, 3, 2, 20, 0, tzinfo=timezone.utc)  # a Monday
+END = datetime(2026, 3, 2, 23, 0, tzinfo=timezone.utc)
 CALENDAR_ID = "user-submissions"
 
 

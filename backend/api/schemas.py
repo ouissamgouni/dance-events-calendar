@@ -500,6 +500,18 @@ class MyPlanResponse(BaseModel):
     entries: list[MyPlanEntryResponse]
 
 
+class MyPlanShareResponse(BaseModel):
+    token: str
+
+
+class SharedMyPlanResponse(BaseModel):
+    event_id: str
+    event_title: str
+    owner_display_name: Optional[str] = None
+    schedule: EventScheduleResponse
+    entries: list[MyPlanEntryResponse]
+
+
 class EventOrganizerMini(BaseModel):
     user_id: UUID
     handle: Optional[str] = None
@@ -1183,6 +1195,9 @@ class SiteSettingsResponse(BaseModel):
     browse_nav_enabled: bool = False
     # Send the Browse events action directly to the Explorer list.
     browse_direct_to_explorer_enabled: bool = False
+    # Require authentication for app workspace routes while keeping public
+    # detail and shared-link routes readable.
+    app_auth_gate_enabled: bool = False
     # Ask onboarding users to confirm their name and optionally add a picture.
     onboarding_profile_step_enabled: bool = False
     # Required tag-group ids used by the event suggestion form.
@@ -1285,6 +1300,8 @@ class SiteSettingsResponse(BaseModel):
     # When True, floating Explorer controls show labels below desktop widths.
     # Desktop controls are always labeled.
     explorer_view_control_labels_enabled: bool = True
+    # When True, the shared Explorer and Calendar filter bar may use two rows.
+    summary_two_line_enabled: bool = False
     # When True, event pictures render on cards and detail pages. Admin upload
     # stays available regardless so images can be prepared before going live.
     event_images_enabled: bool = True
@@ -1478,6 +1495,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     my_events_nav_enabled: Optional[bool] = None
     browse_nav_enabled: Optional[bool] = None
     browse_direct_to_explorer_enabled: Optional[bool] = None
+    app_auth_gate_enabled: Optional[bool] = None
     onboarding_profile_step_enabled: Optional[bool] = None
     suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
     suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)
@@ -1535,6 +1553,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     event_card_show_time_location_icons_enabled: Optional[bool] = None
     explorer_event_card_card_style_enabled: Optional[bool] = None
     explorer_view_control_labels_enabled: Optional[bool] = None
+    summary_two_line_enabled: Optional[bool] = None
     event_images_enabled: Optional[bool] = None
     event_card_placeholder_style: Optional[str] = Field(
         default=None, pattern="^(gradient|initial|none)$"

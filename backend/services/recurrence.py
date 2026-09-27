@@ -14,7 +14,7 @@ Two mutually exclusive inputs, mirroring ``EventSuggestion``:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Optional, Sequence
 
 from dateutil.rrule import rrulestr
@@ -95,14 +95,17 @@ def is_open_ended(rule: Optional[str]) -> bool:
 
 def _coerce_datetime(value: Any) -> datetime:
     if isinstance(value, datetime):
-        return value
-    if isinstance(value, str):
+        parsed = value
+    elif isinstance(value, str):
         text = value.strip()
         if text.endswith("Z"):
             text = text[:-1] + "+00:00"
         parsed = datetime.fromisoformat(text)
-        return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
-    raise ValueError(f"Expected a datetime, got {type(value).__name__}")
+    else:
+        raise ValueError(f"Expected a datetime, got {type(value).__name__}")
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def normalize_dates(items: Iterable[Any]) -> list[Occurrence]:
@@ -145,6 +148,10 @@ def expand_occurrences(
     Always expands from the original start so an occurrence's index is stable
     across calls — the index is what the CachedEvent id is derived from.
     """
+    start = _coerce_datetime(start)
+    end = _coerce_datetime(end)
+    if horizon_end is not None:
+        horizon_end = _coerce_datetime(horizon_end)
     cap = max(1, min(limit or MAX_OCCURRENCES, MAX_SERIES_OCCURRENCES))
 
     if recurrence_dates:

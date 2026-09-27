@@ -360,9 +360,7 @@ def test_schedule_publish_and_my_plan_lifecycle(
     assert program_ics.status_code == 200
     assert program_ics.headers["content-type"].startswith("text/calendar")
     assert f"UID:{session_id}@program.joinmovida.com" in program_ics.text
-    assert "back-2-mambo-2026-program.ics" in program_ics.headers[
-        "content-disposition"
-    ]
+    assert "back-2-mambo-2026-program.ics" in program_ics.headers["content-disposition"]
     program_csv = client.get(
         "/api/admin/events/back-2-mambo-2026/schedule/published-export/csv"
     )
@@ -407,9 +405,37 @@ def test_schedule_publish_and_my_plan_lifecycle(
     assert f"UID:{session_id}@program.joinmovida.com" in my_plan_ics.text
     assert "STATUS:CANCELLED" not in my_plan_ics.text
     assert my_plan_ics.headers["cache-control"] == "private, no-store"
-    assert "back-2-mambo-2026-my-plan.ics" in my_plan_ics.headers[
-        "content-disposition"
-    ]
+    assert "back-2-mambo-2026-my-plan.ics" in my_plan_ics.headers["content-disposition"]
+    assert client.get("/api/events/back-2-mambo-2026/my-plan/share").json() is None
+    shared = client.post("/api/events/back-2-mambo-2026/my-plan/share")
+    assert shared.status_code == 201
+    token = shared.json()["token"]
+    assert client.post("/api/events/back-2-mambo-2026/my-plan/share").json() == {
+        "token": token
+    }
+    with Session(engine) as session:
+        owner = session.exec(
+            select(User).where(User.email == "dancer@example.com")
+        ).one()
+        owner.display_name = None
+        session.add(owner)
+        session.commit()
+
+    client.cookies.clear()
+    public_plan = client.get(f"/api/share/plan/{token}")
+    assert public_plan.status_code == 200
+    assert public_plan.headers["cache-control"] == "no-store"
+    assert public_plan.json()["event_title"] == "Back 2 Mambo 2026"
+    assert public_plan.json()["owner_display_name"] is None
+    assert public_plan.json()["entries"][0]["session_id"] == str(session_id)
+    assert "email" not in public_plan.text
+
+    _login(client, "dancer@example.com")
+    assert (
+        client.delete("/api/events/back-2-mambo-2026/my-plan/share").status_code == 204
+    )
+    client.cookies.clear()
+    assert client.get(f"/api/share/plan/{token}").status_code == 404
 
     _login(client, "admin@example.com")
     planners = client.get("/api/admin/events/back-2-mambo-2026/schedule/planners")
@@ -458,6 +484,7 @@ def test_schedule_publish_and_my_plan_lifecycle(
     assert empty_plan_ics.status_code == 200
     assert "BEGIN:VEVENT" not in empty_plan_ics.text
     assert session_id not in empty_plan_ics.text
+    assert client.post("/api/events/back-2-mambo-2026/my-plan/share").status_code == 409
 
 
 def test_schedule_json_import_preview_merge_and_replace(client, schedule_event):

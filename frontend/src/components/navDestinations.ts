@@ -11,7 +11,7 @@ export interface NavDestination {
 // Order defines the left-to-right / bottom-nav order of the primary surfaces.
 const EXPLORE_DESTINATION: NavDestination = {
     id: 'explore',
-    label: 'Explore',
+    label: 'Home',
     path: '/',
     icon: '/find-event.png',
     isActive: (p) => p === '/' || p.startsWith('/search') || p === '/explore',

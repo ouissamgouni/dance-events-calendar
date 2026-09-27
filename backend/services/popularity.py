@@ -139,9 +139,7 @@ def compute_popularity_scores(
 
         # ``CachedEvent`` does not have a dedicated ``created_at`` column;
         # ``updated_at`` is set on insert + every sync touch and is the
-        # closest proxy to "row freshness" available. UTC is the source
-        # of truth (DB stores naive datetimes; we treat them as UTC
-        # throughout the codebase).
+        # closest proxy to "row freshness" available.
         ref = getattr(e, "updated_at", None) or e.start
         hours_age = max(0.0, (now - ref).total_seconds() / 3600.0)
 

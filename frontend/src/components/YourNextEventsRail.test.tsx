@@ -97,6 +97,20 @@ describe('YourNextEventsRail', () => {
         vi.useRealTimers();
     });
 
+    it('links directly to a populated My Plan instead of the Program', () => {
+        const flags = { ...defaultFlags, eventScheduleEnabled: true };
+        render(
+            <MemoryRouter>
+                <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
+                    <YourNextEventsRail events={[{ ...event, schedule_published: true }]} myPlanCount={3} />
+                </FeatureFlagsContext.Provider>
+            </MemoryRouter>,
+        );
+
+        expect(screen.getByRole('link', { name: 'My Plan (3)' })).toHaveAttribute('href', '/event/evt-next-1/program/plan');
+        expect(screen.queryByRole('link', { name: 'Program' })).not.toBeInTheDocument();
+    });
+
     it('hides the Program action when the schedule is not published', () => {
         renderRail([event]);
 

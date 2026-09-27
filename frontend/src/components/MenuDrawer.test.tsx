@@ -20,11 +20,11 @@ describe('MenuDrawer', () => {
         expect(screen.queryByRole('link', { name: /Dance Passport/ })).not.toBeInTheDocument();
     });
 
-    it('uses the calendar icon for the Explore entry on admin pages', () => {
+    it('uses the calendar icon for the Home entry on admin pages', () => {
         render(<MemoryRouter initialEntries={['/admin']}><MenuDrawer open onClose={vi.fn()} /></MemoryRouter>);
 
-        const exploreLink = screen.getByRole('link', { name: 'Explore' });
-        expect(exploreLink).toHaveAttribute('href', '/');
-        expect(exploreLink.querySelector('img')).toHaveAttribute('src', '/calendar.png');
+        const homeLink = screen.getByRole('link', { name: 'Home' });
+        expect(homeLink).toHaveAttribute('href', '/');
+        expect(homeLink.querySelector('img')).toHaveAttribute('src', '/calendar.png');
     });
 });

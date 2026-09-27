@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import (
     CheckConstraint,
     Column,
+    DateTime,
     Index,
     JSON,
     Text,
@@ -12,6 +13,8 @@ from sqlalchemy import (
     text,
 )
 from sqlmodel import Field, Relationship, SQLModel
+
+from backend.db.sqltypes import UTCDateTime
 
 
 class User(SQLModel, table=True):
@@ -649,6 +652,21 @@ class UserPlanSession(SQLModel, table=True):
     )
     last_known_session: dict = Field(sa_column=Column(JSON, nullable=False))
     added_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class MyPlanShareToken(SQLModel, table=True):
+    __tablename__ = "my_plan_share_tokens"
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_id", name="uq_my_plan_share_user_event"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True, nullable=False)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    event_id: str = Field(
+        foreign_key="cached_events.event_id", index=True, nullable=False
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class BlockedEvent(SQLModel, table=True):
@@ -1899,3 +1917,9 @@ class UserConsistencyAchievement(SQLModel, table=True):
     period_start: str = Field(max_length=7, nullable=False)
     reached_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     seen_at: Optional[datetime] = Field(default=None)
+
+
+for table in SQLModel.metadata.tables.values():
+    for column in table.columns:
+        if isinstance(column.type, DateTime):
+            column.type = UTCDateTime()

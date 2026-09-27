@@ -143,6 +143,7 @@ class TestSettingsEndpoint:
         assert resp.json()["my_events_nav_enabled"] is True
         assert resp.json()["browse_nav_enabled"] is False
         assert resp.json()["browse_direct_to_explorer_enabled"] is False
+        assert resp.json()["app_auth_gate_enabled"] is False
         assert resp.json()["onboarding_profile_step_enabled"] is False
 
     def test_admin_can_update_onboarding_profile_step_flag(self, sqlite_client):
@@ -230,6 +231,18 @@ class TestSettingsEndpoint:
 
         with Session(engine) as session:
             row = session.get(SiteSetting, "browse_direct_to_explorer_enabled")
+            assert row is not None
+            assert row.value == "true"
+
+    def test_admin_can_update_app_auth_gate_flag(self, sqlite_client):
+        client, engine = sqlite_client
+
+        resp = client.put("/api/settings", json={"app_auth_gate_enabled": True})
+        assert resp.status_code == 200
+        assert resp.json()["app_auth_gate_enabled"] is True
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "app_auth_gate_enabled")
             assert row is not None
             assert row.value == "true"
 

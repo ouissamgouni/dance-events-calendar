@@ -64,11 +64,6 @@ jobs:
         run: task install:frontend
 
       - name: Run backend unit tests
-        env:
-          # Extras not covered by config/base.env or config/test.env
-          # but required by the test suite.
-          GOOGLE_CLIENT_ID: test-client-id
-          ADMIN_EMAIL: admin@example.com
         run: task test:unit:backend
 
       - name: Run frontend checks (type check + unit tests + build)

@@ -3,15 +3,16 @@ import type { TagGroup } from '../types';
 import { REACH_FILTER_LABELS, type ReachFilter } from '../utils/reach';
 import PeopleAvatarTrack, { type PersonMini } from './PeopleAvatarTrack';
 
-// SummaryBar — single-line filter summary with deterministic, width-based
-// priority collapse. Fixed semantic priority (left→right):
+// SummaryBar — filter summary with deterministic, width-based priority
+// collapse and an opt-in two-row capacity. Fixed semantic priority (left→right):
 //   Date → Area → Dance → Reach → People → Remaining (+X ⚙)
 // As available width shrinks, pills hide RIGHT-TO-LEFT by priority and every
 // hidden/never-shown active filter group folds into a single "+X ⚙" control
-// that opens the main Filters sheet. The bar never wraps or horizontally
-// scrolls. Pills are visually quiet: neutral background, light border, dark
-// text, no active-blue fills — the bar communicates search state without
-// competing with the results.
+// that opens the main Filters sheet. The default bar never wraps or
+// horizontally scrolls; the two-line variant wraps once before applying the
+// same collapse rule. Pills are visually quiet: neutral background, light
+// border, dark text, no active-blue fills — the bar communicates search state
+// without competing with the results.
 
 export type InterestSource = 'follows' | 'friends' | null;
 export type InterestKind = 'any' | 'going' | 'saved';
@@ -19,6 +20,7 @@ export type InterestMatch = 'any' | 'all';
 
 export interface SummaryBarProps {
     className?: string;
+    twoLine?: boolean;
 
     // Counts are accepted for API compatibility with callers but the bar no
     // longer renders them — it shows filter state only.
@@ -43,7 +45,7 @@ export interface SummaryBarProps {
     activeTagIds: Set<number>;
     tagGroups: TagGroup[];
 
-    // Dance pill (text, "Salsa +2") and Reach pill (icon-only). Pass the
+    // Dance pill (text, "Salsa +2") and Reach pill (icon + short label). Pass the
     // resolved groups so the bar can render + deep-link into their editors.
     danceGroup?: TagGroup | null;
     onEditDance?: () => void;
@@ -173,6 +175,7 @@ type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people';
 export default function SummaryBar(props: SummaryBarProps) {
     const {
         className = '',
+        twoLine = false,
         startDate,
         endDate,
         onEditPeriod,
@@ -276,19 +279,29 @@ export default function SummaryBar(props: SummaryBarProps) {
             setVisibleCount(candidates.length);
             return;
         }
-        // Reserve the always-present Filters pill before fitting candidates.
-        // Each candidate below accounts for the single gap to its right, so
-        // only the gear width (not an extra gap) is reserved up front.
-        let avail = containerWidth - gearW;
+        const fits = (candidateCount: number) => {
+            const itemWidths = [...widths.slice(0, candidateCount), gearW];
+            let rows = 1;
+            let rowWidth = 0;
+            for (const width of itemWidths) {
+                const nextWidth = rowWidth === 0 ? width : rowWidth + GAP + width;
+                if (rowWidth > 0 && nextWidth > containerWidth) {
+                    rows += 1;
+                    rowWidth = width;
+                } else {
+                    rowWidth = nextWidth;
+                }
+            }
+            return rows <= (twoLine ? 2 : 1);
+        };
+
         let count = 0;
-        for (let i = 0; i < widths.length; i += 1) {
-            const next = widths[i] + GAP;
-            if (avail - next < 0) break;
-            avail -= next;
-            count += 1;
+        for (let i = 1; i <= widths.length; i += 1) {
+            if (!fits(i)) break;
+            count = i;
         }
         setVisibleCount(count);
-    }, [candidates, containerWidth, foldedRemainingCount, danceSel.label, areaLabel, startDate, endDate, peopleTypeLabel, peopleStatusLabel, reachFilter]);
+    }, [candidates, containerWidth, foldedRemainingCount, danceSel.label, areaLabel, startDate, endDate, peopleTypeLabel, peopleStatusLabel, reachFilter, twoLine]);
 
     const hiddenActivePrimaries = Math.max(0, candidates.length - visibleCount);
     const extraCount = foldedRemainingCount + hiddenActivePrimaries;
@@ -332,13 +345,14 @@ export default function SummaryBar(props: SummaryBarProps) {
                     />
                 );
             case 'reach': {
-                // Text label instead of an icon; truncate long labels to 3
-                // chars but keep short words (e.g. "Any", "local") intact.
+                // Truncate long labels to 3 chars but keep short words (e.g.
+                // "Any", "local") intact.
                 const full = REACH_FILTER_LABELS[reachFilter];
                 const short = full.length <= 5 ? full : full.slice(0, 3);
                 return (
                     <Pill
                         key="reach"
+                        icon={<img src="/scale.png" alt="" aria-hidden="true" className={ICON_CLS} />}
                         label={short}
                         ariaLabel={`Event reach: ${full}`}
                         title={`Event reach: ${full}`}
@@ -404,12 +418,12 @@ export default function SummaryBar(props: SummaryBarProps) {
             ref={containerRef}
             className={`summary-bar relative w-full overflow-hidden border-y border-line bg-surface px-3 py-3 shadow-sm ${onOpenFilters ? 'cursor-pointer' : ''} ${className}`}
             data-testid="summary-bar"
-            data-variant="single"
+            data-variant={twoLine ? 'two-line' : 'single'}
             aria-label="Active filters"
             onClick={handleBarClick}
         >
             <div className="flex items-center gap-1.5 min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <div className={`flex items-center gap-1.5 min-w-0 flex-1 ${twoLine ? 'flex-wrap' : ''}`}>
                     {visibleKeys.map((k) => buildPill(k))}
                     {buildGear(extraCount)}
                 </div>

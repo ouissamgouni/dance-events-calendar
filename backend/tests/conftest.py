@@ -11,13 +11,27 @@ makes ``_send_email`` short-circuit exactly as it does in production when SMTP
 is unconfigured.
 """
 
+import os
+import tempfile
+from pathlib import Path
+from uuid import uuid4
+
+_TEST_DATABASE_PATH = Path(tempfile.gettempdir()) / f"movida-pytest-{uuid4().hex}.db"
+os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DATABASE_PATH}"
+os.environ["GOOGLE_CLIENT_ID"] = "test-client-id"
+os.environ["ADMIN_EMAIL"] = "admin@example.com"
+os.environ["SESSION_SECRET"] = "test-session-secret"
+os.environ["CALENDAR_SERVICE"] = "mock"
+os.environ["DEV_AUTH"] = "true"
+os.environ["OBJECT_STORAGE_PROVIDER"] = "minio"
+os.environ["AUTO_SYNC_SCHEDULER_ENABLED"] = "false"
+os.environ["NOTIFICATION_SCHEDULER_ENABLED"] = "false"
+
 import pytest
 
 
 @pytest.fixture(autouse=True, scope="session")
 def _disable_smtp():
-    import os
-
     saved = {k: os.environ.get(k) for k in ("SMTP_HOST", "SMTP_FROM")}
     os.environ["SMTP_HOST"] = ""
     os.environ["SMTP_FROM"] = ""
@@ -29,3 +43,17 @@ def _disable_smtp():
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _initialize_test_database():
+    from backend.db import database
+
+    database.init_db()
+    try:
+        yield
+    finally:
+        if database._engine is not None:
+            database._engine.dispose()
+            database._engine = None
+        _TEST_DATABASE_PATH.unlink(missing_ok=True)

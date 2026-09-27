@@ -17,15 +17,18 @@ to call this primitive.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 
 os.environ.setdefault("SESSION_SECRET", "test-secret-engagement")
 
 from backend.db.models import (  # noqa: E402
+    CachedEvent,
     User,
     UserEventAttendance,
     UserSavedEvent,
@@ -34,6 +37,7 @@ from backend.services.engagement import (  # noqa: E402
     EngagementResult,
     set_event_engagement,
 )
+from backend.services.popularity import compute_popularity_scores  # noqa: E402
 
 
 @pytest.fixture
@@ -239,3 +243,35 @@ def test_going_curator_device_key_does_not_collide_with_user_device(session):
     ).first()
     assert row is not None
     assert row.device_id.startswith("admin:")
+
+
+def test_popularity_uses_aware_utc_after_database_round_trip(session):
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    event = CachedEvent(
+        event_id="evt-popularity-utc",
+        calendar_id="cal-1",
+        title="UTC event",
+        start=now + timedelta(hours=1),
+        end=now + timedelta(hours=3),
+        updated_at=now - timedelta(hours=2),
+        review_status="reviewed",
+    )
+    session.add(event)
+    for index in range(3):
+        session.add(
+            UserEventAttendance(
+                device_id=f"popularity-device-{index}",
+                event_id=event.event_id,
+                attending_since=now - timedelta(minutes=index),
+            )
+        )
+    session.commit()
+    session.refresh(event)
+
+    assert (
+        CachedEvent.__table__.c.start.type.compile(dialect=postgresql.dialect())
+        == "TIMESTAMP WITH TIME ZONE"
+    )
+    assert event.end.tzinfo is not None
+    assert event.updated_at.tzinfo is not None
+    assert compute_popularity_scores(session, [event], now=now)[event.event_id] > 0

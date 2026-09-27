@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
 import AudiencePicker from './AudiencePicker';
@@ -56,6 +58,10 @@ export default function SaveEventButton({
 }: Props) {
     const { isSaved, toggleSave, getSavedAudience, setSavedAudience } = useSavedEvents();
     const { user } = useAuth();
+    const { appAuthGateEnabled } = useOptionalFeatureFlags();
+    const featureFlagsReady = useFeatureFlagsReady();
+    const location = useLocation();
+    const navigate = useNavigate();
     const saved = isSaved(eventId);
     const buttonRef = useRef<HTMLButtonElement | null>(null);
     const popoverRef = useRef<HTMLDivElement | null>(null);
@@ -101,6 +107,14 @@ export default function SaveEventButton({
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
         if (stopPropagation) event.stopPropagation();
         toast.hide();
+        if (!user && !featureFlagsReady) return;
+        if (!user && appAuthGateEnabled) {
+            const next = encodeURIComponent(
+                `${location.pathname}${location.search}${location.hash}`,
+            );
+            navigate(`/login?next=${next}`);
+            return;
+        }
         if (saved && user) {
             // Already saved + signed-in: open popover with audience picker
             // + "Unsave" instead of toggling off blindly. Mirrors GoingButton.

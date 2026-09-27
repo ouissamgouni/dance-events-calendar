@@ -4,6 +4,8 @@ These test the full DB round-trip: models, seed, queries.
 Run with: task test:int (requires DB on port 5434)
 """
 
+from datetime import datetime, timezone
+
 import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 
@@ -52,8 +54,6 @@ class TestDatabaseModels:
         assert fetched.color == "#123456"
 
     def test_create_cached_event(self, session):
-        from datetime import datetime, timezone
-
         cal = CalendarSetting(calendar_id="test-cal-2", name="Cal2", enabled=True)
         session.add(cal)
         session.flush()
@@ -74,8 +74,6 @@ class TestDatabaseModels:
         assert fetched.deleted_at is None
 
     def test_soft_delete_event(self, session):
-        from datetime import datetime
-
         evt = session.get(CachedEvent, "test-evt-1")
         if evt is None:
             evt = CachedEvent(
@@ -112,8 +110,12 @@ class TestDatabaseModels:
 
 @pytest.mark.integration
 class TestSeederIntegration:
-    def test_seed_default_scenario(self, session):
+    def test_seed_default_scenario(self, session, monkeypatch):
         from backend.db.seed import SCENARIOS_DIR
+
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "google"
+        )
 
         seeder = DatabaseSeeder(session)
         seeder.seed(SCENARIOS_DIR / "calendar-service-mock")

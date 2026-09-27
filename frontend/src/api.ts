@@ -1,5 +1,6 @@
 import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
+import type { SharedMyPlanResponse } from './types';
 
 declare const __VITE_API_URL__: string;
 
@@ -420,6 +421,40 @@ export async function downloadMyPlanIcs(eventId: string): Promise<FileDownload> 
     return fileDownload(response, `${eventId}-my-plan.ics`, 'Failed to download My Plan');
 }
 
+export async function fetchMyPlanShare(eventId: string): Promise<{ token: string } | null> {
+    const response = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/my-plan/share`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return parseJsonResponse<{ token: string } | null>(response, 'Failed to load My Plan share link');
+}
+
+export async function createMyPlanShare(eventId: string): Promise<{ token: string }> {
+    const response = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/my-plan/share`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<{ token: string }>(response, 'Failed to create My Plan share link');
+}
+
+export async function revokeMyPlanShare(eventId: string): Promise<void> {
+    const response = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/my-plan/share`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!response.ok) await parseJsonResponse(response, 'Failed to stop sharing My Plan');
+}
+
+export function getMyPlanShareUrl(token: string): string {
+    return `${window.location.origin}/shared/plan/${encodeURIComponent(token)}`;
+}
+
+export async function fetchSharedMyPlan(token: string): Promise<SharedMyPlanResponse> {
+    const response = await fetch(`${BASE}/share/plan/${encodeURIComponent(token)}`, { cache: 'no-store' });
+    if (response.status === 404) throw new Error('not_found');
+    return parseJsonResponse<SharedMyPlanResponse>(response, 'Failed to load shared My Plan');
+}
+
 export async function fetchScheduleImportSchema(eventId: string): Promise<{ schema: object; example: ScheduleImportDocument }> {
     return scheduleRequest<{ schema: object; example: ScheduleImportDocument }>(eventId, '/import-schema', 'GET');
 }
@@ -501,9 +536,8 @@ export interface SiteSettings {
     my_events_nav_enabled?: boolean;
     browse_nav_enabled?: boolean;
     browse_direct_to_explorer_enabled?: boolean;
+    app_auth_gate_enabled?: boolean;
     onboarding_profile_step_enabled?: boolean;
-    /** Experiment: two-line, icon-prefixed filter summary bar with the
-     * Map/Calendar controls pinned to its right. */
     suggest_event_required_dance_group_id?: number | null;
     suggest_event_required_reach_group_id?: number | null;
     tag_as_badge_enabled?: boolean;
@@ -539,6 +573,9 @@ export interface SiteSettings {
     /** When true, floating Explorer controls show labels below desktop widths.
      * Desktop controls are always labeled. Client default: true. */
     explorer_view_control_labels_enabled?: boolean;
+    /** Allow the shared Explorer and Calendar filter bar to use a second row
+     * before lower-priority filters collapse into the overflow count. */
+    summary_two_line_enabled?: boolean;
     /** When true, event pictures are displayed across cards and detail views.
      * Admins can always manage pictures regardless of this flag.
      * Client default: false. */

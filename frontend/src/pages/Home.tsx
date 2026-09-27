@@ -245,7 +245,7 @@ function writeExplorerStateToSearchParams(
 
 export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerViewConfig }) {
     const { user, loading: authLoading } = useAuth();
-    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerViewControlLabelsEnabled } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerViewControlLabelsEnabled, summaryTwoLineEnabled } = useFeatureFlags();
     const mapFollowingBadgeOverlay = true;
     const mapTrendingOverlay = true;
     const location = useLocation();
@@ -1711,6 +1711,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         return (
             <SummaryBar
                 className={opts?.className}
+                twoLine={summaryTwoLineEnabled}
                 totalCount={count}
                 visibleCount={count}
                 startDate={isCal ? calendarSummaryRange.startDate : startDate}

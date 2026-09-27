@@ -181,9 +181,9 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
     }
 
 
-def _utc_naive(value: datetime, zone: ZoneInfo) -> datetime:
+def _to_utc(value: datetime, zone: ZoneInfo) -> datetime:
     aware = value.replace(tzinfo=zone) if value.tzinfo is None else value
-    return aware.astimezone(timezone.utc).replace(tzinfo=None)
+    return aware.astimezone(timezone.utc)
 
 
 def _upsert_named(session, model, schedule_id: int, rows, values):
@@ -340,8 +340,8 @@ def apply_import_document(
     imported_ids = set()
     for item in document.sessions:
         imported_ids.add(item.external_id)
-        start = _utc_naive(item.start, zone)
-        end = _utc_naive(item.end, zone)
+        start = _to_utc(item.start, zone)
+        end = _to_utc(item.end, zone)
         if end <= start:
             raise ValueError(f"{item.title}: end must be after start")
         values = {

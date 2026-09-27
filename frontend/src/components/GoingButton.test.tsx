@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
+import { useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import GoingButton from './GoingButton'
 import { renderWithProviders } from '../test/render'
 import { server } from '../test/server'
-import { FeatureFlagsProvider } from '../context/FeatureFlagsContext'
+import { defaultFlags, FeatureFlagsContext, FeatureFlagsProvider } from '../context/FeatureFlagsContext'
+
+function LocationProbe() {
+    const location = useLocation()
+    return <div data-testid="location">{location.pathname + location.search}</div>
+}
 
 function renderGoingButton(eventId: string) {
     return renderWithProviders(
@@ -73,6 +79,61 @@ describe('GoingButton (anonymous)', () => {
             expect(screen.getByText(/couldn’t mark you as going|couldn't mark you as going/i)).toBeInTheDocument(),
         )
         expect(screen.queryByRole('button', { name: 'Not going' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: "I'm going" })).toBeInTheDocument()
+    })
+
+    it('requires sign-in without writing anonymous state when the app gate is enabled', async () => {
+        let writes = 0
+        server.use(
+            http.post('*/api/track/event-attendance', () => {
+                writes += 1
+                return new HttpResponse(null, { status: 204 })
+            }),
+        )
+        const { user } = renderWithProviders(
+            <FeatureFlagsContext.Provider
+                value={{
+                    flags: { ...defaultFlags, appAuthGateEnabled: true },
+                    updateFlag: vi.fn(),
+                    ready: true,
+                }}
+            >
+                <LocationProbe />
+                <GoingButton eventId="evt-gated" />
+            </FeatureFlagsContext.Provider>,
+            { routerEntries: ['/event/evt-gated?src=share#people'] },
+        )
+
+        await user.click(await screen.findByRole('button', { name: "I'm going" }))
+
+        await waitFor(() =>
+            expect(screen.getByTestId('location')).toHaveTextContent(
+                '/login?next=%2Fevent%2Fevt-gated%3Fsrc%3Dshare%23people',
+            ),
+        )
+        expect(writes).toBe(0)
+        expect(screen.getByRole('button', { name: "I'm going" })).toBeInTheDocument()
+    })
+
+    it('does not write anonymous state before feature flags resolve', async () => {
+        let writes = 0
+        server.use(
+            http.post('*/api/track/event-attendance', () => {
+                writes += 1
+                return new HttpResponse(null, { status: 204 })
+            }),
+        )
+        const { user } = renderWithProviders(
+            <FeatureFlagsContext.Provider
+                value={{ flags: defaultFlags, updateFlag: vi.fn(), ready: false }}
+            >
+                <GoingButton eventId="evt-loading" />
+            </FeatureFlagsContext.Provider>,
+        )
+
+        await user.click(await screen.findByRole('button', { name: "I'm going" }))
+
+        expect(writes).toBe(0)
         expect(screen.getByRole('button', { name: "I'm going" })).toBeInTheDocument()
     })
 })

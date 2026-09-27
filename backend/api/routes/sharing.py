@@ -14,6 +14,7 @@ from backend.api.schemas import (
     CreateShareTokenRequest,
     EventResponse,
     SharedCalendarResponse,
+    SharedMyPlanResponse,
     ShareTokenResponse,
 )
 from backend.db.database import get_session
@@ -21,11 +22,14 @@ from backend.db.models import (
     CalendarSetting,
     CachedEvent,
     EventView,
+    EventSchedule,
+    MyPlanShareToken,
     ShareToken,
     User,
     UserEventAttendance,
     UserSavedEvent,
 )
+from backend.services.schedules import latest_publication, plan_entries
 from backend.services.event_visibility import (
     apply_event_visibility,
     show_pending_events_enabled,
@@ -35,6 +39,43 @@ from backend.services.ics import build_ics
 router = APIRouter(prefix="/api/share", tags=["sharing"])
 
 limiter = Limiter(key_func=client_ip)
+
+
+@router.get("/plan/{token}", response_model=SharedMyPlanResponse)
+@limiter.limit("60/minute")
+def get_shared_my_plan(
+    request: Request,
+    token: str,
+    response: Response,
+    session: Session = Depends(get_session),
+):
+    share = session.exec(
+        select(MyPlanShareToken).where(MyPlanShareToken.token == token)
+    ).first()
+    if share is None:
+        raise HTTPException(status_code=404, detail="Share link not found")
+    schedule = session.exec(
+        select(EventSchedule).where(EventSchedule.event_id == share.event_id)
+    ).first()
+    event = session.get(CachedEvent, share.event_id)
+    if schedule is None or event is None or event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Shared plan not found")
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    owner = session.get(User, share.user_id)
+    owner_display_name = None
+    if owner is not None:
+        raw_name = (owner.display_name or "").strip()
+        owner_display_name = raw_name.split()[0] if raw_name else None
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "event_id": event.event_id,
+        "event_title": event.title,
+        "owner_display_name": owner_display_name,
+        "schedule": publication.snapshot,
+        "entries": plan_entries(session, share.user_id, share.event_id, publication),
+    }
 
 
 @router.post("/calendar", response_model=ShareTokenResponse, status_code=201)

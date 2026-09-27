@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
@@ -409,7 +409,8 @@ def submit_suggestion(
             latitude=body.latitude,
             longitude=body.longitude,
             limit=PREVIEW_OCCURRENCE_LIMIT,
-            horizon_end=datetime.now(timezone.utc) + timedelta(days=PREVIEW_HORIZON_DAYS),
+            horizon_end=datetime.now(timezone.utc)
+            + timedelta(days=PREVIEW_HORIZON_DAYS),
         )
         cached_event = cached_events[0]
         for occurrence in cached_events:

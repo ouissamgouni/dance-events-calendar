@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { UserRoundCheck, UserRoundPlus } from 'lucide-react';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
-import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
+import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { updateMyVisibility, type ShareAudience } from '../api';
 import { trackShareConversion } from '../utils/tracking';
 import { getActiveReferral } from '../hooks/useReferralAttribution';
@@ -151,7 +152,10 @@ export default function GoingButton({
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user, refreshUser } = useAuth();
-    const { goingButtonIconVariant } = useOptionalFeatureFlags();
+    const { goingButtonIconVariant, appAuthGateEnabled } = useOptionalFeatureFlags();
+    const featureFlagsReady = useFeatureFlagsReady();
+    const location = useLocation();
+    const navigate = useNavigate();
     const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
     const going = isAttending(eventId);
 
@@ -206,6 +210,14 @@ export default function GoingButton({
         if (stopPropagation) e.stopPropagation();
         // Dismiss any lingering anchored error toast on every click.
         errorToast.hide();
+        if (!user && !featureFlagsReady) return;
+        if (!user && appAuthGateEnabled) {
+            const next = encodeURIComponent(
+                `${location.pathname}${location.search}${location.hash}`,
+            );
+            navigate(`/login?next=${next}`);
+            return;
+        }
         if (going) {
             // Already going. For signed-in users, open the audience popover
             // (with a "Not going" action) instead of toggling off blindly.

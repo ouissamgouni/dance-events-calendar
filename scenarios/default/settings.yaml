@@ -2,7 +2,8 @@ settings:
   # Pricing feature — disabled
   show_prices: false
 
-  # All other features — enabled
+  # Production-enabled feature defaults. Scenario settings are applied after
+  # these values and may override them for focused or negative-control tests.
   show_popularity: true
   show_ratings: true
   following_badge_enabled: true
@@ -11,4 +12,20 @@ settings:
   trending_banner_enabled: true
   promo_codes_enabled: true
   organizer_claims_enabled: true
+  event_schedule_enabled: true
+  my_events_route_enabled: true
+  my_events_nav_enabled: true
+  onboarding_profile_step_enabled: true
+  event_reminders_enabled: true
+  activity_digest_email_enabled: true
+  digest_v2_enabled: true
+  interest_match_notifications_enabled: true
+  web_push_enabled: true
+  milestone_notifications_enabled: true
+  review_prompt_enabled: true
+  event_review_size_step_enabled: true
+  event_card_imgoing_location_bottom_enabled: true
+  explorer_event_card_card_style_enabled: true
+  explorer_view_control_labels_enabled: true
+  event_images_enabled: true
   tag_as_badge_enabled: true
