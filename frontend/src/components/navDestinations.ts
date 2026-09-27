@@ -13,7 +13,7 @@ const EXPLORE_DESTINATION: NavDestination = {
     id: 'explore',
     label: 'Home',
     path: '/',
-    icon: '/find-event.png',
+    icon: '/home.png',
     isActive: (p) => p === '/' || p.startsWith('/search') || p === '/explore',
 };
 
