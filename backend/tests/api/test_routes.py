@@ -479,7 +479,7 @@ class TestSettingsEndpoint:
 class TestEventsEndpoint:
     def test_pending_events_follow_visibility_setting(self, sqlite_client):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
         with Session(engine) as session:
             session.add(
                 CalendarSetting(
@@ -655,7 +655,7 @@ class TestEventsEndpoint:
         self, sqlite_client
     ):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             session.add(
@@ -783,7 +783,7 @@ class TestEventsEndpoint:
         self, sqlite_client
     ):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             group = TagGroup(slug="features", label="Features", enabled=True)
@@ -863,7 +863,7 @@ class TestEventsEndpoint:
 
     def test_get_events_paginates_with_limit_and_offset(self, sqlite_client):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             session.add(
@@ -908,7 +908,7 @@ class TestEventsEndpoint:
 
     def test_get_events_promo_override_unlocks_badge_when_flag_off(self, sqlite_client):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             session.add(
@@ -967,7 +967,7 @@ class TestEventsEndpoint:
 
     def test_get_event_reports_active_promo_code(self, sqlite_client):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             session.add(

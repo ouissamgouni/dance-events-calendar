@@ -8,7 +8,7 @@ shape of the response is locked in).
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest

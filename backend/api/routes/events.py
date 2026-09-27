@@ -990,7 +990,7 @@ def search_events(
         ),
         else_=1,
     )
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     effective_date_scope: EventSearchDateScope = date_scope or (
         "all" if include_past else "upcoming"
     )
@@ -1109,7 +1109,7 @@ def popular_cities(
     Each city's pin is the average lat/lng of its events, so tapping a pill
     centers the map without a geocoder round-trip. Cities missing a name or
     coordinates are excluded so a pill can never resolve to an empty map."""
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     statement = (
         select(
             CachedEvent.city,

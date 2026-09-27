@@ -20,7 +20,7 @@ _SYNC_JOB_ADVISORY_LOCK_KEY = 0x6D6F7669736E6373  # "movisncs"
 
 def _utcnow_naive() -> datetime:
     """Return UTC now as naive datetime for compatibility with existing DB models."""
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(UTC)
 
 
 class SyncJobStatus:
@@ -122,9 +122,7 @@ class SyncJobService:
                 conn.close()
             except Exception:
                 pass
-            raise RuntimeError(
-                "Another backend instance is already running a sync job"
-            )
+            raise RuntimeError("Another backend instance is already running a sync job")
         return conn
 
     @staticmethod

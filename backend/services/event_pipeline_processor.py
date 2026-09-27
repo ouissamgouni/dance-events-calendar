@@ -135,7 +135,7 @@ _ALL_STAGE_NAMES = _ENRICHMENT_STAGE_NAMES + (PipelineStage.PERSISTENCE.value,)
 
 
 def _utcnow_iso() -> str:
-    return datetime.now(UTC).replace(tzinfo=None).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass
