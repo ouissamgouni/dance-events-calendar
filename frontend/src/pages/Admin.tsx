@@ -239,6 +239,7 @@ export default function Admin() {
     const [myEventsNavEnabled, setMyEventsNavEnabled] = useState(true);
     const [browseNavEnabled, setBrowseNavEnabled] = useState(false);
     const [browseDirectToExplorerEnabled, setBrowseDirectToExplorerEnabled] = useState(false);
+    const [appAuthGateEnabled, setAppAuthGateEnabled] = useState(false);
     const [onboardingProfileStepEnabled, setOnboardingProfileStepEnabled] = useState(false);
     const [eventCardSaveShowStatsEnabled, setEventCardSaveShowStatsEnabled] = useState(false);
     const [eventCardImgoingShowStatsEnabled, setEventCardImgoingShowStatsEnabled] = useState(false);
@@ -247,6 +248,7 @@ export default function Admin() {
     const [eventCardShowTimeLocationIconsEnabled, setEventCardShowTimeLocationIconsEnabled] = useState(false);
     const [explorerEventCardCardStyleEnabled, setExplorerEventCardCardStyleEnabled] = useState(false);
     const [explorerViewControlLabelsEnabled, setExplorerViewControlLabelsEnabled] = useState(true);
+    const [summaryTwoLineEnabled, setSummaryTwoLineEnabled] = useState(false);
     const [eventImagesEnabled, setEventImagesEnabled] = useState(false);
     const [eventCardPlaceholderStyle, setEventCardPlaceholderStyle] = useState<'gradient' | 'initial' | 'none'>('gradient');
     // Notification / re-engagement gates. Booleans are master switches
@@ -429,6 +431,7 @@ export default function Admin() {
             setMyEventsNavEnabled(s.my_events_nav_enabled ?? true);
             setBrowseNavEnabled(s.browse_nav_enabled ?? false);
             setBrowseDirectToExplorerEnabled(s.browse_direct_to_explorer_enabled ?? false);
+            setAppAuthGateEnabled(s.app_auth_gate_enabled ?? false);
             setOnboardingProfileStepEnabled(s.onboarding_profile_step_enabled ?? false);
             setEventCardSaveShowStatsEnabled(s.event_card_save_show_stats_enabled ?? false);
             setEventCardImgoingShowStatsEnabled(s.event_card_imgoing_show_stats_enabled ?? false);
@@ -437,6 +440,7 @@ export default function Admin() {
             setEventCardShowTimeLocationIconsEnabled(s.event_card_show_time_location_icons_enabled ?? false);
             setExplorerEventCardCardStyleEnabled(s.explorer_event_card_card_style_enabled ?? false);
             setExplorerViewControlLabelsEnabled(s.explorer_view_control_labels_enabled ?? true);
+            setSummaryTwoLineEnabled(s.summary_two_line_enabled ?? false);
             setEventImagesEnabled(s.event_images_enabled ?? true);
             setEventCardPlaceholderStyle(s.event_card_placeholder_style ?? 'none');
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
@@ -846,6 +850,19 @@ export default function Admin() {
         }
     };
 
+    const handleToggleAppAuthGate = async () => {
+        const newVal = !appAuthGateEnabled;
+        setAppAuthGateEnabled(newVal);
+        try {
+            await updateSettings({ app_auth_gate_enabled: newVal });
+            updateFlagFn('appAuthGateEnabled', newVal);
+            setMessage(`Required sign-in ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setAppAuthGateEnabled(!newVal);
+            setMessage('Failed to update required sign-in toggle.');
+        }
+    };
+
     const handleToggleOnboardingProfileStep = async () => {
         const newVal = !onboardingProfileStepEnabled;
         setOnboardingProfileStepEnabled(newVal);
@@ -940,6 +957,18 @@ export default function Admin() {
         } catch {
             setExplorerViewControlLabelsEnabled(!newVal);
             setMessage('Failed to update Explorer control labels toggle.');
+        }
+    };
+
+    const handleToggleSummaryTwoLine = async () => {
+        const newVal = !summaryTwoLineEnabled;
+        setSummaryTwoLineEnabled(newVal);
+        try {
+            await updateSettings({ summary_two_line_enabled: newVal });
+            setMessage(`Two-line filter bar ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setSummaryTwoLineEnabled(!newVal);
+            setMessage('Failed to update two-line filter bar toggle.');
         }
     };
 
@@ -2377,6 +2406,21 @@ export default function Admin() {
                                     </button>
                                 </div>
 
+                                {/* Explorer and Calendar: filter summary rows */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Two-line filter bar</span>
+                                        <p className="text-[10px] text-muted">Let Explorer and Calendar use a second row before filters collapse into +N</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleSummaryTwoLine}
+                                        aria-label="Toggle two-line filter bar"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${summaryTwoLineEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${summaryTwoLineEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
                                 {/* Event pictures */}
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -2456,7 +2500,7 @@ export default function Admin() {
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <span className="text-[11px] font-medium text-ink">Browse navigation</span>
-                                        <p className="text-[10px] text-muted">Show Browse beside Explore in primary navigation</p>
+                                        <p className="text-[10px] text-muted">Show Browse beside Home in primary navigation</p>
                                     </div>
                                     <button
                                         onClick={handleToggleBrowseNav}
@@ -2478,6 +2522,20 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${browseDirectToExplorerEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${browseDirectToExplorerEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Require sign-in for app access</span>
+                                        <p className="text-[10px] text-muted">Gate app routes while keeping public event, profile, and shared pages readable</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleAppAuthGate}
+                                        aria-label="Toggle required sign-in for app access"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${appAuthGateEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${appAuthGateEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import difflib
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
@@ -145,7 +145,7 @@ def find_candidate_matches(
     """Active events in the same calendar, within ``CANDIDATE_WINDOW_DAYS``
     of ``event.start``, with a similar title (and location, when both are
     set) and a start time far enough away to not be a near-duplicate."""
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     window = timedelta(days=CANDIDATE_WINDOW_DAYS)
     min_gap = timedelta(hours=MIN_OCCURRENCE_SEPARATION_HOURS)
 
@@ -244,7 +244,7 @@ def detect_series_for_event(
             event is not None
             and event.deleted_at is None
             and not event.is_hidden
-            and event.end > datetime.utcnow()
+            and event.end > datetime.now(timezone.utc)
         ):
             matches = find_candidate_matches(session, event)
             candidates_found = len(matches)
@@ -259,7 +259,7 @@ def detect_series_for_event(
         log.status = "failed"
         raise
     finally:
-        log.finished_at = datetime.utcnow()
+        log.finished_at = datetime.now(timezone.utc)
         log.candidates_found = candidates_found
         log.groups_created = groups_created
         session.add(log)
@@ -288,7 +288,7 @@ def run_full_scan(
     groups_created = 0
     candidates_found = 0
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         events = session.exec(
             select(CachedEvent)
             .where(
@@ -318,7 +318,7 @@ def run_full_scan(
         log.status = "failed"
         raise
     finally:
-        log.finished_at = datetime.utcnow()
+        log.finished_at = datetime.now(timezone.utc)
         log.candidates_found = candidates_found
         log.groups_created = groups_created
         session.add(log)
@@ -354,7 +354,7 @@ def create_manual_series(
         scan_type="manual",
         triggered_by_admin=triggered_by_admin,
         status="completed",
-        finished_at=datetime.utcnow(),
+        finished_at=datetime.now(timezone.utc),
         candidates_found=len(event_ids),
         groups_created=1,
     )
@@ -412,7 +412,7 @@ def approve_series(
     if canonical_title is not None:
         series.canonical_title = canonical_title
     series.status = "resolved"
-    series.resolved_at = datetime.utcnow()
+    series.resolved_at = datetime.now(timezone.utc)
     series.resolved_by_admin = admin_email
     session.add(series)
     session.commit()
@@ -429,7 +429,7 @@ def dismiss_series(
     if series is None:
         raise ValueError("Series not found")
     series.status = "dismissed"
-    series.resolved_at = datetime.utcnow()
+    series.resolved_at = datetime.now(timezone.utc)
     series.resolved_by_admin = admin_email
     session.add(series)
     session.commit()

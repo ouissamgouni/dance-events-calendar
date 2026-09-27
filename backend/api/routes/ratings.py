@@ -16,7 +16,7 @@ Design notes:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import (
@@ -579,7 +579,7 @@ _DAY_LIMIT = 20
 
 def _enforce_user_rate_limit(session: Session, user_id: UUID) -> None:
     """Raise 429 if the user has submitted too many ratings recently."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     hour_ago = now - timedelta(hours=1)
     day_ago = now - timedelta(days=1)
     count_hour = session.exec(
@@ -644,14 +644,14 @@ def submit_feedback(
                 comment_status="none",
                 is_anonymous=body.is_anonymous,
                 status="approved",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
             ),
             tag_suggestion_ids=[],
         )
 
     # Upcoming editions can't be reviewed — reviews open only after the event ends.
-    if event.end and event.end > datetime.utcnow():
+    if event.end and event.end > datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="This event hasn't taken place yet")
 
     _enforce_user_rate_limit(session, user.id)
@@ -676,7 +676,7 @@ def submit_feedback(
             EventRating.user_id == user.id, EventRating.event_id == event_id
         )
     ).first()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     client_ip = get_client_ip(request)
     user_agent = (request.headers.get("user-agent") or "")[:512] or None
 
@@ -893,7 +893,7 @@ def get_rating_aggregates_batch(
     results: dict[str, EventRatingAggregate] = {}
 
     # Identify upcoming events in resolved series for special handling
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     upcoming_ids = [
         ev_id
         for ev_id, end in session.exec(
@@ -1039,7 +1039,7 @@ def _reviews_to_public(
                 id=r.id,
                 event_id=r.event_id,
                 event_title=ev.title if ev else "",
-                event_start=ev.start if ev else datetime.utcnow(),
+                event_start=ev.start if ev else datetime.now(timezone.utc),
                 overall_sentiment=r.overall_sentiment,
                 comment=comment,
                 aspect_tags=_load_tags_as_response(
@@ -1244,7 +1244,7 @@ def list_my_pending_reviews(
     within the admin-configurable recency window, newest-first. Powers the
     "Share your experience" trail on the "For you" page."""
     window_days = get_for_you_review_window_days(session)
-    cutoff = datetime.utcnow() - timedelta(days=window_days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
     events = [e for e in attended_events(session, user.id) if e.start >= cutoff]
     if not events:
         return []
@@ -1402,7 +1402,7 @@ def approve_rating(
             status_code=400, detail=f"Comment is already {rating.comment_status}"
         )
     rating.comment_status = "approved"
-    rating.reviewed_at = datetime.utcnow()
+    rating.reviewed_at = datetime.now(timezone.utc)
     rating.reviewed_by = admin.get("email")
     if body.admin_notes is not None:
         rating.admin_notes = body.admin_notes
@@ -1432,7 +1432,7 @@ def reject_rating(
             status_code=400, detail=f"Comment is already {rating.comment_status}"
         )
     rating.comment_status = "rejected"
-    rating.reviewed_at = datetime.utcnow()
+    rating.reviewed_at = datetime.now(timezone.utc)
     rating.reviewed_by = admin.get("email")
     if body.admin_notes is not None:
         rating.admin_notes = body.admin_notes

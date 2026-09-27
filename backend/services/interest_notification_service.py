@@ -68,9 +68,9 @@ _LAST_SCAN_KEY = "interest_notification_last_scan"
 _INITIAL_LOOKBACK = timedelta(hours=24)
 
 
-def _utcnow_naive() -> datetime:
-    # datetime.utcnow() is deprecated in 3.12+; preserve naive-UTC semantics.
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+def _utcnow() -> datetime:
+    # Use timezone-aware UTC for compatibility with SQLAlchemy datetime fields.
+    return datetime.now(timezone.utc)
 
 
 def _geo_match(profile: UserInterestProfile, lat: float, lng: float) -> bool:
@@ -86,7 +86,7 @@ def _get_last_scan(session: Session) -> datetime:
             return datetime.fromisoformat(row.value)
         except ValueError:
             pass
-    return _utcnow_naive() - _INITIAL_LOOKBACK
+    return _utcnow() - _INITIAL_LOOKBACK
 
 
 def _set_last_scan(session: Session, when: datetime) -> None:
@@ -303,7 +303,7 @@ def run_once() -> dict:
     if not get_interest_match_notifications_enabled():
         return {"skipped": "interest_notifications_disabled"}
 
-    now = _utcnow_naive()
+    now = _utcnow()
 
     with Session(get_engine(), expire_on_commit=False) as session:
         since = _get_last_scan(session)
@@ -336,7 +336,7 @@ def run_once_for_users(user_ids: set, lookback_hours: int) -> dict:
     this creates new matches within the window, it does not duplicate or
     resend ones already delivered.
     """
-    now = _utcnow_naive()
+    now = _utcnow()
     since = now - timedelta(hours=lookback_hours)
 
     with Session(get_engine(), expire_on_commit=False) as session:
@@ -375,7 +375,7 @@ def preview_matches_for_users(user_ids: set, lookback_hours: int) -> dict:
     ``interest_event`` notification (i.e. what a force-send would actually
     create).
     """
-    now = _utcnow_naive()
+    now = _utcnow()
     since = now - timedelta(hours=lookback_hours)
 
     with Session(get_engine(), expire_on_commit=False) as session:

@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
+import { useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import SaveEventButton from './SaveEventButton'
 import { renderWithProviders } from '../test/render'
 import { server } from '../test/server'
+import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext'
+
+function LocationProbe() {
+    const location = useLocation()
+    return <div data-testid="location">{location.pathname + location.search}</div>
+}
 
 // SaveEventButton drives the SavedEventsContext optimistic-save flow end to
 // end: a click issues POST /api/track/event-save and flips local state. We
@@ -47,6 +54,61 @@ describe('SaveEventButton (anonymous)', () => {
         expect(
             screen.queryByRole('button', { name: 'Edit saved visibility' }),
         ).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Save event' })).toBeInTheDocument()
+    })
+
+    it('requires sign-in without writing anonymous state when the app gate is enabled', async () => {
+        let writes = 0
+        server.use(
+            http.post('*/api/track/event-save', () => {
+                writes += 1
+                return new HttpResponse(null, { status: 204 })
+            }),
+        )
+        const { user } = renderWithProviders(
+            <FeatureFlagsContext.Provider
+                value={{
+                    flags: { ...defaultFlags, appAuthGateEnabled: true },
+                    updateFlag: vi.fn(),
+                    ready: true,
+                }}
+            >
+                <LocationProbe />
+                <SaveEventButton eventId="evt-gated" />
+            </FeatureFlagsContext.Provider>,
+            { routerEntries: ['/event/evt-gated?src=share#people'] },
+        )
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+
+        await waitFor(() =>
+            expect(screen.getByTestId('location')).toHaveTextContent(
+                '/login?next=%2Fevent%2Fevt-gated%3Fsrc%3Dshare%23people',
+            ),
+        )
+        expect(writes).toBe(0)
+        expect(screen.getByRole('button', { name: 'Save event' })).toBeInTheDocument()
+    })
+
+    it('does not write anonymous state before feature flags resolve', async () => {
+        let writes = 0
+        server.use(
+            http.post('*/api/track/event-save', () => {
+                writes += 1
+                return new HttpResponse(null, { status: 204 })
+            }),
+        )
+        const { user } = renderWithProviders(
+            <FeatureFlagsContext.Provider
+                value={{ flags: defaultFlags, updateFlag: vi.fn(), ready: false }}
+            >
+                <SaveEventButton eventId="evt-loading" />
+            </FeatureFlagsContext.Provider>,
+        )
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+
+        expect(writes).toBe(0)
         expect(screen.getByRole('button', { name: 'Save event' })).toBeInTheDocument()
     })
 })

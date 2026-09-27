@@ -181,9 +181,9 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
     }
 
 
-def _utc_naive(value: datetime, zone: ZoneInfo) -> datetime:
+def _to_utc(value: datetime, zone: ZoneInfo) -> datetime:
     aware = value.replace(tzinfo=zone) if value.tzinfo is None else value
-    return aware.astimezone(timezone.utc).replace(tzinfo=None)
+    return aware.astimezone(timezone.utc)
 
 
 def _upsert_named(session, model, schedule_id: int, rows, values):
@@ -231,7 +231,7 @@ def apply_import_document(
     schedule.timezone = document.timezone
     schedule.day_start_hour = document.day_start_hour
     schedule.days = [day.isoformat() for day in document.days]
-    schedule.updated_at = datetime.utcnow()
+    schedule.updated_at = datetime.now(timezone.utc)
     session.add(schedule)
 
     venues, vc, vu, vn = _upsert_named(
@@ -340,8 +340,8 @@ def apply_import_document(
     imported_ids = set()
     for item in document.sessions:
         imported_ids.add(item.external_id)
-        start = _utc_naive(item.start, zone)
-        end = _utc_naive(item.end, zone)
+        start = _to_utc(item.start, zone)
+        end = _to_utc(item.end, zone)
         if end <= start:
             raise ValueError(f"{item.title}: end must be after start")
         values = {
@@ -383,7 +383,7 @@ def apply_import_document(
             row.external_id = item.external_id
             for key, value in values.items():
                 setattr(row, key, value)
-            row.updated_at = datetime.utcnow()
+            row.updated_at = datetime.now(timezone.utc)
             session.add(row)
             updated += int(changed)
             unchanged += int(not changed)
@@ -392,7 +392,7 @@ def apply_import_document(
     if mode == "replace":
         for external_id, row in existing_sessions.items():
             if external_id not in imported_ids and row.deleted_at is None:
-                row.deleted_at = datetime.utcnow()
+                row.deleted_at = datetime.now(timezone.utc)
                 session.add(row)
                 removed += 1
     session.flush()

@@ -135,7 +135,7 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                             {user.is_admin && (
                                 <Link to={isAdminPage ? '/' : '/admin'} onClick={onClose} className={rowClass}>
                                     <img src={isAdminPage ? '/calendar.png' : '/admin.png'} alt="" aria-hidden="true" className={iconClass} />
-                                    {isAdminPage ? 'Explore' : 'Admin'}
+                                    {isAdminPage ? 'Home' : 'Admin'}
                                 </Link>
                             )}
                             <button type="button" onClick={onLogout} className={rowClass + ' w-full text-left text-danger'}>

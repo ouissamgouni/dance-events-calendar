@@ -14,6 +14,7 @@ interface NextUpEventCardProps {
     onClick?: (event: CalendarEvent) => void;
     testId?: string;
     to?: string;
+    myPlanCount?: number;
 }
 
 function countdownLabel(startIso: string, endIso: string): string {
@@ -148,13 +149,14 @@ export default function NextUpEventCard({
     onClick,
     testId = 'next-up-event-card',
     to,
+    myPlanCount,
 }: NextUpEventCardProps) {
     const { eventScheduleEnabled } = useFeatureFlags();
     const label = `Open ${event.title} event details`;
     const content: ReactNode = <CardContent event={event} friendsVariant={friendsVariant} />;
     const programAction = eventScheduleEnabled && event.schedule_published ? (
         <div className="absolute right-4 bottom-3 z-[2]">
-            <ProgramAction event={event} />
+            <ProgramAction event={event} myPlanCount={myPlanCount} />
         </div>
     ) : null;
     const detailsClassName = `${cardClassName} ${programAction ? 'pb-12' : ''}`;

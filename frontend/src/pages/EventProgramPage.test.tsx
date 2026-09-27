@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan } from '../api';
+import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchMyPlanShare } from '../api';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, EventSchedule } from '../types';
 import EventProgramPage from './EventProgramPage';
@@ -13,7 +13,7 @@ const requestInstallInvitation = vi.hoisted(() => vi.fn());
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn() };
+    return { ...actual, addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn(), fetchMyPlanShare: vi.fn() };
 });
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user, loading: false }) }));
 vi.mock('../context/PwaInstallContext', () => ({
@@ -69,6 +69,7 @@ describe('EventProgramPage', () => {
         vi.mocked(fetchEventSchedule).mockResolvedValue(schedule);
         vi.mocked(fetchEventScheduleEditorAccess).mockResolvedValue({ can_edit: false });
         vi.mocked(fetchMyPlan).mockResolvedValue({ entries: [] });
+        vi.mocked(fetchMyPlanShare).mockResolvedValue(null);
         vi.mocked(addToMyPlan).mockImplementation(async (_eventId, sessionId) => ({
             session_id: sessionId,
             status: 'active',
@@ -301,7 +302,8 @@ describe('EventProgramPage', () => {
         expect(screen.queryByRole('button', { name: 'Filter schedule' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { current: 'date' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Export published program' })).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Download My Plan (.ics)' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Share and export My Plan' }));
+        fireEvent.click(screen.getByRole('button', { name: /^Download calendar \(.ics\)/ }));
         await waitFor(() => expect(downloadMyPlanIcs).toHaveBeenCalledWith('movida-2026'));
         expect(saveDownload).toHaveBeenCalledWith(expect.objectContaining({ filename: 'movida-2026-my-plan.ics' }));
     });

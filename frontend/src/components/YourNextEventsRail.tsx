@@ -9,9 +9,10 @@ interface YourNextEventsRailProps {
     onEventClick?: (event: CalendarEvent) => void;
     className?: string;
     loading?: boolean;
+    myPlanCount?: number;
 }
 
-export default function YourNextEventsRail({ events, onEventClick, className = '', loading = false }: YourNextEventsRailProps) {
+export default function YourNextEventsRail({ events, onEventClick, className = '', loading = false, myPlanCount }: YourNextEventsRailProps) {
     if (loading) return null;
 
     const nextEvent = events[0];
@@ -32,6 +33,7 @@ export default function YourNextEventsRail({ events, onEventClick, className = '
                         onClick={onEventClick}
                         to={onEventClick ? undefined : `/event/${nextEvent.event_id}`}
                         testId="your-next-event-card"
+                        myPlanCount={myPlanCount}
                     />
                 </div>
             ) : (

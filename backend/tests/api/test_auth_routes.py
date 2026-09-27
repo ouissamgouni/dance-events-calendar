@@ -7,7 +7,7 @@ share-token claim, etc.).
 
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import pytest
@@ -365,7 +365,7 @@ def test_delete_me_reactivates_same_user_on_repeat_signup(client, session, monke
 
     db_user = session.get(User, user_id)
     assert db_user is not None
-    db_user.onboarded_at = datetime.utcnow()
+    db_user.onboarded_at = datetime.now(timezone.utc)
     session.add(db_user)
     session.commit()
 
@@ -604,7 +604,7 @@ def test_saves_persist_across_logout_and_relogin(client, session, monkeypatch):
 def test_share_link_includes_saved_and_attending_events(client, session, monkeypatch):
     """The shared calendar must mirror My Calendar = saved \u222a attending."""
     from backend.db.models import CalendarSetting, CachedEvent
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
     device_a = "dev-share"
@@ -616,7 +616,7 @@ def test_share_link_includes_saved_and_attending_events(client, session, monkeyp
     session.add(
         CalendarSetting(calendar_id="cal-1", name="Cal 1", enabled=True, color="#fff")
     )
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for evt in ["evt-saved-1", "evt-attending-1", "evt-both"]:
         session.add(
             CachedEvent(
@@ -884,7 +884,7 @@ def test_auth_google_reports_needs_onboarding_false_after_completion(
     monkeypatch.setattr(auth_module, "get_current_onboarding_version", lambda: 2)
     _login(client, email="alice@example.com")
     user = session.exec(select(User).where(User.email == "alice@example.com")).one()
-    user.onboarded_at = datetime.utcnow()
+    user.onboarded_at = datetime.now(timezone.utc)
     user.onboarding_version = 2
     session.add(user)
     session.commit()
@@ -907,7 +907,7 @@ def test_auth_google_forces_re_onboarding_when_version_bumped(
     monkeypatch.setattr(auth_module, "get_current_onboarding_version", lambda: 3)
     _login(client, email="alice@example.com")
     user = session.exec(select(User).where(User.email == "alice@example.com")).one()
-    user.onboarded_at = datetime.utcnow()
+    user.onboarded_at = datetime.now(timezone.utc)
     user.onboarding_version = 1  # older version than current (3)
     session.add(user)
     session.commit()
@@ -1016,7 +1016,7 @@ def test_email_code_verify_wrong_code_burns_after_max_attempts(client):
 def test_email_code_verify_expired_code_fails(client, session):
     code = _request_code(client, "alice@example.com").json()["dev_code"]
     row = session.exec(select(EmailLoginCode)).one()
-    row.expires_at = datetime.utcnow() - timedelta(minutes=1)
+    row.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     session.add(row)
     session.commit()
 

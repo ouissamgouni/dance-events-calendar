@@ -3,7 +3,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
@@ -309,7 +309,7 @@ class SyncService:
             log.error_message = str(exc)
             raise
         finally:
-            log.finished_at = datetime.utcnow()
+            log.finished_at = datetime.now(timezone.utc)
             log.calendars_synced = stats["calendars_synced"]
             log.events_upserted = stats["events_upserted"]
             log.events_deleted = stats["events_deleted"]
@@ -454,7 +454,7 @@ class SyncService:
                 existing.end = event.end
                 existing.all_day = event.all_day
                 existing.content_hash = content_hash
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = datetime.now(timezone.utc)
                 existing.deleted_at = None  # un-delete if re-appeared
                 if fields_changed:
                     existing.review_status = "pending"
@@ -538,13 +538,13 @@ class SyncService:
         for event_id in result.deleted_event_ids:
             existing = session.get(CachedEvent, event_id)
             if existing and existing.deleted_at is None:
-                existing.deleted_at = datetime.utcnow()
+                existing.deleted_at = datetime.now(timezone.utc)
                 session.add(existing)
                 deleted += 1
 
         if result.next_sync_token:
             cal.sync_token = result.next_sync_token
-            cal.updated_at = datetime.utcnow()
+            cal.updated_at = datetime.now(timezone.utc)
             session.add(cal)
 
         # Commit events immediately — visible to API consumers now

@@ -15,7 +15,7 @@ Covers:
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -121,8 +121,8 @@ def _make_event(
         event_id=event_id,
         calendar_id="cal",
         title=f"Event {event_id}",
-        start=start or (datetime.utcnow() + timedelta(hours=6)),
-        end=(start or (datetime.utcnow() + timedelta(hours=6))) + timedelta(hours=2),
+        start=start or (datetime.now(timezone.utc) + timedelta(hours=6)),
+        end=(start or (datetime.now(timezone.utc) + timedelta(hours=6))) + timedelta(hours=2),
         all_day=False,
         latitude=lat,
         longitude=lng,
@@ -339,7 +339,7 @@ def test_run_once_does_not_renotify_after_same_event_update(session):
     assert svc.run_once()["created"] == 1
 
     event.title = "Updated event title"
-    event.updated_at = datetime.utcnow() + timedelta(seconds=1)
+    event.updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
     session.add(event)
     session.commit()
 
@@ -475,13 +475,13 @@ def test_run_once_ignores_events_outside_scan_window(session):
 
     # Seed the last-scan marker so this event's updated_at (long ago) falls
     # outside the (since, now] window.
-    old = datetime.utcnow() - timedelta(days=10)
+    old = datetime.now(timezone.utc) - timedelta(days=10)
     event = _make_event(session, "ev-old", updated_at=old)
     _tag_event(session, event.event_id, salsa)
     session.add(
         SiteSetting(
             key=svc._LAST_SCAN_KEY,
-            value=(datetime.utcnow() - timedelta(days=1)).isoformat(),
+            value=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
         )
     )
     session.commit()
@@ -572,7 +572,7 @@ def test_run_once_excludes_deleted_users(session):
         session,
         "alice@example.com",
         "alice",
-        deleted_at=datetime.utcnow(),
+        deleted_at=datetime.now(timezone.utc),
     )
     _make_profile(session, alice, dance_tags=[salsa])
 

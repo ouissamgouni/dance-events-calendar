@@ -143,6 +143,7 @@ class TestSettingsEndpoint:
         assert resp.json()["my_events_nav_enabled"] is True
         assert resp.json()["browse_nav_enabled"] is False
         assert resp.json()["browse_direct_to_explorer_enabled"] is False
+        assert resp.json()["app_auth_gate_enabled"] is False
         assert resp.json()["onboarding_profile_step_enabled"] is False
 
     def test_admin_can_update_onboarding_profile_step_flag(self, sqlite_client):
@@ -230,6 +231,18 @@ class TestSettingsEndpoint:
 
         with Session(engine) as session:
             row = session.get(SiteSetting, "browse_direct_to_explorer_enabled")
+            assert row is not None
+            assert row.value == "true"
+
+    def test_admin_can_update_app_auth_gate_flag(self, sqlite_client):
+        client, engine = sqlite_client
+
+        resp = client.put("/api/settings", json={"app_auth_gate_enabled": True})
+        assert resp.status_code == 200
+        assert resp.json()["app_auth_gate_enabled"] is True
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "app_auth_gate_enabled")
             assert row is not None
             assert row.value == "true"
 
@@ -479,7 +492,7 @@ class TestSettingsEndpoint:
 class TestEventsEndpoint:
     def test_pending_events_follow_visibility_setting(self, sqlite_client):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
         with Session(engine) as session:
             session.add(
                 CalendarSetting(
@@ -655,7 +668,7 @@ class TestEventsEndpoint:
         self, sqlite_client
     ):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             session.add(
@@ -783,7 +796,7 @@ class TestEventsEndpoint:
         self, sqlite_client
     ):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             group = TagGroup(slug="features", label="Features", enabled=True)
@@ -863,7 +876,7 @@ class TestEventsEndpoint:
 
     def test_get_events_paginates_with_limit_and_offset(self, sqlite_client):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             session.add(
@@ -908,7 +921,7 @@ class TestEventsEndpoint:
 
     def test_get_events_promo_override_unlocks_badge_when_flag_off(self, sqlite_client):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             session.add(
@@ -967,7 +980,7 @@ class TestEventsEndpoint:
 
     def test_get_event_reports_active_promo_code(self, sqlite_client):
         client, engine = sqlite_client
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC)
 
         with Session(engine) as session:
             session.add(

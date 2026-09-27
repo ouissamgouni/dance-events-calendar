@@ -9,7 +9,7 @@ activity to non-mutual followers, and the endpoint must never 403.
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -109,12 +109,12 @@ def world(session):
     """Events, calendar, three users with a defined follow graph.
 
     - alice <-> bob: mutual friends.
-    - carol -> alice: one-way (carol follows alice; alice does NOT
+    - carol -> alice: one-way (carol follows alice, timezone; alice does NOT
       follow carol back).
     """
     session.add(SiteSetting(key="cutoff_date", value="2020-01-01"))
     session.add(CalendarSetting(calendar_id="cal-1", name="Salsa", enabled=True))
-    base = datetime(2030, 1, 1, 20, 0, 0)
+    base = datetime(2030, 1, 1, 20, 0, 0, tzinfo=timezone.utc)
     for eid, offset in (
         ("evt-going", 0),
         ("evt-saved", 1),

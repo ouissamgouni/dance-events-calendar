@@ -1,6 +1,6 @@
 """Unit tests for the Dance Passport stats aggregation service."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
@@ -18,7 +18,7 @@ from backend.db.models import (
 from backend.services import passport as passport_service
 from sqlmodel import select
 
-NOW = datetime.utcnow()
+NOW = datetime.now(timezone.utc)
 
 
 def _past(days: int) -> datetime:
@@ -69,7 +69,7 @@ def _review(session, user_id, event_id, *, status="approved", created_at=None):
             user_id=user_id,
             stars=4,
             status=status,
-            created_at=created_at or datetime.utcnow(),
+            created_at=created_at or datetime.now(timezone.utc),
         )
     )
 
@@ -197,7 +197,7 @@ class TestStatsContext:
 class TestConsistency:
     """Recurring consistency achievements (rolling 12-month active months).
 
-    A month is "active" when it has >=1 attended event; a period opens when the
+    A month is "active" when it has >=1 attended event, timezone; a period opens when the
     rolling active-month count first reaches 3 and closes when it drops below 3.
     Every level recurs across distinct periods.
     """

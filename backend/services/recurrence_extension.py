@@ -9,7 +9,7 @@ a finite window. This job walks that window forward on every scheduler tick so
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, col, select
 
@@ -33,7 +33,7 @@ def run_once() -> dict:
         _upsert_occurrences_from_suggestion,
     )
 
-    horizon_end = datetime.utcnow() + timedelta(days=MAX_HORIZON_DAYS)
+    horizon_end = datetime.now(timezone.utc) + timedelta(days=MAX_HORIZON_DAYS)
     extended = 0
     created = 0
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
@@ -31,7 +31,9 @@ ALLOWED_GOING_BUTTON_ICON_VARIANTS = {"hand", "person"}
 
 
 def _default_since_date() -> str:
-    return (datetime.utcnow() - timedelta(days=DEFAULT_SINCE_DAYS)).strftime("%Y-%m-%d")
+    return (datetime.now(timezone.utc) - timedelta(days=DEFAULT_SINCE_DAYS)).strftime(
+        "%Y-%m-%d"
+    )
 
 
 def _get_since_date(session: Session) -> str:
@@ -209,6 +211,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         browse_direct_to_explorer_enabled=_get_bool_setting(
             session, "browse_direct_to_explorer_enabled", default=False
         ),
+        app_auth_gate_enabled=_get_bool_setting(
+            session, "app_auth_gate_enabled", default=False
+        ),
         onboarding_profile_step_enabled=_get_bool_setting(
             session, "onboarding_profile_step_enabled", default=False
         ),
@@ -335,6 +340,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         explorer_view_control_labels_enabled=_get_bool_setting(
             session, "explorer_view_control_labels_enabled", default=True
         ),
+        summary_two_line_enabled=_get_bool_setting(session, "summary_two_line_enabled"),
         event_images_enabled=_get_bool_setting(
             session, "event_images_enabled", default=True
         ),
@@ -588,6 +594,13 @@ def update_settings(
             body.explorer_view_control_labels_enabled,
         )
 
+    if body.summary_two_line_enabled is not None:
+        _set_bool_setting(
+            session,
+            "summary_two_line_enabled",
+            body.summary_two_line_enabled,
+        )
+
     if body.event_images_enabled is not None:
         _set_bool_setting(session, "event_images_enabled", body.event_images_enabled)
 
@@ -633,6 +646,9 @@ def update_settings(
             "browse_direct_to_explorer_enabled",
             body.browse_direct_to_explorer_enabled,
         )
+
+    if body.app_auth_gate_enabled is not None:
+        _set_bool_setting(session, "app_auth_gate_enabled", body.app_auth_gate_enabled)
 
     if body.suggest_event_required_dance_group_id is not None:
         row = session.get(SiteSetting, "suggest_event_required_dance_group_id")

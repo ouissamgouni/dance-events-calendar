@@ -1,6 +1,6 @@
 import ipaddress
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import Cookie, Depends, HTTPException, Request
@@ -81,7 +81,7 @@ def get_current_user_optional(
 
 
 def _touch_last_visit(session: Session, user: User, request: Request) -> None:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if (
         user.last_visit_at is not None
         and now - user.last_visit_at < _LAST_SEEN_THROTTLE

@@ -245,6 +245,14 @@ export interface MyPlanResponse {
     entries: MyPlanEntry[];
 }
 
+export interface SharedMyPlanResponse {
+    event_id: string;
+    event_title: string;
+    owner_display_name: string | null;
+    schedule: EventSchedule;
+    entries: MyPlanEntry[];
+}
+
 export interface ProgramExportSession {
     id: string;
     title: string;

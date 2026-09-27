@@ -7,7 +7,7 @@ switch.
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.pool import StaticPool
@@ -86,7 +86,7 @@ def _attend_past_event(
             CalendarSetting(calendar_id="cal", name="C", color="#abc", enabled=True)
         )
         session.commit()
-    start = datetime.utcnow() - timedelta(days=days_ago)
+    start = datetime.now(timezone.utc) - timedelta(days=days_ago)
     session.add(
         CachedEvent(
             event_id=event_id,
@@ -103,7 +103,7 @@ def _attend_past_event(
             device_id=str(user.id).replace("-", "")[:20] + event_id[:8],
             user_id=user.id,
             event_id=event_id,
-            attending_since=datetime.utcnow(),
+            attending_since=datetime.now(timezone.utc),
         )
     )
     session.commit()

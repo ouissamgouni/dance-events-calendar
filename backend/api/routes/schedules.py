@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from slowapi import Limiter
@@ -26,6 +26,7 @@ from backend.api.schemas import (
     EventScheduleUpdateRequest,
     MyPlanEntryResponse,
     MyPlanResponse,
+    MyPlanShareResponse,
     ProgramExportResponse,
     ScheduleActivityTypeRequest,
     ScheduleActivityTypeResponse,
@@ -54,6 +55,7 @@ from backend.db.models import (
     CachedEvent,
     EventSchedule,
     EventScheduleEditor,
+    MyPlanShareToken,
     Notification,
     PushSubscription,
     ScheduleActivityType,
@@ -72,10 +74,11 @@ from backend.services.schedules import (
     compute_issues,
     default_schedule_days,
     latest_publication,
+    plan_entries,
     seed_default_activity_types,
     seed_default_dance_levels,
     session_snapshot,
-    to_utc_naive,
+    to_utc,
     validate_timezone,
 )
 from backend.services.schedule_import import (
@@ -258,32 +261,68 @@ def get_my_plan(
 ):
     schedule = _schedule_for_event(session, event_id)
     publication = latest_publication(session, schedule.id)
-    current = {
-        row["id"]: row
-        for row in (publication.snapshot.get("sessions", []) if publication else [])
-    }
-    rows = session.exec(
-        select(UserPlanSession)
-        .where(
-            UserPlanSession.user_id == user.id,
-            UserPlanSession.event_id == event_id,
+    return {"entries": plan_entries(session, user.id, event_id, publication)}
+
+
+@public_router.get("/my-plan/share", response_model=MyPlanShareResponse | None)
+def get_my_plan_share(
+    event_id: str,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    return session.exec(
+        select(MyPlanShareToken).where(
+            MyPlanShareToken.user_id == user.id,
+            MyPlanShareToken.event_id == event_id,
         )
-        .order_by(UserPlanSession.added_at)
-    ).all()
-    entries = []
-    for row in rows:
-        item = current.get(str(row.session_id))
-        item_status = "removed"
-        if item is not None:
-            item_status = "cancelled" if item.get("is_cancelled") else "active"
-        entries.append(
-            {
-                "session_id": row.session_id,
-                "status": item_status,
-                "session": item or row.last_known_session,
-            }
+    ).first()
+
+
+@public_router.post(
+    "/my-plan/share", response_model=MyPlanShareResponse, status_code=201
+)
+def create_my_plan_share(
+    event_id: str,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    if not plan_entries(session, user.id, event_id, publication):
+        raise HTTPException(status_code=409, detail="My Plan is empty")
+    existing = session.exec(
+        select(MyPlanShareToken).where(
+            MyPlanShareToken.user_id == user.id,
+            MyPlanShareToken.event_id == event_id,
         )
-    return {"entries": entries}
+    ).first()
+    if existing is not None:
+        return existing
+    share = MyPlanShareToken(token=str(uuid4()), user_id=user.id, event_id=event_id)
+    session.add(share)
+    session.commit()
+    session.refresh(share)
+    return share
+
+
+@public_router.delete("/my-plan/share", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_my_plan_share(
+    event_id: str,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    existing = session.exec(
+        select(MyPlanShareToken).where(
+            MyPlanShareToken.user_id == user.id,
+            MyPlanShareToken.event_id == event_id,
+        )
+    ).first()
+    if existing is not None:
+        session.delete(existing)
+        session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @public_router.get("/my-plan/ics")
@@ -298,32 +337,16 @@ def export_my_plan_ics(
     publication = latest_publication(session, schedule.id)
     if publication is None:
         raise HTTPException(status_code=404, detail="Published schedule not found")
-    current = {
-        row["id"]: row for row in publication.snapshot.get("sessions", [])
-    }
-    plan_rows = session.exec(
-        select(UserPlanSession)
-        .where(
-            UserPlanSession.user_id == user.id,
-            UserPlanSession.event_id == event_id,
-        )
-        .order_by(UserPlanSession.added_at)
-    ).all()
-    selected_sessions = []
-    for row in plan_rows:
-        item = current.get(str(row.session_id))
-        item_status = "removed"
-        if item is not None:
-            item_status = "cancelled" if item.get("is_cancelled") else "active"
-        selected_sessions.append((item or row.last_known_session, item_status))
+    selected_sessions = [
+        (entry["session"], entry["status"])
+        for entry in plan_entries(session, user.id, event_id, publication)
+    ]
     projection = _published_projection(
         session,
         event_id,
         selected_sessions=selected_sessions,
     )
-    filename = _export_filename(
-        projection["event_title"], event_id, "my-plan.ics"
-    )
+    filename = _export_filename(projection["event_title"], event_id, "my-plan.ics")
     return Response(
         render_program_ics(projection, my_plan=True).encode("utf-8"),
         media_type="text/calendar; charset=utf-8",
@@ -549,7 +572,7 @@ def update_admin_schedule(
         schedule.days = [value.isoformat() for value in data["days"]]
     if data.get("day_start_hour") is not None:
         schedule.day_start_hour = data["day_start_hour"]
-    schedule.updated_at = datetime.utcnow()
+    schedule.updated_at = datetime.now(timezone.utc)
     session.add(schedule)
     session.commit()
     session.refresh(schedule)
@@ -755,7 +778,7 @@ def update_session(
     }
     merged = _validated_session_data(session, schedule, merged)
     _apply(row, merged)
-    row.updated_at = datetime.utcnow()
+    row.updated_at = datetime.now(timezone.utc)
     session.add(row)
     session.commit()
     session.refresh(row)
@@ -770,8 +793,8 @@ def delete_session(
     row = session.get(ScheduleSession, session_id)
     if row is None or row.schedule_id != schedule.id or row.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Session not found")
-    row.deleted_at = datetime.utcnow()
-    row.updated_at = datetime.utcnow()
+    row.deleted_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(timezone.utc)
     session.add(row)
     session.commit()
 
@@ -1005,7 +1028,7 @@ def notify_program_available(
         ).all()
     }
     session_count = len(publication.snapshot.get("sessions", []))
-    stamp_now = datetime.utcnow()
+    stamp_now = datetime.now(timezone.utc)
     emailed = pushed = in_app_created = 0
     results: list[ScheduleProgramNotifyResult] = []
 
@@ -1205,7 +1228,7 @@ def publish_schedule(
     schedule = _schedule_for_event(session, event_id)
     latest = latest_publication(session, schedule.id)
     version = 1 if latest is None else latest.version + 1
-    published_at = datetime.utcnow()
+    published_at = datetime.now(timezone.utc)
     snapshot = build_snapshot(session, schedule)
     snapshot["version"] = version
     snapshot["published_at"] = published_at.isoformat()
@@ -1248,7 +1271,7 @@ def publish_schedule(
     from backend.services.notification_delivery import record_delivery
 
     emailed = pushed = 0
-    delivered_at = datetime.utcnow()
+    delivered_at = datetime.now(timezone.utc)
     if event is not None:
         for notification in impacted_notifications:
             user = users.get(notification.recipient_user_id)
@@ -1381,7 +1404,7 @@ def _notify_publication_going_attendees(
         if recipient_ids
         else {}
     )
-    delivered_at = datetime.utcnow()
+    delivered_at = datetime.now(timezone.utc)
     emailed = pushed = in_app_created = 0
     results: list[ScheduleProgramNotifyResult] = []
     session_count = len(publication.snapshot.get("sessions", []))
@@ -1535,8 +1558,8 @@ def _apply(row, data: dict) -> None:
 def _validated_session_data(
     session: Session, schedule: EventSchedule, data: dict
 ) -> dict:
-    data["start"] = to_utc_naive(data["start"])
-    data["end"] = to_utc_naive(data["end"])
+    data["start"] = to_utc(data["start"])
+    data["end"] = to_utc(data["end"])
     if data["end"] <= data["start"]:
         raise HTTPException(status_code=422, detail="End time must be after start time")
     for key, model in (

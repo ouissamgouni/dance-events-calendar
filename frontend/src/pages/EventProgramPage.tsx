@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarPlus, ChevronLeft, Download, Pencil } from 'lucide-react';
+import { ChevronLeft, Download, Pencil } from 'lucide-react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, removeFromMyPlan } from '../api';
+import { addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, removeFromMyPlan } from '../api';
+import MyPlanUtilityMenu from '../components/MyPlanUtilityMenu';
 import ScheduleGrid from '../components/program/ScheduleGrid';
 import MyPlanList from '../components/program/MyPlanList';
 import { AttendeeProgramFilters, ProgramDayPicker } from '../components/program/ProgramControls';
@@ -10,7 +11,6 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
 import { usePwaInstall } from '../context/PwaInstallContext';
 import type { CalendarEvent, EventSchedule, MyPlanEntry, ScheduleSession } from '../types';
-import { saveDownload } from '../utils/download';
 import { programInstallDismissedKey, programPushOptInKey } from '../utils/installPromptStorage';
 import { filterScheduleSessions, firstDayWithSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
 import { trackProgramViewed } from '../utils/tracking';
@@ -42,7 +42,6 @@ export default function EventProgramPage() {
     const [positionRequest, setPositionRequest] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [canEdit, setCanEdit] = useState(false);
-    const [planExportStatus, setPlanExportStatus] = useState<'idle' | 'busy' | 'error'>('idle');
     const trackedProgramEventId = useRef<string | null>(null);
 
     useEffect(() => {
@@ -193,16 +192,6 @@ export default function EventProgramPage() {
             setPlan(previous);
         }
     };
-    const exportMyPlan = async () => {
-        if (!eventId) return;
-        setPlanExportStatus('busy');
-        try {
-            saveDownload(await downloadMyPlanIcs(eventId));
-            setPlanExportStatus('idle');
-        } catch {
-            setPlanExportStatus('error');
-        }
-    };
     const backToEvent = () => {
         if (fromEventDetail && window.history.length > 1) navigate(-1);
         else navigate(`/event/${eventId}`, { replace: true });
@@ -242,8 +231,7 @@ export default function EventProgramPage() {
                 ) : user ? (
                     <div className="flex min-h-0 flex-1 flex-col">
                         {plan.length ? <div className="shrink-0 border-b border-line bg-surface px-4 py-2 text-right">
-                            <button type="button" disabled={planExportStatus === 'busy'} onClick={exportMyPlan} className="inline-flex items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink disabled:opacity-50"><CalendarPlus size={17} />{planExportStatus === 'busy' ? 'Downloading…' : 'Download My Plan (.ics)'}</button>
-                            {planExportStatus === 'error' ? <p className="mt-1 text-sm text-danger">Could not download My Plan.</p> : null}
+                            <MyPlanUtilityMenu eventId={event.event_id} />
                         </div> : null}
                         <MyPlanList schedule={schedule} entries={plan} onOpen={openSession} onRemove={removePlanEntry} onProgram={() => navigate(`/event/${event.event_id}/program`)} />
                     </div>

@@ -35,7 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
@@ -135,7 +135,7 @@ def excluded_tag_ids_for_event(session: Session, event_id: str) -> set[int]:
     ).all()
     excluded.update(t for t in applied if t is not None)
 
-    cutoff = datetime.utcnow() - timedelta(days=REJECTION_SUPPRESSION_DAYS)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=REJECTION_SUPPRESSION_DAYS)
     rejected = session.exec(
         select(TagSuggestion.tag_id)
         .where(TagSuggestion.event_id == event_id)

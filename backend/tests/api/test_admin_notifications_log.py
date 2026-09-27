@@ -8,7 +8,7 @@ was never delivered (e.g. suppressed by a disabled user setting) simply
 has no row, rather than being derived from a boolean flag.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -78,7 +78,7 @@ def _add_delivery(
 
 
 def _seed(engine):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     with Session(engine) as s:
         alice = _make_user(s, "alice@example.com", "alice")
         bob = _make_user(s, "bob@example.com", "bob")

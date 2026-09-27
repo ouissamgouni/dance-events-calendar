@@ -19,6 +19,7 @@ import HeaderUserMenu from './components/HeaderUserMenu';
 import DesktopNav from './components/DesktopNav';
 import BottomNav from './components/BottomNav';
 import ProtectedRoute from './components/ProtectedRoute';
+import AppAccessGate from './components/AppAccessGate';
 import SignUpBanner from './components/SignUpBanner';
 import ShareReferralBanner from './components/ShareReferralBanner';
 import InstallPrompt from './components/InstallPrompt';
@@ -41,6 +42,7 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
 const SharedPassportPage = lazy(() => import('./pages/SharedPassportPage'));
+const SharedMyPlanPage = lazy(() => import('./pages/SharedMyPlanPage'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const OnboardingWizard = lazy(() => import('./pages/OnboardingWizard'));
 const ReferralLanding = lazy(() => import('./pages/ReferralLanding'));
@@ -97,25 +99,27 @@ export default function App() {
     <AuthProvider>
       <ConsentProvider>
         <FeatureFlagsProvider>
-          <AttendanceSummariesProvider>
-            <SavedEventsProvider>
-              <PreferencesProvider>
-                <RatingAggregatesProvider>
-                  <MessageCountsProvider>
-                    <MyRatingsProvider>
-                      <AttendingEventsProvider>
-                        <PwaInstallProvider>
-                          <QaTestPlanProvider>
-                            <AppShell />
-                          </QaTestPlanProvider>
-                        </PwaInstallProvider>
-                      </AttendingEventsProvider>
-                    </MyRatingsProvider>
-                  </MessageCountsProvider>
-                </RatingAggregatesProvider>
-              </PreferencesProvider>
-            </SavedEventsProvider>
-          </AttendanceSummariesProvider>
+          <AppAccessGate>
+            <AttendanceSummariesProvider>
+              <SavedEventsProvider>
+                <PreferencesProvider>
+                  <RatingAggregatesProvider>
+                    <MessageCountsProvider>
+                      <MyRatingsProvider>
+                        <AttendingEventsProvider>
+                          <PwaInstallProvider>
+                            <QaTestPlanProvider>
+                              <AppShell />
+                            </QaTestPlanProvider>
+                          </PwaInstallProvider>
+                        </AttendingEventsProvider>
+                      </MyRatingsProvider>
+                    </MessageCountsProvider>
+                  </RatingAggregatesProvider>
+                </PreferencesProvider>
+              </SavedEventsProvider>
+            </AttendanceSummariesProvider>
+          </AppAccessGate>
         </FeatureFlagsProvider>
       </ConsentProvider>
     </AuthProvider>
@@ -245,6 +249,7 @@ function AppShell() {
                 <Route path="/mine/profiles/:profileId/edit" element={<LegacySavedSearchEditRedirect />} />
                 <Route path="/shared/:token" element={<SharedCalendarPage />} />
                 <Route path="/shared/passport/:token" element={<SharedPassportPage />} />
+                <Route path="/shared/plan/:token" element={<SharedMyPlanPage />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/install" element={<InstallPage />} />
                 <Route path="/invite" element={<InvitePage />} />

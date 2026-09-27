@@ -13,7 +13,7 @@ in :func:`admin_decide_claim`.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -453,9 +453,9 @@ def admin_decide_claim(
 
     claim.status = "approved" if granted_something else "rejected"
     claim.admin_notes = body.admin_notes
-    claim.reviewed_at = datetime.utcnow()
+    claim.reviewed_at = datetime.now(timezone.utc)
     claim.reviewed_by = admin.get("email")
-    claim.updated_at = datetime.utcnow()
+    claim.updated_at = datetime.now(timezone.utc)
     session.add(claim)
 
     # Auto-going for the organizer on each approved event. Public

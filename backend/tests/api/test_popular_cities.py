@@ -7,7 +7,7 @@ and hidden events, are excluded so a pill can never resolve to an empty map.
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -91,7 +91,7 @@ def _event(
 
 
 def test_popular_cities_ranks_by_upcoming_count(client, session):
-    future = datetime.utcnow() + timedelta(days=5)
+    future = datetime.now(timezone.utc) + timedelta(days=5)
     # Paris: two upcoming events -> should rank first, pin = averaged coords.
     _event(
         session,
@@ -135,8 +135,8 @@ def test_popular_cities_ranks_by_upcoming_count(client, session):
 
 
 def test_popular_cities_excludes_past_hidden_and_incomplete(client, session):
-    future = datetime.utcnow() + timedelta(days=5)
-    past = datetime.utcnow() - timedelta(days=5)
+    future = datetime.now(timezone.utc) + timedelta(days=5)
+    past = datetime.now(timezone.utc) - timedelta(days=5)
     # Excluded: past, hidden, soft-deleted, missing city, missing coords.
     _event(
         session,
@@ -165,7 +165,7 @@ def test_popular_cities_excludes_past_hidden_and_incomplete(client, session):
         country="DE",
         latitude=52.5,
         longitude=13.4,
-        deleted_at=datetime.utcnow(),
+        deleted_at=datetime.now(timezone.utc),
     )
     _event(
         session,
@@ -203,7 +203,7 @@ def test_popular_cities_excludes_past_hidden_and_incomplete(client, session):
 
 
 def test_popular_cities_respects_limit(client, session):
-    future = datetime.utcnow() + timedelta(days=5)
+    future = datetime.now(timezone.utc) + timedelta(days=5)
     for i, name in enumerate(("A", "B", "C")):
         _event(
             session,

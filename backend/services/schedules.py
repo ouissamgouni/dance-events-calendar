@@ -12,6 +12,7 @@ from backend.db.models import (
     ScheduleRoom,
     ScheduleSession,
     ScheduleVenue,
+    UserPlanSession,
 )
 
 
@@ -42,10 +43,10 @@ def validate_timezone(value: str) -> str:
     return value
 
 
-def to_utc_naive(value: datetime) -> datetime:
+def to_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
-        return value
-    return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def utc_isoformat(value: datetime) -> str:
@@ -105,6 +106,40 @@ def latest_publication(
         .where(SchedulePublication.schedule_id == schedule_id)
         .order_by(SchedulePublication.version.desc())
     ).first()
+
+
+def plan_entries(
+    session: Session,
+    user_id,
+    event_id: str,
+    publication: SchedulePublication | None,
+) -> list[dict]:
+    current = {
+        row["id"]: row
+        for row in (publication.snapshot.get("sessions", []) if publication else [])
+    }
+    rows = session.exec(
+        select(UserPlanSession)
+        .where(
+            UserPlanSession.user_id == user_id,
+            UserPlanSession.event_id == event_id,
+        )
+        .order_by(UserPlanSession.added_at)
+    ).all()
+    entries = []
+    for row in rows:
+        item = current.get(str(row.session_id))
+        item_status = "removed"
+        if item is not None:
+            item_status = "cancelled" if item.get("is_cancelled") else "active"
+        entries.append(
+            {
+                "session_id": row.session_id,
+                "status": item_status,
+                "session": item or row.last_known_session,
+            }
+        )
+    return entries
 
 
 def published_schedule_event_ids(session: Session, event_ids: list[str]) -> set[str]:

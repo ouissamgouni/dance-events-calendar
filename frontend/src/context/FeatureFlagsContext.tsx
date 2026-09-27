@@ -37,6 +37,8 @@ export interface FeatureFlags {
     browseNavEnabled: boolean;
     /** Send the Browse events action directly to the Explorer list. */
     browseDirectToExplorerEnabled: boolean;
+    /** Require authentication for app workspace routes. */
+    appAuthGateEnabled: boolean;
     /** Ask onboarding users to confirm their name and optionally add a picture. */
     onboardingProfileStepEnabled: boolean;
     /** Show the optional event-size question in the review wizard. */
@@ -69,6 +71,8 @@ export interface FeatureFlags {
     explorerEventCardCardStyleEnabled: boolean;
     /** Show floating Explorer control labels below desktop widths. */
     explorerViewControlLabelsEnabled: boolean;
+    /** Allow the shared Explorer and Calendar filter bar to use a second row. */
+    summaryTwoLineEnabled: boolean;
     /** When true, event pictures are displayed. Admin picture management is
      * always available regardless of this flag. */
     eventImagesEnabled: boolean;
@@ -99,6 +103,7 @@ const defaultFlags: FeatureFlags = {
     myEventsNavEnabled: true,
     browseNavEnabled: false,
     browseDirectToExplorerEnabled: false,
+    appAuthGateEnabled: false,
     onboardingProfileStepEnabled: false,
     eventReviewSizeStepEnabled: true,
     tagAsBadge: false,
@@ -112,6 +117,7 @@ const defaultFlags: FeatureFlags = {
     eventCardShowTimeLocationIconsEnabled: false,
     explorerEventCardCardStyleEnabled: true,
     explorerViewControlLabelsEnabled: true,
+    summaryTwoLineEnabled: false,
     eventImagesEnabled: true,
     eventCardPlaceholderStyle: 'none',
 };
@@ -161,6 +167,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     myEventsNavEnabled: s.my_events_nav_enabled ?? true,
                     browseNavEnabled: s.browse_nav_enabled ?? false,
                     browseDirectToExplorerEnabled: s.browse_direct_to_explorer_enabled ?? false,
+                    appAuthGateEnabled: s.app_auth_gate_enabled ?? false,
                     onboardingProfileStepEnabled: s.onboarding_profile_step_enabled ?? false,
                     eventReviewSizeStepEnabled: s.event_review_size_step_enabled ?? true,
                     tagAsBadge: s.tag_as_badge_enabled ?? false,
@@ -174,6 +181,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     eventCardShowTimeLocationIconsEnabled: s.event_card_show_time_location_icons_enabled ?? false,
                     explorerEventCardCardStyleEnabled: s.explorer_event_card_card_style_enabled ?? false,
                     explorerViewControlLabelsEnabled: s.explorer_view_control_labels_enabled ?? true,
+                    summaryTwoLineEnabled: s.summary_two_line_enabled ?? false,
                     eventImagesEnabled: s.event_images_enabled ?? true,
                     eventCardPlaceholderStyle: s.event_card_placeholder_style ?? 'none',
                 });

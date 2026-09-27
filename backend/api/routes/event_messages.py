@@ -11,7 +11,7 @@ post-moderated: users report, and the author or an admin can soft-delete.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import (
@@ -337,7 +337,7 @@ def create_message(
 
     # The board closes once the event is over — attendee coordination
     # (roommate/ride/questions) is only useful up to the event's end.
-    if event.end < datetime.utcnow():
+    if event.end < datetime.now(timezone.utc):
         raise HTTPException(status_code=409, detail="Event has ended")
 
     text = body.body.strip()
@@ -367,7 +367,7 @@ def create_message(
 
     # Replies inherit the parent's category; only top-level posts choose one.
     category = parent.category if parent is not None else body.category
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     msg = EventMessage(
         event_id=event_id,
         author_user_id=user.id,
@@ -447,7 +447,7 @@ def delete_message(
     if msg.author_user_id != user.id and not is_admin_user(user):
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    msg.deleted_at = datetime.utcnow()
+    msg.deleted_at = datetime.now(timezone.utc)
     session.add(msg)
     session.commit()
     return Response(status_code=204)

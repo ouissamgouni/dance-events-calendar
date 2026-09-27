@@ -516,7 +516,7 @@ def run_once(
     if not get_activity_digest_email_enabled():
         return {"skipped": "activity_email_disabled"}
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     now_utc = now.replace(tzinfo=timezone.utc)
     cutoff_old = now - _MAX_AGE
     weekdays, sched_hour, sched_minute = _parse_schedule(get_activity_digest_schedule())

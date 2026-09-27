@@ -1,7 +1,7 @@
 """Unit tests for DatabaseSeeder logic."""
 
 import pytest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlmodel import SQLModel, Session, create_engine, select
@@ -11,6 +11,7 @@ from backend.db.models import (
     CachedEvent,
     EventTag,
     EventView,
+    SiteSetting,
     Tag,
     TagGroup,
     User,
@@ -202,6 +203,31 @@ class TestDatabaseSeeder:
         assert tag is not None
         assert user is not None
 
+    def test_seed_layers_scenario_settings_over_defaults(self, tmp_path, monkeypatch):
+        scenarios_dir = tmp_path / "scenarios"
+        default_dir = scenarios_dir / "default"
+        scenario_dir = scenarios_dir / "focused"
+        default_dir.mkdir(parents=True)
+        scenario_dir.mkdir()
+        (default_dir / "settings.yaml").write_text(
+            "settings:\n  event_schedule_enabled: true\n  promo_codes_enabled: true\n"
+        )
+        (scenario_dir / "settings.yaml").write_text(
+            "settings:\n  promo_codes_enabled: false\n"
+        )
+        monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+
+            assert session.get(SiteSetting, "event_schedule_enabled").value == "true"
+            assert session.get(SiteSetting, "promo_codes_enabled").value == "false"
+
     def test_seed_admin_managed_user_defaults_to_public_audience(
         self, tmp_path, monkeypatch
     ):
@@ -369,7 +395,7 @@ class TestDatabaseSeeder:
         assert pending is not None
         assert pending.onboarded_at is None
         assert fixed is not None
-        assert fixed.onboarded_at == datetime(2025, 1, 15, 9, 30, 0)
+        assert fixed.onboarded_at == datetime(2025, 1, 15, 9, 30, tzinfo=timezone.utc)
         assert fixed.onboarding_version == 3
 
     def test_seed_existing_mock_user_backfills_missing_avatar(

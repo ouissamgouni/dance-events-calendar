@@ -7,19 +7,25 @@ interface ProgramActionProps {
     event: CalendarEvent;
     variant?: 'full' | 'compact';
     onNavigate?: () => void;
+    myPlanCount?: number;
 }
 
-export default function ProgramAction({ event, variant = 'compact', onNavigate }: ProgramActionProps) {
+export default function ProgramAction({ event, variant = 'compact', onNavigate, myPlanCount }: ProgramActionProps) {
     const { eventScheduleEnabled } = useFeatureFlags();
     if (!eventScheduleEnabled || !event.schedule_published) return null;
 
     const now = Date.now();
     const isLive = new Date(event.start).getTime() <= now && now < new Date(event.end).getTime();
-    const label = variant === 'full' ? (isLive ? 'Open live program' : 'View program') : 'Program';
+    const hasPlan = variant === 'compact' && (myPlanCount ?? 0) > 0;
+    const label = hasPlan
+        ? `My Plan (${myPlanCount})`
+        : variant === 'full'
+            ? (isLive ? 'Open live program' : 'View program')
+            : 'Program';
 
     return (
         <Link
-            to={`/event/${event.event_id}/program`}
+            to={`/event/${event.event_id}/program${hasPlan ? '/plan' : ''}`}
             onClick={(clickEvent) => {
                 clickEvent.stopPropagation();
                 onNavigate?.();

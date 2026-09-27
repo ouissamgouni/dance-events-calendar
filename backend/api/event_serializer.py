@@ -115,7 +115,7 @@ def serialize_events(
     except Exception:
         pass
 
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     promo_eligible_ids = [
         e.event_id
@@ -128,7 +128,7 @@ def serialize_events(
     ]
     events_with_promos: set[str] = set()
     if promo_eligible_ids:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         promo_rows = session.exec(
             select(EventPromoCode.event_id)
             .where(EventPromoCode.event_id.in_(promo_eligible_ids))

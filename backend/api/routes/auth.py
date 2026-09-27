@@ -5,7 +5,7 @@ import os
 import re
 import secrets
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -214,7 +214,7 @@ def _upsert_user_from_claims(
     if user is None:
         user = session.exec(select(User).where(User.email == email)).first()
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     ua = (user_agent or "").strip()[:400] or None
     is_new_user = user is None
     if user is None:
@@ -479,7 +479,7 @@ def _apply_anon_preferences(
         # Stale tag IDs from localStorage — drop them, don't fail sign-in.
         tag_ids = []
     _replace_preferred_tags(session, user, tag_ids)
-    user.preferences_set_at = datetime.utcnow()
+    user.preferences_set_at = datetime.now(timezone.utc)
     session.add(user)
     session.commit()
 
@@ -638,7 +638,7 @@ def request_email_code(
     if not _EMAIL_RE.match(email):
         return JSONResponse(status_code=400, content={"detail": "Invalid email"})
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     # Per-email resend cooldown: block a fresh code while a recent unconsumed
     # one is still within the cooldown window (limits email bombing beyond the
     # per-IP rate limit).
@@ -717,7 +717,7 @@ def verify_email_code(
             status_code=400, content={"detail": "Invalid or expired code"}
         )
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     row = session.exec(
         select(EmailLoginCode)
         .where(EmailLoginCode.email == email)
@@ -968,7 +968,7 @@ def report_app_installed(
     ``display-mode: standalone`` for a signed-in user (see InstallPrompt.tsx).
     """
     if user.installed_at is None:
-        user.installed_at = datetime.utcnow()
+        user.installed_at = datetime.now(timezone.utc)
         session.add(user)
         session.commit()
         session.refresh(user)
@@ -1044,7 +1044,7 @@ def update_preferences(
             user.home_label = home.label
 
     if touched_prefs:
-        user.preferences_set_at = datetime.utcnow()
+        user.preferences_set_at = datetime.now(timezone.utc)
 
     session.add(user)
     session.commit()
@@ -1603,7 +1603,7 @@ def purge_user_account(session: Session, user_id) -> None:
         db_user.display_name = None
         db_user.avatar_url = None
         db_user.avatar_key = None
-        db_user.deleted_at = datetime.utcnow()
+        db_user.deleted_at = datetime.now(timezone.utc)
         session.add(db_user)
 
 

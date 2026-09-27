@@ -1,10 +1,11 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import List, Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     CheckConstraint,
     Column,
+    DateTime,
     Index,
     JSON,
     Text,
@@ -12,6 +13,8 @@ from sqlalchemy import (
     text,
 )
 from sqlmodel import Field, Relationship, SQLModel
+
+from backend.db.sqltypes import UTCDateTime
 
 
 class User(SQLModel, table=True):
@@ -41,7 +44,7 @@ class User(SQLModel, table=True):
     provider_subject: Optional[str] = Field(
         default=None, unique=True, index=True, max_length=255
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Most recent visit: bumped on Google login AND on any subsequent
     # session-cookie-authenticated request (throttled — see
     # ``_LAST_SEEN_THROTTLE`` in api/deps.py).
@@ -254,7 +257,9 @@ class BlockedUserIdentity(SQLModel, table=True):
     provider_subject: str = Field(max_length=255, index=True)
     email: Optional[str] = Field(default=None, max_length=255, index=True)
     reason: Optional[str] = Field(default=None, sa_column=Column(Text))
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
     created_by_admin_user_id: Optional[UUID] = Field(
         default=None, foreign_key="users.id", index=True
     )
@@ -277,7 +282,9 @@ class EmailLoginCode(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(index=True, max_length=255)
     code_hash: str = Field(max_length=64)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
     expires_at: datetime = Field()
     consumed_at: Optional[datetime] = Field(default=None)
     attempt_count: int = Field(default=0, nullable=False)
@@ -297,7 +304,9 @@ class UserAccountMerge(SQLModel, table=True):
     )
     reason: Optional[str] = Field(default=None, sa_column=Column(Text))
     summary: dict = Field(default_factory=dict, sa_column=Column(JSON))
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
 
 
 class CalendarSetting(SQLModel, table=True):
@@ -322,8 +331,8 @@ class CalendarSetting(SQLModel, table=True):
     show_events: bool = Field(default=True)
     color: Optional[str] = Field(default=None)
     sync_token: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CalendarCurationRule(SQLModel, table=True):
@@ -363,7 +372,7 @@ class CalendarCurationRule(SQLModel, table=True):
     # default at engagement time (mirrors the bulk route default).
     audience: Optional[str] = Field(default=None, max_length=16)
     enabled: bool = Field(default=True, nullable=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CachedEvent(SQLModel, table=True):
@@ -422,7 +431,7 @@ class CachedEvent(SQLModel, table=True):
     review_status: str = Field(default="pending")
     links: Optional[list] = Field(default=None, sa_column=Column(JSON))
     content_hash: Optional[str] = Field(default=None, index=True)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deleted_at: Optional[datetime] = Field(default=None, index=True)
     is_hidden: bool = Field(default=False, index=True)
     # Per-event overrides for the ``show_prices`` / ``promo_codes_enabled``
@@ -467,8 +476,8 @@ class EventSchedule(SQLModel, table=True):
     timezone: str = Field(max_length=64, nullable=False)
     day_start_hour: int = Field(default=6, nullable=False)
     days: list = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventScheduleEditor(SQLModel, table=True):
@@ -485,7 +494,7 @@ class EventScheduleEditor(SQLModel, table=True):
     granted_by_user_id: Optional[UUID] = Field(
         default=None, foreign_key="users.id", index=True
     )
-    granted_at: datetime = Field(default_factory=datetime.utcnow)
+    granted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ScheduleVenue(SQLModel, table=True):
@@ -602,8 +611,8 @@ class ScheduleSession(SQLModel, table=True):
     allow_plan: bool = Field(default=True, nullable=False)
     is_cancelled: bool = Field(default=False, nullable=False)
     deleted_at: Optional[datetime] = Field(default=None, index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class SchedulePublication(SQLModel, table=True):
@@ -620,7 +629,7 @@ class SchedulePublication(SQLModel, table=True):
     )
     version: int = Field(nullable=False)
     snapshot: dict = Field(sa_column=Column(JSON, nullable=False))
-    published_at: datetime = Field(default_factory=datetime.utcnow)
+    published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     published_by_user_id: Optional[UUID] = Field(
         default=None, foreign_key="users.id", index=True
     )
@@ -642,7 +651,22 @@ class UserPlanSession(SQLModel, table=True):
         foreign_key="cached_events.event_id", index=True, nullable=False
     )
     last_known_session: dict = Field(sa_column=Column(JSON, nullable=False))
-    added_at: datetime = Field(default_factory=datetime.utcnow)
+    added_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class MyPlanShareToken(SQLModel, table=True):
+    __tablename__ = "my_plan_share_tokens"
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_id", name="uq_my_plan_share_user_event"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True, nullable=False)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    event_id: str = Field(
+        foreign_key="cached_events.event_id", index=True, nullable=False
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class BlockedEvent(SQLModel, table=True):
@@ -655,7 +679,7 @@ class BlockedEvent(SQLModel, table=True):
     __tablename__ = "blocked_events"
 
     event_id: str = Field(primary_key=True)
-    blocked_at: datetime = Field(default_factory=datetime.utcnow)
+    blocked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventDuplicateGroup(SQLModel, table=True):
@@ -675,7 +699,7 @@ class EventDuplicateGroup(SQLModel, table=True):
     status: str = Field(default="pending", index=True)  # pending|resolved|dismissed
     source: str = Field(default="auto")  # auto|manual
     kept_event_id: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     resolved_at: Optional[datetime] = Field(default=None)
     resolved_by_admin: Optional[str] = Field(default=None, max_length=255)
 
@@ -702,7 +726,7 @@ class EventDuplicateScanLog(SQLModel, table=True):
     scan_type: str = Field(default="incremental")  # incremental|full|manual_pair
     triggered_by_event_id: Optional[str] = Field(default=None)
     triggered_by_admin: Optional[str] = Field(default=None, max_length=255)
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: Optional[datetime] = Field(default=None)
     candidates_found: int = Field(default=0)
     groups_created: int = Field(default=0)
@@ -733,7 +757,7 @@ class EventSeries(SQLModel, table=True):
     # Admin-editable label shown in the panel and (Phase 5) on the series
     # aggregate card. Defaults to the first member's title at creation time.
     canonical_title: str = Field(default="", max_length=200)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     resolved_at: Optional[datetime] = Field(default=None)
     resolved_by_admin: Optional[str] = Field(default=None, max_length=255)
 
@@ -761,7 +785,7 @@ class EventSeriesScanLog(SQLModel, table=True):
     scan_type: str = Field(default="incremental")  # incremental|full|manual
     triggered_by_event_id: Optional[str] = Field(default=None)
     triggered_by_admin: Optional[str] = Field(default=None, max_length=255)
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: Optional[datetime] = Field(default=None)
     candidates_found: int = Field(default=0)
     groups_created: int = Field(default=0)
@@ -779,7 +803,7 @@ class EventCalendarSource(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     event_id: str = Field(foreign_key="cached_events.event_id", index=True)
     calendar_id: str = Field(foreign_key="calendar_settings.calendar_id", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventView(SQLModel, table=True):
@@ -794,7 +818,7 @@ class EventView(SQLModel, table=True):
     source: Optional[str] = Field(default=None)  # calendar | list | map | direct
     country: Optional[str] = Field(default=None)
     city: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventSave(SQLModel, table=True):
@@ -804,7 +828,7 @@ class EventSave(SQLModel, table=True):
     event_id: str = Field(index=True)
     device_id: str = Field(index=True)
     action: str = Field(default="save")  # save | unsave
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class UserSavedEvent(SQLModel, table=True):
@@ -830,7 +854,7 @@ class UserSavedEvent(SQLModel, table=True):
         default=None, foreign_key="users.id", index=True
     )
     user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
-    saved_at: datetime = Field(default_factory=datetime.utcnow)
+    saved_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Per-saved-event audience (public / friends / private). Treated as
     # the equivalent of "interested" tier on Facebook events. Defaults
     # to ``friends`` (privacy-by-default per GDPR Art. 25) — the
@@ -854,7 +878,7 @@ class ShareToken(SQLModel, table=True):
     user_id: Optional[UUID] = Field(
         default=None, foreign_key="users.id", unique=True, index=True
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class PassportShareToken(SQLModel, table=True):
@@ -877,7 +901,7 @@ class PassportShareToken(SQLModel, table=True):
     # viewer (``/shared/{token}`` returns 401 for anonymous). Default False
     # keeps the classic "anyone with the link" behavior.
     require_signin: bool = Field(default=False, nullable=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class SiteSetting(SQLModel, table=True):
@@ -891,7 +915,7 @@ class SyncLog(SQLModel, table=True):
     __tablename__ = "sync_logs"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: Optional[datetime] = Field(default=None)
     status: str = Field(default="running")  # running | success | error
     trigger: str = Field(default="auto")  # auto | manual
@@ -1014,7 +1038,7 @@ class EventSuggestion(SQLModel, table=True):
     price_currency: Optional[str] = Field(default=None)
     price_is_free: Optional[bool] = Field(default=None)
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None)
 
@@ -1045,8 +1069,8 @@ class EventPromoCode(SQLModel, table=True):
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None, max_length=255)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class OrganizerClaim(SQLModel, table=True):
@@ -1083,8 +1107,8 @@ class OrganizerClaim(SQLModel, table=True):
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None, max_length=255)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class OrganizerClaimEvent(SQLModel, table=True):
@@ -1105,7 +1129,7 @@ class OrganizerClaimEvent(SQLModel, table=True):
     claim_id: UUID = Field(foreign_key="organizer_claims.id", index=True)
     event_id: str = Field(foreign_key="cached_events.event_id", index=True)
     decision: str = Field(default="pending", max_length=16)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventLinkClick(SQLModel, table=True):
@@ -1117,7 +1141,7 @@ class EventLinkClick(SQLModel, table=True):
     url: str
     country: Optional[str] = Field(default=None)
     city: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventExport(SQLModel, table=True):
@@ -1127,7 +1151,7 @@ class EventExport(SQLModel, table=True):
     device_id: Optional[str] = Field(default=None, index=True)
     format: str  # ics | xlsx
     event_count: int = Field(default=0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # --- Tags / Categorization ---
@@ -1160,7 +1184,7 @@ class TagGroup(SQLModel, table=True):
     # Guards system-relied-upon groups (e.g. "reach", used by
     # interest_notification_service) from admin delete/slug-change.
     protected: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     tags: List["Tag"] = Relationship(back_populates="group")
 
@@ -1182,7 +1206,7 @@ class Tag(SQLModel, table=True):
     # both-polarity ordering in the review flow and the community summary
     # (loved vs mentioned). NULL for event/audience tags.
     polarity: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     group: Optional[TagGroup] = Relationship(back_populates="tags")
 
@@ -1203,7 +1227,7 @@ class TagSynonym(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     tag_id: int = Field(foreign_key="tags.id", index=True)
     term: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventTag(SQLModel, table=True):
@@ -1215,7 +1239,7 @@ class EventTag(SQLModel, table=True):
 
     event_id: str = Field(foreign_key="cached_events.event_id", primary_key=True)
     tag_id: int = Field(foreign_key="tags.id", primary_key=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class UserPreferredTag(SQLModel, table=True):
@@ -1230,7 +1254,7 @@ class UserPreferredTag(SQLModel, table=True):
 
     user_id: UUID = Field(foreign_key="users.id", primary_key=True)
     tag_id: int = Field(foreign_key="tags.id", primary_key=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class UserInterestProfile(SQLModel, table=True):
@@ -1268,7 +1292,7 @@ class UserInterestProfile(SQLModel, table=True):
     # Explorer/For-You default filters follow the single active profile per
     # user. Enforced by application code, not a DB constraint (SQLite-friendly).
     is_active: bool = Field(default=False, nullable=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class UserInterestProfileTag(SQLModel, table=True):
@@ -1285,7 +1309,7 @@ class UserInterestProfileTag(SQLModel, table=True):
 
     profile_id: int = Field(foreign_key="user_interest_profiles.id", primary_key=True)
     tag_id: int = Field(foreign_key="tags.id", primary_key=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class TagSuggestion(SQLModel, table=True):
@@ -1301,7 +1325,7 @@ class TagSuggestion(SQLModel, table=True):
     submitter_ip: Optional[str] = Field(default=None)
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Links a TagSuggestion to the parent feedback envelope (rating + tag suggestions
     # submitted together). NULL for legacy/standalone suggestions.
     feedback_submission_id: Optional[UUID] = Field(default=None, index=True)
@@ -1369,8 +1393,10 @@ class EventRating(SQLModel, table=True):
     submitter_user_agent: Optional[str] = Field(default=None)
     submitter_country: Optional[str] = Field(default=None)
 
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventRatingAspectScore(SQLModel, table=True):
@@ -1392,7 +1418,7 @@ class EventRatingAspectScore(SQLModel, table=True):
     rating_id: UUID = Field(foreign_key="event_ratings.id", index=True)
     aspect_slug: str = Field(max_length=32)
     score: int = Field(ge=1, le=5)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventRatingAspectTag(SQLModel, table=True):
@@ -1411,7 +1437,7 @@ class EventRatingAspectTag(SQLModel, table=True):
     rating_id: UUID = Field(foreign_key="event_ratings.id", index=True)
     aspect_slug: str = Field(max_length=32)
     tag_id: int = Field(foreign_key="tags.id", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventMessage(SQLModel, table=True):
@@ -1443,8 +1469,10 @@ class EventMessage(SQLModel, table=True):
     # Admin moderation flag; hidden messages are excluded from public reads.
     is_hidden: bool = Field(default=False, index=True)
     deleted_at: Optional[datetime] = Field(default=None, index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventMessageReport(SQLModel, table=True):
@@ -1463,7 +1491,9 @@ class EventMessageReport(SQLModel, table=True):
         default=None, foreign_key="users.id", index=True
     )
     reason: Optional[str] = Field(default=None, max_length=280)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
     resolved_at: Optional[datetime] = Field(default=None)
     resolved_by: Optional[str] = Field(default=None, max_length=255)
 
@@ -1484,7 +1514,7 @@ class UserEventMute(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: UUID = Field(foreign_key="users.id", index=True)
     event_id: str = Field(foreign_key="cached_events.event_id", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventAttendance(SQLModel, table=True):
@@ -1496,7 +1526,7 @@ class EventAttendance(SQLModel, table=True):
     event_id: str = Field(index=True)
     device_id: str = Field(index=True)
     action: str = Field(default="going")  # going | not_going
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class UserEventAttendance(SQLModel, table=True):
@@ -1534,7 +1564,9 @@ class UserEventAttendance(SQLModel, table=True):
         default=None, foreign_key="users.id", index=True
     )
     user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
-    attending_since: datetime = Field(default_factory=datetime.utcnow)
+    attending_since: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     # When True AND user_id IS NOT NULL the row is eligible to appear in the
     # public attendee list for the event. When False, the attendance is
     # counted but the user is not named ("private going"). Anonymous device
@@ -1564,7 +1596,7 @@ class CalendarDefaultTag(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     calendar_id: str = Field(foreign_key="calendar_settings.calendar_id", index=True)
     tag_id: int = Field(foreign_key="tags.id", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ShareEvent(SQLModel, table=True):
@@ -1584,7 +1616,7 @@ class ShareEvent(SQLModel, table=True):
     action: str = Field(max_length=16)  # share | click | conversion
     share_code: Optional[str] = Field(default=None, max_length=12, index=True)
     device_id: Optional[str] = Field(default=None, max_length=64, index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class UserFollow(SQLModel, table=True):
@@ -1603,7 +1635,7 @@ class UserFollow(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     follower_id: UUID = Field(foreign_key="users.id", index=True)
     followee_id: UUID = Field(foreign_key="users.id", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Phase E (E8). For ``friends``-visibility targets the follow is
     # created with ``status='pending'`` and grants NO visibility until
     # the target approves; for ``public`` targets it is created with
@@ -1636,7 +1668,7 @@ class UserReferral(SQLModel, table=True):
     # Short opaque case-insensitive identifier (base32, no padding).
     # Surfaced in URLs like ``https://app.example.com/r/{code}``.
     code: str = Field(max_length=24)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     used_count: int = Field(default=0, nullable=False)
 
 
@@ -1668,7 +1700,7 @@ class CalendarSubscription(SQLModel, table=True):
     subscriber_id: UUID = Field(foreign_key="users.id", index=True)
     target_user_id: UUID = Field(foreign_key="users.id", index=True)
     notify_new_events: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Notification(SQLModel, table=True):
@@ -1736,7 +1768,9 @@ class Notification(SQLModel, table=True):
         index=True
     )  # subscription_going | subscription_suggested | new_follower | new_friend | follow_request
     event_id: Optional[str] = Field(default=None, index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
     read_at: Optional[datetime] = Field(default=None, index=True)
     # Set once this notification has been included in a batched activity
     # digest email (see ``services/activity_email.py``). NULL means it is
@@ -1798,7 +1832,9 @@ class NotificationDelivery(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     notification_id: int = Field(foreign_key="notifications.id", index=True)
     channel: str = Field(index=True)  # "app" | "email" | "push"
-    delivered_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    delivered_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
 
 
 class PushSubscription(SQLModel, table=True):
@@ -1826,7 +1862,9 @@ class PushSubscription(SQLModel, table=True):
     p256dh: str = Field(max_length=255)
     auth: str = Field(max_length=255)
     user_agent: Optional[str] = Field(default=None, max_length=400)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
 
 
 class UserMilestone(SQLModel, table=True):
@@ -1846,7 +1884,7 @@ class UserMilestone(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
     milestone_key: str = Field(max_length=48, nullable=False)
-    unlocked_at: datetime = Field(default_factory=datetime.utcnow)
+    unlocked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     seen_at: Optional[datetime] = Field(default=None)
 
 
@@ -1877,5 +1915,11 @@ class UserConsistencyAchievement(SQLModel, table=True):
     user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
     level_key: str = Field(max_length=32, nullable=False)
     period_start: str = Field(max_length=7, nullable=False)
-    reached_at: datetime = Field(default_factory=datetime.utcnow)
+    reached_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     seen_at: Optional[datetime] = Field(default=None)
+
+
+for table in SQLModel.metadata.tables.values():
+    for column in table.columns:
+        if isinstance(column.type, DateTime):
+            column.type = UTCDateTime()

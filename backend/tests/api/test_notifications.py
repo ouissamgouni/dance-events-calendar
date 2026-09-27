@@ -13,7 +13,7 @@ Covers:
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import pytest
@@ -142,8 +142,8 @@ def _make_event(
         event_id=event_id,
         calendar_id=cal_id,
         title=title,
-        start=datetime.utcnow() + timedelta(days=1),
-        end=datetime.utcnow() + timedelta(days=1, hours=2),
+        start=datetime.now(timezone.utc) + timedelta(days=1),
+        end=datetime.now(timezone.utc) + timedelta(days=1, hours=2),
         all_day=False,
         review_status="reviewed",
     )
@@ -219,8 +219,8 @@ def test_going_past_event_does_not_fan_out(client, session):
         event_id="ev-past",
         calendar_id="cal-test",
         title="Salsa Night",
-        start=datetime.utcnow() - timedelta(days=1, hours=2),
-        end=datetime.utcnow() - timedelta(days=1),
+        start=datetime.now(timezone.utc) - timedelta(days=1, hours=2),
+        end=datetime.now(timezone.utc) - timedelta(days=1),
         all_day=False,
         review_status="reviewed",
     )
@@ -295,7 +295,7 @@ def test_signed_in_suggestion_submit_does_not_fan_out_pending_event(client, sess
     _subscribe(session, bob, alice)
 
     _login(client, "alice@example.com")
-    start = (datetime.utcnow() + timedelta(days=1)).replace(microsecond=0)
+    start = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
     end = start + timedelta(hours=3)
     r = client.post(
         "/api/suggestions",
@@ -419,8 +419,8 @@ def test_suggested_fan_out_on_admin_approval(client, session):
         "/api/suggestions",
         json={
             "title": "Suggested Salsa",
-            "start": (datetime.utcnow() + timedelta(days=2)).isoformat(),
-            "end": (datetime.utcnow() + timedelta(days=2, hours=2)).isoformat(),
+            "start": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
+            "end": (datetime.now(timezone.utc) + timedelta(days=2, hours=2)).isoformat(),
             "all_day": False,
         },
     )
@@ -466,8 +466,8 @@ def test_anonymous_suggestion_no_fan_out(client, session):
         "/api/suggestions",
         json={
             "title": "Anon Salsa",
-            "start": (datetime.utcnow() + timedelta(days=2)).isoformat(),
-            "end": (datetime.utcnow() + timedelta(days=2, hours=2)).isoformat(),
+            "start": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
+            "end": (datetime.now(timezone.utc) + timedelta(days=2, hours=2)).isoformat(),
             "all_day": False,
         },
     )
@@ -624,7 +624,7 @@ def test_unread_count(client, session):
     alice = _make_user(session, "alice@example.com", "alice")
     bob = _make_user(session, "bob@example.com", "bob")
     n1 = _seed_one_notif(session, bob, alice, event_id="ev-1")
-    n1.read_at = datetime.utcnow()
+    n1.read_at = datetime.now(timezone.utc)
     session.add(n1)
     _seed_one_notif(session, bob, alice, kind="subscription_suggested", event_id="ev-1")
     session.commit()
@@ -994,8 +994,8 @@ def test_subscribed_events_aggregation(client, session):
     session.add(
         EventSuggestion(
             title="Suggested Event",
-            start=datetime.utcnow() + timedelta(days=3),
-            end=datetime.utcnow() + timedelta(days=3, hours=2),
+            start=datetime.now(timezone.utc) + timedelta(days=3),
+            end=datetime.now(timezone.utc) + timedelta(days=3, hours=2),
             submitter_user_id=alice.id,
             status="approved",
             created_event_id="ev-2",
@@ -1050,8 +1050,8 @@ def test_subscribed_events_multi_handle_kind_and_upcoming_filters(client, sessio
     _make_event(session, "ev-going", title="Going Event")
     _make_event(session, "ev-saved", title="Saved Event")
     past = _make_event(session, "ev-past", title="Past Event")
-    past.start = datetime.utcnow() - timedelta(days=2)
-    past.end = datetime.utcnow() - timedelta(days=1)
+    past.start = datetime.now(timezone.utc) - timedelta(days=2)
+    past.end = datetime.now(timezone.utc) - timedelta(days=1)
     session.add(past)
 
     alice = _make_user(session, "alice@example.com", "alice")
@@ -1478,8 +1478,8 @@ def _make_past_event(session: Session, event_id: str) -> CachedEvent:
         event_id=event_id,
         calendar_id="cal-test",
         title="Past Social",
-        start=datetime.utcnow() - timedelta(days=2, hours=2),
-        end=datetime.utcnow() - timedelta(days=2),
+        start=datetime.now(timezone.utc) - timedelta(days=2, hours=2),
+        end=datetime.now(timezone.utc) - timedelta(days=2),
         all_day=False,
         review_status="reviewed",
     )

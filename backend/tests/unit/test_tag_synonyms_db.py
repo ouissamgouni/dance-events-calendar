@@ -5,7 +5,7 @@ engine no longer falls back to the static seed map, so admin deletions stay
 deleted.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
@@ -53,7 +53,9 @@ def test_load_taxonomy_uses_db_synonyms_when_present(session):
     salsa_id, _ = _seed(session)
     session.add(
         TagSynonym(
-            tag_id=salsa_id, term="custom-salsa-term", created_at=datetime.utcnow()
+            tag_id=salsa_id,
+            term="custom-salsa-term",
+            created_at=datetime.now(timezone.utc),
         )
     )
     session.commit()
@@ -75,7 +77,7 @@ def test_load_taxonomy_does_not_fall_back_to_static_map(session):
 
     snapshot = load_taxonomy(session)
     salsa_terms = _terms_for(snapshot, "salsa")
-    # Only the slug/label survive ("salsa" itself); no "casino" / "rueda" / etc.
+    # Only the slug/label survive ("salsa" itself), timezone; no "casino" / "rueda" / etc.
     assert salsa_terms == {"salsa"}
 
 
@@ -83,7 +85,9 @@ def test_db_rows_are_the_only_synonym_source(session):
     """Admin-configured synonyms are the sole runtime source."""
     salsa_id, _ = _seed(session)
     session.add(
-        TagSynonym(tag_id=salsa_id, term="only-this", created_at=datetime.utcnow())
+        TagSynonym(
+            tag_id=salsa_id, term="only-this", created_at=datetime.now(timezone.utc)
+        )
     )
     session.commit()
 

@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import MagicMock
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -427,14 +427,14 @@ class TestCalendarFeed:
         past_event = _sample_event(
             event_id="evt-past-001",
             title="Past Event",
-            start=datetime(2025, 1, 1, 20, 0),
-            end=datetime(2025, 1, 1, 23, 0),
+            start=datetime(2025, 1, 1, 20, 0, tzinfo=timezone.utc),
+            end=datetime(2025, 1, 1, 23, 0, tzinfo=timezone.utc),
         )
         future_event = _sample_event(
             event_id="evt-future-001",
             title="Future Event",
-            start=datetime(2026, 12, 31, 20, 0),
-            end=datetime(2026, 12, 31, 23, 0),
+            start=datetime(2026, 12, 31, 20, 0, tzinfo=timezone.utc),
+            end=datetime(2026, 12, 31, 23, 0, tzinfo=timezone.utc),
         )
 
         _feed_mock(
@@ -448,7 +448,9 @@ class TestCalendarFeed:
         )
 
         with patch("backend.api.routes.sharing.datetime") as mock_datetime:
-            mock_datetime.utcnow.return_value = datetime(2026, 6, 15, 12, 0)
+            mock_datetime.now.return_value = datetime(
+                2026, 6, 15, 12, 0, tzinfo=timezone.utc
+            )
             resp = c.get("/api/share/calendar/test-token-uuid.ics?view=upcoming")
 
         assert resp.status_code == 200
@@ -468,14 +470,14 @@ class TestCalendarFeed:
         past_event = _sample_event(
             event_id="evt-past-001",
             title="Past Event",
-            start=datetime(2025, 1, 1, 20, 0),
-            end=datetime(2025, 1, 1, 23, 0),
+            start=datetime(2025, 1, 1, 20, 0, tzinfo=timezone.utc),
+            end=datetime(2025, 1, 1, 23, 0, tzinfo=timezone.utc),
         )
         future_event = _sample_event(
             event_id="evt-future-001",
             title="Future Event",
-            start=datetime(2026, 12, 31, 20, 0),
-            end=datetime(2026, 12, 31, 23, 0),
+            start=datetime(2026, 12, 31, 20, 0, tzinfo=timezone.utc),
+            end=datetime(2026, 12, 31, 23, 0, tzinfo=timezone.utc),
         )
 
         _feed_mock(
@@ -489,7 +491,9 @@ class TestCalendarFeed:
         )
 
         with patch("backend.api.routes.sharing.datetime") as mock_datetime:
-            mock_datetime.utcnow.return_value = datetime(2026, 6, 15, 12, 0)
+            mock_datetime.now.return_value = datetime(
+                2026, 6, 15, 12, 0, tzinfo=timezone.utc
+            )
             resp = c.get("/api/share/calendar/test-token-uuid.ics?view=past")
 
         assert resp.status_code == 200
@@ -531,16 +535,16 @@ class TestCalendarFeed:
         past_event = _sample_event(
             event_id="evt-past-001",
             title="Past Event",
-            start=datetime(2025, 1, 1, 20, 0),
-            end=datetime(2025, 1, 1, 23, 0),
+            start=datetime(2025, 1, 1, 20, 0, tzinfo=timezone.utc),
+            end=datetime(2025, 1, 1, 23, 0, tzinfo=timezone.utc),
         )
         # Upcoming (future) going event: view=past must hide it even though the
         # legacy scope=going would otherwise include it.
         going_event = _sample_event(
             event_id="evt-going-001",
             title="Going Event",
-            start=datetime(2026, 12, 1, 20, 0),
-            end=datetime(2026, 12, 1, 23, 0),
+            start=datetime(2026, 12, 1, 20, 0, tzinfo=timezone.utc),
+            end=datetime(2026, 12, 1, 23, 0, tzinfo=timezone.utc),
         )
 
         _feed_mock(
@@ -554,7 +558,9 @@ class TestCalendarFeed:
         )
 
         with patch("backend.api.routes.sharing.datetime") as mock_datetime:
-            mock_datetime.utcnow.return_value = datetime(2026, 6, 15, 12, 0)
+            mock_datetime.now.return_value = datetime(
+                2026, 6, 15, 12, 0, tzinfo=timezone.utc
+            )
             # Provide both scope=going and view=past; view should win
             resp = c.get(
                 "/api/share/calendar/test-token-uuid.ics?scope=going&view=past"

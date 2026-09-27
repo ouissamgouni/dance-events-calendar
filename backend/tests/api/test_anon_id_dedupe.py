@@ -10,7 +10,7 @@ the backend uses as the dedupe key for anonymous writers.
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -36,7 +36,7 @@ def engine():
     )
     SQLModel.metadata.create_all(eng)
     with Session(eng) as session:
-        start = datetime.utcnow() + timedelta(days=1)
+        start = datetime.now(timezone.utc) + timedelta(days=1)
         session.add_all(
             [
                 CachedEvent(
@@ -106,7 +106,7 @@ def test_save_sets_anon_id_cookie_on_first_call(client, engine):
 
 @pytest.mark.unit
 def test_anonymous_save_dedupes_across_device_id_changes(client, engine):
-    """Reproduces bug #1: clearing localStorage mints a new device_id; the
+    """Reproduces bug #1: clearing localStorage mints a new device_id, timezone; the
     cookie-based dedupe must keep total_saved == 1 across rotated device_ids."""
     r1 = _save(client, event_id="evt-X", device_id="dev-original")
     assert r1.status_code == 201

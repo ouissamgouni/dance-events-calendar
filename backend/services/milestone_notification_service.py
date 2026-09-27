@@ -29,7 +29,7 @@ re-creating the in-app row or re-sending a channel that already fired.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlmodel import Session, select
@@ -375,7 +375,7 @@ def _stamp_deliveries(session, emailed_ids, pushed_ids) -> None:
     """Stamp ``emailed_at``/``pushed_at`` and log per-channel delivery rows."""
     from sqlmodel import col, update
 
-    stamp_now = datetime.utcnow()
+    stamp_now = datetime.now(timezone.utc)
     if emailed_ids:
         session.exec(
             update(Notification)

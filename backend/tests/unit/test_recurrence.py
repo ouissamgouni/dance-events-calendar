@@ -1,6 +1,6 @@
 """Unit tests for backend.services.recurrence."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -13,8 +13,8 @@ from backend.services.recurrence import (
     validate_rule,
 )
 
-START = datetime(2025, 3, 3, 20, 0)  # a Monday
-END = datetime(2025, 3, 3, 23, 30)
+START = datetime(2025, 3, 3, 20, 0, tzinfo=timezone.utc)  # a Monday
+END = datetime(2025, 3, 3, 23, 30, tzinfo=timezone.utc)
 
 
 class TestNormalizeRule:
@@ -84,11 +84,11 @@ class TestNormalizeDates:
         ]
         result = normalize_dates(items)
         assert [pair[0] for pair in result] == [
-            datetime(2025, 3, 3, 20),
-            datetime(2025, 3, 10, 20),
+            datetime(2025, 3, 3, 20, tzinfo=timezone.utc),
+            datetime(2025, 3, 10, 20, tzinfo=timezone.utc),
         ]
 
-    def test_accepts_iso_strings_and_drops_utc_designator(self):
+    def test_accepts_iso_strings_as_utc(self):
         result = normalize_dates(
             [{"start": "2025-03-03T20:00:00Z", "end": "2025-03-03T23:30:00Z"}]
         )

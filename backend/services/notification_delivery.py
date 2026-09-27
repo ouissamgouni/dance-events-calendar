@@ -8,7 +8,7 @@ stamps set regardless of per-user channel preference.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlmodel import Session
@@ -27,6 +27,6 @@ def record_delivery(
         NotificationDelivery(
             notification_id=notification_id,
             channel=channel,
-            delivered_at=when or datetime.utcnow(),
+            delivered_at=when or datetime.now(timezone.utc),
         )
     )

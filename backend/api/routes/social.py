@@ -12,7 +12,7 @@ Privacy notes:
   ``handle``.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import os
 from typing import Optional
@@ -320,7 +320,7 @@ def _going_count_30d(session: Session, user_id: UUID) -> int:
     Used for the profile stat row; the caller is responsible for visibility
     gating (this function does not check ``can_view``).
     """
-    cutoff = datetime.utcnow() - timedelta(days=30)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     statement = (
         select(func.count(UserEventAttendance.id))
         .join(
@@ -577,7 +577,7 @@ def users_interest_summary(
     ).all()
     user_by_handle: dict[str, User] = {(u.handle or "").lower(): u for u in users}
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     items: list[InterestSummaryItem] = []
     for h in seen:
         owner = user_by_handle.get(h)
@@ -1462,7 +1462,7 @@ def friends_leaderboard(
         raise HTTPException(
             status_code=400, detail="period must be one of 7d, 30d, 90d"
         )
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Friend set (mutuals).
     f1 = aliased(UserFollow)
@@ -1545,7 +1545,7 @@ def following_most_active(
         raise HTTPException(
             status_code=400, detail="period must be one of 90d, 180d, 365d"
         )
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Everyone the viewer follows (approved edges only).
     following_sub = (
@@ -1797,7 +1797,7 @@ def _hydrate_profile_events(
     }
     if not enabled_calendar_ids:
         return [], 0
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     stmt = (
         select(CachedEvent)
         .where(col(CachedEvent.event_id).in_(event_ids))
@@ -3341,7 +3341,7 @@ def _merge_managed_user_account(
     source.share_code = None
     source.is_admin_managed = False
     source.managed_label = None
-    source.deleted_at = datetime.utcnow()
+    source.deleted_at = datetime.now(timezone.utc)
     session.add(source)
     _bump(summary, "source_users_anonymized")
 
@@ -3649,7 +3649,7 @@ def admin_revoke_user_block(
     if block is None:
         raise HTTPException(status_code=404, detail="Block not found")
     if block.revoked_at is None:
-        block.revoked_at = datetime.utcnow()
+        block.revoked_at = datetime.now(timezone.utc)
         block.revoked_by_admin_user_id = get_admin_user_id(session)
         session.add(block)
         session.commit()
@@ -4156,7 +4156,7 @@ def list_subscribed_events(
             select(CalendarSetting).where(CalendarSetting.show_events == True)  # noqa: E712
         ).all()
     }
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     event_statement = (
         select(CachedEvent)
         .where(col(CachedEvent.event_id).in_(list(via_map.keys())))
@@ -4400,7 +4400,7 @@ def onboarding_complete(
                 friended_ids.add(target.id)
             followed.append(target.handle or "")
 
-    viewer.onboarded_at = datetime.utcnow()
+    viewer.onboarded_at = datetime.now(timezone.utc)
     viewer.onboarding_version = get_current_onboarding_version()
     session.add(viewer)
     session.commit()

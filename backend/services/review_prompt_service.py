@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlmodel import Session, select
@@ -231,7 +231,7 @@ def run_once() -> dict:
 
     delay_hours = get_review_prompt_delay_hours()
     lookback_hours = get_review_prompt_lookback_hours()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     to_email: list[tuple] = []
     to_push: list[tuple] = []
     notif_ids: dict[tuple, int] = {}
@@ -304,7 +304,7 @@ def run_once() -> dict:
         from sqlmodel import col, update
 
         with Session(get_engine()) as session:
-            stamp_now = datetime.utcnow()
+            stamp_now = datetime.now(timezone.utc)
             if emailed_ids:
                 session.exec(
                     update(Notification)

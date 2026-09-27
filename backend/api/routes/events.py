@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -856,7 +856,7 @@ def get_events(
             .where(EventPromoCode.status == "approved")
             .where(
                 (EventPromoCode.expires_at.is_(None))
-                | (EventPromoCode.expires_at > datetime.utcnow())
+                | (EventPromoCode.expires_at > datetime.now(timezone.utc))
             )
             .group_by(EventPromoCode.event_id)
         ).all()
@@ -990,7 +990,7 @@ def search_events(
         ),
         else_=1,
     )
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     effective_date_scope: EventSearchDateScope = date_scope or (
         "all" if include_past else "upcoming"
     )
@@ -1109,7 +1109,7 @@ def popular_cities(
     Each city's pin is the average lat/lng of its events, so tapping a pill
     centers the map without a geocoder round-trip. Cities missing a name or
     coordinates are excluded so a pill can never resolve to an empty map."""
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     statement = (
         select(
             CachedEvent.city,
@@ -1233,7 +1233,7 @@ def get_events_by_ids(
             .where(EventPromoCode.status == "approved")
             .where(
                 (EventPromoCode.expires_at.is_(None))
-                | (EventPromoCode.expires_at > datetime.utcnow())
+                | (EventPromoCode.expires_at > datetime.now(timezone.utc))
             )
             .group_by(EventPromoCode.event_id)
         ).all()
@@ -1352,7 +1352,7 @@ def get_event(
                 .where(EventPromoCode.status == "approved")
                 .where(
                     (EventPromoCode.expires_at.is_(None))
-                    | (EventPromoCode.expires_at > datetime.utcnow())
+                    | (EventPromoCode.expires_at > datetime.now(timezone.utc))
                 )
             ).first()
             is not None
