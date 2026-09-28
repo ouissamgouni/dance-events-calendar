@@ -211,6 +211,43 @@ const notif = (over: Record<string, unknown>) => ({
 })
 
 describe('NotificationsPage (redesigned rows)', () => {
+    it('renders Plan activity count and routes to the planned Program session', async () => {
+        server.use(
+            http.get('*/api/notifications', () =>
+                HttpResponse.json({
+                    items: [
+                        notif({
+                            id: 4,
+                            kind: 'plan_session_added',
+                            event_id: 'evt-1',
+                            event_title: 'Salsa Night',
+                            context: 'Musicality Lab',
+                            description: '2 sessions planned',
+                            schedule_session_id: 'session-2',
+                        }),
+                    ],
+                    total: 1,
+                    unread_count: 1,
+                    limit: 50,
+                    offset: 0,
+                }),
+            ),
+        )
+        const user = userEvent.setup()
+
+        render(
+            <MemoryRouter>
+                <NotificationsPage />
+            </MemoryRouter>,
+        )
+
+        expect(await screen.findByText('2 sessions planned')).toBeInTheDocument()
+        expect(screen.getByText(/added Musicality Lab to their plan for/i)).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: /ann added Musicality Lab/i }))
+        await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/event/evt-1/program?session=session-2'))
+    })
+
     it('renders a subscription_saved row with "is interested in" and a thumbnail', async () => {
         server.use(
             http.get('*/api/notifications', () =>

@@ -58,6 +58,7 @@ INSTANT_KINDS = frozenset(
         "new_friend",
         "follow_request",
         "follow_request_approved",
+        "plan_session_added",
     }
 )
 

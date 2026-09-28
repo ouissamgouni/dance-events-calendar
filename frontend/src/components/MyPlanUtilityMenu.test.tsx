@@ -31,7 +31,8 @@ describe('MyPlanUtilityMenu', () => {
     });
 
     it('shares, downloads, and revokes a live plan link', async () => {
-        render(<MyPlanUtilityMenu eventId="event-1" />);
+        const onAudienceChange = vi.fn().mockResolvedValue(undefined);
+        render(<MyPlanUtilityMenu eventId="event-1" audience="private" onAudienceChange={onAudienceChange} />);
         fireEvent.click(screen.getByRole('button', { name: 'Share and export My Plan' }));
         await waitFor(() => expect(fetchMyPlanShare).toHaveBeenCalledWith('event-1'));
 
@@ -45,5 +46,8 @@ describe('MyPlanUtilityMenu', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Stop sharing' }));
         await waitFor(() => expect(revokeMyPlanShare).toHaveBeenCalledWith('event-1'));
         expect(screen.queryByRole('button', { name: 'Stop sharing' })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('radio', { name: /Followers attending/ }));
+        await waitFor(() => expect(onAudienceChange).toHaveBeenCalledWith('followers'));
     });
 });

@@ -79,6 +79,7 @@ ACTIVITY_KINDS = (
     "milestone_unlocked",
     "event_message",
     "event_message_reply",
+    "plan_session_added",
 )
 
 # One-to-one map from notification kind → feature bucket. Every kind in
@@ -97,12 +98,14 @@ FEATURE_BY_KIND: dict[str, str] = {
     "milestone_unlocked": "milestone_unlocked",
     "event_message": "event_messages",
     "event_message_reply": "event_messages",
+    "plan_session_added": "plan_activity",
 }
 
 # Per-(channel, feature) User attribute that must be True for delivery.
 CHANNEL_FLAG: dict[tuple[str, str], str] = {
     ("email", "social_activity"): "email_social_activity_enabled",
     ("email", "friends_going"): "email_friends_going_enabled",
+    ("email", "plan_activity"): "email_plan_activity_enabled",
     ("email", "friend_reviews"): "email_friend_reviews_enabled",
     ("email", "friend_milestones"): "email_friend_milestones_enabled",
     ("email", "interest_matches"): "email_interest_matches_enabled",
@@ -111,6 +114,7 @@ CHANNEL_FLAG: dict[tuple[str, str], str] = {
     ("email", "suggested_events"): "email_suggested_events_enabled",
     ("push", "social_activity"): "push_social_activity_enabled",
     ("push", "friends_going"): "push_friends_going_enabled",
+    ("push", "plan_activity"): "push_plan_activity_enabled",
     ("push", "friend_reviews"): "push_friend_reviews_enabled",
     ("push", "friend_milestones"): "push_friend_milestones_enabled",
     ("push", "interest_matches"): "push_interest_matches_enabled",
@@ -317,6 +321,13 @@ def _render_line(
         if also_going:
             return f"You and <strong>{who}</strong> are going to {title}"
         return f"<strong>{who}</strong> is going to {title}"
+    if kind == "plan_session_added":
+        session_title = escape(context or "a session")
+        suffix = f" · {escape(description)}" if description else ""
+        return (
+            f"<strong>{who}</strong> added <strong>{session_title}</strong> "
+            f"to their plan for {title}{suffix}"
+        )
     if kind == "subscription_review":
         return f"<strong>{who}</strong> shared their experience of {title}"
     if kind == "subscription_milestone":
@@ -402,6 +413,9 @@ def _render_plain(
         if also_going:
             return f"You and {who} are going to {title}"
         return f"{who} is going to {title}"
+    if kind == "plan_session_added":
+        line = f"{who} added {context or 'a session'} to their plan for {title}"
+        return f"{line} · {description}" if description else line
     if kind == "subscription_review":
         return f"{who} shared their experience of {title}"
     if kind == "subscription_milestone":

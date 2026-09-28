@@ -1,0 +1,5 @@
+# Plan activity email is explicitly enabled for this scenario's positive
+# recipient; production user defaults remain email OFF and push ON.
+settings:
+  plan_activity_email_instant: true
+  plan_activity_email_digest: true

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { EventSchedule, ScheduleRoom, ScheduleSession } from '../../types';
+import type { EventSchedule, ScheduleRoom, ScheduleSession, SessionAttendanceSummary } from '../../types';
 import { formatTime, isSessionActive, minuteOfProgramDay, programDayOf, sessionsForDay } from '../../utils/schedule';
 import { roomColor } from './RoomPill';
+import SessionAttendeeStack from './SessionAttendeeStack';
 
 interface Props {
     schedule: EventSchedule;
@@ -11,12 +12,13 @@ interface Props {
     onTimeClick: (minute: number) => void;
     positionRequest?: number;
     compactHeader?: boolean;
+    attendeeSummaries?: Map<string, SessionAttendanceSummary>;
 }
 
 const SLOT_MINUTES = 15;
-const SLOT_HEIGHT = 22;
+const SLOT_HEIGHT = 24;
 
-export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0, compactHeader = false }: Props) {
+export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0, compactHeader = false, attendeeSummaries }: Props) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const positionedDays = useRef(new Set<string>());
     const handledPositionRequest = useRef(0);
@@ -57,6 +59,7 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
             ? Math.min(...sessions.map((session) => minuteOfProgramDay(session.start, schedule.timezone, schedule.day_start_hour)))
             : axisStart;
         scrollRef.current.scrollTop = Math.max(0, ((firstMinute - axisStart) / SLOT_MINUTES) * SLOT_HEIGHT - 48);
+        scrollRef.current.scrollLeft = 0;
         handledPositionRequest.current = positionRequest;
     }, [axisStart, positionRequest, schedule.day_start_hour, schedule.timezone, sessions]);
 
@@ -128,19 +131,25 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                     const level = schedule.levels.find((item) => item.id === session.level_id);
                     const color = roomColor(room?.color ?? 'slate');
                     const activeNow = showNow && isSessionActive(session, now);
+                    const attendance = attendeeSummaries?.get(session.id);
                     return (
                         <button
                             key={session.id}
                             type="button"
                             onClick={() => onSessionClick(session)}
                             aria-current={activeNow ? 'time' : undefined}
-                            className={`relative z-10 m-0.5 min-h-11 overflow-hidden rounded-field border p-2 text-left shadow-sm ${color.cell} ${activeNow ? 'ring-2 ring-action ring-inset' : ''} ${session.is_cancelled ? 'opacity-60' : ''}`}
+                            className={`relative z-10 m-0.5 min-h-11 overflow-hidden rounded-field border px-2 py-2 text-left shadow-sm ${color.cell} ${activeNow ? 'ring-2 ring-action ring-inset' : ''} ${session.is_cancelled ? 'opacity-60' : ''}`}
                             style={{ gridColumn: roomColumn(session.room_id), gridRow: sessionRow(session) }}
                         >
                             <span className={`block line-clamp-2 text-xs font-semibold leading-4 text-ink ${session.is_cancelled ? 'line-through' : ''}`}>{session.title}</span>
-                            {session.instructors ? <span className="mt-0.5 block truncate text-[11px] text-ink-soft">{session.instructors}</span> : null}
+                            {session.instructors ? <span className="mt-0.5 block whitespace-normal text-[11px] leading-4 text-ink-soft">{session.instructors}</span> : null}
                             {level ? <span className="mt-1 block truncate text-[10px] font-medium text-action">{level.label}</span> : null}
                             {activeNow ? <span className="mt-1 inline-block bg-action px-1.5 py-0.5 text-[10px] font-bold text-white">Now</span> : null}
+                            {attendance?.visible_count ? (
+                                <span className="mt-1 block" aria-label={`${attendance.visible_count} people in their plan`}>
+                                    <SessionAttendeeStack summary={attendance} max={3} size="sm" />
+                                </span>
+                            ) : null}
                             {plannedSessionIds?.has(session.id) ? <span className="sr-only">In My Plan</span> : null}
                         </button>
                     );

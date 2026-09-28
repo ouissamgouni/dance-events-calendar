@@ -24,6 +24,8 @@ export function getNotificationVerb(item: NotificationItem): string {
             return item.also_going ? 'are going to' : 'is going to';
         case 'subscription_saved':
             return 'is interested in';
+        case 'plan_session_added':
+            return `added ${item.context || 'a session'} to their plan for`;
         case 'subscription_review':
             return 'reviewed';
         case 'subscription_milestone':
@@ -104,6 +106,8 @@ export function resolveNotificationDestination(item: NotificationItem): string {
             return `/event/${item.event_id}#messages`;
         case 'planned_session_changed':
             return `/event/${item.event_id}/program/plan${item.schedule_session_id ? `?session=${item.schedule_session_id}` : ''}`;
+        case 'plan_session_added':
+            return `/event/${item.event_id}/program${item.schedule_session_id ? `?session=${item.schedule_session_id}` : ''}`;
         case 'schedule_program_available':
         case 'schedule_program_updated':
             return `/event/${item.event_id}/program`;
@@ -154,6 +158,7 @@ const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> =
     event_message_reply: 'others',
     event_message_reported: 'others',
     planned_session_changed: 'events',
+    plan_session_added: 'events',
     schedule_program_available: 'events',
     schedule_program_updated: 'events',
 };

@@ -1,0 +1,72 @@
+# Bob and Carol are approved followers of Alice. Bob is also a mutual
+# friend; Dave attends the event but does not follow Alice.
+follows:
+  - follower: bob
+    followee: alice
+    status: approved
+  - follower: alice
+    followee: bob
+    status: approved
+  - follower: carol
+    followee: alice
+    status: approved
+  - follower: alice
+    followee: nora
+    status: approved
+  - follower: alice
+    followee: marco
+    status: approved
+  - follower: alice
+    followee: sofia
+    status: approved
+  - follower: alice
+    followee: tiago
+    status: approved
+  - follower: alice
+    followee: ines
+    status: approved
+  - follower: alice
+    followee: miguel
+    status: approved
+  - follower: alice
+    followee: beatriz
+    status: approved
+  - follower: alice
+    followee: joao
+    status: approved
+  - follower: alice
+    followee: clara
+    status: approved
+  - follower: alice
+    followee: rui
+    status: approved
+  - follower: alice
+    followee: marta
+    status: approved
+  - follower: alice
+    followee: pedro
+    status: approved
+  - follower: alice
+    followee: ana
+    status: approved
+  - follower: alice
+    followee: luis
+    status: approved
+  - follower: alice
+    followee: helena
+    status: approved
+  - follower: alice
+    followee: diogo
+    status: approved
+  - follower: alice
+    followee: catarina
+    status: approved
+  - follower: alice
+    followee: andre
+    status: approved
+  - follower: alice
+    followee: luisa
+    status: approved
+  - follower: alice
+    followee: vasco
+    status: approved

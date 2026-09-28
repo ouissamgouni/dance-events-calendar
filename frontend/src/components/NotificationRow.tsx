@@ -57,6 +57,7 @@ const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: strin
     event_message_reply: { Icon: MessageCircle, cls: 'bg-sky-100 text-sky-600' },
     event_message_reported: { Icon: Flag, cls: 'bg-sky-100 text-sky-600' },
     planned_session_changed: { Icon: Clock, cls: 'bg-amber-100 text-amber-700' },
+    plan_session_added: { Icon: CalendarPlus, cls: 'bg-emerald-100 text-emerald-600' },
     schedule_program_available: { Icon: CalendarCheck, cls: 'bg-blue-100 text-action' },
     schedule_program_updated: { Icon: CalendarCheck, cls: 'bg-blue-100 text-action' },
 };
@@ -74,6 +75,7 @@ const AVATAR_KINDS = new Set<NotificationItem['kind']>([
     'new_friend',
     'follow_request',
     'follow_request_approved',
+    'plan_session_added',
 ]);
 
 const displayNameOf = (a: NotificationActor): string =>
@@ -497,6 +499,7 @@ export default function NotificationRow({
                         </>
                     )}
                 </p>
+                {item.description && <p className={descClass}>{item.description}</p>}
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
             </>
         );

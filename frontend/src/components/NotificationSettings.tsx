@@ -18,7 +18,7 @@ import {
  * that flips all six channel flags to false in a single PATCH.
  */
 
-type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked' | 'event_messages' | 'suggested_events' | 'schedule_updates';
+type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'plan_activity' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked' | 'event_messages' | 'suggested_events' | 'schedule_updates';
 type Channel = 'email' | 'push';
 type FlagKey =
     | 'email_event_reminders_enabled'
@@ -35,6 +35,8 @@ type FlagKey =
     | 'push_milestone_unlocked_enabled'
     | 'email_friends_going_enabled'
     | 'push_friends_going_enabled'
+    | 'email_plan_activity_enabled'
+    | 'push_plan_activity_enabled'
     | 'email_friend_reviews_enabled'
     | 'push_friend_reviews_enabled'
     | 'email_friend_milestones_enabled'
@@ -75,6 +77,12 @@ const FEATURES: {
             label: 'Friends going',
             description: 'When someone you follow is going to an event.',
             anchor: 'notify-friends-going',
+        },
+        {
+            key: 'plan_activity',
+            label: 'Session plan updates',
+            description: 'When someone you follow plans sessions at an event you’re attending.',
+            anchor: 'notify-plan-activity',
         },
         {
             key: 'friend_reviews',

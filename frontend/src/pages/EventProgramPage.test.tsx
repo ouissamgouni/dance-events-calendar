@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchMyPlanShare, removeFromMyPlan } from '../api';
+import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchMyPlanShare, fetchSessionAttendanceSummary, fetchSessionAttendees, fetchSingleSessionAttendanceSummary, removeFromMyPlan, updateMyPlanAudience } from '../api';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, EventSchedule } from '../types';
 import EventProgramPage from './EventProgramPage';
@@ -14,7 +14,7 @@ const attendanceState = vi.hoisted(() => ({ attending: false, toggleAttending: v
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn(), fetchMyPlanShare: vi.fn(), removeFromMyPlan: vi.fn() };
+    return { ...actual, addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn(), fetchMyPlanShare: vi.fn(), fetchSessionAttendanceSummary: vi.fn(), fetchSessionAttendees: vi.fn(), fetchSingleSessionAttendanceSummary: vi.fn(), removeFromMyPlan: vi.fn(), updateMyPlanAudience: vi.fn() };
 });
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user, loading: false }) }));
 vi.mock('../context/AttendingEventsContext', () => ({
@@ -47,10 +47,10 @@ const schedule: EventSchedule = {
     version: 1, published_at: '2026-09-01T12:00:00Z',
 };
 
-function renderPage(path = '/event/movida-2026/program') {
+function renderPage(path = '/event/movida-2026/program', flags: Partial<typeof defaultFlags> = {}) {
     return render(
         <MemoryRouter initialEntries={[path]}>
-            <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, eventScheduleEnabled: true }, updateFlag: vi.fn(), ready: true }}>
+            <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, eventScheduleEnabled: true, ...flags }, updateFlag: vi.fn(), ready: true }}>
                 <Routes><Route path="/event/:eventId/program/*" element={<EventProgramPage />} /></Routes>
             </FeatureFlagsContext.Provider>
         </MemoryRouter>,
@@ -82,8 +82,12 @@ describe('EventProgramPage', () => {
         });
         vi.mocked(fetchEventSchedule).mockResolvedValue(schedule);
         vi.mocked(fetchEventScheduleEditorAccess).mockResolvedValue({ can_edit: false });
-        vi.mocked(fetchMyPlan).mockResolvedValue({ entries: [] });
+        vi.mocked(fetchMyPlan).mockResolvedValue({ entries: [], audience: 'private' });
+        vi.mocked(updateMyPlanAudience).mockImplementation(async (_eventId, audience) => ({ entries: [], audience }));
         vi.mocked(fetchMyPlanShare).mockResolvedValue(null);
+        vi.mocked(fetchSessionAttendanceSummary).mockResolvedValue({ sessions: [] });
+        vi.mocked(fetchSingleSessionAttendanceSummary).mockImplementation(async (_eventId, sessionId) => ({ session_id: sessionId, visible_count: 0, preview_attendees: [] }));
+        vi.mocked(fetchSessionAttendees).mockResolvedValue([]);
         vi.mocked(removeFromMyPlan).mockResolvedValue();
         vi.mocked(addToMyPlan).mockImplementation(async (_eventId, sessionId) => ({
             session_id: sessionId,
@@ -112,7 +116,7 @@ describe('EventProgramPage', () => {
         renderPage();
 
         await screen.findByRole('button', { name: /Thursday Session/ });
-        expect(trackProgramViewed).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(trackProgramViewed).toHaveBeenCalledTimes(1));
 
         fireEvent.click(screen.getByRole('button', { name: '16 Fri' }));
         expect(await screen.findByRole('button', { name: /Friday Session/ })).toBeInTheDocument();
@@ -123,6 +127,25 @@ describe('EventProgramPage', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Program' }));
         await waitFor(() => expect(trackProgramViewed).toHaveBeenCalledTimes(2));
+    });
+
+    it('loads the program and attendance preview once without reloading', async () => {
+        authState.user = { user_id: 'dancer' };
+        renderPage('/event/movida-2026/program', { programGridAttendeePreviewEnabled: true });
+
+        await screen.findByRole('button', { name: /Thursday Session/ });
+        await waitFor(() => expect(fetchSessionAttendanceSummary).toHaveBeenCalledTimes(1));
+        expect(fetchEvent).toHaveBeenCalledTimes(1);
+        expect(fetchEventSchedule).toHaveBeenCalledTimes(1);
+        expect(fetchMyPlan).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not load grid attendance previews while the feature flag is disabled', async () => {
+        authState.user = { user_id: 'dancer' };
+        renderPage();
+
+        await screen.findByRole('button', { name: /Thursday Session/ });
+        expect(fetchSessionAttendanceSummary).not.toHaveBeenCalled();
     });
 
     it('shows attendance feedback before requesting the install invitation', async () => {
@@ -151,6 +174,25 @@ describe('EventProgramPage', () => {
 
         await waitFor(() => expect(addToMyPlan).toHaveBeenCalledTimes(2));
         expect(requestInstallInvitation).toHaveBeenCalledTimes(2);
+    });
+
+    it('asks before sharing the first plan activity and continues after confirmation', async () => {
+        authState.user = { user_id: 'dancer' };
+        vi.mocked(fetchMyPlan).mockResolvedValue({ entries: [], audience: null });
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /Thursday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        const audienceSheet = await screen.findByRole('dialog', { name: 'Share your plan activity?' });
+        expect(within(audienceSheet).getByRole('radio', { name: /Followers attending/ })).toHaveAttribute('aria-checked', 'true');
+        expect(attendanceState.toggleAttending).not.toHaveBeenCalled();
+        expect(requestInstallInvitation).not.toHaveBeenCalled();
+
+        fireEvent.click(within(audienceSheet).getByRole('button', { name: 'Continue' }));
+        await waitFor(() => expect(updateMyPlanAudience).toHaveBeenCalledWith(event.event_id, 'followers'));
+        expect(await screen.findByRole('dialog', { name: 'Added to My Plan' })).toBeInTheDocument();
+        expect(requestInstallInvitation).not.toHaveBeenCalled();
     });
 
     it('marks a non-attendee Going with their default visibility after adding to My Plan', async () => {
@@ -207,6 +249,7 @@ describe('EventProgramPage', () => {
         attendanceState.attending = true;
         vi.mocked(fetchMyPlan).mockResolvedValue({
             entries: [{ session_id: 'thursday', status: 'active', session: schedule.sessions[0] }],
+            audience: 'private',
         });
         renderPage();
 
@@ -222,6 +265,7 @@ describe('EventProgramPage', () => {
         localStorage.setItem(`movida:program-install-invited:${event.event_id}`, '1');
         vi.mocked(fetchMyPlan).mockResolvedValue({
             entries: [{ session_id: 'thursday', status: 'active', session: schedule.sessions[0] }],
+            audience: 'private',
         });
         renderPage();
 
@@ -377,7 +421,8 @@ describe('EventProgramPage', () => {
             entries: [
                 { session_id: 'thursday', status: 'active', session: schedule.sessions[0] },
                 { session_id: 'friday', status: 'active', session: schedule.sessions[1] },
-            ]
+            ],
+            audience: 'private',
         });
         renderPage('/event/movida-2026/program/plan');
 

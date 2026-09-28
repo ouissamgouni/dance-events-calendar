@@ -498,6 +498,28 @@ class MyPlanEntryResponse(BaseModel):
 
 class MyPlanResponse(BaseModel):
     entries: list[MyPlanEntryResponse]
+    audience: Optional[Literal["followers", "friends", "private"]] = None
+
+
+class SessionPlanAttendeeResponse(BaseModel):
+    user_id: UUID
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    handle: Optional[str] = None
+
+
+class SessionAttendanceSummaryResponse(BaseModel):
+    session_id: UUID
+    visible_count: int = 0
+    preview_attendees: list[SessionPlanAttendeeResponse] = []
+
+
+class SessionAttendanceSummaryBatchResponse(BaseModel):
+    sessions: list[SessionAttendanceSummaryResponse] = []
+
+
+class UpdateMyPlanAudienceRequest(BaseModel):
+    audience: Literal["followers", "friends", "private"]
 
 
 class MyPlanShareResponse(BaseModel):
@@ -1184,6 +1206,7 @@ class SiteSettingsResponse(BaseModel):
     # and event "Organized by" pill are hidden.
     organizer_claims_enabled: bool = False
     event_schedule_enabled: bool = False
+    program_grid_attendee_preview_enabled: bool = False
     # Tribe > Calendars "Your Network" snapshot of upcoming events people
     # you follow are going to. When False, the snapshot is hidden.
     network_going_snapshot_enabled: bool = False
@@ -1236,6 +1259,8 @@ class SiteSettingsResponse(BaseModel):
     # or neither. Defaults preserve prior behaviour (digest-only).
     friends_going_email_instant: bool = False
     friends_going_email_digest: bool = True
+    plan_activity_email_instant: bool = False
+    plan_activity_email_digest: bool = True
     social_activity_email_instant: bool = False
     social_activity_email_digest: bool = True
     friend_reviews_email_instant: bool = False
@@ -1490,6 +1515,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     promo_codes_enabled: Optional[bool] = None
     organizer_claims_enabled: Optional[bool] = None
     event_schedule_enabled: Optional[bool] = None
+    program_grid_attendee_preview_enabled: Optional[bool] = None
     network_going_snapshot_enabled: Optional[bool] = None
     my_events_route_enabled: Optional[bool] = None
     my_events_nav_enabled: Optional[bool] = None
@@ -1522,6 +1548,8 @@ class SiteSettingsUpdateRequest(BaseModel):
     )
     friends_going_email_instant: Optional[bool] = None
     friends_going_email_digest: Optional[bool] = None
+    plan_activity_email_instant: Optional[bool] = None
+    plan_activity_email_digest: Optional[bool] = None
     social_activity_email_instant: Optional[bool] = None
     social_activity_email_digest: Optional[bool] = None
     friend_reviews_email_instant: Optional[bool] = None

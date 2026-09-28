@@ -34,12 +34,44 @@ describe('ScheduleGrid', () => {
         const { rerender } = render(<ScheduleGrid schedule={schedule} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} positionRequest={1} />);
         const grid = screen.getByTestId('schedule-grid');
         expect(grid.scrollTop).toBeGreaterThan(0);
+        expect(grid.scrollLeft).toBe(0);
 
         grid.scrollTop = 5;
+        grid.scrollLeft = 100;
         rerender(<ScheduleGrid schedule={{ ...schedule }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} positionRequest={1} />);
         expect(grid.scrollTop).toBe(5);
+        expect(grid.scrollLeft).toBe(100);
 
         rerender(<ScheduleGrid schedule={{ ...schedule }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} positionRequest={2} />);
         expect(grid.scrollTop).toBeGreaterThan(5);
+        expect(grid.scrollLeft).toBe(0);
+    });
+
+    it('shows at most three attendee avatars and an overflow count', () => {
+        render(
+            <ScheduleGrid
+                schedule={schedule}
+                day="2026-10-16"
+                onSessionClick={vi.fn()}
+                onTimeClick={vi.fn()}
+                attendeeSummaries={new Map([['afterparty', {
+                    session_id: 'afterparty',
+                    visible_count: 4,
+                    preview_attendees: [
+                        { user_id: '1', display_name: 'Alice', avatar_url: null, handle: 'alice' },
+                        { user_id: '2', display_name: 'Bea', avatar_url: null, handle: 'bea' },
+                        { user_id: '3', display_name: 'Cam', avatar_url: null, handle: 'cam' },
+                        { user_id: '4', display_name: 'Dani', avatar_url: null, handle: 'dani' },
+                    ],
+                }]])}
+            />,
+        );
+
+        const preview = screen.getByLabelText('4 people in their plan');
+        expect(preview).toHaveTextContent('A');
+        expect(preview).toHaveTextContent('B');
+        expect(preview).toHaveTextContent('C');
+        expect(preview).not.toHaveTextContent('D');
+        expect(preview).toHaveTextContent('+1');
     });
 });

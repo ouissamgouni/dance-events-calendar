@@ -216,6 +216,23 @@ export interface EventSchedule {
     published_at: string | null;
 }
 
+export interface SessionPlanAttendee {
+    user_id: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    handle: string | null;
+}
+
+export interface SessionAttendanceSummary {
+    session_id: string;
+    visible_count: number;
+    preview_attendees: SessionPlanAttendee[];
+}
+
+export interface SessionAttendanceSummaryBatch {
+    sessions: SessionAttendanceSummary[];
+}
+
 export interface ScheduleIssue {
     code: string;
     severity: 'warning' | 'error';
@@ -241,8 +258,11 @@ export interface MyPlanEntry {
     session: ScheduleSession;
 }
 
+export type PlanAudience = 'followers' | 'friends' | 'private';
+
 export interface MyPlanResponse {
     entries: MyPlanEntry[];
+    audience: PlanAudience | null;
 }
 
 export interface SharedMyPlanResponse {

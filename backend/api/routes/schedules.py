@@ -27,6 +27,7 @@ from backend.api.schemas import (
     MyPlanEntryResponse,
     MyPlanResponse,
     MyPlanShareResponse,
+    UpdateMyPlanAudienceRequest,
     ProgramExportResponse,
     ScheduleActivityTypeRequest,
     ScheduleActivityTypeResponse,
@@ -47,6 +48,9 @@ from backend.api.schemas import (
     ScheduleSessionCreateRequest,
     ScheduleSessionResponse,
     ScheduleSessionUpdateRequest,
+    SessionAttendanceSummaryBatchResponse,
+    SessionAttendanceSummaryResponse,
+    SessionPlanAttendeeResponse,
     ScheduleVenueRequest,
     ScheduleVenueResponse,
 )
@@ -66,6 +70,7 @@ from backend.db.models import (
     ScheduleVenue,
     User,
     UserEventAttendance,
+    UserPlanAudience,
     UserPlanSession,
 )
 from backend.services.schedules import (
@@ -77,6 +82,7 @@ from backend.services.schedules import (
     plan_entries,
     seed_default_activity_types,
     seed_default_dance_levels,
+    session_attendance_projection,
     session_snapshot,
     to_utc,
     validate_timezone,
@@ -86,7 +92,11 @@ from backend.services.schedule_import import (
     build_schedule_import_example,
     export_schedule_document,
 )
-from backend.services.notifications import notify_planned_session_changes
+from backend.services.notifications import (
+    notify_planned_session_changes,
+    reconcile_plan_activity_notifications,
+)
+from backend.services import activity_instant
 from backend.services.program_exports import (
     build_program_projection,
     render_program_csv,
@@ -243,6 +253,102 @@ def get_published_schedule(
 
 
 @public_router.get(
+    "/schedule/attendance-summary",
+    response_model=SessionAttendanceSummaryBatchResponse,
+)
+def get_session_attendance_summary(
+    event_id: str,
+    response: Response,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    projected = session_attendance_projection(session, user, event_id, publication)
+    response.headers["Cache-Control"] = "private, no-store"
+    return {
+        "sessions": [
+            {
+                "session_id": row["id"],
+                "visible_count": len(projected.get(row["id"], [])),
+                "preview_attendees": projected.get(row["id"], [])[:3],
+            }
+            for row in publication.snapshot.get("sessions", [])
+            if not row.get("is_cancelled", False)
+        ]
+    }
+
+
+@public_router.get(
+    "/schedule/sessions/{session_id}/attendees",
+    response_model=list[SessionPlanAttendeeResponse],
+)
+def get_session_attendees(
+    event_id: str,
+    session_id: UUID,
+    response: Response,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    item = next(
+        (
+            row
+            for row in publication.snapshot.get("sessions", [])
+            if row["id"] == str(session_id) and not row.get("is_cancelled", False)
+        ),
+        None,
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    response.headers["Cache-Control"] = "private, no-store"
+    return session_attendance_projection(session, user, event_id, publication).get(
+        str(session_id), []
+    )
+
+
+@public_router.get(
+    "/schedule/sessions/{session_id}/attendance-summary",
+    response_model=SessionAttendanceSummaryResponse,
+)
+def get_single_session_attendance_summary(
+    event_id: str,
+    session_id: UUID,
+    response: Response,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    item = next(
+        (
+            row
+            for row in publication.snapshot.get("sessions", [])
+            if row["id"] == str(session_id) and not row.get("is_cancelled", False)
+        ),
+        None,
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    attendees = session_attendance_projection(session, user, event_id, publication).get(
+        str(session_id), []
+    )
+    response.headers["Cache-Control"] = "private, no-store"
+    return {
+        "session_id": session_id,
+        "visible_count": len(attendees),
+        "preview_attendees": attendees[:5],
+    }
+
+
+@public_router.get(
     "/schedule/editor-access", response_model=EventScheduleEditorAccessResponse
 )
 def get_schedule_editor_access(
@@ -261,7 +367,69 @@ def get_my_plan(
 ):
     schedule = _schedule_for_event(session, event_id)
     publication = latest_publication(session, schedule.id)
-    return {"entries": plan_entries(session, user.id, event_id, publication)}
+    audience = session.exec(
+        select(UserPlanAudience).where(
+            UserPlanAudience.user_id == user.id,
+            UserPlanAudience.event_id == event_id,
+        )
+    ).first()
+    return {
+        "entries": plan_entries(session, user.id, event_id, publication),
+        "audience": audience.audience if audience else None,
+    }
+
+
+@public_router.put("/my-plan/audience", response_model=MyPlanResponse)
+def update_my_plan_audience(
+    event_id: str,
+    payload: UpdateMyPlanAudienceRequest,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    entries = plan_entries(session, user.id, event_id, publication)
+    if payload.audience != "private" and not entries:
+        raise HTTPException(status_code=409, detail="My Plan is empty")
+    row = session.exec(
+        select(UserPlanAudience).where(
+            UserPlanAudience.user_id == user.id,
+            UserPlanAudience.event_id == event_id,
+        )
+    ).first()
+    first_public_choice = row is None and payload.audience in {"followers", "friends"}
+    if row is None:
+        row = UserPlanAudience(
+            user_id=user.id,
+            event_id=event_id,
+            audience=payload.audience,
+        )
+    else:
+        row.audience = payload.audience
+        row.updated_at = datetime.now(timezone.utc)
+    session.add(row)
+    session.flush()
+    reconcile_plan_activity_notifications(
+        session,
+        user,
+        event_id,
+        alert=False,
+    )
+    session.commit()
+    if first_public_choice:
+        try:
+            activity_instant.dispatch_activity_instant(
+                session,
+                kind="plan_session_added",
+                actor=user,
+                event_id=event_id,
+            )
+        except Exception:  # noqa: BLE001 - audience choice is already saved
+            session.rollback()
+            logger.warning("Plan activity instant delivery failed", exc_info=True)
+    return {"entries": entries, "audience": row.audience}
 
 
 @public_router.get("/my-plan/share", response_model=MyPlanShareResponse | None)
@@ -401,7 +569,19 @@ def add_to_my_plan(
                 last_known_session=item,
             )
         )
+        session.flush()
+        reconcile_plan_activity_notifications(session, user, event_id, alert=True)
         session.commit()
+        try:
+            activity_instant.dispatch_activity_instant(
+                session,
+                kind="plan_session_added",
+                actor=user,
+                event_id=event_id,
+            )
+        except Exception:  # noqa: BLE001 - delivery must not undo the saved plan
+            session.rollback()
+            logger.warning("Plan activity instant delivery failed", exc_info=True)
     return {"session_id": session_id, "status": "active", "session": item}
 
 
@@ -421,6 +601,8 @@ def remove_from_my_plan(
     ).first()
     if row is not None:
         session.delete(row)
+        session.flush()
+        reconcile_plan_activity_notifications(session, user, event_id, alert=False)
         session.commit()
 
 

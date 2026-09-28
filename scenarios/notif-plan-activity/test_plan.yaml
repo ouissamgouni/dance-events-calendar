@@ -1,0 +1,95 @@
+test_plan:
+  name: "My Plan activity — attending followers"
+  description: >
+    Adding sessions to My Plan creates one mutable plan_session_added row per
+    eligible attending follower. The first add asks Alice who may see her Plan
+    activity. Later additions update the same row with the latest session and
+    aggregate count. Audience changes quietly reconcile recipients without
+    replaying alerts.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`."
+    - >-
+      Start the scenario:
+      `SCENARIO=notif-plan-activity RESET=1 task start:scenario`.
+    - "Clear Mailpit. No My Plan or notification rows are seeded by this scenario."
+    - >-
+      For push delivery, sign in as Bob in Chromium, open
+      /account#notifications, and grant browser notification permission.
+
+  cast:
+    - "Alice — actor; attending; adds sessions through the published Program."
+    - "Bob — attending approved follower and mutual friend; Plan activity email and push ON."
+    - "Carol — attending approved follower but not mutual; email OFF and push ON."
+    - "Dave — attending non-follower; negative recipient control."
+
+  steps:
+    - id: 1
+      title: "First add requires an audience decision"
+      description: >
+        Sign in as Alice, open /event/plan-activity-weekender/program, open
+        Musicality Lab, and click Add to My Plan.
+      expected: >
+        A "Share your plan activity?" sheet appears before any Going feedback
+        or install invitation. Followers attending is preselected. Choose
+        Continue. The choice is saved and is also visible in My Plan's Share &
+        export menu.
+
+    - id: 2
+      title: "Attending followers receive one row"
+      description: >
+        Sign in as Bob, Carol, and Dave in turn and inspect Activity.
+      expected: >
+        Bob and Carol each have one plan_session_added row saying Alice added
+        Musicality Lab to her plan for Lisbon Salsa Weekender. Dave has no row.
+        Opening the row routes to the Program with Musicality Lab selected.
+
+    - id: 3
+      title: "A second session updates the aggregate"
+      description: >
+        As Alice, add Partnerwork Flow to My Plan. Re-open Bob and Carol's
+        Activity feeds.
+      expected: >
+        Each recipient still has one Plan activity row, not two. Its main copy
+        names Partnerwork Flow, the secondary line says "2 sessions planned",
+        and the row links to Partnerwork Flow.
+
+    - id: 4
+      title: "Friends audience retracts non-mutual recipients quietly"
+      description: >
+        As Alice, open My Plan, then Share & export My Plan, and change Plan
+        activity from Followers attending to Friends attending.
+      expected: >
+        Bob keeps the existing row because Alice and Bob follow each other.
+        Carol's row is removed because her follow is one-way. Bob is not
+        re-alerted and no duplicate row is created.
+
+    - id: 5
+      title: "Only me retracts all rows"
+      description: >
+        Change Alice's Plan activity audience to Only me.
+      expected: >
+        Bob's remaining Plan activity row is removed. Bob, Carol, and Dave now
+        have zero plan_session_added rows for the event.
+
+    - id: 6
+      title: "Dismissal is private and does not repeat"
+      description: >
+        Reset the scenario. As Alice add Musicality Lab again, then dismiss the
+        audience sheet using Not now, Escape, or the backdrop. Add Partnerwork
+        Flow afterward.
+      expected: >
+        Dismissal persists Only me. No recipient row is created, and the second
+        add does not show the first-add audience sheet again.
+
+    - id: 7
+      title: "Dedicated channel defaults and delivery"
+      description: >
+        Inspect Alice and Carol's notification settings, then perform step 1
+        with Bob's Plan activity email explicitly enabled by this scenario.
+      expected: >
+        Accounts without an override show Plan activity email OFF and push ON.
+        Bob receives the instant Plan activity email because his dedicated
+        email preference is explicitly ON and settings.yaml enables instant
+        mode. Carol receives no email. Push remains dependent on an active
+        browser PushSubscription and granted permission.
