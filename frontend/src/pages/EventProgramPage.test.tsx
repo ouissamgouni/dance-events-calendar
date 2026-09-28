@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchMyPlanShare } from '../api';
+import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchMyPlanShare, removeFromMyPlan } from '../api';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, EventSchedule } from '../types';
 import EventProgramPage from './EventProgramPage';
@@ -10,12 +10,20 @@ import { trackProgramViewed } from '../utils/tracking';
 
 const authState = vi.hoisted(() => ({ user: null as object | null }));
 const requestInstallInvitation = vi.hoisted(() => vi.fn());
+const attendanceState = vi.hoisted(() => ({ attending: false, toggleAttending: vi.fn(), setAudience: vi.fn() }));
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn(), fetchMyPlanShare: vi.fn() };
+    return { ...actual, addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn(), fetchMyPlanShare: vi.fn(), removeFromMyPlan: vi.fn() };
 });
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user, loading: false }) }));
+vi.mock('../context/AttendingEventsContext', () => ({
+    useAttendingEvents: () => ({
+        isAttending: () => attendanceState.attending,
+        toggleAttending: attendanceState.toggleAttending,
+        setAudience: attendanceState.setAudience,
+    }),
+}));
 vi.mock('../context/PwaInstallContext', () => ({
     usePwaInstall: () => ({ requestInstallInvitation }),
 }));
@@ -60,6 +68,12 @@ describe('EventProgramPage', () => {
         localStorage.clear();
         sessionStorage.clear();
         authState.user = null;
+        attendanceState.attending = false;
+        attendanceState.toggleAttending.mockImplementation(async () => {
+            attendanceState.attending = !attendanceState.attending;
+            return true;
+        });
+        attendanceState.setAudience.mockResolvedValue(true);
         vi.mocked(fetchEvent).mockResolvedValue(event);
         vi.mocked(fetchAdminEventSchedule).mockResolvedValue({
             ...schedule,
@@ -70,6 +84,7 @@ describe('EventProgramPage', () => {
         vi.mocked(fetchEventScheduleEditorAccess).mockResolvedValue({ can_edit: false });
         vi.mocked(fetchMyPlan).mockResolvedValue({ entries: [] });
         vi.mocked(fetchMyPlanShare).mockResolvedValue(null);
+        vi.mocked(removeFromMyPlan).mockResolvedValue();
         vi.mocked(addToMyPlan).mockImplementation(async (_eventId, sessionId) => ({
             session_id: sessionId,
             status: 'active',
@@ -110,12 +125,17 @@ describe('EventProgramPage', () => {
         await waitFor(() => expect(trackProgramViewed).toHaveBeenCalledTimes(2));
     });
 
-    it('requests an install invitation after confirmed My Plan saves until it is dismissed', async () => {
+    it('shows attendance feedback before requesting the install invitation', async () => {
         authState.user = { user_id: 'dancer' };
         renderPage();
 
         fireEvent.click(await screen.findByRole('button', { name: /Thursday Session/ }));
         fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        const feedback = await screen.findByRole('dialog', { name: 'Added to My Plan' });
+        expect(within(feedback).getByText('You’re going')).toBeInTheDocument();
+        expect(requestInstallInvitation).not.toHaveBeenCalled();
+        fireEvent.click(within(feedback).getByRole('button', { name: 'Done' }));
 
         await waitFor(() => expect(requestInstallInvitation).toHaveBeenCalledWith({
             source: 'program',
@@ -133,6 +153,70 @@ describe('EventProgramPage', () => {
         expect(requestInstallInvitation).toHaveBeenCalledTimes(2);
     });
 
+    it('marks a non-attendee Going with their default visibility after adding to My Plan', async () => {
+        authState.user = {
+            user_id: 'dancer',
+            share_attendance_default_audience: 'friends',
+        };
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /Thursday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        await waitFor(() => expect(addToMyPlan).toHaveBeenCalledWith(event.event_id, 'thursday'));
+        expect(attendanceState.toggleAttending).toHaveBeenCalledWith(event.event_id, 'friends');
+        const feedback = screen.getByRole('dialog', { name: 'Added to My Plan' });
+        expect(within(feedback).getByRole('radio', { name: 'Friends — Mutual followers only' })).toHaveAttribute('aria-checked', 'true');
+
+        fireEvent.click(within(feedback).getByRole('radio', { name: 'Private — Only me' }));
+        await waitFor(() => expect(attendanceState.setAudience).toHaveBeenCalledWith(event.event_id, 'private'));
+
+        fireEvent.click(within(feedback).getByRole('button', { name: 'Undo Going' }));
+        await waitFor(() => expect(attendanceState.toggleAttending).toHaveBeenLastCalledWith(event.event_id));
+        expect(screen.queryByRole('dialog', { name: 'Added to My Plan' })).not.toBeInTheDocument();
+        expect(addToMyPlan).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not change attendance when an attendee adds to My Plan', async () => {
+        authState.user = { user_id: 'dancer' };
+        attendanceState.attending = true;
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /Thursday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        await waitFor(() => expect(addToMyPlan).toHaveBeenCalledWith(event.event_id, 'thursday'));
+        expect(attendanceState.toggleAttending).not.toHaveBeenCalled();
+    });
+
+    it('keeps the session planned when the automatic RSVP fails', async () => {
+        authState.user = { user_id: 'dancer' };
+        localStorage.setItem(`movida:program-install-dismissed:dancer:${event.event_id}`, '1');
+        attendanceState.toggleAttending.mockRejectedValueOnce(new Error('RSVP failed'));
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /Thursday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        expect(await screen.findByRole('button', { name: 'In My Plan · Remove' })).toBeInTheDocument();
+        expect(removeFromMyPlan).not.toHaveBeenCalled();
+    });
+
+    it('does not change attendance when removing a session from My Plan', async () => {
+        authState.user = { user_id: 'dancer' };
+        attendanceState.attending = true;
+        vi.mocked(fetchMyPlan).mockResolvedValue({
+            entries: [{ session_id: 'thursday', status: 'active', session: schedule.sessions[0] }],
+        });
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /Thursday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'In My Plan · Remove' }));
+
+        await waitFor(() => expect(removeFromMyPlan).toHaveBeenCalledWith(event.event_id, 'thursday'));
+        expect(attendanceState.toggleAttending).not.toHaveBeenCalled();
+    });
+
     it('ignores stale invitation markers and prompts an existing-plan user on the next save', async () => {
         authState.user = { user_id: 'dancer' };
         localStorage.setItem(`movida:program-install-invited:${event.event_id}`, '1');
@@ -145,6 +229,8 @@ describe('EventProgramPage', () => {
         fireEvent.click(await screen.findByRole('button', { name: /Friday Session/ }));
         fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
 
+        const feedback = await screen.findByRole('dialog', { name: 'Added to My Plan' });
+        fireEvent.click(within(feedback).getByRole('button', { name: 'Done' }));
         await waitFor(() => expect(requestInstallInvitation).toHaveBeenCalledWith({
             source: 'program',
             eventId: event.event_id,

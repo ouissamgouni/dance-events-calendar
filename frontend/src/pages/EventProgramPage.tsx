@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Download, Pencil } from 'lucide-react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, removeFromMyPlan } from '../api';
+import { addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, removeFromMyPlan, type ShareAudience } from '../api';
 import MyPlanUtilityMenu from '../components/MyPlanUtilityMenu';
 import ScheduleGrid from '../components/program/ScheduleGrid';
 import MyPlanList from '../components/program/MyPlanList';
 import { AttendeeProgramFilters, ProgramDayPicker } from '../components/program/ProgramControls';
-import { SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
+import { PlanAttendanceFeedbackSheet, SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
+import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
 import { usePwaInstall } from '../context/PwaInstallContext';
 import type { CalendarEvent, EventSchedule, MyPlanEntry, ScheduleSession } from '../types';
+import { defaultRsvpAudienceFor } from '../utils/audiencePreference';
 import { programInstallDismissedKey, programPushOptInKey } from '../utils/installPromptStorage';
 import { filterScheduleSessions, firstDayWithSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
 import { trackProgramViewed } from '../utils/tracking';
@@ -23,6 +25,7 @@ export default function EventProgramPage() {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const { user, loading: authLoading } = useAuth();
+    const { isAttending, toggleAttending, setAudience } = useAttendingEvents();
     const { requestInstallInvitation } = usePwaInstall();
     const { eventScheduleEnabled } = useFeatureFlags();
     const flagsReady = useFeatureFlagsReady();
@@ -42,6 +45,9 @@ export default function EventProgramPage() {
     const [positionRequest, setPositionRequest] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [canEdit, setCanEdit] = useState(false);
+    const [attendanceFeedback, setAttendanceFeedback] = useState<{ audience: ShareAudience; inviteAfterClose: boolean } | null>(null);
+    const [attendanceFeedbackBusy, setAttendanceFeedbackBusy] = useState(false);
+    const [attendanceFeedbackError, setAttendanceFeedbackError] = useState<string | null>(null);
     const trackedProgramEventId = useRef<string | null>(null);
 
     useEffect(() => {
@@ -153,6 +159,35 @@ export default function EventProgramPage() {
         next.delete('session');
         setSearchParams(next, { replace: true });
     };
+    const requestProgramInstallInvitation = () => {
+        if (!eventId || !user?.user_id || localStorage.getItem(programInstallDismissedKey(user.user_id, eventId))) return;
+        localStorage.setItem(programPushOptInKey(user.user_id), eventId);
+        requestInstallInvitation({ source: 'program', eventId, eventTitle: event?.title ?? 'this event' });
+    };
+    const closeAttendanceFeedback = () => {
+        const inviteAfterClose = attendanceFeedback?.inviteAfterClose;
+        setAttendanceFeedback(null);
+        setAttendanceFeedbackError(null);
+        if (inviteAfterClose) requestProgramInstallInvitation();
+    };
+    const changeAttendanceAudience = async (audience: ShareAudience) => {
+        if (!eventId) return;
+        setAttendanceFeedbackBusy(true);
+        setAttendanceFeedbackError(null);
+        const updated = await setAudience(eventId, audience);
+        if (updated) setAttendanceFeedback((value) => value ? { ...value, audience } : value);
+        else setAttendanceFeedbackError('Could not update visibility. Try again.');
+        setAttendanceFeedbackBusy(false);
+    };
+    const undoAutomaticAttendance = async () => {
+        if (!eventId) return;
+        setAttendanceFeedbackBusy(true);
+        setAttendanceFeedbackError(null);
+        const updated = await toggleAttending(eventId);
+        setAttendanceFeedbackBusy(false);
+        if (updated) closeAttendanceFeedback();
+        else setAttendanceFeedbackError('Could not undo Going. Try again.');
+    };
     const togglePlan = async (session: ScheduleSession) => {
         if (!eventId) return;
         const existing = plan.find((entry) => entry.session_id === session.id);
@@ -171,9 +206,18 @@ export default function EventProgramPage() {
             try {
                 const saved = await addToMyPlan(eventId, session.id);
                 setPlan((rows) => rows.map((entry) => entry.session_id === session.id ? saved : entry));
-                if (user?.user_id && !localStorage.getItem(programInstallDismissedKey(user.user_id, eventId))) {
-                    localStorage.setItem(programPushOptInKey(user.user_id), eventId);
-                    requestInstallInvitation({ source: 'program', eventId, eventTitle: event?.title ?? 'this event' });
+                const inviteAfterClose = Boolean(user?.user_id && !localStorage.getItem(programInstallDismissedKey(user.user_id, eventId)));
+                if (user && !isAttending(eventId)) {
+                    const audience = defaultRsvpAudienceFor(user);
+                    const markedGoing = await toggleAttending(eventId, audience).catch(() => false);
+                    if (markedGoing) {
+                        closeSession();
+                        setAttendanceFeedback({ audience, inviteAfterClose });
+                        return;
+                    }
+                }
+                if (inviteAfterClose) {
+                    requestProgramInstallInvitation();
                     closeSession();
                 }
             } catch (reason) {
@@ -255,6 +299,16 @@ export default function EventProgramPage() {
             ) : null}
             {selectedSession ? (
                 <SessionDetailsSheet schedule={schedule} session={selectedSession} planned={plannedIds.has(selectedSession.id)} preview={preview} onClose={closeSession} onTogglePlan={togglePlan} />
+            ) : null}
+            {attendanceFeedback ? (
+                <PlanAttendanceFeedbackSheet
+                    audience={attendanceFeedback.audience}
+                    busy={attendanceFeedbackBusy}
+                    error={attendanceFeedbackError}
+                    onAudienceChange={changeAttendanceAudience}
+                    onUndoGoing={undoAutomaticAttendance}
+                    onClose={closeAttendanceFeedback}
+                />
             ) : null}
         </div>
     );
