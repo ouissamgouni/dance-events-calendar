@@ -13,6 +13,12 @@
 
 import type { ShareAudience } from '../api';
 
+interface RsvpAudienceUser {
+    user_id?: string;
+    share_attendance_default?: boolean;
+    share_attendance_default_audience?: ShareAudience;
+}
+
 const KEY_PREFIX = 'audience.lastUsed.';
 
 const VALID: ReadonlyArray<ShareAudience> = ['public', 'friends', 'private'];
@@ -64,4 +70,10 @@ export function defaultAudienceFor(
 ): ShareAudience {
     if (!identity) return 'private';
     return getLastUsedAudience(identity) ?? 'public';
+}
+
+export function defaultRsvpAudienceFor(user: RsvpAudienceUser): ShareAudience {
+    return user.share_attendance_default_audience
+        ?? getLastUsedAudience(user.user_id)
+        ?? (user.share_attendance_default === false ? 'private' : 'public');
 }

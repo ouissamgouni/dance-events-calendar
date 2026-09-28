@@ -12,8 +12,8 @@ import PostRsvpPopover, { type PostRsvpVariant } from './PostRsvpPopover';
 import AudiencePicker from './AudiencePicker';
 import { useAnchoredToast } from './AnchoredToast';
 import {
+    defaultRsvpAudienceFor,
     setLastUsedAudience,
-    getLastUsedAudience,
 } from '../utils/audiencePreference';
 
 interface Props {
@@ -247,10 +247,7 @@ export default function GoingButton({
             //      (Phase C — last explicit per-event choice; only used
             //      when the account-level default is unset).
             //   3. Legacy boolean fallback for very old payloads.
-            const defaultAudience: ShareAudience =
-                user.share_attendance_default_audience
-                ?? getLastUsedAudience(user.user_id)
-                ?? (user.share_attendance_default === false ? 'private' : 'public');
+            const defaultAudience = defaultRsvpAudienceFor(user);
             // Always RSVP immediately with the default audience — no extra
             // confirmation click. The post-RSVP popover surfaces an inline
             // picker so the user can change visibility on the fly.

@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
 import { BookmarkPlus, CalendarDays, Clock, MapPin, Trash2 } from 'lucide-react';
 import BottomSheet from '../BottomSheet';
+import AudiencePicker from '../AudiencePicker';
 import SignInNudge, { useSignInNudge } from '../SignInNudge';
 import { useAuth } from '../../context/AuthContext';
+import type { ShareAudience } from '../../api';
 import type { EventSchedule, ScheduleSession } from '../../types';
 import { formatDayLabel, formatTimeRange, programDayOf } from '../../utils/schedule';
 import RoomPill from './RoomPill';
@@ -78,6 +80,57 @@ export function SessionDetailsSheet({ schedule, session, planned, preview, onClo
                 </div>
                 {session.is_cancelled ? <p className="border border-line bg-canvas p-3 text-sm font-medium text-danger">This session was cancelled by the organizer.</p> : null}
                 {session.attendee_note ? <p className="text-sm leading-6 text-ink-soft">{session.attendee_note}</p> : null}
+            </div>
+        </BottomSheet>
+    );
+}
+
+interface PlanAttendanceFeedbackSheetProps {
+    audience: ShareAudience;
+    busy: boolean;
+    error: string | null;
+    onAudienceChange: (audience: ShareAudience) => void;
+    onUndoGoing: () => void;
+    onClose: () => void;
+}
+
+export function PlanAttendanceFeedbackSheet({
+    audience,
+    busy,
+    error,
+    onAudienceChange,
+    onUndoGoing,
+    onClose,
+}: PlanAttendanceFeedbackSheetProps) {
+    return (
+        <BottomSheet
+            title="Added to My Plan"
+            onClose={() => { if (!busy) onClose(); }}
+            footer={(
+                <button type="button" onClick={onClose} disabled={busy} className="min-h-12 w-full rounded-field bg-action px-4 text-sm font-semibold text-white disabled:opacity-50">
+                    Done
+                </button>
+            )}
+        >
+            <div className="space-y-4 pb-2">
+                <div>
+                    <p className="text-lg font-bold text-ink">You’re going</p>
+                    <p className="mt-1 text-sm text-ink-soft">Adding a session to your plan also marked you as going to this event.</p>
+                </div>
+                <div>
+                    <p className="mb-2 text-sm font-semibold text-ink">Who can see you in the attendee list?</p>
+                    <AudiencePicker
+                        value={audience}
+                        onChange={onAudienceChange}
+                        disabled={busy}
+                        size="full"
+                        ariaLabel="Attendance visibility"
+                    />
+                </div>
+                {error ? <p role="alert" className="text-sm font-medium text-danger">{error}</p> : null}
+                <button type="button" onClick={onUndoGoing} disabled={busy} className="text-sm font-semibold text-danger disabled:opacity-50">
+                    {busy ? 'Updating…' : 'Undo Going'}
+                </button>
             </div>
         </BottomSheet>
     );
