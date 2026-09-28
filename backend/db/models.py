@@ -195,6 +195,8 @@ class User(SQLModel, table=True):
     # independently of follows/friend-requests.
     email_friends_going_enabled: bool = Field(default=True, nullable=False)
     push_friends_going_enabled: bool = Field(default=True, nullable=False)
+    email_plan_activity_enabled: bool = Field(default=False, nullable=False)
+    push_plan_activity_enabled: bool = Field(default=True, nullable=False)
     # A followee dropped a review (``subscription_review``).
     email_friend_reviews_enabled: bool = Field(default=True, nullable=False)
     push_friend_reviews_enabled: bool = Field(default=True, nullable=False)
@@ -652,6 +654,26 @@ class UserPlanSession(SQLModel, table=True):
     )
     last_known_session: dict = Field(sa_column=Column(JSON, nullable=False))
     added_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserPlanAudience(SQLModel, table=True):
+    __tablename__ = "user_plan_audiences"
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_id", name="uq_user_plan_audience"),
+        CheckConstraint(
+            "audience IN ('followers', 'friends', 'private')",
+            name="ck_user_plan_audience_value",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    event_id: str = Field(
+        foreign_key="cached_events.event_id", index=True, nullable=False
+    )
+    audience: str = Field(max_length=16, nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class MyPlanShareToken(SQLModel, table=True):

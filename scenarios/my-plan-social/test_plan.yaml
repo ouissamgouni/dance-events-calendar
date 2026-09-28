@@ -1,0 +1,157 @@
+test_plan:
+  name: "My Plan social visibility and activity"
+  description: >
+    My Plan visibility controls session attendee previews, full rosters, and
+    activity notifications independently of event-level Going visibility.
+    Notifications require both an eligible relationship and a shared planned
+    session, while share links remain a separate revocable capability.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`."
+    - >-
+      Start the scenario:
+      `SCENARIO=my-plan-social RESET=1 task start:scenario`.
+    - >-
+      Clear Mailpit. Showcase My Plan rows are seeded for roster density, but
+      no notification rows are seeded and Alice, Bob, Carol, and Dave start
+      without planned sessions.
+    - >-
+      For push delivery, sign in as Bob in Chromium, open
+      /account#notifications, and grant browser notification permission.
+
+  cast:
+    - "Alice — actor; attending; adds sessions through the published Program."
+    - "Bob — mutual friend; privately plans both sessions; Plan activity email and push ON."
+    - "Carol — one-way follower; privately plans Musicality Lab; email OFF and push ON."
+    - "Dave — non-follower; privately plans Musicality Lab; Going-only negative control."
+    - >-
+      "Nora through Vasco — 20 showcase dancers; public Going attendance and
+      follower-visible seeded plans used for grid and roster density checks."
+
+  steps:
+    - id: 0
+      title: "Verify varied grid and roster density"
+      description: >
+        Sign in as Alice and open /event/plan-activity-weekender/program. Scan
+        all three room columns on Friday and Saturday, then open Musicality Lab,
+        Guided Practice, and Beginner Foundations.
+      expected: >
+        Main Studio, Rooftop Studio, and Practice Lounge render concurrently.
+        Seeded visible counts vary across sessions: Musicality Lab 20, Bachata
+        Styling 15, Salsa Footwork 12, Shines Challenge 10, Connection Lab 8,
+        Social Warm-up 6, Partnerwork Flow 5, and Guided Practice 3. Their grid
+        stacks stay compact; the Session details sentence sits immediately
+        after the larger avatar stack. Beginner Foundations, Spins & Balance,
+        and Open Practice show no attendee section because they have no plans.
+
+    - id: 1
+      title: "Build recipient plans without reciprocal activity"
+      description: >
+        Sign in as Bob and add Musicality Lab and Partnerwork Flow. Sign in as
+        Carol and Dave and add Musicality Lab. For each account choose Only me
+        when first prompted.
+      expected: >
+        Each account sees its sessions in My Plan. Their private choices create
+        no social Plan activity rows. Dave remains Going but has no relationship
+        with Alice.
+
+    - id: 2
+      title: "First add requires an audience decision"
+      description: >
+        Sign in as Alice, open /event/plan-activity-weekender/program, open
+        Musicality Lab, and click Add to My Plan.
+      expected: >
+        A "Share your plan activity?" sheet appears before any Going feedback
+        or install invitation. Followers attending is preselected. Choose
+        Continue. The choice is saved and is also visible in My Plan's Share &
+        export menu.
+
+    - id: 3
+      title: "Shared-session previews and roster respect relationships"
+      description: >
+        Sign in as Bob, Carol, and Dave in turn. Open the Program and Musicality
+        Lab Session details; activate Who's attending to open the full list.
+      expected: >
+        With the scenario grid flag on, Bob and Carol see Alice's compact grid
+        preview and Session details preview, and the full list contains Alice.
+        Dave sees no Alice identity or hidden count. Closing the attendee list
+        returns to Session details.
+
+    - id: 4
+      title: "Only matching attendees receive activity"
+      description: >
+        Inspect Activity as Bob, Carol, and Dave after Alice's Musicality add.
+      expected: >
+        Bob and Carol each have one plan_session_added row naming Musicality
+        Lab. Dave has no row even though he is Going and planned the session,
+        because he does not follow Alice. Opening a row selects Musicality Lab.
+
+    - id: 5
+      title: "A second session refreshes only a matching recipient"
+      description: >
+        As Alice, add Partnerwork Flow. Re-open Bob and Carol's Activity feeds.
+      expected: >
+        Bob's one mutable row now names Partnerwork Flow and says "2 sessions
+        planned". Carol's row remains targeted to Musicality Lab because she
+        did not plan Partnerwork Flow. No recipient gets a second row.
+
+    - id: 6
+      title: "Removing a session falls back silently"
+      description: >
+        As Alice, remove Partnerwork Flow from My Plan, then inspect Bob's feed.
+      expected: >
+        Bob's existing row falls back to Musicality Lab without a new alert or
+        duplicate row.
+
+    - id: 7
+      title: "Audience changes update lists and rows together"
+      description: >
+        As Alice, change Plan activity from Followers attending to Friends
+        attending, inspect Bob and Carol, then change it to Only me.
+      expected: >
+        Friends keeps Alice visible to Bob and keeps Bob's row, while Alice is
+        removed from Carol's previews, roster, and feed. Only me removes Alice
+        from both users' social surfaces and retracts all remaining rows without
+        replaying alerts.
+
+    - id: 8
+      title: "Grid rollout does not gate Session details"
+      description: >
+        As Admin, disable Program grid attendee previews. Restore Alice's
+        Followers attending choice, then inspect Musicality Lab as Bob.
+      expected: >
+        The grid has no avatar preview and makes no batch-summary request, while
+        Session details still shows Who's attending and opens Alice's roster
+        entry. Re-enable the flag for subsequent checks.
+
+    - id: 9
+      title: "Share links are independent and revocable"
+      description: >
+        With Alice's audience set to Only me, create a Share My Plan link and
+        open it logged out. Then stop sharing and reload the same URL.
+      expected: >
+        The capability URL exposes Alice's complete current plan while active,
+        despite private social visibility. After revocation, the URL no longer
+        resolves.
+
+    - id: 10
+      title: "Dismissal is private and does not repeat"
+      description: >
+        Reset the scenario. As Alice add Musicality Lab again, then dismiss the
+        audience sheet using Not now, Escape, or the backdrop. Add Partnerwork
+        Flow afterward.
+      expected: >
+        Dismissal persists Only me. No recipient row is created, and the second
+        add does not show the first-add audience sheet again.
+
+    - id: 11
+      title: "Dedicated channel defaults and delivery"
+      description: >
+        Inspect Alice and Carol's notification settings, then perform step 1
+        with Bob's Plan activity email explicitly enabled by this scenario.
+      expected: >
+        Accounts without an override show Plan activity email OFF and push ON.
+        Bob receives the instant Plan activity email because his dedicated
+        email preference is explicitly ON and settings.yaml enables instant
+        mode. Carol receives no email. Push remains dependent on an active
+        browser PushSubscription and granted permission.

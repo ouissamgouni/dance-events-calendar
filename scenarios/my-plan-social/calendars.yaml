@@ -1,0 +1,5 @@
+calendars:
+  - id: plan-activity-calendar
+    name: Plan Activity QA
+    color: "#2563eb"
+    enabled: true

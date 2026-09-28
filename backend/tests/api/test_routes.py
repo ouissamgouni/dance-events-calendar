@@ -110,6 +110,28 @@ class TestHealthEndpoint:
 
 @pytest.mark.unit
 class TestSettingsEndpoint:
+    def test_program_grid_attendee_preview_defaults_off_and_can_be_enabled(
+        self, sqlite_client
+    ):
+        client, engine = sqlite_client
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["program_grid_attendee_preview_enabled"] is False
+
+        resp = client.put(
+            "/api/settings",
+            json={"program_grid_attendee_preview_enabled": True},
+            headers={"X-Admin-Email": "admin@example.com"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["program_grid_attendee_preview_enabled"] is True
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "program_grid_attendee_preview_enabled")
+            assert row is not None
+            assert row.value == "true"
+
     def test_show_pending_events_defaults_off_and_can_be_enabled(self, sqlite_client):
         client, engine = sqlite_client
 

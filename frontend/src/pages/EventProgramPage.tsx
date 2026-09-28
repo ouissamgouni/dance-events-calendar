@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Download, Pencil } from 'lucide-react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, removeFromMyPlan, type ShareAudience } from '../api';
+import { addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchSessionAttendanceSummary, fetchSingleSessionAttendanceSummary, removeFromMyPlan, updateMyPlanAudience, type ShareAudience } from '../api';
 import MyPlanUtilityMenu from '../components/MyPlanUtilityMenu';
 import ScheduleGrid from '../components/program/ScheduleGrid';
 import MyPlanList from '../components/program/MyPlanList';
+import PlanAudienceSheet from '../components/program/PlanAudienceSheet';
 import { AttendeeProgramFilters, ProgramDayPicker } from '../components/program/ProgramControls';
 import { PlanAttendanceFeedbackSheet, SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
 import { usePwaInstall } from '../context/PwaInstallContext';
-import type { CalendarEvent, EventSchedule, MyPlanEntry, ScheduleSession } from '../types';
+import type { CalendarEvent, EventSchedule, MyPlanEntry, PlanAudience, ScheduleSession, SessionAttendanceSummary } from '../types';
 import { defaultRsvpAudienceFor } from '../utils/audiencePreference';
 import { programInstallDismissedKey, programPushOptInKey } from '../utils/installPromptStorage';
 import { filterScheduleSessions, firstDayWithSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
@@ -27,7 +28,7 @@ export default function EventProgramPage() {
     const { user, loading: authLoading } = useAuth();
     const { isAttending, toggleAttending, setAudience } = useAttendingEvents();
     const { requestInstallInvitation } = usePwaInstall();
-    const { eventScheduleEnabled } = useFeatureFlags();
+    const { eventScheduleEnabled, programGridAttendeePreviewEnabled } = useFeatureFlags();
     const flagsReady = useFeatureFlagsReady();
     const initialSearchParams = useRef(searchParams);
     const preview = searchParams.get('preview') === 'draft';
@@ -38,6 +39,12 @@ export default function EventProgramPage() {
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [schedule, setSchedule] = useState<EventSchedule | null>(null);
     const [plan, setPlan] = useState<MyPlanEntry[]>([]);
+    const [planAudience, setPlanAudience] = useState<PlanAudience | null>(null);
+    const [planAudienceLoaded, setPlanAudienceLoaded] = useState(false);
+    const [planAudiencePrompt, setPlanAudiencePrompt] = useState(false);
+    const [planAudienceBusy, setPlanAudienceBusy] = useState(false);
+    const [planAudienceError, setPlanAudienceError] = useState<string | null>(null);
+    const [pendingPostAdd, setPendingPostAdd] = useState<{ inviteAfterClose: boolean } | null>(null);
     const [selectedDay, setSelectedDay] = useState('');
     const [selectedSession, setSelectedSession] = useState<ScheduleSession | null>(null);
     const [selectedHour, setSelectedHour] = useState<number | null>(null);
@@ -48,6 +55,9 @@ export default function EventProgramPage() {
     const [attendanceFeedback, setAttendanceFeedback] = useState<{ audience: ShareAudience; inviteAfterClose: boolean } | null>(null);
     const [attendanceFeedbackBusy, setAttendanceFeedbackBusy] = useState(false);
     const [attendanceFeedbackError, setAttendanceFeedbackError] = useState<string | null>(null);
+    const [attendanceSummaries, setAttendanceSummaries] = useState<Map<string, SessionAttendanceSummary>>(new Map());
+    const [selectedAttendance, setSelectedAttendance] = useState<SessionAttendanceSummary | null>(null);
+    const [selectedAttendanceLoading, setSelectedAttendanceLoading] = useState(false);
     const trackedProgramEventId = useRef<string | null>(null);
 
     useEffect(() => {
@@ -85,7 +95,14 @@ export default function EventProgramPage() {
 
     useEffect(() => {
         if (!eventId || authLoading || !user || preview) return;
-        fetchMyPlan(eventId).then((value) => setPlan(value.entries)).catch(() => setPlan([]));
+        fetchMyPlan(eventId).then((value) => {
+            setPlan(value.entries);
+            setPlanAudience(value.audience);
+            setPlanAudienceLoaded(true);
+        }).catch(() => {
+            setPlan([]);
+            setPlanAudienceLoaded(false);
+        });
     }, [authLoading, eventId, preview, user]);
 
     useEffect(() => {
@@ -99,6 +116,42 @@ export default function EventProgramPage() {
             .catch(() => { if (!cancelled) setCanEdit(false); });
         return () => { cancelled = true; };
     }, [authLoading, eventId, preview, user]);
+
+    useEffect(() => {
+        if (!eventId || authLoading || !user || preview || !programGridAttendeePreviewEnabled) {
+            setAttendanceSummaries(new Map());
+            return;
+        }
+        let cancelled = false;
+        fetchSessionAttendanceSummary(eventId)
+            .then((value) => {
+                if (!cancelled) setAttendanceSummaries(new Map(value.sessions.map((item) => [item.session_id, item])));
+            })
+            .catch(() => { if (!cancelled) setAttendanceSummaries(new Map()); });
+        return () => { cancelled = true; };
+    }, [authLoading, eventId, preview, programGridAttendeePreviewEnabled, user]);
+
+    useEffect(() => {
+        if (!eventId || authLoading || !user || preview || !selectedSession) {
+            setSelectedAttendance(null);
+            setSelectedAttendanceLoading(false);
+            return;
+        }
+        const cached = attendanceSummaries.get(selectedSession.id);
+        if (cached) {
+            setSelectedAttendance(cached);
+            setSelectedAttendanceLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setSelectedAttendance(null);
+        setSelectedAttendanceLoading(true);
+        fetchSingleSessionAttendanceSummary(eventId, selectedSession.id)
+            .then((value) => { if (!cancelled) setSelectedAttendance(value); })
+            .catch(() => { if (!cancelled) setSelectedAttendance(null); })
+            .finally(() => { if (!cancelled) setSelectedAttendanceLoading(false); });
+        return () => { cancelled = true; };
+    }, [attendanceSummaries, authLoading, eventId, preview, selectedSession, user]);
 
     useEffect(() => {
         if (activeTab !== 'program') {
@@ -188,6 +241,47 @@ export default function EventProgramPage() {
         if (updated) closeAttendanceFeedback();
         else setAttendanceFeedbackError('Could not undo Going. Try again.');
     };
+    const continueAfterPlanAudience = async (inviteAfterClose: boolean) => {
+        if (!eventId) return;
+        if (user && !isAttending(eventId)) {
+            const audience = defaultRsvpAudienceFor(user);
+            const markedGoing = await toggleAttending(eventId, audience).catch(() => false);
+            if (markedGoing) {
+                closeSession();
+                setAttendanceFeedback({ audience, inviteAfterClose });
+                return;
+            }
+        }
+        if (inviteAfterClose) {
+            requestProgramInstallInvitation();
+            closeSession();
+        }
+    };
+    const persistPlanAudience = async (audience: PlanAudience) => {
+        if (!eventId || planAudienceBusy) return;
+        setPlanAudienceBusy(true);
+        setPlanAudienceError(null);
+        try {
+            const response = await updateMyPlanAudience(eventId, audience);
+            setPlanAudience(response.audience);
+        } catch {
+            setPlanAudienceError('Could not save this choice. Try again.');
+            throw new Error('Could not update session sharing');
+        } finally {
+            setPlanAudienceBusy(false);
+        }
+    };
+    const savePromptPlanAudience = async (audience: PlanAudience) => {
+        try {
+            await persistPlanAudience(audience);
+            setPlanAudiencePrompt(false);
+            const pending = pendingPostAdd;
+            setPendingPostAdd(null);
+            await continueAfterPlanAudience(pending?.inviteAfterClose ?? false);
+        } catch {
+            // Error is rendered in the sheet.
+        }
+    };
     const togglePlan = async (session: ScheduleSession) => {
         if (!eventId) return;
         const existing = plan.find((entry) => entry.session_id === session.id);
@@ -207,19 +301,13 @@ export default function EventProgramPage() {
                 const saved = await addToMyPlan(eventId, session.id);
                 setPlan((rows) => rows.map((entry) => entry.session_id === session.id ? saved : entry));
                 const inviteAfterClose = Boolean(user?.user_id && !localStorage.getItem(programInstallDismissedKey(user.user_id, eventId)));
-                if (user && !isAttending(eventId)) {
-                    const audience = defaultRsvpAudienceFor(user);
-                    const markedGoing = await toggleAttending(eventId, audience).catch(() => false);
-                    if (markedGoing) {
-                        closeSession();
-                        setAttendanceFeedback({ audience, inviteAfterClose });
-                        return;
-                    }
-                }
-                if (inviteAfterClose) {
-                    requestProgramInstallInvitation();
+                if (planAudienceLoaded && planAudience === null) {
+                    setPendingPostAdd({ inviteAfterClose });
+                    setPlanAudiencePrompt(true);
                     closeSession();
+                    return;
                 }
+                await continueAfterPlanAudience(inviteAfterClose);
             } catch (reason) {
                 setPlan(previous);
                 throw reason;
@@ -271,11 +359,11 @@ export default function EventProgramPage() {
 
             <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col">
                 {activeTab === 'program' ? (
-                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} compactHeader />
+                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} compactHeader attendeeSummaries={attendanceSummaries} />
                 ) : user ? (
                     <div className="flex min-h-0 flex-1 flex-col">
                         {plan.length ? <div className="shrink-0 border-b border-line bg-surface px-4 py-2 text-right">
-                            <MyPlanUtilityMenu eventId={event.event_id} />
+                            <MyPlanUtilityMenu eventId={event.event_id} audience={planAudience} onAudienceChange={persistPlanAudience} />
                         </div> : null}
                         <MyPlanList schedule={schedule} entries={plan} onOpen={openSession} onRemove={removePlanEntry} onProgram={() => navigate(`/event/${event.event_id}/program`)} />
                     </div>
@@ -298,7 +386,7 @@ export default function EventProgramPage() {
                 />
             ) : null}
             {selectedSession ? (
-                <SessionDetailsSheet schedule={schedule} session={selectedSession} planned={plannedIds.has(selectedSession.id)} preview={preview} onClose={closeSession} onTogglePlan={togglePlan} />
+                <SessionDetailsSheet schedule={schedule} session={selectedSession} planned={plannedIds.has(selectedSession.id)} preview={preview} onClose={closeSession} onTogglePlan={togglePlan} attendanceSummary={selectedAttendance} attendanceLoading={selectedAttendanceLoading} eventId={event.event_id} />
             ) : null}
             {attendanceFeedback ? (
                 <PlanAttendanceFeedbackSheet
@@ -308,6 +396,14 @@ export default function EventProgramPage() {
                     onAudienceChange={changeAttendanceAudience}
                     onUndoGoing={undoAutomaticAttendance}
                     onClose={closeAttendanceFeedback}
+                />
+            ) : null}
+            {planAudiencePrompt ? (
+                <PlanAudienceSheet
+                    busy={planAudienceBusy}
+                    error={planAudienceError}
+                    onConfirm={savePromptPlanAudience}
+                    onNotNow={() => savePromptPlanAudience('private')}
                 />
             ) : null}
         </div>

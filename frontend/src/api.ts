@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 import type { SharedMyPlanResponse } from './types';
 
@@ -211,6 +211,30 @@ export async function fetchEventSchedule(eventId: string): Promise<EventSchedule
         credentials: 'include',
     });
     return parseJsonResponse<EventSchedule>(res, 'Failed to load the event program');
+}
+
+export async function fetchSessionAttendanceSummary(eventId: string): Promise<SessionAttendanceSummaryBatch> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/schedule/attendance-summary`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return parseJsonResponse<SessionAttendanceSummaryBatch>(res, 'Failed to load session attendance');
+}
+
+export async function fetchSingleSessionAttendanceSummary(eventId: string, sessionId: string): Promise<SessionAttendanceSummary> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/schedule/sessions/${encodeURIComponent(sessionId)}/attendance-summary`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return parseJsonResponse<SessionAttendanceSummary>(res, 'Failed to load session attendance');
+}
+
+export async function fetchSessionAttendees(eventId: string, sessionId: string): Promise<SessionPlanAttendee[]> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/schedule/sessions/${encodeURIComponent(sessionId)}/attendees`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return parseJsonResponse<SessionPlanAttendee[]>(res, 'Failed to load session attendees');
 }
 
 export async function fetchEventScheduleEditorAccess(eventId: string): Promise<{ can_edit: boolean }> {
@@ -485,6 +509,19 @@ export async function fetchMyPlan(eventId: string): Promise<MyPlanResponse> {
     return parseJsonResponse<MyPlanResponse>(res, 'Failed to load My Plan');
 }
 
+export async function updateMyPlanAudience(
+    eventId: string,
+    audience: import('./types').PlanAudience,
+): Promise<MyPlanResponse> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/my-plan/audience`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audience }),
+    });
+    return parseJsonResponse<MyPlanResponse>(res, 'Failed to update My Plan sharing');
+}
+
 export async function addToMyPlan(eventId: string, sessionId: string): Promise<MyPlanEntry> {
     const res = await fetch(
         `${BASE}/events/${encodeURIComponent(eventId)}/my-plan/${encodeURIComponent(sessionId)}`,
@@ -530,6 +567,7 @@ export interface SiteSettings {
     promo_codes_enabled?: boolean;
     organizer_claims_enabled?: boolean;
     event_schedule_enabled?: boolean;
+    program_grid_attendee_preview_enabled?: boolean;
     duplicate_auto_detect_enabled?: boolean;
     network_going_snapshot_enabled?: boolean;
     my_events_route_enabled?: boolean;
@@ -611,6 +649,8 @@ export interface SiteSettings {
      * the digest, both, or neither. Defaults: instant=false, digest=true. */
     friends_going_email_instant?: boolean;
     friends_going_email_digest?: boolean;
+    plan_activity_email_instant?: boolean;
+    plan_activity_email_digest?: boolean;
     social_activity_email_instant?: boolean;
     social_activity_email_digest?: boolean;
     friend_reviews_email_instant?: boolean;
@@ -1046,6 +1086,8 @@ export interface AuthUser {
     push_milestone_unlocked_enabled?: boolean;
     email_friends_going_enabled?: boolean;
     push_friends_going_enabled?: boolean;
+    email_plan_activity_enabled?: boolean;
+    push_plan_activity_enabled?: boolean;
     email_friend_reviews_enabled?: boolean;
     push_friend_reviews_enabled?: boolean;
     email_friend_milestones_enabled?: boolean;
@@ -1242,6 +1284,8 @@ export interface NotificationPreferences {
     push_milestone_unlocked_enabled: boolean;
     email_friends_going_enabled: boolean;
     push_friends_going_enabled: boolean;
+    email_plan_activity_enabled: boolean;
+    push_plan_activity_enabled: boolean;
     email_friend_reviews_enabled: boolean;
     push_friend_reviews_enabled: boolean;
     email_friend_milestones_enabled: boolean;
@@ -1276,6 +1320,8 @@ export interface UpdateNotificationPreferencesPayload {
     push_milestone_unlocked_enabled?: boolean;
     email_friends_going_enabled?: boolean;
     push_friends_going_enabled?: boolean;
+    email_plan_activity_enabled?: boolean;
+    push_plan_activity_enabled?: boolean;
     email_friend_reviews_enabled?: boolean;
     push_friend_reviews_enabled?: boolean;
     email_friend_milestones_enabled?: boolean;
@@ -2189,6 +2235,7 @@ export type NotificationKind =
     | 'event_message_reply'
     | 'event_message_reported'
     | 'planned_session_changed'
+    | 'plan_session_added'
     | 'schedule_program_available'
     | 'schedule_program_updated';
 

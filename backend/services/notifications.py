@@ -32,6 +32,8 @@ from backend.db.models import (
     User,
     UserEventAttendance,
     UserEventMute,
+    UserFollow,
+    UserPlanAudience,
     UserSavedEvent,
     UserPlanSession,
 )
@@ -68,6 +70,110 @@ EVENT_MESSAGE_REPLY = "event_message_reply"
 # A user reported a message; delivered to the site admin only (in-app).
 EVENT_MESSAGE_REPORTED = "event_message_reported"
 PLANNED_SESSION_CHANGED = "planned_session_changed"
+PLAN_SESSION_ADDED = "plan_session_added"
+
+
+def reconcile_plan_activity_notifications(
+    session: Session,
+    actor: User,
+    event_id: str,
+    *,
+    alert: bool,
+) -> list[Notification]:
+    existing = session.exec(
+        select(Notification).where(
+            Notification.kind == PLAN_SESSION_ADDED,
+            Notification.actor_user_id == actor.id,
+            Notification.event_id == event_id,
+        )
+    ).all()
+    existing_by_recipient = {row.recipient_user_id: row for row in existing}
+    audience = session.exec(
+        select(UserPlanAudience.audience).where(
+            UserPlanAudience.user_id == actor.id,
+            UserPlanAudience.event_id == event_id,
+        )
+    ).first()
+    plans = session.exec(
+        select(UserPlanSession)
+        .where(
+            UserPlanSession.user_id == actor.id,
+            UserPlanSession.event_id == event_id,
+        )
+        .order_by(UserPlanSession.added_at)
+    ).all()
+    eligible_ids: set[UUID] = set()
+    if (
+        audience in {"followers", "friends"}
+        and plans
+        and event_id in eligible_event_ids(session, [event_id])
+        and not _event_is_past(session, event_id)
+    ):
+        eligible_ids = set(
+            session.exec(
+                select(UserFollow.follower_id)
+                .join(User, User.id == UserFollow.follower_id)
+                .join(
+                    UserEventAttendance,
+                    UserEventAttendance.user_id == UserFollow.follower_id,
+                )
+                .where(
+                    UserFollow.followee_id == actor.id,
+                    UserFollow.status == "approved",
+                    UserEventAttendance.event_id == event_id,
+                    User.deleted_at.is_(None),  # type: ignore[union-attr]
+                )
+            ).all()
+        )
+        if audience == "friends" and eligible_ids:
+            reciprocal_ids = set(
+                session.exec(
+                    select(UserFollow.followee_id).where(
+                        UserFollow.follower_id == actor.id,
+                        UserFollow.status == "approved",
+                        col(UserFollow.followee_id).in_(eligible_ids),
+                    )
+                ).all()
+            )
+            eligible_ids.intersection_update(reciprocal_ids)
+
+    for recipient_id, row in existing_by_recipient.items():
+        if recipient_id not in eligible_ids:
+            session.delete(row)
+
+    if not plans:
+        return []
+    latest = plans[-1]
+    latest_title = latest.last_known_session.get("title") or "a session"
+    description = f"{len(plans)} session{'s' if len(plans) != 1 else ''} planned"
+    now = datetime.now(timezone.utc)
+    rows: list[Notification] = []
+    for recipient_id in eligible_ids:
+        row = existing_by_recipient.get(recipient_id)
+        if row is None:
+            row = Notification(
+                recipient_user_id=recipient_id,
+                actor_user_id=actor.id,
+                kind=PLAN_SESSION_ADDED,
+                event_id=event_id,
+            )
+            session.add(row)
+            session.flush()
+            record_delivery(session, row.id, "app")
+        elif alert:
+            row.created_at = now
+            row.read_at = None
+            row.emailed_at = None
+            row.pushed_at = None
+            row.instant_emailed_at = None
+            record_delivery(session, row.id, "app")
+        row.group_key = str(latest.session_id)
+        row.context = latest_title[:200]
+        row.description = description
+        session.add(row)
+        rows.append(row)
+    session.flush()
+    return rows
 
 
 def withdraw_review_notifications(

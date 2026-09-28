@@ -1,0 +1,485 @@
+schedules:
+  - event_id: plan-activity-weekender
+    timezone: Europe/Lisbon
+    day_start_hour: 6
+    days:
+      - "2026-10-16"
+      - "2026-10-17"
+    venues:
+      - name: Dance Loft
+        address: Lisbon
+    rooms:
+      - name: Main Studio
+        venue: Dance Loft
+        color: blue
+      - name: Rooftop Studio
+        venue: Dance Loft
+        color: amber
+      - name: Practice Lounge
+        venue: Dance Loft
+        color: emerald
+    levels:
+      - label: Beginner
+      - label: Open Level
+      - label: Intermediate
+    activity_types:
+      - name: Workshop
+        color: blue
+      - name: Practice
+        color: emerald
+      - name: Social
+        color: amber
+    sessions:
+      - id: "71000000-0000-4000-8000-000000000001"
+        title: Musicality Lab
+        instructors: Maya & Leo
+        start: "2026-10-16T17:00:00Z"
+        end: "2026-10-16T18:00:00Z"
+        room: Main Studio
+        venue: Dance Loft
+        level: Open Level
+        activity_type: Workshop
+      - id: "71000000-0000-4000-8000-000000000003"
+        title: Bachata Styling
+        instructors: Sofia Cruz
+        start: "2026-10-16T17:00:00Z"
+        end: "2026-10-16T18:00:00Z"
+        room: Rooftop Studio
+        venue: Dance Loft
+        level: Intermediate
+        activity_type: Workshop
+      - id: "71000000-0000-4000-8000-000000000004"
+        title: Beginner Foundations
+        instructors: Rita & Tomas
+        start: "2026-10-16T17:00:00Z"
+        end: "2026-10-16T18:00:00Z"
+        room: Practice Lounge
+        venue: Dance Loft
+        level: Beginner
+        activity_type: Workshop
+      - id: "71000000-0000-4000-8000-000000000005"
+        title: Salsa Footwork
+        instructors: Elena Ruiz
+        start: "2026-10-16T18:15:00Z"
+        end: "2026-10-16T19:15:00Z"
+        room: Main Studio
+        venue: Dance Loft
+        level: Intermediate
+        activity_type: Workshop
+      - id: "71000000-0000-4000-8000-000000000006"
+        title: Connection Lab
+        instructors: Marco & Ines
+        start: "2026-10-16T18:15:00Z"
+        end: "2026-10-16T19:15:00Z"
+        room: Rooftop Studio
+        venue: Dance Loft
+        level: Open Level
+        activity_type: Workshop
+      - id: "71000000-0000-4000-8000-000000000007"
+        title: Guided Practice
+        instructors: Team Movida
+        start: "2026-10-16T18:15:00Z"
+        end: "2026-10-16T19:15:00Z"
+        room: Practice Lounge
+        venue: Dance Loft
+        level: Beginner
+        activity_type: Practice
+      - id: "71000000-0000-4000-8000-000000000008"
+        title: Social Warm-up
+        instructors: DJ Marta
+        start: "2026-10-16T19:30:00Z"
+        end: "2026-10-16T20:30:00Z"
+        room: Main Studio
+        venue: Dance Loft
+        level: Open Level
+        activity_type: Social
+      - id: "71000000-0000-4000-8000-000000000009"
+        title: Spins & Balance
+        instructors: Clara Mendes
+        start: "2026-10-16T19:30:00Z"
+        end: "2026-10-16T20:30:00Z"
+        room: Rooftop Studio
+        venue: Dance Loft
+        level: Intermediate
+        activity_type: Workshop
+      - id: "71000000-0000-4000-8000-000000000002"
+        title: Partnerwork Flow
+        instructors: Ana & Luis
+        start: "2026-10-17T10:00:00Z"
+        end: "2026-10-17T11:00:00Z"
+        room: Main Studio
+        venue: Dance Loft
+        level: Open Level
+        activity_type: Workshop
+      - id: "71000000-0000-4000-8000-000000000010"
+        title: Shines Challenge
+        instructors: Diogo Neves
+        start: "2026-10-17T10:00:00Z"
+        end: "2026-10-17T11:00:00Z"
+        room: Rooftop Studio
+        venue: Dance Loft
+        level: Intermediate
+        activity_type: Workshop
+      - id: "71000000-0000-4000-8000-000000000011"
+        title: Open Practice
+        instructors: Team Movida
+        start: "2026-10-17T10:00:00Z"
+        end: "2026-10-17T11:00:00Z"
+        room: Practice Lounge
+        venue: Dance Loft
+        level: Open Level
+        activity_type: Practice
+    published: true
+    plans:
+      # Musicality Lab: 20 visible planners.
+      - {
+          email: nora@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: marco@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: sofia@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: tiago@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: ines@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: miguel@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: beatriz@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: joao@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: clara@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: rui@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: marta@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: pedro@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: ana@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: luis@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: helena@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: diogo@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: catarina@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: andre@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: luisa@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+      - {
+          email: vasco@example.com,
+          session_id: "71000000-0000-4000-8000-000000000001",
+          audience: followers,
+        }
+
+      # Bachata Styling: 15 planners.
+      - {
+          email: nora@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: marco@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: sofia@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: tiago@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: ines@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: miguel@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: beatriz@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: joao@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: clara@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: rui@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: marta@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: pedro@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: ana@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: luis@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+      - {
+          email: helena@example.com,
+          session_id: "71000000-0000-4000-8000-000000000003",
+        }
+
+      # Salsa Footwork: 12 planners.
+      - {
+          email: nora@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: marco@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: sofia@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: tiago@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: ines@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: miguel@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: beatriz@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: joao@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: clara@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: rui@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: marta@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+      - {
+          email: pedro@example.com,
+          session_id: "71000000-0000-4000-8000-000000000005",
+        }
+
+      # Connection Lab: 8 planners.
+      - {
+          email: nora@example.com,
+          session_id: "71000000-0000-4000-8000-000000000006",
+        }
+      - {
+          email: marco@example.com,
+          session_id: "71000000-0000-4000-8000-000000000006",
+        }
+      - {
+          email: sofia@example.com,
+          session_id: "71000000-0000-4000-8000-000000000006",
+        }
+      - {
+          email: tiago@example.com,
+          session_id: "71000000-0000-4000-8000-000000000006",
+        }
+      - {
+          email: ines@example.com,
+          session_id: "71000000-0000-4000-8000-000000000006",
+        }
+      - {
+          email: miguel@example.com,
+          session_id: "71000000-0000-4000-8000-000000000006",
+        }
+      - {
+          email: beatriz@example.com,
+          session_id: "71000000-0000-4000-8000-000000000006",
+        }
+      - {
+          email: joao@example.com,
+          session_id: "71000000-0000-4000-8000-000000000006",
+        }
+
+      # Guided Practice: 3 planners.
+      - {
+          email: nora@example.com,
+          session_id: "71000000-0000-4000-8000-000000000007",
+        }
+      - {
+          email: marco@example.com,
+          session_id: "71000000-0000-4000-8000-000000000007",
+        }
+      - {
+          email: sofia@example.com,
+          session_id: "71000000-0000-4000-8000-000000000007",
+        }
+
+      # Social Warm-up: 6 planners.
+      - {
+          email: nora@example.com,
+          session_id: "71000000-0000-4000-8000-000000000008",
+        }
+      - {
+          email: marco@example.com,
+          session_id: "71000000-0000-4000-8000-000000000008",
+        }
+      - {
+          email: sofia@example.com,
+          session_id: "71000000-0000-4000-8000-000000000008",
+        }
+      - {
+          email: tiago@example.com,
+          session_id: "71000000-0000-4000-8000-000000000008",
+        }
+      - {
+          email: ines@example.com,
+          session_id: "71000000-0000-4000-8000-000000000008",
+        }
+      - {
+          email: miguel@example.com,
+          session_id: "71000000-0000-4000-8000-000000000008",
+        }
+
+      # Partnerwork Flow: 5 planners.
+      - {
+          email: nora@example.com,
+          session_id: "71000000-0000-4000-8000-000000000002",
+        }
+      - {
+          email: marco@example.com,
+          session_id: "71000000-0000-4000-8000-000000000002",
+        }
+      - {
+          email: sofia@example.com,
+          session_id: "71000000-0000-4000-8000-000000000002",
+        }
+      - {
+          email: tiago@example.com,
+          session_id: "71000000-0000-4000-8000-000000000002",
+        }
+      - {
+          email: ines@example.com,
+          session_id: "71000000-0000-4000-8000-000000000002",
+        }
+
+      # Shines Challenge: 10 planners. Beginner Foundations, Spins & Balance,
+      # and Open Practice intentionally have none.
+      - {
+          email: nora@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }
+      - {
+          email: marco@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }
+      - {
+          email: sofia@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }
+      - {
+          email: tiago@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }
+      - {
+          email: ines@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }
+      - {
+          email: miguel@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }
+      - {
+          email: beatriz@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }
+      - {
+          email: joao@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }
+      - {
+          email: clara@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }
+      - {
+          email: rui@example.com,
+          session_id: "71000000-0000-4000-8000-000000000010",
+        }

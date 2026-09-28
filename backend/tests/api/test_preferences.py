@@ -71,6 +71,24 @@ def _login(client: TestClient, *, email: str, anon_prefs: dict | None = None):
     return client.post("/api/auth/google", json=body)
 
 
+@pytest.mark.unit
+def test_plan_activity_notification_preferences_default_and_update(client):
+    signed_in = _login(client, email="plan-recipient@example.com")
+    assert signed_in.status_code == 200
+    current = client.get("/api/auth/me")
+    assert current.status_code == 200
+    assert current.json()["email_plan_activity_enabled"] is False
+    assert current.json()["push_plan_activity_enabled"] is True
+
+    updated = client.patch(
+        "/api/auth/notification-preferences",
+        json={"email_plan_activity_enabled": True},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["email_plan_activity_enabled"] is True
+    assert updated.json()["push_plan_activity_enabled"] is True
+
+
 @pytest.fixture
 def tags(session):
     """Two enabled dance-style tags + one disabled, returned as (t1, t2, t_disabled)."""

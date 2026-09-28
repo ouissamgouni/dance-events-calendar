@@ -71,6 +71,7 @@ VALID_KINDS = {
     "event_message_reply",
     "event_message_reported",
     "planned_session_changed",
+    "plan_session_added",
     "schedule_program_available",
     "schedule_program_updated",
 }
@@ -265,7 +266,8 @@ def _hydrate(
                 subject_key=rep.subject_key,
                 schedule_session_id=(
                     UUID(rep.group_key)
-                    if rep.kind == "planned_session_changed" and rep.group_key
+                    if rep.kind in {"planned_session_changed", "plan_session_added"}
+                    and rep.group_key
                     else None
                 ),
                 description=rep.description,

@@ -1,7 +1,8 @@
 from datetime import date, datetime, timedelta, timezone
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from backend.db.models import (
     CachedEvent,
@@ -12,8 +13,12 @@ from backend.db.models import (
     ScheduleRoom,
     ScheduleSession,
     ScheduleVenue,
+    User,
+    UserFollow,
+    UserPlanAudience,
     UserPlanSession,
 )
+from backend.services.user_avatars import resolve_user_avatar
 
 
 DEFAULT_ACTIVITY_TYPES = (
@@ -140,6 +145,105 @@ def plan_entries(
             }
         )
     return entries
+
+
+def session_attendance_projection(
+    session: Session,
+    viewer: User,
+    event_id: str,
+    publication: SchedulePublication,
+) -> dict[str, list[dict]]:
+    current_session_ids = {
+        UUID(row["id"])
+        for row in publication.snapshot.get("sessions", [])
+        if not row.get("is_cancelled", False)
+    }
+    if not current_session_ids:
+        return {}
+
+    plan_rows = session.exec(
+        select(UserPlanSession)
+        .where(
+            UserPlanSession.event_id == event_id,
+            col(UserPlanSession.session_id).in_(current_session_ids),
+        )
+        .order_by(UserPlanSession.added_at)
+    ).all()
+    owner_ids = {row.user_id for row in plan_rows}
+    if not owner_ids:
+        return {}
+
+    users = session.exec(
+        select(User).where(
+            col(User.id).in_(owner_ids),
+            User.deleted_at.is_(None),  # type: ignore[union-attr]
+        )
+    ).all()
+    users_by_id = {user.id: user for user in users}
+    audiences = dict(
+        session.exec(
+            select(UserPlanAudience.user_id, UserPlanAudience.audience).where(
+                UserPlanAudience.event_id == event_id,
+                col(UserPlanAudience.user_id).in_(owner_ids),
+            )
+        ).all()
+    )
+    outbound_ids = set(
+        session.exec(
+            select(UserFollow.followee_id).where(
+                UserFollow.follower_id == viewer.id,
+                UserFollow.status == "approved",
+                col(UserFollow.followee_id).in_(owner_ids),
+            )
+        ).all()
+    )
+    inbound_ids = set(
+        session.exec(
+            select(UserFollow.follower_id).where(
+                UserFollow.followee_id == viewer.id,
+                UserFollow.status == "approved",
+                col(UserFollow.follower_id).in_(owner_ids),
+            )
+        ).all()
+    )
+
+    projected: dict[str, list[tuple[int, datetime, dict]]] = {}
+    for row in plan_rows:
+        owner = users_by_id.get(row.user_id)
+        if owner is None:
+            continue
+        is_self = owner.id == viewer.id
+        is_follower = owner.id in outbound_ids
+        is_friend = is_follower and owner.id in inbound_ids
+        account_passes = owner.account_visibility == "public" or is_friend
+        audience = audiences.get(owner.id, "private")
+        audience_passes = (
+            is_self
+            or (audience == "followers" and is_follower)
+            or (audience == "friends" and is_friend)
+        )
+        if not is_self and (not account_passes or not audience_passes):
+            continue
+        attendee = {
+            "user_id": owner.id,
+            "display_name": owner.display_name,
+            "avatar_url": resolve_user_avatar(owner),
+            "handle": owner.handle,
+        }
+        rank = 0 if is_self else 1 if is_friend else 2
+        projected.setdefault(str(row.session_id), []).append(
+            (rank, row.added_at, attendee)
+        )
+
+    return {
+        session_id: [
+            item[2]
+            for item in sorted(
+                items, key=lambda item: (item[0], item[1], str(item[2]["user_id"]))
+            )
+        ]
+        for session_id, items in projected.items()
+    }
 
 
 def published_schedule_event_ids(session: Session, event_ids: list[str]) -> set[str]:

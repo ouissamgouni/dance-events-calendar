@@ -1,0 +1,152 @@
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Alice%20Rivera
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_plan_activity_enabled: true
+    push_plan_activity_enabled: true
+
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    email_plan_activity_enabled: false
+    push_plan_activity_enabled: true
+
+  - email: dave@example.com
+    name: Dave Owens
+    handle: dave
+    account_visibility: public
+    email_plan_activity_enabled: false
+    push_plan_activity_enabled: true
+
+  - email: nora@example.com
+    name: Nora Silva
+    handle: nora
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Nora%20Silva
+
+  - email: marco@example.com
+    name: Marco Costa
+    handle: marco
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Marco%20Costa
+
+  - email: sofia@example.com
+    name: Sofia Ramos
+    handle: sofia
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Sofia%20Ramos
+
+  - email: tiago@example.com
+    name: Tiago Lopes
+    handle: tiago
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Tiago%20Lopes
+
+  - email: ines@example.com
+    name: Ines Ferreira
+    handle: ines
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Ines%20Ferreira
+
+  - email: miguel@example.com
+    name: Miguel Santos
+    handle: miguel
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Miguel%20Santos
+
+  - email: beatriz@example.com
+    name: Beatriz Alves
+    handle: beatriz
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Beatriz%20Alves
+
+  - email: joao@example.com
+    name: Joao Pinto
+    handle: joao
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Joao%20Pinto
+
+  - email: clara@example.com
+    name: Clara Mendes
+    handle: clara
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Clara%20Mendes
+
+  - email: rui@example.com
+    name: Rui Carvalho
+    handle: rui
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Rui%20Carvalho
+
+  - email: marta@example.com
+    name: Marta Correia
+    handle: marta
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Marta%20Correia
+
+  - email: pedro@example.com
+    name: Pedro Rocha
+    handle: pedro
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Pedro%20Rocha
+
+  - email: ana@example.com
+    name: Ana Martins
+    handle: ana
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Ana%20Martins
+
+  - email: luis@example.com
+    name: Luis Gomes
+    handle: luis
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Luis%20Gomes
+
+  - email: helena@example.com
+    name: Helena Sousa
+    handle: helena
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Helena%20Sousa
+
+  - email: diogo@example.com
+    name: Diogo Neves
+    handle: diogo
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Diogo%20Neves
+
+  - email: catarina@example.com
+    name: Catarina Cruz
+    handle: catarina
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Catarina%20Cruz
+
+  - email: andre@example.com
+    name: Andre Moreira
+    handle: andre
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Andre%20Moreira
+
+  - email: luisa@example.com
+    name: Luisa Nunes
+    handle: luisa
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Luisa%20Nunes
+
+  - email: vasco@example.com
+    name: Vasco Teixeira
+    handle: vasco
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Vasco%20Teixeira

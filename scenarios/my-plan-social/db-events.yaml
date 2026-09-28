@@ -1,0 +1,17 @@
+events:
+  - id: plan-activity-weekender
+    calendar_id: plan-activity-calendar
+    title: Lisbon Salsa Weekender
+    description: Published program used to exercise My Plan activity sharing.
+    location: Dance Loft, Lisbon, Portugal
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    latitude: 38.7223
+    longitude: -9.1393
+    start: "2026-10-16T16:00:00+00:00"
+    end: "2026-10-18T03:00:00+00:00"
+    tags:
+      - dance-style:salsa
+      - format:weekender
+      - level:all-levels

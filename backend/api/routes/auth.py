@@ -924,6 +924,8 @@ def get_me(
         "push_milestone_unlocked_enabled": user.push_milestone_unlocked_enabled,
         "email_friends_going_enabled": user.email_friends_going_enabled,
         "push_friends_going_enabled": user.push_friends_going_enabled,
+        "email_plan_activity_enabled": user.email_plan_activity_enabled,
+        "push_plan_activity_enabled": user.push_plan_activity_enabled,
         "email_friend_reviews_enabled": user.email_friend_reviews_enabled,
         "push_friend_reviews_enabled": user.push_friend_reviews_enabled,
         "email_friend_milestones_enabled": user.email_friend_milestones_enabled,
@@ -1076,6 +1078,8 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     push_milestone_unlocked_enabled: Optional[bool] = None
     email_friends_going_enabled: Optional[bool] = None
     push_friends_going_enabled: Optional[bool] = None
+    email_plan_activity_enabled: Optional[bool] = None
+    push_plan_activity_enabled: Optional[bool] = None
     email_friend_reviews_enabled: Optional[bool] = None
     push_friend_reviews_enabled: Optional[bool] = None
     email_friend_milestones_enabled: Optional[bool] = None
@@ -1140,6 +1144,8 @@ _NEW_FLAGS: tuple[str, ...] = (
     "push_milestone_unlocked_enabled",
     "email_friends_going_enabled",
     "push_friends_going_enabled",
+    "email_plan_activity_enabled",
+    "push_plan_activity_enabled",
     "email_friend_reviews_enabled",
     "push_friend_reviews_enabled",
     "email_friend_milestones_enabled",
@@ -1203,6 +1209,8 @@ def update_notification_preferences(
         "push_milestone_unlocked_enabled": user.push_milestone_unlocked_enabled,
         "email_friends_going_enabled": user.email_friends_going_enabled,
         "push_friends_going_enabled": user.push_friends_going_enabled,
+        "email_plan_activity_enabled": user.email_plan_activity_enabled,
+        "push_plan_activity_enabled": user.push_plan_activity_enabled,
         "email_friend_reviews_enabled": user.email_friend_reviews_enabled,
         "push_friend_reviews_enabled": user.push_friend_reviews_enabled,
         "email_friend_milestones_enabled": user.email_friend_milestones_enabled,

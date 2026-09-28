@@ -234,6 +234,7 @@ export default function Admin() {
     const [promoCodesEnabled, setPromoCodesEnabled] = useState(false);
     const [organizerClaimsEnabled, setOrganizerClaimsEnabled] = useState(false);
     const [eventScheduleEnabled, setEventScheduleEnabled] = useState(false);
+    const [programGridAttendeePreviewEnabled, setProgramGridAttendeePreviewEnabled] = useState(false);
     const [networkGoingSnapshotEnabled, setNetworkGoingSnapshotEnabled] = useState(true);
     const [myEventsRouteEnabled, setMyEventsRouteEnabled] = useState(false);
     const [myEventsNavEnabled, setMyEventsNavEnabled] = useState(true);
@@ -426,6 +427,7 @@ export default function Admin() {
             setPromoCodesEnabled(s.promo_codes_enabled ?? false);
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
             setEventScheduleEnabled(s.event_schedule_enabled ?? false);
+            setProgramGridAttendeePreviewEnabled(s.program_grid_attendee_preview_enabled ?? false);
             setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? false);
             setMyEventsRouteEnabled(s.my_events_route_enabled ?? false);
             setMyEventsNavEnabled(s.my_events_nav_enabled ?? true);
@@ -464,6 +466,8 @@ export default function Admin() {
             setEmailModes({
                 friends_going_email_instant: s.friends_going_email_instant ?? false,
                 friends_going_email_digest: s.friends_going_email_digest ?? true,
+                plan_activity_email_instant: s.plan_activity_email_instant ?? false,
+                plan_activity_email_digest: s.plan_activity_email_digest ?? true,
                 social_activity_email_instant: s.social_activity_email_instant ?? false,
                 social_activity_email_digest: s.social_activity_email_digest ?? true,
                 friend_reviews_email_instant: s.friend_reviews_email_instant ?? false,
@@ -1041,6 +1045,19 @@ export default function Admin() {
         } catch {
             setEventScheduleEnabled(!newVal);
             setMessage('Failed to update event programs toggle.');
+        }
+    };
+
+    const handleToggleProgramGridAttendeePreview = async () => {
+        const newVal = !programGridAttendeePreviewEnabled;
+        setProgramGridAttendeePreviewEnabled(newVal);
+        try {
+            await updateSettings({ program_grid_attendee_preview_enabled: newVal });
+            updateFlagFn('programGridAttendeePreviewEnabled', newVal);
+            setMessage(`Program attendee previews ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setProgramGridAttendeePreviewEnabled(!newVal);
+            setMessage('Failed to update program attendee previews toggle.');
         }
     };
 
@@ -2578,6 +2595,20 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventScheduleEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventScheduleEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Program attendee previews</span>
+                                        <p className="text-[10px] text-muted">Show attendee avatars in program grids and session details.</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleProgramGridAttendeePreview}
+                                        aria-label="Toggle program attendee previews"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${programGridAttendeePreviewEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${programGridAttendeePreviewEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

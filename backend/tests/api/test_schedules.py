@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,12 +17,17 @@ from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
     CachedEvent,
     CalendarSetting,
+    Notification,
     NotificationDelivery,
     SchedulePublication,
     SiteSetting,
     User,
     UserEventAttendance,
+    UserFollow,
+    UserPlanAudience,
+    UserPlanSession,
 )
+from backend.services.notifications import reconcile_plan_activity_notifications  # noqa: E402
 
 
 @pytest.fixture
@@ -83,6 +89,287 @@ def _login(client: TestClient, email: str) -> None:
         json={"credential": "ignored", "mock_email": email},
     )
     assert response.status_code == 200
+
+
+def test_plan_activity_reconciles_attending_followers(engine, schedule_event):
+    with Session(engine) as session:
+        users = {
+            handle: User(
+                email=f"{handle}@example.com",
+                display_name=handle.title(),
+                handle=handle,
+            )
+            for handle in ("alice", "bob", "carol", "erin", "frank")
+        }
+        session.add_all(users.values())
+        session.flush()
+        session.add_all(
+            [
+                UserFollow(
+                    follower_id=users["bob"].id,
+                    followee_id=users["alice"].id,
+                    status="approved",
+                ),
+                UserFollow(
+                    follower_id=users["carol"].id,
+                    followee_id=users["alice"].id,
+                    status="approved",
+                ),
+                UserFollow(
+                    follower_id=users["alice"].id,
+                    followee_id=users["carol"].id,
+                    status="approved",
+                ),
+                UserFollow(
+                    follower_id=users["erin"].id,
+                    followee_id=users["alice"].id,
+                    status="pending",
+                ),
+                UserFollow(
+                    follower_id=users["frank"].id,
+                    followee_id=users["alice"].id,
+                    status="approved",
+                ),
+            ]
+        )
+        session.add_all(
+            [
+                UserEventAttendance(
+                    device_id=f"device-{handle}",
+                    event_id="back-2-mambo-2026",
+                    user_id=users[handle].id,
+                )
+                for handle in ("bob", "carol", "erin")
+            ]
+        )
+        first_session_id = uuid4()
+        session.add(
+            UserPlanSession(
+                user_id=users["alice"].id,
+                session_id=first_session_id,
+                event_id="back-2-mambo-2026",
+                last_known_session={"id": str(first_session_id), "title": "Shines"},
+            )
+        )
+        audience = UserPlanAudience(
+            user_id=users["alice"].id,
+            event_id="back-2-mambo-2026",
+            audience="followers",
+        )
+        session.add(audience)
+        session.flush()
+
+        rows = reconcile_plan_activity_notifications(
+            session, users["alice"], "back-2-mambo-2026", alert=True
+        )
+        assert {row.recipient_user_id for row in rows} == {
+            users["bob"].id,
+            users["carol"].id,
+        }
+        original_ids = {row.recipient_user_id: row.id for row in rows}
+
+        second_session_id = uuid4()
+        session.add(
+            UserPlanSession(
+                user_id=users["alice"].id,
+                session_id=second_session_id,
+                event_id="back-2-mambo-2026",
+                last_known_session={
+                    "id": str(second_session_id),
+                    "title": "Musicality Lab",
+                },
+            )
+        )
+        session.flush()
+        updated = reconcile_plan_activity_notifications(
+            session, users["alice"], "back-2-mambo-2026", alert=True
+        )
+        assert {row.recipient_user_id: row.id for row in updated} == original_ids
+        assert {row.context for row in updated} == {"Musicality Lab"}
+        assert {row.description for row in updated} == {"2 sessions planned"}
+
+        audience.audience = "friends"
+        session.add(audience)
+        session.flush()
+        friends = reconcile_plan_activity_notifications(
+            session, users["alice"], "back-2-mambo-2026", alert=False
+        )
+        assert [row.recipient_user_id for row in friends] == [users["carol"].id]
+
+        audience.audience = "private"
+        session.add(audience)
+        session.flush()
+        assert not reconcile_plan_activity_notifications(
+            session, users["alice"], "back-2-mambo-2026", alert=False
+        )
+        assert not session.exec(
+            select(Notification).where(Notification.kind == "plan_session_added")
+        ).all()
+
+
+def test_session_attendance_is_filtered_by_plan_audience(
+    client, engine, schedule_event
+):
+    session_id = uuid4()
+    cancelled_session_id = uuid4()
+    with Session(engine) as session:
+        from backend.db.models import EventSchedule
+
+        schedule = EventSchedule(
+            event_id="back-2-mambo-2026",
+            timezone="Europe/Prague",
+            day_start_hour=6,
+            days=["2026-10-16"],
+        )
+        session.add(schedule)
+        session.flush()
+        session.add(
+            SchedulePublication(
+                schedule_id=schedule.id,
+                version=1,
+                snapshot={
+                    "sessions": [
+                        {
+                            "id": str(session_id),
+                            "title": "Musicality",
+                            "is_cancelled": False,
+                        },
+                        {
+                            "id": str(cancelled_session_id),
+                            "title": "Cancelled",
+                            "is_cancelled": True,
+                        },
+                    ]
+                },
+            )
+        )
+        users = {
+            handle: User(
+                email=f"{handle}@example.com",
+                display_name=handle.title(),
+                handle=handle,
+            )
+            for handle in (
+                "viewer",
+                "follower",
+                "follower2",
+                "follower3",
+                "friend",
+                "private",
+            )
+        }
+        session.add_all(users.values())
+        session.flush()
+        session.add_all(
+            [
+                UserFollow(
+                    follower_id=users["viewer"].id,
+                    followee_id=users["follower"].id,
+                    status="approved",
+                ),
+                UserFollow(
+                    follower_id=users["viewer"].id,
+                    followee_id=users["follower2"].id,
+                    status="approved",
+                ),
+                UserFollow(
+                    follower_id=users["viewer"].id,
+                    followee_id=users["follower3"].id,
+                    status="approved",
+                ),
+                UserFollow(
+                    follower_id=users["viewer"].id,
+                    followee_id=users["friend"].id,
+                    status="approved",
+                ),
+                UserFollow(
+                    follower_id=users["friend"].id,
+                    followee_id=users["viewer"].id,
+                    status="approved",
+                ),
+            ]
+        )
+        for user in users.values():
+            session.add(
+                UserPlanSession(
+                    user_id=user.id,
+                    session_id=session_id,
+                    event_id="back-2-mambo-2026",
+                    last_known_session={"id": str(session_id), "title": "Musicality"},
+                )
+            )
+        session.add_all(
+            [
+                UserPlanAudience(
+                    user_id=users["viewer"].id,
+                    event_id="back-2-mambo-2026",
+                    audience="private",
+                ),
+                UserPlanAudience(
+                    user_id=users["follower"].id,
+                    event_id="back-2-mambo-2026",
+                    audience="followers",
+                ),
+                UserPlanAudience(
+                    user_id=users["follower2"].id,
+                    event_id="back-2-mambo-2026",
+                    audience="followers",
+                ),
+                UserPlanAudience(
+                    user_id=users["follower3"].id,
+                    event_id="back-2-mambo-2026",
+                    audience="followers",
+                ),
+                UserPlanAudience(
+                    user_id=users["friend"].id,
+                    event_id="back-2-mambo-2026",
+                    audience="friends",
+                ),
+                UserPlanAudience(
+                    user_id=users["private"].id,
+                    event_id="back-2-mambo-2026",
+                    audience="private",
+                ),
+            ]
+        )
+        session.commit()
+
+    _login(client, "viewer@example.com")
+    summary = client.get("/api/events/back-2-mambo-2026/schedule/attendance-summary")
+    assert summary.status_code == 200
+    assert summary.headers["cache-control"] == "private, no-store"
+    assert summary.json()["sessions"][0]["visible_count"] == 5
+    assert [
+        row["handle"] for row in summary.json()["sessions"][0]["preview_attendees"]
+    ] == [
+        "viewer",
+        "friend",
+        "follower",
+    ]
+
+    session_summary = client.get(
+        f"/api/events/back-2-mambo-2026/schedule/sessions/{session_id}/attendance-summary"
+    )
+    assert session_summary.status_code == 200
+    assert [row["handle"] for row in session_summary.json()["preview_attendees"]] == [
+        "viewer",
+        "friend",
+        "follower",
+        "follower2",
+        "follower3",
+    ]
+
+    attendees = client.get(
+        f"/api/events/back-2-mambo-2026/schedule/sessions/{session_id}/attendees"
+    )
+    assert attendees.status_code == 200
+    assert len(attendees.json()) == 5
+    assert (
+        client.get(
+            f"/api/events/back-2-mambo-2026/schedule/sessions/{cancelled_session_id}/attendees"
+        ).status_code
+        == 404
+    )
 
 
 def test_event_schedule_editor_grants_are_scoped_and_revocable(
@@ -237,6 +524,7 @@ def test_schedule_publish_and_my_plan_lifecycle(
 ):
     emailed: list[str] = []
     pushed: list[str] = []
+    instant_kinds: list[str] = []
     monkeypatch.setattr(
         "backend.services.email.send_schedule_plan_changed_email",
         lambda user, event, changes: emailed.append(user.email) or True,
@@ -245,6 +533,10 @@ def test_schedule_publish_and_my_plan_lifecycle(
     monkeypatch.setattr(
         "backend.services.push_service.send_push",
         lambda user_id, **kwargs: pushed.append(str(user_id)) or 1,
+    )
+    monkeypatch.setattr(
+        "backend.api.routes.schedules.activity_instant.dispatch_activity_instant",
+        lambda session, *, kind, **kwargs: instant_kinds.append(kind) or {"emails": 0},
     )
     _login(client, "admin@example.com")
 
@@ -400,6 +692,17 @@ def test_schedule_publish_and_my_plan_lifecycle(
     saved = client.put(f"/api/events/back-2-mambo-2026/my-plan/{session_id}")
     assert saved.status_code == 201
     assert saved.json()["status"] == "active"
+    assert instant_kinds == ["plan_session_added"]
+    assert (
+        client.get("/api/events/back-2-mambo-2026/my-plan").json()["audience"] is None
+    )
+    audience = client.put(
+        "/api/events/back-2-mambo-2026/my-plan/audience",
+        json={"audience": "followers"},
+    )
+    assert audience.status_code == 200
+    assert audience.json()["audience"] == "followers"
+    assert instant_kinds == ["plan_session_added", "plan_session_added"]
     my_plan_ics = client.get("/api/events/back-2-mambo-2026/my-plan/ics")
     assert my_plan_ics.status_code == 200
     assert f"UID:{session_id}@program.joinmovida.com" in my_plan_ics.text

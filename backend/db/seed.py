@@ -48,6 +48,7 @@ from backend.db.models import (
     UserInterestProfileTag,
     UserPreferredTag,
     UserSavedEvent,
+    UserPlanAudience,
     UserPlanSession,
 )
 from backend.services.experience_aspects import SENTIMENT_TO_SCORE
@@ -1042,6 +1043,8 @@ class DatabaseSeeder:
                 # friend reviews / friend milestones).
                 "email_friends_going_enabled",
                 "push_friends_going_enabled",
+                "email_plan_activity_enabled",
+                "push_plan_activity_enabled",
                 "email_friend_reviews_enabled",
                 "push_friend_reviews_enabled",
                 "email_friend_milestones_enabled",
@@ -2484,6 +2487,24 @@ class DatabaseSeeder:
                             ),
                         )
                     )
+                audience = plan.get("audience")
+                if audience in {"followers", "friends", "private"}:
+                    audience_row = self.session.exec(
+                        select(UserPlanAudience).where(
+                            UserPlanAudience.user_id == user.id,
+                            UserPlanAudience.event_id == event_id,
+                        )
+                    ).first()
+                    if audience_row is None:
+                        audience_row = UserPlanAudience(
+                            user_id=user.id,
+                            event_id=event_id,
+                            audience=audience,
+                        )
+                    else:
+                        audience_row.audience = audience
+                        audience_row.updated_at = datetime.now(timezone.utc)
+                    self.session.add(audience_row)
 
     def _seed_schedule_named_rows(
         self,

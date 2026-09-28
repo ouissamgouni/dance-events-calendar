@@ -26,6 +26,7 @@ export interface FeatureFlags {
     promoCodesEnabled: boolean;
     organizerClaimsEnabled: boolean;
     eventScheduleEnabled: boolean;
+    programGridAttendeePreviewEnabled: boolean;
     /** Tribe > Calendars "Your Network" snapshot of upcoming events people
      * you follow are going to. When false, the snapshot is hidden. */
     networkGoingSnapshotEnabled: boolean;
@@ -98,6 +99,7 @@ const defaultFlags: FeatureFlags = {
     promoCodesEnabled: true,
     organizerClaimsEnabled: true,
     eventScheduleEnabled: false,
+    programGridAttendeePreviewEnabled: false,
     networkGoingSnapshotEnabled: false,
     myEventsRouteEnabled: true,
     myEventsNavEnabled: true,
@@ -162,6 +164,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     promoCodesEnabled: s.promo_codes_enabled ?? false,
                     organizerClaimsEnabled: s.organizer_claims_enabled ?? false,
                     eventScheduleEnabled: s.event_schedule_enabled ?? false,
+                    programGridAttendeePreviewEnabled: s.program_grid_attendee_preview_enabled ?? false,
                     networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? false,
                     myEventsRouteEnabled: s.my_events_route_enabled ?? false,
                     myEventsNavEnabled: s.my_events_nav_enabled ?? true,

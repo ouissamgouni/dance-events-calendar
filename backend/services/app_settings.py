@@ -285,6 +285,7 @@ def get_interest_match_max_events_per_email(session: Optional[Session] = None) -
 # ``<feature>_email_instant`` and ``<feature>_email_digest``.
 EMAIL_MODE_FEATURES = (
     "friends_going",
+    "plan_activity",
     "social_activity",
     "friend_reviews",
     "friend_milestones",

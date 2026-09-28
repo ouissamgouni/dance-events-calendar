@@ -1,0 +1,6 @@
+# Social grid previews and instant Plan activity delivery are explicit for this
+# scenario; production defaults remain grid OFF, email OFF, and push ON.
+settings:
+  program_grid_attendee_preview_enabled: true
+  plan_activity_email_instant: true
+  plan_activity_email_digest: true

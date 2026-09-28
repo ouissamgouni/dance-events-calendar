@@ -17,6 +17,8 @@ from backend.db.models import (
     User,
     UserEventAttendance,
     UserInterestProfile,
+    UserPlanAudience,
+    UserPlanSession,
     UserSavedEvent,
 )
 from backend.db.seed import DatabaseSeeder, _seed_device_id, resolve_relative_dt
@@ -484,6 +486,60 @@ class TestDatabaseSeeder:
         assert len(saves) == 1
         assert saves[0].event_id == "event-1"
         assert saves[0].audience == "friends"
+
+    def test_seed_schedule_plans_with_audience(self, tmp_path, monkeypatch):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n  - email: viewer@example.com\n    name: Viewer\n"
+        )
+        (scenario_dir / "db-events.yaml").write_text(
+            "events:\n"
+            "  - id: event-1\n"
+            "    calendar_id: cal-1\n"
+            "    title: Event One\n"
+            "    start: '2026-06-01T20:00:00'\n"
+            "    end: '2026-06-01T22:00:00'\n"
+        )
+        schedule_path = scenario_dir / "db-schedules.yaml"
+        schedule_path.write_text(
+            "schedules:\n"
+            "  - event_id: event-1\n"
+            "    timezone: UTC\n"
+            "    days: ['2026-06-01']\n"
+            "    sessions:\n"
+            "      - id: '71000000-0000-4000-8000-000000000001'\n"
+            "        title: Workshop\n"
+            "        start: '2026-06-01T20:00:00Z'\n"
+            "        end: '2026-06-01T21:00:00Z'\n"
+            "    published: true\n"
+            "    plans:\n"
+            "      - email: viewer@example.com\n"
+            "        session_id: '71000000-0000-4000-8000-000000000001'\n"
+            "        audience: followers\n"
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            seeder = DatabaseSeeder(session)
+            seeder.seed(scenario_dir)
+            plan = session.exec(select(UserPlanSession)).one()
+            audience = session.exec(select(UserPlanAudience)).one()
+            assert plan.event_id == "event-1"
+            assert audience.audience == "followers"
+
+            schedule_path.write_text(
+                schedule_path.read_text().replace("followers", "friends")
+            )
+            seeder.seed(scenario_dir)
+            audiences = session.exec(select(UserPlanAudience)).all()
+
+        assert len(audiences) == 1
+        assert audiences[0].audience == "friends"
 
     def test_seed_events_sets_and_updates_visibility_overrides(
         self, tmp_path, monkeypatch

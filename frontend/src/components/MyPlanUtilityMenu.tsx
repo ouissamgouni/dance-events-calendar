@@ -10,12 +10,16 @@ import {
 } from '../api';
 import { saveDownload } from '../utils/download';
 import ShareLinkRow from './ShareLinkRow';
+import type { PlanAudience } from '../types';
+import { PlanAudienceOptions } from './program/PlanAudienceSheet';
 
 interface MyPlanUtilityMenuProps {
     eventId: string;
+    audience: PlanAudience | null;
+    onAudienceChange: (audience: PlanAudience) => Promise<void>;
 }
 
-export default function MyPlanUtilityMenu({ eventId }: MyPlanUtilityMenuProps) {
+export default function MyPlanUtilityMenu({ eventId, audience, onAudienceChange }: MyPlanUtilityMenuProps) {
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState('');
     const [status, setStatus] = useState('');
@@ -102,6 +106,19 @@ export default function MyPlanUtilityMenu({ eventId }: MyPlanUtilityMenuProps) {
         }
     };
 
+    const changePlanAudience = async (next: PlanAudience) => {
+        setBusy('audience');
+        setStatus('');
+        try {
+            await onAudienceChange(next);
+            setStatus('Session sharing updated');
+        } catch {
+            setStatus('Could not update session sharing');
+        } finally {
+            setBusy('');
+        }
+    };
+
     const rowClass = 'flex w-full items-start gap-3 px-3 py-4 text-left hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50';
     const iconClass = 'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-card bg-canvas text-ink';
     const shareUrl = token ? getMyPlanShareUrl(token) : null;
@@ -159,6 +176,10 @@ export default function MyPlanUtilityMenu({ eventId }: MyPlanUtilityMenuProps) {
                                 </div>
                             ) : null}
                         </div>
+
+                        <h3 className="mb-1 mt-6 text-base font-semibold text-ink">Share your plan activity?</h3>
+                        <p className="mb-3 text-sm text-ink-soft">Choose who is notified when you add sessions.</p>
+                        <PlanAudienceOptions busy={!!busy} value={audience} onChange={changePlanAudience} />
 
                         <h3 className="mb-3 mt-6 text-base font-semibold text-ink">Export</h3>
                         <div className="overflow-hidden rounded-card border border-line">

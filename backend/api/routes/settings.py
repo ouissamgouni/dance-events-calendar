@@ -198,6 +198,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
         organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
         event_schedule_enabled=_get_bool_setting(session, "event_schedule_enabled"),
+        program_grid_attendee_preview_enabled=_get_bool_setting(
+            session, "program_grid_attendee_preview_enabled"
+        ),
         network_going_snapshot_enabled=_get_bool_setting(
             session, "network_going_snapshot_enabled", default=False
         ),
@@ -252,6 +255,12 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         ),
         friends_going_email_digest=app_settings.get_feature_email_digest(
             "friends_going", session
+        ),
+        plan_activity_email_instant=app_settings.get_feature_email_instant(
+            "plan_activity", session
+        ),
+        plan_activity_email_digest=app_settings.get_feature_email_digest(
+            "plan_activity", session
         ),
         social_activity_email_instant=app_settings.get_feature_email_instant(
             "social_activity", session
@@ -531,6 +540,13 @@ def update_settings(
             session, "event_schedule_enabled", body.event_schedule_enabled
         )
 
+    if body.program_grid_attendee_preview_enabled is not None:
+        _set_bool_setting(
+            session,
+            "program_grid_attendee_preview_enabled",
+            body.program_grid_attendee_preview_enabled,
+        )
+
     if body.duplicate_auto_detect_enabled is not None:
         _set_bool_setting(
             session,
@@ -715,6 +731,7 @@ def update_settings(
         )
     for _feature in (
         "friends_going",
+        "plan_activity",
         "social_activity",
         "friend_reviews",
         "friend_milestones",

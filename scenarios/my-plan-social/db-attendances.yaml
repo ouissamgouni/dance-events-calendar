@@ -1,0 +1,100 @@
+# Notifications are deliberately not emitted while seeding. The Plan activity
+# rows must be created only when Alice adds a session after startup.
+emit_notifications: false
+attendances:
+  - event_id: plan-activity-weekender
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: dave@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: nora@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: marco@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: sofia@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: tiago@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: ines@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: miguel@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: beatriz@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: joao@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: clara@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: rui@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: marta@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: pedro@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: ana@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: luis@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: helena@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: diogo@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: catarina@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: andre@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: luisa@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: plan-activity-weekender
+    email: vasco@example.com
+    share_publicly: true
+    share_audience: public
