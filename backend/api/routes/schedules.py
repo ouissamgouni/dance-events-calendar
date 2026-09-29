@@ -24,6 +24,8 @@ from backend.api.schemas import (
     EventScheduleEditorResponse,
     EventScheduleResponse,
     EventScheduleUpdateRequest,
+    MyPlanCountBatchRequest,
+    MyPlanCountResponse,
     MyPlanEntryResponse,
     MyPlanResponse,
     MyPlanShareResponse,
@@ -31,6 +33,8 @@ from backend.api.schemas import (
     ProgramExportResponse,
     ScheduleActivityTypeRequest,
     ScheduleActivityTypeResponse,
+    ScheduleContributorRequest,
+    ScheduleContributorResponse,
     ScheduleImportDocument,
     ScheduleImportPreviewResponse,
     ScheduleImportRequest,
@@ -63,10 +67,12 @@ from backend.db.models import (
     Notification,
     PushSubscription,
     ScheduleActivityType,
+    ScheduleContributor,
     ScheduleLevel,
     SchedulePublication,
     ScheduleRoom,
     ScheduleSession,
+    ScheduleSessionContributor,
     ScheduleVenue,
     User,
     UserEventAttendance,
@@ -75,10 +81,12 @@ from backend.db.models import (
 )
 from backend.services.schedules import (
     build_snapshot,
+    compute_change_details,
     compute_diff,
     compute_issues,
     default_schedule_days,
     latest_publication,
+    plan_counts,
     plan_entries,
     seed_default_activity_types,
     seed_default_dance_levels,
@@ -146,6 +154,11 @@ public_router = APIRouter(
     tags=["event-schedules"],
     dependencies=[Depends(require_flag("event_schedule_enabled"))],
 )
+my_plan_router = APIRouter(
+    prefix="/api/my-plan",
+    tags=["event-schedules"],
+    dependencies=[Depends(require_flag("event_schedule_enabled"))],
+)
 admin_router = APIRouter(
     prefix="/api/admin/events/{event_id}/schedule",
     tags=["admin-event-schedules"],
@@ -168,6 +181,10 @@ def _published_projection(
     *,
     days: list[str] | None = None,
     include_cancelled: bool = True,
+    instructor: str | None = None,
+    contributor_ids: list[int] | None = None,
+    level_ids: list[int] | None = None,
+    activity_type_ids: list[int] | None = None,
     selected_sessions: list[tuple[dict, str]] | None = None,
 ) -> dict:
     schedule = _schedule_for_event(session, event_id)
@@ -183,6 +200,10 @@ def _published_projection(
             publication,
             days=days,
             include_cancelled=include_cancelled,
+            instructor=instructor,
+            contributor_ids=contributor_ids,
+            level_ids=level_ids,
+            activity_type_ids=activity_type_ids,
             selected_sessions=selected_sessions,
         )
     except ValueError as exc:
@@ -220,6 +241,7 @@ def _admin_payload(session: Session, schedule: EventSchedule) -> dict:
 def _import_result(
     session: Session, schedule: EventSchedule, request: ScheduleImportRequest
 ) -> dict:
+    previous_snapshot = build_snapshot(session, schedule)
     try:
         result = apply_import_document(
             session, schedule, request.document, request.mode
@@ -233,6 +255,7 @@ def _import_result(
         "operations": {
             key: result[key] for key in ("created", "updated", "removed", "unchanged")
         },
+        "changes": compute_change_details(result["snapshot"], previous_snapshot),
         "issues": compute_issues(session, schedule),
         "diff": compute_diff(
             result["snapshot"], publication.snapshot if publication else None
@@ -357,6 +380,21 @@ def get_schedule_editor_access(
     session: Session = Depends(get_session),
 ):
     return {"can_edit": _can_edit_schedule(session, event_id, user)}
+
+
+@my_plan_router.post("/counts", response_model=list[MyPlanCountResponse])
+def get_my_plan_counts(
+    payload: MyPlanCountBatchRequest,
+    response: Response,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    event_ids = list(dict.fromkeys(payload.event_ids))
+    counts = plan_counts(session, user.id, event_ids)
+    response.headers["Cache-Control"] = "private, no-store"
+    return [
+        {"event_id": event_id, "plan_count": counts[event_id]} for event_id in event_ids
+    ]
 
 
 @public_router.get("/my-plan", response_model=MyPlanResponse)
@@ -912,6 +950,59 @@ def delete_activity_type(
 
 
 @admin_router.post(
+    "/contributors",
+    response_model=ScheduleContributorResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_contributor(
+    event_id: str,
+    body: ScheduleContributorRequest,
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    row = ScheduleContributor(
+        schedule_id=schedule.id,
+        external_id=f"contributor-{uuid4()}",
+        **body.model_dump(),
+    )
+    return _save_config_row(session, row)
+
+
+@admin_router.put(
+    "/contributors/{row_id}", response_model=ScheduleContributorResponse
+)
+def update_contributor(
+    event_id: str,
+    row_id: int,
+    body: ScheduleContributorRequest,
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    row = _row_for_schedule(session, ScheduleContributor, row_id, schedule.id)
+    _apply(row, body.model_dump())
+    return _save_config_row(session, row)
+
+
+@admin_router.delete(
+    "/contributors/{row_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_contributor(
+    event_id: str, row_id: int, session: Session = Depends(get_session)
+):
+    schedule = _schedule_for_event(session, event_id)
+    row = _row_for_schedule(session, ScheduleContributor, row_id, schedule.id)
+    if session.exec(
+        select(ScheduleSessionContributor).where(
+            ScheduleSessionContributor.contributor_id == row_id
+        )
+    ).first():
+        raise HTTPException(
+            status_code=409, detail="Contributor is used by one or more sessions"
+        )
+    _delete_config_row(session, row)
+
+
+@admin_router.post(
     "/sessions",
     response_model=ScheduleSessionResponse,
     status_code=status.HTTP_201_CREATED,
@@ -922,12 +1013,17 @@ def create_session(
     session: Session = Depends(get_session),
 ):
     schedule = _schedule_for_event(session, event_id)
-    data = _validated_session_data(session, schedule, body.model_dump())
+    data = body.model_dump()
+    assignments = data.pop("contributors")
+    data = _validated_session_data(session, schedule, data)
     row = ScheduleSession(schedule_id=schedule.id, **data)
     session.add(row)
+    session.flush()
+    if assignments is not None:
+        _replace_session_contributors(session, schedule, row, assignments)
     session.commit()
     session.refresh(row)
-    return session_snapshot(row)
+    return _session_response(session, row)
 
 
 @admin_router.patch("/sessions/{session_id}", response_model=ScheduleSessionResponse)
@@ -942,6 +1038,7 @@ def update_session(
     if row is None or row.schedule_id != schedule.id or row.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Session not found")
     data = body.model_dump(exclude_unset=True)
+    assignments = data.pop("contributors", None)
     if data.get("title") is None and "title" in data:
         raise HTTPException(status_code=422, detail="Title is required")
     merged = {
@@ -962,9 +1059,11 @@ def update_session(
     _apply(row, merged)
     row.updated_at = datetime.now(timezone.utc)
     session.add(row)
+    if assignments is not None:
+        _replace_session_contributors(session, schedule, row, assignments)
     session.commit()
     session.refresh(row)
-    return session_snapshot(row)
+    return _session_response(session, row)
 
 
 @admin_router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -997,16 +1096,29 @@ def duplicate_session(
         or source.deleted_at is not None
     ):
         raise HTTPException(status_code=404, detail="Session not found")
-    data = session_snapshot(source)
+    source_assignments = _session_contributors(session, source.id)
+    data = session_snapshot(source, source_assignments)
     data.pop("id")
+    data.pop("external_id")
+    data.pop("contributors")
     data["title"] = f"{source.title} (copy)"
     data["start"] = source.start
     data["end"] = source.end
     row = ScheduleSession(schedule_id=schedule.id, **data)
     session.add(row)
+    session.flush()
+    _replace_session_contributors(
+        session,
+        schedule,
+        row,
+        [
+            {"contributor_id": item.contributor_id, "role": item.role}
+            for item in source_assignments
+        ],
+    )
     session.commit()
     session.refresh(row)
-    return session_snapshot(row)
+    return _session_response(session, row)
 
 
 @admin_router.get("/issues")
@@ -1322,6 +1434,10 @@ def get_published_export(
     request: Request,
     days: list[str] | None = Query(default=None),
     include_cancelled: bool = True,
+    instructor: str | None = None,
+    contributor_ids: list[int] | None = Query(default=None),
+    level_ids: list[int] | None = Query(default=None),
+    activity_type_ids: list[int] | None = Query(default=None),
     session: Session = Depends(get_session),
 ):
     return _published_projection(
@@ -1329,6 +1445,10 @@ def get_published_export(
         event_id,
         days=days,
         include_cancelled=include_cancelled,
+        instructor=instructor,
+        contributor_ids=contributor_ids,
+        level_ids=level_ids,
+        activity_type_ids=activity_type_ids,
     )
 
 
@@ -1339,6 +1459,10 @@ def export_published_schedule_ics(
     request: Request,
     days: list[str] | None = Query(default=None),
     include_cancelled: bool = True,
+    instructor: str | None = None,
+    contributor_ids: list[int] | None = Query(default=None),
+    level_ids: list[int] | None = Query(default=None),
+    activity_type_ids: list[int] | None = Query(default=None),
     session: Session = Depends(get_session),
 ):
     projection = _published_projection(
@@ -1346,6 +1470,10 @@ def export_published_schedule_ics(
         event_id,
         days=days,
         include_cancelled=include_cancelled,
+        instructor=instructor,
+        contributor_ids=contributor_ids,
+        level_ids=level_ids,
+        activity_type_ids=activity_type_ids,
     )
     filename = _export_filename(projection["event_title"], event_id, "program.ics")
     return Response(
@@ -1362,6 +1490,10 @@ def export_published_schedule_csv(
     request: Request,
     days: list[str] | None = Query(default=None),
     include_cancelled: bool = True,
+    instructor: str | None = None,
+    contributor_ids: list[int] | None = Query(default=None),
+    level_ids: list[int] | None = Query(default=None),
+    activity_type_ids: list[int] | None = Query(default=None),
     session: Session = Depends(get_session),
 ):
     projection = _published_projection(
@@ -1369,6 +1501,10 @@ def export_published_schedule_csv(
         event_id,
         days=days,
         include_cancelled=include_cancelled,
+        instructor=instructor,
+        contributor_ids=contributor_ids,
+        level_ids=level_ids,
+        activity_type_ids=activity_type_ids,
     )
     filename = _export_filename(projection["event_title"], event_id, "program.csv")
     return Response(
@@ -1752,3 +1888,61 @@ def _validated_session_data(
     ):
         _validated_reference(session, model, data.get(key), schedule.id)
     return data
+
+
+def _session_contributors(
+    session: Session, session_id: UUID
+) -> list[ScheduleSessionContributor]:
+    return list(
+        session.exec(
+            select(ScheduleSessionContributor)
+            .where(ScheduleSessionContributor.session_id == session_id)
+            .order_by(ScheduleSessionContributor.position)
+        ).all()
+    )
+
+
+def _session_response(session: Session, row: ScheduleSession) -> dict:
+    return session_snapshot(row, _session_contributors(session, row.id))
+
+
+def _replace_session_contributors(
+    session: Session,
+    schedule: EventSchedule,
+    row: ScheduleSession,
+    assignments: list[dict],
+) -> None:
+    keys = [(item["contributor_id"], item["role"]) for item in assignments]
+    if len(keys) != len(set(keys)):
+        raise HTTPException(status_code=422, detail="Duplicate session contributor")
+    contributors = {}
+    if keys:
+        contributors = {
+            contributor.id: contributor
+            for contributor in session.exec(
+                select(ScheduleContributor).where(
+                    ScheduleContributor.id.in_([key[0] for key in keys]),
+                    ScheduleContributor.schedule_id == schedule.id,
+                )
+            ).all()
+        }
+    if len(contributors) != len({key[0] for key in keys}):
+        raise HTTPException(status_code=422, detail="Unknown contributor")
+    for existing in _session_contributors(session, row.id):
+        session.delete(existing)
+    session.flush()
+    for position, item in enumerate(assignments):
+        session.add(
+            ScheduleSessionContributor(
+                session_id=row.id,
+                contributor_id=item["contributor_id"],
+                role=item["role"],
+                position=position,
+            )
+        )
+    instructor_names = [
+        contributors[item["contributor_id"]].display_name
+        for item in assignments
+        if item["role"] == "instructor"
+    ]
+    row.instructors = " & ".join(instructor_names) or None

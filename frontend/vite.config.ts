@@ -40,6 +40,9 @@ function pwaEnvName(appName: string, appNameShort: string): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const viteApiUrl = env.VITE_API_URL || process.env.VITE_API_URL
+  const viteProxyTarget = env.VITE_PROXY_TARGET || process.env.VITE_PROXY_TARGET || viteApiUrl
+  const umamiProxyTarget = env.VITE_UMAMI_PROXY_TARGET || process.env.VITE_UMAMI_PROXY_TARGET
+  const allowedHost = env.VITE_ALLOWED_HOST || process.env.VITE_ALLOWED_HOST
   const appName = env.VITE_APP_NAME || process.env.VITE_APP_NAME || 'Movida'
   const appNameShort = env.VITE_APP_NAME_SHORT || process.env.VITE_APP_NAME_SHORT || 'Movida'
 
@@ -80,8 +83,16 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
+      allowedHosts: allowedHost ? [allowedHost] : [],
       proxy: {
-        '/api': viteApiUrl || 'http://localhost:8001',
+        '/api': viteProxyTarget || 'http://localhost:8001',
+        ...(umamiProxyTarget ? {
+          '/umami': {
+            target: umamiProxyTarget,
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/umami/, ''),
+          },
+        } : {}),
       },
     },
   }

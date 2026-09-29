@@ -32,10 +32,12 @@ from backend.db.models import (
     OrganizerClaimEvent,
     SiteSetting,
     ScheduleActivityType,
+    ScheduleContributor,
     ScheduleLevel,
     SchedulePublication,
     ScheduleRoom,
     ScheduleSession,
+    ScheduleSessionContributor,
     ScheduleVenue,
     Tag,
     TagGroup,
@@ -2389,6 +2391,33 @@ class DatabaseSeeder:
                 schedule.id,
                 entry.get("activity_types", []),
             )
+            contributor_entries = entry.get("contributors", []) or []
+            for row in entry.get("sessions", []) or []:
+                if row.get("instructors") and not row.get("contributors"):
+                    contributor_entries.append({"display_name": row["instructors"]})
+                for assignment in row.get("contributors", []) or []:
+                    if assignment.get("display_name"):
+                        contributor_entries.append(
+                            {"display_name": assignment["display_name"]}
+                        )
+            unique_contributors = {}
+            for row in contributor_entries:
+                unique_contributors.setdefault(row["display_name"], row)
+            contributor_entries = list(unique_contributors.values())
+            contributors = self._seed_schedule_named_rows(
+                ScheduleContributor,
+                schedule.id,
+                [
+                    {
+                        **row,
+                        "external_id": row.get("external_id")
+                        or f"legacy-{hashlib.sha1(f'{schedule.id}:{row['display_name']}'.encode()).hexdigest()[:20]}",
+                        "sort_order": row.get("sort_order", position),
+                    }
+                    for position, row in enumerate(contributor_entries)
+                ],
+                identity_field="display_name",
+            )
 
             for row in entry.get("sessions", []) or []:
                 session_id = UUID(str(row["id"]))
@@ -2420,6 +2449,27 @@ class DatabaseSeeder:
                     for key, value in values.items():
                         setattr(schedule_session, key, value)
                 self.session.add(schedule_session)
+                self.session.flush()
+                self.session.exec(
+                    delete(ScheduleSessionContributor).where(
+                        ScheduleSessionContributor.session_id == schedule_session.id
+                    )
+                )
+                assignments = row.get("contributors") or (
+                    [{"display_name": row["instructors"], "role": "instructor"}]
+                    if row.get("instructors")
+                    else []
+                )
+                for position, assignment in enumerate(assignments):
+                    contributor = contributors[assignment["display_name"]]
+                    self.session.add(
+                        ScheduleSessionContributor(
+                            session_id=schedule_session.id,
+                            contributor_id=contributor.id,
+                            role=assignment.get("role", "instructor"),
+                            position=position,
+                        )
+                    )
 
             self.session.flush()
             publication = self.session.exec(

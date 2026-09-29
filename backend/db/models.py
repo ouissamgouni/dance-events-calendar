@@ -578,6 +578,23 @@ class ScheduleActivityType(SQLModel, table=True):
     sort_order: int = Field(default=0, nullable=False)
 
 
+class ScheduleContributor(SQLModel, table=True):
+    __tablename__ = "schedule_contributors"
+    __table_args__ = (
+        UniqueConstraint(
+            "schedule_id", "external_id", name="uq_schedule_contributor_external_id"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    external_id: str = Field(max_length=120, index=True, nullable=False)
+    schedule_id: int = Field(
+        foreign_key="event_schedules.id", index=True, nullable=False
+    )
+    display_name: str = Field(max_length=160, nullable=False)
+    sort_order: int = Field(default=0, nullable=False)
+
+
 class ScheduleSession(SQLModel, table=True):
     __tablename__ = "schedule_sessions"
     __table_args__ = (
@@ -615,6 +632,35 @@ class ScheduleSession(SQLModel, table=True):
     deleted_at: Optional[datetime] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ScheduleSessionContributor(SQLModel, table=True):
+    __tablename__ = "schedule_session_contributors"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('instructor', 'dj', 'performer', 'host', 'other')",
+            name="ck_schedule_session_contributors_role",
+        ),
+        UniqueConstraint(
+            "session_id",
+            "contributor_id",
+            "role",
+            name="uq_schedule_session_contributor_role",
+        ),
+        UniqueConstraint(
+            "session_id", "position", name="uq_schedule_session_contributor_position"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: UUID = Field(
+        foreign_key="schedule_sessions.id", index=True, nullable=False
+    )
+    contributor_id: int = Field(
+        foreign_key="schedule_contributors.id", index=True, nullable=False
+    )
+    role: str = Field(default="instructor", max_length=20, nullable=False)
+    position: int = Field(default=0, nullable=False)
 
 
 class SchedulePublication(SQLModel, table=True):

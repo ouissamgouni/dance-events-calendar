@@ -1,4 +1,4 @@
-import type { MyPlanEntry, ScheduleSession } from '../types';
+import type { EventSchedule, MyPlanEntry, ScheduleSession } from '../types';
 
 interface LocalParts {
     year: number;
@@ -105,6 +105,17 @@ export function scheduleInstructors(sessions: ScheduleSession[]): string[] {
         .sort((left, right) => left.localeCompare(right));
 }
 
+export function scheduleContributorOptions(schedule: EventSchedule): Array<{ id: number | null; label: string }> {
+    if (schedule.contributors?.length) {
+        const referencedIds = new Set(schedule.sessions.flatMap((session) => session.contributors?.map((item) => item.contributor_id) ?? []));
+        return schedule.contributors
+            .filter((contributor) => referencedIds.has(contributor.id))
+            .map((contributor) => ({ id: contributor.id, label: contributor.display_name }))
+            .sort((left, right) => left.label.localeCompare(right.label));
+    }
+    return scheduleInstructors(schedule.sessions).map((label) => ({ id: null, label }));
+}
+
 export function sessionsForDay(
     sessions: ScheduleSession[],
     day: string,
@@ -127,17 +138,20 @@ export function firstDayWithSessions(
 
 export interface ScheduleFilters {
     instructor: string;
+    contributorId?: number | null;
     levelIds: number[];
     activityTypeIds: number[];
 }
 
-export function filterScheduleSessions(
-    sessions: ScheduleSession[],
+export function filterScheduleSessions<Session extends Pick<ScheduleSession, 'instructors' | 'contributors' | 'level_id' | 'activity_type_id'>>(
+    sessions: Session[],
     filters: ScheduleFilters,
-): ScheduleSession[] {
+): Session[] {
     const instructor = filters.instructor.trim().toLocaleLowerCase();
     return sessions.filter((session) => (
-        (!instructor || session.instructors?.toLocaleLowerCase().includes(instructor))
+        (filters.contributorId == null
+            ? (!instructor || session.instructors?.toLocaleLowerCase().includes(instructor))
+            : session.contributors?.some((item) => item.contributor_id === filters.contributorId))
         && (!filters.levelIds.length || (session.level_id != null && filters.levelIds.includes(session.level_id)))
         && (!filters.activityTypeIds.length || (session.activity_type_id != null && filters.activityTypeIds.includes(session.activity_type_id)))
     ));

@@ -1,0 +1,13 @@
+interest_profiles:
+  - user: lina.moreau@joinmovida.com
+    label: Salsa and Bachata across Europe
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags:
+      - dance-style:salsa
+      - dance-style:bachata
+    reach_tags: []
+    matches_enabled: true
+    is_active: true

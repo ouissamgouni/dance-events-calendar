@@ -43,7 +43,7 @@ schedules:
       - id: "20000000-0000-4000-8000-000000000001"
         external_id: just-ended
         title: Just Ended Warm-up
-        instructors: Elena
+        contributors: [{display_name: "Elena", role: instructor}]
         start: now-90m
         end: now-60m
         room: Studio A
@@ -53,7 +53,7 @@ schedules:
       - id: "20000000-0000-4000-8000-000000000002"
         external_id: active-musicality
         title: Musicality in Motion
-        instructors: Alexis Ruiz
+        contributors: [{display_name: "Alexis Ruiz", role: instructor}]
         start: now-45m
         end: now+45m
         room: Studio A
@@ -63,7 +63,7 @@ schedules:
       - id: "20000000-0000-4000-8000-000000000003"
         external_id: active-partnerwork
         title: Live Partnerwork Lab
-        instructors: Maya Chen
+        contributors: [{display_name: "Maya Chen", role: instructor}]
         start: now-20m
         end: now+60m
         room: Studio B

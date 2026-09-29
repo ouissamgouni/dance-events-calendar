@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchEventAttendees, followUser } from '../../api';
 import type { Attendee } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useAttendanceSummary } from '../../context/AttendanceSummariesContext';
 
 interface Props {
     eventId: string;
@@ -146,14 +147,10 @@ function Section({
     );
 }
 
-/**
- * Event detail "People" tab — the full attendee roster split into "Friends
- * going" (mutual friends, no follow controls) and "Other people going" (with
- * follows-in-common and a Follow/Following control). Requires authentication;
- * anonymous callers are prompted to sign in.
- */
+/** Event detail "People" tab grouped by the viewer's relationships. */
 export default function PeopleTab({ eventId }: Props) {
     const { user } = useAuth();
+    const summary = useAttendanceSummary(eventId);
     const [attendees, setAttendees] = useState<Attendee[] | null>(null);
     const [unauthorized, setUnauthorized] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -194,9 +191,17 @@ export default function PeopleTab({ eventId }: Props) {
     const going = list.filter((a) => a.attendance_status !== 'interested');
     const interested = list.filter((a) => a.attendance_status === 'interested');
     const friends = going.filter((a) => a.is_friend);
-    const others = going.filter((a) => !a.is_friend);
+    const following = going.filter(
+        (a) => !a.is_friend && a.viewer_follow_status === 'approved',
+    );
+    const others = going.filter(
+        (a) => !a.is_friend && a.viewer_follow_status !== 'approved',
+    );
+    const hasSocialGoing = friends.length > 0 || following.length > 0;
+    const totalGoing = summary?.total_going ?? going.length;
+    const totalInterested = summary?.total_saved ?? interested.length;
 
-    if (list.length === 0) {
+    if (list.length === 0 && totalGoing === 0 && totalInterested === 0) {
         return (
             <div className="py-6 text-center">
                 <p className="text-sm font-semibold text-ink">No one's going yet</p>
@@ -208,10 +213,11 @@ export default function PeopleTab({ eventId }: Props) {
     return (
         <div className="space-y-5">
             <h3 className="text-lg font-bold text-ink">
-                {going.length} {going.length === 1 ? 'person' : 'people'} going
+                {totalGoing} going · {totalInterested} interested
             </h3>
             <Section title="Friends going" people={friends} showRelationship={false} />
-            <Section title="Other people going" people={others} showRelationship={true} />
+            <Section title="Following going" people={following} showRelationship={true} />
+            <Section title={hasSocialGoing ? 'Other people going' : 'Going'} people={others} showRelationship={true} />
             <Section title="Interested" people={interested} showRelationship={true} />
         </div>
     );

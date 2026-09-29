@@ -21,7 +21,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from slowapi import Limiter
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, col, select
 
@@ -1233,12 +1233,41 @@ def list_following(
 def list_my_followers(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    sort: Optional[str] = Query(default=None, pattern="^(recent)$"),
     session: Session = Depends(get_session),
     viewer: User = Depends(require_user),
 ):
     """Authenticated viewer's own followers list (self-view; no privacy
     gate beyond the auth requirement)."""
-    sub = select(UserFollow.follower_id).where(UserFollow.followee_id == viewer.id)
+    if sort == "recent":
+        base = (
+            select(User)
+            .join(UserFollow, UserFollow.follower_id == User.id)
+            .where(UserFollow.followee_id == viewer.id)
+            .where(UserFollow.status == "approved")
+            .where(User.deleted_at.is_(None))
+        )
+        total = int(
+            session.exec(select(func.count()).select_from(base.subquery())).one()
+        )
+        rows = session.exec(
+            base.order_by(
+                UserFollow.created_at.desc(),
+                User.display_name.asc(),
+                User.handle.asc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        ).all()
+        return FollowListResponse(
+            items=[_to_follow_user(session, viewer.id, u) for u in rows],
+            total=total,
+        )
+    sub = (
+        select(UserFollow.follower_id)
+        .where(UserFollow.followee_id == viewer.id)
+        .where(UserFollow.status == "approved")
+    )
     return _list_users(session, sub, viewer, limit, offset)
 
 
@@ -1246,6 +1275,7 @@ def list_my_followers(
 def list_my_following(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    sort: Optional[str] = Query(default=None, pattern="^(recent)$"),
     q: Optional[str] = Query(
         default=None,
         description=(
@@ -1265,7 +1295,11 @@ def list_my_following(
     regardless of the search filter — this powers the interest picker's
     "friends first" ordering.
     """
-    sub = select(UserFollow.followee_id).where(UserFollow.follower_id == viewer.id)
+    sub = (
+        select(UserFollow.followee_id)
+        .where(UserFollow.follower_id == viewer.id)
+        .where(UserFollow.status == "approved")
+    )
     # Friend ids = followees who also follow back (approved). Used to
     # rank friends ahead of one-way follows in the picker.
     fv1 = aliased(UserFollow)
@@ -1277,6 +1311,8 @@ def list_my_following(
             (fv2.follower_id == fv1.followee_id) & (fv2.followee_id == fv1.follower_id),
         )
         .where(fv1.follower_id == viewer.id)
+        .where(fv1.status == "approved")
+        .where(fv2.status == "approved")
     )
     base_query = select(User).where(User.id.in_(sub)).where(User.deleted_at.is_(None))
     if q:
@@ -1288,15 +1324,24 @@ def list_my_following(
     total = int(
         session.exec(select(func.count()).select_from(base_query.subquery())).one()
     )
-    # Sort: friends first (in_ → bool desc), then display name / handle.
-    rows = session.exec(
-        base_query.order_by(
+    if sort == "recent":
+        base_query = base_query.join(
+            UserFollow,
+            (UserFollow.followee_id == User.id) & (UserFollow.follower_id == viewer.id),
+        )
+        order_by = (
+            UserFollow.created_at.desc(),
+            User.display_name.asc(),
+            User.handle.asc(),
+        )
+    else:
+        order_by = (
             User.id.in_(friend_ids_sub).desc(),
             User.display_name.asc(),
             User.handle.asc(),
         )
-        .limit(limit)
-        .offset(offset)
+    rows = session.exec(
+        base_query.order_by(*order_by).limit(limit).offset(offset)
     ).all()
     return FollowListResponse(
         items=[_to_follow_user(session, viewer.id, u) for u in rows],
@@ -1398,6 +1443,7 @@ def list_my_friends(
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     q: Optional[str] = Query(default=None, max_length=64),
+    sort: Optional[str] = Query(default=None, pattern="^(recent)$"),
     session: Session = Depends(get_session),
     viewer: User = Depends(require_user),
 ):
@@ -1413,6 +1459,8 @@ def list_my_friends(
             (f2.follower_id == f1.followee_id) & (f2.followee_id == f1.follower_id),
         )
         .where(f1.follower_id == viewer.id)
+        .where(f1.status == "approved")
+        .where(f2.status == "approved")
     )
     base = select(User).where(User.id.in_(friends_sub)).where(User.deleted_at.is_(None))
     if q:
@@ -1424,11 +1472,44 @@ def list_my_friends(
             )
         )
     total = int(session.exec(select(func.count()).select_from(base.subquery())).one())
-    rows = session.exec(
-        base.order_by(User.display_name.asc(), User.handle.asc())
-        .limit(limit)
-        .offset(offset)
-    ).all()
+    if sort == "recent":
+        base = (
+            select(User)
+            .join(f1, f1.followee_id == User.id)
+            .join(
+                f2,
+                (f2.follower_id == f1.followee_id) & (f2.followee_id == f1.follower_id),
+            )
+            .where(f1.follower_id == viewer.id)
+            .where(f1.status == "approved")
+            .where(f2.status == "approved")
+            .where(User.deleted_at.is_(None))
+        )
+        if q:
+            base = base.where(
+                or_(
+                    func.lower(User.handle).like(like),
+                    func.lower(User.display_name).like(like),
+                )
+            )
+        rows = session.exec(
+            base.order_by(
+                case(
+                    (f1.created_at >= f2.created_at, f1.created_at),
+                    else_=f2.created_at,
+                ).desc(),
+                User.display_name.asc(),
+                User.handle.asc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        ).all()
+    else:
+        rows = session.exec(
+            base.order_by(User.display_name.asc(), User.handle.asc())
+            .limit(limit)
+            .offset(offset)
+        ).all()
     return FollowListResponse(
         items=[_to_follow_user(session, viewer.id, u) for u in rows],
         total=total,
@@ -4430,92 +4511,90 @@ def onboarding_complete(
 def _build_fof_suggestions(
     session: Session, viewer: User, limit: int, offset: int = 0
 ) -> FoFSuggestionsResponse:
-    """Phase E (E4): "People you may know" — ranked by mutual friends.
-
-    For each candidate ``c`` we compute ``mutual_friend_count`` =
-    number of viewer-friends who also follow ``c``. Tiebreakers (in
-    order): verified-organizer flag desc, then handle asc.
-
-    Excludes: self, viewer's existing follows, soft-deleted accounts,
-    and accounts with no public handle.
-
-    When the viewer has zero mutual-friend candidates (no friends yet,
-    or already follows everyone reachable through their network), falls
-    back to admin-managed curator accounts (``mutual_friend_count=0``)
-    so the surface isn't empty — mirrors ``discover_suggested``.
-    """
-    excluded: set[UUID] = _already_followed_ids(session, viewer.id)
+    """Build ranked network, organizer, and curator suggestions."""
+    followed_ids = _already_followed_ids(session, viewer.id)
+    subscribed_ids = _viewer_subscription_ids(session, viewer)
+    excluded: set[UUID] = followed_ids | subscribed_ids
     excluded.add(viewer.id)
     admin_id = get_admin_user_id(session)
     if admin_id is not None:
         excluded.add(admin_id)
 
-    candidate_scores: dict[UUID, int] = {}
-    viewer_friends = _friend_ids(session, viewer.id)
-    if viewer_friends:
-        rows = session.exec(
-            select(
-                UserFollow.followee_id,
-                func.count(UserFollow.follower_id).label("mutuals"),
-            )
-            .where(col(UserFollow.follower_id).in_(viewer_friends))
+    network_ids = _viewer_followed_ids(session, viewer) | subscribed_ids
+    candidate_intermediaries: dict[UUID, set[UUID]] = {}
+    if network_ids:
+        follow_rows = session.exec(
+            select(UserFollow.followee_id, UserFollow.follower_id)
+            .where(col(UserFollow.follower_id).in_(network_ids))
+            .where(UserFollow.status == "approved")
             .where(~col(UserFollow.followee_id).in_(excluded))
-            .group_by(UserFollow.followee_id)
-            .order_by(func.count(UserFollow.follower_id).desc())
         ).all()
-        candidate_scores.update({r[0]: int(r[1]) for r in rows})
-
-    if not candidate_scores:
-        # No mutual-friend candidates (viewer has no friends yet, or has
-        # already followed everyone reachable through their network) —
-        # fall back to admin-managed curator accounts so the "People you
-        # may know" surface isn't empty for brand-new users. Mirrors the
-        # fallback already used by ``discover_suggested``.
-        curators = _curator_users(session, viewer, limit=limit, excluded_ids=excluded)
-        return FoFSuggestionsResponse(
-            items=[
-                FoFSuggestionItem(
-                    handle=u.handle or "",
-                    display_name=u.display_name,
-                    avatar_url=resolve_user_avatar(u),
-                    is_verified_organizer=bool(u.is_verified_organizer),
-                    is_admin_managed=bool(u.is_admin_managed),
-                    mutual_friend_count=0,
-                    mutual_friends_preview=[],
-                    followers_count=_followers_count(session, u.id),
-                )
-                for u in curators
-            ],
-            total=len(curators),
-        )
-
-    candidate_ids = list(candidate_scores.keys())
-
-    candidates = list(
-        session.exec(
-            select(User)
-            .where(col(User.id).in_(candidate_ids))
-            .where(_suggestable_user_clause())
-            .where(User.deleted_at.is_(None))
-            .where(User.handle.is_not(None))
+        for candidate_id, intermediary_id in follow_rows:
+            candidate_intermediaries.setdefault(candidate_id, set()).add(
+                intermediary_id
+            )
+        subscription_rows = session.exec(
+            select(
+                CalendarSubscription.target_user_id,
+                CalendarSubscription.subscriber_id,
+            )
+            .where(CalendarSubscription.subscriber_id.in_(network_ids))
+            .where(~CalendarSubscription.target_user_id.in_(excluded))
         ).all()
+        for candidate_id, intermediary_id in subscription_rows:
+            candidate_intermediaries.setdefault(candidate_id, set()).add(
+                intermediary_id
+            )
+
+    candidate_scores: dict[UUID, int] = {}
+    candidate_scores.update(
+        {
+            candidate_id: len(intermediary_ids)
+            for candidate_id, intermediary_ids in candidate_intermediaries.items()
+        }
     )
-    total = len(candidates)
+    candidate_ids = list(candidate_scores)
+    candidates = (
+        list(
+            session.exec(
+                select(User)
+                .where(col(User.id).in_(candidate_ids))
+                .where(_suggestable_user_clause())
+                .where(User.deleted_at.is_(None))
+                .where(User.handle.is_not(None))
+            ).all()
+        )
+        if candidate_ids
+        else []
+    )
     _rank_by_relevance(session, viewer, candidates, candidate_scores)
-    candidates = candidates[offset : offset + limit]
 
-    # Preview: up to 3 viewer-friends who follow each candidate.
+    picked_ids = excluded | {u.id for u in candidates}
+    organizers = _organizer_users(
+        session,
+        viewer,
+        limit=_MAX_DISCOVER_POOL,
+        excluded_ids=picked_ids,
+        exclude_followed=True,
+        exclude_subscribed=True,
+    )
+    picked_ids.update(u.id for u in organizers)
+    curators = _curator_users(
+        session,
+        viewer,
+        limit=_MAX_DISCOVER_POOL,
+        excluded_ids=picked_ids,
+        exclude_followed=True,
+        exclude_subscribed=True,
+    )
+    pool = (candidates + organizers + curators)[:_MAX_DISCOVER_POOL]
+    page = pool[offset : offset + limit]
+
+    viewer_friends = _friend_ids(session, viewer.id)
+    previews = _mutual_friends_previews(session, viewer_friends, [u.id for u in page])
     items: list[FoFSuggestionItem] = []
-    for u in candidates:
-        preview_rows = session.exec(
-            select(User.handle)
-            .join(UserFollow, UserFollow.follower_id == User.id)
-            .where(UserFollow.followee_id == u.id)
-            .where(col(UserFollow.follower_id).in_(viewer_friends))
-            .where(User.handle.is_not(None))
-            .order_by(User.handle.asc())
-            .limit(3)
-        ).all()
+    for u in page:
+        mutual_handles = previews.get(u.id, [])
         items.append(
             FoFSuggestionItem(
                 handle=u.handle or "",
@@ -4523,13 +4602,13 @@ def _build_fof_suggestions(
                 avatar_url=resolve_user_avatar(u),
                 is_verified_organizer=bool(u.is_verified_organizer),
                 is_admin_managed=bool(u.is_admin_managed),
-                mutual_friend_count=candidate_scores.get(u.id, 0),
-                mutual_friends_preview=[h for h in preview_rows if h],
+                mutual_friend_count=len(mutual_handles),
+                mutual_friends_preview=mutual_handles[:3],
                 followers_count=_followers_count(session, u.id),
             )
         )
 
-    return FoFSuggestionsResponse(items=items, total=total)
+    return FoFSuggestionsResponse(items=items, total=len(pool))
 
 
 @router.get(

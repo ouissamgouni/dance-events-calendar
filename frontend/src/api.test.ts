@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { fetchOptionalAdminEventSchedule, getCalendarFeedUrl } from './api';
+import { downloadPublishedProgramExport, fetchOptionalAdminEventSchedule, getCalendarFeedUrl } from './api';
 
 // In the Vite dev/test branch resolveApiBase() returns the relative `/api`,
 // so the feed URL is resolved against the current origin — fully-qualified is
@@ -39,5 +39,33 @@ describe('fetchOptionalAdminEventSchedule', () => {
         ));
 
         await expect(fetchOptionalAdminEventSchedule('event-without-program')).rejects.toThrow('Schedule service unavailable');
+    });
+});
+
+describe('downloadPublishedProgramExport', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('serializes the same schedule filters used by the preview', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('calendar', {
+            status: 200,
+            headers: { 'content-disposition': 'attachment; filename="program.ics"' },
+        }));
+
+        await downloadPublishedProgramExport('event-1', 'ics', {
+            days: ['2026-10-16', '2026-10-17'],
+            includeCancelled: false,
+            instructor: 'Maya',
+            contributorIds: [8, 9],
+            levelIds: [2, 3],
+            activityTypeIds: [4],
+        });
+
+        const url = new URL(String(fetchMock.mock.calls[0][0]), window.location.origin);
+        expect(url.searchParams.getAll('days')).toEqual(['2026-10-16', '2026-10-17']);
+        expect(url.searchParams.get('include_cancelled')).toBe('false');
+        expect(url.searchParams.get('instructor')).toBe('Maya');
+        expect(url.searchParams.getAll('contributor_ids')).toEqual(['8', '9']);
+        expect(url.searchParams.getAll('level_ids')).toEqual(['2', '3']);
+        expect(url.searchParams.getAll('activity_type_ids')).toEqual(['4']);
     });
 });

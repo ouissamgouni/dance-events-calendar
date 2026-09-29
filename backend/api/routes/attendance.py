@@ -76,6 +76,65 @@ def _row_visible_to(
     return is_mutual_follow(session, viewer.id, row.user_id)
 
 
+def _viewer_relationship_ids(
+    session: Session, viewer_id: UUID
+) -> tuple[set[UUID], set[UUID]]:
+    followed_rows = session.exec(
+        select(UserFollow.followee_id)
+        .where(UserFollow.follower_id == viewer_id)
+        .where(UserFollow.status == "approved")
+    ).all()
+    followed_ids = {
+        row if isinstance(row, UUID) else UUID(str(row)) for row in followed_rows
+    }
+    if not followed_ids:
+        return set(), set()
+    reciprocal_rows = session.exec(
+        select(UserFollow.follower_id)
+        .where(col(UserFollow.follower_id).in_(followed_ids))
+        .where(UserFollow.followee_id == viewer_id)
+        .where(UserFollow.status == "approved")
+    ).all()
+    friend_ids = {
+        row if isinstance(row, UUID) else UUID(str(row)) for row in reciprocal_rows
+    }
+    return followed_ids, friend_ids
+
+
+def _build_preview(
+    rows: list[UserEventAttendance],
+    users_by_id: dict[UUID, User],
+    followed_ids: set[UUID],
+    friend_ids: set[UUID],
+) -> list[AttendeeResponse]:
+    ordered = sorted(
+        rows,
+        key=lambda row: (
+            0 if row.user_id in friend_ids else 1 if row.user_id in followed_ids else 2,
+            row.attending_since,
+            row.id or 0,
+        ),
+    )
+    preview: list[AttendeeResponse] = []
+    for row in ordered:
+        u = users_by_id.get(row.user_id)
+        if u is None:
+            continue
+        preview.append(
+            AttendeeResponse(
+                user_id=u.id,
+                display_name=u.display_name,
+                avatar_url=resolve_user_avatar(u),
+                handle=u.handle,
+                viewer_follow_status=("approved" if u.id in followed_ids else None),
+                is_friend=u.id in friend_ids,
+            )
+        )
+        if len(preview) == _PREVIEW_LIMIT:
+            break
+    return preview
+
+
 def _summarize_for_event(
     session: Session,
     event_id: str,
@@ -107,21 +166,11 @@ def _summarize_for_event(
 
     preview: list[AttendeeResponse] = []
     if visible_rows:
-        preview_user_ids = [r.user_id for r in visible_rows[:_PREVIEW_LIMIT]]
+        preview_user_ids = [r.user_id for r in visible_rows]
         users = session.exec(select(User).where(User.id.in_(preview_user_ids))).all()
-        users_by_id = {u.id: u for u in users}
-        for row in visible_rows[:_PREVIEW_LIMIT]:
-            u = users_by_id.get(row.user_id)
-            if u is None or u.deleted_at is not None:
-                continue
-            preview.append(
-                AttendeeResponse(
-                    user_id=u.id,
-                    display_name=u.display_name,
-                    avatar_url=resolve_user_avatar(u),
-                    handle=u.handle,
-                )
-            )
+        users_by_id = {u.id: u for u in users if u.deleted_at is None}
+        followed_ids, friend_ids = _viewer_relationship_ids(session, viewer.id)
+        preview = _build_preview(visible_rows, users_by_id, followed_ids, friend_ids)
 
     return AttendanceSummaryResponse(
         event_id=event_id,
@@ -176,11 +225,14 @@ def get_attendance_summary_batch(
         if r.user_id is not None and (r.share_audience or "private") != "private"
     }
     users_by_id: dict[UUID, User] = {}
+    followed_ids: set[UUID] = set()
+    friend_ids: set[UUID] = set()
     if viewer is not None and candidate_user_ids:
         users = session.exec(
             select(User).where(User.id.in_(list(candidate_user_ids)))
         ).all()
         users_by_id = {u.id: u for u in users if u.deleted_at is None}
+        followed_ids, friend_ids = _viewer_relationship_ids(session, viewer.id)
 
     results: list[AttendanceSummaryResponse] = []
     for event_id in payload.event_ids:
@@ -205,19 +257,7 @@ def get_attendance_summary_batch(
             r.user_id == viewer.id and (r.share_audience or "private") != "private"
             for r in event_rows
         )
-        preview: list[AttendeeResponse] = []
-        for row in visible_rows[:_PREVIEW_LIMIT]:
-            u = users_by_id.get(row.user_id)
-            if u is None:
-                continue
-            preview.append(
-                AttendeeResponse(
-                    user_id=u.id,
-                    display_name=u.display_name,
-                    avatar_url=resolve_user_avatar(u),
-                    handle=u.handle,
-                )
-            )
+        preview = _build_preview(visible_rows, users_by_id, followed_ids, friend_ids)
         results.append(
             AttendanceSummaryResponse(
                 event_id=event_id,

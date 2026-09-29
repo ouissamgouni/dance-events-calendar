@@ -35,6 +35,8 @@ interface Props {
      * its own wording alongside.
      */
     layout?: 'inline' | 'stacked' | 'faces';
+    /** Prioritize friends/following and render public non-tribe attendees smaller. */
+    relationshipHierarchy?: boolean;
 }
 
 interface SizeStyles {
@@ -83,17 +85,15 @@ const SIZE_STYLES: Record<AttendeeAvatarStackSize, SizeStyles> = {
 function MiniAvatar({
     person,
     z,
-    isFriend,
+    isRelationship,
     styles,
 }: {
     person: { user_id: string; display_name: string | null; avatar_url: string | null };
     z: number;
-    isFriend?: boolean;
+    isRelationship?: boolean;
     styles: SizeStyles;
 }) {
-    // Friend avatars get a blue ring (not a chip, not a label) — single
-    // affordance that reads as "someone you follow / who follows you".
-    const ring = `${styles.ring} ${isFriend ? 'ring-blue-300' : 'ring-white'}`;
+    const ring = `${styles.ring} ${isRelationship ? 'ring-blue-300' : 'ring-white'}`;
     if (person.avatar_url) {
         return (
             <img
@@ -107,7 +107,7 @@ function MiniAvatar({
         );
     }
     const initial = (person.display_name?.trim()[0] ?? '?').toUpperCase();
-    const bg = isFriend ? 'bg-blue-50 text-action' : 'bg-slate-300 text-ink';
+    const bg = isRelationship ? 'bg-blue-50 text-action' : 'bg-slate-300 text-ink';
     return (
         <span
             title={person.display_name ?? undefined}
@@ -190,7 +190,7 @@ function namesGoingSentence(names: string[], totalGoing: number, viewerGoing: bo
  * Anonymous viewers see only aggregate social proof, with identities
  * gated behind sign-in.
  */
-export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPreview, size = 'md', hideIfOnlyCurrentUser = false, layout = 'inline' }: Props) {
+export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPreview, size = 'md', hideIfOnlyCurrentUser = false, layout = 'inline', relationshipHierarchy = false }: Props) {
     const { user } = useAuth();
     const { isAttending } = useAttendingEvents();
     const { eventCardShowPeopleIconEnabled } = useOptionalFeatureFlags();
@@ -206,9 +206,18 @@ export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPrev
 
     // Combined ordered list: friends first, then non-friend attendees,
     // capped at ``max``.
-    const combined: Array<{ user_id: string; display_name: string | null; avatar_url: string | null; isFriend: boolean }> = [];
-    for (const f of friends) combined.push({ ...f, isFriend: true });
-    for (const a of others) combined.push({ user_id: a.user_id, display_name: a.display_name, avatar_url: a.avatar_url, isFriend: false });
+    const combined: Array<{ user_id: string; display_name: string | null; avatar_url: string | null; isRelationship: boolean; relationshipRank: number }> = [];
+    for (const f of friends) combined.push({ ...f, isRelationship: true, relationshipRank: 0 });
+    for (const a of others) combined.push({
+        user_id: a.user_id,
+        display_name: a.display_name,
+        avatar_url: a.avatar_url,
+        isRelationship: a.is_friend === true || a.viewer_follow_status === 'approved',
+        relationshipRank: a.is_friend === true ? 0 : a.viewer_follow_status === 'approved' ? 1 : 2,
+    });
+    if (relationshipHierarchy) {
+        combined.sort((a, b) => a.relationshipRank - b.relationshipRank);
+    }
     if (hideIfOnlyCurrentUser && shouldHideSoloCurrentUser(summary?.total_going ?? 0, combined.map((person) => person.user_id), user?.user_id)) {
         return null;
     }
@@ -255,7 +264,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPrev
 
     const totalKnown = summary?.total_going ?? 0;
     const overflow = Math.max(0, totalKnown - shown.length);
-    const hasFriend = friends.length > 0;
+    const hasRelationship = shown.some((person) => person.isRelationship);
     const namesTitle = `${shown.map((p) => p.display_name ?? 'Attendee').join(', ')}${overflow > 0 ? ` and ${overflow} more` : ''}`;
 
     if (layout === 'faces') {
@@ -265,10 +274,10 @@ export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPrev
                 onClick={(e) => e.stopPropagation()}
                 className={styles.stack}
                 title={namesTitle}
-                data-testid={hasFriend ? 'attendee-track-with-friends' : 'attendee-track'}
+                data-testid={hasRelationship ? 'attendee-track-with-friends' : 'attendee-track'}
             >
                 {shown.map((p, i) => (
-                    <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isFriend={p.isFriend} styles={styles} />
+                    <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isRelationship={p.isRelationship} styles={relationshipHierarchy && !p.isRelationship ? SIZE_STYLES.md : styles} />
                 ))}
                 {overflow > 0 && (
                     <span
@@ -289,11 +298,11 @@ export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPrev
                 onClick={(e) => e.stopPropagation()}
                 className="flex flex-col gap-1.5 min-w-0"
                 title={namesTitle}
-                data-testid={hasFriend ? 'attendee-track-with-friends' : 'attendee-track'}
+                data-testid={hasRelationship ? 'attendee-track-with-friends' : 'attendee-track'}
             >
                 <span className={styles.stack}>
                     {shown.map((p, i) => (
-                        <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isFriend={p.isFriend} styles={styles} />
+                        <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isRelationship={p.isRelationship} styles={relationshipHierarchy && !p.isRelationship ? SIZE_STYLES.md : styles} />
                     ))}
                     {overflow > 0 && (
                         <span
@@ -314,12 +323,12 @@ export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPrev
             onClick={(e) => e.stopPropagation()}
             className={styles.link}
             title={namesTitle}
-            data-testid={hasFriend ? 'attendee-track-with-friends' : 'attendee-track'}
+            data-testid={hasRelationship ? 'attendee-track-with-friends' : 'attendee-track'}
         >
             {eventCardShowPeopleIconEnabled && <PeopleIcon className={styles.icon} color="text-blue-400" />}
             <span className={styles.stack}>
                 {shown.map((p, i) => (
-                    <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isFriend={p.isFriend} styles={styles} />
+                    <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isRelationship={p.isRelationship} styles={relationshipHierarchy && !p.isRelationship ? SIZE_STYLES.md : styles} />
                 ))}
             </span>
             <span className="truncate">{renderGoingSentence(viewerGoing, totalKnown)}</span>

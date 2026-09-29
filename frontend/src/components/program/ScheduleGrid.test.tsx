@@ -47,6 +47,51 @@ describe('ScheduleGrid', () => {
         expect(grid.scrollLeft).toBe(0);
     });
 
+    it('shows structured contributors in assignment order', () => {
+        render(<ScheduleGrid schedule={{
+            ...schedule,
+            contributors: [
+                { id: 1, external_id: 'alexis-ruiz', display_name: 'Alexis Ruiz', sort_order: 0 },
+                { id: 2, external_id: 'angelo-rito', display_name: 'Angelo Rito', sort_order: 1 },
+                { id: 3, external_id: 'terry-salsalianza', display_name: 'Terry Salsalianza', sort_order: 2 },
+            ],
+            sessions: [{
+                ...schedule.sessions[0],
+                instructors: null,
+                contributors: [
+                    { contributor_id: 1, role: 'instructor', position: 0 },
+                    { contributor_id: 2, role: 'instructor', position: 1 },
+                    { contributor_id: 3, role: 'instructor', position: 2 },
+                ],
+            }],
+        }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} />);
+
+        expect(screen.getByText('Alexis Ruiz, Angelo Rito, Terry Salsalianza')).toBeInTheDocument();
+    });
+
+    it('shows the full level label without an activity type', () => {
+        render(<ScheduleGrid schedule={{
+            ...schedule,
+            levels: [{ id: 1, label: 'Advanced', notation: '**', sort_order: 0 }],
+            activity_types: [{ id: 2, name: 'Workshop', color: 'blue', sort_order: 0 }],
+            sessions: [{ ...schedule.sessions[0], level_id: 1, activity_type_id: 2 }],
+        }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} />);
+
+        expect(screen.getByText('Advanced')).toBeInTheDocument();
+        expect(screen.queryByText('**')).not.toBeInTheDocument();
+        expect(screen.queryByText('Workshop')).not.toBeInTheDocument();
+    });
+
+    it('falls back to the level label when notation is unavailable', () => {
+        render(<ScheduleGrid schedule={{
+            ...schedule,
+            levels: [{ id: 1, label: 'Open level', notation: null, sort_order: 0 }],
+            sessions: [{ ...schedule.sessions[0], level_id: 1 }],
+        }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} />);
+
+        expect(screen.getByText('Open level')).toBeInTheDocument();
+    });
+
     it('shows at most three attendee avatars and an overflow count', () => {
         render(
             <ScheduleGrid

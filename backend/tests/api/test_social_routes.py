@@ -442,6 +442,51 @@ def test_my_friends_only_returns_mutuals(client, session):
     assert body["total"] == 1
 
 
+def test_my_network_lists_sort_recent_relationships_first(client, session):
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    older = _make_user(session, "older@example.com", "zolder")
+    newer = _make_user(session, "newer@example.com", "anewer")
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    session.add(
+        UserFollow(
+            follower_id=viewer.id,
+            followee_id=older.id,
+            created_at=base,
+        )
+    )
+    session.add(
+        UserFollow(
+            follower_id=viewer.id,
+            followee_id=newer.id,
+            created_at=base + timedelta(days=1),
+        )
+    )
+    session.add(
+        UserFollow(
+            follower_id=older.id,
+            followee_id=viewer.id,
+            created_at=base + timedelta(days=2),
+        )
+    )
+    session.add(
+        UserFollow(
+            follower_id=newer.id,
+            followee_id=viewer.id,
+            created_at=base + timedelta(days=3),
+        )
+    )
+    session.commit()
+
+    _login(client, "viewer@example.com")
+    following = client.get("/api/social/me/following?sort=recent").json()
+    followers = client.get("/api/social/me/followers?sort=recent").json()
+    friends = client.get("/api/social/me/friends?sort=recent").json()
+
+    assert [item["handle"] for item in following["items"]] == ["anewer", "zolder"]
+    assert [item["handle"] for item in followers["items"]] == ["anewer", "zolder"]
+    assert [item["handle"] for item in friends["items"]] == ["anewer", "zolder"]
+
+
 # --- Profile Dance Passport tab (Phase 2) -----------------------------------
 
 

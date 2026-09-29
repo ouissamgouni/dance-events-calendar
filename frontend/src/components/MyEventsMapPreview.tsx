@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import EventCard from './EventCard';
 import ScrollDotsIndicator from './ScrollDots';
+import ProgramAction from './ProgramAction';
 
 interface Props {
     event: CalendarEvent;
@@ -30,6 +31,7 @@ interface Props {
     actions?: ReadonlyArray<'save' | 'going'>;
     showRatings?: boolean;
     followingBadgeEnabled?: boolean;
+    showProgramAction?: boolean;
     /** Reports the sheet's pixel height so a floating map control can sit
      * just above it instead of overlapping. */
     onHeightChange?: (height: number) => void;
@@ -61,6 +63,7 @@ export default function MyEventsMapPreview({
     actions,
     showRatings = false,
     followingBadgeEnabled = false,
+    showProgramAction = false,
     onHeightChange,
 }: Props) {
     const pointerStart = useRef<number | null>(null);
@@ -129,6 +132,7 @@ export default function MyEventsMapPreview({
                         showRatings={showRatings}
                         followingBadgeEnabled={followingBadgeEnabled}
                         goingIconVariant="hand"
+                        bottomSlot={showProgramAction ? <ProgramAction event={event} /> : undefined}
                         testId="my-events-map-card"
                     />
                 </div>

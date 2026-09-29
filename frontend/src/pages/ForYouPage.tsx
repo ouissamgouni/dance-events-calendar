@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { CalendarEvent, PendingReview } from '../types';
-import { fetchEventsByIds, fetchMyPendingReviews, fetchMyPlan } from '../api';
+import { fetchEventsByIds, fetchMyPendingReviews } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { usePreferences } from '../context/PreferencesContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
@@ -193,7 +193,6 @@ export default function ForYouPage() {
         trendingTopN,
         trendingTopPercent,
         followingBadgeEnabled,
-        eventScheduleEnabled,
     } = useFeatureFlags();
 
     const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
@@ -331,27 +330,6 @@ export default function ForYouPage() {
             .filter((e) => ids.has(e.event_id))
             .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
     }, [user, attendingEventIds, rawYourNextEvents]);
-    const nextEvent = yourNextEvents[0];
-    const [nextEventPlanCount, setNextEventPlanCount] = useState<number | undefined>();
-    useEffect(() => {
-        if (!user || !eventScheduleEnabled || !nextEvent?.schedule_published) {
-            setNextEventPlanCount(undefined);
-            return;
-        }
-        let cancelled = false;
-        setNextEventPlanCount(undefined);
-        fetchMyPlan(nextEvent.event_id)
-            .then((value) => {
-                if (!cancelled) {
-                    setNextEventPlanCount(value.entries.filter((entry) => entry.status !== 'removed').length);
-                }
-            })
-            .catch(() => {
-                if (!cancelled) setNextEventPlanCount(undefined);
-            });
-        return () => { cancelled = true; };
-    }, [eventScheduleEnabled, nextEvent?.event_id, nextEvent?.schedule_published, user]);
-
     // "Share your experience": past events the viewer attended but hasn't
     // reviewed yet (server applies the admin-configurable recency window).
     const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
@@ -428,7 +406,6 @@ export default function ForYouPage() {
                             events={yourNextEvents}
                             onEventClick={handleEventClick}
                             loading={attendingEventsLoading || yourNextEventsLoading}
-                            myPlanCount={nextEventPlanCount}
                         />
                         <LensTrail
                             title="You might like"

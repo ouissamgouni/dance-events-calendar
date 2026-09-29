@@ -255,7 +255,8 @@ export function EventListCard({
                             size="lg"
                             layout="stacked"
                             max={5}
-                            goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
+                            goingFriendsPreview={event.friends_going_preview}
+                            relationshipHierarchy
                         />
                     ) : undefined}
                     bottomSlot={eventScheduleEnabled && event.schedule_published ? <ProgramAction event={event} /> : undefined}
@@ -298,7 +299,8 @@ export function EventListCard({
                                 size="lg"
                                 layout="stacked"
                                 max={5}
-                                goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
+                                goingFriendsPreview={event.friends_going_preview}
+                                relationshipHierarchy
                             />
                         </div>
                     )}

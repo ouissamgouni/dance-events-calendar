@@ -37,6 +37,10 @@ def build_program_projection(
     *,
     days: list[str] | None = None,
     include_cancelled: bool = True,
+    instructor: str | None = None,
+    contributor_ids: list[int] | None = None,
+    level_ids: list[int] | None = None,
+    activity_type_ids: list[int] | None = None,
     selected_sessions: list[tuple[dict, str]] | None = None,
 ) -> dict:
     snapshot = publication.snapshot
@@ -53,6 +57,11 @@ def build_program_projection(
     rooms = _lookup(snapshot.get("rooms", []))
     levels = _lookup(snapshot.get("levels", []))
     activity_types = _lookup(snapshot.get("activity_types", []))
+    contributors = _lookup(snapshot.get("contributors", []))
+    instructor_query = (instructor or "").strip().casefold()
+    selected_contributor_ids = set(contributor_ids or [])
+    selected_level_ids = set(level_ids or [])
+    selected_activity_type_ids = set(activity_type_ids or [])
     source_sessions = (
         selected_sessions
         if selected_sessions is not None
@@ -64,6 +73,42 @@ def build_program_projection(
     sessions = []
     for row, status in source_sessions:
         if status != "active" and not include_cancelled:
+            continue
+        assignments = row.get("contributors", [])
+        contributor_assignments = [
+            {
+                **assignment,
+                "display_name": contributors.get(assignment["contributor_id"], {}).get(
+                    "display_name"
+                ),
+            }
+            for assignment in assignments
+        ]
+        contributor_names = ", ".join(
+            assignment["display_name"]
+            for assignment in contributor_assignments
+            if assignment["display_name"]
+        )
+        contributor_display = contributor_names or row.get("instructors")
+        row_contributor_ids = {
+            assignment["contributor_id"] for assignment in assignments
+        }
+        if selected_contributor_ids and not selected_contributor_ids.intersection(
+            row_contributor_ids
+        ):
+            continue
+        if (
+            not selected_contributor_ids
+            and instructor_query
+            and instructor_query not in (contributor_display or "").casefold()
+        ):
+            continue
+        if selected_level_ids and row.get("level_id") not in selected_level_ids:
+            continue
+        if (
+            selected_activity_type_ids
+            and row.get("activity_type_id") not in selected_activity_type_ids
+        ):
             continue
         start = _utc(row["start"])
         end = _utc(row["end"])
@@ -80,19 +125,25 @@ def build_program_projection(
             {
                 "id": str(row["id"]),
                 "title": row["title"],
-                "instructors": row.get("instructors"),
+                "instructors": contributor_display,
+                "contributors": contributor_assignments,
                 "start": utc_isoformat(start),
                 "end": utc_isoformat(end),
                 "program_day": program_day,
                 "local_date": local_start.date().isoformat(),
                 "local_start_time": local_start.strftime("%H:%M"),
                 "local_end_time": local_end.strftime("%H:%M"),
+                "venue_id": row.get("venue_id") or room.get("venue_id"),
+                "room_id": row.get("room_id"),
+                "level_id": row.get("level_id"),
+                "activity_type_id": row.get("activity_type_id"),
                 "venue": venue.get("name"),
                 "room": room.get("name"),
                 "address": venue.get("address"),
                 "level": level.get("label"),
                 "activity_type": activity_type.get("name"),
                 "attendee_note": row.get("attendee_note"),
+                "is_cancelled": status != "active",
                 "status": status,
                 "venue_sort_order": venue.get("sort_order", 0),
                 "room_sort_order": room.get("sort_order", 0),
@@ -119,6 +170,11 @@ def build_program_projection(
         "day_start_hour": day_start_hour,
         "available_days": available_days,
         "selected_days": selected_days,
+        "venues": snapshot.get("venues", []),
+        "rooms": snapshot.get("rooms", []),
+        "levels": snapshot.get("levels", []),
+        "activity_types": snapshot.get("activity_types", []),
+        "contributors": snapshot.get("contributors", []),
         "version": publication.version,
         "published_at": utc_isoformat(publication.published_at),
         "sessions": sessions,
@@ -151,7 +207,7 @@ def render_program_ics(projection: dict, *, my_plan: bool = False) -> str:
         description = "\n".join(
             value
             for value in (
-                f"Instructors: {session['instructors']}"
+                f"Contributors: {session['instructors']}"
                 if session["instructors"]
                 else None,
                 f"Activity: {session['activity_type']}"
@@ -204,7 +260,7 @@ def render_program_csv(projection: dict) -> bytes:
             "End time",
             "Time zone",
             "Session",
-            "Instructors",
+            "Contributors",
             "Activity type",
             "Level",
             "Venue",

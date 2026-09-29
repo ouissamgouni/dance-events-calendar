@@ -32,7 +32,7 @@ schedules:
     sessions:
       - id: "71000000-0000-4000-8000-000000000001"
         title: Musicality Lab
-        instructors: Maya & Leo
+        contributors: [{display_name: "Maya & Leo", role: instructor}]
         start: "2026-10-16T17:00:00Z"
         end: "2026-10-16T18:00:00Z"
         room: Main Studio
@@ -41,7 +41,7 @@ schedules:
         activity_type: Workshop
       - id: "71000000-0000-4000-8000-000000000003"
         title: Bachata Styling
-        instructors: Sofia Cruz
+        contributors: [{display_name: "Sofia Cruz", role: instructor}]
         start: "2026-10-16T17:00:00Z"
         end: "2026-10-16T18:00:00Z"
         room: Rooftop Studio
@@ -50,7 +50,7 @@ schedules:
         activity_type: Workshop
       - id: "71000000-0000-4000-8000-000000000004"
         title: Beginner Foundations
-        instructors: Rita & Tomas
+        contributors: [{display_name: "Rita & Tomas", role: instructor}]
         start: "2026-10-16T17:00:00Z"
         end: "2026-10-16T18:00:00Z"
         room: Practice Lounge
@@ -59,7 +59,7 @@ schedules:
         activity_type: Workshop
       - id: "71000000-0000-4000-8000-000000000005"
         title: Salsa Footwork
-        instructors: Elena Ruiz
+        contributors: [{display_name: "Elena Ruiz", role: instructor}]
         start: "2026-10-16T18:15:00Z"
         end: "2026-10-16T19:15:00Z"
         room: Main Studio
@@ -68,7 +68,7 @@ schedules:
         activity_type: Workshop
       - id: "71000000-0000-4000-8000-000000000006"
         title: Connection Lab
-        instructors: Marco & Ines
+        contributors: [{display_name: "Marco & Ines", role: instructor}]
         start: "2026-10-16T18:15:00Z"
         end: "2026-10-16T19:15:00Z"
         room: Rooftop Studio
@@ -77,7 +77,7 @@ schedules:
         activity_type: Workshop
       - id: "71000000-0000-4000-8000-000000000007"
         title: Guided Practice
-        instructors: Team Movida
+        contributors: [{display_name: "Team Movida", role: instructor}]
         start: "2026-10-16T18:15:00Z"
         end: "2026-10-16T19:15:00Z"
         room: Practice Lounge
@@ -86,7 +86,7 @@ schedules:
         activity_type: Practice
       - id: "71000000-0000-4000-8000-000000000008"
         title: Social Warm-up
-        instructors: DJ Marta
+        contributors: [{display_name: "DJ Marta", role: instructor}]
         start: "2026-10-16T19:30:00Z"
         end: "2026-10-16T20:30:00Z"
         room: Main Studio
@@ -95,7 +95,7 @@ schedules:
         activity_type: Social
       - id: "71000000-0000-4000-8000-000000000009"
         title: Spins & Balance
-        instructors: Clara Mendes
+        contributors: [{display_name: "Clara Mendes", role: instructor}]
         start: "2026-10-16T19:30:00Z"
         end: "2026-10-16T20:30:00Z"
         room: Rooftop Studio
@@ -104,7 +104,7 @@ schedules:
         activity_type: Workshop
       - id: "71000000-0000-4000-8000-000000000002"
         title: Partnerwork Flow
-        instructors: Ana & Luis
+        contributors: [{display_name: "Ana & Luis", role: instructor}]
         start: "2026-10-17T10:00:00Z"
         end: "2026-10-17T11:00:00Z"
         room: Main Studio
@@ -113,7 +113,7 @@ schedules:
         activity_type: Workshop
       - id: "71000000-0000-4000-8000-000000000010"
         title: Shines Challenge
-        instructors: Diogo Neves
+        contributors: [{display_name: "Diogo Neves", role: instructor}]
         start: "2026-10-17T10:00:00Z"
         end: "2026-10-17T11:00:00Z"
         room: Rooftop Studio
@@ -122,7 +122,7 @@ schedules:
         activity_type: Workshop
       - id: "71000000-0000-4000-8000-000000000011"
         title: Open Practice
-        instructors: Team Movida
+        contributors: [{display_name: "Team Movida", role: instructor}]
         start: "2026-10-17T10:00:00Z"
         end: "2026-10-17T11:00:00Z"
         room: Practice Lounge

@@ -11,6 +11,8 @@ from backend.db.models import (
     CachedEvent,
     EventTag,
     EventView,
+    ScheduleContributor,
+    ScheduleSessionContributor,
     SiteSetting,
     Tag,
     TagGroup,
@@ -507,9 +509,19 @@ class TestDatabaseSeeder:
             "  - event_id: event-1\n"
             "    timezone: UTC\n"
             "    days: ['2026-06-01']\n"
+            "    contributors:\n"
+            "      - display_name: Maya Chen\n"
+            "        external_id: maya-chen\n"
+            "      - display_name: DJ Marta\n"
+            "        external_id: dj-marta\n"
             "    sessions:\n"
             "      - id: '71000000-0000-4000-8000-000000000001'\n"
             "        title: Workshop\n"
+            "        contributors:\n"
+            "          - display_name: Maya Chen\n"
+            "            role: instructor\n"
+            "          - display_name: DJ Marta\n"
+            "            role: dj\n"
             "        start: '2026-06-01T20:00:00Z'\n"
             "        end: '2026-06-01T21:00:00Z'\n"
             "    published: true\n"
@@ -537,9 +549,19 @@ class TestDatabaseSeeder:
             )
             seeder.seed(scenario_dir)
             audiences = session.exec(select(UserPlanAudience)).all()
+            contributors = session.exec(
+                select(ScheduleContributor).order_by(ScheduleContributor.sort_order)
+            ).all()
+            assignments = session.exec(
+                select(ScheduleSessionContributor).order_by(
+                    ScheduleSessionContributor.position
+                )
+            ).all()
 
         assert len(audiences) == 1
         assert audiences[0].audience == "friends"
+        assert [row.display_name for row in contributors] == ["Maya Chen", "DJ Marta"]
+        assert [row.role for row in assignments] == ["instructor", "dj"]
 
     def test_seed_events_sets_and_updates_visibility_overrides(
         self, tmp_path, monkeypatch

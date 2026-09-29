@@ -147,7 +147,7 @@ export default function NetworkPanel() {
                 : listTab === 'followers'
                     ? fetchMyFollowers
                     : fetchMyFollowing;
-        fetcher({ limit: 100 })
+        fetcher({ limit: 100, sort: 'recent' })
             .then((res) => {
                 if (!cancelled) setListData((d) => ({ ...d, [listTab]: res }));
             })

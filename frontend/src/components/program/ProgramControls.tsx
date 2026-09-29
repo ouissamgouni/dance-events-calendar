@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { ChevronLeft, ChevronRight, ListFilter, Search, X } from 'lucide-react';
 import type { EventSchedule, ScheduleSession } from '../../types';
-import { filterScheduleSessions, formatDayLabel, programDayOf, scheduleInstructors, sessionsForDay, type ScheduleFilters } from '../../utils/schedule';
+import { filterScheduleSessions, formatDayLabel, programDayOf, scheduleContributorOptions, sessionsForDay, type ScheduleFilters } from '../../utils/schedule';
 import BottomSheet from '../BottomSheet';
 
 const EMPTY_FILTERS: ScheduleFilters = { instructor: '', levelIds: [], activityTypeIds: [] };
@@ -12,6 +12,10 @@ interface FilterProps {
     schedule: EventSchedule;
     filters: ScheduleFilters;
     onChange: (filters: ScheduleFilters) => void;
+    cancelledFilter?: {
+        value: boolean;
+        onChange: (value: boolean) => void;
+    };
 }
 
 export function ProgramFilters({ schedule, filters, onChange }: FilterProps) {
@@ -19,23 +23,23 @@ export function ProgramFilters({ schedule, filters, onChange }: FilterProps) {
     const instructorListId = useId();
     const [suggestionsOpen, setSuggestionsOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState(0);
-    const instructors = scheduleInstructors(schedule.sessions);
+    const contributors = scheduleContributorOptions(schedule);
     const instructorQuery = filters.instructor.trim().toLocaleLowerCase();
-    const matchingInstructors = instructors
-        .filter((instructor) => !instructorQuery || instructor.toLocaleLowerCase().includes(instructorQuery));
+    const matchingContributors = contributors
+        .filter((contributor) => !instructorQuery || contributor.label.toLocaleLowerCase().includes(instructorQuery));
     const activeCount = (filters.instructor.trim() ? 1 : 0) + filters.levelIds.length + filters.activityTypeIds.length;
     const toggle = (key: 'levelIds' | 'activityTypeIds', id: number) => {
         const values = filters[key];
         onChange({ ...filters, [key]: values.includes(id) ? values.filter((value) => value !== id) : [...values, id] });
     };
-    const selectInstructor = (instructor: string) => {
-        onChange({ ...filters, instructor });
+    const selectContributor = (contributor: { id: number | null; label: string }) => {
+        onChange({ ...filters, instructor: contributor.label, contributorId: contributor.id });
         setSuggestionsOpen(false);
     };
     return <div className="mx-auto w-full max-w-5xl border-t border-line py-3">
         <div className="flex items-center gap-2">
             <div className="relative min-w-0 flex-1" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSuggestionsOpen(false); }}>
-                <label htmlFor={instructorInputId} className="sr-only">Search instructors</label>
+                <label htmlFor={instructorInputId} className="sr-only">Search artists and instructors</label>
                 <Search size={17} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                 <input
                     id={instructorInputId}
@@ -44,24 +48,24 @@ export function ProgramFilters({ schedule, filters, onChange }: FilterProps) {
                     role="combobox"
                     autoComplete="off"
                     aria-autocomplete="list"
-                    aria-expanded={suggestionsOpen && matchingInstructors.length > 0}
+                    aria-expanded={suggestionsOpen && matchingContributors.length > 0}
                     aria-controls={instructorListId}
-                    aria-activedescendant={suggestionsOpen && matchingInstructors[activeIndex] ? `${instructorListId}-${activeIndex}` : undefined}
+                    aria-activedescendant={suggestionsOpen && matchingContributors[activeIndex] ? `${instructorListId}-${activeIndex}` : undefined}
                     value={filters.instructor}
                     onFocus={() => setSuggestionsOpen(true)}
-                    onChange={(event) => { onChange({ ...filters, instructor: event.target.value }); setActiveIndex(0); setSuggestionsOpen(true); }}
+                    onChange={(event) => { onChange({ ...filters, instructor: event.target.value, contributorId: null }); setActiveIndex(0); setSuggestionsOpen(true); }}
                     onKeyDown={(event) => {
                         if (event.key === 'Escape') { setSuggestionsOpen(false); return; }
-                        if (event.key === 'ArrowDown') { event.preventDefault(); setSuggestionsOpen(true); setActiveIndex((value) => Math.min(value + 1, matchingInstructors.length - 1)); }
+                        if (event.key === 'ArrowDown') { event.preventDefault(); setSuggestionsOpen(true); setActiveIndex((value) => Math.min(value + 1, matchingContributors.length - 1)); }
                         if (event.key === 'ArrowUp') { event.preventDefault(); setActiveIndex((value) => Math.max(value - 1, 0)); }
-                        if (event.key === 'Enter' && suggestionsOpen && matchingInstructors[activeIndex]) { event.preventDefault(); selectInstructor(matchingInstructors[activeIndex]); }
+                        if (event.key === 'Enter' && suggestionsOpen && matchingContributors[activeIndex]) { event.preventDefault(); selectContributor(matchingContributors[activeIndex]); }
                     }}
-                    placeholder="Search instructors"
+                    placeholder="Search artists & instructors"
                     className="min-h-11 w-full rounded-field border border-line bg-surface py-2 pl-10 pr-10 text-base text-ink outline-none focus:border-action sm:text-sm"
                 />
-                {filters.instructor ? <button type="button" onClick={() => { onChange({ ...filters, instructor: '' }); setActiveIndex(0); setSuggestionsOpen(true); }} aria-label="Clear instructor filter" className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center text-muted hover:text-ink"><X size={17} /></button> : null}
-                {suggestionsOpen && matchingInstructors.length ? <div id={instructorListId} role="listbox" aria-label="Instructor suggestions" className="absolute inset-x-0 top-[calc(100%+0.375rem)] z-[12000] max-h-64 overflow-y-auto rounded-card border border-card-line bg-surface p-1.5 shadow-xl">
-                    {matchingInstructors.map((instructor, index) => <button key={instructor} id={`${instructorListId}-${index}`} type="button" role="option" aria-selected={index === activeIndex} onMouseDown={(event) => event.preventDefault()} onClick={() => selectInstructor(instructor)} className={`flex min-h-11 w-full items-center px-3 text-left text-sm font-medium ${index === activeIndex ? 'bg-action/10 text-action' : 'text-ink hover:bg-canvas'}`}>{instructor}</button>)}
+                {filters.instructor ? <button type="button" onClick={() => { onChange({ ...filters, instructor: '', contributorId: null }); setActiveIndex(0); setSuggestionsOpen(true); }} aria-label="Clear contributor filter" className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center text-muted hover:text-ink"><X size={17} /></button> : null}
+                {suggestionsOpen && matchingContributors.length ? <div id={instructorListId} role="listbox" aria-label="Artist and instructor suggestions" className="absolute inset-x-0 top-[calc(100%+0.375rem)] z-[12000] max-h-64 overflow-y-auto rounded-card border border-card-line bg-surface p-1.5 shadow-xl">
+                    {matchingContributors.map((contributor, index) => <button key={`${contributor.id ?? 'legacy'}-${contributor.label}`} id={`${instructorListId}-${index}`} type="button" role="option" aria-selected={index === activeIndex} onMouseDown={(event) => event.preventDefault()} onClick={() => selectContributor(contributor)} className={`flex min-h-11 w-full items-center px-3 text-left text-sm font-medium ${index === activeIndex ? 'bg-action/10 text-action' : 'text-ink hover:bg-canvas'}`}>{contributor.label}</button>)}
                 </div> : null}
             </div>
             {activeCount ? <button type="button" onClick={() => onChange({ instructor: '', levelIds: [], activityTypeIds: [] })} className="shrink-0 text-sm font-semibold text-action">Clear ({activeCount})</button> : null}
@@ -73,22 +77,24 @@ export function ProgramFilters({ schedule, filters, onChange }: FilterProps) {
     </div>;
 }
 
-export function AttendeeProgramFilters({ schedule, filters, onChange }: FilterProps) {
+export function AttendeeProgramFilters({ schedule, filters, onChange, cancelledFilter }: FilterProps) {
     const instructorSearchId = useId();
     const [sheetOpen, setSheetOpen] = useState(false);
     const [sheetView, setSheetView] = useState<'filters' | 'instructor'>('filters');
     const [draftFilters, setDraftFilters] = useState<ScheduleFilters>(filters);
+    const [draftIncludeCancelled, setDraftIncludeCancelled] = useState(cancelledFilter?.value ?? false);
     const [instructorQuery, setInstructorQuery] = useState('');
     const levels = schedule.levels.filter((level) => ATTENDEE_LEVELS.has(level.label.trim().toLocaleLowerCase()));
     const activityTypes = schedule.activity_types.filter((type) => ATTENDEE_ACTIVITY_TYPES.has(type.name.trim().toLocaleLowerCase()));
-    const instructors = scheduleInstructors(schedule.sessions);
-    const matchingInstructors = instructors.filter((instructor) => instructor.toLocaleLowerCase().includes(instructorQuery.trim().toLocaleLowerCase()));
-    const activeCount = (filters.instructor.trim() ? 1 : 0) + filters.levelIds.length + filters.activityTypeIds.length;
-    const draftActiveCount = (draftFilters.instructor.trim() ? 1 : 0) + draftFilters.levelIds.length + draftFilters.activityTypeIds.length;
-    const matchingSessionCount = filterScheduleSessions(schedule.sessions, draftFilters).length;
+    const contributors = scheduleContributorOptions(schedule);
+    const matchingContributors = contributors.filter((contributor) => contributor.label.toLocaleLowerCase().includes(instructorQuery.trim().toLocaleLowerCase()));
+    const activeCount = (filters.instructor.trim() ? 1 : 0) + filters.levelIds.length + filters.activityTypeIds.length + (cancelledFilter?.value ? 1 : 0);
+    const draftActiveCount = (draftFilters.instructor.trim() ? 1 : 0) + draftFilters.levelIds.length + draftFilters.activityTypeIds.length + (draftIncludeCancelled ? 1 : 0);
+    const matchingSessionCount = filterScheduleSessions(schedule.sessions, draftFilters)
+        .filter((session) => draftIncludeCancelled || !session.is_cancelled).length;
     const levelLabels = levels.filter((level) => filters.levelIds.includes(level.id)).map((level) => level.label);
     const activityLabels = activityTypes.filter((type) => filters.activityTypeIds.includes(type.id)).map((type) => type.name);
-    const summaryParts = [levelLabels[0], activityLabels[0], filters.instructor.trim() || undefined, ...levelLabels.slice(1), ...activityLabels.slice(1)]
+    const summaryParts = [levelLabels[0], activityLabels[0], filters.instructor.trim() || undefined, cancelledFilter?.value ? 'Cancelled' : undefined, ...levelLabels.slice(1), ...activityLabels.slice(1)]
         .filter((value): value is string => Boolean(value));
     const visibleSummary = summaryParts.slice(0, 2);
     const hiddenCount = Math.max(0, activeCount - visibleSummary.length);
@@ -105,10 +111,12 @@ export function AttendeeProgramFilters({ schedule, filters, onChange }: FilterPr
     };
     const clearFilters = () => {
         setDraftFilters(EMPTY_FILTERS);
+        setDraftIncludeCancelled(false);
         onChange(EMPTY_FILTERS);
+        cancelledFilter?.onChange(false);
     };
-    const selectInstructor = (instructor: string) => {
-        setDraftFilters((current) => ({ ...current, instructor }));
+    const selectContributor = (contributor: { id: number | null; label: string }) => {
+        setDraftFilters((current) => ({ ...current, instructor: contributor.label, contributorId: contributor.id }));
         setSheetView('filters');
         setInstructorQuery('');
     };
@@ -136,20 +144,20 @@ export function AttendeeProgramFilters({ schedule, filters, onChange }: FilterPr
 
             {sheetOpen ? (
                 <BottomSheet
-                    title={sheetView === 'filters' ? 'Filter schedule' : 'Select instructor'}
+                    title={sheetView === 'filters' ? 'Filter schedule' : 'Select artist or instructor'}
                     onClose={closeSheet}
                     headerLeading={sheetView === 'instructor' ? (
                         <button type="button" onClick={() => { setSheetView('filters'); setInstructorQuery(''); }} aria-label="Back to filters" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft hover:bg-canvas">
                             <ChevronLeft size={20} aria-hidden="true" />
                         </button>
                     ) : undefined}
-                    headerAction={sheetView === 'filters' ? <button type="button" disabled={!draftActiveCount} onClick={() => setDraftFilters(EMPTY_FILTERS)} className="px-2 py-2 text-sm font-semibold text-action disabled:text-muted">Reset</button> : undefined}
+                    headerAction={sheetView === 'filters' ? <button type="button" disabled={!draftActiveCount} onClick={() => { setDraftFilters(EMPTY_FILTERS); setDraftIncludeCancelled(false); }} className="px-2 py-2 text-sm font-semibold text-action disabled:text-muted">Reset</button> : undefined}
                     showClose={sheetView === 'filters'}
                     footer={sheetView === 'filters' ? (
                         <button
                             type="button"
                             disabled={!matchingSessionCount}
-                            onClick={() => { onChange(draftFilters); closeSheet(); }}
+                            onClick={() => { onChange(draftFilters); cancelledFilter?.onChange(draftIncludeCancelled); closeSheet(); }}
                             className="min-h-11 w-full rounded-field bg-action px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:bg-canvas disabled:text-ink-soft"
                         >
                             {matchingSessionCount ? `Show ${matchingSessionCount} ${matchingSessionCount === 1 ? 'session' : 'sessions'}` : 'No sessions match'}
@@ -182,25 +190,31 @@ export function AttendeeProgramFilters({ schedule, filters, onChange }: FilterPr
                             </fieldset>
                         ) : null}
                         <div>
-                            <p className="mb-2 text-sm font-semibold text-ink">Instructor</p>
+                            <p className="mb-2 text-sm font-semibold text-ink">Artists & instructors</p>
                             <button type="button" onClick={() => { setInstructorQuery(''); setSheetView('instructor'); }} className="flex min-h-11 w-full items-center justify-between rounded-field border border-line bg-surface px-3 text-left text-sm text-ink">
-                                <span className="truncate">{draftFilters.instructor || 'All instructors'}</span>
+                                <span className="truncate">{draftFilters.instructor || 'All artists & instructors'}</span>
                                 <ChevronRight size={17} aria-hidden="true" className="shrink-0 text-muted" />
                             </button>
                         </div>
+                        {cancelledFilter ? (
+                            <label className="flex min-h-11 items-center justify-between gap-4 border-t border-line pt-4 text-sm font-medium text-ink">
+                                <span>Show cancelled sessions</span>
+                                <input type="checkbox" checked={draftIncludeCancelled} onChange={(event) => setDraftIncludeCancelled(event.target.checked)} className="h-5 w-5 accent-action" />
+                            </label>
+                        ) : null}
                     </div> : (
                         <div>
-                            <label htmlFor={instructorSearchId} className="sr-only">Search instructors</label>
+                            <label htmlFor={instructorSearchId} className="sr-only">Search artists and instructors</label>
                             <div className="relative">
                                 <Search size={17} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                                <input id={instructorSearchId} type="search" autoFocus value={instructorQuery} onChange={(event) => setInstructorQuery(event.target.value)} placeholder="Search instructors…" className="min-h-11 w-full rounded-field border border-line bg-surface py-2 pl-10 pr-3 text-base text-ink outline-none focus:border-action sm:text-sm" />
+                                <input id={instructorSearchId} type="search" autoFocus value={instructorQuery} onChange={(event) => setInstructorQuery(event.target.value)} placeholder="Search artists & instructors" className="min-h-11 w-full rounded-field border border-line bg-surface py-2 pl-10 pr-3 text-base text-ink outline-none focus:border-action sm:text-sm" />
                             </div>
                             <fieldset className="mt-3 divide-y divide-line">
                                 <legend className="sr-only">Instructor</legend>
-                                <InstructorOption instructor="" selected={!draftFilters.instructor} onSelect={selectInstructor} />
-                                {matchingInstructors.map((instructor) => <InstructorOption key={instructor} instructor={instructor} selected={draftFilters.instructor === instructor} onSelect={selectInstructor} />)}
+                                <ContributorOption contributor={{ id: null, label: '' }} selected={!draftFilters.instructor} onSelect={selectContributor} />
+                                {matchingContributors.map((contributor) => <ContributorOption key={`${contributor.id ?? 'legacy'}-${contributor.label}`} contributor={contributor} selected={draftFilters.contributorId != null ? draftFilters.contributorId === contributor.id : draftFilters.instructor === contributor.label} onSelect={selectContributor} />)}
                             </fieldset>
-                            {instructorQuery.trim() && !matchingInstructors.length ? <p className="py-8 text-center text-sm text-ink-soft">No instructors found</p> : null}
+                            {instructorQuery.trim() && !matchingContributors.length ? <p className="py-8 text-center text-sm text-ink-soft">No artists or instructors found</p> : null}
                         </div>
                     )}
                 </BottomSheet>
@@ -209,11 +223,11 @@ export function AttendeeProgramFilters({ schedule, filters, onChange }: FilterPr
     );
 }
 
-function InstructorOption({ instructor, selected, onSelect }: { instructor: string; selected: boolean; onSelect: (instructor: string) => void }) {
-    const label = instructor || 'All instructors';
+function ContributorOption({ contributor, selected, onSelect }: { contributor: { id: number | null; label: string }; selected: boolean; onSelect: (contributor: { id: number | null; label: string }) => void }) {
+    const label = contributor.label || 'All artists & instructors';
     return (
         <label className="flex min-h-11 cursor-pointer items-center gap-3 py-2 text-sm text-ink">
-            <input type="radio" name="schedule-instructor" value={instructor} checked={selected} onChange={() => onSelect(instructor)} className="h-5 w-5 shrink-0 accent-action" />
+            <input type="radio" name="schedule-contributor" value={contributor.id ?? contributor.label} checked={selected} onChange={() => onSelect(contributor)} className="h-5 w-5 shrink-0 accent-action" />
             <span>{label}</span>
         </label>
     );

@@ -28,6 +28,7 @@ from backend.db.models import (  # noqa: E402
     UserPlanSession,
 )
 from backend.services.notifications import reconcile_plan_activity_notifications  # noqa: E402
+from backend.services.schedules import compute_change_details  # noqa: E402
 
 
 @pytest.fixture
@@ -645,20 +646,35 @@ def test_schedule_publish_and_my_plan_lifecycle(
         row for row in published_export.json()["sessions"] if row["id"] == session_id
     )
     assert exported_session["title"] == "Shines / Partnerwork"
+    assert exported_session["room_id"] is not None
+    assert published_export.json()["rooms"]
     assert published_export.json()["timezone"] == "Europe/Prague"
+    filtered_params = {
+        "days": "2026-10-16",
+        "instructor": "missing instructor",
+        "level_ids": exported_session["level_id"],
+        "activity_type_ids": exported_session["activity_type_id"],
+        "include_cancelled": False,
+    }
+    assert client.get(
+        "/api/admin/events/back-2-mambo-2026/schedule/published-export",
+        params=filtered_params,
+    ).json()["sessions"] == []
     program_ics = client.get(
-        "/api/admin/events/back-2-mambo-2026/schedule/published-export/ics"
+        "/api/admin/events/back-2-mambo-2026/schedule/published-export/ics",
+        params=filtered_params,
     )
     assert program_ics.status_code == 200
     assert program_ics.headers["content-type"].startswith("text/calendar")
-    assert f"UID:{session_id}@program.joinmovida.com" in program_ics.text
+    assert "BEGIN:VEVENT" not in program_ics.text
     assert "back-2-mambo-2026-program.ics" in program_ics.headers["content-disposition"]
     program_csv = client.get(
-        "/api/admin/events/back-2-mambo-2026/schedule/published-export/csv"
+        "/api/admin/events/back-2-mambo-2026/schedule/published-export/csv",
+        params=filtered_params,
     )
     assert program_csv.status_code == 200
     assert program_csv.content.startswith(b"\xef\xbb\xbf")
-    assert b"Shines / Partnerwork" in program_csv.content
+    assert b"Shines / Partnerwork" not in program_csv.content
     assert (
         client.get(
             "/api/admin/events/back-2-mambo-2026/schedule/published-export",
@@ -688,11 +704,34 @@ def test_schedule_publish_and_my_plan_lifecycle(
     client.cookies.clear()
     assert client.get("/api/events/back-2-mambo-2026/my-plan").status_code == 401
     assert client.get("/api/events/back-2-mambo-2026/my-plan/ics").status_code == 401
+    assert (
+        client.post(
+            "/api/my-plan/counts",
+            json={"event_ids": ["back-2-mambo-2026"]},
+        ).status_code
+        == 401
+    )
     _login(client, "dancer@example.com")
     saved = client.put(f"/api/events/back-2-mambo-2026/my-plan/{session_id}")
     assert saved.status_code == 201
     assert saved.json()["status"] == "active"
     assert instant_kinds == ["plan_session_added"]
+    plan_counts = client.post(
+        "/api/my-plan/counts",
+        json={
+            "event_ids": [
+                "back-2-mambo-2026",
+                "event-without-a-plan",
+                "back-2-mambo-2026",
+            ]
+        },
+    )
+    assert plan_counts.status_code == 200
+    assert plan_counts.headers["cache-control"] == "private, no-store"
+    assert plan_counts.json() == [
+        {"event_id": "back-2-mambo-2026", "plan_count": 1},
+        {"event_id": "event-without-a-plan", "plan_count": 0},
+    ]
     assert (
         client.get("/api/events/back-2-mambo-2026/my-plan").json()["audience"] is None
     )
@@ -771,6 +810,10 @@ def test_schedule_publish_and_my_plan_lifecycle(
     assert plan.status_code == 200
     assert plan.json()["entries"][0]["status"] == "removed"
     assert plan.json()["entries"][0]["session"]["title"] == "Shines / Partnerwork"
+    assert client.post(
+        "/api/my-plan/counts",
+        json={"event_ids": ["back-2-mambo-2026"]},
+    ).json() == [{"event_id": "back-2-mambo-2026", "plan_count": 0}]
     removed_plan_ics = client.get("/api/events/back-2-mambo-2026/my-plan/ics")
     assert removed_plan_ics.status_code == 200
     assert f"UID:{session_id}@program.joinmovida.com" in removed_plan_ics.text
@@ -856,7 +899,16 @@ def test_schedule_json_import_preview_merge_and_replace(client, schedule_event):
         json={"mode": "merge", "document": document},
     )
     assert preview.status_code == 200
-    assert preview.json()["operations"]["created"] == 3
+    assert preview.json()["operations"]["created"] == 4
+    assert {
+        "entity_type": "session",
+        "operation": "create",
+        "label": "Shines / Partnerwork",
+    }.items() <= next(
+        change
+        for change in preview.json()["changes"]
+        if change["entity_type"] == "session"
+    ).items()
     assert (
         client.get("/api/admin/events/back-2-mambo-2026/schedule").json()["sessions"]
         == []
@@ -867,7 +919,7 @@ def test_schedule_json_import_preview_merge_and_replace(client, schedule_event):
         json={"mode": "merge", "document": document},
     )
     assert applied.status_code == 200
-    assert applied.json()["operations"]["created"] == 3
+    assert applied.json()["operations"]["created"] == 4
     exported = client.get("/api/admin/events/back-2-mambo-2026/schedule/export")
     assert exported.status_code == 200
     assert exported.json()["sessions"][0]["start"] == "2026-10-16T14:00:00"
@@ -888,10 +940,165 @@ def test_schedule_json_import_preview_merge_and_replace(client, schedule_event):
     )
     assert replaced.status_code == 200
     assert replaced.json()["operations"]["removed"] == 1
+    removed_change = next(
+        change
+        for change in replaced.json()["changes"]
+        if change["operation"] == "remove"
+    )
+    assert removed_change["entity_type"] == "session"
+    assert removed_change["label"] == "Shines / Partnerwork"
     assert (
         client.get("/api/admin/events/back-2-mambo-2026/schedule").json()["sessions"]
         == []
     )
+
+
+def test_schedule_import_preview_hides_generated_external_id_backfill(
+    client, schedule_event
+):
+    _login(client, "admin@example.com")
+    assert client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule",
+        json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
+    ).status_code == 201
+    assert client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule/venues",
+        json={"name": "Slovanský dům", "address": "Na Příkopě 22"},
+    ).status_code == 201
+    document = client.get(
+        "/api/admin/events/back-2-mambo-2026/schedule/export"
+    ).json()
+
+    preview = client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule/import-preview",
+        json={"mode": "merge", "document": document},
+    )
+
+    assert preview.status_code == 200
+    assert preview.json()["operations"]["updated"] == 0
+    assert preview.json()["changes"] == []
+
+
+def test_schedule_change_details_render_contributor_names_and_roles():
+    previous = {
+        "contributors": [{"id": 1, "display_name": "Maya Chen"}],
+        "sessions": [
+            {
+                "id": "session-1",
+                "title": "Workshop",
+                "contributors": [
+                    {"contributor_id": 1, "role": "instructor", "position": 0}
+                ],
+            }
+        ],
+    }
+    current = {
+        "contributors": [{"id": 2, "display_name": "DJ Marta"}],
+        "sessions": [
+            {
+                "id": "session-1",
+                "title": "Workshop",
+                "contributors": [
+                    {"contributor_id": 2, "role": "dj", "position": 0}
+                ],
+            }
+        ],
+    }
+
+    session_change = next(
+        change
+        for change in compute_change_details(current, previous)
+        if change["entity_type"] == "session"
+    )
+
+    assert session_change["fields"] == [
+        {
+            "field": "contributors",
+            "before": "Maya Chen (instructor)",
+            "after": "DJ Marta (dj)",
+        }
+    ]
+
+
+def test_schedule_json_import_v2_round_trips_session_contributors(
+    client, schedule_event
+):
+    _login(client, "admin@example.com")
+    assert client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule",
+        json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
+    ).status_code == 201
+    document = {
+        "schema_version": 2,
+        "event_id": "back-2-mambo-2026",
+        "timezone": "Europe/Prague",
+        "day_start_hour": 6,
+        "days": ["2026-10-16"],
+        "venues": [],
+        "rooms": [],
+        "levels": [],
+        "activity_types": [],
+        "contributors": [
+            {"external_id": "maya", "display_name": "Maya Chen"},
+            {"external_id": "leo", "display_name": "Leo Cruz", "sort_order": 1},
+            {"external_id": "dj-marta", "display_name": "DJ Marta", "sort_order": 2},
+        ],
+        "sessions": [
+            {
+                "external_id": "social",
+                "title": "Afternoon Social",
+                "contributors": [],
+                "start": "2026-10-16T14:00:00",
+                "end": "2026-10-16T15:00:00",
+            },
+            {
+                "external_id": "workshop",
+                "title": "Partnerwork",
+                "contributors": [
+                    {"contributor_external_id": "maya", "role": "instructor"},
+                    {"contributor_external_id": "leo", "role": "instructor"},
+                ],
+                "start": "2026-10-16T15:00:00",
+                "end": "2026-10-16T16:00:00",
+            },
+            {
+                "external_id": "party",
+                "title": "Evening Party",
+                "contributors": [
+                    {"contributor_external_id": "dj-marta", "role": "dj"}
+                ],
+                "start": "2026-10-16T20:00:00",
+                "end": "2026-10-16T23:00:00",
+            },
+        ],
+    }
+
+    applied = client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule/import",
+        json={"mode": "replace", "document": document},
+    )
+
+    assert applied.status_code == 200
+    exported = client.get(
+        "/api/admin/events/back-2-mambo-2026/schedule/export"
+    ).json()
+    assert exported["schema_version"] == 2
+    assert [row["external_id"] for row in exported["contributors"]] == [
+        "maya",
+        "leo",
+        "dj-marta",
+    ]
+    sessions = {row["external_id"]: row for row in exported["sessions"]}
+    assert sessions["social"]["contributors"] == []
+    assert sessions["workshop"]["contributors"] == [
+        {"contributor_external_id": "maya", "role": "instructor"},
+        {"contributor_external_id": "leo", "role": "instructor"},
+    ]
+    assert sessions["workshop"]["instructors"] == "Maya Chen & Leo Cruz"
+    assert sessions["party"]["contributors"] == [
+        {"contributor_external_id": "dj-marta", "role": "dj"}
+    ]
+    assert sessions["party"]["instructors"] is None
 
 
 def test_schedule_json_import_rejects_unknown_reference_without_writes(

@@ -35,10 +35,10 @@ function event(id: string, imageUrl: string | null): CalendarEvent {
     };
 }
 
-function renderList(tab: 'upcoming' | 'saved' | 'past', events: CalendarEvent[], onEventClick = vi.fn()) {
+function renderList(tab: 'upcoming' | 'saved' | 'past', events: CalendarEvent[], onEventClick = vi.fn(), scheduleEnabled = false) {
     // Pictures are behind a site setting; turn it on so the image assertions
     // below exercise the picture slot rather than the placeholder-free layout.
-    const flags = { ...defaultFlags, eventImagesEnabled: true };
+    const flags = { ...defaultFlags, eventImagesEnabled: true, eventScheduleEnabled: scheduleEnabled };
     return renderWithProviders(
         <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
             <MyRatingsProvider>
@@ -99,6 +99,25 @@ describe('MyEventsList', () => {
         // the avatars stack — no Save / I'm going action buttons.
         expect(screen.queryByRole('button', { name: 'Save event' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: "I'm going" })).not.toBeInTheDocument();
+    });
+
+    it('shows My Plan only on an Upcoming card when the shared count is positive', async () => {
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/users/me/ratings', () => HttpResponse.json([])),
+            http.post('*/api/my-plan/counts', () => HttpResponse.json([
+                { event_id: 'planned', plan_count: 3 },
+            ])),
+        );
+        const plannedEvent = { ...event('planned', null), schedule_published: true };
+        const { unmount } = renderList('upcoming', [plannedEvent], vi.fn(), true);
+
+        expect(await screen.findByRole('link', { name: 'My Plan' })).toHaveAttribute('href', '/event/planned/program/plan');
+        unmount();
+
+        renderList('saved', [plannedEvent], vi.fn(), true);
+        expect(screen.queryByRole('link', { name: 'My Plan' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Program' })).not.toBeInTheDocument();
     });
 
     it('removes a failed image and shows only the I\'m going button on Saved', () => {

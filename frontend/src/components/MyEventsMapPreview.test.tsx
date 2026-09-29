@@ -1,7 +1,10 @@
 import { fireEvent, screen } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { FeatureFlagsProvider } from '../context/FeatureFlagsContext';
+import { defaultFlags, FeatureFlagsContext, FeatureFlagsProvider } from '../context/FeatureFlagsContext';
 import { renderWithProviders } from '../test/render';
+import { makeUser } from '../test/handlers';
+import { server } from '../test/server';
 import type { CalendarEvent } from '../types';
 import MyEventsMapPreview from './MyEventsMapPreview';
 
@@ -86,5 +89,29 @@ describe('MyEventsMapPreview', () => {
         expect(screen.getByText('Paris, France')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Previous event' })).toBeDisabled();
         expect(screen.getByRole('button', { name: 'Next event' })).toBeDisabled();
+    });
+
+    it('shows My Plan in an Upcoming map preview when the shared count is positive', async () => {
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.post('*/api/my-plan/counts', () => HttpResponse.json([
+                { event_id: 'evt-1', plan_count: 2 },
+            ])),
+        );
+        renderWithProviders(
+            <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, eventScheduleEnabled: true }, updateFlag: vi.fn() }}>
+                <MyEventsMapPreview
+                    event={{ ...event, schedule_published: true }}
+                    hasPrevious={false}
+                    hasNext={false}
+                    onPrevious={vi.fn()}
+                    onNext={vi.fn()}
+                    onOpen={vi.fn()}
+                    showProgramAction
+                />
+            </FeatureFlagsContext.Provider>,
+        );
+
+        expect(await screen.findByRole('link', { name: 'My Plan' })).toHaveAttribute('href', '/event/evt-1/program/plan');
     });
 });

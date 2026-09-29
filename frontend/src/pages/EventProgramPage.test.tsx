@@ -78,7 +78,7 @@ describe('EventProgramPage', () => {
         vi.mocked(fetchAdminEventSchedule).mockResolvedValue({
             ...schedule,
             issues: [],
-            diff: { added_session_ids: [], removed_session_ids: [], changed_sessions: {}, configuration_changed: false },
+            diff: { added_session_ids: [], removed_session_ids: [], changed_sessions: {}, configuration_changed: false, changes: [] },
         });
         vi.mocked(fetchEventSchedule).mockResolvedValue(schedule);
         vi.mocked(fetchEventScheduleEditorAccess).mockResolvedValue({ can_edit: false });
@@ -334,11 +334,11 @@ describe('EventProgramPage', () => {
 
         fireEvent.click(within(sheet).getByRole('button', { name: 'Open Level' }));
         fireEvent.click(within(sheet).getByRole('button', { name: 'Workshop' }));
-        fireEvent.click(within(sheet).getByRole('button', { name: 'All instructors' }));
-        const instructorSheet = screen.getByRole('dialog', { name: 'Select instructor' });
-        expect(within(instructorSheet).getByRole('radio', { name: 'All instructors' })).toBeInTheDocument();
-        fireEvent.change(within(instructorSheet).getByLabelText('Search instructors'), { target: { value: 'may' } });
-        expect(within(instructorSheet).getByRole('radio', { name: 'All instructors' })).toBeInTheDocument();
+        fireEvent.click(within(sheet).getByRole('button', { name: 'All artists & instructors' }));
+        const instructorSheet = screen.getByRole('dialog', { name: 'Select artist or instructor' });
+        expect(within(instructorSheet).getByRole('radio', { name: 'All artists & instructors' })).toBeInTheDocument();
+        fireEvent.change(within(instructorSheet).getByLabelText('Search artists and instructors'), { target: { value: 'may' } });
+        expect(within(instructorSheet).getByRole('radio', { name: 'All artists & instructors' })).toBeInTheDocument();
         fireEvent.click(within(instructorSheet).getByRole('radio', { name: 'Maya' }));
         sheet = screen.getByRole('dialog', { name: 'Filter schedule' });
         expect(within(sheet).getByRole('button', { name: 'Maya' })).toBeInTheDocument();
@@ -404,11 +404,11 @@ describe('EventProgramPage', () => {
         renderPage();
 
         fireEvent.click(await screen.findByRole('button', { name: 'Filter schedule' }));
-        fireEvent.click(screen.getByRole('button', { name: 'All instructors' }));
-        const sheet = screen.getByRole('dialog', { name: 'Select instructor' });
+        fireEvent.click(screen.getByRole('button', { name: 'All artists & instructors' }));
+        const sheet = screen.getByRole('dialog', { name: 'Select artist or instructor' });
 
         expect(within(sheet).getAllByRole('radio')).toHaveLength(11);
-        fireEvent.change(within(sheet).getByLabelText('Search instructors'), { target: { value: 'Instructor 9' } });
+        fireEvent.change(within(sheet).getByLabelText('Search artists and instructors'), { target: { value: 'Instructor 9' } });
         expect(within(sheet).getAllByRole('radio')).toHaveLength(2);
         expect(within(sheet).getByRole('radio', { name: 'Instructor 9' })).toBeInTheDocument();
     });

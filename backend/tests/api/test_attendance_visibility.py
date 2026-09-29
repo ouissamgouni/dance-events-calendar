@@ -30,6 +30,7 @@ from backend.db.models import (  # noqa: E402
     EventSuggestion,
     User,
     UserEventAttendance,
+    UserFollow,
     UserSavedEvent,
 )
 
@@ -484,3 +485,59 @@ def test_attendance_summary_batch_includes_total_saved(client, session):
     assert by_id[event_b]["total_saved"] == 2
     assert by_id[event_c]["total_going"] == 0
     assert by_id[event_c]["total_saved"] == 0
+
+
+@pytest.mark.unit
+def test_attendance_summaries_prioritize_friend_then_following(client, session):
+    viewer = _make_user(session, "viewer@example.com", "Viewer")
+    stranger = _make_user(session, "stranger@example.com", "Stranger")
+    followed = _make_user(session, "followed@example.com", "Followed")
+    friend = _make_user(session, "friend@example.com", "Friend")
+    session.add(UserFollow(follower_id=viewer.id, followee_id=followed.id))
+    session.add(UserFollow(follower_id=viewer.id, followee_id=friend.id))
+    session.add(UserFollow(follower_id=friend.id, followee_id=viewer.id))
+    session.commit()
+
+    event_id = "evt-relationship-preview"
+    _seed(
+        session,
+        event_id=event_id,
+        user=stranger,
+        device_id="d-stranger",
+        share_publicly=True,
+    )
+    _seed(
+        session,
+        event_id=event_id,
+        user=followed,
+        device_id="d-followed",
+        share_publicly=True,
+    )
+    _seed(
+        session,
+        event_id=event_id,
+        user=friend,
+        device_id="d-friend",
+        share_publicly=True,
+    )
+
+    _login(client, "viewer@example.com")
+    single = client.get(f"/api/events/{event_id}/attendance-summary")
+    batch = client.post(
+        "/api/events/attendance-summary", json={"event_ids": [event_id]}
+    )
+
+    assert single.status_code == 200, single.text
+    assert batch.status_code == 200, batch.text
+    for summary in (single.json(), batch.json()[0]):
+        preview = summary["preview_attendees"]
+        assert [row["display_name"] for row in preview] == [
+            "Friend",
+            "Followed",
+            "Stranger",
+        ]
+        assert preview[0]["is_friend"] is True
+        assert preview[0]["viewer_follow_status"] == "approved"
+        assert preview[1]["is_friend"] is False
+        assert preview[1]["viewer_follow_status"] == "approved"
+        assert preview[2]["viewer_follow_status"] is None

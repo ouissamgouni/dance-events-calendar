@@ -433,6 +433,36 @@ def test_e4_suggestions_fall_back_to_curators_without_mutuals(client, session):
     assert curator_item["mutual_friend_count"] == 0
 
 
+def test_e4_suggestions_use_one_way_follow_network_then_trusted_topups(client, session):
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    followed = _make_user(session, "followed@example.com", "followed")
+    network_candidate = _make_user(session, "network@example.com", "network")
+    organizer = _make_user(
+        session,
+        "organizer@example.com",
+        "organizer",
+        is_verified_organizer=True,
+    )
+    curator = _make_user(
+        session, "curator@example.com", "curator", is_admin_managed=True
+    )
+    _follow(session, viewer, followed)
+    _follow(session, followed, network_candidate)
+
+    _login(client, "viewer@example.com")
+    r = client.get("/api/social/me/suggestions")
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [item["handle"] for item in body["items"]] == [
+        "network",
+        "organizer",
+        "curator",
+    ]
+    assert body["total"] == 3
+    assert all(item["mutual_friend_count"] == 0 for item in body["items"])
+
+
 def test_e4_fof_suggestions_exclude_opted_out_users(client, session):
     viewer = _make_user(session, "viewer@example.com", "viewer")
     friend = _make_user(session, "friend@example.com", "friend")

@@ -7,6 +7,7 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useMyRating, useMyRatingsLoaded } from '../context/MyRatingsContext';
 import EventCard from './EventCard';
 import EventReviewCard from './EventReviewCard';
+import ProgramAction from './ProgramAction';
 
 interface Props {
     events: CalendarEvent[];
@@ -51,6 +52,7 @@ function MyEventRow({ event, tab, onEventClick, reviewTagLabels }: { event: Cale
             actions={isSaved ? ['going'] : undefined}
             hideAvatarsIfOnlyCurrentUser={isUpcoming}
             goingIconVariant="hand"
+            bottomSlot={isUpcoming ? <ProgramAction event={event} /> : undefined}
             testId="my-events-row"
         />
     );

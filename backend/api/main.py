@@ -33,6 +33,7 @@ from backend.api.routes.promo_codes import router as promo_codes_router
 from backend.api.routes.organizer_claims import router as organizer_claims_router
 from backend.api.routes.passport import router as passport_router
 from backend.api.routes.schedules import admin_router as admin_schedules_router
+from backend.api.routes.schedules import my_plan_router
 from backend.api.routes.schedules import public_router as schedules_router
 from backend.api.routes.tags import router as tags_router
 from backend.api.routes.tracking import router as tracking_router
@@ -226,6 +227,7 @@ app.include_router(notifications_router)
 app.include_router(push_router)
 app.include_router(interest_profiles_router)
 app.include_router(passport_router)
+app.include_router(my_plan_router)
 app.include_router(schedules_router)
 app.include_router(admin_schedules_router)
 
