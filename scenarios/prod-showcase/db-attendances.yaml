@@ -1,10 +1,10 @@
 attendances:
   - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    email: lina.moreau@joinmovida.com
+    email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: friends
   - event_id: atlantic-salsa-weekender
-    email: lina.moreau@joinmovida.com
+    email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: friends
   - event_id: seine-salsa-social
@@ -68,7 +68,7 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
-    email: lina.moreau@joinmovida.com
+    email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
@@ -136,10 +136,6 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
-  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
     email: victor.schmidt@joinmovida.com
     share_publicly: true
     share_audience: public
@@ -168,7 +164,7 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
-    email: lina.moreau@joinmovida.com
+    email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
@@ -236,7 +232,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
-    email: lina.moreau@joinmovida.com
+    email: elena.moreau@joinmovida.com
     share_publicly: false
     share_audience: private
   - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
@@ -360,7 +356,7 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: 6dh36chlc8r62bb3cdi32b9k6lh3ab9oc4pmab9p6dim4d316hgm6opk6k
-    email: lina.moreau@joinmovida.com
+    email: elena.moreau@joinmovida.com
     share_publicly: false
     share_audience: friends
   - event_id: 6dh36chlc8r62bb3cdi32b9k6lh3ab9oc4pmab9p6dim4d316hgm6opk6k
@@ -480,7 +476,7 @@ attendances:
     share_publicly: false
     share_audience: private
   - event_id: 68o3icj660s6abb6cgrj8b9k68p3abb26gp3gb9m6grm6ohh6co38cb36s
-    email: lina.moreau@joinmovida.com
+    email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc

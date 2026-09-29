@@ -1,33 +1,33 @@
 emit_notifications: true
 
 follows:
-  - follower: lina.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
     followee: picks@joinmovida.com
-  - follower: lina.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
     followee: penny.valdez@joinmovida.com
-  - follower: lina.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
     followee: maya.rivera@joinmovida.com
   - follower: maya.rivera@joinmovida.com
-    followee: lina.moreau@joinmovida.com
-  - follower: lina.moreau@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
     followee: leo.martin@joinmovida.com
   - follower: leo.martin@joinmovida.com
-    followee: lina.moreau@joinmovida.com
-  - follower: lina.moreau@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
     followee: ines.lopez@joinmovida.com
   - follower: ines.lopez@joinmovida.com
-    followee: lina.moreau@joinmovida.com
-  - follower: lina.moreau@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
     followee: noah.kim@joinmovida.com
   - follower: noah.kim@joinmovida.com
-    followee: lina.moreau@joinmovida.com
-  - follower: lina.moreau@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
     followee: zara.benali@joinmovida.com
   - follower: zara.benali@joinmovida.com
-    followee: lina.moreau@joinmovida.com
+    followee: elena.moreau@joinmovida.com
   - follower: omar.costa@joinmovida.com
-    followee: lina.moreau@joinmovida.com
-  - follower: lina.moreau@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
     followee: clara.dubois@joinmovida.com
     status: pending
   - follower: picks@joinmovida.com

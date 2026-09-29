@@ -293,7 +293,7 @@ Recording checklist:
 1. Keep the launch terminal open. In another terminal, run
   `task showcase:status` and confirm Web, API, Mailpit, and Tailscale Serve are
   ready.
-2. Open the printed Tailscale URL on the phone. Sign in as Lina Moreau for the
+2. Open the printed Tailscale URL on the phone. Sign in as Elena Moreau for the
   populated experience or Amira Haddad for onboarding.
 3. On iPhone, use Safari's Share > Add to Home Screen. On Android, use the
   browser's Install app action. Launch the installed app before enabling push.
@@ -314,6 +314,13 @@ tailnet-only `*.ts.net` address. Verify that provider against a separately
 deployed public environment; do not enable Tailscale Funnel for the local
 showcase. Apple Calendar and other clients that fetch on the connected device
 can use the private feed.
+
+The files under `frontend/public/splash/` are Apple startup images referenced by
+`apple-touch-startup-image`; Android does not use them. Chrome builds the brief
+WebAPK launch screen from the manifest icon, `background_color`, and
+`theme_color`. It normally appears only on a cold process launch and may be
+skipped when the installed app resumes from memory. To verify it, force-stop
+Movida in Android settings and then launch it from the installed app icon.
 
 Do not run the generic scenario with production database or SMTP credentials.
 The showcase task deliberately redirects SMTP to Mailpit, disables Google

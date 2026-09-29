@@ -5,6 +5,13 @@ calendars:
   enabled: false
   default_tags:
   - dance-style:bachata
+- id: e71e38cf61b1a12f8fa45f8703ca49f5eaa05f54cbe23f1383b6875c290485c8@group.calendar.google.com
+  name: Bachata - Int
+  color: '#9333ea'
+  enabled: true
+  default_tags:
+  - dance-style:bachata
+  - reach:international
 - id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   name: Salsa
   color: '#e11d48'
@@ -23,6 +30,34 @@ calendars:
   color: '#ab2737'
   enabled: false
   default_tags:
+  - reach:local
+- id: c9f97611396839b34602d48cc6fe04555217e5f924d4c3ef11d184af36be2234@group.calendar.google.com
+  name: Salsa | Mambo - Int
+  color: '#2563eb'
+  enabled: true
+  default_tags:
+  - dance-style:mambo
+  - dance-style:salsa
+  - reach:international
+- id: 2181fecd0d5ab744bc83c09e00f62d241543021e2473b928c91efb573b130839@group.calendar.google.com
+  name: SBK - Int
+  color: '#d97706'
+  enabled: true
+  default_tags:
+  - dance-style:bachata
+  - dance-style:cuban
+  - dance-style:kizomba
+  - dance-style:salsa
+  - reach:international
+- id: 7d8eab6df289fa3d08657a723c34936ac02570747bf2862c342a3ade07d5ceb8@group.calendar.google.com
+  name: SBK - Loc
+  color: '#9333ea'
+  enabled: true
+  default_tags:
+  - dance-style:bachata
+  - dance-style:cuban
+  - dance-style:kizomba
+  - dance-style:salsa
   - reach:local
 - id: movida-community-events
   name: Movida Community Events

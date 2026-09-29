@@ -30,7 +30,7 @@ messages:
     body: First-time visitors, shall we meet by registration before the welcome class?
   - reply_to: weekender-meetup
     event_id: atlantic-salsa-weekender
-    email: lina.moreau@joinmovida.com
+    email: elena.moreau@joinmovida.com
     body: Great idea. I will be there in a green jacket.
   - key: lisbon-shoes
     event_id: alfama-thursday-salsa-next

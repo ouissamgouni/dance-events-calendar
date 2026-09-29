@@ -96,6 +96,66 @@ def _load_yaml(path: Path) -> dict:
         return yaml.safe_load(file) or {}
 
 
+def _normalized_asset_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+def _validate_local_assets(output_dir: Path, users: list[dict]) -> None:
+    missing = []
+    for user in users:
+        filename = user.get("avatar") if isinstance(user, dict) else None
+        if filename and not (output_dir / "user-avatars" / filename).is_file():
+            missing.append(f"avatar {filename}")
+
+    overlay = _load_yaml(output_dir / "overlay-events.yaml")
+    for event in overlay.get("events") or []:
+        filename = event.get("image") if isinstance(event, dict) else None
+        if not filename:
+            continue
+        if not (output_dir / "images" / filename).is_file():
+            missing.append(f"event image {filename}")
+            continue
+        image_name = re.sub(r"^\d+[-_]", "", Path(filename).stem)
+        if _normalized_asset_name(image_name) != _normalized_asset_name(
+            event.get("title", "")
+        ):
+            raise ValueError(
+                f"Showcase event image does not match title: {filename}"
+            )
+
+    if missing:
+        raise ValueError("Missing showcase local assets: " + ", ".join(sorted(missing)))
+
+
+def _validate_review_tags(output_dir: Path) -> None:
+    tag_groups = _load_yaml(output_dir / "tags.yaml").get("tag_groups") or []
+    scopes = {
+        f"{group['slug']}:{tag['slug']}": group.get("scope", "event")
+        for group in tag_groups
+        for tag in group.get("tags") or []
+    }
+    ratings = _load_yaml(output_dir / "overlay-events.yaml").get("ratings") or []
+    invalid = []
+    for rating in ratings:
+        for slug in rating.get("aspect_tags") or []:
+            if scopes.get(slug) != "aspect":
+                invalid.append(slug)
+        for slug in rating.get("audience_tags") or []:
+            if scopes.get(slug) != "audience":
+                invalid.append(slug)
+        for group_slug in (rating.get("aspect_scores") or {}):
+            if not any(
+                group.get("slug") == group_slug and group.get("scope") == "aspect"
+                for group in tag_groups
+            ):
+                invalid.append(group_slug)
+    if invalid:
+        raise ValueError(
+            "Showcase reviews reference invalid tags or aspects: "
+            + ", ".join(sorted(set(invalid)))
+        )
+
+
 def validate_showcase_fixtures(output_dir: Path, event_ids: set[str]) -> None:
     users = _load_yaml(output_dir / "mock-users.yaml").get("users") or []
     emails = [
@@ -155,6 +215,8 @@ def validate_showcase_fixtures(output_dir: Path, event_ids: set[str]) -> None:
         )
         raise ValueError("Showcase fixtures reference unknown users: " + details)
 
+    _validate_local_assets(output_dir, users)
+    _validate_review_tags(output_dir)
     validate_overlays(output_dir, event_ids)
 
     if forbidden_by_file:

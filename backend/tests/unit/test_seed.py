@@ -438,6 +438,55 @@ class TestDatabaseSeeder:
         assert user is not None
         assert user.avatar_url == "https://example.com/avatar-viewer.jpg"
 
+    def test_seed_local_user_avatar_is_managed_and_idempotent(
+        self, tmp_path, monkeypatch
+    ):
+        scenario_dir = tmp_path / "scenario"
+        avatars_dir = scenario_dir / "user-avatars"
+        avatars_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: viewer@example.com\n"
+            "    name: Viewer\n"
+            "    avatar: viewer.jpg\n"
+            "    avatar_url: https://example.com/fallback.jpg\n",
+            encoding="utf-8",
+        )
+        (avatars_dir / "viewer.jpg").write_bytes(b"avatar-bytes")
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.get_client", lambda: object()
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.ensure_buckets", lambda client: None
+        )
+        uploads = []
+
+        def store_user_avatar(user_id, data, content_type=None, client=None):
+            uploads.append((user_id, data, client))
+            return f"users/{user_id}/avatar/seed"
+
+        monkeypatch.setattr(
+            "backend.services.user_avatars.store_user_avatar", store_user_avatar
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            seeder = DatabaseSeeder(session)
+            seeder.seed(scenario_dir)
+            seeder.seed(scenario_dir)
+            user = session.exec(
+                select(User).where(User.email == "viewer@example.com")
+            ).first()
+
+        assert user is not None
+        assert user.avatar_url == "https://example.com/fallback.jpg"
+        assert user.avatar_key == f"users/{user.id}/avatar/seed"
+        assert uploads == [(str(user.id), b"avatar-bytes", uploads[0][2])]
+
     def test_seed_attendances_and_saves_from_separate_files(
         self, tmp_path, monkeypatch
     ):

@@ -208,11 +208,11 @@ schedules:
         attendee_note: Farewell social and closing announcements.
     published: true
     plans:
-      - email: lina.moreau@joinmovida.com
+      - email: elena.moreau@joinmovida.com
         session_id: "30000000-0000-4000-8000-000000001601"
-      - email: lina.moreau@joinmovida.com
+      - email: elena.moreau@joinmovida.com
         session_id: "30000000-0000-4000-8000-000000001606"
-      - email: lina.moreau@joinmovida.com
+      - email: elena.moreau@joinmovida.com
         session_id: "30000000-0000-4000-8000-000000001703"
-      - email: lina.moreau@joinmovida.com
+      - email: elena.moreau@joinmovida.com
         session_id: "30000000-0000-4000-8000-000000001801"

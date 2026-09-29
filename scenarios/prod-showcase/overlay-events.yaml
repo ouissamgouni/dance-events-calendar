@@ -18,6 +18,7 @@ events:
     longitude: -9.1393
     start: w-8 Thu 20:00
     end: w-8 Fri 00:30
+    image: 01_alfama_thursday_salsa_summer_edition.png
     price_min: 10
     price_currency: EUR
     price_is_free: false
@@ -37,6 +38,7 @@ events:
     longitude: -9.1393
     start: w-2 Thu 20:00
     end: w-2 Fri 00:30
+    image: 02_alfama_thursday_salsa_autumn_edition.png
     price_min: 10
     price_currency: EUR
     price_is_free: false
@@ -48,7 +50,7 @@ events:
     calendar_id: movida-community-events
     title: Alfama Thursday Salsa - Next Edition
     description: Beginner class, social dancing, and a late-night salsa set in central Lisbon.
-    image: landscape.jpg
+    image: 03_alfama_thursday_salsa_next_edition.png
     location: Clube do Tejo, Lisbon, Portugal
     city: Lisbon
     country: Portugal
@@ -76,6 +78,7 @@ events:
     longitude: 2.3522
     start: w-20 Sat 20:00
     end: w-20 Sun 01:00
+    image: 04_seine_salsa_social.png
     price_is_free: true
     tags:
       - format:social
@@ -93,6 +96,7 @@ events:
     longitude: 13.405
     start: w-16 Sat 14:00
     end: w-16 Sun 02:00
+    image: 05_berlin_bachata_exchange.png
     price_min: 45
     price_currency: EUR
     price_is_free: false
@@ -104,7 +108,7 @@ events:
     calendar_id: movida-community-events
     title: Madrid Salsa Congress Night
     description: Congress workshops followed by live music and social dancing until late.
-    image: ultrawide.jpg
+    image: 06_madrid_salsa_congress_night.png
     location: Palacio de Congresos, Madrid, Spain
     city: Madrid
     country: Spain
@@ -132,6 +136,7 @@ events:
     longitude: 4.9041
     start: w-10 Sun 15:00
     end: w-10 Sun 22:00
+    image: 07_canal_bachata_sunday.png
     price_min: 18
     price_currency: EUR
     price_is_free: false
@@ -151,6 +156,7 @@ events:
     longitude: -0.1276
     start: w-6 Fri 19:00
     end: w-6 Sun 02:00
+    image: 08_london_salsa_weekender.png
     price_min: 65
     price_currency: GBP
     price_is_free: false
@@ -170,6 +176,7 @@ events:
     longitude: 4.3517
     start: w-5 Sat 19:00
     end: w-5 Sat 23:30
+    image: 09_brussels_latin_rooftop.png
     price_is_free: true
     tags:
       - format:social
@@ -188,6 +195,7 @@ events:
     longitude: 9.19
     start: w-4 Sat 14:00
     end: w-4 Sun 01:00
+    image: 10_milano_salsa_lab.png
     price_min: 35
     price_currency: EUR
     price_is_free: false
@@ -207,6 +215,7 @@ events:
     longitude: 2.1734
     start: w-3 Sun 18:00
     end: w-3 Sun 23:00
+    image: 11_barcelona_beach_bachata.png
     price_is_free: true
     tags:
       - format:social
@@ -216,7 +225,7 @@ events:
     calendar_id: movida-community-events
     title: Atlantic Salsa Weekender
     description: A future community weekender with workshops, parties, and beach meetups.
-    image: portrait.jpg
+    image: 12_atlantic_salsa_weekender.png
     location: Estoril Congress Center, Estoril, Portugal
     city: Estoril
     country: Portugal
@@ -247,42 +256,88 @@ ratings:
     email: maya.rivera@joinmovida.com
     overall_sentiment: amazing
     comment: Warm hosts, a lovely floor, and music that kept everyone dancing.
+    aspect_scores: {music: 5, atmosphere: 5, venue-quality: 4}
+    aspect_tags:
+      - music:great-playlist
+      - atmosphere:friendly-crowd
+      - venue-quality:great-dance-floor
+    audience_tags:
+      - audience:meet-new-people
     comment_status: approved
     status: approved
   - event_id: alfama-thursday-salsa-summer
     email: noah.kim@joinmovida.com
     overall_sentiment: great
     comment: The beginner class made it very easy to join the social afterwards.
+    aspect_scores: {atmosphere: 5, organization: 4}
+    aspect_tags:
+      - atmosphere:welcoming-inclusive
+      - organization:well-organized
+    audience_tags:
+      - audience:first-social
     comment_status: approved
     status: approved
   - event_id: alfama-thursday-salsa-autumn
     email: clara.dubois@joinmovida.com
     overall_sentiment: great
     comment: Consistently friendly crowd and an excellent final salsa set.
+    aspect_scores: {music: 5, atmosphere: 4}
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:late-night-dancers
     comment_status: approved
     status: approved
   - event_id: alfama-thursday-salsa-autumn
     email: ana.garcia@joinmovida.com
     overall_sentiment: okay
     comment: Great music, though the room became crowded later in the evening.
+    aspect_scores: {music: 4, venue-quality: 2}
+    aspect_tags:
+      - music:great-playlist
+      - venue-quality:crowded
+    audience_tags:
+      - audience:music-lovers
     comment_status: approved
     status: approved
   - event_id: berlin-bachata-exchange
     email: leo.martin@joinmovida.com
     overall_sentiment: amazing
     comment: Clear workshops and a genuinely international social floor.
+    aspect_scores: {atmosphere: 5, organization: 5}
+    aspect_tags:
+      - atmosphere:international-crowd
+      - organization:well-organized
+    audience_tags:
+      - audience:travelers
     comment_status: approved
     status: approved
   - event_id: madrid-salsa-congress-night
     email: mina.silva@joinmovida.com
     overall_sentiment: great
     comment: Live band night was the highlight of the weekend.
+    aspect_scores: {music: 5, shows: 5, atmosphere: 4}
+    aspect_tags:
+      - music:live-band
+      - shows:great-performances
+      - atmosphere:high-energy
+    audience_tags:
+      - audience:performance-lovers
     comment_status: approved
     status: approved
   - event_id: london-salsa-weekender
-    email: lina.moreau@joinmovida.com
+    email: elena.moreau@joinmovida.com
     overall_sentiment: great
     comment: Well organised, varied music, and plenty of space across the rooms.
+    aspect_scores: {organization: 5, music: 5, venue-quality: 5}
+    aspect_tags:
+      - organization:well-organized
+      - music:good-variety
+      - venue-quality:spacious
+    audience_tags:
+      - audience:travelers
+      - audience:late-night-dancers
     comment_status: approved
     status: approved
 

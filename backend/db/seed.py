@@ -174,8 +174,64 @@ class DatabaseSeeder:
         self._seed_site_settings(scenario_dir / "settings.yaml")
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
+        self._seed_user_avatars(scenario_dir)
         self._seed_event_images(scenario_dir)
         logger.info("Seeding complete")
+
+    def _seed_user_avatars(self, scenario_dir: Path) -> None:
+        path = scenario_file_with_default(scenario_dir, "mock-users.yaml")
+        if not path.exists():
+            return
+
+        with open(path) as file:
+            data = yaml.safe_load(file) or {}
+        entries = [
+            ((entry.get("email") or "").strip().lower(), entry.get("avatar"))
+            for entry in data.get("users", []) or []
+            if isinstance(entry, dict) and entry.get("avatar")
+        ]
+        if not entries:
+            return
+
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        from backend.services import object_storage, user_avatars
+
+        try:
+            client = object_storage.get_client()
+            object_storage.ensure_buckets(client)
+        except (
+            object_storage.ObjectStorageError,
+            BotoCoreError,
+            ClientError,
+        ) as exc:
+            logger.warning(
+                "Object storage unavailable (%s) — skipping user avatar seed", exc
+            )
+            return
+
+        for email, filename in entries:
+            user = self.session.exec(select(User).where(User.email == email)).first()
+            if not user:
+                logger.warning("Avatar seed: unknown user %s", email)
+                continue
+            if user.avatar_key:
+                continue
+
+            source = scenario_dir / "user-avatars" / filename
+            if not source.exists():
+                source = SCENARIOS_DIR / "default" / "user-avatars" / filename
+            if not source.exists():
+                logger.warning("Avatar seed: %s not found for %s", filename, email)
+                continue
+
+            user.avatar_key = user_avatars.store_user_avatar(
+                str(user.id), source.read_bytes(), client=client
+            )
+            self.session.add(user)
+            logger.info("Seeded avatar %s for %s", filename, email)
+
+        self.session.commit()
 
     def _seed_event_images(self, scenario_dir: Path):
         """Push ``image:`` source files from a scenario into object storage.

@@ -2,7 +2,7 @@ test_plan:
   name: "Movida mobile product walkthrough"
   description: |
     Explore Movida with production-derived event listings and a complete
-    community of dancers, organizers, and curators. Use Lina Moreau (@lina)
+    community of dancers, organizers, and curators. Use Elena Moreau (@elena)
     for established-member journeys and Amira Haddad (@amira-haddad) for the
     first-time experience.
 
@@ -23,11 +23,11 @@ test_plan:
       verification: "Amira can complete onboarding without encountering seeded QA language."
 
     - id: 2
-      title: "Browse Lina's personalized Home"
+      title: "Browse Elena's personalized Home"
       description: |
-        Sign in as Lina Moreau and open Home.
+        Sign in as Elena Moreau and open Home.
       expected: |
-        Your next event shows Back 2 Mambo 2026. You might like reflects Lina's
+        Your next event shows Back 2 Mambo 2026. You might like reflects Elena's
         Salsa and Bachata profile, Friends are going uses her network, Build
         your tribe suggests relevant organizers, and New contains unseen events.
       verification: "All populated sections render independently and card actions work."
@@ -44,14 +44,16 @@ test_plan:
       verification: "List and map stay in sync and clearing filters restores the catalog."
 
     - id: 4
-      title: "Inspect image-rich and fallback event cards"
+      title: "Inspect event pictures and member avatars"
       description: |
-        Compare Alfama Thursday Salsa - Next Edition, Atlantic Salsa Weekender,
-        and Madrid Salsa Congress Night with events that have no picture.
+        Browse all twelve Movida Community Events, then open attendee lists,
+        reviews, Tribe, and profiles for several different members.
       expected: |
-        The three pictured events use different source aspect ratios without
-        distortion. Events without pictures retain stable, polished cards.
-      verification: "Card thumbnails and detail images load from the local object store."
+        Every community event uses the local picture whose filename matches its
+        title, upcoming production events retain their production pictures, and
+        each seeded identity has a distinct portrait with Elena's portrait
+        consistent across the app.
+      verification: "Event thumbnails, detail images, avatar stacks, and profiles load from the local object store."
 
     - id: 5
       title: "Save and join with privacy controls"
@@ -60,7 +62,7 @@ test_plan:
         Public, Friends, and Private.
       expected: |
         Button states update immediately, privacy choices persist, and the
-        events move into Lina's calendar without leaving the current screen.
+        events move into Elena's calendar without leaving the current screen.
       verification: "Reloading preserves both actions and their audiences."
 
     - id: 6
@@ -76,8 +78,8 @@ test_plan:
     - id: 7
       title: "Use the social graph"
       description: |
-        Open Tribe and inspect Lina's network and suggestions. Visit
-        @clara-dubois to see Lina's pending request, then sign in as Clara to
+        Open Tribe and inspect Elena's network and suggestions. Visit
+        @clara-dubois to see Elena's pending request, then sign in as Clara to
         approve it.
       expected: |
         Mutual friends, one-way follows, friend suggestions, pending state,
@@ -87,11 +89,11 @@ test_plan:
     - id: 8
       title: "Browse subscribed calendars"
       description: |
-        As Lina, open Tribe > Calendars and switch among subscriptions, Going,
-        and Saved views. Open Lina's own calendar and its export menu.
+        As Elena, open Tribe > Calendars and switch among subscriptions, Going,
+        and Saved views. Open Elena's own calendar and its export menu.
       expected: |
         Follow-created calendar subscriptions include people and Movida Picks.
-        Lina's Going and Saved events are populated, shareable, and exportable.
+        Elena's Going and Saved events are populated, shareable, and exportable.
       verification: "The live iCalendar URL opens on the phone and updates from local actions."
 
     - id: 9
@@ -99,7 +101,7 @@ test_plan:
       description: |
         Open Notifications, then Account > Notifications and email.
       expected: |
-        Lina has social, discussion, and suggested-event activity. Rows deep-link
+        Elena has social, discussion, and suggested-event activity. Rows deep-link
         to their subject, read state updates, and channel preferences persist.
       verification: "Notification badge count and inbox read state stay consistent."
 
@@ -130,8 +132,9 @@ test_plan:
         Community Experience and the linked series.
       expected: |
         The upcoming event belongs to a three-edition series and aggregates
-        approved reviews from its two previous editions.
-      verification: "Series navigation, sentiment summary, and review authors render correctly."
+        approved reviews from its two previous editions. Reviews include
+        realistic aspect scores, experience tags, and audience recommendations.
+      verification: "Series navigation, sentiment summary, structured review tags, and authors render correctly."
 
     - id: 13
       title: "Join an event discussion"
@@ -158,7 +161,7 @@ test_plan:
         Open Back 2 Mambo 2026, select Program, filter by day, room, level, and
         instructor, then open My Plan and its share/export actions.
       expected: |
-        The published four-day program is populated across rooms. Lina starts
+        The published four-day program is populated across rooms. Elena starts
         with three non-conflicting sessions and can add or remove more.
       verification: "Plan count, schedule filters, shared plan, and export preview stay aligned."
 
@@ -178,6 +181,6 @@ test_plan:
         In Safari use Share > Add to Home Screen, or use the browser install
         action on Android. Launch the installed app and enable notifications.
       expected: |
-        The app launches standalone on the private HTTPS origin, keeps Lina's
+        The app launches standalone on the private HTTPS origin, keeps Elena's
         session, and registers notification permission and a push subscription.
       verification: "Installed navigation, safe-area layout, and notification state work on mobile."

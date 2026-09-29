@@ -5,10 +5,11 @@ users:
     name: Movida Operations
     handle: movida-operations
     account_visibility: public
+    avatar: uifaces-human-avatar (13).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Movida%20Operations
-  - email: lina.moreau@joinmovida.com
-    name: Lina Moreau
-    handle: lina
+  - email: elena.moreau@joinmovida.com
+    name: Elena Moreau
+    handle: elena
     account_visibility: public
     bio: Salsa and bachata dancer based in Brussels, always planning the next festival.
     share_attendance_default: true
@@ -27,7 +28,8 @@ users:
     push_event_messages_enabled: true
     push_schedule_updates_enabled: true
     push_suggested_events_enabled: true
-    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Lina%20Moreau
+    avatar: uifaces-human-avatar.jpg
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Elena%20Moreau
   - email: amira.haddad@joinmovida.com
     name: Amira Haddad
     handle: amira-haddad
@@ -36,6 +38,7 @@ users:
     onboarded_at: null
     share_attendance_default: true
     share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (15).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Amira%20Haddad
   - email: picks@joinmovida.com
     name: Movida Picks
@@ -46,6 +49,7 @@ users:
     bio: Hand-picked festivals, weekenders, and standout social dance events across Europe.
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (1).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Movida%20Picks
   - email: sea.sun.salsa@joinmovida.com
     name: Sea Sun Salsa
@@ -53,6 +57,7 @@ users:
     account_visibility: public
     is_verified_organizer: true
     bio: Seaside salsa festivals, destination weekends, and international dance holidays.
+    avatar: uifaces-human-avatar (22).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Sea%20Sun%20Salsa%20Team
   - email: rave.republic@joinmovida.com
     name: Rave Republic
@@ -60,12 +65,14 @@ users:
     account_visibility: public
     is_verified_organizer: true
     bio: High-energy salsa socials, special guests, and late-night dance experiences.
+    avatar: uifaces-human-avatar (11).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Rave%20Republic
   - email: penny.valdez@joinmovida.com
     name: Penny Valdez
     handle: penny-valdez
     account_visibility: public
     bio: Festival ambassador sharing offers and practical travel tips with dancers.
+    avatar: uifaces-human-avatar (10).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Penny%20Valdez
   - email: maya.rivera@joinmovida.com
     name: Maya Rivera
@@ -76,6 +83,7 @@ users:
     dancing_since: 2019-04-12
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (3).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Maya%20Rivera
   - email: leo.martin@joinmovida.com
     name: Leo Martin
@@ -83,6 +91,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (12).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Leo%20Martin
   - email: ines.lopez@joinmovida.com
     name: Ines Lopez
@@ -90,6 +99,7 @@ users:
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: private
+    avatar: uifaces-human-avatar (19).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Ines%20Lopez
   - email: noah.kim@joinmovida.com
     name: Noah Kim
@@ -100,6 +110,7 @@ users:
     dancing_since: 2021-09-03
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (20).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Noah%20Kim
   - email: zara.benali@joinmovida.com
     name: Zara Benali
@@ -107,6 +118,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (7).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Zara%20Benali
   - email: omar.costa@joinmovida.com
     name: Omar Costa
@@ -114,6 +126,7 @@ users:
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
+    avatar: uifaces-human-avatar (16).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Omar%20Costa
   - email: clara.dubois@joinmovida.com
     name: Clara Dubois
@@ -121,6 +134,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (4).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Clara%20Dubois
   - email: jonas.meyer@joinmovida.com
     name: Jonas Meyer
@@ -128,6 +142,7 @@ users:
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (17).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Jonas%20Meyer
   - email: mina.silva@joinmovida.com
     name: Mina Silva
@@ -135,6 +150,7 @@ users:
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
+    avatar: uifaces-human-avatar (24).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Mina%20Silva
   - email: theo.novak@joinmovida.com
     name: Theo Novak
@@ -142,6 +158,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (18).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Theo%20Novak
   - email: ana.garcia@joinmovida.com
     name: Ana Garcia
@@ -149,6 +166,7 @@ users:
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (9).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Ana%20Garcia
   - email: pablo.rossi@joinmovida.com
     name: Pablo Rossi
@@ -156,6 +174,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: private
+    avatar: uifaces-human-avatar (5).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Pablo%20Rossi
   - email: nina.khan@joinmovida.com
     name: Nina Khan
@@ -163,6 +182,7 @@ users:
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (21).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Nina%20Khan
   - email: samir.ivanov@joinmovida.com
     name: Samir Ivanov
@@ -170,20 +190,15 @@ users:
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (28).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Samir%20Ivanov
-  - email: elena.moreau@joinmovida.com
-    name: Elena Moreau
-    handle: elena-moreau
-    account_visibility: friends
-    share_attendance_default: true
-    share_attendance_default_audience: private
-    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Elena%20Moreau
   - email: victor.schmidt@joinmovida.com
     name: Victor Schmidt
     handle: victor-schmidt
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (6).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Victor%20Schmidt
   - email: sofia.torres@joinmovida.com
     name: Sofia Torres
@@ -191,6 +206,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (2).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Sofia%20Torres
   - email: milan.horvat@joinmovida.com
     name: Milan Horvat
@@ -198,6 +214,7 @@ users:
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: private
+    avatar: uifaces-human-avatar (29).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Milan%20Horvat
   - email: rita.petrov@joinmovida.com
     name: Rita Petrov
@@ -205,6 +222,7 @@ users:
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (23).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Rita%20Petrov
   - email: ivo.diallo@joinmovida.com
     name: Ivo Diallo
@@ -212,6 +230,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (26).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Ivo%20Diallo
   - email: nadia.fischer@joinmovida.com
     name: Nadia Fischer
@@ -219,6 +238,7 @@ users:
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
+    avatar: uifaces-human-avatar (25).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Nadia%20Fischer
   - email: bruno.santos@joinmovida.com
     name: Bruno Santos
@@ -226,6 +246,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (14).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Bruno%20Santos
   - email: camille.laurent@joinmovida.com
     name: Camille Laurent
@@ -233,6 +254,7 @@ users:
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (31).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Camille%20Laurent
   - email: mateo.vega@joinmovida.com
     name: Mateo Vega
@@ -240,6 +262,7 @@ users:
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
+    avatar: uifaces-human-avatar (8).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Mateo%20Vega
   - email: leila.bauer@joinmovida.com
     name: Leila Bauer
@@ -247,4 +270,5 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: public
+    avatar: uifaces-human-avatar (27).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Leila%20Bauer

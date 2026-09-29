@@ -225,9 +225,9 @@ def test_validate_overlays_checks_suggested_event_fanout(tmp_path):
 def test_validate_showcase_fixtures_accepts_consistent_entities(tmp_path):
     (tmp_path / "mock-users.yaml").write_text(
         "users:\n"
-        "  - email: lina@joinmovida.com\n"
-        "    name: Lina Moreau\n"
-        "    handle: lina\n",
+        "  - email: elena@joinmovida.com\n"
+        "    name: Elena Moreau\n"
+        "    handle: elena\n",
         encoding="utf-8",
     )
     (tmp_path / "overlay-events.yaml").write_text(
@@ -236,7 +236,7 @@ def test_validate_showcase_fixtures_accepts_consistent_entities(tmp_path):
         "    title: Alfama Thursday Salsa\n"
         "ratings:\n"
         "  - event_id: alfama-salsa\n"
-        "    email: lina@joinmovida.com\n",
+        "    email: elena@joinmovida.com\n",
         encoding="utf-8",
     )
 
@@ -246,7 +246,7 @@ def test_validate_showcase_fixtures_accepts_consistent_entities(tmp_path):
 @pytest.mark.unit
 def test_validate_showcase_fixtures_rejects_unknown_user(tmp_path):
     (tmp_path / "mock-users.yaml").write_text(
-        "users:\n  - email: lina@joinmovida.com\n    handle: lina\n",
+        "users:\n  - email: elena@joinmovida.com\n    handle: elena\n",
         encoding="utf-8",
     )
     (tmp_path / "db-saves.yaml").write_text(
@@ -262,10 +262,10 @@ def test_validate_showcase_fixtures_rejects_unknown_user(tmp_path):
 def test_validate_showcase_fixtures_rejects_duplicate_handle(tmp_path):
     (tmp_path / "mock-users.yaml").write_text(
         "users:\n"
-        "  - email: lina@joinmovida.com\n"
-        "    handle: lina\n"
+        "  - email: elena@joinmovida.com\n"
+        "    handle: elena\n"
         "  - email: maya@joinmovida.com\n"
-        "    handle: lina\n",
+        "    handle: elena\n",
         encoding="utf-8",
     )
 
@@ -277,14 +277,56 @@ def test_validate_showcase_fixtures_rejects_duplicate_handle(tmp_path):
 def test_validate_showcase_fixtures_rejects_environment_naming(tmp_path):
     (tmp_path / "mock-users.yaml").write_text(
         "users:\n"
-        "  - email: lina@joinmovida.com\n"
+        "  - email: elena@joinmovida.com\n"
         "    name: Showcase Dancer\n"
-        "    handle: lina\n",
+        "    handle: elena\n",
         encoding="utf-8",
     )
 
     with pytest.raises(ValueError, match="naming looks non-production"):
         validate_showcase_fixtures(tmp_path, set())
+
+
+@pytest.mark.unit
+def test_validate_showcase_fixtures_rejects_missing_local_avatar(tmp_path):
+    (tmp_path / "mock-users.yaml").write_text(
+        "users:\n"
+        "  - email: elena@joinmovida.com\n"
+        "    handle: elena\n"
+        "    avatar: missing.jpg\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="missing.jpg"):
+        validate_showcase_fixtures(tmp_path, set())
+
+
+@pytest.mark.unit
+def test_validate_showcase_fixtures_rejects_invalid_review_tag_scope(tmp_path):
+    (tmp_path / "mock-users.yaml").write_text(
+        "users:\n  - email: elena@joinmovida.com\n    handle: elena\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tags.yaml").write_text(
+        "tag_groups:\n"
+        "  - slug: format\n"
+        "    scope: event\n"
+        "    tags:\n"
+        "      - slug: social\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "overlay-events.yaml").write_text(
+        "events:\n  - id: social\n"
+        "ratings:\n"
+        "  - event_id: social\n"
+        "    email: elena@joinmovida.com\n"
+        "    overall_sentiment: great\n"
+        "    aspect_tags: [format:social]\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="format:social"):
+        validate_showcase_fixtures(tmp_path, {"social"})
 
 
 @pytest.mark.unit
