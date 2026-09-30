@@ -71,6 +71,25 @@ function baseHandlers(opts?: {
 }
 
 describe('NetworkPanel (People page)', () => {
+    it('requests recently added ordering for the active relationship list', async () => {
+        let activeListSort: string | null = null
+        server.use(
+            http.get('*/api/social/me/following', ({ request }) => {
+                const url = new URL(request.url)
+                if (url.searchParams.get('limit') === '100') {
+                    activeListSort = url.searchParams.get('sort')
+                }
+                return HttpResponse.json({ items: [followUser('newest')], total: 1 })
+            }),
+            ...baseHandlers(),
+        )
+
+        renderWithProviders(<NetworkPanel />)
+
+        expect(await screen.findByText('NEWEST')).toBeInTheDocument()
+        expect(activeListSort).toBe('recent')
+    })
+
     it('shows the discovery block and All following list by default', async () => {
         server.use(...baseHandlers())
         renderWithProviders(<NetworkPanel />)

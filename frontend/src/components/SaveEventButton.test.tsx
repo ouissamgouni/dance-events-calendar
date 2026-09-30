@@ -5,7 +5,21 @@ import { http, HttpResponse } from 'msw'
 import SaveEventButton from './SaveEventButton'
 import { renderWithProviders } from '../test/render'
 import { server } from '../test/server'
+import { makeUser } from '../test/handlers'
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext'
+
+function useMobileViewport() {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(max-width: 639px)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    }))
+}
 
 function LocationProbe() {
     const location = useLocation()
@@ -110,5 +124,24 @@ describe('SaveEventButton (anonymous)', () => {
 
         expect(writes).toBe(0)
         expect(screen.getByRole('button', { name: 'Save event' })).toBeInTheDocument()
+    })
+})
+
+describe('SaveEventButton visibility', () => {
+    it('uses a mobile bottom sheet with horizontal audience pills', async () => {
+        useMobileViewport()
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+        )
+        const { user } = renderWithProviders(<SaveEventButton eventId="evt-mobile-visibility" eventTitle="Summer Salsa Social" />)
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+
+        const sheet = await screen.findByRole('dialog', { name: 'Saved event visibility' })
+        expect(sheet).toHaveAttribute('aria-modal', 'true')
+        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-sm')
+        expect(screen.getByRole('radiogroup', { name: 'Saved event visibility' })).toHaveClass('flex', 'w-full')
+        expect(screen.getAllByRole('radio')).toHaveLength(3)
+        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-11', 'text-sm')
     })
 })

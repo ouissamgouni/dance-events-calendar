@@ -32,10 +32,12 @@ from backend.db.models import (
     OrganizerClaimEvent,
     SiteSetting,
     ScheduleActivityType,
+    ScheduleContributor,
     ScheduleLevel,
     SchedulePublication,
     ScheduleRoom,
     ScheduleSession,
+    ScheduleSessionContributor,
     ScheduleVenue,
     Tag,
     TagGroup,
@@ -172,15 +174,71 @@ class DatabaseSeeder:
         self._seed_site_settings(scenario_dir / "settings.yaml")
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
+        self._seed_user_avatars(scenario_dir)
         self._seed_event_images(scenario_dir)
         logger.info("Seeding complete")
+
+    def _seed_user_avatars(self, scenario_dir: Path) -> None:
+        path = scenario_file_with_default(scenario_dir, "mock-users.yaml")
+        if not path.exists():
+            return
+
+        with open(path) as file:
+            data = yaml.safe_load(file) or {}
+        entries = [
+            ((entry.get("email") or "").strip().lower(), entry.get("avatar"))
+            for entry in data.get("users", []) or []
+            if isinstance(entry, dict) and entry.get("avatar")
+        ]
+        if not entries:
+            return
+
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        from backend.services import object_storage, user_avatars
+
+        try:
+            client = object_storage.get_client()
+            object_storage.ensure_buckets(client)
+        except (
+            object_storage.ObjectStorageError,
+            BotoCoreError,
+            ClientError,
+        ) as exc:
+            logger.warning(
+                "Object storage unavailable (%s) — skipping user avatar seed", exc
+            )
+            return
+
+        for email, filename in entries:
+            user = self.session.exec(select(User).where(User.email == email)).first()
+            if not user:
+                logger.warning("Avatar seed: unknown user %s", email)
+                continue
+            if user.avatar_key:
+                continue
+
+            source = scenario_dir / "user-avatars" / filename
+            if not source.exists():
+                source = SCENARIOS_DIR / "default" / "user-avatars" / filename
+            if not source.exists():
+                logger.warning("Avatar seed: %s not found for %s", filename, email)
+                continue
+
+            user.avatar_key = user_avatars.store_user_avatar(
+                str(user.id), source.read_bytes(), client=client
+            )
+            self.session.add(user)
+            logger.info("Seeded avatar %s for %s", filename, email)
+
+        self.session.commit()
 
     def _seed_event_images(self, scenario_dir: Path):
         """Push ``image:`` source files from a scenario into object storage.
 
         Runs the same pipeline as an admin upload, so a scenario exercises the
-        real cropping code. Keys are deterministic and skipped when already
-        present, so restarts don't re-upload.
+        real cropping code. Keys include the source digest, so changed fixtures
+        are uploaded under fresh browser-cache-safe URLs.
         """
         path = scenario_dir / "db-events.yaml"
         if not path.exists():
@@ -226,10 +284,12 @@ class DatabaseSeeder:
                 logger.warning("Image seed: %s not found for %s", filename, event_id)
                 continue
 
-            key = f"events/{event_id}/seed"
+            source_bytes = source.read_bytes()
+            digest = hashlib.sha256(source_bytes).hexdigest()[:16]
+            key = f"events/{event_id}/seed/{digest}"
             if not object_storage.object_exists(f"{key}/thumb.webp", client=client):
                 event_images.store_event_image(
-                    event_id, source.read_bytes(), base_key=key, client=client
+                    event_id, source_bytes, base_key=key, client=client
                 )
                 logger.info(
                     "Seeded image %s for %s → bucket %s, key %s/{thumb,full}.webp",
@@ -2389,6 +2449,33 @@ class DatabaseSeeder:
                 schedule.id,
                 entry.get("activity_types", []),
             )
+            contributor_entries = entry.get("contributors", []) or []
+            for row in entry.get("sessions", []) or []:
+                if row.get("instructors") and not row.get("contributors"):
+                    contributor_entries.append({"display_name": row["instructors"]})
+                for assignment in row.get("contributors", []) or []:
+                    if assignment.get("display_name"):
+                        contributor_entries.append(
+                            {"display_name": assignment["display_name"]}
+                        )
+            unique_contributors = {}
+            for row in contributor_entries:
+                unique_contributors.setdefault(row["display_name"], row)
+            contributor_entries = list(unique_contributors.values())
+            contributors = self._seed_schedule_named_rows(
+                ScheduleContributor,
+                schedule.id,
+                [
+                    {
+                        **row,
+                        "external_id": row.get("external_id")
+                        or f"legacy-{hashlib.sha1(f'{schedule.id}:{row['display_name']}'.encode()).hexdigest()[:20]}",
+                        "sort_order": row.get("sort_order", position),
+                    }
+                    for position, row in enumerate(contributor_entries)
+                ],
+                identity_field="display_name",
+            )
 
             for row in entry.get("sessions", []) or []:
                 session_id = UUID(str(row["id"]))
@@ -2420,6 +2507,27 @@ class DatabaseSeeder:
                     for key, value in values.items():
                         setattr(schedule_session, key, value)
                 self.session.add(schedule_session)
+                self.session.flush()
+                self.session.exec(
+                    delete(ScheduleSessionContributor).where(
+                        ScheduleSessionContributor.session_id == schedule_session.id
+                    )
+                )
+                assignments = row.get("contributors") or (
+                    [{"display_name": row["instructors"], "role": "instructor"}]
+                    if row.get("instructors")
+                    else []
+                )
+                for position, assignment in enumerate(assignments):
+                    contributor = contributors[assignment["display_name"]]
+                    self.session.add(
+                        ScheduleSessionContributor(
+                            session_id=schedule_session.id,
+                            contributor_id=contributor.id,
+                            role=assignment.get("role", "instructor"),
+                            position=position,
+                        )
+                    )
 
             self.session.flush()
             publication = self.session.exec(

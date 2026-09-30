@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanCount, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleContributor, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 import type { SharedMyPlanResponse } from './types';
 
@@ -318,7 +318,21 @@ export async function deleteScheduleActivityType(eventId: string, id: number): P
     return scheduleRequest<void>(eventId, `/activity-types/${id}`, 'DELETE');
 }
 
-export type ScheduleSessionInput = Omit<ScheduleSession, 'id'>;
+export async function createScheduleContributor(eventId: string, body: Pick<ScheduleContributor, 'display_name' | 'sort_order'>): Promise<ScheduleContributor> {
+    return scheduleRequest<ScheduleContributor>(eventId, '/contributors', 'POST', body);
+}
+
+export async function updateScheduleContributor(eventId: string, id: number, body: Pick<ScheduleContributor, 'display_name' | 'sort_order'>): Promise<ScheduleContributor> {
+    return scheduleRequest<ScheduleContributor>(eventId, `/contributors/${id}`, 'PUT', body);
+}
+
+export async function deleteScheduleContributor(eventId: string, id: number): Promise<void> {
+    return scheduleRequest<void>(eventId, `/contributors/${id}`, 'DELETE');
+}
+
+export type ScheduleSessionInput = Omit<ScheduleSession, 'id' | 'external_id' | 'contributors'> & {
+    contributors?: Array<Omit<NonNullable<ScheduleSession['contributors']>[number], 'position'>>;
+};
 
 export async function createScheduleSession(eventId: string, body: ScheduleSessionInput): Promise<ScheduleSession> {
     return scheduleRequest<ScheduleSession>(eventId, '/sessions', 'POST', body);
@@ -398,6 +412,10 @@ export async function exportEventSchedule(eventId: string): Promise<ScheduleImpo
 export interface ProgramExportOptions {
     days?: string[];
     includeCancelled?: boolean;
+    instructor?: string;
+    contributorIds?: number[];
+    levelIds?: number[];
+    activityTypeIds?: number[];
 }
 
 export interface FileDownload {
@@ -409,6 +427,10 @@ function programExportQuery(options?: ProgramExportOptions): string {
     const params = new URLSearchParams();
     options?.days?.forEach((day) => params.append('days', day));
     if (options?.includeCancelled === false) params.set('include_cancelled', 'false');
+    if (options?.instructor?.trim()) params.set('instructor', options.instructor.trim());
+    options?.contributorIds?.forEach((id) => params.append('contributor_ids', String(id)));
+    options?.levelIds?.forEach((id) => params.append('level_ids', String(id)));
+    options?.activityTypeIds?.forEach((id) => params.append('activity_type_ids', String(id)));
     const query = params.toString();
     return query ? `?${query}` : '';
 }
@@ -507,6 +529,17 @@ export async function fetchMyPlan(eventId: string): Promise<MyPlanResponse> {
         cache: 'no-store',
     });
     return parseJsonResponse<MyPlanResponse>(res, 'Failed to load My Plan');
+}
+
+export async function fetchMyPlanCounts(eventIds: string[]): Promise<MyPlanCount[]> {
+    const res = await fetch(`${BASE}/my-plan/counts`, {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    return parseJsonResponse<MyPlanCount[]>(res, 'Failed to load My Plan counts');
 }
 
 export async function updateMyPlanAudience(
@@ -1799,10 +1832,11 @@ export async function fetchFollowing(
     return parseJsonResponse<FollowList>(res, 'Failed to fetch following');
 }
 
-export async function fetchMyFriends(opts?: { q?: string; limit?: number }): Promise<FollowList> {
+export async function fetchMyFriends(opts?: { q?: string; limit?: number; sort?: 'recent' }): Promise<FollowList> {
     const sp = new URLSearchParams();
     if (opts?.q) sp.set('q', opts.q);
     if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.sort) sp.set('sort', opts.sort);
     const qs = sp.toString();
     const res = await fetch(
         `${BASE}/social/me/friends${qs ? `?${qs}` : ''}`,
@@ -2060,11 +2094,12 @@ export async function fetchGoingWedge(
 }
 
 export async function fetchMyFollowers(
-    opts?: { limit?: number; offset?: number },
+    opts?: { limit?: number; offset?: number; sort?: 'recent' },
 ): Promise<FollowList> {
     const sp = new URLSearchParams();
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));
+    if (opts?.sort) sp.set('sort', opts.sort);
     const qs = sp.toString();
     const res = await fetch(
         `${BASE}/social/me/followers${qs ? `?${qs}` : ''}`,
@@ -2074,11 +2109,12 @@ export async function fetchMyFollowers(
 }
 
 export async function fetchMyFollowing(
-    opts?: { limit?: number; offset?: number },
+    opts?: { limit?: number; offset?: number; sort?: 'recent' },
 ): Promise<FollowList> {
     const sp = new URLSearchParams();
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));
+    if (opts?.sort) sp.set('sort', opts.sort);
     const qs = sp.toString();
     const res = await fetch(
         `${BASE}/social/me/following${qs ? `?${qs}` : ''}`,

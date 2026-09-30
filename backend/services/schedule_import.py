@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from hashlib import sha1
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 from sqlmodel import Session, select
@@ -7,9 +9,11 @@ from backend.api.schemas import ScheduleImportDocument
 from backend.db.models import (
     EventSchedule,
     ScheduleActivityType,
+    ScheduleContributor,
     ScheduleLevel,
     ScheduleRoom,
     ScheduleSession,
+    ScheduleSessionContributor,
     ScheduleVenue,
 )
 from backend.services.schedules import build_snapshot, utc_isoformat, validate_timezone
@@ -22,7 +26,7 @@ def _external_id(row, prefix: str) -> str:
 def build_schedule_import_example(schedule: EventSchedule) -> dict:
     day = schedule.days[0]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "event_id": schedule.event_id,
         "timezone": schedule.timezone,
         "day_start_hour": schedule.day_start_hour,
@@ -60,11 +64,32 @@ def build_schedule_import_example(schedule: EventSchedule) -> dict:
                 "sort_order": 0,
             }
         ],
+        "contributors": [
+            {
+                "external_id": "sample-alex",
+                "display_name": "Alex",
+                "sort_order": 0,
+            },
+            {
+                "external_id": "sample-sam",
+                "display_name": "Sam",
+                "sort_order": 1,
+            },
+        ],
         "sessions": [
             {
                 "external_id": "sample-welcome-class",
                 "title": "Sample Welcome Class",
-                "instructors": "Alex & Sam",
+                "contributors": [
+                    {
+                        "contributor_external_id": "sample-alex",
+                        "role": "instructor",
+                    },
+                    {
+                        "contributor_external_id": "sample-sam",
+                        "role": "instructor",
+                    },
+                ],
                 "start": f"{day}T10:00:00",
                 "end": f"{day}T11:00:00",
                 "room_external_id": "sample-grand-room",
@@ -100,6 +125,11 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
         .where(ScheduleActivityType.schedule_id == schedule.id)
         .order_by(ScheduleActivityType.sort_order, ScheduleActivityType.id)
     ).all()
+    contributors = session.exec(
+        select(ScheduleContributor)
+        .where(ScheduleContributor.schedule_id == schedule.id)
+        .order_by(ScheduleContributor.sort_order, ScheduleContributor.id)
+    ).all()
     sessions = session.exec(
         select(ScheduleSession)
         .where(
@@ -108,10 +138,31 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
         )
         .order_by(ScheduleSession.start, ScheduleSession.title)
     ).all()
+    assignments = session.exec(
+        select(ScheduleSessionContributor)
+        .join(
+            ScheduleSession,
+            ScheduleSession.id == ScheduleSessionContributor.session_id,
+        )
+        .where(
+            ScheduleSession.schedule_id == schedule.id,
+            ScheduleSession.deleted_at.is_(None),
+        )
+        .order_by(
+            ScheduleSessionContributor.session_id,
+            ScheduleSessionContributor.position,
+        )
+    ).all()
     venue_refs = {row.id: _external_id(row, "venue") for row in venues}
     room_refs = {row.id: _external_id(row, "room") for row in rooms}
     level_refs = {row.id: _external_id(row, "level") for row in levels}
     type_refs = {row.id: _external_id(row, "activity") for row in activity_types}
+    contributor_refs = {
+        row.id: _external_id(row, "contributor") for row in contributors
+    }
+    assignments_by_session: dict = {}
+    for assignment in assignments:
+        assignments_by_session.setdefault(assignment.session_id, []).append(assignment)
     zone = ZoneInfo(schedule.timezone)
 
     def local_iso(value: datetime) -> str:
@@ -119,7 +170,7 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
         return aware.astimezone(zone).replace(tzinfo=None).isoformat(timespec="minutes")
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "event_id": schedule.event_id,
         "timezone": schedule.timezone,
         "day_start_hour": schedule.day_start_hour,
@@ -161,11 +212,28 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
             }
             for row in activity_types
         ],
+        "contributors": [
+            {
+                "external_id": contributor_refs[row.id],
+                "display_name": row.display_name,
+                "sort_order": row.sort_order,
+            }
+            for row in contributors
+        ],
         "sessions": [
             {
                 "external_id": _external_id(row, "session"),
                 "title": row.title,
                 "instructors": row.instructors,
+                "contributors": [
+                    {
+                        "contributor_external_id": contributor_refs[
+                            assignment.contributor_id
+                        ],
+                        "role": assignment.role,
+                    }
+                    for assignment in assignments_by_session.get(row.id, [])
+                ],
                 "start": local_iso(row.start),
                 "end": local_iso(row.end),
                 "room_external_id": room_refs.get(row.room_id),
@@ -186,12 +254,14 @@ def _to_utc(value: datetime, zone: ZoneInfo) -> datetime:
     return aware.astimezone(timezone.utc)
 
 
-def _upsert_named(session, model, schedule_id: int, rows, values):
+def _upsert_named(
+    session, model, schedule_id: int, rows, values, identity_field: str | None = None
+):
     existing_rows = session.exec(
         select(model).where(model.schedule_id == schedule_id)
     ).all()
     existing = {row.external_id: row for row in existing_rows if row.external_id}
-    identity_field = "label" if model is ScheduleLevel else "name"
+    identity_field = identity_field or ("label" if model is ScheduleLevel else "name")
     existing_by_identity = {
         getattr(row, identity_field).casefold(): row for row in existing_rows
     }
@@ -288,6 +358,37 @@ def apply_import_document(
             "sort_order": row.sort_order,
         },
     )
+    contributor_items = list(document.contributors)
+    legacy_contributor_refs: dict[str, str] = {}
+    if document.schema_version == 1:
+        for display_name in sorted(
+            {
+                row.instructors.strip()
+                for row in document.sessions
+                if row.instructors and row.instructors.strip()
+            },
+            key=str.casefold,
+        ):
+            external_id = f"legacy-{sha1(f'{schedule.id}:{display_name}'.encode()).hexdigest()[:20]}"
+            legacy_contributor_refs[display_name] = external_id
+            contributor_items.append(
+                SimpleNamespace(
+                    external_id=external_id,
+                    display_name=display_name,
+                    sort_order=len(contributor_items),
+                )
+            )
+    contributors, cc, cu, cn = _upsert_named(
+        session,
+        ScheduleContributor,
+        schedule.id,
+        contributor_items,
+        lambda row: {
+            "display_name": row.display_name,
+            "sort_order": row.sort_order,
+        },
+        identity_field="display_name",
+    )
     reference_sets = (
         (
             "room",
@@ -334,9 +435,24 @@ def apply_import_document(
         row.external_id or f"session-{row.id}": row for row in existing_session_rows
     }
     zone = ZoneInfo(document.timezone)
-    created = vc + rc + lc + ac
-    updated = vu + ru + lu + au
-    unchanged = vn + rn + ln + an
+    existing_assignments = session.exec(
+        select(ScheduleSessionContributor)
+        .join(
+            ScheduleSession,
+            ScheduleSession.id == ScheduleSessionContributor.session_id,
+        )
+        .where(ScheduleSession.schedule_id == schedule.id)
+        .order_by(
+            ScheduleSessionContributor.session_id,
+            ScheduleSessionContributor.position,
+        )
+    ).all()
+    assignments_by_session: dict = {}
+    for assignment in existing_assignments:
+        assignments_by_session.setdefault(assignment.session_id, []).append(assignment)
+    created = vc + rc + lc + ac + cc
+    updated = vu + ru + lu + au + cu
+    unchanged = vn + rn + ln + an + cn
     imported_ids = set()
     for item in document.sessions:
         imported_ids.add(item.external_id)
@@ -344,9 +460,40 @@ def apply_import_document(
         end = _to_utc(item.end, zone)
         if end <= start:
             raise ValueError(f"{item.title}: end must be after start")
+        imported_assignments = (
+            [
+                (
+                    contributors[assignment.contributor_external_id].id,
+                    assignment.role,
+                )
+                for assignment in (item.contributors or [])
+            ]
+            if document.schema_version == 2
+            else (
+                [
+                    (
+                        contributors[
+                            legacy_contributor_refs[item.instructors.strip()]
+                        ].id,
+                        "instructor",
+                    )
+                ]
+                if item.instructors and item.instructors.strip()
+                else []
+            )
+        )
         values = {
             "title": item.title,
-            "instructors": item.instructors,
+            "instructors": (
+                " & ".join(
+                    contributors[assignment.contributor_external_id].display_name
+                    for assignment in (item.contributors or [])
+                    if assignment.role == "instructor"
+                )
+                or None
+                if document.schema_version == 2
+                else item.instructors
+            ),
             "start": start,
             "end": end,
             "room_id": rooms[item.room_external_id].id
@@ -368,17 +515,26 @@ def apply_import_document(
         }
         row = existing_sessions.get(item.external_id)
         if row is None:
-            session.add(
-                ScheduleSession(
-                    schedule_id=schedule.id,
-                    external_id=item.external_id,
-                    **values,
-                )
+            row = ScheduleSession(
+                schedule_id=schedule.id,
+                external_id=item.external_id,
+                **values,
             )
+            session.add(row)
+            session.flush()
             created += 1
         else:
-            changed = row.external_id != item.external_id or any(
-                getattr(row, key) != value for key, value in values.items()
+            current_assignments = [
+                (assignment.contributor_id, assignment.role)
+                for assignment in assignments_by_session.get(row.id, [])
+            ]
+            changed = (
+                row.external_id != item.external_id
+                or any(getattr(row, key) != value for key, value in values.items())
+                or (
+                    imported_assignments is not None
+                    and current_assignments != imported_assignments
+                )
             )
             row.external_id = item.external_id
             for key, value in values.items():
@@ -387,6 +543,19 @@ def apply_import_document(
             session.add(row)
             updated += int(changed)
             unchanged += int(not changed)
+        if imported_assignments is not None:
+            for assignment in assignments_by_session.get(row.id, []):
+                session.delete(assignment)
+            session.flush()
+            for position, (contributor_id, role) in enumerate(imported_assignments):
+                session.add(
+                    ScheduleSessionContributor(
+                        session_id=row.id,
+                        contributor_id=contributor_id,
+                        role=role,
+                        position=position,
+                    )
+                )
 
     removed = 0
     if mode == "replace":
@@ -396,6 +565,26 @@ def apply_import_document(
                 session.add(row)
                 removed += 1
     session.flush()
+    if mode == "replace" and document.schema_version == 2:
+        imported_contributor_ids = {row.external_id for row in document.contributors}
+        referenced_contributor_ids = set(
+            session.exec(select(ScheduleSessionContributor.contributor_id)).all()
+        )
+        for external_id, contributor in {
+            row.external_id: row
+            for row in session.exec(
+                select(ScheduleContributor).where(
+                    ScheduleContributor.schedule_id == schedule.id
+                )
+            ).all()
+        }.items():
+            if (
+                external_id not in imported_contributor_ids
+                and contributor.id not in referenced_contributor_ids
+            ):
+                session.delete(contributor)
+                removed += 1
+        session.flush()
     return {
         "created": created,
         "updated": updated,

@@ -67,6 +67,13 @@ describe('schedule time helpers', () => {
         expect(scheduleInstructors([alexis, maya, { ...alexis, id: 'duplicate' }])).toEqual(['Alexis Ruiz', 'Maya']);
     });
 
+    it('filters structured contributors by exact id', () => {
+        const alex = { ...session('Alex', '2026-10-16T12:00:00Z', '2026-10-16T13:00:00Z'), instructors: 'Alex', contributors: [{ contributor_id: 1, role: 'instructor' as const, position: 0 }] };
+        const alexis = { ...session('Alexis', '2026-10-16T13:00:00Z', '2026-10-16T14:00:00Z'), instructors: 'Alexis', contributors: [{ contributor_id: 2, role: 'instructor' as const, position: 0 }] };
+
+        expect(filterScheduleSessions([alex, alexis], { instructor: 'Alex', contributorId: 1, levelIds: [], activityTypeIds: [] })).toEqual([alex]);
+    });
+
     it('treats the end timestamp as no longer active', () => {
         const row = session('Now', '2026-10-16T12:00:00Z', '2026-10-16T13:00:00Z');
         expect(isSessionActive(row, new Date('2026-10-16T12:30:00Z'))).toBe(true);

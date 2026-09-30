@@ -11,6 +11,7 @@ import { AttendanceSummariesProvider } from './context/AttendanceSummariesContex
 import { RatingAggregatesProvider } from './context/RatingAggregatesContext';
 import { MessageCountsProvider } from './context/MessageCountsContext';
 import { MyRatingsProvider } from './context/MyRatingsContext';
+import { MyPlanCountProvider } from './context/MyPlanCountContext';
 import { PwaInstallProvider } from './context/PwaInstallContext';
 import { QaTestPlanProvider, useQaPinnedWidth } from './components/QaTestPlanPanel';
 import { StatusBar } from './components/StatusBar';
@@ -101,23 +102,25 @@ export default function App() {
         <FeatureFlagsProvider>
           <AppAccessGate>
             <AttendanceSummariesProvider>
-              <SavedEventsProvider>
-                <PreferencesProvider>
-                  <RatingAggregatesProvider>
-                    <MessageCountsProvider>
-                      <MyRatingsProvider>
-                        <AttendingEventsProvider>
-                          <PwaInstallProvider>
-                            <QaTestPlanProvider>
-                              <AppShell />
-                            </QaTestPlanProvider>
-                          </PwaInstallProvider>
-                        </AttendingEventsProvider>
-                      </MyRatingsProvider>
-                    </MessageCountsProvider>
-                  </RatingAggregatesProvider>
-                </PreferencesProvider>
-              </SavedEventsProvider>
+              <MyPlanCountProvider>
+                <SavedEventsProvider>
+                  <PreferencesProvider>
+                    <RatingAggregatesProvider>
+                      <MessageCountsProvider>
+                        <MyRatingsProvider>
+                          <AttendingEventsProvider>
+                            <PwaInstallProvider>
+                              <QaTestPlanProvider>
+                                <AppShell />
+                              </QaTestPlanProvider>
+                            </PwaInstallProvider>
+                          </AttendingEventsProvider>
+                        </MyRatingsProvider>
+                      </MessageCountsProvider>
+                    </RatingAggregatesProvider>
+                  </PreferencesProvider>
+                </SavedEventsProvider>
+              </MyPlanCountProvider>
             </AttendanceSummariesProvider>
           </AppAccessGate>
         </FeatureFlagsProvider>

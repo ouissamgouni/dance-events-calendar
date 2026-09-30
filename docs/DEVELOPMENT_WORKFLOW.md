@@ -225,6 +225,107 @@ task stop:scenario:all
 
 Ports are deterministic per scenario name. Run `task scenarios` to see all assignments.
 
+### Private production-catalog showcase
+
+The `prod-showcase` scenario combines a selectively exported production event
+catalog with synthetic users and activity. It does not clone production users,
+attendance rows, saves, notifications, analytics, or credentials.
+
+`scenarios/prod-showcase/showcase.yaml` is the source of truth for production
+selection. Its `production.required_ids` list names exact event IDs, while
+`production.required_series_ids` names exact series IDs whose members should
+also be exported. Missing, hidden, or deleted required records fail the refresh.
+
+The same file records exact synthetic event, series, rating, and message counts.
+Synthetic content remains authored in the scenario fixture files rather than
+being generated from those counts. Before replacing any files, the exporter
+merges `scenarios/prod-showcase/overlay-events.yaml`, validates the expected
+counts, and checks every authored event and user reference. It also rejects
+duplicate fixture identities and entity values containing environment-signalling
+names. A failed check leaves the existing fixture unchanged.
+
+Prerequisites:
+
+- Docker and the normal scenario dependencies.
+- `mailpit` on `PATH` (`brew install mailpit`).
+- The Tailscale macOS app and `tailscale` CLI on `PATH`, signed in with MagicDNS
+  and HTTPS certificates enabled for the tailnet.
+- The phone signed into the same tailnet with its Tailscale VPN connected.
+- `config/secrets.prod.env` with the production `DATABASE_URL`.
+- `config/secrets.scenario.env` with throwaway scenario VAPID keys.
+
+Refresh the catalog when production events change:
+
+```bash
+task showcase:refresh
+```
+
+The exporter opens a PostgreSQL transaction and runs `SET TRANSACTION READ
+ONLY` before querying. It writes a catalog manifest with aggregate counts and a
+content checksum, but no production user identifiers, activity counts, or
+activity event lists.
+
+Start the private mobile showcase in a foreground terminal:
+
+```bash
+task showcase:mobile RESET=1
+```
+
+The command starts the normal isolated `prod-showcase` stack, local Umami,
+Mailpit on <http://127.0.0.1:8025>, and a Tailscale Serve HTTPS listener. It
+prints the private `https://<device>.<tailnet>.ts.net` URL to open on the phone.
+Vite proxies `/api` locally, so browser sessions, PWA installation, and web push
+all stay on that HTTPS origin.
+
+If the task reports that Tailscale is unavailable, open the Tailscale macOS app,
+connect it to the intended tailnet, and confirm the CLI can see the device:
+
+```bash
+tailscale status
+```
+
+Do not replace the printed HTTPS URL with the Mac's LAN IP. HTTPS is required
+for service workers, PWA installation, notification permission, and push
+subscriptions. Tailscale Serve also avoids exposing the scenario publicly.
+
+Recording checklist:
+
+1. Keep the launch terminal open. In another terminal, run
+  `task showcase:status` and confirm Web, API, Mailpit, and Tailscale Serve are
+  ready.
+2. Open the printed Tailscale URL on the phone. Sign in as Elena Moreau for the
+  populated experience or Amira Haddad for onboarding.
+3. On iPhone, use Safari's Share > Add to Home Screen. On Android, use the
+  browser's Install app action. Launch the installed app before enabling push.
+4. Follow `scenarios/prod-showcase/test_plan.yaml`. Writes remain in the local
+  scenario database; email is captured by Mailpit and analytics by local Umami.
+5. Use My Calendar > Export > Subscribe in calendar app to exercise the private
+  live iCalendar feed from a client running on the tailnet.
+6. Stop every local component and the HTTPS listener:
+
+```bash
+task showcase:status
+task showcase:stop
+```
+
+Google Calendar's "Add calendar from URL" is not part of this private run.
+Google fetches subscription URLs from its own servers, which cannot reach a
+tailnet-only `*.ts.net` address. Verify that provider against a separately
+deployed public environment; do not enable Tailscale Funnel for the local
+showcase. Apple Calendar and other clients that fetch on the connected device
+can use the private feed.
+
+The files under `frontend/public/splash/` are Apple startup images referenced by
+`apple-touch-startup-image`; Android does not use them. Chrome builds the brief
+WebAPK launch screen from the manifest icon, `background_color`, and
+`theme_color`. It normally appears only on a cold process launch and may be
+skipped when the installed app resumes from memory. To verify it, force-stop
+Movida in Android settings and then launch it from the installed app icon.
+
+Do not run the generic scenario with production database or SMTP credentials.
+The showcase task deliberately redirects SMTP to Mailpit, disables Google
+calendar sync, uses scenario VAPID keys, and never exposes a public Funnel.
+
 ---
 
 ## Testing

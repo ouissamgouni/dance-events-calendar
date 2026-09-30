@@ -6,6 +6,11 @@ import type { CalendarEvent } from '../types';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import YourNextEventsRail from './YourNextEventsRail';
 
+const planCount = vi.hoisted(() => ({ value: undefined as number | undefined }));
+vi.mock('../context/MyPlanCountContext', () => ({
+    useMyPlanCount: () => planCount.value,
+}));
+
 const event: CalendarEvent = {
     event_id: 'evt-next-1',
     calendar_id: 'cal-1',
@@ -97,18 +102,12 @@ describe('YourNextEventsRail', () => {
         vi.useRealTimers();
     });
 
-    it('links directly to a populated My Plan instead of the Program', () => {
-        const flags = { ...defaultFlags, eventScheduleEnabled: true };
-        render(
-            <MemoryRouter>
-                <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
-                    <YourNextEventsRail events={[{ ...event, schedule_published: true }]} myPlanCount={3} />
-                </FeatureFlagsContext.Provider>
-            </MemoryRouter>,
-        );
+    it('uses the shared numeric count to link to My Plan', () => {
+        planCount.value = 3;
+        renderRail([{ ...event, schedule_published: true }]);
 
-        expect(screen.getByRole('link', { name: 'My Plan (3)' })).toHaveAttribute('href', '/event/evt-next-1/program/plan');
-        expect(screen.queryByRole('link', { name: 'Program' })).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'My Plan' })).toHaveAttribute('href', '/event/evt-next-1/program/plan');
+        planCount.value = undefined;
     });
 
     it('hides the Program action when the schedule is not published', () => {

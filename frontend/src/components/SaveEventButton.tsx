@@ -7,11 +7,14 @@ import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/Featur
 import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
 import AudiencePicker from './AudiencePicker';
+import BottomSheet from './BottomSheet';
 import { trackSave } from '../utils/tracking';
+import useMediaQuery from '../hooks/useMediaQuery';
 import type { ShareAudience } from '../api';
 
 interface Props {
     eventId: string;
+    eventTitle?: string;
     appearance?: 'icon' | 'pill';
     size?: 'sm' | 'md';
     stopPropagation?: boolean;
@@ -51,6 +54,7 @@ function computePopoverPos(
 
 export default function SaveEventButton({
     eventId,
+    eventTitle,
     appearance = 'icon',
     stopPropagation = false,
     className = '',
@@ -62,6 +66,7 @@ export default function SaveEventButton({
     const featureFlagsReady = useFeatureFlagsReady();
     const location = useLocation();
     const navigate = useNavigate();
+    const isMobile = useMediaQuery('(max-width: 639px)');
     const saved = isSaved(eventId);
     const buttonRef = useRef<HTMLButtonElement | null>(null);
     const popoverRef = useRef<HTMLDivElement | null>(null);
@@ -73,7 +78,7 @@ export default function SaveEventButton({
     const [popoverPos, setPopoverPos] = useState<PopoverPos | null>(null);
 
     useEffect(() => {
-        if (!popoverOpen || !buttonRef.current) return;
+        if (!popoverOpen || isMobile || !buttonRef.current) return;
         const update = () => {
             if (buttonRef.current) {
                 setPopoverPos(computePopoverPos(buttonRef.current, POPOVER_WIDTH));
@@ -86,10 +91,10 @@ export default function SaveEventButton({
             window.removeEventListener('scroll', update, true);
             window.removeEventListener('resize', update);
         };
-    }, [popoverOpen]);
+    }, [isMobile, popoverOpen]);
 
     useEffect(() => {
-        if (!popoverOpen) return;
+        if (!popoverOpen || isMobile) return;
         const onDocClick = (e: MouseEvent) => {
             const t = e.target as Node;
             if (popoverRef.current?.contains(t) || buttonRef.current?.contains(t)) return;
@@ -102,7 +107,7 @@ export default function SaveEventButton({
             document.removeEventListener('mousedown', onDocClick);
             document.removeEventListener('keydown', onKey);
         };
-    }, [popoverOpen]);
+    }, [isMobile, popoverOpen]);
 
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
         if (stopPropagation) event.stopPropagation();
@@ -182,7 +187,59 @@ export default function SaveEventButton({
         });
     };
 
-    const popover = popoverOpen && popoverPos && createPortal(
+    const visibilityDetails = (
+        <>
+            <p className={isMobile ? 'mb-3 text-base leading-6 text-ink-soft' : 'mb-2 text-[11px] text-ink-soft'}>
+                Who can see you saved this event?
+            </p>
+            <AudiencePicker
+                value={pendingAudience}
+                onChange={handlePopoverAudienceChange}
+                size={isMobile ? 'sheet' : 'full'}
+                ariaLabel="Saved event visibility"
+            />
+            <p className={isMobile ? 'mt-3 text-sm leading-5 text-ink-soft' : 'mt-1.5 text-[11px] text-ink-soft'}>
+                {pendingAudience === 'public'
+                    ? 'Anyone who can view your profile will see this in your saved list.'
+                    : pendingAudience === 'friends'
+                        ? 'Only your mutual followers will see this in your saved list.'
+                        : 'Only you can see this in your saved list.'}
+            </p>
+        </>
+    );
+
+    const visibilityActions = (
+        <div className="flex w-full items-center justify-between gap-2">
+            <button
+                type="button"
+                onClick={unsave}
+                className="min-h-11 rounded-field px-3 py-2 text-sm font-semibold text-danger hover:bg-canvas"
+            >
+                Unsave
+            </button>
+            <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setPopoverOpen(false); }}
+                className="min-h-11 rounded-field border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink"
+            >
+                Close
+            </button>
+        </div>
+    );
+
+    const popover = popoverOpen && (isMobile ? createPortal(
+        <BottomSheet
+            title="Saved event visibility"
+            subtitle={eventTitle}
+            titleSize="large"
+            onClose={() => setPopoverOpen(false)}
+            layer="transient"
+            footer={visibilityActions}
+        >
+            {visibilityDetails}
+        </BottomSheet>,
+        document.body,
+    ) : popoverPos && createPortal(
         <div
             ref={popoverRef}
             onClick={(e) => e.stopPropagation()}
@@ -226,7 +283,7 @@ export default function SaveEventButton({
             </div>
         </div>,
         document.body,
-    );
+    ));
 
     const nudgeNode = showNudge && !user ? (
         <SignInNudge

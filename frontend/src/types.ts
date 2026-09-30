@@ -186,11 +186,27 @@ export interface ScheduleActivityType {
     sort_order: number;
 }
 
+export type ScheduleContributorRole = 'instructor' | 'dj' | 'performer' | 'host' | 'other';
+
+export interface ScheduleContributor {
+    id: number;
+    external_id: string;
+    display_name: string;
+    sort_order: number;
+}
+
+export interface ScheduleSessionContributor {
+    contributor_id: number;
+    role: ScheduleContributorRole;
+    position: number;
+}
+
 export interface ScheduleSession {
     id: string;
     external_id?: string | null;
     title: string;
     instructors: string | null;
+    contributors?: ScheduleSessionContributor[];
     start: string;
     end: string;
     room_id: number | null;
@@ -211,6 +227,7 @@ export interface EventSchedule {
     rooms: ScheduleRoom[];
     levels: ScheduleLevel[];
     activity_types: ScheduleActivityType[];
+    contributors?: ScheduleContributor[];
     sessions: ScheduleSession[];
     version: number | null;
     published_at: string | null;
@@ -240,11 +257,26 @@ export interface ScheduleIssue {
     session_ids: string[];
 }
 
+export interface ScheduleFieldChange {
+    field: string;
+    before: unknown;
+    after: unknown;
+}
+
+export interface ScheduleChange {
+    entity_type: 'schedule' | 'venue' | 'room' | 'level' | 'activity_type' | 'contributor' | 'session';
+    operation: 'create' | 'update' | 'remove';
+    entity_id: string;
+    label: string;
+    fields: ScheduleFieldChange[];
+}
+
 export interface ScheduleDiff {
     added_session_ids: string[];
     removed_session_ids: string[];
     changed_sessions: Record<string, string[]>;
     configuration_changed: boolean;
+    changes: ScheduleChange[];
 }
 
 export interface AdminEventSchedule extends EventSchedule {
@@ -265,6 +297,11 @@ export interface MyPlanResponse {
     audience: PlanAudience | null;
 }
 
+export interface MyPlanCount {
+    event_id: string;
+    plan_count: number;
+}
+
 export interface SharedMyPlanResponse {
     event_id: string;
     event_title: string;
@@ -277,18 +314,24 @@ export interface ProgramExportSession {
     id: string;
     title: string;
     instructors: string | null;
+    contributors: ScheduleSessionContributor[];
     start: string;
     end: string;
     program_day: string;
     local_date: string;
     local_start_time: string;
     local_end_time: string;
+    venue_id: number | null;
+    room_id: number | null;
+    level_id: number | null;
+    activity_type_id: number | null;
     venue: string | null;
     room: string | null;
     address: string | null;
     level: string | null;
     activity_type: string | null;
     attendee_note: string | null;
+    is_cancelled: boolean;
     status: 'active' | 'cancelled' | 'removed';
 }
 
@@ -300,13 +343,18 @@ export interface ProgramExport {
     day_start_hour: number;
     available_days: string[];
     selected_days: string[];
+    venues: ScheduleVenue[];
+    rooms: ScheduleRoom[];
+    levels: ScheduleLevel[];
+    activity_types: ScheduleActivityType[];
+    contributors: ScheduleContributor[];
     version: number;
     published_at: string;
     sessions: ProgramExportSession[];
 }
 
 export interface ScheduleImportDocument {
-    schema_version: 1;
+    schema_version: 1 | 2;
     event_id?: string | null;
     timezone: string;
     day_start_hour: number;
@@ -315,10 +363,12 @@ export interface ScheduleImportDocument {
     rooms: Array<{ external_id: string; name: string; venue_external_id?: string | null; color?: string; sort_order?: number }>;
     levels: Array<{ external_id: string; label: string; notation?: string | null; sort_order?: number }>;
     activity_types: Array<{ external_id: string; name: string; color?: string; sort_order?: number }>;
+    contributors?: Array<{ external_id: string; display_name: string; sort_order?: number }>;
     sessions: Array<{
         external_id: string;
         title: string;
         instructors?: string | null;
+        contributors?: Array<{ contributor_external_id: string; role: ScheduleContributorRole }>;
         start: string;
         end: string;
         room_external_id?: string | null;
@@ -334,6 +384,7 @@ export interface ScheduleImportDocument {
 export interface ScheduleImportPreview {
     document: ScheduleImportDocument;
     operations: { created: number; updated: number; removed: number; unchanged: number };
+    changes: ScheduleChange[];
     issues: ScheduleIssue[];
     diff: ScheduleDiff;
 }
@@ -556,6 +607,7 @@ export interface AttendanceSummary {
     anonymous_going: number;
     can_view_attendees: boolean;
     viewer_is_sharing: boolean;
+    /** Viewer-visible attendees ordered friend, following, then other. */
     preview_attendees: Attendee[];
 }
 

@@ -1,0 +1,218 @@
+schedules:
+  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    timezone: Europe/Prague
+    day_start_hour: 6
+    days:
+      - "2026-10-15"
+      - "2026-10-16"
+      - "2026-10-17"
+      - "2026-10-18"
+    venues:
+      - name: Slovansky dum
+        address: Na Prikope 22, Prague
+        sort_order: 0
+    rooms:
+      - name: Grand Hall
+        venue: Slovansky dum
+        color: amber
+        sort_order: 0
+      - name: Lounge Hall
+        venue: Slovansky dum
+        color: pink
+        sort_order: 1
+      - name: Nyx
+        venue: Slovansky dum
+        color: brown
+        sort_order: 2
+      - name: Main Hall
+        venue: Slovansky dum
+        color: violet
+        sort_order: 3
+    levels:
+      - label: Open Level
+        notation: "*"
+        sort_order: 0
+      - label: Intermediate
+        notation: "**"
+        sort_order: 1
+      - label: Advanced
+        notation: "***"
+        sort_order: 2
+    activity_types:
+      - name: Workshop
+        color: blue
+        sort_order: 0
+      - name: Social
+        color: emerald
+        sort_order: 1
+      - name: Show
+        color: pink
+        sort_order: 2
+      - name: Party
+        color: amber
+        sort_order: 3
+    sessions:
+      - id: "30000000-0000-4000-8000-000000001501"
+        title: Mambo Preparty
+        start: "2026-10-15T21:00:00Z"
+        end: "2026-10-16T03:00:00Z"
+        room: Grand Hall
+        venue: Slovansky dum
+        activity_type: Party
+        attendee_note: Registration is open throughout the preparty.
+      - id: "30000000-0000-4000-8000-000000001601"
+        title: Shines and Partnerwork
+        contributors:
+          - display_name: Jemis and Dyanna
+            role: instructor
+        start: "2026-10-16T12:00:00Z"
+        end: "2026-10-16T13:00:00Z"
+        room: Grand Hall
+        venue: Slovansky dum
+        level: Open Level
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001602"
+        title: Mobility and Strength for Dancers
+        contributors:
+          - display_name: Joana Coimbra
+            role: instructor
+        start: "2026-10-16T12:00:00Z"
+        end: "2026-10-16T13:00:00Z"
+        room: Lounge Hall
+        venue: Slovansky dum
+        level: Open Level
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001603"
+        title: Musicality Intro
+        contributors:
+          - display_name: Alexis Ruiz
+            role: instructor
+        start: "2026-10-16T12:00:00Z"
+        end: "2026-10-16T13:00:00Z"
+        room: Nyx
+        venue: Slovansky dum
+        level: Open Level
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001604"
+        title: Musicality Bootcamp
+        contributors:
+          - display_name: Alexis Ruiz
+            role: instructor
+        start: "2026-10-16T13:00:00Z"
+        end: "2026-10-16T14:00:00Z"
+        room: Nyx
+        venue: Slovansky dum
+        level: Intermediate
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001605"
+        title: Afternoon Social
+        start: "2026-10-16T14:00:00Z"
+        end: "2026-10-16T18:00:00Z"
+        room: Main Hall
+        venue: Slovansky dum
+        activity_type: Social
+      - id: "30000000-0000-4000-8000-000000001606"
+        title: Secrets to Social Dancing
+        contributors:
+          - display_name: Angel and Stephany
+            role: instructor
+        start: "2026-10-16T18:00:00Z"
+        end: "2026-10-16T19:00:00Z"
+        room: Grand Hall
+        venue: Slovansky dum
+        level: Intermediate
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001607"
+        title: Friday Welcome Party
+        start: "2026-10-16T21:00:00Z"
+        end: "2026-10-17T04:00:00Z"
+        room: Main Hall
+        venue: Slovansky dum
+        activity_type: Party
+      - id: "30000000-0000-4000-8000-000000001701"
+        title: Partnerwork Connection
+        contributors:
+          - display_name: Talia and Pacho
+            role: instructor
+        start: "2026-10-17T10:00:00Z"
+        end: "2026-10-17T11:00:00Z"
+        room: Grand Hall
+        venue: Slovansky dum
+        level: Intermediate
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001702"
+        title: Cha Cha Foundations
+        contributors:
+          - display_name: Ella Jouk
+            role: instructor
+        start: "2026-10-17T11:00:00Z"
+        end: "2026-10-17T12:00:00Z"
+        room: Nyx
+        venue: Slovansky dum
+        level: Open Level
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001703"
+        title: Mambo Partnerwork Lab
+        contributors:
+          - display_name: Luigi and Elena
+            role: instructor
+        start: "2026-10-17T13:00:00Z"
+        end: "2026-10-17T14:30:00Z"
+        room: Lounge Hall
+        venue: Slovansky dum
+        level: Advanced
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001704"
+        title: Saturday Artist Performances
+        start: "2026-10-17T21:00:00Z"
+        end: "2026-10-17T22:00:00Z"
+        room: Main Hall
+        venue: Slovansky dum
+        activity_type: Show
+      - id: "30000000-0000-4000-8000-000000001705"
+        title: Saturday Mambo Party
+        start: "2026-10-17T22:00:00Z"
+        end: "2026-10-18T04:00:00Z"
+        room: Main Hall
+        venue: Slovansky dum
+        activity_type: Party
+      - id: "30000000-0000-4000-8000-000000001801"
+        title: Body Movement Essentials
+        contributors:
+          - display_name: Michelle Morales
+            role: instructor
+        start: "2026-10-18T10:00:00Z"
+        end: "2026-10-18T11:00:00Z"
+        room: Lounge Hall
+        venue: Slovansky dum
+        level: Open Level
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001802"
+        title: Advanced Musicality
+        contributors:
+          - display_name: Alexis Ruiz
+            role: instructor
+        start: "2026-10-18T13:00:00Z"
+        end: "2026-10-18T14:30:00Z"
+        room: Nyx
+        venue: Slovansky dum
+        level: Advanced
+        activity_type: Workshop
+      - id: "30000000-0000-4000-8000-000000001803"
+        title: Closing Social
+        start: "2026-10-18T18:00:00Z"
+        end: "2026-10-18T22:00:00Z"
+        room: Main Hall
+        venue: Slovansky dum
+        activity_type: Social
+        attendee_note: Farewell social and closing announcements.
+    published: true
+    plans:
+      - email: elena.moreau@joinmovida.com
+        session_id: "30000000-0000-4000-8000-000000001601"
+      - email: elena.moreau@joinmovida.com
+        session_id: "30000000-0000-4000-8000-000000001606"
+      - email: elena.moreau@joinmovida.com
+        session_id: "30000000-0000-4000-8000-000000001703"
+      - email: elena.moreau@joinmovida.com
+        session_id: "30000000-0000-4000-8000-000000001801"

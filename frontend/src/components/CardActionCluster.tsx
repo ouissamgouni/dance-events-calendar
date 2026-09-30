@@ -4,6 +4,7 @@ import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
 
 interface CardActionClusterProps {
     eventId: string;
+    eventTitle: string;
     isSavedFlag?: boolean;
     isPast?: boolean;
     /** Show the live saved count next to the Save action. */
@@ -27,6 +28,7 @@ interface CardActionClusterProps {
  */
 export default function CardActionCluster({
     eventId,
+    eventTitle,
     isSavedFlag = false,
     isPast = false,
     showSaveStats = false,
@@ -44,6 +46,7 @@ export default function CardActionCluster({
                 <span className="inline-flex items-center">
                     <SaveEventButton
                         eventId={eventId}
+                        eventTitle={eventTitle}
                         appearance="icon"
                         size={size}
                         stopPropagation
@@ -60,6 +63,7 @@ export default function CardActionCluster({
                 <span className="inline-flex items-center">
                     <GoingButton
                         eventId={eventId}
+                        eventTitle={eventTitle}
                         appearance="icon"
                         size={size}
                         stopPropagation

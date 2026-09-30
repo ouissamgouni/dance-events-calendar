@@ -4,13 +4,18 @@ import {
     completeOnboarding,
     createInterestProfile,
     deleteInterestProfile,
+    fetchOnboardingSuggestions,
     fetchInterestProfiles,
     fetchTagGroups,
+    followUser,
+    searchUsers,
+    unfollowUser,
     updateUserProfile,
     updateInterestProfile,
     type HomeLocationPayload,
     type InterestProfile,
     type PreferredAreaPayload,
+    type UserSearchResult,
 } from '../../api';
 import CityRadiusEditor from '../CityRadiusEditor';
 import AreaMapPreview from '../AreaMapPreview';
@@ -25,12 +30,14 @@ import { bboxFromPinRadius } from './onboardingGeometry';
 import { bboxSearchArea, radiusSearchArea } from '../../utils/searchArea';
 import { generateProfileName } from '../../utils/searchProfiles';
 
-type Step = 'dances' | 'international' | 'home' | 'profile' | 'review';
+type Step = 'dances' | 'international' | 'home' | 'follow' | 'profile' | 'review';
 type InternationalView = 'presets' | 'editor';
 type HomeView = 'choice' | 'editor';
+type FollowStatus = 'idle' | 'following' | 'unfollowing' | 'followed' | 'requested';
 
-const BASE_STEPS: Step[] = ['dances', 'international', 'home', 'review'];
-const PROFILE_STEPS: Step[] = ['dances', 'international', 'home', 'profile', 'review'];
+const BASE_STEPS: Step[] = ['dances', 'international', 'home', 'follow', 'review'];
+const PROFILE_STEPS: Step[] = ['dances', 'international', 'home', 'follow', 'profile', 'review'];
+const SUGGESTION_LIMIT = 7;
 const LATIN_AMERICA: PreferredAreaPayload = { label: 'Latin America', min_lat: -56, min_lng: -118, max_lat: 33, max_lng: -34 };
 const CUSTOM_AREA: PreferredAreaPayload = { label: 'Custom', min_lat: -55, min_lng: -70, max_lat: 55, max_lng: 70 };
 const ONBOARDING_PRESETS: PreferredAreaPayload[] = [
@@ -81,7 +88,15 @@ function OnboardingFlowContent({ profileStepEnabledAtMount }: { profileStepEnabl
     const [internationalNameManuallyEdited, setInternationalNameManuallyEdited] = useState(false);
     const [home, setHome] = useState<HomeDraft | null>(null);
     const [nameDraft, setNameDraft] = useState(user?.name ?? '');
+    const [followItems, setFollowItems] = useState<UserSearchResult[] | null>(null);
+    const [followStatus, setFollowStatus] = useState<Record<string, FollowStatus>>({});
+    const [followSuggestionsLoading, setFollowSuggestionsLoading] = useState(false);
+    const [followSuggestionsRequest, setFollowSuggestionsRequest] = useState(0);
+    const [userSearch, setUserSearch] = useState('');
+    const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
+    const [userSearching, setUserSearching] = useState(false);
     const initialPrefsRef = useRef(prefs);
+    const followLoadedRequestRef = useRef(-1);
 
     const danceGroup = useMemo(() => tagGroups.find((group) => group.slug === 'dance-style' && group.enabled !== false) ?? null, [tagGroups]);
     const activeProfile = profiles.find((profile) => profile.is_active) ?? profiles[0] ?? null;
@@ -112,6 +127,84 @@ function OnboardingFlowContent({ profileStepEnabledAtMount }: { profileStepEnabl
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, []);
+
+    useEffect(() => {
+        if (step !== 'follow' || followLoadedRequestRef.current === followSuggestionsRequest) return;
+        followLoadedRequestRef.current = followSuggestionsRequest;
+        let cancelled = false;
+        setFollowSuggestionsLoading(true);
+        fetchOnboardingSuggestions(SUGGESTION_LIMIT)
+            .then((response) => {
+                if (cancelled) return;
+                setFollowItems(response.items);
+                setFollowStatus((statuses) => {
+                    const next = { ...statuses };
+                    response.items.forEach((item) => {
+                        next[item.handle] ??= item.is_followed_by_viewer ? 'followed' : 'idle';
+                    });
+                    return next;
+                });
+            })
+            .catch((caught) => { if (!cancelled) setError(caught instanceof Error ? caught.message : 'We could not load follow suggestions.'); })
+            .finally(() => { if (!cancelled) setFollowSuggestionsLoading(false); });
+        return () => { cancelled = true; };
+    }, [step, followSuggestionsRequest]);
+
+    useEffect(() => {
+        const term = userSearch.trim();
+        let cancelled = false;
+        const timer = window.setTimeout(() => {
+            if (term.length < 2) {
+                setUserResults([]);
+                setUserSearching(false);
+                return;
+            }
+            searchUsers(term, { limit: 8 })
+                .then((response) => { if (!cancelled) setUserResults(response.items); })
+                .catch(() => { if (!cancelled) setUserResults([]); })
+                .finally(() => { if (!cancelled) setUserSearching(false); });
+        }, 250);
+        return () => { cancelled = true; window.clearTimeout(timer); };
+    }, [userSearch]);
+
+    const addToFollowList = (candidate: UserSearchResult, prepend = false) => {
+        setFollowItems((current) => {
+            const items = current ?? [];
+            if (items.some((item) => item.handle === candidate.handle)) return items;
+            return prepend ? [candidate, ...items] : [...items, candidate];
+        });
+    };
+
+    const toggleFollow = async (candidate: UserSearchResult) => {
+        const handle = candidate.handle;
+        const current = followStatus[handle] ?? (candidate.is_followed_by_viewer ? 'followed' : 'idle');
+        if (current === 'following' || current === 'unfollowing') return;
+        addToFollowList(candidate);
+        setError(null);
+        const isFollowing = current === 'followed' || current === 'requested';
+        setFollowStatus((statuses) => ({ ...statuses, [handle]: isFollowing ? 'unfollowing' : 'following' }));
+        try {
+            const result = isFollowing ? await unfollowUser(handle) : await followUser(handle);
+            const nextStatus: FollowStatus = result.is_following
+                ? result.follow_status === 'pending' ? 'requested' : 'followed'
+                : 'idle';
+            setFollowStatus((statuses) => ({ ...statuses, [handle]: nextStatus }));
+            setFollowItems((items) => (items ?? []).map((item) => item.handle === handle
+                ? { ...item, is_followed_by_viewer: result.is_following, is_friend: result.is_friend, is_subscribed: result.is_subscribed }
+                : item));
+            window.dispatchEvent(new Event('network:changed'));
+        } catch (caught) {
+            setFollowStatus((statuses) => ({ ...statuses, [handle]: current }));
+            setError(caught instanceof Error ? caught.message : 'Failed to update follow.');
+        }
+    };
+
+    const followFromSearch = (candidate: UserSearchResult) => {
+        addToFollowList(candidate, true);
+        setUserSearch('');
+        setUserResults([]);
+        void toggleFollow(candidate);
+    };
 
     const goToStep = (nextStep: Step, fromReview = false) => {
         setError(null);
@@ -190,6 +283,7 @@ function OnboardingFlowContent({ profileStepEnabledAtMount }: { profileStepEnabl
         dances: ['What do you dance?', 'Select all that apply'],
         international: ['Where do you want to discover events?', 'Choose your international area.'],
         home: ['Find events near home?', 'Add a local search for events in your city and nearby area.'],
+        follow: ['Build your tribe', 'Follow a few people to see their calendars and activity.'],
         profile: ['Complete your profile', 'Confirm the name people will see and optionally add a picture.'],
         review: ["You're all set", 'Review your preferences before exploring.'],
     }[step];
@@ -237,8 +331,22 @@ function OnboardingFlowContent({ profileStepEnabledAtMount }: { profileStepEnabl
                 <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-6">
                     {step === 'dances' && <DanceStep loading={loading} group={danceGroup} selectedIds={danceIds} onChange={setDanceIds} />}
                     {step === 'international' && <PresetStep onSelect={(preset) => { setArea({ ...preset }); setInternationalNameManuallyEdited(false); setInternationalView('editor'); }} />}
-                    {step === 'home' && homeView === 'choice' && <HomeChoice onYes={() => setHomeView('editor')} onNo={() => { setHome(null); finishEditOrAdvance(profileStepEnabled ? 'profile' : 'review'); }} />}
+                    {step === 'home' && homeView === 'choice' && <HomeChoice onYes={() => setHomeView('editor')} onNo={() => { setHome(null); finishEditOrAdvance('follow'); }} />}
                     {step === 'home' && homeView === 'editor' && <HomeEditor value={home} onChange={setHome} />}
+                    {step === 'follow' && (
+                        <FollowStep
+                            items={followItems}
+                            statuses={followStatus}
+                            loadingSuggestions={followSuggestionsLoading}
+                            search={userSearch}
+                            searchResults={userResults}
+                            searching={userSearching}
+                            onSearchChange={(value) => { setUserSearch(value); setUserSearching(value.trim().length >= 2); }}
+                            onShuffle={() => setFollowSuggestionsRequest((request) => request + 1)}
+                            onToggle={(candidate) => void toggleFollow(candidate)}
+                            onFollowSearchResult={followFromSearch}
+                        />
+                    )}
                     {step === 'profile' && (
                         <ProfileStep
                             loading={!user}
@@ -249,23 +357,27 @@ function OnboardingFlowContent({ profileStepEnabledAtMount }: { profileStepEnabl
                             onAvatarChange={refreshUser}
                         />
                     )}
-                    {step === 'review' && <ReviewStep dances={danceGroup?.tags.filter((tag) => danceIds.includes(tag.id)) ?? []} area={area} home={home} profile={profileStepEnabled ? { name: nameDraft.trim(), avatarUrl: user?.avatar_url ?? null } : null} onEdit={(target) => goToStep(target, true)} />}
+                    {step === 'review' && <ReviewStep dances={danceGroup?.tags.filter((tag) => danceIds.includes(tag.id)) ?? []} area={area} home={home} followedUsers={(followItems ?? []).filter((item) => ['followed', 'requested'].includes(followStatus[item.handle] ?? 'idle'))} profile={profileStepEnabled ? { name: nameDraft.trim(), avatarUrl: user?.avatar_url ?? null } : null} onEdit={(target) => goToStep(target, true)} />}
                 </main>
-                {(step === 'dances' || (step === 'home' && homeView === 'editor') || step === 'profile' || step === 'review') && (
+                {(step === 'dances' || (step === 'home' && homeView === 'editor') || step === 'follow' || step === 'profile' || step === 'review') && (
                     <StickyFooter>
-                        <button
-                            type="button"
-                            disabled={saving || (step === 'dances' && danceIds.length === 0) || (step === 'home' && homeView === 'editor' && !home) || (step === 'profile' && (!user || !nameDraft.trim()))}
-                            onClick={() => {
-                                if (step === 'dances') finishEditOrAdvance('international');
-                                else if (step === 'home') finishEditOrAdvance(profileStepEnabled ? 'profile' : 'review');
-                                else if (step === 'profile') finishEditOrAdvance('review');
-                                else void saveAll();
-                            }}
-                            className="min-h-12 w-full bg-action px-4 text-sm font-semibold text-white hover:bg-action-strong disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            {saving ? 'Saving…' : step === 'review' ? 'Start exploring' : editingFromReview ? 'Save' : 'Continue'}
-                        </button>
+                        <div className="flex gap-3">
+                            {step === 'follow' && !editingFromReview && <button type="button" onClick={() => finishEditOrAdvance(profileStepEnabled ? 'profile' : 'review')} className="min-h-12 border border-line bg-surface px-4 text-sm font-semibold text-ink hover:bg-canvas">Skip</button>}
+                            <button
+                                type="button"
+                                disabled={saving || (step === 'dances' && danceIds.length === 0) || (step === 'home' && homeView === 'editor' && !home) || (step === 'profile' && (!user || !nameDraft.trim()))}
+                                onClick={() => {
+                                    if (step === 'dances') finishEditOrAdvance('international');
+                                    else if (step === 'home') finishEditOrAdvance('follow');
+                                    else if (step === 'follow') finishEditOrAdvance(profileStepEnabled ? 'profile' : 'review');
+                                    else if (step === 'profile') finishEditOrAdvance('review');
+                                    else void saveAll();
+                                }}
+                                className="min-h-12 flex-1 bg-action px-4 text-sm font-semibold text-white hover:bg-action-strong disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                {saving ? 'Saving…' : step === 'review' ? 'Start exploring' : editingFromReview ? 'Save' : 'Continue'}
+                            </button>
+                        </div>
                     </StickyFooter>
                 )}
             </div>
@@ -274,7 +386,7 @@ function OnboardingFlowContent({ profileStepEnabledAtMount }: { profileStepEnabl
 }
 
 function OnboardingShell({ stepIndex, profileStepEnabled, compactHeader = false, children }: { stepIndex: number; profileStepEnabled: boolean; compactHeader?: boolean; children: ReactNode }) {
-    const labels = profileStepEnabled ? ['Dance styles', 'International area', 'Near home', 'Profile', 'Review'] : ['Dance styles', 'International area', 'Near home', 'Review'];
+    const labels = profileStepEnabled ? ['Dance styles', 'International area', 'Near home', 'Build your tribe', 'Profile', 'Review'] : ['Dance styles', 'International area', 'Near home', 'Build your tribe', 'Review'];
     return (
         <div className="mx-auto flex h-full min-h-[560px] w-full max-w-lg flex-col overflow-hidden bg-surface sm:my-4 sm:h-[min(820px,calc(100%-32px))] sm:rounded-card sm:border sm:border-card-line sm:shadow-sm">
             <div className={compactHeader ? 'px-4 pt-3' : 'px-4 pt-4'}>
@@ -336,6 +448,76 @@ function HomeEditor({ value, onChange }: { value: HomeDraft | null; onChange: (v
     );
 }
 
+function FollowStep({ items, statuses, loadingSuggestions, search, searchResults, searching, onSearchChange, onShuffle, onToggle, onFollowSearchResult }: { items: UserSearchResult[] | null; statuses: Record<string, FollowStatus>; loadingSuggestions: boolean; search: string; searchResults: UserSearchResult[]; searching: boolean; onSearchChange: (value: string) => void; onShuffle: () => void; onToggle: (candidate: UserSearchResult) => void; onFollowSearchResult: (candidate: UserSearchResult) => void }) {
+    return (
+        <div className="space-y-4">
+            <div className="relative">
+                <input type="search" value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search by name or @handle" aria-label="Search users" className="min-h-12 w-full rounded-field border border-line bg-surface px-3 text-sm text-ink focus:border-action focus:outline-none" />
+                {search.trim().length >= 2 && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-field border border-line bg-surface shadow-lg">
+                        {searching && <p className="px-3 py-3 text-sm text-ink-soft">Searching…</p>}
+                        {!searching && searchResults.length === 0 && <p className="px-3 py-3 text-sm text-ink-soft">No matches.</p>}
+                        {searchResults.map((candidate) => <FollowRow key={candidate.handle} candidate={candidate} status={statuses[candidate.handle] ?? (candidate.is_followed_by_viewer ? 'followed' : 'idle')} onToggle={() => onFollowSearchResult(candidate)} compact />)}
+                    </div>
+                )}
+            </div>
+            <div>
+                {(loadingSuggestions || (items && items.length > 0)) && (
+                    <div className="flex items-center justify-between pb-1">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Suggestions for you</span>
+                        {items && items.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={onShuffle}
+                                disabled={loadingSuggestions}
+                                aria-label="Refresh suggestions"
+                                className="min-h-6 min-w-6 p-0 text-action hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                    className={loadingSuggestions ? 'animate-spin' : ''}
+                                >
+                                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                    <path d="M21 3v6h-6" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                )}
+                {items === null ? <p className="text-sm text-muted">Loading suggestions…</p> : items.length === 0 ? <p className="text-sm text-ink-soft">No suggestions yet. Search above to find people.</p> : <ul className="divide-y divide-card-line">{items.map((candidate) => <li key={candidate.handle}><FollowRow candidate={candidate} status={statuses[candidate.handle] ?? (candidate.is_followed_by_viewer ? 'followed' : 'idle')} onToggle={() => onToggle(candidate)} /></li>)}</ul>}
+            </div>
+        </div>
+    );
+}
+
+function FollowRow({ candidate, status, onToggle, compact = false }: { candidate: UserSearchResult; status: FollowStatus; onToggle: () => void; compact?: boolean }) {
+    const isFollowing = status === 'followed' || status === 'requested';
+    const isBusy = status === 'following' || status === 'unfollowing';
+    return (
+        <div className={`flex items-center gap-3 ${compact ? 'px-3 py-2' : 'py-3'}`}>
+            <FollowAvatar candidate={candidate} />
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5"><span className="truncate text-sm font-semibold text-ink">{candidate.display_name || `@${candidate.handle}`}</span>{candidate.is_verified_organizer && <img src="/orga.png" alt="" title="Verified organizer" className="h-4 w-4 object-contain" />}</div>
+                <p className="truncate text-xs text-ink-soft">@{candidate.handle}{compact ? ` · ${candidate.subscribers_count} subscriber${candidate.subscribers_count === 1 ? '' : 's'}` : ''}</p>
+            </div>
+            <button type="button" disabled={isBusy} onClick={onToggle} title={isFollowing ? 'Click to undo' : undefined} className={isFollowing ? 'min-h-10 border border-action bg-action px-3 text-xs font-semibold text-white disabled:opacity-50' : 'min-h-10 border border-line bg-surface px-3 text-xs font-semibold text-ink hover:bg-canvas disabled:opacity-50'}>{isBusy ? status === 'unfollowing' ? 'Undoing…' : 'Following…' : status === 'requested' ? 'Requested' : status === 'followed' ? 'Following' : 'Follow'}</button>
+        </div>
+    );
+}
+
+function FollowAvatar({ candidate }: { candidate: UserSearchResult }) {
+    // eslint-disable-next-line no-restricted-syntax -- Profile avatars are circular by design.
+    return candidate.avatar_url ? <img src={candidate.avatar_url} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-canvas text-sm font-semibold text-ink-soft">{(candidate.display_name || candidate.handle).charAt(0).toUpperCase()}</span>;
+}
+
 function ProfileStep({ loading, name, avatarUrl, hasCustomAvatar, onNameChange, onAvatarChange }: { loading: boolean; name: string; avatarUrl: string | null; hasCustomAvatar: boolean; onNameChange: (name: string) => void; onAvatarChange: () => Promise<void> }) {
     if (loading) return <p className="text-sm text-ink-soft">Loading your profile…</p>;
     return (
@@ -350,9 +532,9 @@ function ProfileStep({ loading, name, avatarUrl, hasCustomAvatar, onNameChange, 
     );
 }
 
-function ReviewStep({ dances, area, home, profile, onEdit }: { dances: Tag[]; area: PreferredAreaPayload; home: HomeDraft | null; profile: { name: string; avatarUrl: string | null } | null; onEdit: (step: Step) => void }) {
+function ReviewStep({ dances, area, home, followedUsers, profile, onEdit }: { dances: Tag[]; area: PreferredAreaPayload; home: HomeDraft | null; followedUsers: UserSearchResult[]; profile: { name: string; avatarUrl: string | null } | null; onEdit: (step: Step) => void }) {
     // eslint-disable-next-line no-restricted-syntax -- Profile avatars are circular by design.
-    return <div className="space-y-3"><ReviewCard icon="♪" title="Dance styles" value={dances.map((tag) => tag.label).join(', ')} onClick={() => onEdit('dances')} /><ReviewCard icon="◎" title="International area" value={area.label} preview={<AreaMapPreview area={bboxSearchArea(area, 'preference')} className="h-12 w-16" />} onClick={() => onEdit('international')} /><ReviewCard icon="⌂" title="Near home" value={home ? `${home.location.label} · ${home.radiusKm} km` : 'Not set'} preview={home ? <AreaMapPreview area={radiusSearchArea(home.location.label, home.location, home.radiusKm, 'preference')} className="h-12 w-16" /> : undefined} onClick={() => onEdit('home')} />{profile && <ReviewCard icon="" title="Profile" value={profile.name} preview={profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-12 w-12 rounded-full object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-canvas font-semibold text-ink-soft">{profile.name.charAt(0).toUpperCase()}</span>} onClick={() => onEdit('profile')} />}</div>;
+    return <div className="space-y-3"><ReviewCard icon="♪" title="Dance styles" value={dances.map((tag) => tag.label).join(', ')} onClick={() => onEdit('dances')} /><ReviewCard icon="◎" title="International area" value={area.label} preview={<AreaMapPreview area={bboxSearchArea(area, 'preference')} className="h-12 w-16" />} onClick={() => onEdit('international')} /><ReviewCard icon="⌂" title="Near home" value={home ? `${home.location.label} · ${home.radiusKm} km` : 'Not set'} preview={home ? <AreaMapPreview area={radiusSearchArea(home.location.label, home.location, home.radiusKm, 'preference')} className="h-12 w-16" /> : undefined} onClick={() => onEdit('home')} /><ReviewCard icon="♙" title="Following" value={followedUsers.length > 0 ? followedUsers.map((candidate) => candidate.display_name || `@${candidate.handle}`).join(', ') : 'None yet'} onClick={() => onEdit('follow')} />{profile && <ReviewCard icon="" title="Profile" value={profile.name} preview={profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-12 w-12 rounded-full object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-canvas font-semibold text-ink-soft">{profile.name.charAt(0).toUpperCase()}</span>} onClick={() => onEdit('profile')} />}</div>;
 }
 
 function ReviewCard({ icon, title, value, preview, onClick }: { icon: string; title: string; value: string; preview?: ReactNode; onClick: () => void }) {

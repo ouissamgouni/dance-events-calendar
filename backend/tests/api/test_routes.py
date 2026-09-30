@@ -591,7 +591,7 @@ class TestEventsEndpoint:
 
             assert resp.status_code == 200
             assert resp.headers["cache-control"] == "public, max-age=60"
-            assert "vary" not in resp.headers
+            assert resp.headers.get("vary") == "Origin"
         finally:
             app.dependency_overrides.clear()
 
@@ -612,7 +612,7 @@ class TestEventsEndpoint:
 
             assert resp.status_code == 200
             assert resp.headers["cache-control"] == "private, max-age=0"
-            assert resp.headers["vary"] == "Cookie"
+            assert resp.headers["vary"] == "Cookie, Origin"
         finally:
             app.dependency_overrides.clear()
 
@@ -629,7 +629,7 @@ class TestEventsEndpoint:
             assert resp.status_code == 200
             assert resp.json() == []
             assert resp.headers["cache-control"] == "private, max-age=0"
-            assert resp.headers["vary"] == "Cookie"
+            assert resp.headers["vary"] == "Cookie, Origin"
         finally:
             app.dependency_overrides.clear()
 

@@ -1,0 +1,348 @@
+calendars:
+  - id: movida-community-events
+    name: Movida Community Events
+    color: "#0f766e"
+    enabled: true
+    default_tags: []
+
+events:
+  - id: alfama-thursday-salsa-summer
+    calendar_id: movida-community-events
+    title: Alfama Thursday Salsa - Summer Edition
+    description: A relaxed weekly salsa social with an introductory class and resident DJs.
+    location: Clube do Tejo, Lisbon, Portugal
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w-8 Thu 20:00
+    end: w-8 Fri 00:30
+    image: 01_alfama_thursday_salsa_summer_edition.png
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: alfama-thursday-salsa-autumn
+    calendar_id: movida-community-events
+    title: Alfama Thursday Salsa - Autumn Edition
+    description: The latest edition of Lisbon's welcoming Thursday salsa social.
+    location: Clube do Tejo, Lisbon, Portugal
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w-2 Thu 20:00
+    end: w-2 Fri 00:30
+    image: 02_alfama_thursday_salsa_autumn_edition.png
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: alfama-thursday-salsa-next
+    calendar_id: movida-community-events
+    title: Alfama Thursday Salsa - Next Edition
+    description: Beginner class, social dancing, and a late-night salsa set in central Lisbon.
+    image: 03_alfama_thursday_salsa_next_edition.png
+    location: Clube do Tejo, Lisbon, Portugal
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w2 Thu 20:00
+    end: w2 Fri 00:30
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: seine-salsa-social
+    calendar_id: movida-community-events
+    title: Seine Salsa Social
+    description: An evening of salsa dancing beside the Seine with a friendly local crowd.
+    location: Studio Bastille, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w-20 Sat 20:00
+    end: w-20 Sun 01:00
+    image: 04_seine_salsa_social.png
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: berlin-bachata-exchange
+    calendar_id: movida-community-events
+    title: Berlin Bachata Exchange
+    description: A weekend workshop and social for bachata dancers from across Europe.
+    location: Kulturhalle, Berlin, Germany
+    city: Berlin
+    country: Germany
+    country_code: DE
+    latitude: 52.52
+    longitude: 13.405
+    start: w-16 Sat 14:00
+    end: w-16 Sun 02:00
+    image: 05_berlin_bachata_exchange.png
+    price_min: 45
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:international
+  - id: madrid-salsa-congress-night
+    calendar_id: movida-community-events
+    title: Madrid Salsa Congress Night
+    description: Congress workshops followed by live music and social dancing until late.
+    image: 06_madrid_salsa_congress_night.png
+    location: Palacio de Congresos, Madrid, Spain
+    city: Madrid
+    country: Spain
+    country_code: ES
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w-12 Sat 18:00
+    end: w-12 Sun 03:00
+    price_min: 55
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+  - id: canal-bachata-sunday
+    calendar_id: movida-community-events
+    title: Canal Bachata Sunday
+    description: Sunday bachata workshops and a sunset social near the waterfront.
+    location: Panama, Amsterdam, Netherlands
+    city: Amsterdam
+    country: Netherlands
+    country_code: NL
+    latitude: 52.3676
+    longitude: 4.9041
+    start: w-10 Sun 15:00
+    end: w-10 Sun 22:00
+    image: 07_canal_bachata_sunday.png
+    price_min: 18
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:workshop
+      - dance-style:bachata
+      - reach:regional
+  - id: barcelona-salsa-beach-party
+    calendar_id: movida-community-events
+    title: Barcelona Salsa Beach Party
+    description: Sunset salsa dancing by the sea with DJs and an open-air social.
+    location: Bogatell Beach, Barcelona, Spain
+    city: Barcelona
+    country: Spain
+    country_code: ES
+    latitude: 41.3851
+    longitude: 2.1734
+    start: w-6 Sat 18:00
+    end: w-6 Sun 02:00
+    image: 08_barcelona_salsa_beach_party.png
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:regional
+  - id: vienna-bachata-nights
+    calendar_id: movida-community-events
+    title: Vienna Bachata Nights
+    description: An elegant Friday bachata social with classes and late-night dancing.
+    location: Tanzhaus Wien, Vienna, Austria
+    city: Vienna
+    country: Austria
+    country_code: AT
+    latitude: 48.2082
+    longitude: 16.3738
+    start: w4 Fri 21:00
+    end: w4 Sat 02:00
+    image: 09_vienna_bachata_nights.png
+    price_min: 18
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:regional
+  - id: rome-latin-social
+    calendar_id: movida-community-events
+    title: Rome Latin Social
+    description: A Saturday-night Latin social with salsa and bachata in central Rome.
+    location: Spazio Nova, Rome, Italy
+    city: Rome
+    country: Italy
+    country_code: IT
+    latitude: 41.9028
+    longitude: 12.4964
+    start: w8 Sat 21:00
+    end: w8 Sun 01:00
+    image: 10_rome_latin_social.png
+    price_min: 15
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:regional
+  - id: zurich-kizomba-social
+    calendar_id: movida-community-events
+    title: Zurich Kizomba Social
+    description: A Friday kizomba social beside the lake with an intimate late-night floor.
+    location: Dynamo, Zurich, Switzerland
+    city: Zurich
+    country: Switzerland
+    country_code: CH
+    latitude: 47.3769
+    longitude: 8.5417
+    start: w14 Fri 20:00
+    end: w14 Sat 01:00
+    image: 11_zurich_kizomba_social.png
+    price_min: 20
+    price_currency: CHF
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:local
+  - id: london-salsa-sessions
+    calendar_id: movida-community-events
+    title: London Salsa Sessions
+    description: A Saturday salsa session with classes, social dancing, and late-night DJs.
+    image: 12_london_salsa_sessions.png
+    location: The Loft, London, United Kingdom
+    city: London
+    country: United Kingdom
+    country_code: GB
+    latitude: 51.5072
+    longitude: -0.1276
+    start: w18 Sat 20:00
+    end: w18 Sun 01:00
+    price_min: 24
+    price_currency: GBP
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:regional
+
+event_series:
+  - canonical_title: Alfama Thursday Salsa
+    status: resolved
+    source: manual
+    members:
+      - alfama-thursday-salsa-summer
+      - alfama-thursday-salsa-autumn
+      - alfama-thursday-salsa-next
+
+ratings:
+  - event_id: alfama-thursday-salsa-summer
+    email: maya.rivera@joinmovida.com
+    overall_sentiment: amazing
+    comment: Warm hosts, a lovely floor, and music that kept everyone dancing.
+    aspect_scores: { music: 5, atmosphere: 5, venue-quality: 4 }
+    aspect_tags:
+      - music:great-playlist
+      - atmosphere:friendly-crowd
+      - venue-quality:great-dance-floor
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: alfama-thursday-salsa-summer
+    email: noah.kim@joinmovida.com
+    overall_sentiment: great
+    comment: The beginner class made it very easy to join the social afterwards.
+    aspect_scores: { atmosphere: 5, organization: 4 }
+    aspect_tags:
+      - atmosphere:welcoming-inclusive
+      - organization:well-organized
+    audience_tags:
+      - audience:first-social
+    comment_status: approved
+    status: approved
+  - event_id: alfama-thursday-salsa-autumn
+    email: clara.dubois@joinmovida.com
+    overall_sentiment: great
+    comment: Consistently friendly crowd and an excellent final salsa set.
+    aspect_scores: { music: 5, atmosphere: 4 }
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: alfama-thursday-salsa-autumn
+    email: ana.garcia@joinmovida.com
+    overall_sentiment: okay
+    comment: Great music, though the room became crowded later in the evening.
+    aspect_scores: { music: 4, venue-quality: 2 }
+    aspect_tags:
+      - music:great-playlist
+      - venue-quality:crowded
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+  - event_id: berlin-bachata-exchange
+    email: leo.martin@joinmovida.com
+    overall_sentiment: amazing
+    comment: Clear workshops and a genuinely international social floor.
+    aspect_scores: { atmosphere: 5, organization: 5 }
+    aspect_tags:
+      - atmosphere:international-crowd
+      - organization:well-organized
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: madrid-salsa-congress-night
+    email: mina.silva@joinmovida.com
+    overall_sentiment: great
+    comment: Live band night was the highlight of the weekend.
+    aspect_scores: { music: 5, shows: 5, atmosphere: 4 }
+    aspect_tags:
+      - music:live-band
+      - shows:great-performances
+      - atmosphere:high-energy
+    audience_tags:
+      - audience:performance-lovers
+    comment_status: approved
+    status: approved
+  - event_id: barcelona-salsa-beach-party
+    email: elena.moreau@joinmovida.com
+    overall_sentiment: great
+    comment: Great sunset atmosphere, varied music, and plenty of room to dance by the sea.
+    aspect_scores: { organization: 5, music: 5, atmosphere: 5 }
+    aspect_tags:
+      - organization:well-organized
+      - music:good-variety
+      - atmosphere:high-energy
+    audience_tags:
+      - audience:travelers
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+
+emit_suggested:
+  - event_id: london-salsa-sessions
+    email: penny.valdez@joinmovida.com

@@ -31,6 +31,10 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
         () => sessionsForDay(schedule.sessions, day, schedule.timezone, schedule.day_start_hour),
         [day, schedule],
     );
+    const contributorNames = useMemo(
+        () => new Map(schedule.contributors?.map((contributor) => [contributor.id, contributor.display_name]) ?? []),
+        [schedule.contributors],
+    );
     const usedRoomIds = new Set(sessions.flatMap((session) => session.room_id == null ? [] : [session.room_id]));
     const rooms = schedule.rooms.filter((room) => usedRoomIds.has(room.id));
     const startMinutes = sessions.map((session) => minuteOfProgramDay(session.start, schedule.timezone, schedule.day_start_hour));
@@ -129,6 +133,10 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                 {sessions.map((session) => {
                     const room = schedule.rooms.find((item) => item.id === session.room_id);
                     const level = schedule.levels.find((item) => item.id === session.level_id);
+                    const contributors = session.contributors
+                        ?.map((assignment) => contributorNames.get(assignment.contributor_id))
+                        .filter((name): name is string => Boolean(name))
+                        .join(', ') || session.instructors;
                     const color = roomColor(room?.color ?? 'slate');
                     const activeNow = showNow && isSessionActive(session, now);
                     const attendance = attendeeSummaries?.get(session.id);
@@ -142,7 +150,7 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                             style={{ gridColumn: roomColumn(session.room_id), gridRow: sessionRow(session) }}
                         >
                             <span className={`block line-clamp-2 text-xs font-semibold leading-4 text-ink ${session.is_cancelled ? 'line-through' : ''}`}>{session.title}</span>
-                            {session.instructors ? <span className="mt-0.5 block whitespace-normal text-[11px] leading-4 text-ink-soft">{session.instructors}</span> : null}
+                            {contributors ? <span className="mt-0.5 block whitespace-normal text-[11px] leading-4 text-ink-soft">{contributors}</span> : null}
                             {level ? <span className="mt-1 block truncate text-[10px] font-medium text-action">{level.label}</span> : null}
                             {activeNow ? <span className="mt-1 inline-block bg-action px-1.5 py-0.5 text-[10px] font-bold text-white">Now</span> : null}
                             {attendance?.visible_count ? (

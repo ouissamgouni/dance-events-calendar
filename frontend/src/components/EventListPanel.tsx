@@ -255,7 +255,8 @@ export function EventListCard({
                             size="lg"
                             layout="stacked"
                             max={5}
-                            goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
+                            goingFriendsPreview={event.friends_going_preview}
+                            relationshipHierarchy
                         />
                     ) : undefined}
                     bottomSlot={eventScheduleEnabled && event.schedule_published ? <ProgramAction event={event} /> : undefined}
@@ -298,7 +299,8 @@ export function EventListCard({
                                 size="lg"
                                 layout="stacked"
                                 max={5}
-                                goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
+                                goingFriendsPreview={event.friends_going_preview}
+                                relationshipHierarchy
                             />
                         </div>
                     )}
@@ -368,6 +370,7 @@ export function EventListCard({
                                 >
                                     <CardActionCluster
                                         eventId={event.event_id}
+                                        eventTitle={event.title}
                                         isPast={new Date(event.end).getTime() < Date.now()}
                                         include={['going']}
                                         showGoingStats={eventCardImgoingShowStatsEnabled}
@@ -395,6 +398,7 @@ export function EventListCard({
                     <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
                         <CardActionCluster
                             eventId={event.event_id}
+                            eventTitle={event.title}
                             isSavedFlag={isSavedFlag}
                             isPast={new Date(event.end).getTime() < Date.now()}
                             include={tribeLayout ? ['save', 'going'] : (eventCardImgoingLocationBottomEnabled ? ['save'] : ['save', 'going'])}

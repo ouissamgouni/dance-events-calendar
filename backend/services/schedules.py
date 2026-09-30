@@ -8,10 +8,12 @@ from backend.db.models import (
     CachedEvent,
     EventSchedule,
     ScheduleActivityType,
+    ScheduleContributor,
     ScheduleLevel,
     SchedulePublication,
     ScheduleRoom,
     ScheduleSession,
+    ScheduleSessionContributor,
     ScheduleVenue,
     User,
     UserFollow,
@@ -147,6 +149,58 @@ def plan_entries(
     return entries
 
 
+def plan_counts(
+    session: Session,
+    user_id,
+    event_ids: list[str],
+) -> dict[str, int]:
+    unique_event_ids = list(dict.fromkeys(event_ids))
+    counts = {event_id: 0 for event_id in unique_event_ids}
+    if not unique_event_ids:
+        return counts
+
+    schedules = session.exec(
+        select(EventSchedule).where(EventSchedule.event_id.in_(unique_event_ids))
+    ).all()
+    if not schedules:
+        return counts
+
+    schedule_ids = [schedule.id for schedule in schedules if schedule.id is not None]
+    publications = session.exec(
+        select(SchedulePublication)
+        .where(SchedulePublication.schedule_id.in_(schedule_ids))
+        .order_by(
+            SchedulePublication.schedule_id,
+            SchedulePublication.version.desc(),
+        )
+    ).all()
+    latest_by_schedule: dict[int, SchedulePublication] = {}
+    for publication in publications:
+        latest_by_schedule.setdefault(publication.schedule_id, publication)
+
+    current_session_ids_by_event: dict[str, set[str]] = {}
+    for schedule in schedules:
+        if schedule.id is None:
+            continue
+        publication = latest_by_schedule.get(schedule.id)
+        if publication is None:
+            continue
+        current_session_ids_by_event[schedule.event_id] = {
+            str(item["id"]) for item in publication.snapshot.get("sessions", [])
+        }
+
+    rows = session.exec(
+        select(UserPlanSession).where(
+            UserPlanSession.user_id == user_id,
+            UserPlanSession.event_id.in_(unique_event_ids),
+        )
+    ).all()
+    for row in rows:
+        if str(row.session_id) in current_session_ids_by_event.get(row.event_id, set()):
+            counts[row.event_id] += 1
+    return counts
+
+
 def session_attendance_projection(
     session: Session,
     viewer: User,
@@ -262,12 +316,22 @@ def published_schedule_event_ids(session: Session, event_ids: list[str]) -> set[
     )
 
 
-def session_snapshot(row: ScheduleSession) -> dict:
+def session_snapshot(
+    row: ScheduleSession, contributors: list[ScheduleSessionContributor] | None = None
+) -> dict:
     return {
         "id": str(row.id),
         "external_id": row.external_id,
         "title": row.title,
         "instructors": row.instructors,
+        "contributors": [
+            {
+                "contributor_id": assignment.contributor_id,
+                "role": assignment.role,
+                "position": assignment.position,
+            }
+            for assignment in (contributors or [])
+        ],
         "start": utc_isoformat(row.start),
         "end": utc_isoformat(row.end),
         "room_id": row.room_id,
@@ -302,6 +366,11 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
         .where(ScheduleActivityType.schedule_id == schedule_id)
         .order_by(ScheduleActivityType.sort_order, ScheduleActivityType.id)
     ).all()
+    contributors = session.exec(
+        select(ScheduleContributor)
+        .where(ScheduleContributor.schedule_id == schedule_id)
+        .order_by(ScheduleContributor.sort_order, ScheduleContributor.id)
+    ).all()
     sessions = session.exec(
         select(ScheduleSession)
         .where(
@@ -310,6 +379,24 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
         )
         .order_by(ScheduleSession.start, ScheduleSession.title)
     ).all()
+    assignments = session.exec(
+        select(ScheduleSessionContributor)
+        .join(
+            ScheduleSession,
+            ScheduleSession.id == ScheduleSessionContributor.session_id,
+        )
+        .where(
+            ScheduleSession.schedule_id == schedule_id,
+            ScheduleSession.deleted_at.is_(None),
+        )
+        .order_by(
+            ScheduleSessionContributor.session_id,
+            ScheduleSessionContributor.position,
+        )
+    ).all()
+    assignments_by_session: dict[UUID, list[ScheduleSessionContributor]] = {}
+    for assignment in assignments:
+        assignments_by_session.setdefault(assignment.session_id, []).append(assignment)
     return {
         "event_id": schedule.event_id,
         "timezone": schedule.timezone,
@@ -356,7 +443,19 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
             }
             for row in activity_types
         ],
-        "sessions": [session_snapshot(row) for row in sessions],
+        "contributors": [
+            {
+                "id": row.id,
+                "external_id": row.external_id,
+                "display_name": row.display_name,
+                "sort_order": row.sort_order,
+            }
+            for row in contributors
+        ],
+        "sessions": [
+            session_snapshot(row, assignments_by_session.get(row.id, []))
+            for row in sessions
+        ],
     }
 
 
@@ -457,7 +556,9 @@ def compute_diff(draft: dict, published: dict | None) -> dict:
                 or draft["rooms"]
                 or draft["levels"]
                 or draft["activity_types"]
+                or draft["contributors"]
             ),
+            "changes": compute_change_details(draft, None),
         }
     draft_sessions = {row["id"]: row for row in draft["sessions"]}
     published_sessions = {row["id"]: row for row in published.get("sessions", [])}
@@ -480,6 +581,7 @@ def compute_diff(draft: dict, published: dict | None) -> dict:
         "rooms",
         "levels",
         "activity_types",
+        "contributors",
     )
     return {
         "added_session_ids": sorted(draft_sessions.keys() - published_sessions.keys()),
@@ -490,4 +592,118 @@ def compute_diff(draft: dict, published: dict | None) -> dict:
         "configuration_changed": any(
             draft.get(key) != published.get(key) for key in config_keys
         ),
+        "changes": compute_change_details(draft, published),
     }
+
+
+def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
+    previous = previous or {
+        "timezone": None,
+        "day_start_hour": None,
+        "days": [],
+        "venues": [],
+        "rooms": [],
+        "levels": [],
+        "activity_types": [],
+        "contributors": [],
+        "sessions": [],
+    }
+    changes: list[dict] = []
+    current_contributors = {
+        row["id"]: row["display_name"] for row in current.get("contributors", [])
+    }
+    previous_contributors = {
+        row["id"]: row["display_name"] for row in previous.get("contributors", [])
+    }
+
+    def display_value(field: str, value, contributor_names: dict) -> object:
+        if field != "contributors" or not isinstance(value, list):
+            return value
+        return ", ".join(
+            f"{contributor_names.get(row.get('contributor_id'), 'Unknown contributor')} ({row.get('role', 'other')})"
+            for row in value
+        )
+
+    setting_fields = ("timezone", "day_start_hour", "days")
+    changed_settings = [
+        {
+            "field": field,
+            "before": previous.get(field),
+            "after": current.get(field),
+        }
+        for field in setting_fields
+        if previous.get(field) != current.get(field)
+    ]
+    if changed_settings:
+        changes.append(
+            {
+                "entity_type": "schedule",
+                "operation": "update",
+                "entity_id": "schedule",
+                "label": "Schedule settings",
+                "fields": changed_settings,
+            }
+        )
+
+    collections = (
+        ("venues", "venue", "name"),
+        ("rooms", "room", "name"),
+        ("levels", "level", "label"),
+        ("activity_types", "activity_type", "name"),
+        ("contributors", "contributor", "display_name"),
+        ("sessions", "session", "title"),
+    )
+    for key, entity_type, label_field in collections:
+        current_rows = {str(row["id"]): row for row in current.get(key, [])}
+        previous_rows = {str(row["id"]): row for row in previous.get(key, [])}
+        for entity_id in sorted(current_rows.keys() - previous_rows.keys()):
+            row = current_rows[entity_id]
+            changes.append(
+                {
+                    "entity_type": entity_type,
+                    "operation": "create",
+                    "entity_id": entity_id,
+                    "label": row[label_field],
+                    "fields": [],
+                }
+            )
+        for entity_id in sorted(previous_rows.keys() - current_rows.keys()):
+            row = previous_rows[entity_id]
+            changes.append(
+                {
+                    "entity_type": entity_type,
+                    "operation": "remove",
+                    "entity_id": entity_id,
+                    "label": row[label_field],
+                    "fields": [],
+                }
+            )
+        for entity_id in sorted(current_rows.keys() & previous_rows.keys()):
+            current_row = current_rows[entity_id]
+            previous_row = previous_rows[entity_id]
+            fields = [
+                {
+                    "field": field,
+                    "before": display_value(
+                        field, previous_row.get(field), previous_contributors
+                    ),
+                    "after": display_value(
+                        field, current_row.get(field), current_contributors
+                    ),
+                }
+                for field in current_row
+                if field != "id"
+                and not (field == "external_id" and previous_row.get(field) is None)
+                and previous_row.get(field) != current_row.get(field)
+            ]
+            if fields:
+                changes.append(
+                    {
+                        "entity_type": entity_type,
+                        "operation": "update",
+                        "entity_id": entity_id,
+                        "label": current_row[label_field],
+                        "fields": fields,
+                    }
+                )
+    return changes

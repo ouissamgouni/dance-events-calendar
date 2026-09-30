@@ -1,9 +1,10 @@
 """Unit tests for DatabaseSeeder logic."""
 
-import pytest
+import hashlib
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
 from sqlmodel import SQLModel, Session, create_engine, select
 
 from backend.db.models import (
@@ -11,6 +12,8 @@ from backend.db.models import (
     CachedEvent,
     EventTag,
     EventView,
+    ScheduleContributor,
+    ScheduleSessionContributor,
     SiteSetting,
     Tag,
     TagGroup,
@@ -436,6 +439,120 @@ class TestDatabaseSeeder:
         assert user is not None
         assert user.avatar_url == "https://example.com/avatar-viewer.jpg"
 
+    def test_seed_local_user_avatar_is_managed_and_idempotent(
+        self, tmp_path, monkeypatch
+    ):
+        scenario_dir = tmp_path / "scenario"
+        avatars_dir = scenario_dir / "user-avatars"
+        avatars_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: viewer@example.com\n"
+            "    name: Viewer\n"
+            "    avatar: viewer.jpg\n"
+            "    avatar_url: https://example.com/fallback.jpg\n",
+            encoding="utf-8",
+        )
+        (avatars_dir / "viewer.jpg").write_bytes(b"avatar-bytes")
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.get_client", lambda: object()
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.ensure_buckets", lambda client: None
+        )
+        uploads = []
+
+        def store_user_avatar(user_id, data, content_type=None, client=None):
+            uploads.append((user_id, data, client))
+            return f"users/{user_id}/avatar/seed"
+
+        monkeypatch.setattr(
+            "backend.services.user_avatars.store_user_avatar", store_user_avatar
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            seeder = DatabaseSeeder(session)
+            seeder.seed(scenario_dir)
+            seeder.seed(scenario_dir)
+            user = session.exec(
+                select(User).where(User.email == "viewer@example.com")
+            ).first()
+
+        assert user is not None
+        assert user.avatar_url == "https://example.com/fallback.jpg"
+        assert user.avatar_key == f"users/{user.id}/avatar/seed"
+        assert uploads == [(str(user.id), b"avatar-bytes", uploads[0][2])]
+
+    def test_changed_event_image_uses_fresh_storage_key(self, tmp_path, monkeypatch):
+        scenario_dir = tmp_path / "scenario"
+        images_dir = scenario_dir / "images"
+        images_dir.mkdir(parents=True)
+        (scenario_dir / "db-events.yaml").write_text(
+            "events:\n  - id: pictured-event\n    image: pictured-event.png\n",
+            encoding="utf-8",
+        )
+        image_path = images_dir / "pictured-event.png"
+        image_path.write_bytes(b"first-image")
+
+        client = object()
+        monkeypatch.setattr(
+            "backend.services.object_storage.get_client", lambda: client
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.ensure_buckets", lambda current: None
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.object_exists",
+            lambda key, client=None: False,
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.get_public_bucket", lambda: "public"
+        )
+        uploads = []
+
+        def store_event_image(event_id, data, base_key=None, client=None):
+            uploads.append((event_id, data, base_key, client))
+            return base_key
+
+        monkeypatch.setattr(
+            "backend.services.event_images.store_event_image", store_event_image
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            event = CachedEvent(
+                event_id="pictured-event",
+                calendar_id="calendar",
+                start=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                end=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+            session.add(event)
+            session.commit()
+            seeder = DatabaseSeeder(session)
+            seeder._seed_event_images(scenario_dir)
+            first_key = event.image_key
+
+            image_path.write_bytes(b"second-image")
+            seeder._seed_event_images(scenario_dir)
+            second_key = event.image_key
+
+        assert [upload[1] for upload in uploads] == [b"first-image", b"second-image"]
+        assert first_key != second_key
+        assert first_key == (
+            f"events/pictured-event/seed/"
+            f"{hashlib.sha256(b'first-image').hexdigest()[:16]}"
+        )
+        assert second_key == (
+            f"events/pictured-event/seed/"
+            f"{hashlib.sha256(b'second-image').hexdigest()[:16]}"
+        )
+
     def test_seed_attendances_and_saves_from_separate_files(
         self, tmp_path, monkeypatch
     ):
@@ -507,9 +624,19 @@ class TestDatabaseSeeder:
             "  - event_id: event-1\n"
             "    timezone: UTC\n"
             "    days: ['2026-06-01']\n"
+            "    contributors:\n"
+            "      - display_name: Maya Chen\n"
+            "        external_id: maya-chen\n"
+            "      - display_name: DJ Marta\n"
+            "        external_id: dj-marta\n"
             "    sessions:\n"
             "      - id: '71000000-0000-4000-8000-000000000001'\n"
             "        title: Workshop\n"
+            "        contributors:\n"
+            "          - display_name: Maya Chen\n"
+            "            role: instructor\n"
+            "          - display_name: DJ Marta\n"
+            "            role: dj\n"
             "        start: '2026-06-01T20:00:00Z'\n"
             "        end: '2026-06-01T21:00:00Z'\n"
             "    published: true\n"
@@ -537,9 +664,19 @@ class TestDatabaseSeeder:
             )
             seeder.seed(scenario_dir)
             audiences = session.exec(select(UserPlanAudience)).all()
+            contributors = session.exec(
+                select(ScheduleContributor).order_by(ScheduleContributor.sort_order)
+            ).all()
+            assignments = session.exec(
+                select(ScheduleSessionContributor).order_by(
+                    ScheduleSessionContributor.position
+                )
+            ).all()
 
         assert len(audiences) == 1
         assert audiences[0].audience == "friends"
+        assert [row.display_name for row in contributors] == ["Maya Chen", "DJ Marta"]
+        assert [row.role for row in assignments] == ["instructor", "dj"]
 
     def test_seed_events_sets_and_updates_visibility_overrides(
         self, tmp_path, monkeypatch

@@ -240,6 +240,7 @@ export default function EventCard({
                 >
                     <CardActionCluster
                         eventId={event.event_id}
+                        eventTitle={event.title}
                         isPast={isPast}
                         include={['going']}
                         showGoingStats={eventCardImgoingShowStatsEnabled}
@@ -321,6 +322,7 @@ export default function EventCard({
                                 >
                                     <CardActionCluster
                                         eventId={event.event_id}
+                                        eventTitle={event.title}
                                         isSavedFlag={isSavedFlag}
                                         isPast={isPast}
                                         include={topActions}
@@ -371,6 +373,7 @@ export default function EventCard({
                             >
                                 <CardActionCluster
                                     eventId={event.event_id}
+                                    eventTitle={event.title}
                                     isSavedFlag={isSavedFlag}
                                     isPast={isPast}
                                     include={topActions}

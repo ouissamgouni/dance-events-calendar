@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addScheduleEditor, applyScheduleImport, createAdminEventSchedule, exportEventSchedule, fetchAdminEventSchedule, fetchAdminUsers, fetchEvent, fetchEventScheduleEditorAccess, fetchOptionalAdminEventSchedule, fetchScheduleEditors, fetchScheduleImportSchema, fetchSchedulePlanners, previewScheduleImport, publishEventSchedule, removeScheduleEditor, type AdminUserRow } from '../api';
+import { addScheduleEditor, applyScheduleImport, createAdminEventSchedule, exportEventSchedule, fetchAdminEventSchedule, fetchAdminUsers, fetchEvent, fetchEventScheduleEditorAccess, fetchOptionalAdminEventSchedule, fetchScheduleEditors, fetchScheduleImportSchema, fetchSchedulePlanners, previewScheduleImport, publishEventSchedule, removeScheduleEditor, updateScheduleSession, type AdminUserRow } from '../api';
 import type { AdminEventSchedule, CalendarEvent } from '../types';
 import AdminEventSchedulePage from './AdminEventSchedulePage';
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, addScheduleEditor: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchAdminUsers: vi.fn(), fetchEvent: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleEditors: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn(), removeScheduleEditor: vi.fn() };
+    return { ...actual, addScheduleEditor: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchAdminUsers: vi.fn(), fetchEvent: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleEditors: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn(), removeScheduleEditor: vi.fn(), updateScheduleSession: vi.fn() };
 });
 
 const event: CalendarEvent = {
@@ -42,11 +42,12 @@ const schedule: AdminEventSchedule = {
     rooms: [{ id: 1, venue_id: 1, name: 'Grand Hall', color: 'blue', sort_order: 0 }],
     levels: [{ id: 1, label: 'Open level', notation: null, sort_order: 0 }],
     activity_types: [{ id: 1, name: 'Workshop', color: 'blue', sort_order: 0 }],
-    sessions: [{ id: 'session-1', title: 'Musicality', instructors: 'Maya', start: '2026-10-16T12:00:00Z', end: '2026-10-16T13:00:00Z', room_id: 1, venue_id: 1, level_id: 1, activity_type_id: 1, attendee_note: null, allow_plan: true, is_cancelled: false }],
+    contributors: [{ id: 1, external_id: 'maya', display_name: 'Maya', sort_order: 0 }, { id: 2, external_id: 'marta', display_name: 'DJ Marta', sort_order: 1 }],
+    sessions: [{ id: 'session-1', title: 'Musicality', instructors: 'Maya', contributors: [{ contributor_id: 1, role: 'instructor', position: 0 }], start: '2026-10-16T12:00:00Z', end: '2026-10-16T13:00:00Z', room_id: 1, venue_id: 1, level_id: 1, activity_type_id: 1, attendee_note: null, allow_plan: true, is_cancelled: false }],
     version: 1,
     published_at: '2026-09-01T12:00:00Z',
     issues: [],
-    diff: { added_session_ids: [], removed_session_ids: [], changed_sessions: {}, configuration_changed: false },
+    diff: { added_session_ids: [], removed_session_ids: [], changed_sessions: {}, configuration_changed: false, changes: [] },
 };
 const importDocument = { schema_version: 1 as const, event_id: event.event_id, timezone: 'Europe/Prague', day_start_hour: 6, days: ['2026-10-16'], venues: [], rooms: [], levels: [], activity_types: [], sessions: [] };
 const exampleDocument = { ...importDocument, sessions: [{ external_id: 'sample-session', title: 'Sample Session', instructors: null, start: '2026-10-16T10:00:00', end: '2026-10-16T11:00:00', room_external_id: null, venue_external_id: null, level_external_id: null, activity_type_external_id: null, attendee_note: null, allow_plan: true, is_cancelled: false }] };
@@ -103,18 +104,34 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.getByRole('dialog', { name: 'Edit session' })).toBeInTheDocument();
         expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Musicality');
         expect(screen.getByLabelText('Room')).toHaveValue('1');
+        expect(screen.getByLabelText('Contributor 1')).toHaveValue('1');
+        fireEvent.change(screen.getByLabelText('Contributor 1 role'), { target: { value: 'performer' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Add artist or instructor' }));
+        expect(screen.getByLabelText('Contributor 2')).toHaveValue('2');
+        fireEvent.change(screen.getByLabelText('Contributor 2 role'), { target: { value: 'dj' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(updateScheduleSession).toHaveBeenCalledWith(event.event_id, 'session-1', expect.objectContaining({
+            instructors: null,
+            contributors: [
+                { contributor_id: 1, role: 'performer' },
+                { contributor_id: 2, role: 'dj' },
+            ],
+        })));
     });
 
     it('requires preview before applying imported JSON to the draft', async () => {
         vi.mocked(previewScheduleImport).mockResolvedValue({
             document: importDocument,
             operations: { created: 1, updated: 0, removed: 0, unchanged: 0 },
+            changes: [{ entity_type: 'session', operation: 'create', entity_id: 'sample-session', label: 'Sample Session', fields: [] }],
             issues: [],
             diff: schedule.diff,
         });
         vi.mocked(applyScheduleImport).mockResolvedValue({
             document: importDocument,
             operations: { created: 1, updated: 0, removed: 0, unchanged: 0 },
+            changes: [{ entity_type: 'session', operation: 'create', entity_id: 'sample-session', label: 'Sample Session', fields: [] }],
             issues: [],
             diff: schedule.diff,
         });
@@ -134,10 +151,42 @@ describe('AdminEventSchedulePage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Preview import' }));
 
         expect(await screen.findByText('No schedule warnings.')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('View 1 change detail'));
+        expect(screen.getByText('Sample Session')).toBeInTheDocument();
         expect(apply).toBeEnabled();
         fireEvent.click(apply);
         await waitFor(() => expect(applyScheduleImport).toHaveBeenCalledWith(event.event_id, 'merge', expect.any(Object)));
         await waitFor(() => expect(fetchAdminEventSchedule).toHaveBeenCalledTimes(1));
+    });
+
+    it('shows field changes before publishing', async () => {
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({
+            ...schedule,
+            diff: {
+                added_session_ids: [],
+                removed_session_ids: [],
+                changed_sessions: { 'session-1': ['title'] },
+                configuration_changed: false,
+                changes: [{
+                    entity_type: 'session',
+                    operation: 'update',
+                    entity_id: 'session-1',
+                    label: 'Draft title',
+                    fields: [{ field: 'title', before: 'Musicality', after: 'Draft title' }],
+                }],
+            },
+        });
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Publish (1)' }));
+        fireEvent.click(screen.getByText('View 1 change detail'));
+
+        expect(screen.getByText('Draft title')).toBeInTheDocument();
+        expect(screen.getAllByText('Musicality')).toHaveLength(2);
     });
 
     it('loads a standalone example and can reset to the current draft', async () => {
@@ -175,12 +224,31 @@ describe('AdminEventSchedulePage', () => {
 
         fireEvent.click(await screen.findByRole('button', { name: 'sessions' }));
 
-        expect(screen.getByLabelText('Search instructors')).toBeInTheDocument();
+        expect(screen.getByLabelText('Search artists and instructors')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.getByRole('columnheader', { name: 'Date' })).toBeInTheDocument();
         expect(screen.getByRole('cell', { name: 'Thursday Basics' })).toBeInTheDocument();
         expect(screen.getByRole('cell', { name: 'Musicality' })).toBeInTheDocument();
         expect(screen.getByRole('cell', { name: /Fri.*16|16.*Fri/ })).toBeInTheDocument();
+    });
+
+    it('uses focused tabs to manage program taxonomy', async () => {
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'taxonomy' }));
+
+        expect(screen.getByRole('tab', { name: 'Contributors, 2 items' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('tabpanel', { name: 'Contributors' })).toHaveTextContent('DJ Marta');
+        expect(screen.queryByText('Open level')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Levels, 1 item' }));
+        expect(screen.getByRole('tabpanel', { name: 'Levels' })).toHaveTextContent('Open level');
+        fireEvent.click(screen.getByRole('button', { name: 'Add level' }));
+        expect(screen.getByRole('dialog', { name: 'Add level' })).toBeInTheDocument();
     });
 
     it('offers timezone choices and previews only the Program surface', async () => {
@@ -201,7 +269,7 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.queryByRole('option', { name: 'UTC' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('option', { name: 'Europe/Prague' }));
         expect(timezone).toHaveValue('Europe/Prague');
-        expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'export' })).toBeEnabled();
         expect(screen.queryByText('dancer@example.com')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
         expect(screen.getByTitle('Draft attendee preview')).toHaveAttribute('src', '/event/movida-2026/program?preview=draft&embed=program');
@@ -250,9 +318,11 @@ describe('AdminEventSchedulePage', () => {
             </MemoryRouter>,
         );
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
-
-        expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
+        fireEvent.click(await screen.findByRole('button', { name: 'export' }));
+        expect(screen.getByRole('heading', { name: 'Export options' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Preview PDF' })).toBeEnabled();
+        expect(screen.queryByRole('button', { name: 'Download calendar (.ics)' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
         expect(screen.getByText(/Publishing makes this program visible and announces it/)).toBeInTheDocument();
         expect(screen.queryByRole('checkbox', { name: /Also notify all Going attendees/ })).not.toBeInTheDocument();
     });

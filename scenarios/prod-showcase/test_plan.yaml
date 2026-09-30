@@ -1,74 +1,186 @@
 test_plan:
-  name: "Production Showcase — demo walkthrough"
+  name: "Movida mobile product walkthrough"
   description: |
-    Demo production-derived events, production tags, promo-code badges, fake
-    social graph, fake curator activity, and fake organizer attribution without
-    seeding production users.
+    Explore Movida with production-derived event listings and a complete
+    community of dancers, organizers, and curators. Use Elena Moreau (@elena)
+    for established-member journeys and Amira Haddad (@amira-haddad) for the
+    first-time experience.
 
-    Personas: sign in as Lina Showcase (@lina) for the mixed friends graph,
-    open @movida-picks for curator activity, and open @sea-sun-salsa /
-    @rave-republic for verified organizer profiles.
+  preconditions:
+    - "Start privately with: task showcase:mobile RESET=1"
+    - "Open the printed HTTPS address on a phone connected to the same tailnet."
+    - "Use a fresh browser profile when checking installation or onboarding."
 
   steps:
     - id: 1
-      title: "Production events render with tags"
+      title: "Complete first-time onboarding"
       description: |
-        Open the Explorer in the prod-showcase scenario and search/filter for
-        Rovinj, SALSARAVE, Salsa Grand, or elSol.
+        Sign in as Amira Haddad and complete dance-style, location, and follow
+        preferences.
       expected: |
-        Production-derived events are present with production calendar colors,
-        production tag chips, dates, locations, prices, and event links.
-      verification: "Cards and event details load without console errors."
+        The onboarding flow introduces preferences progressively, suggests
+        verified organizers and Movida Picks, and lands on a personalized Home.
+      verification: "Amira can complete onboarding without encountering seeded QA language."
 
     - id: 2
-      title: "Rovinj has 25 fake attendees"
+      title: "Browse Elena's personalized Home"
       description: |
-        Open "Rovinj Croatian Summer Salsa Festival - CSSF 2026" and inspect
-        the Going / attendee UI.
+        Sign in as Elena Moreau and open Home.
       expected: |
-        The event shows 25 Going rows. Attendees are fake scenario users with a
-        mix of public, friends-only, and private sharing audiences.
-      verification: "The attendee count is 25 and no production user identity appears."
+        Your next event shows Back 2 Mambo 2026. You might like reflects Elena's
+        Salsa and Bachata profile, Friends are going uses her network, Build
+        your tribe suggests relevant organizers, and New contains unseen events.
+      verification: "All populated sections render independently and card actions work."
 
     - id: 3
-      title: "SALSARAVE has 10 fake attendees"
+      title: "Explore by search, filters, and map"
       description: |
-        Open "SALSARAVE 2026 - 5 YEARS ANNIVERSARY" and inspect the Going /
-        attendee UI.
+        Open Browse and search for Rovinj, SALSARAVE, Salsa Grand, elSol, and
+        London Salsa Sessions. Switch between list and map and apply dance,
+        format, date, price, and area filters.
       expected: |
-        The event shows 10 Going rows seeded from fake users. The promo-code
-        badge is visible because an approved code is attached to this event.
-      verification: "The attendee count is 10 and the promo-code section opens."
+        Results preserve production calendar colors, taxonomy tags, dates,
+        locations, pricing, links, popularity, and map positions.
+      verification: "List and map stay in sync and clearing filters restores the catalog."
 
     - id: 4
-      title: "Curator activity is visible"
+      title: "Inspect event pictures and member avatars"
       description: |
-        Open @movida-picks, or sign in as Lina Showcase and use following /
-        interest surfaces that show curator activity.
+        Browse all twelve Movida Community Events, then open attendee lists,
+        reviews, Tribe, and profiles for several different members.
       expected: |
-        The fake curator has public Going / Saved activity on selected
-        production-derived events. It is marked as an admin-managed curator
-        account, not a real production user.
-      verification: "Curator profile and following surfaces show seeded fake activity."
+        Every community event uses the local picture whose filename matches its
+        title, upcoming production events retain their production pictures, and
+        each seeded identity has a distinct portrait with Elena's portrait
+        consistent across the app.
+      verification: "Event thumbnails, detail images, avatar stacks, and profiles load from the local object store."
 
     - id: 5
-      title: "Verified organizers are attributed"
+      title: "Save and join with privacy controls"
       description: |
-        Open @sea-sun-salsa and @rave-republic, then open their attributed
-        events from the profile or event detail organizer block.
+        Save an event, mark another Going, and change each audience between
+        Public, Friends, and Private.
       expected: |
-        Both fake organizers are verified. Sea Sun Salsa is attributed to
-        Rovinj and Salsa Grand; Rave Republic is attributed to SALSARAVE and
-        Grupo Alafia Halloween Costume Salsa Night.
-      verification: "Organizer profile/event links navigate correctly."
+        Button states update immediately, privacy choices persist, and the
+        events move into Elena's calendar without leaving the current screen.
+      verification: "Reloading preserves both actions and their audiences."
 
     - id: 6
-      title: "Promo codes use fake submitters"
+      title: "Inspect attendance and popularity"
       description: |
-        Open Rovinj, Salsa Grand, SALSARAVE, or elSol and inspect promo codes.
-        Then sign in as Dev Admin and open the admin Promo Codes panel.
+        Open Rovinj Croatian Summer Salsa Festival and SALSARAVE 2026.
       expected: |
-        Production promo-code values are present, but submitters are fake
-        scenario accounts such as Penny Promo. The pending demo code appears
-        in the admin review flow.
-      verification: "No production user email, id, handle, or avatar is displayed."
+        Rovinj shows 25 attendees and SALSARAVE shows 10. Public, friends-only,
+        and private attendance are reflected without exposing private profiles,
+        while trending and popularity treatments remain visible.
+      verification: "Counts, avatar stacks, attendee sheet, and privacy boundaries agree."
+
+    - id: 7
+      title: "Use the social graph"
+      description: |
+        Open Tribe and inspect Elena's network and suggestions. Visit
+        @clara-dubois to see Elena's pending request, then sign in as Clara to
+        approve it.
+      expected: |
+        Mutual friends, one-way follows, friend suggestions, pending state,
+        approval, follower counts, and profile visibility update consistently.
+      verification: "Approving the request creates the friendship and calendar subscription."
+
+    - id: 8
+      title: "Browse subscribed calendars"
+      description: |
+        As Elena, open Tribe > Calendars and switch among subscriptions, Going,
+        and Saved views. Open Elena's own calendar and its export menu.
+      expected: |
+        Follow-created calendar subscriptions include people and Movida Picks.
+        Elena's Going and Saved events are populated, shareable, and exportable.
+      verification: "The live iCalendar URL opens on the phone and updates from local actions."
+
+    - id: 9
+      title: "Read and manage notifications"
+      description: |
+        Open Notifications, then Account > Notifications and email.
+      expected: |
+        Elena has social, discussion, and suggested-event activity. Rows deep-link
+        to their subject, read state updates, and channel preferences persist.
+      verification: "Notification badge count and inbox read state stay consistent."
+
+    - id: 10
+      title: "Open curator and organizer profiles"
+      description: |
+        Visit @movida-picks, @sea-sun-salsa, and @rave-republic, then follow
+        their attributed events back to event details.
+      expected: |
+        Movida Picks shows public Going and Saved activity. Both organizer
+        profiles are verified and display their attributed events.
+      verification: "Profile, organizer block, and event navigation agree."
+
+    - id: 11
+      title: "Use an event promo code"
+      description: |
+        Open Rovinj, Salsa Grand, SALSARAVE, or elSol and inspect the available
+        offer.
+      expected: |
+        Approved promo codes show their description, source, and expiry where
+        available, with Penny Valdez shown as the community contributor.
+      verification: "The promo-code action opens and copies the displayed value."
+
+    - id: 12
+      title: "Read recurring-event reviews"
+      description: |
+        Search for Alfama Thursday Salsa, open the upcoming edition, and inspect
+        Community Experience and the linked series.
+      expected: |
+        The upcoming event belongs to a three-edition series and aggregates
+        approved reviews from its two previous editions. Reviews include
+        realistic aspect scores, experience tags, and audience recommendations.
+      verification: "Series navigation, sentiment summary, structured review tags, and authors render correctly."
+
+    - id: 13
+      title: "Join an event discussion"
+      description: |
+        Open London Salsa Sessions and inspect Discussion, then add a reply
+        to an accommodation, ride, or meetup thread.
+      expected: |
+        Existing threads and replies are visible by category. A new reply posts
+        in place and participates in notification delivery.
+      verification: "Thread authors, reply counts, composer state, and notification link work."
+
+    - id: 14
+      title: "Explore public Dance Passports"
+      description: |
+        Visit @maya-rivera and @noah-kim and open Dance Passport and Timeline.
+      expected: |
+        Both profiles show past dance history across cities and countries. Maya
+        has the richer international history and a visible dancing-since date.
+      verification: "Passport totals and maps exclude future events."
+
+    - id: 15
+      title: "Build and share a festival plan"
+      description: |
+        Open Back 2 Mambo 2026, select Program, filter by day, room, level, and
+        instructor, then open My Plan and its share/export actions.
+      expected: |
+        The published four-day program is populated across rooms. Elena starts
+        with three non-conflicting sessions and can add or remove more.
+      verification: "Plan count, schedule filters, shared plan, and export preview stay aligned."
+
+    - id: 16
+      title: "Suggest an event"
+      description: |
+        Open Suggest event and submit a complete event with location, schedule,
+        links, price, and tags.
+      expected: |
+        Validation is field-specific, successful submission gets a clear
+        confirmation, and no production calendar credentials are required.
+      verification: "The contribution completes through the ordinary-user flow."
+
+    - id: 17
+      title: "Install Movida and enable push"
+      description: |
+        In Safari use Share > Add to Home Screen, or use the browser install
+        action on Android. Launch the installed app and enable notifications.
+      expected: |
+        The app launches standalone on the private HTTPS origin, keeps Elena's
+        session, and registers notification permission and a push subscription.
+      verification: "Installed navigation, safe-area layout, and notification state work on mobile."

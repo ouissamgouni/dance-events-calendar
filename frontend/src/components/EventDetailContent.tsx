@@ -696,8 +696,8 @@ export default function EventDetailContent({
                 {/* Action bar */}
                 {showActions && (
                     <div className="border-t border-card-line pt-3 flex items-center gap-2 flex-wrap">
-                        <SaveEventButton eventId={event.event_id} appearance="pill" />
-                        <GoingButton eventId={event.event_id} appearance="pill" isPast={new Date(event.end).getTime() < Date.now()} />
+                        <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" />
+                        <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={new Date(event.end).getTime() < Date.now()} />
                         {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" isEventDetailPage showCount={false} isPast={new Date(event.end).getTime() < Date.now()} />}
                         <ShareButton
                             eventId={event.event_id}

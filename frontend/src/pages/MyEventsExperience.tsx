@@ -187,6 +187,7 @@ export default function MyEventsExperience() {
                             showActions={activeTab === 'saved'}
                             showPrice={false}
                             actions={activeTab === 'saved' ? ['going'] : undefined}
+                            showProgramAction={activeTab === 'upcoming'}
                             onHeightChange={setMapPreviewHeight}
                         />
                     )}

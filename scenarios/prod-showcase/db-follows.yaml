@@ -1,44 +1,50 @@
+emit_notifications: true
+
 follows:
-  - follower: viewer@example.com
-    followee: showcase-dancer-01@example.com
-  - follower: showcase-dancer-01@example.com
-    followee: viewer@example.com
-  - follower: viewer@example.com
-    followee: showcase-dancer-02@example.com
-  - follower: showcase-dancer-02@example.com
-    followee: viewer@example.com
-  - follower: viewer@example.com
-    followee: showcase-dancer-03@example.com
-  - follower: showcase-dancer-03@example.com
-    followee: viewer@example.com
-  - follower: viewer@example.com
-    followee: showcase-dancer-04@example.com
-  - follower: showcase-dancer-04@example.com
-    followee: viewer@example.com
-  - follower: viewer@example.com
-    followee: showcase-dancer-05@example.com
-  - follower: showcase-dancer-05@example.com
-    followee: viewer@example.com
-  - follower: showcase-dancer-06@example.com
-    followee: viewer@example.com
-  - follower: viewer@example.com
-    followee: showcase-dancer-07@example.com
+  - follower: elena.moreau@joinmovida.com
+    followee: picks@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
+    followee: penny.valdez@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
+    followee: maya.rivera@joinmovida.com
+  - follower: maya.rivera@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
+    followee: leo.martin@joinmovida.com
+  - follower: leo.martin@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
+    followee: ines.lopez@joinmovida.com
+  - follower: ines.lopez@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
+    followee: noah.kim@joinmovida.com
+  - follower: noah.kim@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
+    followee: zara.benali@joinmovida.com
+  - follower: zara.benali@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: omar.costa@joinmovida.com
+    followee: elena.moreau@joinmovida.com
+  - follower: elena.moreau@joinmovida.com
+    followee: clara.dubois@joinmovida.com
     status: pending
-  - follower: curator-showcase@example.com
-    followee: organizer-one@example.com
-  - follower: curator-showcase@example.com
-    followee: organizer-two@example.com
-  - follower: showcase-dancer-01@example.com
-    followee: organizer-one@example.com
-  - follower: showcase-dancer-02@example.com
-    followee: organizer-one@example.com
-  - follower: showcase-dancer-03@example.com
-    followee: organizer-two@example.com
-  - follower: showcase-dancer-04@example.com
-    followee: organizer-two@example.com
-  - follower: showcase-dancer-08@example.com
-    followee: showcase-dancer-09@example.com
-  - follower: showcase-dancer-09@example.com
-    followee: showcase-dancer-08@example.com
-  - follower: showcase-dancer-10@example.com
-    followee: showcase-dancer-11@example.com
+  - follower: picks@joinmovida.com
+    followee: sea.sun.salsa@joinmovida.com
+  - follower: picks@joinmovida.com
+    followee: rave.republic@joinmovida.com
+  - follower: maya.rivera@joinmovida.com
+    followee: sea.sun.salsa@joinmovida.com
+  - follower: leo.martin@joinmovida.com
+    followee: sea.sun.salsa@joinmovida.com
+  - follower: ines.lopez@joinmovida.com
+    followee: rave.republic@joinmovida.com
+  - follower: noah.kim@joinmovida.com
+    followee: rave.republic@joinmovida.com
+  - follower: jonas.meyer@joinmovida.com
+    followee: mina.silva@joinmovida.com
+  - follower: mina.silva@joinmovida.com
+    followee: jonas.meyer@joinmovida.com
+  - follower: theo.novak@joinmovida.com
+    followee: ana.garcia@joinmovida.com

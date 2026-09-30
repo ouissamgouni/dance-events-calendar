@@ -1,24 +1,25 @@
 import { CalendarDays } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useMyPlanCount } from '../context/MyPlanCountContext';
 import type { CalendarEvent } from '../types';
 
 interface ProgramActionProps {
     event: CalendarEvent;
     variant?: 'full' | 'compact';
     onNavigate?: () => void;
-    myPlanCount?: number;
 }
 
-export default function ProgramAction({ event, variant = 'compact', onNavigate, myPlanCount }: ProgramActionProps) {
+export default function ProgramAction({ event, variant = 'compact', onNavigate }: ProgramActionProps) {
     const { eventScheduleEnabled } = useFeatureFlags();
+    const myPlanCount = useMyPlanCount(eventScheduleEnabled && event.schedule_published ? event.event_id : null);
     if (!eventScheduleEnabled || !event.schedule_published) return null;
 
     const now = Date.now();
     const isLive = new Date(event.start).getTime() <= now && now < new Date(event.end).getTime();
-    const hasPlan = variant === 'compact' && (myPlanCount ?? 0) > 0;
+    const hasPlan = (myPlanCount ?? 0) > 0;
     const label = hasPlan
-        ? `My Plan (${myPlanCount})`
+        ? 'My Plan'
         : variant === 'full'
             ? (isLive ? 'Open live program' : 'View program')
             : 'Program';

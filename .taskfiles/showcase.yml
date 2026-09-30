@@ -1,0 +1,90 @@
+version: "3"
+
+vars:
+  SHOWCASE_SCENARIO: prod-showcase
+  SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
+
+tasks:
+  refresh:
+    desc: Refresh the showcase catalog from read-only production queries
+    dotenv:
+      ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/secrets.prod.env"]
+    cmds:
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m
+        backend.scripts.refresh_showcase
+
+  mobile:
+    desc: Start prod-showcase privately over Tailscale HTTPS
+    vars:
+      RESET: '{{.RESET | default "0"}}'
+    preconditions:
+      - sh: command -v mailpit >/dev/null 2>&1
+        msg: "Mailpit is required: brew install mailpit"
+      - sh: command -v tailscale >/dev/null 2>&1
+        msg: "Tailscale CLI is required and must be connected to your tailnet"
+    cmds:
+      - |
+        source {{.SCENARIO_PORTS_SH}} {{.SHOWCASE_SCENARIO}}
+        STATE_DIR="{{.ROOT_DIR}}/.taskfiles/.scenario-state"
+        mkdir -p "$STATE_DIR"
+
+        TAILSCALE_HOST=$(tailscale status --json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("Self", {}).get("DNSName", "").rstrip("."))')
+        if [ -z "$TAILSCALE_HOST" ]; then
+          echo "Tailscale is not connected or MagicDNS is unavailable" >&2
+          exit 1
+        fi
+
+        if ! curl -sf http://127.0.0.1:8025/api/v1/info >/dev/null 2>&1; then
+          if lsof -iTCP:1025 -sTCP:LISTEN >/dev/null 2>&1 || lsof -iTCP:8025 -sTCP:LISTEN >/dev/null 2>&1; then
+            echo "Ports 1025 or 8025 are occupied by something other than Mailpit" >&2
+            exit 1
+          fi
+          mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 > "$STATE_DIR/{{.SHOWCASE_SCENARIO}}-mailpit.log" 2>&1 &
+          echo $! > "$STATE_DIR/{{.SHOWCASE_SCENARIO}}-mailpit.pid"
+        fi
+
+        tailscale serve --yes --bg --https=443 "http://localhost:$SC_WEB_PORT"
+        export VITE_ALLOWED_HOST="$TAILSCALE_HOST"
+        export VITE_API_URL_OVERRIDE=""
+        export VITE_UMAMI_URL_OVERRIDE="/umami"
+        export PUBLIC_APP_URL_OVERRIDE="https://$TAILSCALE_HOST"
+        export OBJECT_STORAGE_PUBLIC_BASE_URL="/objects"
+        export CORS_ORIGINS="https://$TAILSCALE_HOST,http://localhost:$SC_WEB_PORT"
+
+        echo "Showcase: https://$TAILSCALE_HOST"
+        echo "Mailpit:  http://127.0.0.1:8025"
+        task start:scenario SCENARIO={{.SHOWCASE_SCENARIO}} RESET={{.RESET}} BROWSER=none
+
+  status:
+    desc: Show private showcase, Mailpit, and scenario status
+    cmds:
+      - |
+        source {{.SCENARIO_PORTS_SH}} {{.SHOWCASE_SCENARIO}}
+        STATE_FILE="{{.ROOT_DIR}}/.taskfiles/.scenario-state/{{.SHOWCASE_SCENARIO}}.env"
+        [ -f "$STATE_FILE" ] && source "$STATE_FILE"
+        echo "Scenario ports: web=$SC_WEB_PORT api=$SC_API_PORT db=$SC_DB_PORT"
+        curl -sf "http://localhost:$SC_WEB_PORT" >/dev/null 2>&1 && echo "Web:     ready" || echo "Web:     stopped"
+        curl -sf "http://localhost:$SC_API_PORT/health" >/dev/null 2>&1 && echo "API:     ready" || echo "API:     stopped"
+        curl -sf http://127.0.0.1:8025/api/v1/info >/dev/null 2>&1 && echo "Mailpit: ready at http://127.0.0.1:8025" || echo "Mailpit: stopped"
+        if command -v tailscale >/dev/null 2>&1; then
+          tailscale serve status
+        else
+          echo "Tailscale CLI: unavailable"
+        fi
+
+  stop:
+    desc: Stop the showcase, its HTTPS listener, and task-owned Mailpit
+    cmds:
+      - |
+        source {{.SCENARIO_PORTS_SH}} {{.SHOWCASE_SCENARIO}}
+        if command -v tailscale >/dev/null 2>&1; then
+          tailscale serve --yes --https=443 off || true
+        fi
+        task --yes stop:scenario SCENARIO={{.SHOWCASE_SCENARIO}}
+
+        PID_FILE="{{.ROOT_DIR}}/.taskfiles/.scenario-state/{{.SHOWCASE_SCENARIO}}-mailpit.pid"
+        if [ -f "$PID_FILE" ]; then
+          MAILPIT_PID=$(cat "$PID_FILE")
+          kill "$MAILPIT_PID" 2>/dev/null || true
+          rm -f "$PID_FILE"
+        fi

@@ -5,7 +5,21 @@ import { http, HttpResponse } from 'msw'
 import GoingButton from './GoingButton'
 import { renderWithProviders } from '../test/render'
 import { server } from '../test/server'
+import { makeUser } from '../test/handlers'
 import { defaultFlags, FeatureFlagsContext, FeatureFlagsProvider } from '../context/FeatureFlagsContext'
+
+function useMobileViewport() {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(max-width: 639px)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    }))
+}
 
 function LocationProbe() {
     const location = useLocation()
@@ -15,7 +29,7 @@ function LocationProbe() {
 function renderGoingButton(eventId: string) {
     return renderWithProviders(
         <FeatureFlagsProvider>
-            <GoingButton eventId={eventId} />
+            <GoingButton eventId={eventId} eventTitle="Summer Salsa Social" />
         </FeatureFlagsProvider>,
     )
 }
@@ -135,5 +149,30 @@ describe('GoingButton (anonymous)', () => {
 
         expect(writes).toBe(0)
         expect(screen.getByRole('button', { name: "I'm going" })).toBeInTheDocument()
+    })
+})
+
+describe('GoingButton visibility', () => {
+    it('uses mobile bottom sheets with horizontal audience pills', async () => {
+        useMobileViewport()
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+        )
+        const { user } = renderGoingButton('evt-mobile-visibility')
+
+        await user.click(await screen.findByRole('button', { name: "I'm going" }))
+
+        const confirmationSheet = await screen.findByRole('dialog', { name: "You're going!" })
+        expect(confirmationSheet).toHaveAttribute('aria-modal', 'true')
+        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-sm')
+        expect(screen.getByRole('radiogroup', { name: 'Attendance visibility' })).toHaveClass('flex', 'w-full')
+        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-11', 'text-sm')
+
+        await user.click(screen.getByRole('button', { name: 'Close' }))
+        await user.click(screen.getByRole('button', { name: 'Not going' }))
+
+        const editSheet = screen.getByRole('dialog', { name: 'RSVP visibility' })
+        expect(editSheet).toHaveAttribute('aria-modal', 'true')
+        expect(screen.getByRole('radiogroup', { name: 'Attendance visibility' })).toHaveClass('flex', 'w-full')
     })
 })

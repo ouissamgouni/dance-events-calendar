@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider } from '../context/AuthContext'
 import { AttendanceSummariesProvider } from '../context/AttendanceSummariesContext'
+import { MyPlanCountProvider } from '../context/MyPlanCountContext'
 import { SavedEventsProvider } from '../context/SavedEventsContext'
 import { AttendingEventsProvider } from '../context/AttendingEventsContext'
 
@@ -26,9 +27,11 @@ function Providers({ children, routerEntries = ['/'] }: ProvidersProps) {
         <MemoryRouter initialEntries={routerEntries}>
             <AuthProvider>
                 <AttendanceSummariesProvider>
-                    <SavedEventsProvider>
-                        <AttendingEventsProvider>{children}</AttendingEventsProvider>
-                    </SavedEventsProvider>
+                    <MyPlanCountProvider>
+                        <SavedEventsProvider>
+                            <AttendingEventsProvider>{children}</AttendingEventsProvider>
+                        </SavedEventsProvider>
+                    </MyPlanCountProvider>
                 </AttendanceSummariesProvider>
             </AuthProvider>
         </MemoryRouter>

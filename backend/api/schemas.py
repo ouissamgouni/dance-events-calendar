@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
@@ -144,11 +144,28 @@ class ScheduleActivityTypeResponse(BaseModel):
     sort_order: int = 0
 
 
+ScheduleContributorRole = Literal["instructor", "dj", "performer", "host", "other"]
+
+
+class ScheduleContributorResponse(BaseModel):
+    id: int
+    external_id: str
+    display_name: str
+    sort_order: int = 0
+
+
+class ScheduleSessionContributorResponse(BaseModel):
+    contributor_id: int
+    role: ScheduleContributorRole = "instructor"
+    position: int = 0
+
+
 class ScheduleSessionResponse(BaseModel):
     id: UUID
     external_id: Optional[str] = None
     title: str
     instructors: Optional[str] = None
+    contributors: list[ScheduleSessionContributorResponse] = []
     start: datetime
     end: datetime
     room_id: Optional[int] = None
@@ -169,6 +186,7 @@ class EventScheduleResponse(BaseModel):
     rooms: list[ScheduleRoomResponse]
     levels: list[ScheduleLevelResponse]
     activity_types: list[ScheduleActivityTypeResponse]
+    contributors: list[ScheduleContributorResponse] = []
     sessions: list[ScheduleSessionResponse]
     version: Optional[int] = None
     published_at: Optional[datetime] = None
@@ -181,11 +199,34 @@ class ScheduleIssueResponse(BaseModel):
     session_ids: list[UUID] = []
 
 
+class ScheduleFieldChangeResponse(BaseModel):
+    field: str
+    before: Any = None
+    after: Any = None
+
+
+class ScheduleChangeResponse(BaseModel):
+    entity_type: Literal[
+        "schedule",
+        "venue",
+        "room",
+        "level",
+        "activity_type",
+        "contributor",
+        "session",
+    ]
+    operation: Literal["create", "update", "remove"]
+    entity_id: str
+    label: str
+    fields: list[ScheduleFieldChangeResponse] = []
+
+
 class ScheduleDiffResponse(BaseModel):
     added_session_ids: list[UUID] = []
     removed_session_ids: list[UUID] = []
     changed_sessions: dict[str, list[str]] = {}
     configuration_changed: bool = False
+    changes: list[ScheduleChangeResponse] = []
 
 
 class AdminEventScheduleResponse(EventScheduleResponse):
@@ -213,18 +254,24 @@ class ProgramExportSessionResponse(BaseModel):
     id: str
     title: str
     instructors: Optional[str] = None
+    contributors: list[ScheduleSessionContributorResponse] = []
     start: datetime
     end: datetime
     program_day: date
     local_date: date
     local_start_time: str
     local_end_time: str
+    venue_id: Optional[int] = None
+    room_id: Optional[int] = None
+    level_id: Optional[int] = None
+    activity_type_id: Optional[int] = None
     venue: Optional[str] = None
     room: Optional[str] = None
     address: Optional[str] = None
     level: Optional[str] = None
     activity_type: Optional[str] = None
     attendee_note: Optional[str] = None
+    is_cancelled: bool = False
     status: Literal["active", "cancelled", "removed"]
 
 
@@ -236,6 +283,11 @@ class ProgramExportResponse(BaseModel):
     day_start_hour: int
     available_days: list[date]
     selected_days: list[date]
+    venues: list[ScheduleVenueResponse]
+    rooms: list[ScheduleRoomResponse]
+    levels: list[ScheduleLevelResponse]
+    activity_types: list[ScheduleActivityTypeResponse]
+    contributors: list[ScheduleContributorResponse] = []
     version: int
     published_at: datetime
     sessions: list[ProgramExportSessionResponse]
@@ -303,6 +355,21 @@ class ScheduleImportActivityType(BaseModel):
     sort_order: int = 0
 
 
+class ScheduleImportContributor(BaseModel):
+    external_id: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Stable import key, unique among contributors and preserved across reimports.",
+    )
+    display_name: str = Field(min_length=1, max_length=160)
+    sort_order: int = 0
+
+
+class ScheduleImportSessionContributor(BaseModel):
+    contributor_external_id: str = Field(min_length=1, max_length=120)
+    role: ScheduleContributorRole = "instructor"
+
+
 class ScheduleImportSession(BaseModel):
     external_id: str = Field(
         min_length=1,
@@ -311,6 +378,7 @@ class ScheduleImportSession(BaseModel):
     )
     title: str = Field(min_length=1, max_length=200)
     instructors: Optional[str] = Field(default=None, max_length=300)
+    contributors: Optional[list[ScheduleImportSessionContributor]] = None
     start: datetime
     end: datetime
     room_external_id: Optional[str] = Field(default=None, max_length=120)
@@ -325,7 +393,7 @@ class ScheduleImportSession(BaseModel):
 class ScheduleImportDocument(BaseModel):
     """Reviewed schedule import using stable external keys rather than database IDs."""
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[1, 2] = 1
     event_id: Optional[str] = None
     timezone: str = Field(min_length=1, max_length=64)
     day_start_hour: int = Field(default=6, ge=0, le=23)
@@ -334,6 +402,7 @@ class ScheduleImportDocument(BaseModel):
     rooms: list[ScheduleImportRoom] = []
     levels: list[ScheduleImportLevel] = []
     activity_types: list[ScheduleImportActivityType] = []
+    contributors: list[ScheduleImportContributor] = []
     sessions: list[ScheduleImportSession] = []
 
     @model_validator(mode="after")
@@ -343,11 +412,30 @@ class ScheduleImportDocument(BaseModel):
             ("room", self.rooms),
             ("level", self.levels),
             ("activity type", self.activity_types),
+            ("contributor", self.contributors),
             ("session", self.sessions),
         ):
             values = [row.external_id for row in rows]
             if len(values) != len(set(values)):
                 raise ValueError(f"Duplicate {label} external_id")
+        if self.schema_version == 2:
+            contributor_ids = {row.external_id for row in self.contributors}
+            for schedule_session in self.sessions:
+                assignments = schedule_session.contributors or []
+                keys = [
+                    (row.contributor_external_id, row.role) for row in assignments
+                ]
+                if len(keys) != len(set(keys)):
+                    raise ValueError("Duplicate session contributor")
+                missing = {
+                    row.contributor_external_id
+                    for row in assignments
+                    if row.contributor_external_id not in contributor_ids
+                }
+                if missing:
+                    raise ValueError(
+                        f"Unknown contributor external_id: {sorted(missing)[0]}"
+                    )
         return self
 
 
@@ -366,6 +454,7 @@ class ScheduleImportOperations(BaseModel):
 class ScheduleImportPreviewResponse(BaseModel):
     document: ScheduleImportDocument
     operations: ScheduleImportOperations
+    changes: list[ScheduleChangeResponse] = []
     issues: list[ScheduleIssueResponse] = []
     diff: ScheduleDiffResponse
 
@@ -462,9 +551,20 @@ class ScheduleActivityTypeRequest(BaseModel):
     sort_order: int = 0
 
 
+class ScheduleContributorRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=160)
+    sort_order: int = 0
+
+
+class ScheduleSessionContributorInput(BaseModel):
+    contributor_id: int
+    role: ScheduleContributorRole = "instructor"
+
+
 class ScheduleSessionCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     instructors: Optional[str] = Field(default=None, max_length=300)
+    contributors: Optional[list[ScheduleSessionContributorInput]] = None
     start: datetime
     end: datetime
     room_id: Optional[int] = None
@@ -479,6 +579,7 @@ class ScheduleSessionCreateRequest(BaseModel):
 class ScheduleSessionUpdateRequest(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=200)
     instructors: Optional[str] = Field(default=None, max_length=300)
+    contributors: Optional[list[ScheduleSessionContributorInput]] = None
     start: Optional[datetime] = None
     end: Optional[datetime] = None
     room_id: Optional[int] = None
@@ -499,6 +600,15 @@ class MyPlanEntryResponse(BaseModel):
 class MyPlanResponse(BaseModel):
     entries: list[MyPlanEntryResponse]
     audience: Optional[Literal["followers", "friends", "private"]] = None
+
+
+class MyPlanCountBatchRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=50)
+
+
+class MyPlanCountResponse(BaseModel):
+    event_id: str
+    plan_count: int = 0
 
 
 class SessionPlanAttendeeResponse(BaseModel):
@@ -634,7 +744,8 @@ class AttendeeResponse(BaseModel):
 class AttendanceSummaryResponse(BaseModel):
     """Counts for one event. The ``public_*`` and ``anonymous_*`` breakdown is
     only populated for authenticated callers — logged-out viewers see only the
-    total and a flag telling them to sign in for the rest."""
+    total and a flag telling them to sign in for the rest. Authenticated preview
+    rows carry viewer-relative friend/follow fields and are relationship-first."""
 
     event_id: str
     total_going: int = 0

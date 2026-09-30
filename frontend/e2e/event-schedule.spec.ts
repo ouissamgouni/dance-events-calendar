@@ -84,9 +84,9 @@ test('supports live program filters, details and an all-days plan', async ({ pag
 
     await page.getByRole('button', { name: 'Filter schedule' }).click();
     const filterSheet = page.getByRole('dialog', { name: 'Filter schedule' });
-    await filterSheet.getByRole('button', { name: 'All instructors' }).click();
-    const instructorSheet = page.getByRole('dialog', { name: 'Select instructor' });
-    await instructorSheet.getByLabel('Search instructors').fill('Maya');
+    await filterSheet.getByRole('button', { name: 'All artists & instructors' }).click();
+    const instructorSheet = page.getByRole('dialog', { name: 'Select artist or instructor' });
+    await instructorSheet.getByLabel('Search artists and instructors').fill('Maya');
     await instructorSheet.getByRole('radio', { name: 'Maya' }).click();
     await expect(filterSheet.getByRole('button', { name: 'Maya' })).toBeVisible();
     await expect(filterSheet.getByRole('button', { name: 'Show 1 session' })).toBeVisible();

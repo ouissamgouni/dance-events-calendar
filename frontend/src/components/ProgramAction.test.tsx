@@ -5,6 +5,11 @@ import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContex
 import type { CalendarEvent } from '../types';
 import ProgramAction from './ProgramAction';
 
+const planCount = vi.hoisted(() => ({ value: undefined as number | undefined }));
+vi.mock('../context/MyPlanCountContext', () => ({
+    useMyPlanCount: () => planCount.value,
+}));
+
 const event = {
     event_id: 'program-event',
     title: 'Program Event',
@@ -23,7 +28,10 @@ function renderAction(enabled: boolean, value: CalendarEvent = event, variant: '
     );
 }
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+    vi.useRealTimers();
+    planCount.value = undefined;
+});
 
 describe('ProgramAction', () => {
     it('links to a published program when the feature is enabled', () => {
@@ -52,5 +60,12 @@ describe('ProgramAction', () => {
         renderAction(true, event, 'full');
 
         expect(screen.getByRole('link', { name: 'Open live program' })).toBeInTheDocument();
+    });
+
+    it.each(['compact', 'full'] as const)('links to My Plan for a positive count in %s mode', (variant) => {
+        planCount.value = 3;
+        renderAction(true, event, variant);
+
+        expect(screen.getByRole('link', { name: 'My Plan' })).toHaveAttribute('href', '/event/program-event/program/plan');
     });
 });

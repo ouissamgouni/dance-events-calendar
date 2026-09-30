@@ -142,9 +142,34 @@ body {
   overflow: hidden;
 }
 
+.program-calendar-sheet {
+  display: flex;
+  min-height: 680px;
+  flex-direction: column;
+}
+
+.program-calendar-session {
+  container-type: inline-size;
+}
+
+.program-calendar-level-compact {
+  display: none;
+}
+
+@container (max-width: 160px) {
+  .program-calendar-level-full {
+    display: none;
+  }
+
+  .program-calendar-level-compact {
+    display: inline;
+  }
+}
+
 @media print {
   @page {
-    margin: 14mm;
+    size: A3 landscape;
+    margin: 8mm;
   }
 
   body,
@@ -169,10 +194,31 @@ body {
     inset: 0;
     margin: 0;
     padding: 0;
+    overflow: visible;
     color: #000000;
   }
 
-  .program-export-session {
+  .program-calendar-canvas {
+    min-width: 0;
+  }
+
+  .program-calendar-pages {
+    display: block;
+  }
+
+  .program-calendar-sheet {
+    width: 404mm;
+    height: auto;
+    min-width: 0 !important;
+    min-height: 281mm;
+    break-inside: auto;
+    border: 0;
+    box-shadow: none;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .program-calendar-session {
     break-inside: avoid;
   }
 }

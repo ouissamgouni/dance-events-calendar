@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
@@ -52,6 +52,10 @@ const reachGroup: TagGroup = {
     tags: [makeTag(20, 'international', 'International', 'reach'), makeTag(21, 'local', 'Local', 'reach')],
 }
 
+const salsaHub = { handle: 'salsahub', display_name: 'Salsa Hub', avatar_url: null, is_verified_organizer: true, subscribers_count: 24, is_subscribed: false, is_followed_by_viewer: false }
+const maya = { handle: 'maya', display_name: 'Maya Dancer', avatar_url: null, is_verified_organizer: false, subscribers_count: 5, is_subscribed: false, is_followed_by_viewer: false }
+const lina = { handle: 'lina', display_name: 'Lina Salsera', avatar_url: null, is_verified_organizer: false, subscribers_count: 8, is_subscribed: false, is_followed_by_viewer: false }
+
 function renderWizard(profileStepEnabled = false) {
     return render(
         <MemoryRouter initialEntries={['/onboarding/preferences?next=/']}>
@@ -64,7 +68,7 @@ function renderWizard(profileStepEnabled = false) {
     )
 }
 
-function useBaseHandlers(overrides?: { onComplete?: () => void; onCreate?: (body: Record<string, unknown>) => void; onProfile?: (body: Record<string, unknown>) => void }) {
+function useBaseHandlers(overrides?: { onComplete?: () => void; onCreate?: (body: Record<string, unknown>) => void; onProfile?: (body: Record<string, unknown>) => void; onFollow?: (handle: string) => void; onUnfollow?: (handle: string) => void }) {
     server.use(
         http.get('*/api/auth/me', () => HttpResponse.json(makeUser({
             needs_onboarding: true, onboarded_at: null,
@@ -73,6 +77,18 @@ function useBaseHandlers(overrides?: { onComplete?: () => void; onCreate?: (body
         http.get('*/api/tags', () => HttpResponse.json([danceGroup, reachGroup])),
         http.get('*/api/interest-profiles', () => HttpResponse.json([])),
         http.get('*/api/events/popular-cities', () => HttpResponse.json([{ city: 'Paris', country: 'France', count: 10, lat: 48.8566, lng: 2.3522 }])),
+        http.get('*/api/social/onboarding/suggestions', () => HttpResponse.json({ items: [salsaHub] })),
+        http.get('*/api/social/search/users', () => HttpResponse.json({ items: [maya] })),
+        http.post('*/api/social/users/:handle/follow', ({ params }) => {
+            const handle = String(params.handle)
+            overrides?.onFollow?.(handle)
+            return HttpResponse.json({ handle, is_following: true, follow_status: 'approved', is_friend: false, followers_count: 1, is_subscribed: true, notify_new_events: false })
+        }),
+        http.delete('*/api/social/users/:handle/follow', ({ params }) => {
+            const handle = String(params.handle)
+            overrides?.onUnfollow?.(handle)
+            return HttpResponse.json({ handle, is_following: false, follow_status: null, is_friend: false, followers_count: 0, is_subscribed: false, notify_new_events: false })
+        }),
         http.patch('*/api/auth/preferences', async ({ request }) => {
             const body = await request.json() as Record<string, unknown>
             return HttpResponse.json({ share_attendance_default: false, preferred_area: body.preferred_area ?? null, preferred_tag_ids: body.preferred_tag_ids ?? [], home_location: body.home_location ?? null, set_at: new Date().toISOString() })
@@ -101,6 +117,8 @@ async function reachReview(user: ReturnType<typeof userEvent.setup>) {
     expect(await screen.findByText('Editing Europe')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     await user.click(await screen.findByRole('button', { name: /Not now/i }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Build your tribe' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Skip' }))
     expect(await screen.findByText("You're all set!")).toBeInTheDocument()
 }
 
@@ -132,7 +150,7 @@ describe('OnboardingWizard', () => {
         expect(await screen.findByText('Where do you want to discover events?')).toBeInTheDocument()
         expect(completed).toBe(false)
         expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2')
-        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '4')
+        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '5')
     })
 
     it('opens a preset in step 2 and progressively reveals near-home controls', async () => {
@@ -187,6 +205,54 @@ describe('OnboardingWizard', () => {
         expect(await screen.findByText('home page')).toBeInTheDocument()
     })
 
+    it('restores Build your tribe with suggestions, search, undo, skip, and review editing', async () => {
+        const followed: string[] = []
+        const unfollowed: string[] = []
+        let suggestionRequests = 0
+        useBaseHandlers({ onFollow: (handle) => followed.push(handle), onUnfollow: (handle) => unfollowed.push(handle) })
+        server.use(http.get('*/api/social/onboarding/suggestions', () => {
+            suggestionRequests += 1
+            return HttpResponse.json({ items: suggestionRequests === 1 ? [salsaHub] : [salsaHub, lina] })
+        }))
+        const user = userEvent.setup()
+        renderWizard()
+
+        await user.click(await screen.findByRole('button', { name: 'Salsa' }))
+        await user.click(screen.getByRole('button', { name: 'Continue' }))
+        await user.click(await screen.findByRole('button', { name: 'Europe' }))
+        await user.click(await screen.findByRole('button', { name: 'Continue' }))
+        await user.click(await screen.findByRole('button', { name: /Not now/i }))
+
+        expect(await screen.findByRole('heading', { level: 1, name: 'Build your tribe' })).toBeInTheDocument()
+        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '4')
+        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '5')
+        expect(await screen.findByText('Salsa Hub')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Refresh suggestions' }))
+        expect(await screen.findByText('Lina Salsera')).toBeInTheDocument()
+        expect(suggestionRequests).toBe(2)
+        const salsaRow = screen.getByText('Salsa Hub').closest('.flex.items-center.gap-3') as HTMLElement
+        await user.click(within(salsaRow).getByRole('button', { name: 'Follow' }))
+        await waitFor(() => expect(within(salsaRow).getByRole('button', { name: 'Following' })).toBeInTheDocument())
+        expect(followed).toEqual(['salsahub'])
+        await user.click(within(salsaRow).getByRole('button', { name: 'Following' }))
+        await waitFor(() => expect(unfollowed).toEqual(['salsahub']))
+
+        await user.type(screen.getByRole('searchbox', { name: 'Search users' }), 'Maya')
+        const mayaName = await screen.findByText('Maya Dancer')
+        const mayaRow = mayaName.closest('.flex.items-center.gap-3') as HTMLElement
+        await user.click(within(mayaRow).getByRole('button', { name: 'Follow' }))
+        await waitFor(() => expect(followed).toEqual(['salsahub', 'maya']))
+        await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+        expect(await screen.findByText("You're all set!")).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Following/i })).toHaveTextContent('Maya Dancer')
+        await user.click(screen.getByRole('button', { name: /Following/i }))
+        expect(await screen.findByRole('heading', { level: 1, name: 'Build your tribe' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+        expect(await screen.findByText("You're all set!")).toBeInTheDocument()
+    })
+
     it('adds a required Profile step before Review when the flag is enabled', async () => {
         let completed = false
         const profiles: Record<string, unknown>[] = []
@@ -202,10 +268,12 @@ describe('OnboardingWizard', () => {
         await user.click(await screen.findByRole('button', { name: 'Europe' }))
         await user.click(await screen.findByRole('button', { name: 'Continue' }))
         await user.click(await screen.findByRole('button', { name: /Not now/i }))
+        expect(await screen.findByRole('heading', { level: 1, name: 'Build your tribe' })).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Skip' }))
 
         expect(await screen.findByText('Complete your profile')).toBeInTheDocument()
-        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '4')
-        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '5')
+        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '5')
+        expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '6')
         const nameInput = screen.getByRole('textbox', { name: 'Display name' })
         expect(nameInput).toHaveValue('Test Dancer')
         await user.clear(nameInput)
