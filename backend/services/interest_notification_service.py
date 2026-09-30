@@ -83,9 +83,14 @@ def _get_last_scan(session: Session) -> datetime:
     row = session.get(SiteSetting, _LAST_SCAN_KEY)
     if row and row.value:
         try:
-            return datetime.fromisoformat(row.value)
+            parsed = datetime.fromisoformat(row.value)
         except ValueError:
             pass
+        else:
+            # Cursors written before the tz-aware migration are naive UTC.
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed
     return _utcnow() - _INITIAL_LOOKBACK
 
 

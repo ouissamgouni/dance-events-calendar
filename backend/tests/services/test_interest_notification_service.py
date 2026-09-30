@@ -122,7 +122,8 @@ def _make_event(
         calendar_id="cal",
         title=f"Event {event_id}",
         start=start or (datetime.now(timezone.utc) + timedelta(hours=6)),
-        end=(start or (datetime.now(timezone.utc) + timedelta(hours=6))) + timedelta(hours=2),
+        end=(start or (datetime.now(timezone.utc) + timedelta(hours=6)))
+        + timedelta(hours=2),
         all_day=False,
         latitude=lat,
         longitude=lng,
@@ -488,6 +489,28 @@ def test_run_once_ignores_events_outside_scan_window(session):
 
     stats = svc.run_once()
     assert stats["created"] == 0
+
+
+def test_run_once_accepts_legacy_naive_scan_cursor(session):
+    dance_group = _make_tag_group(session, "dance")
+    salsa = _make_tag(session, dance_group, "salsa")
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_profile(session, alice, dance_tags=[salsa])
+
+    event = _make_event(session, "ev-1")
+    _tag_event(session, event.event_id, salsa)
+    naive_cursor = (datetime.now(timezone.utc) - timedelta(hours=1)).replace(
+        tzinfo=None
+    )
+    session.add(SiteSetting(key=svc._LAST_SCAN_KEY, value=naive_cursor.isoformat()))
+    session.commit()
+
+    stats = svc.run_once()
+    assert stats["created"] == 1
+    session.expire_all()
+    stored = session.get(SiteSetting, svc._LAST_SCAN_KEY).value
+    assert datetime.fromisoformat(stored).tzinfo is not None
 
 
 def test_context_is_comma_joined_across_matching_profiles(session):

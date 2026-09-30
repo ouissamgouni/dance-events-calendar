@@ -119,6 +119,8 @@ def _interest_scan_window(session: Session) -> dict:
     if row and row.value:
         try:
             since = datetime.fromisoformat(row.value)
+            if since.tzinfo is not None:
+                since = since.astimezone(timezone.utc).replace(tzinfo=None)
             source = "site_setting"
         except ValueError:
             since = now - _INITIAL_LOOKBACK
@@ -253,6 +255,8 @@ def _events_in_scan_window(session: Session) -> int:
     if row and row.value:
         try:
             since = datetime.fromisoformat(row.value)
+            if since.tzinfo is not None:
+                since = since.astimezone(timezone.utc).replace(tzinfo=None)
         except ValueError:
             since = now - _INITIAL_LOOKBACK
     else:
