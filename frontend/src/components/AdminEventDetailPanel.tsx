@@ -3,6 +3,14 @@ import { Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { blockEvent, dismissDuplicateGroup, fetchAdminEvent, fetchEventDuplicateCandidates, keepDuplicateEvent, unblockEvent, updateEvent, fetchEventSeriesCandidates, splitSeriesMember, addEventsToSeries, fetchSeriesGroups } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
+import {
+    ADMIN_EVENT_HIDDEN_CHIP_CLASS,
+    ADMIN_EVENT_STATUS_CHIP_CLASSES,
+    getAdminEventPanelClass,
+    getAdminEventStatus,
+    getAdminEventStatusIcon,
+    getBlockReasonLabel,
+} from '../utils/adminEventStatus';
 import { useToast } from './Toast';
 import AdminEventDetailContent from './AdminEventDetailContent';
 import EventImageEditor from './EventImageEditor';
@@ -292,10 +300,10 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
 
             {/* Panel */}
             <div
-                className={`fixed top-0 right-0 h-full w-[520px] max-w-full bg-surface shadow-xl border-l border-line z-[60] flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-[520px] max-w-full shadow-xl border-l border-line z-[60] flex flex-col transform transition-transform duration-200 ease-in-out ${getAdminEventPanelClass(event)} ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 {/* Header */}
-                <div className="flex items-start justify-between px-5 py-3 border-b border-line bg-canvas shrink-0">
+                <div className="flex items-start justify-between px-5 py-3 border-b border-line bg-transparent shrink-0">
                     <div className="flex-1 min-w-0 mr-3">
                         {editingTitle ? (
                             <input
@@ -324,12 +332,28 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                             </p>
                         )}
                         {event && (
-                            <div className="flex gap-1 mt-1">
-                                {event.is_blocked && (
-                                    <span className="text-[10px] bg-slate-200 text-ink px-1.5 py-0.5 font-medium uppercase tracking-wide">Blocked</span>
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                                {getAdminEventStatusIcon(event) && (
+                                    <img
+                                        src={getAdminEventStatusIcon(event) ?? undefined}
+                                        alt=""
+                                        aria-hidden="true"
+                                        className="h-8 w-8 shrink-0 object-contain"
+                                    />
                                 )}
-                                {event.is_hidden && !event.is_blocked && (
-                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 font-medium uppercase tracking-wide">Hidden</span>
+                                <span className={`px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${ADMIN_EVENT_STATUS_CHIP_CLASSES[getAdminEventStatus(event)]}`}>
+                                    {getAdminEventStatus(event)}
+                                </span>
+                                {event.is_hidden && getAdminEventStatus(event) !== 'blocked' && (
+                                    <span className={`px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${ADMIN_EVENT_HIDDEN_CHIP_CLASS}`}>Hidden</span>
+                                )}
+                                {getAdminEventStatus(event) === 'blocked' && getBlockReasonLabel(event.block_reason) && (
+                                    <span
+                                        className="bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-soft"
+                                        title={event.block_reason_detail ?? undefined}
+                                    >
+                                        {getBlockReasonLabel(event.block_reason)}
+                                    </span>
                                 )}
                             </div>
                         )}

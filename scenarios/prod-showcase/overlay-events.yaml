@@ -143,7 +143,7 @@ events:
     tags:
       - format:workshop
       - dance-style:bachata
-      - reach:regional
+      - reach:international
   - id: barcelona-salsa-beach-party
     calendar_id: movida-community-events
     title: Barcelona Salsa Beach Party
@@ -161,7 +161,7 @@ events:
     tags:
       - format:social
       - dance-style:salsa
-      - reach:regional
+      - reach:international
   - id: vienna-bachata-nights
     calendar_id: movida-community-events
     title: Vienna Bachata Nights
@@ -181,7 +181,7 @@ events:
     tags:
       - format:social
       - dance-style:bachata
-      - reach:regional
+      - reach:international
   - id: rome-latin-social
     calendar_id: movida-community-events
     title: Rome Latin Social
@@ -202,7 +202,7 @@ events:
       - format:social
       - dance-style:salsa
       - dance-style:bachata
-      - reach:regional
+      - reach:international
   - id: zurich-kizomba-social
     calendar_id: movida-community-events
     title: Zurich Kizomba Social
@@ -242,7 +242,46 @@ events:
     tags:
       - format:social
       - dance-style:salsa
-      - reach:regional
+      - reach:international
+  - id: new-york-mambo-reunion
+    calendar_id: movida-community-events
+    title: New York Mambo Reunion
+    description: A reunion social bringing mambo dancers together from across the Americas.
+    location: Midtown Dance Hall, New York, United States
+    city: New York
+    country: United States
+    country_code: US
+    latitude: 40.7549
+    longitude: -73.9840
+    start: w-24 Sat 19:00
+    end: w-24 Sun 02:00
+    price_min: 30
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:mambo
+      - dance-style:salsa
+      - reach:international
+  - id: seoul-bachata-weekender
+    calendar_id: movida-community-events
+    title: Seoul Bachata Weekender
+    description: An international bachata weekender with workshops and social dancing in Seoul.
+    location: Mapo Latin Studio, Seoul, South Korea
+    city: Seoul
+    country: South Korea
+    country_code: KR
+    latitude: 37.5665
+    longitude: 126.9780
+    start: w-22 Fri 18:00
+    end: w-22 Sun 23:00
+    price_min: 90
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:bachata
+      - reach:international
 
 event_series:
   - canonical_title: Alfama Thursday Salsa

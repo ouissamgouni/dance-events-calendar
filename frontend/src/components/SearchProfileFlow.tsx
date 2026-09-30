@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ArrowLeft, X } from 'lucide-react';
 import type {
     InterestProfile,
     InterestProfilePayload,
@@ -11,7 +12,10 @@ import {
     summarizeSelection,
     type CurrentSearchSelection,
 } from '../utils/searchProfiles';
-import ProfileDraftEditor, { type ProfileDraftInitialValue } from './ProfileDraftEditor';
+import ProfileDraftEditor, {
+    type ProfileDraftInitialValue,
+    type ProfileDraftView,
+} from './ProfileDraftEditor';
 import { ConfirmDialog } from './AppDialog';
 import {
     bboxSearchArea,
@@ -46,12 +50,6 @@ export interface SearchProfileFlowProps {
     deleteProfile: (id: number) => Promise<void>;
 }
 
-const backIcon = (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 4 6 10l6 6" />
-    </svg>
-);
-
 const pencilIcon = (
     <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 3l3 3-9 9H5v-3l9-9z" />
@@ -73,11 +71,13 @@ function Radio({ checked }: { checked: boolean }) {
  *  Constrained to fit within the available space without taking full screen. */
 function FlowShell({
     title,
-    onBack,
+    action = 'back',
+    onAction,
     children,
 }: {
     title: string;
-    onBack: () => void;
+    action?: 'back' | 'close';
+    onAction: () => void;
     children: React.ReactNode;
 }) {
     const panel = (
@@ -88,11 +88,13 @@ function FlowShell({
             <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-2">
                 <button
                     type="button"
-                    onClick={onBack}
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-ink hover:text-action"
-                    data-testid="search-profile-flow-back"
+                    onClick={onAction}
+                    className="inline-flex items-center gap-1 text-lg font-semibold text-ink hover:text-action"
+                    data-testid={`search-profile-flow-${action}`}
                 >
-                    {backIcon}
+                    {action === 'close'
+                        ? <X aria-hidden="true" className="h-4 w-4" />
+                        : <ArrowLeft aria-hidden="true" className="h-4 w-4" />}
                     <span className="truncate">{title}</span>
                 </button>
             </div>
@@ -130,6 +132,7 @@ export default function SearchProfileFlow({
     const [error, setError] = useState<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [targetProfileId, setTargetProfileId] = useState<number | null>(null);
+    const [editorView, setEditorView] = useState<ProfileDraftView>('summary');
 
     // Reset to the requested entry step each time the flow opens.
     useEffect(() => {
@@ -141,6 +144,7 @@ export default function SearchProfileFlow({
             setEditingId(null);
             setDraft(null);
             setError(null);
+            setEditorView('summary');
             // No profile is selected by default.
             setTargetProfileId(null);
         });
@@ -161,6 +165,7 @@ export default function SearchProfileFlow({
     const openCreate = (fromCurrent: boolean) => {
         setEditingId(null);
         setError(null);
+        setEditorView('summary');
         setDraft(fromCurrent ? draftFromCurrent() : {
             area: bboxSearchArea(DEFAULT_AREA_BBOX, 'preset'),
             danceIds: [],
@@ -173,6 +178,7 @@ export default function SearchProfileFlow({
     const openEdit = (profile: InterestProfile) => {
         setEditingId(profile.id);
         setError(null);
+        setEditorView('summary');
         setDraft({
             label: profile.label,
             area: searchAreaFromProfile(profile),
@@ -235,7 +241,7 @@ export default function SearchProfileFlow({
     // ── Picker ───────────────────────────────────────────────────────────
     if (step === 'picker') {
         return (
-            <FlowShell title="Choose search profile" onBack={onClose}>
+            <FlowShell title="Choose search profile" onAction={onClose}>
                 <ul className="flex flex-col gap-1" data-testid="search-profile-picker">
                     {selectedProfileId === 'custom' && (
                         <li className="flex items-start gap-3 px-2 py-3">
@@ -296,7 +302,7 @@ export default function SearchProfileFlow({
     if (step === 'save') {
         const profileList = profiles ?? [];
         return (
-            <FlowShell title="Save search profile" onBack={onClose}>
+            <FlowShell title="Save search profile" onAction={onClose}>
                 <div className="flex flex-col gap-6" data-testid="search-profile-save">
                     {profileList.length > 0 && (
                         <div>
@@ -365,9 +371,25 @@ export default function SearchProfileFlow({
 
     // ── Edit / Create ────────────────────────────────────────────────────
     const isEdit = step === 'edit';
-    const backTo = () => setStep(isEdit ? 'picker' : (initialStep === 'save' ? 'save' : 'picker'));
+    const surfaceTitles: Record<Exclude<ProfileDraftView, 'summary'>, string> = {
+        dance: 'Dance styles',
+        area: 'Search area',
+        reach: 'Event reach',
+    };
+    const title = editorView === 'summary'
+        ? (isEdit ? 'Edit profile' : 'New profile')
+        : surfaceTitles[editorView];
+    const action = !isEdit && editorView === 'summary' ? 'close' : 'back';
+    const handleEditorAction = () => {
+        if (editorView !== 'summary') {
+            setEditorView('summary');
+            return;
+        }
+        if (isEdit) setStep('picker');
+        else onClose();
+    };
     return (
-        <FlowShell title={isEdit ? 'Edit profile' : 'New profile'} onBack={backTo}>
+        <FlowShell title={title} action={action} onAction={handleEditorAction}>
             {draft && (
                 <div data-testid="search-profile-editor">
                     <ProfileDraftEditor
@@ -377,6 +399,8 @@ export default function SearchProfileFlow({
                         initialValue={draft}
                         onSave={handleSaveDraft}
                         onDelete={isEdit ? () => setConfirmDelete(true) : undefined}
+                        view={editorView}
+                        onViewChange={setEditorView}
                     />
                     {error && <p className="mt-2 text-xs text-danger">{error}</p>}
                 </div>

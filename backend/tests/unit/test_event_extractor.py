@@ -104,3 +104,73 @@ def test_invalid_block_preserves_existing_structured_values():
     assert event.links == [{"url": "https://admin.test", "label": None}]
     assert event.price_min == 12
     assert event.extractor_state["valid"] is False
+
+
+@pytest.mark.unit
+def test_google_rich_text_keeps_raw_source_and_applies_clean_values():
+    raw = (
+        "<p>Human text</p>"
+        "<p>&lt;&lt;&lt;EXTRACTOR_JSON&gt;&gt;&gt;"
+        "{&quot;links&quot;:[&quot;https://tickets.test&quot;]}"
+        "&lt;&lt;&lt;END_EXTRACTOR_JSON&gt;&gt;&gt;</p>"
+    )
+    event = _event()
+
+    apply_calendar_description(event, raw, is_new=True)
+
+    assert event.source_description == raw
+    assert event.description == "Human text"
+    assert event.links == [{"url": "https://tickets.test", "label": None}]
+    assert event.extractor_state["version"] == 2
+    assert event.extractor_state["valid"] is True
+
+
+@pytest.mark.unit
+def test_stale_rich_text_state_upgrades_extractor_owned_description():
+    raw = (
+        "<p>Human text</p>"
+        "<p>&lt;&lt;&lt;EXTRACTOR_JSON&gt;&gt;&gt;{&quot;tags&quot;:[&quot;salsa&quot;]}"
+        "&lt;&lt;&lt;END_EXTRACTOR_JSON&gt;&gt;&gt;</p>"
+    )
+    event = _event(
+        description=raw,
+        source_description=raw,
+        extractor_state={
+            "version": 1,
+            "valid": False,
+            "payload": None,
+            "applied": {"description": raw},
+        },
+    )
+
+    apply_calendar_description(event, raw, is_new=False)
+
+    assert event.source_description == raw
+    assert event.description == "Human text"
+    assert event.extractor_state["version"] == 2
+    assert event.extractor_state["valid"] is True
+
+
+@pytest.mark.unit
+def test_stale_rich_text_state_preserves_admin_description():
+    raw = (
+        "<p>Human text</p>"
+        "<p>&lt;&lt;&lt;EXTRACTOR_JSON&gt;&gt;&gt;{&quot;tags&quot;:[&quot;salsa&quot;]}"
+        "&lt;&lt;&lt;END_EXTRACTOR_JSON&gt;&gt;&gt;</p>"
+    )
+    event = _event(
+        description="Admin description",
+        source_description=raw,
+        extractor_state={
+            "version": 1,
+            "valid": False,
+            "payload": None,
+            "applied": {"description": raw},
+        },
+    )
+
+    apply_calendar_description(event, raw, is_new=False)
+
+    assert event.description == "Admin description"
+    assert event.extractor_state["version"] == 2
+    assert event.extractor_state["valid"] is True

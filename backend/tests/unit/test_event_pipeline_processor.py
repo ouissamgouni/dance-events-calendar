@@ -8,7 +8,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from backend.db.models import CachedEvent
 from backend.services.calendar.base import CalendarEvent
+from backend.services.event_extractor import apply_calendar_description
 from backend.services.event_pipeline_processor import (
     CalendarProgress,
     EventPipelineProcessor,
@@ -261,3 +263,61 @@ class TestEventPipelineProcessor:
         error_logs = [l for l in progress.logs if l.level == "ERROR"]
         assert len(error_logs) == 1
         assert "DB connection lost" in error_logs[0].message
+
+    @pytest.mark.parametrize(
+        ("existing_version", "expected_action"),
+        [(1, "updated"), (2, "unchanged")],
+    )
+    def test_unchanged_event_refreshes_only_stale_extractor_state(
+        self, existing_version, expected_action
+    ):
+        raw = (
+            "<p>Human text</p>"
+            "<p>&lt;&lt;&lt;EXTRACTOR_JSON&gt;&gt;&gt;{&quot;tags&quot;:[&quot;salsa&quot;]}"
+            "&lt;&lt;&lt;END_EXTRACTOR_JSON&gt;&gt;&gt;</p>"
+        )
+        buffer = CachedEvent(
+            event_id="ev1",
+            calendar_id="cal1",
+            title="Test Event",
+            description=None,
+            start=datetime(2026, 6, 1, 20, 0),
+            end=datetime(2026, 6, 1, 22, 0),
+            content_hash="same-hash",
+        )
+        apply_calendar_description(buffer, raw, is_new=True)
+        existing = CachedEvent(
+            event_id="ev1",
+            calendar_id="cal1",
+            title=buffer.title,
+            description=raw if existing_version == 1 else buffer.description,
+            source_description=raw,
+            extractor_state=(
+                {
+                    "version": 1,
+                    "valid": False,
+                    "payload": None,
+                    "applied": {"description": raw},
+                }
+                if existing_version == 1
+                else buffer.extractor_state
+            ),
+            links=[],
+            start=buffer.start,
+            end=buffer.end,
+            content_hash=buffer.content_hash,
+        )
+        buffer.links = []
+        session = MagicMock()
+        session.get.return_value = existing
+        processor = _make_processor()
+
+        with patch("backend.services.event_pipeline_processor._upsert_calendar_source"):
+            result, action = processor._persist_with_dedup(
+                session, _make_task(_make_event(description=raw)), buffer
+            )
+
+        assert result is existing
+        assert action == expected_action
+        assert existing.extractor_state["version"] == 2
+        assert existing.description == "Human text"

@@ -151,7 +151,12 @@ def _r2_api_error(action: str, bucket: str, response: httpx.Response) -> str:
 
 def _create_bucket(client, bucket: str) -> None:
     if get_provider() != PROVIDER_R2:
-        client.create_bucket(Bucket=bucket)
+        try:
+            client.create_bucket(Bucket=bucket)
+        except ClientError as e:
+            # Ignore if bucket already exists and is owned by this account
+            if e.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
+                raise
         return
     response = _r2_api("POST", "", json={"name": bucket})
     if response.status_code == 409:

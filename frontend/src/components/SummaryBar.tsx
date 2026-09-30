@@ -119,6 +119,11 @@ interface PillProps {
     testId?: string;
     ariaLabel?: string;
     className?: string;
+    maxWidth?: number;
+    labelMaxWidth?: number;
+    measureKey?: CandidateKey;
+    measureVariant?: PillVariant;
+    measureGear?: boolean;
 }
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
@@ -126,15 +131,19 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
     return target.closest('button, a, input, select, textarea, [role="button"]') !== null;
 }
 
-function Pill({ label, title, icon, onClick, onRemove, removeAriaLabel, testId, ariaLabel, className }: PillProps) {
+function Pill({ label, title, icon, onClick, onRemove, removeAriaLabel, testId, ariaLabel, className, maxWidth, labelMaxWidth, measureKey, measureVariant, measureGear }: PillProps) {
     const padding = onRemove ? 'pl-2.5 pr-1' : '';
     return (
         <span
             className={`${PILL_BASE} ${padding} ${onClick ? PILL_INTERACTIVE : ''} ${className ?? ''}`.trim()}
+            style={maxWidth === undefined ? undefined : { maxWidth }}
             title={title ?? label}
             aria-label={ariaLabel}
             onClick={onClick}
             data-testid={testId}
+            data-measure-key={measureKey}
+            data-measure-variant={measureVariant}
+            data-measure-gear={measureGear ? '' : undefined}
             role={onClick ? 'button' : undefined}
             tabIndex={onClick ? 0 : undefined}
             onKeyDown={(e) => {
@@ -146,7 +155,14 @@ function Pill({ label, title, icon, onClick, onRemove, removeAriaLabel, testId, 
             }}
         >
             {icon}
-            {label !== undefined && <span className="truncate">{label}</span>}
+            {label !== undefined && (
+                <span
+                    className="truncate"
+                    style={labelMaxWidth === undefined ? undefined : { maxWidth: labelMaxWidth }}
+                >
+                    {label}
+                </span>
+            )}
             {onRemove && (
                 <button
                     type="button"
@@ -166,11 +182,18 @@ function Pill({ label, title, icon, onClick, onRemove, removeAriaLabel, testId, 
 }
 
 const ICON_CLS = 'h-4 w-4 shrink-0';
+const AREA_COMPACT_LABEL_MAX_WIDTH = 48;
 
 // Every chip carries the same icon its filter-sheet section uses, so the
 // summary bar reads as a compact echo of the open Filters sheet.
 
 type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people';
+type PillVariant = 'compact' | 'full';
+
+interface SummaryLayout {
+    visibleCount: number;
+    expandedWidths: Partial<Record<CandidateKey, number>>;
+}
 
 export default function SummaryBar(props: SummaryBarProps) {
     const {
@@ -199,11 +222,15 @@ export default function SummaryBar(props: SummaryBarProps) {
     } = props;
 
     const danceSel = useMemo(() => {
-        if (!danceGroup) return { label: '', count: 0 };
+        if (!danceGroup) return { compactLabel: '', fullLabel: '', count: 0 };
         const selected = danceGroup.tags.filter((t) => activeTagIds.has(t.id));
-        if (selected.length === 0) return { label: 'Any', count: 0 };
+        if (selected.length === 0) return { compactLabel: 'Any', fullLabel: 'Any', count: 0 };
         const first = selected[0].label;
-        return { label: selected.length > 1 ? `${first} +${selected.length - 1}` : first, count: selected.length };
+        return {
+            compactLabel: selected.length > 1 ? `${first} +${selected.length - 1}` : first,
+            fullLabel: selected.map((tag) => tag.label).join(', '),
+            count: selected.length,
+        };
     }, [danceGroup, activeTagIds]);
 
     // Opt-in: a status-only selection (kind alone) never surfaces a chip.
@@ -253,7 +280,10 @@ export default function SummaryBar(props: SummaryBarProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const ghostRowRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState(0);
-    const [visibleCount, setVisibleCount] = useState(candidates.length);
+    const [layout, setLayout] = useState<SummaryLayout>({
+        visibleCount: candidates.length,
+        expandedWidths: {},
+    });
 
     useEffect(() => {
         const el = containerRef.current;
@@ -269,14 +299,24 @@ export default function SummaryBar(props: SummaryBarProps) {
     const GAP = 6; // matches gap-1.5
 
     useLayoutEffect(() => {
-        // Ghost row children are the candidate pills in priority order followed
-        // by the widest gear pill last.
-        const ghostChildren = ghostRowRef.current ? Array.from(ghostRowRef.current.children) : [];
-        const widths = candidates.map((_, i) => (ghostChildren[i] as HTMLElement | undefined)?.offsetWidth ?? 0);
-        const gearW = (ghostChildren[candidates.length] as HTMLElement | undefined)?.offsetWidth ?? 0;
+        const ghostRow = ghostRowRef.current;
+        const compactWidths = new Map<CandidateKey, number>();
+        const fullWidths = new Map<CandidateKey, number>();
+        for (const key of candidates) {
+            compactWidths.set(
+                key,
+                ghostRow?.querySelector<HTMLElement>(`[data-measure-key="${key}"][data-measure-variant="compact"]`)?.offsetWidth ?? 0,
+            );
+            fullWidths.set(
+                key,
+                ghostRow?.querySelector<HTMLElement>(`[data-measure-key="${key}"][data-measure-variant="full"]`)?.offsetWidth ?? 0,
+            );
+        }
+        const widths = candidates.map((key) => compactWidths.get(key) ?? 0);
+        const gearW = ghostRow?.querySelector<HTMLElement>('[data-measure-gear]')?.offsetWidth ?? 0;
         // No usable measurement yet (e.g. jsdom / first paint): show everything.
-        if (containerWidth <= 0 || gearW <= 0 || widths.some((w) => w <= 0)) {
-            setVisibleCount(candidates.length);
+        if (containerWidth <= 0 || gearW <= 0 || widths.some((w) => w <= 0) || candidates.some((key) => (fullWidths.get(key) ?? 0) <= 0)) {
+            setLayout({ visibleCount: candidates.length, expandedWidths: {} });
             return;
         }
         const fits = (candidateCount: number) => {
@@ -300,48 +340,116 @@ export default function SummaryBar(props: SummaryBarProps) {
             if (!fits(i)) break;
             count = i;
         }
-        setVisibleCount(count);
-    }, [candidates, containerWidth, foldedRemainingCount, danceSel.label, areaLabel, startDate, endDate, peopleTypeLabel, peopleStatusLabel, reachFilter, twoLine]);
 
-    const hiddenActivePrimaries = Math.max(0, candidates.length - visibleCount);
+        type RowItem = { key: CandidateKey | null; width: number };
+        const rows: Array<{ items: RowItem[]; used: number }> = [];
+        const items: RowItem[] = [
+            ...candidates.slice(0, count).map((key) => ({ key, width: compactWidths.get(key) ?? 0 })),
+            { key: null, width: gearW },
+        ];
+        for (const item of items) {
+            let row = rows[rows.length - 1];
+            const nextWidth = row ? row.used + GAP + item.width : item.width;
+            if (row && nextWidth > containerWidth) {
+                row = { items: [], used: 0 };
+                rows.push(row);
+            } else if (!row) {
+                row = { items: [], used: 0 };
+                rows.push(row);
+            }
+            row.used = row.items.length === 0 ? item.width : row.used + GAP + item.width;
+            row.items.push(item);
+        }
+
+        const expandedWidths: Partial<Record<CandidateKey, number>> = {};
+        for (const row of rows) {
+            let remainingSlack = Math.max(0, Math.floor(containerWidth - row.used - 1));
+            let expandable = row.items.flatMap((item) => {
+                if (!item.key) return [];
+                const fullWidth = fullWidths.get(item.key) ?? item.width;
+                const needed = fullWidth - item.width;
+                return needed > 0 ? [{ key: item.key, compactWidth: item.width, needed }] : [];
+            });
+            const increments = new Map<CandidateKey, number>();
+
+            while (remainingSlack > 0 && expandable.length > 0) {
+                const share = remainingSlack / expandable.length;
+                const saturated = expandable.filter((item) => item.needed <= share);
+                if (saturated.length === 0) {
+                    for (const item of expandable) increments.set(item.key, share);
+                    remainingSlack = 0;
+                    break;
+                }
+                for (const item of saturated) {
+                    increments.set(item.key, item.needed);
+                    remainingSlack -= item.needed;
+                }
+                const saturatedKeys = new Set(saturated.map((item) => item.key));
+                expandable = expandable.filter((item) => !saturatedKeys.has(item.key));
+            }
+
+            for (const item of row.items) {
+                if (!item.key) continue;
+                const increment = increments.get(item.key) ?? 0;
+                if (increment > 0) {
+                    expandedWidths[item.key] = Math.min(
+                        fullWidths.get(item.key) ?? item.width,
+                        item.width + increment,
+                    );
+                }
+            }
+        }
+
+        setLayout({ visibleCount: count, expandedWidths });
+    }, [candidates, containerWidth, foldedRemainingCount, danceSel.compactLabel, danceSel.fullLabel, areaLabel, startDate, endDate, peopleTypeLabel, peopleStatusLabel, reachFilter, twoLine]);
+
+    const hiddenActivePrimaries = Math.max(0, candidates.length - layout.visibleCount);
     const extraCount = foldedRemainingCount + hiddenActivePrimaries;
 
     // ---- Pill builders -------------------------------------------------
-    const buildPill = (key: CandidateKey, measuring?: boolean): React.ReactNode => {
+    const buildPill = (key: CandidateKey, measuring = false, variant: PillVariant = 'compact', maxWidth?: number): React.ReactNode => {
         const tid = (id: string) => (measuring ? undefined : id);
+        const measurementProps = measuring ? { measureKey: key, measureVariant: variant } : {};
+        const pillKey = measuring ? `${key}-${variant}` : key;
         switch (key) {
             case 'period':
                 return (
                     <Pill
-                        key="period"
+                        key={pillKey}
                         icon={<img src="/calendar.png" alt="" aria-hidden="true" className={ICON_CLS} />}
                         label={formatPeriodLabel(startDate, endDate)}
                         onClick={onEditPeriod}
                         testId={tid('summary-chip-period')}
+                        maxWidth={maxWidth}
+                        {...measurementProps}
                     />
                 );
             case 'area':
                 return (
                     <Pill
-                        key="area"
+                        key={pillKey}
                         icon={<img src="/pin.png" alt="" aria-hidden="true" className={ICON_CLS} />}
                         label={areaLabel}
-                        className="max-w-[88px] sm:max-w-none"
+                        maxWidth={maxWidth}
+                        labelMaxWidth={variant === 'compact' ? AREA_COMPACT_LABEL_MAX_WIDTH : undefined}
                         onClick={onEditArea}
                         onRemove={!areaIsDefault ? onClearArea : undefined}
                         removeAriaLabel="Clear area filter"
                         testId={tid('summary-chip-area')}
+                        {...measurementProps}
                     />
                 );
             case 'dance':
                 return (
                     <Pill
-                        key="dance"
+                        key={pillKey}
                         icon={<img src="/dance.png" alt="" aria-hidden="true" className={ICON_CLS} />}
-                        label={danceSel.label}
-                        title={`Dance styles: ${danceSel.label}`}
+                        label={variant === 'full' ? danceSel.fullLabel : danceSel.compactLabel}
+                        title={`Dance styles: ${danceSel.fullLabel}`}
                         onClick={onEditDance}
                         testId={tid('summary-chip-dance')}
+                        maxWidth={maxWidth}
+                        {...measurementProps}
                     />
                 );
             case 'reach': {
@@ -351,13 +459,15 @@ export default function SummaryBar(props: SummaryBarProps) {
                 const short = full.length <= 5 ? full : full.slice(0, 3);
                 return (
                     <Pill
-                        key="reach"
+                        key={pillKey}
                         icon={<img src="/scale.png" alt="" aria-hidden="true" className={ICON_CLS} />}
-                        label={short}
+                        label={variant === 'full' ? full : short}
                         ariaLabel={`Event reach: ${full}`}
                         title={`Event reach: ${full}`}
                         onClick={onEditReach}
                         testId={tid('summary-chip-reach')}
+                        maxWidth={maxWidth}
+                        {...measurementProps}
                     />
                 );
             }
@@ -377,7 +487,7 @@ export default function SummaryBar(props: SummaryBarProps) {
                     : status ? `${who} ${status.toLowerCase()}` : who;
                 return (
                     <Pill
-                        key="people"
+                        key={pillKey}
                         icon={hasFaces
                             ? <PeopleAvatarTrack people={interestUserPeople!} total={interestUserHandles.length} max={3} size="sm" />
                             : <img src="/high-five.png" alt="" aria-hidden="true" className={ICON_CLS} />}
@@ -386,6 +496,8 @@ export default function SummaryBar(props: SummaryBarProps) {
                         title={`People: ${combinedLabel}`}
                         onClick={onEditPeople}
                         testId={tid('summary-chip-people')}
+                        maxWidth={maxWidth}
+                        {...measurementProps}
                     />
                 );
             }
@@ -403,6 +515,7 @@ export default function SummaryBar(props: SummaryBarProps) {
             ariaLabel={count > 0 ? `${count} more filters` : 'Filters'}
             title="Filters"
             testId={measuring ? undefined : 'summary-open-filters'}
+            measureGear={measuring}
         />
     );
 
@@ -411,7 +524,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         onOpenFilters();
     };
 
-    const visibleKeys = candidates.slice(0, visibleCount);
+    const visibleKeys = candidates.slice(0, layout.visibleCount);
 
     return (
         <div
@@ -424,7 +537,10 @@ export default function SummaryBar(props: SummaryBarProps) {
         >
             <div className="flex items-center gap-1.5 min-w-0">
                 <div className={`flex items-center gap-1.5 min-w-0 flex-1 ${twoLine ? 'flex-wrap' : ''}`}>
-                    {visibleKeys.map((k) => buildPill(k))}
+                    {visibleKeys.map((key) => {
+                        const expandedWidth = layout.expandedWidths[key];
+                        return buildPill(key, false, expandedWidth === undefined ? 'compact' : 'full', expandedWidth);
+                    })}
                     {buildGear(extraCount)}
                 </div>
             </div>
@@ -436,7 +552,10 @@ export default function SummaryBar(props: SummaryBarProps) {
                 aria-hidden="true"
                 className="pointer-events-none absolute -left-[9999px] top-0 flex items-center gap-1.5 opacity-0"
             >
-                {candidates.map((k) => buildPill(k, true))}
+                {candidates.flatMap((key) => [
+                    buildPill(key, true, 'compact'),
+                    buildPill(key, true, 'full'),
+                ])}
                 {buildGear(foldedRemainingCount + candidates.length, true)}
             </div>
         </div>

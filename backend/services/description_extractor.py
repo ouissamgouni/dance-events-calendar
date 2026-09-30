@@ -1,6 +1,7 @@
 import json
 import re
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from typing import Optional
 from urllib.parse import urlsplit
 
@@ -11,6 +12,38 @@ _BLOCK_PATTERN = re.compile(
     rf"{re.escape(START_MARKER)}(.*?){re.escape(END_MARKER)}",
     re.DOTALL,
 )
+_RICH_TEXT_PATTERN = re.compile(r"</?(?:p|div|br|li)\b", re.IGNORECASE)
+
+
+class _RichTextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+
+    def _append_break(self) -> None:
+        if self.parts and not self.parts[-1].endswith("\n"):
+            self.parts.append("\n")
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+        if tag in {"p", "div", "br", "li"}:
+            self._append_break()
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"p", "div", "li"}:
+            self._append_break()
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+
+def _normalize_description(description: str) -> str:
+    if _RICH_TEXT_PATTERN.search(description) is None:
+        return description
+
+    parser = _RichTextParser()
+    parser.feed(description)
+    parser.close()
+    return "".join(parser.parts).strip()
 
 
 @dataclass(frozen=True)
@@ -47,9 +80,10 @@ def extract_description(description: Optional[str]) -> DescriptionExtraction:
     if description is None:
         return DescriptionExtraction(description=None, payload=None)
 
-    match = _BLOCK_PATTERN.search(description)
+    normalized = _normalize_description(description)
+    match = _BLOCK_PATTERN.search(normalized)
     if match is None:
-        return DescriptionExtraction(description=description, payload=None)
+        return DescriptionExtraction(description=normalized, payload=None)
 
     try:
         raw = json.loads(match.group(1))
@@ -82,7 +116,7 @@ def extract_description(description: Optional[str]) -> DescriptionExtraction:
     normalized_tags = _deduplicate(
         [value.strip().lower() for value in tags if value.strip()]
     )
-    cleaned = _BLOCK_PATTERN.sub("", description).strip()
+    cleaned = _BLOCK_PATTERN.sub("", normalized).strip()
 
     return DescriptionExtraction(
         description=cleaned,

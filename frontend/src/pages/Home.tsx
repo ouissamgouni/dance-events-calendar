@@ -698,13 +698,28 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         const nextParams = new URLSearchParams(searchParams);
         if (nextView === 'calendar') {
             nextParams.delete('view');
+            // Preserve the current explorer path so we can return to it
+            const currentExplorerPath = location.pathname === '/browse' ? '/browse' : '/';
+            if (currentExplorerPath === '/browse') {
+                nextParams.set('explore_from', 'browse');
+            } else {
+                nextParams.delete('explore_from');
+            }
             navigate({ pathname: '/calendar', search: nextParams.toString() });
             return;
         }
         const openMap = nextView === 'map';
         if (openMap) nextParams.set('view', 'map');
         else nextParams.delete('view');
-        const explorerPathname = location.pathname === '/browse' ? '/browse' : '/';
+        // When returning to explorer from calendar, use the saved explore_from param
+        // If coming from calendar view, check if we have a saved path; otherwise use current path or default to '/'
+        let explorerPathname = location.pathname === '/browse' ? '/browse' : '/';
+        if (location.pathname === '/calendar') {
+            // We're coming from the calendar view, so check for the explore_from param
+            const exploreFrom = nextParams.get('explore_from');
+            explorerPathname = exploreFrom === 'browse' ? '/browse' : '/';
+            nextParams.delete('explore_from');
+        }
         navigate({ pathname: explorerPathname, search: nextParams.toString() });
     }, [location.pathname, navigate, searchParams]);
 

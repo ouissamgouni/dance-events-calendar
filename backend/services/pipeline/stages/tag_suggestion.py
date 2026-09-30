@@ -39,7 +39,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
-from backend.db.models import CachedEvent, EventTag, TagSuggestion
+from backend.db.models import BlockedEvent, CachedEvent, EventTag, TagSuggestion
 from backend.services.pipeline.base import EnrichmentStage
 from backend.services.tag_suggester import (
     TagCandidate,
@@ -74,6 +74,8 @@ class TagSuggestionStage(EnrichmentStage):
         return True
 
     def process_with_session(self, session: Session, event: CachedEvent) -> bool:
+        if session.get(BlockedEvent, event.event_id) is not None:
+            return True
         source_tags = _extractor_tags(event)
         fingerprint = _input_fingerprint(event, source_tags)
         already = session.exec(

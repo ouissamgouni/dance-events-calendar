@@ -2093,6 +2093,9 @@ class BulkTagSuggestionRunResponse(BaseModel):
 
 class AdminEventResponse(EventResponse):
     source_description: Optional[str] = None
+    status: Literal["pending", "reviewed", "blocked"] = "reviewed"
+    block_reason: Optional[Literal["deleted", "duplicate", "rejected"]] = None
+    block_reason_detail: Optional[str] = None
 
 
 class PaginatedEventsResponse(BaseModel):
@@ -2230,7 +2233,7 @@ class FilterOption(BaseModel):
 
 class EventFilterOptionsResponse(BaseModel):
     calendars: list[FilterOption] = []
-    review_statuses: list[FilterOption] = []
+    statuses: list[FilterOption] = []
     geo_statuses: list[FilterOption] = []
     tags: list[FilterOption] = []
     total_count: int = 0

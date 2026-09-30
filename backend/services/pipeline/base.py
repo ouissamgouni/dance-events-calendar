@@ -7,7 +7,7 @@ from datetime import datetime
 
 from sqlmodel import Session, col, select
 
-from backend.db.models import CachedEvent
+from backend.db.models import BlockedEvent, CachedEvent
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +50,7 @@ class EnrichmentStage(ABC):
     def process(self, event: CachedEvent) -> bool:
         """Enrich the event in-place. Return True on success, False on failure."""
 
-    def process_with_session(
-        self, session: Session, event: CachedEvent
-    ) -> bool:
+    def process_with_session(self, session: Session, event: CachedEvent) -> bool:
         """Session-aware variant. Defaults to ``process(event)`` for stages
         that only mutate the event in place. Override when the stage needs to
         write to *other* tables (e.g. the ``tag_suggestions`` table).
@@ -122,7 +120,7 @@ class EnrichmentPipeline:
         results: dict[str, StageResult] = {
             stage.name: StageResult() for stage in self.stages
         }
-        if event.deleted_at is not None:
+        if event.deleted_at is not None or session.get(BlockedEvent, event.event_id):
             return results
         for stage in self.stages:
             result = results[stage.name]
@@ -169,6 +167,7 @@ class EnrichmentPipeline:
                 .where(
                     CachedEvent.event_id.in_(chunk_ids),  # type: ignore[attr-defined]
                     CachedEvent.deleted_at == None,
+                    ~CachedEvent.event_id.in_(select(BlockedEvent.event_id)),
                 )
                 .order_by(col(CachedEvent.start).desc())
             ).all()

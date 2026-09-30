@@ -1,13 +1,103 @@
 interest_profiles:
   - user: elena.moreau@joinmovida.com
-    label: Salsa and Bachata across Europe
+    label: Salsa + Mambo - Europe
+    area_label: Europe & nearby
     min_lat: 24
     min_lng: -18
     max_lat: 69
     max_lng: 50
     dance_tags:
       - dance-style:salsa
-      - dance-style:bachata
-    reach_tags: []
+      - dance-style:mambo
+    reach_tags: ["reach:international"]
     matches_enabled: true
     is_active: true
+  - user: elena.moreau@joinmovida.com
+    label: Salsa + Mambo - Paris 25km
+    area_label: Paris
+    min_lat: 48.6318
+    min_lng: 2.0099
+    max_lat: 49.0814
+    max_lng: 2.6945
+    dance_tags: ["dance-style:salsa", "dance-style:mambo"]
+    reach_tags: []
+    matches_enabled: false
+    is_active: false
+  - user: maya.rivera@joinmovida.com
+    label: Salsa + Mambo - Europe
+    area_label: Europe & nearby
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags:
+      - dance-style:salsa
+      - dance-style:mambo
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true
+  - user: maya.rivera@joinmovida.com
+    label: Salsa + Mambo - New York 25km
+    area_label: New York
+    min_lat: 40.4875
+    min_lng: -74.3047
+    max_lat: 40.9379
+    max_lng: -73.7073
+    dance_tags:
+      - dance-style:salsa
+      - dance-style:mambo
+    reach_tags: []
+    matches_enabled: false
+    is_active: false
+  - user: noah.kim@joinmovida.com
+    label: Salsa + Mambo - Asia
+    area_label: Asia & nearby
+    min_lat: -10
+    min_lng: 60
+    max_lat: 55
+    max_lng: 150
+    dance_tags:
+      - dance-style:salsa
+      - dance-style:mambo
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true
+  - user: noah.kim@joinmovida.com
+    label: Salsa + Mambo - Seoul 25km
+    area_label: Seoul
+    min_lat: 37.3410
+    min_lng: 126.6940
+    max_lat: 37.7900
+    max_lng: 127.2590
+    dance_tags:
+      - dance-style:salsa
+      - dance-style:mambo
+    reach_tags: []
+    matches_enabled: false
+    is_active: false
+  - user: leo.martin@joinmovida.com
+    label: Salsa + Mambo - Europe
+    area_label: Europe & nearby
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags:
+      - dance-style:salsa
+      - dance-style:mambo
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true
+  - user: leo.martin@joinmovida.com
+    label: Salsa + Mambo - Brussels 25km
+    area_label: Brussels
+    min_lat: 50.6252
+    min_lng: 4.0100
+    max_lat: 51.0748
+    max_lng: 4.6978
+    dance_tags:
+      - dance-style:salsa
+      - dance-style:mambo
+    reach_tags: []
+    matches_enabled: false
+    is_active: false

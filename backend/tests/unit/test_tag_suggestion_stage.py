@@ -10,6 +10,7 @@ import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
 from backend.db.models import (
+    BlockedEvent,
     CachedEvent,
     CalendarSetting,
     EventTag,
@@ -108,6 +109,23 @@ def test_process_without_session_is_noop():
     stage = TagSuggestionStage()
     ev = _bare_event(title="Salsa")
     assert stage.process(ev) is True
+
+
+def test_process_with_session_skips_blocked_event(session):
+    _seed_taxonomy(session)
+    ev = _seed_event(session, title="Salsa & Bachata Social")
+    session.add(BlockedEvent(event_id=ev.event_id, reason="deleted"))
+    session.commit()
+
+    assert TagSuggestionStage().process_with_session(session, ev) is True
+    assert (
+        session.exec(
+            TagSuggestion.__table__.select().where(
+                TagSuggestion.__table__.c.event_id == ev.event_id
+            )
+        ).all()
+        == []
+    )
 
 
 # ---------------------------------------------------------------------------

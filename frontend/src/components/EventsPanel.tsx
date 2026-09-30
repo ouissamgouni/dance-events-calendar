@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CalendarEvent, SeriesGroup, DuplicateGroup } from '../types';
+import type { AdminEventStatus, CalendarEvent, SeriesGroup, DuplicateGroup } from '../types';
 import type {
+    AdminEventGeoStatus,
     EventFilterParams,
     EventFilterOptionsResponse,
 } from '../api';
@@ -33,6 +34,14 @@ import TagsPicker from './TagsPicker';
 import SeriesGroupCard from './SeriesGroupCard';
 import DuplicateGroupCard from './DuplicateGroupCard';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
+import {
+    ADMIN_EVENT_HIDDEN_CHIP_CLASS,
+    ADMIN_EVENT_STATUS_CHIP_CLASSES,
+    getAdminEventRowClass,
+    getAdminEventStatus,
+    getAdminEventStatusIcon,
+    getBlockReasonLabel,
+} from '../utils/adminEventStatus';
 
 export type EventsPanelPreset = 'all' | 'pending' | 'ungeolocated';
 
@@ -47,7 +56,7 @@ const PAGE_SIZE = 25;
 
 const PRESET_FILTERS: Record<EventsPanelPreset, Partial<EventFilterParams>> = {
     all: {},
-    pending: { review_status: 'pending' },
+    pending: { status: 'pending' },
     ungeolocated: { ungeolocated: true },
 };
 
@@ -66,8 +75,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [filterOptions, setFilterOptions] = useState<EventFilterOptionsResponse | null>(null);
     const [selectedCalendar, setSelectedCalendar] = useState<string>('');
-    const [selectedReviewStatus, setSelectedReviewStatus] = useState<string>('');
-    const [selectedGeoStatus, setSelectedGeoStatus] = useState<string>('');
+    const [selectedStatus, setSelectedStatus] = useState<AdminEventStatus | ''>('');
+    const [selectedGeoStatus, setSelectedGeoStatus] = useState<AdminEventGeoStatus | ''>('');
     const [selectedTagIds, setSelectedTagIds] = useState<string>('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [allMatchingSelected, setAllMatchingSelected] = useState(false);
@@ -96,7 +105,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [selectedCurateHandles, setSelectedCurateHandles] = useState<Set<string>>(new Set());
     const [curateKind, setCurateKind] = useState<AdminBulkEngagementKind>('save');
     const [curateAudience, setCurateAudience] = useState<AdminBulkEngagementAudience | ''>('');
-    const [selectedVisibility, setSelectedVisibility] = useState<'hidden' | 'blocked' | ''>('');
+    const [hiddenOnly, setHiddenOnly] = useState(false);
     // Hide past events by default; toggle to include them. Local to this panel
     // so the Events and Pending Review panels filter independently.
     const [hidePast, setHidePast] = useState(true);
@@ -111,15 +120,16 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 limit: PAGE_SIZE,
                 offset: (pageOverride ?? page) * PAGE_SIZE,
                 search: debouncedSearch || undefined,
-                review_status: selectedReviewStatus || presetFilters.review_status || undefined,
+                status: selectedStatus || undefined,
                 calendar_id: selectedCalendar || undefined,
                 tag_ids: selectedTagIds || undefined,
-                ungeolocated: selectedGeoStatus === 'ungeolocated' || presetFilters.ungeolocated || undefined,
+                geo_status: selectedGeoStatus || undefined,
+                ungeolocated: presetFilters.ungeolocated || undefined,
                 include_past: !hidePast || undefined,
-                visibility: selectedVisibility || undefined,
+                hidden: hiddenOnly || undefined,
             };
         },
-        [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast, selectedVisibility],
+        [preset, page, debouncedSearch, selectedStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast, hiddenOnly],
     );
 
     // Load events
@@ -154,9 +164,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setSearch('');
             setDebouncedSearch('');
             setSelectedCalendar(initialCalendarId ?? '');
-            setSelectedReviewStatus('');
+            setSelectedStatus(PRESET_FILTERS[preset].status ?? '');
             setSelectedGeoStatus('');
             setSelectedTagIds('');
+            setHiddenOnly(false);
             setSelectedIds(new Set());
             setAllMatchingSelected(false);
             setMessage('');
@@ -595,20 +606,22 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 </select>
                             )}
 
-                            {/* Review status chips */}
-                            {preset === 'all' && filterOptions.review_statuses.map((rs) => (
+                            {/* Status chips */}
+                            {filterOptions.statuses.map((statusOption) => (
                                 <button
-                                    key={rs.value}
+                                    key={statusOption.value}
                                     onClick={() => {
-                                        setSelectedReviewStatus((prev) => (prev === rs.value ? '' : rs.value));
+                                        setSelectedStatus((prev) => (
+                                            prev === statusOption.value ? '' : statusOption.value as AdminEventStatus
+                                        ));
                                         setPage(0);
                                     }}
-                                    className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedReviewStatus === rs.value
+                                    className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedStatus === statusOption.value
                                         ? 'bg-blue-50 border-blue-300 text-action'
                                         : 'bg-surface border-line text-ink-soft hover:bg-canvas'
                                         }`}
                                 >
-                                    {rs.label} ({rs.count})
+                                    {statusOption.label} ({statusOption.count})
                                 </button>
                             ))}
 
@@ -617,7 +630,9 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 <button
                                     key={gs.value}
                                     onClick={() => {
-                                        setSelectedGeoStatus((prev) => (prev === gs.value ? '' : gs.value));
+                                        setSelectedGeoStatus((prev) => (
+                                            prev === gs.value ? '' : gs.value as AdminEventGeoStatus
+                                        ));
                                         setPage(0);
                                     }}
                                     className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedGeoStatus === gs.value
@@ -657,21 +672,15 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 {hidePast ? 'Show past' : 'Hide past'}
                             </button>
 
-                            {/* Visibility pills */}
-                            {(['hidden', 'blocked'] as const).map((v) => (
-                                <button
-                                    key={v}
-                                    onClick={() => { setSelectedVisibility((prev) => (prev === v ? '' : v)); setPage(0); }}
-                                    className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedVisibility === v
-                                        ? v === 'hidden'
-                                            ? 'bg-amber-100 border-amber-400 text-amber-800'
-                                            : 'bg-slate-200 border-line text-ink'
-                                        : 'bg-surface border-line text-ink-soft hover:bg-canvas'
-                                        }`}
-                                >
-                                    {v.charAt(0).toUpperCase() + v.slice(1)}
-                                </button>
-                            ))}
+                            <button
+                                onClick={() => { setHiddenOnly((value) => !value); setPage(0); }}
+                                className={`text-[10px] font-medium px-2 py-0.5 border transition ${hiddenOnly
+                                    ? 'bg-slate-200 border-line text-ink'
+                                    : 'bg-surface border-line text-ink-soft hover:bg-canvas'
+                                    }`}
+                            >
+                                Hidden
+                            </button>
                         </div>
                     )}
                 </div>
@@ -719,14 +728,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 {events.map((event) => (
                                     <tr
                                         key={event.event_id}
-                                        className={`hover:bg-opacity-80 transition cursor-pointer ${event.is_blocked
-                                            ? 'bg-slate-100 hover:bg-canvas/70'
-                                            : event.is_hidden
-                                                ? 'bg-amber-50 hover:bg-amber-100/70'
-                                                : selectedIds.has(event.event_id)
-                                                    ? 'bg-blue-50/30'
-                                                    : 'hover:bg-canvas/50'
-                                            }`}
+                                        className={`transition cursor-pointer ${getAdminEventRowClass(event)}`}
                                         onClick={() => setAdminDetailEventId(event.event_id)}
                                     >
                                         <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
@@ -770,20 +772,28 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                             )}
                                         </td>
                                         <td className="px-2 py-1.5">
-                                            <div className="flex flex-wrap gap-1">
-                                                <span
-                                                    className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${event.review_status === 'pending'
-                                                        ? 'bg-amber-50 text-amber-700'
-                                                        : 'bg-emerald-50 text-success'
-                                                        }`}
-                                                >
-                                                    {event.review_status ?? 'reviewed'}
-                                                </span>
-                                                {event.is_blocked && (
-                                                    <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-slate-200 text-ink">Blocked</span>
+                                            <div className="flex flex-wrap items-center gap-1">
+                                                {getAdminEventStatusIcon(event) && (
+                                                    <img
+                                                        src={getAdminEventStatusIcon(event) ?? undefined}
+                                                        alt=""
+                                                        aria-hidden="true"
+                                                        className="h-4 w-4 shrink-0 object-contain"
+                                                    />
                                                 )}
-                                                {event.is_hidden && !event.is_blocked && (
-                                                    <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700">Hidden</span>
+                                                <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${ADMIN_EVENT_STATUS_CHIP_CLASSES[getAdminEventStatus(event)]}`}>
+                                                    {getAdminEventStatus(event)}
+                                                </span>
+                                                {event.is_hidden && getAdminEventStatus(event) !== 'blocked' && (
+                                                    <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${ADMIN_EVENT_HIDDEN_CHIP_CLASS}`}>Hidden</span>
+                                                )}
+                                                {getAdminEventStatus(event) === 'blocked' && getBlockReasonLabel(event.block_reason) && (
+                                                    <span
+                                                        className="inline-block bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-soft"
+                                                        title={event.block_reason_detail ?? undefined}
+                                                    >
+                                                        {getBlockReasonLabel(event.block_reason)}
+                                                    </span>
                                                 )}
                                             </div>
                                         </td>
@@ -811,7 +821,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                             </div>
                                         </td>
                                         <td className="px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
-                                            {event.review_status === 'pending' && (
+                                            {getAdminEventStatus(event) === 'pending' && (
                                                 <button
                                                     onClick={() => handleSingleReview(event.event_id)}
                                                     className="text-[10px] text-action hover:text-blue-800 font-medium"

@@ -22,10 +22,11 @@ from enum import Enum
 from sqlmodel import Session, select
 
 from backend.db.database import get_engine
-from backend.db.models import CachedEvent, EventCalendarSource, EventTag
+from backend.db.models import BlockedEvent, CachedEvent, EventCalendarSource, EventTag
 from backend.services.calendar.base import CalendarEvent
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.event_extractor import (
+    EXTRACTOR_STATE_VERSION,
     apply_calendar_description,
     apply_extractor_image,
 )
@@ -495,6 +496,15 @@ class EventPipelineProcessor:
         progress = self._progress_map.get(task.calendar_id)
         cal_event = task.calendar_event
 
+        with DBSession(engine) as session:
+            blocked = session.get(BlockedEvent, cal_event.event_id)
+            if type(blocked) is BlockedEvent:
+                logger.debug(
+                    "Skipping blocked event_id=%s before enrichment",
+                    cal_event.event_id,
+                )
+                return
+
         # Tag this thread so stdlib log records emitted by helpers
         # (geocoding, tag suggestion, etc.) get routed to this calendar.
         set_current_calendar_id(task.calendar_id)
@@ -801,11 +811,15 @@ class EventPipelineProcessor:
             # Detect whether this re-pull actually changes anything.
             content_unchanged = existing.content_hash == buffer.content_hash
             source_unchanged = existing.source_description == buffer.source_description
+            extractor_current = (existing.extractor_state or {}).get(
+                "version"
+            ) == EXTRACTOR_STATE_VERSION
             new_geocode = existing.latitude is None and buffer.latitude is not None
             new_links = existing.links is None and buffer.links is not None
             if (
                 content_unchanged
                 and source_unchanged
+                and extractor_current
                 and not (new_geocode or new_links)
             ):
                 # No-op re-pull from upstream — still upsert calendar source link

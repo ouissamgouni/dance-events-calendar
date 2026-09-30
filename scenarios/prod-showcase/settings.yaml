@@ -1,4 +1,8 @@
 settings:
+  summary_two_line_enabled: true
+  app_auth_gate_enabled: true
+  browse_nav_enabled: true
+  network_going_snapshot_enabled: true
   promo_codes_enabled: true
   organizer_claims_enabled: true
   following_badge_enabled: true

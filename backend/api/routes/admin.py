@@ -99,9 +99,89 @@ from backend.services.sync_service import SyncService
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
+def _get_blocked_event(session: Session, event_id: str) -> Optional[BlockedEvent]:
+    blocked = session.get(BlockedEvent, event_id)
+    return blocked if type(blocked) is BlockedEvent else None
+
+
 def _is_event_blocked(session: Session, event_id: str) -> bool:
     """Return True if event_id has an entry in blocked_events."""
-    return session.get(BlockedEvent, event_id) is not None
+    return _get_blocked_event(session, event_id) is not None
+
+
+def _admin_event_response(
+    event: CachedEvent,
+    *,
+    color: Optional[str],
+    tags: list,
+    blocked: Optional[BlockedEvent],
+) -> AdminEventResponse:
+    return AdminEventResponse(
+        event_id=event.event_id,
+        calendar_id=event.calendar_id,
+        title=event.title,
+        description=event.description,
+        source_description=event.source_description,
+        **event_image_fields(event),
+        location=event.location,
+        start=event.start,
+        end=event.end,
+        all_day=event.all_day,
+        latitude=event.latitude,
+        longitude=event.longitude,
+        color=color,
+        price_min=event.price_min,
+        price_max=event.price_max,
+        price_currency=event.price_currency,
+        price_is_free=event.price_is_free,
+        review_status=event.review_status,
+        status="blocked" if blocked else event.review_status,
+        links=event.links,
+        tags=tags,
+        is_hidden=event.is_hidden,
+        is_blocked=blocked is not None,
+        block_reason=blocked.reason if blocked else None,
+        block_reason_detail=blocked.reason_detail if blocked else None,
+        show_price_override=event.show_price_override,
+        show_promo_override=event.show_promo_override,
+    )
+
+
+def _apply_admin_status_filter(stmt, status: Optional[str]):
+    blocked_ids = select(BlockedEvent.event_id)
+    if status == "blocked":
+        return stmt.where(CachedEvent.event_id.in_(blocked_ids))
+    if status in ("pending", "reviewed"):
+        return stmt.where(
+            CachedEvent.review_status == status,
+            ~CachedEvent.event_id.in_(blocked_ids),
+        )
+    return stmt
+
+
+def _apply_admin_geo_filter(
+    stmt, geo_status: Optional[str], ungeolocated: Optional[bool] = None
+):
+    if not geo_status and ungeolocated:
+        geo_status = "ungeolocated"
+    if not geo_status:
+        return stmt
+
+    stmt = stmt.where(~CachedEvent.event_id.in_(select(BlockedEvent.event_id)))
+    if geo_status == "geolocated":
+        return stmt.where(
+            CachedEvent.latitude != None,
+            CachedEvent.longitude != None,
+        )
+    if geo_status == "ungeolocated":
+        return stmt.where(
+            CachedEvent.location != None,
+            CachedEvent.latitude == None,
+        )
+    return stmt.where(
+        or_(CachedEvent.latitude == None, CachedEvent.longitude == None),
+        or_(CachedEvent.location == None, CachedEvent.latitude != None),
+    )
 
 
 def _apply_upcoming_filter(
@@ -1682,13 +1762,16 @@ def list_admin_events(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     search: Optional[str] = Query(default=None, max_length=200),
-    review_status: Optional[str] = Query(default=None, pattern="^(pending|reviewed)$"),
+    status: Optional[str] = Query(default=None, pattern="^(pending|reviewed|blocked)$"),
     calendar_id: Optional[str] = Query(default=None),
     tag_ids: Optional[str] = Query(default=None),
+    geo_status: Optional[str] = Query(
+        default=None, pattern="^(geolocated|ungeolocated|no-location)$"
+    ),
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
     include_past: bool = Query(default=False),
-    visibility: Optional[str] = Query(default=None, pattern="^(hidden|blocked)$"),
+    hidden: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -1705,15 +1788,9 @@ def list_admin_events(
     # Build base query
     base = select(CachedEvent).where(CachedEvent.deleted_at == None)
 
-    if review_status:
-        base = base.where(CachedEvent.review_status == review_status)
     if calendar_id:
         base = base.where(CachedEvent.calendar_id == calendar_id)
-    if ungeolocated:
-        base = base.where(
-            CachedEvent.location != None,
-            CachedEvent.latitude == None,
-        )
+    base = _apply_admin_geo_filter(base, geo_status, ungeolocated)
     base = _apply_upcoming_filter(
         base, include_past=include_past, future_only=future_only
     )
@@ -1735,14 +1812,9 @@ def list_admin_events(
             ).all()
             base = base.where(CachedEvent.event_id.in_(matching_event_ids))
 
-    if visibility == "blocked":
-        blocked_subq = select(BlockedEvent.event_id)
-        base = base.where(CachedEvent.event_id.in_(blocked_subq))
-    elif visibility == "hidden":
-        blocked_subq = select(BlockedEvent.event_id)
-        base = base.where(CachedEvent.is_hidden == True).where(
-            ~CachedEvent.event_id.in_(blocked_subq)
-        )
+    if hidden:
+        base = base.where(CachedEvent.is_hidden == True)
+    base = _apply_admin_status_filter(base, status)
 
     # Count total matching
     count_stmt = select(func.count()).select_from(base.subquery())
@@ -1755,31 +1827,19 @@ def list_admin_events(
 
     event_ids = [e.event_id for e in events]
     tags_map = get_event_tags(session, event_ids)
+    blocked_map = {
+        blocked.event_id: blocked
+        for blocked in session.exec(
+            select(BlockedEvent).where(BlockedEvent.event_id.in_(event_ids))
+        ).all()
+    }
 
     items = [
-        AdminEventResponse(
-            event_id=e.event_id,
-            calendar_id=e.calendar_id,
-            title=e.title,
-            description=e.description,
-            source_description=e.source_description,
-            **event_image_fields(e),
-            location=e.location,
-            start=e.start,
-            end=e.end,
-            all_day=e.all_day,
-            latitude=e.latitude,
-            longitude=e.longitude,
+        _admin_event_response(
+            e,
             color=color_map.get(e.calendar_id),
-            price_min=e.price_min,
-            price_max=e.price_max,
-            price_currency=e.price_currency,
-            price_is_free=e.price_is_free,
-            review_status=e.review_status,
-            links=e.links,
             tags=tags_map.get(e.event_id, []),
-            is_hidden=e.is_hidden,
-            is_blocked=_is_event_blocked(session, e.event_id),
+            blocked=blocked_map.get(e.event_id),
         )
         for e in events
     ]
@@ -1872,62 +1932,22 @@ def update_event(
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return AdminEventResponse(
-        event_id=event.event_id,
-        calendar_id=event.calendar_id,
-        title=event.title,
-        description=event.description,
-        source_description=event.source_description,
-        **event_image_fields(event),
-        location=event.location,
-        start=event.start,
-        end=event.end,
-        all_day=event.all_day,
-        latitude=event.latitude,
-        longitude=event.longitude,
+    return _admin_event_response(
+        event,
         color=cal.color if cal else None,
-        price_min=event.price_min,
-        price_max=event.price_max,
-        price_currency=event.price_currency,
-        price_is_free=event.price_is_free,
-        review_status=event.review_status,
-        links=event.links,
         tags=event_tags.get(event_id, []),
-        is_hidden=event.is_hidden,
-        is_blocked=_is_event_blocked(session, event_id),
-        show_price_override=event.show_price_override,
-        show_promo_override=event.show_promo_override,
+        blocked=_get_blocked_event(session, event_id),
     )
 
 
 def _event_image_response(session: Session, event: CachedEvent) -> AdminEventResponse:
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event.event_id])
-    return AdminEventResponse(
-        event_id=event.event_id,
-        calendar_id=event.calendar_id,
-        title=event.title,
-        description=event.description,
-        source_description=event.source_description,
-        **event_image_fields(event),
-        location=event.location,
-        start=event.start,
-        end=event.end,
-        all_day=event.all_day,
-        latitude=event.latitude,
-        longitude=event.longitude,
+    return _admin_event_response(
+        event,
         color=cal.color if cal else None,
-        price_min=event.price_min,
-        price_max=event.price_max,
-        price_currency=event.price_currency,
-        price_is_free=event.price_is_free,
-        review_status=event.review_status,
-        links=event.links,
         tags=event_tags.get(event.event_id, []),
-        is_hidden=event.is_hidden,
-        is_blocked=_is_event_blocked(session, event.event_id),
-        show_price_override=event.show_price_override,
-        show_promo_override=event.show_promo_override,
+        blocked=_get_blocked_event(session, event.event_id),
     )
 
 
@@ -2039,13 +2059,16 @@ def geocode_search(
 @router.get("/events/filter-options", response_model=EventFilterOptionsResponse)
 def event_filter_options(
     search: Optional[str] = Query(default=None, max_length=200),
-    review_status: Optional[str] = Query(default=None, pattern="^(pending|reviewed)$"),
+    status: Optional[str] = Query(default=None, pattern="^(pending|reviewed|blocked)$"),
     calendar_id: Optional[str] = Query(default=None),
     tag_ids: Optional[str] = Query(default=None),
+    geo_status: Optional[str] = Query(
+        default=None, pattern="^(geolocated|ungeolocated|no-location)$"
+    ),
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
     include_past: bool = Query(default=False),
-    visibility: Optional[str] = Query(default=None, pattern="^(hidden|blocked)$"),
+    hidden: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -2058,12 +2081,9 @@ def event_filter_options(
 
     # Build filtered base (same logic as list_admin_events)
     base = select(CachedEvent).where(CachedEvent.deleted_at == None)
-    if review_status:
-        base = base.where(CachedEvent.review_status == review_status)
     if calendar_id:
         base = base.where(CachedEvent.calendar_id == calendar_id)
-    if ungeolocated:
-        base = base.where(CachedEvent.location != None, CachedEvent.latitude == None)
+    base = _apply_admin_geo_filter(base, geo_status, ungeolocated)
     base = _apply_upcoming_filter(
         base, include_past=include_past, future_only=future_only
     )
@@ -2085,14 +2105,35 @@ def event_filter_options(
             ).all()
             base = base.where(CachedEvent.event_id.in_(matching))
 
-    if visibility == "blocked":
-        blocked_subq = select(BlockedEvent.event_id)
-        base = base.where(CachedEvent.event_id.in_(blocked_subq))
-    elif visibility == "hidden":
-        blocked_subq = select(BlockedEvent.event_id)
-        base = base.where(CachedEvent.is_hidden == True).where(
-            ~CachedEvent.event_id.in_(blocked_subq)
+    if hidden:
+        base = base.where(CachedEvent.is_hidden == True)
+
+    blocked_ids = select(BlockedEvent.event_id)
+    status_options = [
+        FilterOption(
+            value=value,
+            label=value.capitalize(),
+            count=session.exec(select(func.count()).select_from(stmt.subquery())).one(),
         )
+        for value, stmt in (
+            (
+                "pending",
+                base.where(
+                    CachedEvent.review_status == "pending",
+                    ~CachedEvent.event_id.in_(blocked_ids),
+                ),
+            ),
+            (
+                "reviewed",
+                base.where(
+                    CachedEvent.review_status == "reviewed",
+                    ~CachedEvent.event_id.in_(blocked_ids),
+                ),
+            ),
+            ("blocked", base.where(CachedEvent.event_id.in_(blocked_ids))),
+        )
+    ]
+    base = _apply_admin_status_filter(base, status)
 
     filtered_cte = base.subquery()
     fe = filtered_cte.c
@@ -2114,16 +2155,6 @@ def event_filter_options(
         for cid, cnt in cal_rows
     ]
 
-    # Review status counts
-    rs_rows = session.exec(
-        select(fe.review_status, func.count())
-        .select_from(filtered_cte)
-        .group_by(fe.review_status)
-    ).all()
-    rs_options = [
-        FilterOption(value=s, label=s.capitalize(), count=c) for s, c in rs_rows
-    ]
-
     # Geo status counts
     geo_rows = session.exec(
         select(
@@ -2135,6 +2166,7 @@ def event_filter_options(
             func.count(),
         )
         .select_from(filtered_cte)
+        .where(~fe.event_id.in_(blocked_ids))
         .group_by(literal_column("geo_status"))
     ).all()
     geo_labels = {
@@ -2159,7 +2191,7 @@ def event_filter_options(
 
     return EventFilterOptionsResponse(
         calendars=cal_options,
-        review_statuses=rs_options,
+        statuses=status_options,
         geo_statuses=geo_options,
         tags=tag_options,
         total_count=total_count,
@@ -2184,29 +2216,11 @@ def review_event(
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return AdminEventResponse(
-        event_id=event.event_id,
-        calendar_id=event.calendar_id,
-        title=event.title,
-        description=event.description,
-        source_description=event.source_description,
-        **event_image_fields(event),
-        location=event.location,
-        start=event.start,
-        end=event.end,
-        all_day=event.all_day,
-        latitude=event.latitude,
-        longitude=event.longitude,
+    return _admin_event_response(
+        event,
         color=cal.color if cal else None,
-        price_min=event.price_min,
-        price_max=event.price_max,
-        price_currency=event.price_currency,
-        price_is_free=event.price_is_free,
-        review_status=event.review_status,
-        links=event.links,
         tags=event_tags.get(event_id, []),
-        is_hidden=event.is_hidden,
-        is_blocked=_is_event_blocked(session, event_id),
+        blocked=_get_blocked_event(session, event_id),
     )
 
 
@@ -2247,6 +2261,7 @@ def bulk_retry_geocoding(
             CachedEvent.location != None,
             CachedEvent.latitude == None,
             CachedEvent.deleted_at == None,
+            ~CachedEvent.event_id.in_(select(BlockedEvent.event_id)),
         )
     ).all()
     event_ids = [e.event_id for e in events]
@@ -2302,6 +2317,8 @@ def retry_geocoding_single(
     event = session.get(CachedEvent, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    if _is_event_blocked(session, event_id):
+        raise HTTPException(status_code=409, detail="Blocked events are not processed")
 
     pipeline = EnrichmentPipeline([GeocodingStage()])
     progress = pipeline.run(session, [event_id])
@@ -2370,6 +2387,8 @@ def suggest_tags_single(
     event = session.get(CachedEvent, event_id)
     if not event or event.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Event not found")
+    if _is_event_blocked(session, event_id):
+        raise HTTPException(status_code=409, detail="Blocked events are not processed")
 
     snapshot = load_taxonomy(session)
     generated, replaced, inserted = _run_tag_suggestion_for_event(
@@ -2427,6 +2446,7 @@ def suggest_tags_bulk(
         select(CachedEvent).where(
             CachedEvent.event_id.in_(body.event_ids),
             CachedEvent.deleted_at == None,
+            ~CachedEvent.event_id.in_(select(BlockedEvent.event_id)),
         )
     ).all()
 
@@ -2462,13 +2482,16 @@ def suggest_tags_bulk(
 @router.get("/events/ids", response_model=EventIdsResponse)
 def list_admin_event_ids(
     search: Optional[str] = Query(default=None, max_length=200),
-    review_status: Optional[str] = Query(default=None, pattern="^(pending|reviewed)$"),
+    status: Optional[str] = Query(default=None, pattern="^(pending|reviewed|blocked)$"),
     calendar_id: Optional[str] = Query(default=None),
     tag_ids: Optional[str] = Query(default=None),
+    geo_status: Optional[str] = Query(
+        default=None, pattern="^(geolocated|ungeolocated|no-location)$"
+    ),
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
     include_past: bool = Query(default=False),
-    visibility: Optional[str] = Query(default=None, pattern="^(hidden|blocked)$"),
+    hidden: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -2480,15 +2503,9 @@ def list_admin_event_ids(
 
     base = select(CachedEvent.event_id).where(CachedEvent.deleted_at == None)
 
-    if review_status:
-        base = base.where(CachedEvent.review_status == review_status)
     if calendar_id:
         base = base.where(CachedEvent.calendar_id == calendar_id)
-    if ungeolocated:
-        base = base.where(
-            CachedEvent.location != None,
-            CachedEvent.latitude == None,
-        )
+    base = _apply_admin_geo_filter(base, geo_status, ungeolocated)
     base = _apply_upcoming_filter(
         base, include_past=include_past, future_only=future_only
     )
@@ -2510,14 +2527,9 @@ def list_admin_event_ids(
             ).all()
             base = base.where(CachedEvent.event_id.in_(matching_event_ids))
 
-    if visibility == "blocked":
-        blocked_subq = select(BlockedEvent.event_id)
-        base = base.where(CachedEvent.event_id.in_(blocked_subq))
-    elif visibility == "hidden":
-        blocked_subq = select(BlockedEvent.event_id)
-        base = base.where(CachedEvent.is_hidden == True).where(
-            ~CachedEvent.event_id.in_(blocked_subq)
-        )
+    if hidden:
+        base = base.where(CachedEvent.is_hidden == True)
+    base = _apply_admin_status_filter(base, status)
 
     ids = session.exec(base).all()
     return EventIdsResponse(ids=list(ids))
@@ -2608,31 +2620,11 @@ def get_admin_event(
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return AdminEventResponse(
-        event_id=event.event_id,
-        calendar_id=event.calendar_id,
-        title=event.title,
-        description=event.description,
-        source_description=event.source_description,
-        **event_image_fields(event),
-        location=event.location,
-        start=event.start,
-        end=event.end,
-        all_day=event.all_day,
-        latitude=event.latitude,
-        longitude=event.longitude,
+    return _admin_event_response(
+        event,
         color=cal.color if cal else None,
-        price_min=event.price_min,
-        price_max=event.price_max,
-        price_currency=event.price_currency,
-        price_is_free=event.price_is_free,
-        review_status=event.review_status,
-        links=event.links,
         tags=event_tags.get(event_id, []),
-        is_hidden=event.is_hidden,
-        is_blocked=_is_event_blocked(session, event_id),
-        show_price_override=event.show_price_override,
-        show_promo_override=event.show_promo_override,
+        blocked=_get_blocked_event(session, event_id),
     )
 
 
@@ -2657,37 +2649,21 @@ def block_event(
     event.updated_at = _dt.utcnow()
     session.add(event)
 
-    if not session.get(BlockedEvent, event_id):
-        session.add(BlockedEvent(event_id=event_id))
+    blocked = session.get(BlockedEvent, event_id)
+    if not blocked:
+        blocked = BlockedEvent(event_id=event_id, reason="deleted")
+        session.add(blocked)
 
     session.commit()
     session.refresh(event)
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return AdminEventResponse(
-        event_id=event.event_id,
-        calendar_id=event.calendar_id,
-        title=event.title,
-        description=event.description,
-        source_description=event.source_description,
-        **event_image_fields(event),
-        location=event.location,
-        start=event.start,
-        end=event.end,
-        all_day=event.all_day,
-        latitude=event.latitude,
-        longitude=event.longitude,
+    return _admin_event_response(
+        event,
         color=cal.color if cal else None,
-        price_min=event.price_min,
-        price_max=event.price_max,
-        price_currency=event.price_currency,
-        price_is_free=event.price_is_free,
-        review_status=event.review_status,
-        links=event.links,
         tags=event_tags.get(event_id, []),
-        is_hidden=event.is_hidden,
-        is_blocked=True,
+        blocked=blocked,
     )
 
 
@@ -2721,29 +2697,11 @@ def unblock_event(
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])
-    return AdminEventResponse(
-        event_id=event.event_id,
-        calendar_id=event.calendar_id,
-        title=event.title,
-        description=event.description,
-        source_description=event.source_description,
-        **event_image_fields(event),
-        location=event.location,
-        start=event.start,
-        end=event.end,
-        all_day=event.all_day,
-        latitude=event.latitude,
-        longitude=event.longitude,
+    return _admin_event_response(
+        event,
         color=cal.color if cal else None,
-        price_min=event.price_min,
-        price_max=event.price_max,
-        price_currency=event.price_currency,
-        price_is_free=event.price_is_free,
-        review_status=event.review_status,
-        links=event.links,
         tags=event_tags.get(event_id, []),
-        is_hidden=event.is_hidden,
-        is_blocked=False,
+        blocked=None,
     )
 
 

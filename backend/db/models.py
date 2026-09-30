@@ -748,6 +748,8 @@ class BlockedEvent(SQLModel, table=True):
 
     event_id: str = Field(primary_key=True)
     blocked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    reason: str = Field(default="deleted", max_length=32)
+    reason_detail: Optional[str] = Field(default=None)
 
 
 class EventDuplicateGroup(SQLModel, table=True):

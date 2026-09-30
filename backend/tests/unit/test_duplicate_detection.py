@@ -136,6 +136,18 @@ class TestFindCandidateMatches:
 
 @pytest.mark.unit
 class TestDetectDuplicatesForEvent:
+    def test_blocked_subject_is_not_scanned(self, session):
+        start = datetime.now(timezone.utc) + timedelta(days=3)
+        _make_event(session, "evt-a", "Salsa Night", start)
+        _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
+        session.add(BlockedEvent(event_id="evt-a", reason="deleted"))
+        session.commit()
+
+        log = detect_duplicates_for_event(session, "evt-a")
+
+        assert log.candidates_found == 0
+        assert log.groups_created == 0
+
     def test_creates_group_and_logs_scan(self, session):
         start = datetime.now(timezone.utc) + timedelta(days=3)
         _make_event(session, "evt-a", "Salsa Night", start)
@@ -255,7 +267,10 @@ class TestKeepEvent:
         assert kept.is_hidden is False
         assert rejected.is_hidden is True
         assert rejected.rejected_duplicate_reason == "Duplicate of evt-a — Salsa Night"
-        assert session.get(BlockedEvent, "evt-b") is not None
+        blocked = session.get(BlockedEvent, "evt-b")
+        assert blocked is not None
+        assert blocked.reason == "duplicate"
+        assert blocked.reason_detail == rejected.rejected_duplicate_reason
         assert session.get(BlockedEvent, "evt-a") is None
 
     def test_raises_for_unknown_group(self, session):

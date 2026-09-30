@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-from backend.db.models import CachedEvent
+from backend.db.models import BlockedEvent, CachedEvent
 from backend.services.pipeline.base import (
     EnrichmentPipeline,
     EnrichmentStage,
@@ -81,6 +81,17 @@ def _make_event(
 
 @pytest.mark.unit
 class TestEnrichmentPipeline:
+    def test_process_event_skips_blocked_event(self):
+        pipeline = EnrichmentPipeline([_SuccessStage()])
+        event = _make_event()
+        session = MagicMock()
+        session.get.return_value = BlockedEvent(event_id=event.event_id)
+
+        progress = pipeline.process_event(session, event)
+
+        assert progress["success_stage"].processed == 0
+        session.commit.assert_not_called()
+
     def test_stages_run_in_order(self):
         """All stages run and results are tracked."""
         pipeline = EnrichmentPipeline([_SuccessStage(), _FailStage(), _SkipStage()])

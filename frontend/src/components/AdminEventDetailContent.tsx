@@ -5,6 +5,7 @@ import { fetchAdminCalendars, retryGeocodingSingle } from '../api';
 import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import { formatEventPrice } from '../utils/eventPrice';
+import { getAdminEventStatus } from '../utils/adminEventStatus';
 import AddressAutocomplete from './AddressAutocomplete';
 import AdminAutoTagSuggestions from './AdminAutoTagSuggestions';
 import AdminEventPromoCodes from './AdminEventPromoCodes';
@@ -224,15 +225,18 @@ export default function AdminEventDetailContent({
                 )}
 
                 <div className="ml-auto flex items-center gap-1.5">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">Review</span>
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">Status</span>
                     <select
-                        value={event.review_status ?? 'pending'}
-                        disabled={saving}
+                        value={getAdminEventStatus(event)}
+                        disabled={saving || getAdminEventStatus(event) === 'blocked'}
                         onChange={(e) => saveField({ review_status: e.target.value })}
                         className="rounded border border-line bg-surface px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                     >
                         <option value="pending">pending</option>
                         <option value="reviewed">reviewed</option>
+                        {getAdminEventStatus(event) === 'blocked' && (
+                            <option value="blocked">blocked</option>
+                        )}
                     </select>
                 </div>
             </div>

@@ -27,9 +27,11 @@ interface Props {
     mode: 'create' | 'edit';
     onSave: (payload: InterestProfilePayload) => Promise<void>;
     onDelete?: () => void;
+    view?: ProfileDraftView;
+    onViewChange?: (view: ProfileDraftView) => void;
 }
 
-type View = 'summary' | 'dance' | 'area' | 'reach';
+export type ProfileDraftView = 'summary' | 'dance' | 'area' | 'reach';
 
 function danceLabels(ids: number[], group: TagGroup | null): string[] {
     if (!group) return [];
@@ -63,9 +65,17 @@ function SummaryRow({
     );
 }
 
-export default function ProfileDraftEditor({ initialValue, danceGroup, mode, onSave, onDelete }: Props) {
+export default function ProfileDraftEditor({
+    initialValue,
+    danceGroup,
+    mode,
+    onSave,
+    onDelete,
+    view,
+    onViewChange,
+}: Props) {
     const initialArea = initialValue.area ?? bboxSearchArea(DEFAULT_AREA_BBOX, 'preset');
-    const [view, setView] = useState<View>('summary');
+    const [internalView, setInternalView] = useState<ProfileDraftView>('summary');
     const [area, setArea] = useState<SearchArea>(initialArea);
     const [danceIds, setDanceIds] = useState(initialValue.danceIds);
     const [reachFilter, setReachFilter] = useState(initialValue.reachFilter);
@@ -75,6 +85,12 @@ export default function ProfileDraftEditor({ initialValue, danceGroup, mode, onS
     const [name, setName] = useState(initialValue.label ?? generatedName);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const activeView = view ?? internalView;
+    const usesExternalHeader = view !== undefined && onViewChange !== undefined;
+    const changeView = (nextView: ProfileDraftView) => {
+        if (usesExternalHeader) onViewChange(nextView);
+        else setInternalView(nextView);
+    };
 
     useEffect(() => {
         if (!nameEdited) setName(generatedName);
@@ -106,17 +122,19 @@ export default function ProfileDraftEditor({ initialValue, danceGroup, mode, onS
         }
     };
 
-    if (view === 'dance') {
+    if (activeView === 'dance') {
         return (
             <div data-testid="profile-draft-dance">
-                <div className="mb-4 flex items-center gap-2">
-                    <button type="button" onClick={() => setView('summary')} className="text-action hover:opacity-75" aria-label="Back">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </button>
-                    <h2 className="text-lg font-bold text-ink">Dance styles</h2>
-                </div>
+                {!usesExternalHeader && (
+                    <div className="mb-4 flex items-center gap-2">
+                        <button type="button" onClick={() => changeView('summary')} className="text-action hover:opacity-75" aria-label="Back">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                            </svg>
+                        </button>
+                        <h2 className="text-lg font-bold text-ink">Dance styles</h2>
+                    </div>
+                )}
                 {!danceGroup ? <p className="text-sm text-muted">Loading dance styles…</p> : (
                     <div className="grid grid-cols-2 gap-2">
                         {danceGroup.tags.map((tag) => {
@@ -139,28 +157,31 @@ export default function ProfileDraftEditor({ initialValue, danceGroup, mode, onS
         );
     }
 
-    if (view === 'area') {
+    if (activeView === 'area') {
         return (
             <div data-testid="profile-draft-area">
-                <div className="mb-4 flex items-center gap-2">
-                    <button type="button" onClick={() => setView('summary')} className="text-action hover:opacity-75" aria-label="Back">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </button>
-                    <h2 className="text-lg font-bold text-ink">Search area</h2>
-                </div>
+                {!usesExternalHeader && (
+                    <div className="mb-4 flex items-center gap-2">
+                        <button type="button" onClick={() => changeView('summary')} className="text-action hover:opacity-75" aria-label="Back">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                            </svg>
+                        </button>
+                        <h2 className="text-lg font-bold text-ink">Search area</h2>
+                    </div>
+                )}
                 <AreaEditor
                     value={area}
                     myArea={area}
                     onUseArea={setArea}
                     showSavedAreas={false}
+                    allowRename
                 />
             </div>
         );
     }
 
-    if (view === 'reach') {
+    if (activeView === 'reach') {
         const reachDescriptions: Record<ReachFilter, string> = {
             any: 'All events, including events without a reach classification.',
             regional_plus: 'Regional and international events.',
@@ -168,14 +189,16 @@ export default function ProfileDraftEditor({ initialValue, danceGroup, mode, onS
         };
         return (
             <div data-testid="profile-draft-reach">
-                <div className="mb-4 flex items-center gap-2">
-                    <button type="button" onClick={() => setView('summary')} className="text-action hover:opacity-75" aria-label="Back">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </button>
-                    <h2 className="text-lg font-bold text-ink">Event reach</h2>
-                </div>
+                {!usesExternalHeader && (
+                    <div className="mb-4 flex items-center gap-2">
+                        <button type="button" onClick={() => changeView('summary')} className="text-action hover:opacity-75" aria-label="Back">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                            </svg>
+                        </button>
+                        <h2 className="text-lg font-bold text-ink">Event reach</h2>
+                    </div>
+                )}
                 <div role="group" aria-label="Event reach" className="grid grid-cols-3 border border-line">
                     {(['any', 'regional_plus', 'international'] as const).map((choice) => (
                         <button
@@ -217,9 +240,9 @@ export default function ProfileDraftEditor({ initialValue, danceGroup, mode, onS
             </div>
 
             <div className="space-y-3">
-                <SummaryRow icon="♪" title="Dance styles" value={dances.length > 0 ? dances.join(', ') : 'Choose dance styles'} onClick={() => setView('dance')} />
-                <SummaryRow icon="◎" title="Area" value={area.label} preview={<AreaMapPreview area={area} className="h-12 w-16" />} onClick={() => setView('area')} />
-                <SummaryRow icon="↗" title="Reach" value={REACH_FILTER_LABELS[reachFilter]} onClick={() => setView('reach')} />
+                <SummaryRow icon="♪" title="Dance styles" value={dances.length > 0 ? dances.join(', ') : 'Choose dance styles'} onClick={() => changeView('dance')} />
+                <SummaryRow icon="◎" title="Area" value={area.label} preview={<AreaMapPreview area={area} className="h-12 w-16" />} onClick={() => changeView('area')} />
+                <SummaryRow icon="↗" title="Reach" value={REACH_FILTER_LABELS[reachFilter]} onClick={() => changeView('reach')} />
             </div>
 
             <label className="flex min-h-12 items-center justify-between border-t border-line py-3 text-sm font-semibold text-ink">

@@ -8,6 +8,9 @@ from backend.services.description_extractor import (
 from backend.services.price_parser import parse_price_range
 
 
+EXTRACTOR_STATE_VERSION = 2
+
+
 def _payload_dict(payload: ExtractorPayload) -> dict[str, Any]:
     return {
         "links": payload.links,
@@ -107,7 +110,7 @@ def apply_calendar_description(
     new_state = dict(old_state)
     new_state.update(
         {
-            "version": 1,
+            "version": EXTRACTOR_STATE_VERSION,
             "valid": payload is not None,
             "payload": _payload_dict(payload) if payload is not None else None,
             "applied": applied,

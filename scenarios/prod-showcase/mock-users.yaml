@@ -5,12 +5,15 @@ users:
     name: Movida Operations
     handle: movida-operations
     account_visibility: public
-    avatar: uifaces-human-avatar.jpg
+    avatar: uifaces-human-avatar (15).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Movida%20Operations
   - email: elena.moreau@joinmovida.com
     name: Elena Moreau
     handle: elena
     account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
+    dancing_since: 2018-06-09
     bio: Salsa and bachata dancer based in Brussels, always planning the next festival.
     share_attendance_default: true
     share_attendance_default_audience: friends
