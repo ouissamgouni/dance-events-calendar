@@ -227,7 +227,7 @@ describe('OnboardingWizard', () => {
         expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '4')
         expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '5')
         expect(await screen.findByText('Salsa Hub')).toBeInTheDocument()
-        await user.click(screen.getByRole('button', { name: 'Shuffle' }))
+        await user.click(screen.getByRole('button', { name: 'Refresh suggestions' }))
         expect(await screen.findByText('Lina Salsera')).toBeInTheDocument()
         expect(suggestionRequests).toBe(2)
         const salsaRow = screen.getByText('Salsa Hub').closest('.flex.items-center.gap-3') as HTMLElement

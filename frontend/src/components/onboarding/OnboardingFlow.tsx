@@ -465,7 +465,31 @@ function FollowStep({ items, statuses, loadingSuggestions, search, searchResults
                 {(loadingSuggestions || (items && items.length > 0)) && (
                     <div className="flex items-center justify-between pb-1">
                         <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Suggestions for you</span>
-                        {items && items.length > 0 && <button type="button" onClick={onShuffle} disabled={loadingSuggestions} className="text-xs font-medium text-action hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50">Shuffle</button>}
+                        {items && items.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={onShuffle}
+                                disabled={loadingSuggestions}
+                                aria-label="Refresh suggestions"
+                                className="min-h-6 min-w-6 p-0 text-action hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                    className={loadingSuggestions ? 'animate-spin' : ''}
+                                >
+                                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                    <path d="M21 3v6h-6" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
                 )}
                 {items === null ? <p className="text-sm text-muted">Loading suggestions…</p> : items.length === 0 ? <p className="text-sm text-ink-soft">No suggestions yet. Search above to find people.</p> : <ul className="divide-y divide-card-line">{items.map((candidate) => <li key={candidate.handle}><FollowRow candidate={candidate} status={statuses[candidate.handle] ?? (candidate.is_followed_by_viewer ? 'followed' : 'idle')} onToggle={() => onToggle(candidate)} /></li>)}</ul>}
