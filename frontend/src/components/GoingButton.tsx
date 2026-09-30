@@ -11,6 +11,8 @@ import { getActiveReferral } from '../hooks/useReferralAttribution';
 import PostRsvpPopover, { type PostRsvpVariant } from './PostRsvpPopover';
 import AudiencePicker from './AudiencePicker';
 import { useAnchoredToast } from './AnchoredToast';
+import BottomSheet from './BottomSheet';
+import useMediaQuery from '../hooks/useMediaQuery';
 import {
     defaultRsvpAudienceFor,
     setLastUsedAudience,
@@ -18,6 +20,7 @@ import {
 
 interface Props {
     eventId: string;
+    eventTitle?: string;
     appearance?: 'icon' | 'pill';
     size?: 'sm' | 'md';
     /**
@@ -143,6 +146,7 @@ const POPOVER_WIDTH = 272; // Tailwind w-68 equiv (matches className below).
 
 export default function GoingButton({
     eventId,
+    eventTitle,
     appearance = 'icon',
     stopPropagation = false,
     className = '',
@@ -156,6 +160,7 @@ export default function GoingButton({
     const featureFlagsReady = useFeatureFlagsReady();
     const location = useLocation();
     const navigate = useNavigate();
+    const isMobile = useMediaQuery('(max-width: 639px)');
     const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
     const going = isAttending(eventId);
 
@@ -174,7 +179,7 @@ export default function GoingButton({
     // Position the popover under the trigger and keep it positioned on
     // scroll/resize while open.
     useEffect(() => {
-        if (!popoverKind || !triggerRef.current) return;
+        if (!popoverKind || isMobile || !triggerRef.current) return;
         const update = () => {
             if (triggerRef.current) {
                 setPopoverPos(computePopoverPos(triggerRef.current, POPOVER_WIDTH));
@@ -187,11 +192,11 @@ export default function GoingButton({
             window.removeEventListener('scroll', update, true);
             window.removeEventListener('resize', update);
         };
-    }, [popoverKind]);
+    }, [isMobile, popoverKind]);
 
     // Close popover on outside click / Escape.
     useEffect(() => {
-        if (!popoverKind) return;
+        if (!popoverKind || isMobile) return;
         const onDocClick = (e: MouseEvent) => {
             const t = e.target as Node;
             if (popoverRef.current?.contains(t) || triggerRef.current?.contains(t)) return;
@@ -204,7 +209,7 @@ export default function GoingButton({
             document.removeEventListener('mousedown', onDocClick);
             document.removeEventListener('keydown', onKey);
         };
-    }, [popoverKind]);
+    }, [isMobile, popoverKind]);
 
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         if (stopPropagation) e.stopPropagation();
@@ -377,6 +382,7 @@ export default function GoingButton({
         <PostRsvpPopover
             anchorRef={triggerRef}
             variant={postRsvpVariant}
+            eventTitle={eventTitle}
             userName={user?.name ?? null}
             isPast={isPast}
             onClose={dismissPostRsvp}
@@ -409,7 +415,101 @@ export default function GoingButton({
         });
     };
 
-    const popover = popoverKind && popoverPos && createPortal(
+    const visibilityDetails = (
+        <>
+            <p className={isMobile ? 'mb-3 text-base leading-6 text-ink-soft' : 'mb-2 text-[11px] text-ink-soft'}>
+                Who can see you in the attendee list?
+            </p>
+            <AudiencePicker
+                value={pendingAudience}
+                onChange={handlePopoverAudienceChange}
+                size={isMobile ? 'sheet' : 'full'}
+                ariaLabel="Attendance visibility"
+            />
+            <p className={isMobile ? 'mt-3 text-sm leading-5 text-ink-soft' : 'mt-1.5 text-[11px] text-ink-soft'}>
+                {pendingAudience === 'public'
+                    ? 'You will appear in the attendee list to anyone who can view this event.'
+                    : pendingAudience === 'friends'
+                        ? 'Only your mutual followers will see your name in the attendee list.'
+                        : 'You will be counted but not named.'}
+            </p>
+            {popoverKind === 'edit' && (
+                <label className={`${isMobile ? 'mt-4 text-sm leading-5' : 'mt-2 text-[11px]'} flex items-start gap-2 text-ink-soft cursor-pointer`}>
+                    <input
+                        type="checkbox"
+                        checked={rememberDefault}
+                        onChange={(e) => {
+                            const checked = e.target.checked;
+                            setRememberDefault(checked);
+                            if (checked) {
+                                updateMyVisibility({ share_attendance_default_audience: pendingAudience })
+                                    .then(() => refreshUser())
+                                    .catch(() => { /* ignore */ });
+                            }
+                        }}
+                        className="mt-0.5"
+                    />
+                    <span>Make this my default for future events</span>
+                </label>
+            )}
+        </>
+    );
+
+    const stopGoing = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        errorToast.hide();
+        setPopoverKind(null);
+        setPostRsvpVariant(null);
+        toggleAttending(eventId).then((ok) => {
+            if (!ok) errorToast.show("Couldn't update \u2014 try again", 3200);
+        });
+    };
+
+    const visibilityActions = (
+        <div className="flex w-full items-center justify-between gap-2">
+            {popoverKind === 'edit' ? (
+                <button
+                    type="button"
+                    onClick={stopGoing}
+                    className="min-h-11 rounded-field px-3 py-2 text-sm font-semibold text-danger hover:bg-canvas"
+                >
+                    {unmarkLabel}
+                </button>
+            ) : <span />}
+            <div className="flex gap-2">
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
+                    className="min-h-11 rounded-field border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink"
+                >
+                    {popoverKind === 'confirm' ? 'Cancel' : 'Close'}
+                </button>
+                {popoverKind === 'confirm' && (
+                    <button
+                        type="button"
+                        onClick={confirmGoing}
+                        className="min-h-11 rounded-field bg-action px-4 py-2 text-sm font-semibold text-white"
+                    >
+                        {markLabel}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+
+    const popover = popoverKind && (isMobile ? createPortal(
+        <BottomSheet
+            title={popoverKind === 'confirm' ? (isPast ? 'You attended!' : "You're going!") : 'RSVP visibility'}
+            subtitle={eventTitle}
+            titleSize="large"
+            onClose={() => setPopoverKind(null)}
+            layer="transient"
+            footer={visibilityActions}
+        >
+            {visibilityDetails}
+        </BottomSheet>,
+        document.body,
+    ) : popoverPos && createPortal(
         <div
             ref={popoverRef}
             onClick={(e) => e.stopPropagation()}
@@ -468,15 +568,7 @@ export default function GoingButton({
                 {popoverKind === 'edit' ? (
                     <button
                         type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            errorToast.hide();
-                            setPopoverKind(null);
-                            setPostRsvpVariant(null);
-                            toggleAttending(eventId).then((ok) => {
-                                if (!ok) errorToast.show("Couldn't update \u2014 try again", 3200);
-                            });
-                        }}
+                        onClick={stopGoing}
                         className="text-xs px-2 py-1 text-rose-600 hover:bg-rose-50"
                     >
                         {unmarkLabel}
@@ -515,7 +607,7 @@ export default function GoingButton({
             </div>
         </div>,
         document.body,
-    );
+    ));
 
     if (appearance === 'pill') {
         // When the user is going AND signed-in, render the pill as a unified

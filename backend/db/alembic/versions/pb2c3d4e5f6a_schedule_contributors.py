@@ -114,11 +114,12 @@ def upgrade() -> None:
                     f"legacy-{sha1(f'{key[0]}:{key[1]}'.encode()).hexdigest()[:20]}"
                 )
                 sort_order = sort_orders.get(key[0], 0)
-                result = bind.execute(
+                contributor_id = bind.execute(
                     sa.text(
                         "INSERT INTO schedule_contributors "
                         "(external_id, schedule_id, display_name, sort_order) "
-                        "VALUES (:external_id, :schedule_id, :display_name, :sort_order)"
+                        "VALUES (:external_id, :schedule_id, :display_name, :sort_order) "
+                        "RETURNING id"
                     ),
                     {
                         "external_id": external_id,
@@ -126,16 +127,7 @@ def upgrade() -> None:
                         "display_name": key[1],
                         "sort_order": sort_order,
                     },
-                )
-                contributor_id = result.lastrowid
-                if contributor_id is None:
-                    contributor_id = bind.execute(
-                        sa.text(
-                            "SELECT id FROM schedule_contributors "
-                            "WHERE schedule_id = :schedule_id AND external_id = :external_id"
-                        ),
-                        {"schedule_id": key[0], "external_id": external_id},
-                    ).scalar_one()
+                ).scalar_one()
                 contributor_ids[key] = contributor_id
                 sort_orders[key[0]] = sort_order + 1
             bind.execute(

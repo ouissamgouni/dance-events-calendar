@@ -119,9 +119,7 @@ def _validate_local_assets(output_dir: Path, users: list[dict]) -> None:
         if _normalized_asset_name(image_name) != _normalized_asset_name(
             event.get("title", "")
         ):
-            raise ValueError(
-                f"Showcase event image does not match title: {filename}"
-            )
+            raise ValueError(f"Showcase event image does not match title: {filename}")
 
     if missing:
         raise ValueError("Missing showcase local assets: " + ", ".join(sorted(missing)))
@@ -143,7 +141,7 @@ def _validate_review_tags(output_dir: Path) -> None:
         for slug in rating.get("audience_tags") or []:
             if scopes.get(slug) != "audience":
                 invalid.append(slug)
-        for group_slug in (rating.get("aspect_scores") or {}):
+        for group_slug in rating.get("aspect_scores") or {}:
             if not any(
                 group.get("slug") == group_slug and group.get("scope") == "aspect"
                 for group in tag_groups

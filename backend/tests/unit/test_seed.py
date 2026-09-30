@@ -1,9 +1,10 @@
 """Unit tests for DatabaseSeeder logic."""
 
-import pytest
+import hashlib
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
 from sqlmodel import SQLModel, Session, create_engine, select
 
 from backend.db.models import (
@@ -486,6 +487,71 @@ class TestDatabaseSeeder:
         assert user.avatar_url == "https://example.com/fallback.jpg"
         assert user.avatar_key == f"users/{user.id}/avatar/seed"
         assert uploads == [(str(user.id), b"avatar-bytes", uploads[0][2])]
+
+    def test_changed_event_image_uses_fresh_storage_key(self, tmp_path, monkeypatch):
+        scenario_dir = tmp_path / "scenario"
+        images_dir = scenario_dir / "images"
+        images_dir.mkdir(parents=True)
+        (scenario_dir / "db-events.yaml").write_text(
+            "events:\n  - id: pictured-event\n    image: pictured-event.png\n",
+            encoding="utf-8",
+        )
+        image_path = images_dir / "pictured-event.png"
+        image_path.write_bytes(b"first-image")
+
+        client = object()
+        monkeypatch.setattr(
+            "backend.services.object_storage.get_client", lambda: client
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.ensure_buckets", lambda current: None
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.object_exists",
+            lambda key, client=None: False,
+        )
+        monkeypatch.setattr(
+            "backend.services.object_storage.get_public_bucket", lambda: "public"
+        )
+        uploads = []
+
+        def store_event_image(event_id, data, base_key=None, client=None):
+            uploads.append((event_id, data, base_key, client))
+            return base_key
+
+        monkeypatch.setattr(
+            "backend.services.event_images.store_event_image", store_event_image
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            event = CachedEvent(
+                event_id="pictured-event",
+                calendar_id="calendar",
+                start=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                end=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            )
+            session.add(event)
+            session.commit()
+            seeder = DatabaseSeeder(session)
+            seeder._seed_event_images(scenario_dir)
+            first_key = event.image_key
+
+            image_path.write_bytes(b"second-image")
+            seeder._seed_event_images(scenario_dir)
+            second_key = event.image_key
+
+        assert [upload[1] for upload in uploads] == [b"first-image", b"second-image"]
+        assert first_key != second_key
+        assert first_key == (
+            f"events/pictured-event/seed/"
+            f"{hashlib.sha256(b'first-image').hexdigest()[:16]}"
+        )
+        assert second_key == (
+            f"events/pictured-event/seed/"
+            f"{hashlib.sha256(b'second-image').hexdigest()[:16]}"
+        )
 
     def test_seed_attendances_and_saves_from_separate_files(
         self, tmp_path, monkeypatch

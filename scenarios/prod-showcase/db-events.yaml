@@ -5006,103 +5006,107 @@ events:
   - format:workshop
   - dance-style:bachata
   - reach:regional
-- id: london-salsa-weekender
+- id: barcelona-salsa-beach-party
   calendar_id: movida-community-events
-  title: London Salsa Weekender
-  description: Three rooms of social dancing with international instructors and DJs.
-  location: Bloomsbury Ballroom, London, United Kingdom
-  city: London
-  country: United Kingdom
-  country_code: GB
-  latitude: 51.5072
-  longitude: -0.1276
-  start: w-6 Fri 19:00
-  end: w-6 Sun 02:00
-  image: 08_london_salsa_weekender.png
-  price_min: 65
-  price_currency: GBP
-  price_is_free: false
-  tags:
-  - format:festival
-  - dance-style:salsa
-  - reach:international
-- id: brussels-latin-rooftop
-  calendar_id: movida-community-events
-  title: Brussels Latin Rooftop
-  description: An open-air salsa and bachata social overlooking central Brussels.
-  location: Mont des Arts Terrace, Brussels, Belgium
-  city: Brussels
-  country: Belgium
-  country_code: BE
-  latitude: 50.8503
-  longitude: 4.3517
-  start: w-5 Sat 19:00
-  end: w-5 Sat 23:30
-  image: 09_brussels_latin_rooftop.png
-  price_is_free: true
-  tags:
-  - format:social
-  - dance-style:salsa
-  - dance-style:bachata
-  - reach:regional
-- id: milano-salsa-lab
-  calendar_id: movida-community-events
-  title: Milano Salsa Lab
-  description: Technique workshops followed by an evening social in central Milan.
-  location: Spazio Danza, Milan, Italy
-  city: Milan
-  country: Italy
-  country_code: IT
-  latitude: 45.4642
-  longitude: 9.19
-  start: w-4 Sat 14:00
-  end: w-4 Sun 01:00
-  image: 10_milano_salsa_lab.png
-  price_min: 35
-  price_currency: EUR
-  price_is_free: false
-  tags:
-  - format:workshop
-  - dance-style:salsa
-  - reach:regional
-- id: barcelona-beach-bachata
-  calendar_id: movida-community-events
-  title: Barcelona Beach Bachata
-  description: Sunset bachata dancing by the beach with an open-level warm-up class.
-  location: Mar Bella, Barcelona, Spain
+  title: Barcelona Salsa Beach Party
+  description: Sunset salsa dancing by the sea with DJs and an open-air social.
+  location: Bogatell Beach, Barcelona, Spain
   city: Barcelona
   country: Spain
   country_code: ES
   latitude: 41.3851
   longitude: 2.1734
-  start: w-3 Sun 18:00
-  end: w-3 Sun 23:00
-  image: 11_barcelona_beach_bachata.png
+  start: w-6 Sat 18:00
+  end: w-6 Sun 02:00
+  image: 08_barcelona_salsa_beach_party.png
   price_is_free: true
   tags:
   - format:social
-  - dance-style:bachata
-  - reach:local
-- id: atlantic-salsa-weekender
+  - dance-style:salsa
+  - reach:regional
+- id: vienna-bachata-nights
   calendar_id: movida-community-events
-  title: Atlantic Salsa Weekender
-  description: A future community weekender with workshops, parties, and beach meetups.
-  image: 12_atlantic_salsa_weekender.png
-  location: Estoril Congress Center, Estoril, Portugal
-  city: Estoril
-  country: Portugal
-  country_code: PT
-  latitude: 38.7071
-  longitude: -9.3976
-  start: w3 Fri 18:00
-  end: w3 Sun 18:00
-  price_min: 79
+  title: Vienna Bachata Nights
+  description: An elegant Friday bachata social with classes and late-night dancing.
+  location: Tanzhaus Wien, Vienna, Austria
+  city: Vienna
+  country: Austria
+  country_code: AT
+  latitude: 48.2082
+  longitude: 16.3738
+  start: w4 Fri 21:00
+  end: w4 Sat 02:00
+  image: 09_vienna_bachata_nights.png
+  price_min: 18
   price_currency: EUR
   price_is_free: false
   tags:
-  - format:festival
+  - format:social
+  - dance-style:bachata
+  - reach:regional
+- id: rome-latin-social
+  calendar_id: movida-community-events
+  title: Rome Latin Social
+  description: A Saturday-night Latin social with salsa and bachata in central Rome.
+  location: Spazio Nova, Rome, Italy
+  city: Rome
+  country: Italy
+  country_code: IT
+  latitude: 41.9028
+  longitude: 12.4964
+  start: w8 Sat 21:00
+  end: w8 Sun 01:00
+  image: 10_rome_latin_social.png
+  price_min: 15
+  price_currency: EUR
+  price_is_free: false
+  tags:
+  - format:social
   - dance-style:salsa
-  - reach:international
+  - dance-style:bachata
+  - reach:regional
+- id: zurich-kizomba-social
+  calendar_id: movida-community-events
+  title: Zurich Kizomba Social
+  description: A Friday kizomba social beside the lake with an intimate late-night
+    floor.
+  location: Dynamo, Zurich, Switzerland
+  city: Zurich
+  country: Switzerland
+  country_code: CH
+  latitude: 47.3769
+  longitude: 8.5417
+  start: w14 Fri 20:00
+  end: w14 Sat 01:00
+  image: 11_zurich_kizomba_social.png
+  price_min: 20
+  price_currency: CHF
+  price_is_free: false
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - reach:local
+- id: london-salsa-sessions
+  calendar_id: movida-community-events
+  title: London Salsa Sessions
+  description: A Saturday salsa session with classes, social dancing, and late-night
+    DJs.
+  image: 12_london_salsa_sessions.png
+  location: The Loft, London, United Kingdom
+  city: London
+  country: United Kingdom
+  country_code: GB
+  latitude: 51.5072
+  longitude: -0.1276
+  start: w18 Sat 20:00
+  end: w18 Sun 01:00
+  price_min: 24
+  price_currency: GBP
+  price_is_free: false
+  tags:
+  - format:social
+  - dance-style:salsa
+  - reach:regional
 event_series:
 - canonical_title: Alfama Thursday Salsa
   status: resolved
@@ -5200,23 +5204,24 @@ ratings:
   - audience:performance-lovers
   comment_status: approved
   status: approved
-- event_id: london-salsa-weekender
+- event_id: barcelona-salsa-beach-party
   email: elena.moreau@joinmovida.com
   overall_sentiment: great
-  comment: Well organised, varied music, and plenty of space across the rooms.
+  comment: Great sunset atmosphere, varied music, and plenty of room to dance by the
+    sea.
   aspect_scores:
     organization: 5
     music: 5
-    venue-quality: 5
+    atmosphere: 5
   aspect_tags:
   - organization:well-organized
   - music:good-variety
-  - venue-quality:spacious
+  - atmosphere:high-energy
   audience_tags:
   - audience:travelers
   - audience:late-night-dancers
   comment_status: approved
   status: approved
 emit_suggested:
-- event_id: atlantic-salsa-weekender
+- event_id: london-salsa-sessions
   email: penny.valdez@joinmovida.com

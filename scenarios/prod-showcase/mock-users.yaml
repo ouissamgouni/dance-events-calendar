@@ -1,274 +1,233 @@
-auto_onboard: true
-
 users:
   - email: operations@joinmovida.com
-    name: Movida Operations
-    handle: movida-operations
+    name: Dev Admin
+    handle: admin
     account_visibility: public
-    avatar: uifaces-human-avatar (13).jpg
-    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Movida%20Operations
-  - email: elena.moreau@joinmovida.com
-    name: Elena Moreau
-    handle: elena
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Dev%20Admin
+  - email: lina.moreau@joinmovida.com
+    name: Dancer Showcase
+    handle: dancer
     account_visibility: public
-    bio: Salsa and bachata dancer based in Brussels, always planning the next festival.
+    bio: Demo viewer with a mixed friends graph.
     share_attendance_default: true
     share_attendance_default_audience: friends
-    email_event_reminders_enabled: true
-    email_social_activity_enabled: true
-    email_interest_matches_enabled: true
-    email_review_prompt_enabled: true
-    email_event_messages_enabled: true
-    email_schedule_updates_enabled: true
-    email_suggested_events_enabled: true
-    push_event_reminders_enabled: true
-    push_social_activity_enabled: true
-    push_interest_matches_enabled: true
-    push_review_prompt_enabled: true
-    push_event_messages_enabled: true
-    push_schedule_updates_enabled: true
-    push_suggested_events_enabled: true
-    avatar: uifaces-human-avatar.jpg
-    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Elena%20Moreau
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Dancer%20Showcase
   - email: amira.haddad@joinmovida.com
-    name: Amira Haddad
-    handle: amira-haddad
+    name: Dancer New Showcase
+    handle: dancer-new
     account_visibility: public
-    bio: New to the local dance community and looking for welcoming socials.
-    onboarded_at: null
+    bio: Demo viewer new.
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (15).jpg
-    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Amira%20Haddad
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Dancer%20New%20Showcase
   - email: picks@joinmovida.com
     name: Movida Picks
     handle: movida-picks
     account_visibility: public
     is_admin_managed: true
-    managed_label: Curated by Movida
-    bio: Hand-picked festivals, weekenders, and standout social dance events across Europe.
+    managed_label: Showcase curator
+    bio: Fake curator account for demoing public Going and Saved activity.
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (1).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Movida%20Picks
   - email: sea.sun.salsa@joinmovida.com
     name: Sea Sun Salsa
     handle: sea-sun-salsa
     account_visibility: public
     is_verified_organizer: true
-    bio: Seaside salsa festivals, destination weekends, and international dance holidays.
-    avatar: uifaces-human-avatar (22).jpg
+    bio: Fake verified organizer profile for festival-scale events.
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Sea%20Sun%20Salsa%20Team
   - email: rave.republic@joinmovida.com
-    name: Rave Republic
-    handle: rave-republic
+    name: CobeatParty
+    handle: cobeat-party
     account_visibility: public
     is_verified_organizer: true
-    bio: High-energy salsa socials, special guests, and late-night dance experiences.
-    avatar: uifaces-human-avatar (11).jpg
+    bio: Fake verified organizer profile for high-energy socials.
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Rave%20Republic
   - email: penny.valdez@joinmovida.com
-    name: Penny Valdez
-    handle: penny-valdez
+    name: Penny Promo
+    handle: promo-penny
     account_visibility: public
-    bio: Festival ambassador sharing offers and practical travel tips with dancers.
-    avatar: uifaces-human-avatar (10).jpg
-    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Penny%20Valdez
+    bio: Fake promo-code submitter used by the showcase scenario.
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Penny%20Promo
   - email: maya.rivera@joinmovida.com
     name: Maya Rivera
-    handle: maya-rivera
+    handle: dancer01
     account_visibility: public
     passport_visibility: public
     passport_show_timeline: true
     dancing_since: 2019-04-12
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (3).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Maya%20Rivera
   - email: leo.martin@joinmovida.com
     name: Leo Martin
-    handle: leo-martin
+    handle: dancer02
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (12).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Leo%20Martin
   - email: ines.lopez@joinmovida.com
     name: Ines Lopez
-    handle: ines-lopez
+    handle: dancer03
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: private
-    avatar: uifaces-human-avatar (19).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Ines%20Lopez
   - email: noah.kim@joinmovida.com
     name: Noah Kim
-    handle: noah-kim
+    handle: dancer04
     account_visibility: public
     passport_visibility: public
     passport_show_timeline: true
     dancing_since: 2021-09-03
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (20).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Noah%20Kim
   - email: zara.benali@joinmovida.com
     name: Zara Benali
-    handle: zara-benali
+    handle: dancer05
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (7).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Zara%20Benali
   - email: omar.costa@joinmovida.com
     name: Omar Costa
-    handle: omar-costa
+    handle: dancer06
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
-    avatar: uifaces-human-avatar (16).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Omar%20Costa
   - email: clara.dubois@joinmovida.com
     name: Clara Dubois
-    handle: clara-dubois
+    handle: dancer07
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (4).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Clara%20Dubois
   - email: jonas.meyer@joinmovida.com
     name: Jonas Meyer
-    handle: jonas-meyer
+    handle: dancer08
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (17).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Jonas%20Meyer
   - email: mina.silva@joinmovida.com
     name: Mina Silva
-    handle: mina-silva
+    handle: dancer09
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
-    avatar: uifaces-human-avatar (24).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Mina%20Silva
   - email: theo.novak@joinmovida.com
     name: Theo Novak
-    handle: theo-novak
+    handle: dancer10
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (18).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Theo%20Novak
   - email: ana.garcia@joinmovida.com
     name: Ana Garcia
-    handle: ana-garcia
+    handle: dancer11
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (9).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Ana%20Garcia
   - email: pablo.rossi@joinmovida.com
     name: Pablo Rossi
-    handle: pablo-rossi
+    handle: dancer12
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: private
-    avatar: uifaces-human-avatar (5).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Pablo%20Rossi
   - email: nina.khan@joinmovida.com
     name: Nina Khan
-    handle: nina-khan
+    handle: dancer13
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (21).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Nina%20Khan
   - email: samir.ivanov@joinmovida.com
     name: Samir Ivanov
-    handle: samir-ivanov
+    handle: dancer14
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (28).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Samir%20Ivanov
+  - email: elena.moreau@joinmovida.com
+    name: Elena Moreau
+    handle: dancer15
+    account_visibility: friends
+    share_attendance_default: true
+    share_attendance_default_audience: private
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Elena%20Moreau
   - email: victor.schmidt@joinmovida.com
     name: Victor Schmidt
-    handle: victor-schmidt
+    handle: dancer16
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (6).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Victor%20Schmidt
   - email: sofia.torres@joinmovida.com
     name: Sofia Torres
-    handle: sofia-torres
+    handle: dancer17
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (2).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Sofia%20Torres
   - email: milan.horvat@joinmovida.com
     name: Milan Horvat
-    handle: milan-horvat
+    handle: dancer18
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: private
-    avatar: uifaces-human-avatar (29).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Milan%20Horvat
   - email: rita.petrov@joinmovida.com
     name: Rita Petrov
-    handle: rita-petrov
+    handle: dancer19
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (23).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Rita%20Petrov
   - email: ivo.diallo@joinmovida.com
     name: Ivo Diallo
-    handle: ivo-diallo
+    handle: dancer20
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (26).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Ivo%20Diallo
   - email: nadia.fischer@joinmovida.com
     name: Nadia Fischer
-    handle: nadia-fischer
+    handle: dancer21
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
-    avatar: uifaces-human-avatar (25).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Nadia%20Fischer
   - email: bruno.santos@joinmovida.com
     name: Bruno Santos
-    handle: bruno-santos
+    handle: dancer22
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (14).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Bruno%20Santos
   - email: camille.laurent@joinmovida.com
     name: Camille Laurent
-    handle: camille-laurent
+    handle: dancer23
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (31).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Camille%20Laurent
   - email: mateo.vega@joinmovida.com
     name: Mateo Vega
-    handle: mateo-vega
+    handle: dancer24
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
-    avatar: uifaces-human-avatar (8).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Mateo%20Vega
   - email: leila.bauer@joinmovida.com
     name: Leila Bauer
-    handle: leila-bauer
+    handle: dancer25
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (27).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Leila%20Bauer

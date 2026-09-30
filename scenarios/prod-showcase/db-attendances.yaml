@@ -3,7 +3,7 @@ attendances:
     email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: friends
-  - event_id: atlantic-salsa-weekender
+  - event_id: london-salsa-sessions
     email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: friends
@@ -23,19 +23,19 @@ attendances:
     email: maya.rivera@joinmovida.com
     share_publicly: true
     share_audience: public
-  - event_id: london-salsa-weekender
+  - event_id: barcelona-salsa-beach-party
     email: maya.rivera@joinmovida.com
     share_publicly: true
     share_audience: public
-  - event_id: brussels-latin-rooftop
+  - event_id: vienna-bachata-nights
     email: maya.rivera@joinmovida.com
     share_publicly: true
     share_audience: public
-  - event_id: milano-salsa-lab
+  - event_id: rome-latin-social
     email: maya.rivera@joinmovida.com
     share_publicly: true
     share_audience: public
-  - event_id: barcelona-beach-bachata
+  - event_id: zurich-kizomba-social
     email: maya.rivera@joinmovida.com
     share_publicly: true
     share_audience: public

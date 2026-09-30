@@ -60,8 +60,8 @@ export default function EventActions({
 
     return (
         <div className="flex w-full min-w-0 flex-nowrap items-center gap-1">
-            <SaveEventButton eventId={event.event_id} appearance="pill" className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
-            <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
+            <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
+            <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
             {!isPast && (
                 <ShareButton
                     eventId={event.event_id}

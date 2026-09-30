@@ -2,7 +2,10 @@ import { useEffect, type ReactNode } from 'react';
 
 interface Props {
     title: string;
+    subtitle?: string;
+    titleSize?: 'default' | 'large';
     onClose: () => void;
+    layer?: 'modal' | 'transient';
     headerLeading?: ReactNode;
     headerAction?: ReactNode;
     showClose?: boolean;
@@ -17,7 +20,7 @@ interface Props {
  * footer clear of the iOS home indicator. The body scrolls independently so the
  * sheet never grows past 85% of the viewport height.
  */
-export default function BottomSheet({ title, onClose, headerLeading, headerAction, showClose = true, footer, children }: Props) {
+export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', headerLeading, headerAction, showClose = true, footer, children }: Props) {
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
@@ -36,7 +39,7 @@ export default function BottomSheet({ title, onClose, headerLeading, headerActio
 
     return (
         <div
-            className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/50 backdrop-blur-sm"
+            className={`fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm ${layer === 'transient' ? 'z-[12000]' : 'z-[10000]'}`}
             onClick={onClose}
         >
             <div
@@ -47,9 +50,14 @@ export default function BottomSheet({ title, onClose, headerLeading, headerActio
                 className="flex max-h-[85dvh] w-full max-w-lg flex-col bg-surface shadow-2xl animate-slide-up sm:rounded-t-card"
             >
                 <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
-                    <div className="flex min-w-0 items-center gap-1">
+                    <div className="flex min-w-0 items-start gap-2">
                         {headerLeading}
-                        <h3 className="truncate text-base font-bold text-ink">{title}</h3>
+                        <div className="min-w-0">
+                            <h3 className={`${titleSize === 'large' ? 'text-lg' : 'text-base'} font-bold text-ink`}>{title}</h3>
+                            {subtitle ? (
+                                <p className="mt-0.5 line-clamp-2 text-sm leading-5 text-ink-soft">{subtitle}</p>
+                            ) : null}
+                        </div>
                     </div>
                     <div className="flex items-center gap-1">
                         {headerAction}

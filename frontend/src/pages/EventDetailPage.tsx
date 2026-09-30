@@ -352,8 +352,8 @@ export default function EventDetailPage() {
                                     />
                                 </div>
                                 <div className="border-t border-card-line px-4 py-3 flex items-center gap-2 flex-wrap">
-                                    <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} className="border border-line" />
-                                    <SaveEventButton eventId={event.event_id} appearance="pill" className="border border-line" />
+                                    <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} className="border border-line" />
+                                    <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" className="border border-line" />
                                     <ShareButton eventId={event.event_id} title={event.title} url={shareUrl} />
                                     {user?.is_admin && (
                                         <button

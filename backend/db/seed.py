@@ -237,8 +237,8 @@ class DatabaseSeeder:
         """Push ``image:`` source files from a scenario into object storage.
 
         Runs the same pipeline as an admin upload, so a scenario exercises the
-        real cropping code. Keys are deterministic and skipped when already
-        present, so restarts don't re-upload.
+        real cropping code. Keys include the source digest, so changed fixtures
+        are uploaded under fresh browser-cache-safe URLs.
         """
         path = scenario_dir / "db-events.yaml"
         if not path.exists():
@@ -284,10 +284,12 @@ class DatabaseSeeder:
                 logger.warning("Image seed: %s not found for %s", filename, event_id)
                 continue
 
-            key = f"events/{event_id}/seed"
+            source_bytes = source.read_bytes()
+            digest = hashlib.sha256(source_bytes).hexdigest()[:16]
+            key = f"events/{event_id}/seed/{digest}"
             if not object_storage.object_exists(f"{key}/thumb.webp", client=client):
                 event_images.store_event_image(
-                    event_id, source.read_bytes(), base_key=key, client=client
+                    event_id, source_bytes, base_key=key, client=client
                 )
                 logger.info(
                     "Seeded image %s for %s → bucket %s, key %s/{thumb,full}.webp",

@@ -1,9 +1,10 @@
 test_plan:
-  name: "Mobile onboarding: dances, international area, near home, review"
+  name: "Mobile onboarding: dances, international area, near home, tribe, review"
   description: >
-    Hard-gated four-step onboarding for a fresh user. Dance preferences and one
+    Hard-gated five-step onboarding for a fresh user. Dance preferences and one
     international geographic profile are required; a second near-home profile
-    is optional. All choices remain draft state until Start exploring.
+    and following people are optional. Profile choices remain draft state until
+    Start exploring, while follow changes are applied immediately.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=onboarding"
@@ -15,7 +16,7 @@ test_plan:
     - id: 1
       title: "Choose required dance styles"
       expected: >
-        Step 1/4 shows four dance pills followed by More styles as the fifth
+        Step 1/5 shows four dance pills followed by More styles as the fifth
         pill when additional styles exist. More styles expands all remaining
         styles inline on the same screen. Continue is sticky and disabled until
         at least one style is selected. There is no Skip, and continuing does
@@ -24,7 +25,7 @@ test_plan:
     - id: 2
       title: "Choose an international area preset"
       expected: >
-        Step 2/4 shows compact two-column cards for Europe, North America,
+        Step 2/5 shows compact two-column cards for Europe, North America,
         Latin America, Asia, Africa, Oceania, Worldwide and Custom, each with a
         distinct geographic icon and a bounds icon for Custom. Selecting any
         card immediately opens the shared editor while progress remains 2/4.
@@ -57,9 +58,9 @@ test_plan:
     - id: 3
       title: "Skip near home"
       expected: >
-        Step 3/4 initially shows only Yes, find events near home and Not now.
+        Step 3/5 initially shows only Yes, find events near home and Not now.
         Add it later in Settings appears beneath the choices. Not now advances
-        directly to Review, where Near home reads Not set.
+        to Build your tribe, while Review later shows Near home as Not set.
 
     - id: 3a
       title: "Configure near home"
@@ -71,16 +72,27 @@ test_plan:
         local alerts toggle defaulted on. No square bbox appears in this step.
 
     - id: 4
+      title: "Build your tribe"
+      expected: >
+        Step 4/5 is titled Build your tribe and shows ranked onboarding
+        suggestions with avatars, organizer badges, handles and Follow actions.
+        Search by name or @handle opens matching people after two characters.
+        Following updates immediately; approved follows show Following, private
+        requests show Requested, and either can be tapped to undo. Skip and
+        Continue both advance without requiring a follow.
+
+    - id: 5
       title: "Review and edit each section"
       expected: >
-        Step 4/4 contains tappable Dance styles, International area and Near
-        home cards without a separate alerts summary. Dance edits return
-        directly to Review after Save. The
+        Step 5/5 contains tappable Dance styles, International area, Near home
+        and Following cards without a separate alerts summary. Following lists
+        selected people or None yet. Dance and Tribe edits return directly to
+        Review after Save. The
         international card opens the existing area editor rather than presets.
         Near home opens its configured editor, or the choice screen when unset.
         Draft selections remain unchanged while moving between these screens.
 
-    - id: 5
+    - id: 6
       title: "Start exploring persists the draft"
       expected: >
         Start exploring updates or creates one active international profile,

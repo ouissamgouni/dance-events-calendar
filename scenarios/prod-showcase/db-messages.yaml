@@ -2,34 +2,34 @@ emit_notifications: true
 
 messages:
   - key: weekender-room
-    event_id: atlantic-salsa-weekender
+    event_id: london-salsa-sessions
     email: leo.martin@joinmovida.com
     category: accommodation
     body: Looking for one more person to share an apartment near the venue from Friday to Monday.
   - reply_to: weekender-room
-    event_id: atlantic-salsa-weekender
+    event_id: london-salsa-sessions
     email: zara.benali@joinmovida.com
-    body: I am interested. Is there a train station nearby?
+    body: I am interested. Is there a Tube station nearby?
   - reply_to: weekender-room
-    event_id: atlantic-salsa-weekender
+    event_id: london-salsa-sessions
     email: samir.ivanov@joinmovida.com
-    body: Yes, it is about a ten-minute walk from Estoril station.
+    body: Yes, it is about a ten-minute walk from the nearest station.
   - key: weekender-ride
-    event_id: atlantic-salsa-weekender
+    event_id: london-salsa-sessions
     email: noah.kim@joinmovida.com
     category: ride
-    body: Driving from Lisbon on Friday afternoon and have two spare seats.
+    body: Driving in from Brighton on Saturday afternoon and have two spare seats.
   - reply_to: weekender-ride
-    event_id: atlantic-salsa-weekender
+    event_id: london-salsa-sessions
     email: ana.garcia@joinmovida.com
-    body: Could I join from Cais do Sodre around 4pm?
+    body: Could I join near Victoria around 4pm?
   - key: weekender-meetup
-    event_id: atlantic-salsa-weekender
+    event_id: london-salsa-sessions
     email: clara.dubois@joinmovida.com
     category: meetup
     body: First-time visitors, shall we meet by registration before the welcome class?
   - reply_to: weekender-meetup
-    event_id: atlantic-salsa-weekender
+    event_id: london-salsa-sessions
     email: elena.moreau@joinmovida.com
     body: Great idea. I will be there in a green jacket.
   - key: lisbon-shoes

@@ -1,5 +1,6 @@
 import type { ShareAudience } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 /**
  * 3-tier audience selector used everywhere a user picks who can see
@@ -27,8 +28,8 @@ export interface AudiencePickerProps {
     /** Optional override of available tiers (e.g. drop "public" in some flows). */
     options?: ShareAudience[];
     disabled?: boolean;
-    /** Compact = icon-only buttons; full = icon + label. Default: 'compact'. */
-    size?: 'compact' | 'full';
+    /** Compact = icon-only; full = labelled; sheet = larger, full-width mobile control. */
+    size?: 'compact' | 'full' | 'sheet';
     /** Optional aria-label for the group; defaults to "Audience". */
     ariaLabel?: string;
     className?: string;
@@ -52,12 +53,13 @@ export default function AudiencePicker({
     // (older payload, anon, transient) → suppress the hint to stay safe.
     const showZeroFriendsHint =
         value === 'friends' && user != null && user.friend_count === 0;
+    const isSheet = size === 'sheet';
     return (
-        <div className={'inline-flex flex-col items-start ' + (className ?? '')}>
+        <div className={`${isSheet ? 'flex w-full' : 'inline-flex'} flex-col items-start ${className ?? ''}`}>
             <div
                 role="radiogroup"
                 aria-label={ariaLabel}
-                className="inline-flex border border-line"
+                className={`${isSheet ? 'flex w-full' : 'inline-flex'} border border-line`}
             >
                 {tiers.map((opt) => {
                     const active = value === opt.value;
@@ -74,7 +76,7 @@ export default function AudiencePicker({
                                 if (!active) onClick(onChange, opt.value);
                             }}
                             className={
-                                'px-2.5 py-1.5 text-xs font-medium transition border-l first:border-l-0 border-line ' +
+                                `${isSheet ? 'min-h-11 min-w-0 flex-1 px-2 py-2 text-sm' : 'px-2.5 py-1.5 text-xs'} font-medium transition border-l first:border-l-0 border-line ` +
                                 (active
                                     ? 'bg-action text-white'
                                     : 'bg-surface text-ink-soft hover:bg-canvas') +
@@ -82,7 +84,7 @@ export default function AudiencePicker({
                             }
                         >
                             <span aria-hidden>{opt.icon}</span>
-                            {size === 'full' && (
+                            {size !== 'compact' && (
                                 <span className="ml-1.5">{opt.label}</span>
                             )}
                         </button>
@@ -91,16 +93,16 @@ export default function AudiencePicker({
             </div>
             {showZeroFriendsHint && (
                 <p
-                    className="mt-1 text-[11px] text-ink-soft"
+                    className={`${isSheet ? 'mt-2 text-sm leading-5' : 'mt-1 text-[11px]'} text-ink-soft`}
                     data-testid="audience-zero-friends-hint"
                 >
                     Visible to 0 people — you have no friends yet.{' '}
-                    <a
-                        href="/account#network"
+                    <Link
+                        to="/tribe/network"
                         className="text-action hover:text-action underline"
                     >
                         Find people to follow →
-                    </a>
+                    </Link>
                 </p>
             )}
         </div>

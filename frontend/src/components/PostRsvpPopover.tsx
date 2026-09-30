@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import AudiencePicker from './AudiencePicker';
+import BottomSheet from './BottomSheet';
+import useMediaQuery from '../hooks/useMediaQuery';
 import type { ShareAudience } from '../api';
 
 interface PopoverPos { top: number; left: number; }
@@ -23,6 +25,7 @@ export type PostRsvpVariant = 'anon' | 'signed-in-default-share' | 'signed-in';
 interface Props {
     anchorRef: RefObject<HTMLElement | null>;
     variant: PostRsvpVariant;
+    eventTitle?: string;
     /** User display name; only used when variant === 'signed-in-default-share'. */
     userName?: string | null;
     /** When true, the event has already ended — headline uses past tense. */
@@ -51,6 +54,7 @@ interface Props {
 export default function PostRsvpPopover({
     anchorRef,
     variant,
+    eventTitle,
     userName,
     isPast = false,
     onClose,
@@ -59,11 +63,13 @@ export default function PostRsvpPopover({
     onAudienceChange,
 }: Props) {
     const location = useLocation();
+    const isMobile = useMediaQuery('(max-width: 639px)');
     const popoverRef = useRef<HTMLDivElement | null>(null);
     const [pos, setPos] = useState<PopoverPos | null>(null);
 
     // Position under the anchor and reposition on scroll/resize.
     useEffect(() => {
+        if (isMobile) return;
         const el = anchorRef.current;
         if (!el) return;
         const update = () => {
@@ -78,10 +84,11 @@ export default function PostRsvpPopover({
             window.removeEventListener('scroll', update, true);
             window.removeEventListener('resize', update);
         };
-    }, [anchorRef]);
+    }, [anchorRef, isMobile]);
 
     // Outside click + Escape close.
     useEffect(() => {
+        if (isMobile) return;
         const onDocClick = (e: MouseEvent) => {
             const t = e.target as Node;
             if (popoverRef.current?.contains(t) || anchorRef.current?.contains(t)) return;
@@ -94,15 +101,13 @@ export default function PostRsvpPopover({
             document.removeEventListener('mousedown', onDocClick);
             document.removeEventListener('keydown', onKey);
         };
-    }, [anchorRef, onClose]);
+    }, [anchorRef, isMobile, onClose]);
 
     // Auto-dismiss if the user neither acts nor explicitly closes.
     useEffect(() => {
         const t = setTimeout(onClose, AUTO_DISMISS_MS);
         return () => clearTimeout(t);
     }, [onClose]);
-
-    if (!pos) return null;
 
     const next = encodeURIComponent(location.pathname + location.search);
 
@@ -114,6 +119,59 @@ export default function PostRsvpPopover({
             : `${isPast ? 'Attended' : 'Going'} as ${userName}`;
 
     const showPicker = !!audience && !!onAudienceChange && variant !== 'anon';
+
+    if (isMobile) {
+        const sheetTitle = isPast ? 'You attended!' : "You're going!";
+        return createPortal(
+            <BottomSheet
+                title={sheetTitle}
+                subtitle={eventTitle}
+                titleSize="large"
+                onClose={onClose}
+                layer="transient"
+                headerLeading={<span aria-hidden className="text-base leading-none">🎉</span>}
+                footer={(
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={onShare}
+                            className="min-h-11 flex-1 rounded-field bg-action px-4 py-2 text-sm font-semibold text-white"
+                        >
+                            Share
+                        </button>
+                        {variant === 'anon' && (
+                            <Link
+                                to={`/login?next=${next}`}
+                                className="flex min-h-11 flex-1 items-center justify-center rounded-field bg-action px-4 py-2 text-sm font-semibold text-white"
+                            >
+                                Sign in
+                            </Link>
+                        )}
+                    </div>
+                )}
+            >
+                {variant === 'anon' && (
+                    <p className="text-base leading-6 text-ink-soft">
+                        Sign in to keep this across devices.
+                    </p>
+                )}
+                {showPicker && (
+                    <div>
+                        <p className="mb-3 text-base leading-6 text-ink-soft">Who can see you in the attendee list?</p>
+                        <AudiencePicker
+                            value={audience!}
+                            onChange={onAudienceChange!}
+                            size="sheet"
+                            ariaLabel="Attendance visibility"
+                        />
+                    </div>
+                )}
+            </BottomSheet>,
+            document.body,
+        );
+    }
+
+    if (!pos) return null;
 
     return createPortal(
         <div

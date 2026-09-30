@@ -40,7 +40,7 @@ export default function EventSectionHeader({ event, shareUrl, onBack }: Props) {
                     <p className="truncate text-sm font-semibold text-ink">{event.title}</p>
                     <p className="truncate text-xs text-ink-soft">{metaLine(event)}</p>
                 </div>
-                <SaveEventButton eventId={event.event_id} appearance="icon" />
+                <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" />
                 <ShareButton eventId={event.event_id} title={event.title} url={shareUrl} />
             </div>
         </div>

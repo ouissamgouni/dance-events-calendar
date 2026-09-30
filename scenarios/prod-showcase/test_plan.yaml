@@ -36,7 +36,7 @@ test_plan:
       title: "Explore by search, filters, and map"
       description: |
         Open Browse and search for Rovinj, SALSARAVE, Salsa Grand, elSol, and
-        Atlantic Salsa Weekender. Switch between list and map and apply dance,
+        London Salsa Sessions. Switch between list and map and apply dance,
         format, date, price, and area filters.
       expected: |
         Results preserve production calendar colors, taxonomy tags, dates,
@@ -139,7 +139,7 @@ test_plan:
     - id: 13
       title: "Join an event discussion"
       description: |
-        Open Atlantic Salsa Weekender and inspect Discussion, then add a reply
+        Open London Salsa Sessions and inspect Discussion, then add a reply
         to an accommodation, ride, or meetup thread.
       expected: |
         Existing threads and replies are visible by category. A new reply posts

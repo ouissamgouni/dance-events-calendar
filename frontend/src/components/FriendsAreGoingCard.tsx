@@ -106,8 +106,8 @@ export default function FriendsAreGoingCard({ event, onClick }: FriendsAreGoingC
             data-testid="friends-going-card"
         >
             <div className="absolute top-1 right-1 z-10 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <SaveEventButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation className="text-ink-soft hover:text-ink" />
-                <GoingButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation className="text-ink-soft hover:text-ink" />
+                <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation className="text-ink-soft hover:text-ink" />
+                <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation className="text-ink-soft hover:text-ink" />
             </div>
 
             <div className={`flex h-[30px] items-center ${showImage ? 'pr-20' : ''}`}>
