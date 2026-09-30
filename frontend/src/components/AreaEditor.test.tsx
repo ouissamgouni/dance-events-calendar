@@ -2,11 +2,27 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { InterestProfile } from '../api';
+import type { BboxSearchArea } from '../utils/searchArea';
 import AreaEditor from './AreaEditor';
 
-vi.mock('./AreaMapPicker', () => ({
-    default: () => <div data-testid="area-map-picker" />,
+vi.mock('./SquareAreaMapEditor', () => ({
+    default: ({ area, onChange, preserveLabel }: {
+        area: BboxSearchArea;
+        onChange: (area: BboxSearchArea) => void;
+        preserveLabel?: boolean;
+    }) => (
+        <button
+            type="button"
+            data-testid="square-area-map-editor"
+            data-preserve-label={String(Boolean(preserveLabel))}
+            onClick={() => onChange({ ...area, label: 'Custom area', min_lat: area.min_lat + 0.1 })}
+        >
+            Adjust map
+        </button>
+    ),
 }));
+
+vi.mock('./RadiusAreaEditor', () => ({ default: () => <div data-testid="radius-area-editor" /> }));
 
 function profile(id: number, label: string, areaLabel: string): InterestProfile {
     return {
@@ -86,5 +102,38 @@ describe('AreaEditor profile areas', () => {
         await userEvent.click(screen.getByRole('button', { name: /your areas/i }));
         expect(screen.getByTestId('area-editor-profile-area-1')).toBeInTheDocument();
         expect(screen.getByTestId('area-editor-my-area')).toHaveTextContent('Paris');
+    });
+
+    it('renames an area below the map and preserves the name through map adjustments', async () => {
+        const user = userEvent.setup();
+        const onUseArea = vi.fn();
+        render(
+            <AreaEditor
+                value={{ label: 'Barcelona', min_lat: 40, min_lng: 1, max_lat: 42, max_lng: 3 }}
+                myArea={{ label: 'Barcelona', min_lat: 40, min_lng: 1, max_lat: 42, max_lng: 3 }}
+                onUseArea={onUseArea}
+                showSavedAreas={false}
+                allowRename
+            />,
+        );
+
+        const nameInput = screen.getByLabelText('Area name');
+        expect(nameInput).toHaveValue('Barcelona');
+        await user.clear(nameInput);
+        await user.type(nameInput, 'My dance area');
+        expect(onUseArea).toHaveBeenLastCalledWith(expect.objectContaining({ label: 'My dance area' }));
+
+        const mapEditor = screen.getByTestId('square-area-map-editor');
+        expect(mapEditor).toHaveAttribute('data-preserve-label', 'true');
+        await user.click(mapEditor);
+        expect(onUseArea).toHaveBeenLastCalledWith(expect.objectContaining({
+            label: 'My dance area',
+            min_lat: 40.1,
+        }));
+
+        await user.clear(nameInput);
+        await user.tab();
+        expect(nameInput).toHaveValue('Custom area');
+        expect(onUseArea).toHaveBeenLastCalledWith(expect.objectContaining({ label: 'Custom area' }));
     });
 });

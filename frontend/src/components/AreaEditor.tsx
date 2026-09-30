@@ -33,6 +33,7 @@ export interface AreaEditorProps {
     onUseArea?: (area: SearchArea) => void;
     onExploreMap?: (area: SearchArea) => void;
     showSavedAreas?: boolean;
+    allowRename?: boolean;
     eventCount?: number;
 }
 
@@ -49,6 +50,7 @@ export default function AreaEditor({
     onUseArea,
     onExploreMap,
     showSavedAreas = true,
+    allowRename = false,
 }: AreaEditorProps) {
     const initialArea = value ? normalizeArea(value) : normalizeArea(myArea, 'preference');
     const [draft, setDraft] = useState<SearchArea>(initialArea);
@@ -57,6 +59,7 @@ export default function AreaEditor({
     const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searching, setSearching] = useState(false);
+    const [nameManuallyEdited, setNameManuallyEdited] = useState(false);
     const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     const searchBoxRef = useRef<HTMLDivElement>(null);
 
@@ -66,14 +69,28 @@ export default function AreaEditor({
     };
 
     const chooseArea = (area: SearchArea) => {
+        setNameManuallyEdited(false);
         setDraft(area);
         setSelectionVersion((version) => version + 1);
         applyArea(area);
     };
 
     const adjustArea = (area: SearchArea) => {
-        setDraft(area);
-        applyArea(area);
+        const nextArea = nameManuallyEdited ? { ...area, label: draft.label } : area;
+        setDraft(nextArea);
+        applyArea(nextArea);
+    };
+
+    const renameArea = (label: string) => {
+        const renamedArea = { ...draft, label: label.slice(0, 30) };
+        setNameManuallyEdited(true);
+        setDraft(renamedArea);
+        applyArea(renamedArea);
+    };
+
+    const normalizeAreaName = () => {
+        if (draft.label.trim()) return;
+        renameArea('Custom area');
     };
 
     const runSearch = useCallback(async (search: string) => {
@@ -233,12 +250,32 @@ export default function AreaEditor({
                             key={`bbox-${selectionVersion}`}
                             area={draft}
                             onChange={adjustArea}
+                            preserveLabel={nameManuallyEdited}
                             mapHeightClass="h-[min(42dvh,380px)] min-h-72"
                         />
                         <p className="px-1 pt-2 text-xs text-ink-soft">Move, zoom or resize to refine the area.</p>
                     </>
                 )}
             </div>
+
+            {allowRename && (
+                <label htmlFor="area-editor-name" className="flex min-h-11 items-center gap-3 bg-surface px-1">
+                    <span className="shrink-0 text-sm font-semibold text-ink">Name</span>
+                    <span className="relative min-w-0 flex-1">
+                        <input
+                            id="area-editor-name"
+                            aria-label="Area name"
+                            value={draft.label}
+                            maxLength={30}
+                            onChange={(event) => renameArea(event.target.value)}
+                            onBlur={normalizeAreaName}
+                            className="min-h-11 w-full rounded-field border border-line bg-surface px-3 pr-10 text-sm font-semibold text-ink focus:border-action focus:outline-none"
+                            data-testid="area-editor-name"
+                        />
+                        <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-action">✎</span>
+                    </span>
+                </label>
+            )}
 
             {onExploreMap && (
                 <button

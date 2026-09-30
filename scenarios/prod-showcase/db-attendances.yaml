@@ -787,3 +787,101 @@ attendances:
     email: milan.horvat@joinmovida.com
     share_publicly: true
     share_audience: public
+  # October 2026 upcoming events for Elena's tribe calendar
+  - event_id: cdj32cj46hij0b9j61hm4b9kcos3eb9oc4rjabb174r66c1jchj64p1nco
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cdj32cj46hij0b9j61hm4b9kcos3eb9oc4rjabb174r66c1jchj64p1nco
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cdj32cj46hij0b9j61hm4b9kcos3eb9oc4rjabb174r66c1jchj64p1nco
+    email: leo.martin@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+    email: leo.martin@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gqjie1p71j38b9g69i62b9kcdi30bb26gqjgb9gchgj4ob161i3cp35c8
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gqjie1p71j38b9g69i62b9kcdi30bb26gqjgb9gchgj4ob161i3cp35c8
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gqjie1p71j38b9g69i62b9kcdi30bb26gqjgb9gchgj4ob161i3cp35c8
+    email: leo.martin@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gs68dpocgrjabb5c5i3cb9kcgo30b9o75gj8bb3cko64eb2cko30c31c4
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gs68dpocgrjabb5c5i3cb9kcgo30b9o75gj8bb3cko64eb2cko30c31c4
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gs68dpocgrjabb5c5i3cb9kcgo30b9o75gj8bb3cko64eb2cko30c31c4
+    email: leo.martin@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: leo.martin@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  # Additional events for Elena's tribe calendar
+  - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: leo.martin@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 60q3cd9j6gom2bb2clhmcb9k74sm2bb2c4s3cbb665i34c356grjgpho60
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 60q3cd9j6gom2bb2clhmcb9k74sm2bb2c4s3cbb665i34c356grjgpho60
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 60q3cd9j6gom2bb2clhmcb9k74sm2bb2c4s3cbb665i34c356grjgpho60
+    email: leo.martin@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc
+    email: leo.martin@joinmovida.com
+    share_publicly: true
+    share_audience: public

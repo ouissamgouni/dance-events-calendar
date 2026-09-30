@@ -101,9 +101,16 @@ test_plan:
       description: >
         Tap the "Save" action → choose "Save as new profile"
         (data-testid `search-profile-save-new`). In the editor, set the name to
-        "Barcelona salsa+bachata" and Save (data-testid
+        "Barcelona salsa+bachata". Verify the root header is `× New profile`,
+        then open Area and verify the entire header changes to `← Search area`.
+        Rename the area below the map to "Barcelona dance area", return with
+        the header arrow, and Save (data-testid
         `search-profile-save-draft`). Do NOT touch the matches/notify checkbox.
       expected: >
+        Only one header is visible at a time. The Search area arrow returns to
+        New profile, while the New profile × closes the whole creation flow.
+        The Area summary shows "Barcelona dance area" and the create request
+        sends area_label="Barcelona dance area".
         POST /api/interest-profiles is issued with matches_enabled=false and
         is_active=false. The flow closes. The selector now reads
         "Barcelona salsa+bachata" (the live selection matches the new profile).
@@ -142,10 +149,14 @@ test_plan:
       title: "Editing applies only when that profile is selected"
       description: >
         Open the picker. Tap the pencil on "Barcelona salsa"
-        (data-testid `search-profile-edit-<id>`) while Default is selected,
+        (data-testid `search-profile-edit-<id>`) while Default is selected.
+        Verify the root header is `← Edit profile`, that it returns to Choose
+        search profile, and that Area, Dance styles, and Event reach each replace
+        the whole header with their own `←` label before returning to Edit profile.
         rename it to "BCN salsa", and Save. Then apply "BCN salsa", edit its
         Area/Dance/Reach, and Save again.
       expected: >
+        No nested surface displays Edit profile and its own title at the same time.
         The editor opens pre-filled with that profile's name/Area/Dance/Reach —
         WITHOUT changing the live search. The first non-selected edit updates
         the saved profile while leaving Explore on Default. The second edit
@@ -190,7 +201,8 @@ test_plan:
         centered modal).
       expected: >
         The picker, Save sheet, and editor render as centered cards stacked
-        above the Filters modal, with identical behavior to mobile.
+        above the Filters modal, with identical single-header navigation and
+        editable area-name behavior to mobile.
 
     - id: 14
       title: "Area UI uses area names instead of profile names"

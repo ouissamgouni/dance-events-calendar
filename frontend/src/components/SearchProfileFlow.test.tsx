@@ -157,6 +157,44 @@ describe('SearchProfileFlow', () => {
         expect(props.onClose).toHaveBeenCalled();
     });
 
+    it('uses one flow header for each create surface and returns to New profile', async () => {
+        const props = baseProps();
+        const user = userEvent.setup();
+        render(<SearchProfileFlow {...props} initialStep="picker" />);
+        await user.click(screen.getByTestId('search-profile-create'));
+
+        expect(screen.getByTestId('search-profile-flow-close')).toHaveTextContent('New profile');
+
+        for (const [row, title] of [
+            [/^area/i, 'Search area'],
+            [/dance styles/i, 'Dance styles'],
+            [/^reach/i, 'Event reach'],
+        ] as const) {
+            await user.click(screen.getByRole('button', { name: row }));
+            expect(screen.getByTestId('search-profile-flow-back')).toHaveTextContent(title);
+            expect(screen.queryByText('New profile')).not.toBeInTheDocument();
+            expect(screen.getAllByText(title)).toHaveLength(1);
+            await user.click(screen.getByTestId('search-profile-flow-back'));
+            expect(screen.getByTestId('search-profile-flow-close')).toHaveTextContent('New profile');
+        }
+    });
+
+    it('closes New profile and returns from Edit profile to the picker', async () => {
+        const props = baseProps();
+        const user = userEvent.setup();
+        const { unmount } = render(<SearchProfileFlow {...props} initialStep="picker" />);
+        await user.click(screen.getByTestId('search-profile-create'));
+        await user.click(screen.getByTestId('search-profile-flow-close'));
+        expect(props.onClose).toHaveBeenCalledTimes(1);
+
+        unmount();
+        render(<SearchProfileFlow {...props} initialStep="picker" />);
+        await user.click(screen.getByTestId('search-profile-edit-1'));
+        expect(screen.getByTestId('search-profile-flow-back')).toHaveTextContent('Edit profile');
+        await user.click(screen.getByTestId('search-profile-flow-back'));
+        expect(screen.getByTestId('search-profile-picker')).toBeInTheDocument();
+    });
+
     it('editing a non-selected profile updates it without applying it', async () => {
         const props = baseProps();
         const user = userEvent.setup();

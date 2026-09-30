@@ -2,11 +2,17 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { TagGroup } from '../types';
-import { bboxSearchArea } from '../utils/searchArea';
+import { bboxSearchArea, type SearchArea } from '../utils/searchArea';
 import ProfileDraftEditor from './ProfileDraftEditor';
 
 vi.mock('./AreaMapPreview', () => ({ default: () => <div data-testid="area-preview" /> }));
-vi.mock('./AreaEditor', () => ({ default: () => <div data-testid="area-editor" /> }));
+vi.mock('./AreaEditor', () => ({
+    default: ({ value, onUseArea }: { value: SearchArea; onUseArea: (area: SearchArea) => void }) => (
+        <button type="button" onClick={() => onUseArea({ ...value, label: 'My dance area' })}>
+            Rename area
+        </button>
+    ),
+}));
 
 const danceGroup = {
     id: 1,
@@ -39,10 +45,15 @@ describe('ProfileDraftEditor', () => {
         await user.click(screen.getByRole('button', { name: /back/i }));
         expect(screen.getByLabelText('Profile name')).toHaveValue('Salsa · Europe · International');
 
+        await user.click(screen.getByRole('button', { name: /^area/i }));
+        await user.click(screen.getByRole('button', { name: 'Rename area' }));
+        await user.click(screen.getByRole('button', { name: /back/i }));
+        expect(screen.getByLabelText('Profile name')).toHaveValue('Salsa · My dance area · International');
+
         await user.click(screen.getByRole('button', { name: 'Create profile' }));
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-            label: 'Salsa · Europe · International',
-            area_label: 'Europe',
+            label: 'Salsa · My dance area · International',
+            area_label: 'My dance area',
             geo_kind: 'area',
             dance_tag_ids: [10],
             reach_filter: 'international',
