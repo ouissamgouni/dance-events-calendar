@@ -18,7 +18,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from backend.api.deps import require_admin
 from backend.api.main import app
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, CalendarSetting
+from backend.db.models import BlockedEvent, CachedEvent, CalendarSetting
 
 
 def _fake_admin():
@@ -111,6 +111,98 @@ class TestIncludePastFilter:
         assert resp.status_code == 200
         ids = {e["event_id"] for e in resp.json()["items"]}
         assert ids == {"evt-past", "evt-future"}
+
+    def test_filter_options_excludes_blocked_events_from_geo_counts(
+        self, client, engine
+    ):
+        _seed_calendar(engine)
+        now = datetime.now(timezone.utc)
+        with Session(engine) as session:
+            session.add_all(
+                [
+                    CachedEvent(
+                        event_id="evt-open",
+                        calendar_id="cal-1",
+                        title="Open Event",
+                        location="Open Venue",
+                        start=now + timedelta(days=1),
+                        end=now + timedelta(days=1, hours=2),
+                    ),
+                    CachedEvent(
+                        event_id="evt-blocked",
+                        calendar_id="cal-1",
+                        title="Blocked Event",
+                        location="Blocked Venue",
+                        start=now + timedelta(days=1),
+                        end=now + timedelta(days=1, hours=2),
+                    ),
+                    BlockedEvent(event_id="evt-blocked"),
+                ]
+            )
+            session.commit()
+
+        resp = client.get("/api/admin/events/filter-options")
+
+        assert resp.status_code == 200
+        geo_counts = {
+            option["value"]: option["count"] for option in resp.json()["geo_statuses"]
+        }
+        assert geo_counts["ungeolocated"] == 1
+
+    @pytest.mark.parametrize(
+        ("geo_status", "expected_id"),
+        [
+            ("geolocated", "evt-geolocated"),
+            ("ungeolocated", "evt-ungeolocated"),
+            ("no-location", "evt-no-location"),
+        ],
+    )
+    def test_geo_status_filters_events_and_ids(
+        self, client, engine, geo_status, expected_id
+    ):
+        _seed_calendar(engine)
+        now = datetime.now(timezone.utc)
+        with Session(engine) as session:
+            session.add_all(
+                [
+                    CachedEvent(
+                        event_id="evt-geolocated",
+                        calendar_id="cal-1",
+                        title="Geolocated Event",
+                        location="Mapped Venue",
+                        latitude=48.8566,
+                        longitude=2.3522,
+                        start=now + timedelta(days=1),
+                        end=now + timedelta(days=1, hours=2),
+                    ),
+                    CachedEvent(
+                        event_id="evt-ungeolocated",
+                        calendar_id="cal-1",
+                        title="Ungeolocated Event",
+                        location="Unknown Venue",
+                        start=now + timedelta(days=1),
+                        end=now + timedelta(days=1, hours=2),
+                    ),
+                    CachedEvent(
+                        event_id="evt-no-location",
+                        calendar_id="cal-1",
+                        title="No Location Event",
+                        start=now + timedelta(days=1),
+                        end=now + timedelta(days=1, hours=2),
+                    ),
+                ]
+            )
+            session.commit()
+
+        events_resp = client.get(f"/api/admin/events?geo_status={geo_status}")
+        ids_resp = client.get(f"/api/admin/events/ids?geo_status={geo_status}")
+
+        assert events_resp.status_code == 200
+        assert [item["event_id"] for item in events_resp.json()["items"]] == [
+            expected_id
+        ]
+        assert ids_resp.status_code == 200
+        assert ids_resp.json()["ids"] == [expected_id]
 
 
 # ---------------------------------------------------------------------------

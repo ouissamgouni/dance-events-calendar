@@ -28,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 from sqlmodel import Session, select
 
 from backend.db.models import (
+    BlockedEvent,
     CachedEvent,
     EventDuplicateGroup,
     EventDuplicateMember,
@@ -102,6 +103,7 @@ def find_candidate_matches(
     narrowed = session.exec(
         select(CachedEvent).where(
             CachedEvent.event_id != event.event_id,
+            ~CachedEvent.event_id.in_(select(BlockedEvent.event_id)),
             CachedEvent.deleted_at == None,  # noqa: E711
             CachedEvent.is_hidden == False,  # noqa: E712
             CachedEvent.end > now,
@@ -184,6 +186,7 @@ def detect_duplicates_for_event(
             event is not None
             and event.deleted_at is None
             and not event.is_hidden
+            and session.get(BlockedEvent, event_id) is None
             and event.end > datetime.now(timezone.utc)
         ):
             matches = find_candidate_matches(session, event)
@@ -234,6 +237,7 @@ def run_full_scan(
             .where(
                 CachedEvent.deleted_at == None,  # noqa: E711
                 CachedEvent.is_hidden == False,  # noqa: E712
+                ~CachedEvent.event_id.in_(select(BlockedEvent.event_id)),
                 CachedEvent.end > now,
             )
             .order_by(CachedEvent.start)
@@ -306,8 +310,6 @@ def keep_event(
     if group is None:
         raise ValueError("Duplicate group not found")
 
-    from backend.db.models import BlockedEvent
-
     members = session.exec(
         select(EventDuplicateMember).where(EventDuplicateMember.group_id == group_id)
     ).all()
@@ -329,7 +331,13 @@ def keep_event(
         event.updated_at = datetime.now(timezone.utc)
         session.add(event)
         if not session.get(BlockedEvent, event_id):
-            session.add(BlockedEvent(event_id=event_id))
+            session.add(
+                BlockedEvent(
+                    event_id=event_id,
+                    reason="duplicate",
+                    reason_detail=event.rejected_duplicate_reason,
+                )
+            )
 
     group.status = "resolved"
     group.kept_event_id = keep_event_id

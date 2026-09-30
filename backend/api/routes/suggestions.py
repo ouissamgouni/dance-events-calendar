@@ -781,7 +781,13 @@ def reject_suggestion(
         event.deleted_at = None
         session.add(event)
         if session.get(BlockedEvent, event.event_id) is None:
-            session.add(BlockedEvent(event_id=event.event_id))
+            session.add(
+                BlockedEvent(
+                    event_id=event.event_id,
+                    reason="rejected",
+                    reason_detail=suggestion.admin_notes,
+                )
+            )
     session.add(suggestion)
     session.commit()
     session.refresh(suggestion)

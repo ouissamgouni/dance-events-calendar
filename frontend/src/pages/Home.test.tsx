@@ -217,4 +217,59 @@ describe('Home — mobile map mount with applied area', () => {
             expect(screen.getByTestId('view-switcher-list')).toBeInTheDocument();
         });
     });
+
+    it('returns to Browse when switching from Calendar back to List', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestProviders initialEntries={['/browse']}>
+                <Home />
+                <LocationProbe />
+            </TestProviders>,
+        );
+
+        // Click Calendar to navigate to /calendar
+        await user.click(screen.getByRole('button', { name: 'Calendar view' }));
+
+        await waitFor(() => {
+            const location = screen.getByTestId('location-probe').textContent ?? '';
+            expect(location.startsWith('/calendar')).toBe(true);
+        });
+
+        // Click List to return to /browse
+        await user.click(screen.getByRole('button', { name: 'List view' }));
+
+        await waitFor(() => {
+            const location = screen.getByTestId('location-probe').textContent ?? '';
+            expect(location.startsWith('/browse')).toBe(true);
+            expect(screen.getByTestId('view-switcher-map')).toBeInTheDocument();
+            expect(screen.getByTestId('view-switcher-calendar')).toBeInTheDocument();
+        });
+    });
+
+    it('returns to Browse when switching from Calendar to Map', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestProviders initialEntries={['/browse']}>
+                <Home />
+                <LocationProbe />
+            </TestProviders>,
+        );
+
+        // Click Calendar to navigate to /calendar
+        await user.click(screen.getByRole('button', { name: 'Calendar view' }));
+
+        await waitFor(() => {
+            const location = screen.getByTestId('location-probe').textContent ?? '';
+            expect(location.startsWith('/calendar')).toBe(true);
+        });
+
+        // Click Map to return to /browse with map view
+        await user.click(screen.getByRole('button', { name: 'Map view' }));
+
+        await waitFor(() => {
+            const location = screen.getByTestId('location-probe').textContent ?? '';
+            expect(location.startsWith('/browse?')).toBe(true);
+            expect(new URLSearchParams(location.split('?')[1]).get('view')).toBe('map');
+        });
+    });
 });

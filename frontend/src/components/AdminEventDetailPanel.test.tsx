@@ -82,6 +82,21 @@ beforeEach(() => {
 })
 
 describe('AdminEventDetailPanel review link', () => {
+    it('shows blocked status and reason on the matching panel surface', async () => {
+        const { container } = renderPanel(makeEvent({
+            status: 'blocked',
+            is_blocked: true,
+            is_hidden: true,
+            block_reason: 'deleted',
+            block_reason_detail: 'Removed by an administrator',
+        }))
+
+        expect(await screen.findByText('blocked')).toBeInTheDocument()
+        expect(screen.getByText('Deleted')).toHaveAttribute('title', 'Removed by an administrator')
+        expect(container.querySelector('.bg-admin-blocked')).toBeInTheDocument()
+        expect(container.querySelector('img[src="/blocked.png"]')).toHaveClass('h-8', 'w-8')
+    })
+
     it('shares the review deep link through the native share API', async () => {
         const share = vi.fn().mockResolvedValue(undefined)
         Object.defineProperty(navigator, 'share', { configurable: true, value: share })

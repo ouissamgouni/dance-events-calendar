@@ -36,11 +36,12 @@ test_plan:
       title: "Explore by search, filters, and map"
       description: |
         Open Browse and search for Rovinj, SALSARAVE, Salsa Grand, elSol, and
-        London Salsa Sessions. Switch between list and map and apply dance,
-        format, date, price, and area filters.
+        London Salsa Sessions. Switch Elena between her Europe and Paris 25km
+        search profiles, then apply dance, format, date, price, and area filters.
       expected: |
         Results preserve production calendar colors, taxonomy tags, dates,
-        locations, pricing, links, popularity, and map positions.
+        locations, pricing, links, popularity, and map positions. Profile names
+        remain distinct from their geographic area labels.
       verification: "List and map stay in sync and clearing filters restores the catalog."
 
     - id: 4
@@ -68,11 +69,12 @@ test_plan:
     - id: 6
       title: "Inspect attendance and popularity"
       description: |
-        Open Rovinj Croatian Summer Salsa Festival and SALSARAVE 2026.
+        Open Back 2 Mambo 2026, Transilvania Salsa Fest, and Rovinj Croatian
+        Summer Salsa Festival.
       expected: |
-        Rovinj shows 25 attendees and SALSARAVE shows 10. Public, friends-only,
-        and private attendance are reflected without exposing private profiles,
-        while trending and popularity treatments remain visible.
+        Back 2 Mambo leads trending with 26 attendees, Transilvania follows with
+        25, and Rovinj follows with 24. Public, friends-only, and private
+        attendance are reflected without exposing private profiles.
       verification: "Counts, avatar stacks, attendee sheet, and privacy boundaries agree."
 
     - id: 7
@@ -93,7 +95,8 @@ test_plan:
         and Saved views. Open Elena's own calendar and its export menu.
       expected: |
         Follow-created calendar subscriptions include people and Movida Picks.
-        Elena's Going and Saved events are populated, shareable, and exportable.
+        Elena's network snapshot contains several upcoming events with multiple
+        friends going. Her Going and Saved events are populated and exportable.
       verification: "The live iCalendar URL opens on the phone and updates from local actions."
 
     - id: 9
@@ -149,10 +152,11 @@ test_plan:
     - id: 14
       title: "Explore public Dance Passports"
       description: |
-        Visit @maya-rivera and @noah-kim and open Dance Passport and Timeline.
+        Open Elena's Dance Passport, then visit @maya-rivera and @noah-kim and
+        open their Dance Passport and Timeline views.
       expected: |
-        Both profiles show past dance history across cities and countries. Maya
-        has the richer international history and a visible dancing-since date.
+        Elena's passport includes past events in Europe, the United States, and
+        Asia. Maya and Noah also show past history across cities and countries.
       verification: "Passport totals and maps exclude future events."
 
     - id: 15

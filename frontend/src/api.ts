@@ -3153,13 +3153,16 @@ export interface PaginatedEventsResponse {
     total: number;
 }
 
+export type AdminEventGeoStatus = 'geolocated' | 'ungeolocated' | 'no-location';
+
 export interface EventFilterParams {
     limit?: number;
     offset?: number;
     search?: string;
-    review_status?: string;
+    status?: 'pending' | 'reviewed' | 'blocked';
     calendar_id?: string;
     tag_ids?: string;
+    geo_status?: AdminEventGeoStatus;
     ungeolocated?: boolean;
     future_only?: boolean;
     /**
@@ -3168,8 +3171,8 @@ export interface EventFilterParams {
      * widen the scope (audits, archives, etc.).
      */
     include_past?: boolean;
-    /** Filter by visibility state: 'hidden' (is_hidden and not blocked) or 'blocked'. */
-    visibility?: 'hidden' | 'blocked';
+    /** When true, return hidden events only. Composes with status. */
+    hidden?: boolean;
 }
 
 export interface FilterOption {
@@ -3180,7 +3183,7 @@ export interface FilterOption {
 
 export interface EventFilterOptionsResponse {
     calendars: FilterOption[];
-    review_statuses: FilterOption[];
+    statuses: FilterOption[];
     geo_statuses: FilterOption[];
     tags: FilterOption[];
     total_count: number;
@@ -3191,13 +3194,14 @@ export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<
     if (params.limit != null) qs.set('limit', String(params.limit));
     if (params.offset != null) qs.set('offset', String(params.offset));
     if (params.search) qs.set('search', params.search);
-    if (params.review_status) qs.set('review_status', params.review_status);
+    if (params.status) qs.set('status', params.status);
     if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
+    if (params.geo_status) qs.set('geo_status', params.geo_status);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
-    if (params.visibility) qs.set('visibility', params.visibility);
+    if (params.hidden) qs.set('hidden', 'true');
     const res = await fetch(`${BASE}/admin/events?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch events');
     return res.json();
@@ -3206,13 +3210,14 @@ export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<
 export async function fetchEventFilterOptions(params: EventFilterParams = {}): Promise<EventFilterOptionsResponse> {
     const qs = new URLSearchParams();
     if (params.search) qs.set('search', params.search);
-    if (params.review_status) qs.set('review_status', params.review_status);
+    if (params.status) qs.set('status', params.status);
     if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
+    if (params.geo_status) qs.set('geo_status', params.geo_status);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
-    if (params.visibility) qs.set('visibility', params.visibility);
+    if (params.hidden) qs.set('hidden', 'true');
     const res = await fetch(`${BASE}/admin/events/filter-options?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch filter options');
     return res.json();
@@ -4197,13 +4202,14 @@ export async function retryGeocodingSingle(eventId: string): Promise<{ geocoded:
 export async function fetchAdminEventIds(params: EventFilterParams = {}): Promise<{ ids: string[] }> {
     const qs = new URLSearchParams();
     if (params.search) qs.set('search', params.search);
-    if (params.review_status) qs.set('review_status', params.review_status);
+    if (params.status) qs.set('status', params.status);
     if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
+    if (params.geo_status) qs.set('geo_status', params.geo_status);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
-    if (params.visibility) qs.set('visibility', params.visibility);
+    if (params.hidden) qs.set('hidden', 'true');
     const res = await fetch(`${BASE}/admin/events/ids?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch event IDs');
     return res.json();

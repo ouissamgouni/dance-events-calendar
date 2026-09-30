@@ -1151,7 +1151,7 @@ class TestEventUpdateEndpoint:
         )
         mock_session = MagicMock(spec=Session)
         mock_session.get.side_effect = lambda model, key: (
-            event if model == CachedEvent else cal
+            event if model is CachedEvent else (None if model is BlockedEvent else cal)
         )
         app.dependency_overrides[get_session] = lambda: mock_session
         app.dependency_overrides[require_admin] = _fake_admin
@@ -1182,7 +1182,7 @@ class TestEventUpdateEndpoint:
         )
         mock_session = MagicMock(spec=Session)
         mock_session.get.side_effect = lambda model, key: (
-            event if model == CachedEvent else cal
+            event if model is CachedEvent else (None if model is BlockedEvent else cal)
         )
         mock_session.exec.return_value.all.return_value = []
         app.dependency_overrides[get_session] = lambda: mock_session
@@ -1229,7 +1229,7 @@ class TestEventUpdateEndpoint:
         )
         mock_session = MagicMock(spec=Session)
         mock_session.get.side_effect = lambda model, key: (
-            event if model == CachedEvent else cal
+            event if model is CachedEvent else (None if model is BlockedEvent else cal)
         )
         mock_session.exec.return_value.all.return_value = []
         app.dependency_overrides[get_session] = lambda: mock_session
@@ -1477,7 +1477,7 @@ class TestPendingReviewEndpoints:
         )
         mock_session = MagicMock(spec=Session)
         mock_session.get.side_effect = lambda model, key: (
-            event if model == CachedEvent else cal
+            event if model == CachedEvent else (None if model == BlockedEvent else cal)
         )
         app.dependency_overrides[get_session] = lambda: mock_session
         app.dependency_overrides[require_admin] = _fake_admin
@@ -1530,7 +1530,7 @@ class TestHideBlockEndpoints:
         cal = self._make_cal()
         mock_session = MagicMock(spec=Session)
         mock_session.get.side_effect = lambda model, key: (
-            event if model == CachedEvent else cal
+            event if model == CachedEvent else (None if model == BlockedEvent else cal)
         )
         app.dependency_overrides[get_session] = lambda: mock_session
         app.dependency_overrides[require_admin] = _fake_admin
@@ -1547,7 +1547,7 @@ class TestHideBlockEndpoints:
         cal = self._make_cal()
         mock_session = MagicMock(spec=Session)
         mock_session.get.side_effect = lambda model, key: (
-            event if model == CachedEvent else cal
+            event if model == CachedEvent else (None if model == BlockedEvent else cal)
         )
         app.dependency_overrides[get_session] = lambda: mock_session
         app.dependency_overrides[require_admin] = _fake_admin
@@ -1589,6 +1589,8 @@ class TestHideBlockEndpoints:
             data = resp.json()
             assert data["is_hidden"] is True
             assert data["is_blocked"] is True
+            assert data["status"] == "blocked"
+            assert data["block_reason"] == "deleted"
         finally:
             app.dependency_overrides.clear()
 
@@ -1627,6 +1629,8 @@ class TestHideBlockEndpoints:
             data = resp.json()
             assert data["is_hidden"] is False
             assert data["is_blocked"] is False
+            assert data["status"] == "pending"
+            assert data["block_reason"] is None
         finally:
             app.dependency_overrides.clear()
 

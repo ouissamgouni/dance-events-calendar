@@ -431,6 +431,10 @@ class SyncService:
                 event.title, event.start, event.location
             )
 
+            if session.get(BlockedEvent, event.event_id) is not None:
+                logger.debug("Skipping blocked event_id=%s during sync", event.event_id)
+                continue
+
             existing = session.get(CachedEvent, event.event_id)
             if existing:
                 # --- Known Google event ID: normal upsert ---
@@ -504,13 +508,6 @@ class SyncService:
                     )
                     duplicates_merged += 1
                 else:
-                    # Genuinely new event — skip if admin has blocked this ID
-                    if session.get(BlockedEvent, event.event_id) is not None:
-                        logger.debug(
-                            "Skipping blocked event_id=%s during sync",
-                            event.event_id,
-                        )
-                        continue
                     new_event = CachedEvent(
                         event_id=event.event_id,
                         calendar_id=event.calendar_id,

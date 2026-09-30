@@ -22,7 +22,7 @@ from enum import Enum
 from sqlmodel import Session, select
 
 from backend.db.database import get_engine
-from backend.db.models import CachedEvent, EventCalendarSource, EventTag
+from backend.db.models import BlockedEvent, CachedEvent, EventCalendarSource, EventTag
 from backend.services.calendar.base import CalendarEvent
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.event_extractor import (
@@ -494,6 +494,15 @@ class EventPipelineProcessor:
         engine = get_engine()
         progress = self._progress_map.get(task.calendar_id)
         cal_event = task.calendar_event
+
+        with DBSession(engine) as session:
+            blocked = session.get(BlockedEvent, cal_event.event_id)
+            if type(blocked) is BlockedEvent:
+                logger.debug(
+                    "Skipping blocked event_id=%s before enrichment",
+                    cal_event.event_id,
+                )
+                return
 
         # Tag this thread so stdlib log records emitted by helpers
         # (geocoding, tag suggestion, etc.) get routed to this calendar.

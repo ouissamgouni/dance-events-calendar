@@ -101,6 +101,22 @@ function mockPillWidth(px: number) {
         },
     });
 }
+
+type MeasuredWidths = Partial<Record<string, { compact: number; full: number }>>;
+
+function mockMeasuredPillWidths(widths: MeasuredWidths, gearWidth: number) {
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+        configurable: true,
+        get() {
+            const element = this as HTMLElement;
+            if (element.hasAttribute('data-measure-gear')) return gearWidth;
+            const key = element.dataset.measureKey;
+            const variant = element.dataset.measureVariant as 'compact' | 'full' | undefined;
+            if (key && variant) return widths[key]?.[variant] ?? 0;
+            return 0;
+        },
+    });
+}
 function restorePillWidth() {
     if (ORIGINAL_OFFSET_WIDTH) {
         Object.defineProperty(HTMLElement.prototype, 'offsetWidth', ORIGINAL_OFFSET_WIDTH);
@@ -153,6 +169,28 @@ describe('SummaryBar', () => {
 
         rerender(<SummaryBar {...baseProps({ areaIsDefault: true, onClearArea })} />);
         expect(screen.queryByRole('button', { name: 'Clear area filter' })).toBeNull();
+    });
+
+    it('does not squeeze the area label when the clear affordance appears', () => {
+        const onClearArea = vi.fn();
+        const { rerender } = render(
+            <SummaryBar {...baseProps({ areaLabel: 'Asia', areaIsDefault: true, onClearArea })} />,
+        );
+        const defaultChip = screen.getByTestId('summary-chip-area');
+        const defaultLabel = defaultChip.querySelector('span');
+        expect(defaultChip).not.toHaveStyle({ maxWidth: '88px' });
+        expect(defaultLabel).toHaveStyle({ maxWidth: '48px' });
+        expect(defaultChip).toHaveTextContent('Asia');
+
+        rerender(
+            <SummaryBar {...baseProps({ areaLabel: 'Asia', areaIsDefault: false, onClearArea })} />,
+        );
+        const activeChip = screen.getByTestId('summary-chip-area');
+        const activeLabel = activeChip.querySelector('span');
+        expect(screen.getByRole('button', { name: 'Clear area filter' })).toBeInTheDocument();
+        expect(activeChip).not.toHaveStyle({ maxWidth: '88px' });
+        expect(activeLabel).toHaveStyle({ maxWidth: '48px' });
+        expect(activeChip).toHaveTextContent('Asia');
     });
 
     it('renders the Dance chip with selected styles and deep-links to its editor', async () => {
@@ -276,6 +314,40 @@ describe('SummaryBar', () => {
         expect(screen.getByTestId('summary-open-filters')).toHaveTextContent('+4');
     });
 
+    it('uses leftover width to expand labels without displacing visible chips', () => {
+        mockMeasuredPillWidths({
+            period: { compact: 80, full: 80 },
+            area: { compact: 88, full: 140 },
+            dance: { compact: 80, full: 140 },
+            reach: { compact: 60, full: 120 },
+        }, 40);
+        render(
+            <SummaryBar
+                {...baseProps({
+                    activeTagIds: new Set([10, 11]),
+                    reachFilter: 'international',
+                    onOpenFilters: vi.fn(),
+                })}
+            />,
+        );
+
+        // Compact pills plus four gaps use 372px; one safety pixel leaves no
+        // expansion room while keeping every candidate visible.
+        setBarWidth(373);
+        expect(screen.getByTestId('summary-chip-dance')).toHaveTextContent('Salsa +1');
+        expect(screen.getByTestId('summary-chip-reach')).toHaveTextContent('Int');
+        expect(screen.getByTestId('summary-chip-area').querySelector('span')).toHaveStyle({ maxWidth: '48px' });
+        expect(screen.getByTestId('summary-open-filters')).not.toHaveTextContent('+');
+
+        setBarWidth(600);
+        expect(screen.getByTestId('summary-chip-area')).toHaveStyle({ maxWidth: '140px' });
+        expect(screen.getByTestId('summary-chip-dance')).toHaveTextContent('Salsa, Bachata');
+        expect(screen.getByTestId('summary-chip-dance')).toHaveStyle({ maxWidth: '140px' });
+        expect(screen.getByTestId('summary-chip-reach')).toHaveTextContent('International');
+        expect(screen.getByTestId('summary-chip-reach')).toHaveStyle({ maxWidth: '120px' });
+        expect(screen.getByTestId('summary-open-filters')).not.toHaveTextContent('+');
+    });
+
     it('uses up to two rows before folding lower-priority pills into +X', () => {
         mockPillWidth(80);
         render(
@@ -311,5 +383,37 @@ describe('SummaryBar', () => {
         expect(screen.queryByTestId('summary-chip-dance')).toBeNull();
         expect(screen.queryByTestId('summary-chip-reach')).toBeNull();
         expect(screen.getByTestId('summary-open-filters')).toHaveTextContent('+3');
+    });
+
+    it('distributes expansion within each compact row and redistributes unused slack', () => {
+        mockMeasuredPillWidths({
+            people: { compact: 80, full: 80 },
+            period: { compact: 80, full: 80 },
+            area: { compact: 80, full: 100 },
+            dance: { compact: 80, full: 160 },
+            reach: { compact: 80, full: 90 },
+        }, 80);
+        render(
+            <SummaryBar
+                {...baseProps({
+                    twoLine: true,
+                    activeTagIds: new Set([10, 11, 30]),
+                    reachFilter: 'international',
+                    onEditPeople: vi.fn(),
+                    interestSource: 'follows',
+                    onOpenFilters: vi.fn(),
+                })}
+            />,
+        );
+
+        setBarWidth(300);
+        expect(screen.getByTestId('summary-chip-people')).toBeInTheDocument();
+        expect(screen.getByTestId('summary-chip-period')).toBeInTheDocument();
+        expect(screen.getByTestId('summary-chip-area')).toHaveStyle({ maxWidth: '100px' });
+        expect(screen.getByTestId('summary-chip-dance')).toHaveTextContent('Salsa, Bachata');
+        expect(screen.getByTestId('summary-chip-dance')).toHaveStyle({ maxWidth: '117px' });
+        expect(screen.getByTestId('summary-chip-reach')).toHaveTextContent('International');
+        expect(screen.getByTestId('summary-chip-reach')).toHaveStyle({ maxWidth: '90px' });
+        expect(screen.getByTestId('summary-open-filters')).toHaveTextContent('+1');
     });
 });

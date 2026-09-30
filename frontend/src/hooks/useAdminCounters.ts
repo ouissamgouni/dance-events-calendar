@@ -62,7 +62,7 @@ export function useAdminCounters(): { counters: AdminCounters; refresh: () => vo
                 setCounters((prev) => ({
                     ...prev,
                     pendingReview:
-                        opts.review_statuses.find((s) => s.value === 'pending')?.count ?? 0,
+                        opts.statuses.find((s) => s.value === 'pending')?.count ?? 0,
                     ungeolocated:
                         opts.geo_statuses.find((s) => s.value === 'ungeolocated')?.count ?? 0,
                 }));

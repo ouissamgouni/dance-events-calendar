@@ -98,6 +98,10 @@
   /* border */
   --color-card-line: #eaecf0;
   /* card border */
+  --color-admin-hidden: #eaecf0;
+  /* hidden admin event surface */
+  --color-admin-blocked: #d0d5dd;
+  /* blocked admin event surface */
   --color-success: #079455;
   /* success / going */
   --color-danger: #d92d20;

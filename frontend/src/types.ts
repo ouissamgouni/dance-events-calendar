@@ -88,6 +88,9 @@ export interface LinkItem {
     label: string | null;
 }
 
+export type AdminEventStatus = 'pending' | 'reviewed' | 'blocked';
+export type AdminEventBlockReason = 'deleted' | 'duplicate' | 'rejected';
+
 export interface CalendarEvent {
     event_id: string;
     calendar_id: string;
@@ -138,8 +141,11 @@ export interface CalendarEvent {
     price_currency: string | null;
     price_is_free: boolean | null;
     review_status?: string;
+    status?: AdminEventStatus;
     is_hidden?: boolean;
     is_blocked?: boolean;
+    block_reason?: AdminEventBlockReason | null;
+    block_reason_detail?: string | null;
     links: LinkItem[] | null;
     tags: Tag[];
     /** Server-computed: at least one approved, non-expired promo code exists.
