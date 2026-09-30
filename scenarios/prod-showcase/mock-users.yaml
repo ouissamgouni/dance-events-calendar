@@ -57,7 +57,7 @@ users:
     account_visibility: public
     is_verified_organizer: true
     bio: Seaside salsa festivals, destination weekends, and international dance holidays.
-    avatar: null
+    avatar: uifaces-human-avatar (11).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Sea%20Sun%20Salsa%20Team
   - email: rave.republic@joinmovida.com
     name: Rave Republic
@@ -65,7 +65,7 @@ users:
     account_visibility: public
     is_verified_organizer: true
     bio: High-energy salsa socials, special guests, and late-night dance experiences.
-    avatar: null
+    avatar: uifaces-human-avatar (30).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Rave%20Republic
   - email: penny.valdez@joinmovida.com
     name: Penny Valdez
@@ -126,7 +126,7 @@ users:
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
-    avatar: uifaces-human-avatar (16).jpg
+    avatar: uifaces-human-avatar (21).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Omar%20Costa
   - email: clara.dubois@joinmovida.com
     name: Clara Dubois
@@ -134,7 +134,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (4).jpg
+    avatar: uifaces-human-avatar (17).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Clara%20Dubois
   - email: jonas.meyer@joinmovida.com
     name: Jonas Meyer
@@ -142,7 +142,7 @@ users:
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (17).jpg
+    avatar: uifaces-human-avatar (13).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Jonas%20Meyer
   - email: mina.silva@joinmovida.com
     name: Mina Silva
@@ -182,7 +182,7 @@ users:
     account_visibility: private
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: uifaces-human-avatar (21).jpg
+    avatar: uifaces-human-avatar (16).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Nina%20Khan
   - email: samir.ivanov@joinmovida.com
     name: Samir Ivanov
@@ -206,7 +206,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (2).jpg
+    avatar: uifaces-human-avatar (10).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Sofia%20Torres
   - email: milan.horvat@joinmovida.com
     name: Milan Horvat
