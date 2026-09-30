@@ -26,6 +26,7 @@ from backend.db.models import BlockedEvent, CachedEvent, EventCalendarSource, Ev
 from backend.services.calendar.base import CalendarEvent
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.event_extractor import (
+    EXTRACTOR_STATE_VERSION,
     apply_calendar_description,
     apply_extractor_image,
 )
@@ -810,11 +811,15 @@ class EventPipelineProcessor:
             # Detect whether this re-pull actually changes anything.
             content_unchanged = existing.content_hash == buffer.content_hash
             source_unchanged = existing.source_description == buffer.source_description
+            extractor_current = (existing.extractor_state or {}).get(
+                "version"
+            ) == EXTRACTOR_STATE_VERSION
             new_geocode = existing.latitude is None and buffer.latitude is not None
             new_links = existing.links is None and buffer.links is not None
             if (
                 content_unchanged
                 and source_unchanged
+                and extractor_current
                 and not (new_geocode or new_links)
             ):
                 # No-op re-pull from upstream — still upsert calendar source link
