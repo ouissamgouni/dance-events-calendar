@@ -249,11 +249,16 @@ export default function GoingButton({
 
     /** Live audience change from the post-RSVP popover — applies
      *  immediately so the toast feels reactive. */
+    const userId = user?.user_id;
     const handlePostRsvpAudienceChange = useCallback((next: ShareAudience) => {
         setAudience(eventId, next).then((ok) => {
-            if (!ok) errorToast.show("Couldn't update visibility \u2014 try again", 3200);
+            if (!ok) {
+                errorToast.show("Couldn't update visibility \u2014 try again", 3200);
+                return;
+            }
+            if (userId) setLastUsedAudience(userId, next);
         });
-    }, [eventId, setAudience, errorToast]);
+    }, [eventId, setAudience, errorToast, userId]);
 
     const shareEventNow = useCallback(async () => {
         const url = `${window.location.origin}/event/${eventId}`;

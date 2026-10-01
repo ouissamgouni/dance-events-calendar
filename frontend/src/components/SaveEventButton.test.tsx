@@ -183,4 +183,24 @@ describe('SaveEventButton visibility', () => {
         expect(radios[0]).toBeChecked()
         expect(screen.getByText('Anyone who can view your profile will see this in your saved list.')).toBeInTheDocument()
     })
+
+    it('uses the last-used audience when there is no account default and remembers changes', async () => {
+        useMobileViewport()
+        localStorage.setItem('audience.lastUsed.user-1', 'friends')
+        server.use(
+            http.get('*/api/auth/me', () =>
+                HttpResponse.json(makeUser({ share_attendance_default_audience: undefined })),
+            ),
+        )
+        const { user } = renderWithProviders(<SaveEventButton eventId="evt-last-used" eventTitle="Summer Salsa Social" />)
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+        await screen.findByRole('dialog', { name: 'Saved!' })
+        expect(screen.getByRole('radio', { name: /^Friends/ })).toHaveAttribute('aria-checked', 'true')
+
+        await user.click(screen.getByRole('radio', { name: /^Private/ }))
+        await waitFor(() =>
+            expect(localStorage.getItem('audience.lastUsed.user-1')).toBe('private'),
+        )
+    })
 })

@@ -179,4 +179,20 @@ describe('GoingButton visibility', () => {
         expect(within(editSheet).getByRole('button', { name: 'Done' })).toBeInTheDocument()
         expect(within(editSheet).queryByRole('checkbox')).not.toBeInTheDocument()
     })
+
+    it('remembers the audience picked in the post-RSVP sheet as last used', async () => {
+        useMobileViewport()
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+        )
+        const { user } = renderGoingButton('evt-last-used')
+
+        await user.click(await screen.findByRole('button', { name: "I'm going" }))
+        await screen.findByRole('dialog', { name: "You're going!" })
+        await user.click(screen.getByRole('radio', { name: /^Private/ }))
+
+        await waitFor(() =>
+            expect(localStorage.getItem('audience.lastUsed.user-1')).toBe('private'),
+        )
+    })
 })

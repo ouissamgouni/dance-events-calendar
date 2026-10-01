@@ -7,6 +7,7 @@ import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
 import { trackSave } from '../utils/tracking';
+import { defaultRsvpAudienceFor, setLastUsedAudience } from '../utils/audiencePreference';
 import type { ShareAudience } from '../api';
 
 interface Props {
@@ -70,9 +71,7 @@ export default function SaveEventButton({
             // account-level default audience, optimistically flip local state,
             // then open the visibility popover so the user can adjust on the
             // fly — parity with the post-RSVP popover that GoingButton shows.
-            const defaultAudience: ShareAudience =
-                user.share_attendance_default_audience
-                ?? (user.share_attendance_default === false ? 'private' : 'public');
+            const defaultAudience = defaultRsvpAudienceFor(user);
             toggleSave(eventId).then((ok) => {
                 if (!ok) {
                     toast.show("Couldn't save \u2014 try again", 3200);
@@ -104,7 +103,11 @@ export default function SaveEventButton({
     const handlePopoverAudienceChange = (next: ShareAudience) => {
         setPendingAudience(next);
         setSavedAudience(eventId, next).then((ok) => {
-            if (!ok) toast.show("Couldn't update visibility \u2014 try again", 3200);
+            if (!ok) {
+                toast.show("Couldn't update visibility \u2014 try again", 3200);
+                return;
+            }
+            if (user?.user_id) setLastUsedAudience(user.user_id, next);
         });
     };
 

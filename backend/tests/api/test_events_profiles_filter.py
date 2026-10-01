@@ -29,8 +29,10 @@ from backend.db.models import (  # noqa: E402
     Tag,
     TagGroup,
     User,
+    UserEventAttendance,
     UserInterestProfile,
     UserInterestProfileTag,
+    UserSavedEvent,
 )
 
 
@@ -212,6 +214,32 @@ def test_profiles_me_returns_union_across_profiles(client, world):
         "evt-paris-salsa-unclassified",
         "evt-madrid-any-intl",
     }
+
+
+def test_profiles_me_exclude_mine_drops_saved_and_going(client, session, world):
+    _login(client, "nora@example.com")
+    user_id = world["user"].id
+    session.add(
+        UserSavedEvent(
+            device_id="d1", event_id="evt-paris-salsa-local", user_id=user_id
+        )
+    )
+    session.add(
+        UserEventAttendance(
+            device_id="d1", event_id="evt-madrid-any-intl", user_id=user_id
+        )
+    )
+    session.commit()
+
+    r = client.get(
+        "/api/events", params={"profiles": "me", "exclude_mine": "true", "limit": 10}
+    )
+    assert r.status_code == 200, r.text
+    assert {e["event_id"] for e in r.json()} == {"evt-paris-salsa-unclassified"}
+    assert r.headers["X-Total-Count"] == "1"
+
+    r = client.get("/api/events", params={"profiles": "me"})
+    assert len(r.json()) == 3
 
 
 def test_profiles_me_anonymous_returns_empty(client, world):

@@ -591,6 +591,13 @@ def get_events(
             "on top as an intersect."
         ),
     ),
+    exclude_mine: bool = Query(
+        False,
+        description=(
+            "Drop events the authenticated viewer has saved or is going "
+            "to. No-op for anonymous viewers."
+        ),
+    ),
     limit: Optional[int] = Query(
         None,
         ge=1,
@@ -738,6 +745,20 @@ def get_events(
         if not profile_event_ids:
             return JSONResponse(content=[], headers={"X-Total-Count": "0"})
         query = query.where(CachedEvent.event_id.in_(profile_event_ids))
+
+    if exclude_mine and current_user is not None:
+        query = query.where(
+            col(CachedEvent.event_id).not_in(
+                select(UserSavedEvent.event_id).where(
+                    UserSavedEvent.user_id == current_user.id
+                )
+            ),
+            col(CachedEvent.event_id).not_in(
+                select(UserEventAttendance.event_id).where(
+                    UserEventAttendance.user_id == current_user.id
+                )
+            ),
+        )
 
     total_count: int | None = None
     if limit is not None:
