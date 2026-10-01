@@ -51,6 +51,8 @@ export interface FilterSheetSection {
     /** Optional right-aligned action in the boxed group header. Rendered in
      *  the small uppercase header row alongside the group label. */
     groupHeaderAction?: React.ReactNode;
+    /** Nested rows shown as a list inside this section; each opens its own sub-editor. */
+    subsections?: FilterSheetSection[];
 }
 
 export interface SaveDefaultsOption {
@@ -101,6 +103,7 @@ export default function FilterSheet({
 }: FilterSheetProps) {
     const sectioned = !!sections && sections.length > 0;
     const [activeSectionId, setActiveSectionId] = useState<string | null>(initialSectionId);
+    const [activeSubsectionId, setActiveSubsectionId] = useState<string | null>(null);
     const swipeStartY = useRef<number | null>(null);
 
     // On open, honor a deep-link section; on close, reset navigation so the
@@ -111,6 +114,7 @@ export default function FilterSheet({
     if (navSync.open !== open || navSync.initialSectionId !== initialSectionId) {
         setNavSync({ open, initialSectionId });
         setActiveSectionId(open ? initialSectionId : null);
+        setActiveSubsectionId(null);
     }
 
     useBackToClose(onClose, open);
@@ -216,7 +220,10 @@ export default function FilterSheet({
         </div>
     );
 
-    const renderNavRow = (section: FilterSheetSection) => {
+    const renderNavRow = (section: FilterSheetSection, onSelect: (id: string) => void = (id) => {
+        setActiveSectionId(id);
+        setActiveSubsectionId(null);
+    }) => {
         if (section.customRow) {
             return (
                 <li key={section.id} data-testid={`filter-sheet-row-${section.id}`}>
@@ -229,7 +236,7 @@ export default function FilterSheet({
             <li key={section.id}>
                 <button
                     type="button"
-                    onClick={() => setActiveSectionId(section.id)}
+                    onClick={() => onSelect(section.id)}
                     className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-canvas"
                     data-testid={`filter-sheet-row-${section.id}`}
                 >
@@ -282,14 +289,14 @@ export default function FilterSheet({
                                     {groupHeaderAction && <div className="ml-auto">{groupHeaderAction}</div>}
                                 </div>
                             )}
-                            <ul>{grp.sections.map(renderNavRow)}</ul>
+                            <ul>{grp.sections.map((s) => renderNavRow(s))}</ul>
                             {i < grouped.length - 1 && <div className="border-t border-card-line py-2" />}
                         </div>
                     );
                 }
                 return (
                     <div key={grp.group ?? `_${i}`}>
-                        <ul className="divide-y divide-card-line">{grp.sections.map(renderNavRow)}</ul>
+                        <ul className="divide-y divide-card-line">{grp.sections.map((s) => renderNavRow(s))}</ul>
                     </div>
                 );
             })}
@@ -301,11 +308,28 @@ export default function FilterSheet({
     );
 
     const activeSection = sectioned && activeSectionId && activeSectionId !== SAVE_DEFAULTS_ID
-        ? sections!.find((s) => s.id === activeSectionId && s.render) ?? null
+        ? sections!.find((s) => s.id === activeSectionId && (s.render || s.subsections)) ?? null
         : null;
+    const activeSubsection = activeSection?.subsections?.find((s) => s.id === activeSubsectionId && s.render) ?? null;
 
-    const editor = activeSection ? (
+    const editor = activeSubsection ? (
         <FullScreenEditor
+            key={`sub-${activeSubsection.id}`}
+            title={activeSubsection.label}
+            onBack={() => setActiveSubsectionId(null)}
+            headerAction={activeSubsection.headerAction}
+            footer={activeSubsection.footer}
+            ctaLabel={activeSubsection.footer ? undefined : ctaLabel}
+            onCta={onClose}
+            secondaryLabel={activeSection!.label}
+            onSecondary={() => setActiveSubsectionId(null)}
+            variant={variant}
+        >
+            {activeSubsection.render?.()}
+        </FullScreenEditor>
+    ) : activeSection ? (
+        <FullScreenEditor
+            key={activeSection.id}
             title={activeSection.label}
             onBack={() => setActiveSectionId(null)}
             headerAction={activeSection.headerAction}
@@ -316,7 +340,11 @@ export default function FilterSheet({
             onSecondary={() => setActiveSectionId(null)}
             variant={variant}
         >
-            {activeSection.render?.()}
+            {activeSection.subsections ? (
+                <ul className="-mx-4 -my-4 divide-y divide-card-line bg-canvas" data-testid={`filter-sheet-subsections-${activeSection.id}`}>
+                    {activeSection.subsections.map((s) => renderNavRow(s, setActiveSubsectionId))}
+                </ul>
+            ) : activeSection.render?.()}
         </FullScreenEditor>
     ) : activeSectionId === SAVE_DEFAULTS_ID && saveDefaults ? (
         <SaveDefaultsEditor
@@ -356,7 +384,7 @@ export default function FilterSheet({
         </>
     );
 
-    const sheetFull = !!activeSection && (activeSection.size ?? 'full') === 'full';
+    const sheetFull = !!activeSection && ((activeSubsection ?? activeSection).size ?? 'full') === 'full';
 
     const panel = (
         <div

@@ -229,6 +229,18 @@ describe('SummaryBar', () => {
         expect(screen.getByTestId('summary-chip-reach')).toHaveTextContent('Int');
     });
 
+    it('shows the Discount chip only while the filter is active and deep-links', async () => {
+        const onEditDiscount = vi.fn();
+        const { rerender } = render(<SummaryBar {...baseProps({ discountActive: false, onEditDiscount })} />);
+        expect(screen.queryByTestId('summary-chip-discount')).toBeNull();
+
+        rerender(<SummaryBar {...baseProps({ discountActive: true, onEditDiscount })} />);
+        const chip = screen.getByTestId('summary-chip-discount');
+        expect(chip).toHaveTextContent('Discount');
+        await userEvent.click(chip);
+        expect(onEditDiscount).toHaveBeenCalledTimes(1);
+    });
+
     it('renders the consolidated, shortened People chip and deep-links', async () => {
         const onEditPeople = vi.fn();
         const { rerender } = render(<SummaryBar {...baseProps()} />);
