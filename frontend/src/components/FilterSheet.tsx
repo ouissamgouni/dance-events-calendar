@@ -295,7 +295,9 @@ export default function FilterSheet({
                     headerAction={activeSection.headerAction}
                     footer={activeSection.footer}
                     ctaLabel={activeSection.footer ? undefined : ctaLabel}
-                    onCta={() => setActiveSectionId(null)}
+                    onCta={onClose}
+                    secondaryLabel="More filters"
+                    onSecondary={() => setActiveSectionId(null)}
                     variant={variant}
                 >
                     {activeSection.render?.()}

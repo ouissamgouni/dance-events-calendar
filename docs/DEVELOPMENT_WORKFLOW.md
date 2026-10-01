@@ -474,12 +474,22 @@ Gates:
 - `REF` must be supplied and reachable from `origin/develop` (no feature branches)
 - `git fetch origin develop` runs automatically before validation
 
-**Full deploy (all three components in sequence):**
+**Deploy changed components (db → backend → frontend):**
 
 ```bash
 task deploy:staging:remote -- develop
 # or any develop commit / SHA:
 task deploy:staging:remote -- abc1234
+```
+
+Only components whose files differ from their staging-deployed SHA
+(`refs/deploys/staging/<component>`) are deployed. Extra args after the ref:
+
+```bash
+task deploy:staging:remote -- develop backend frontend  # exactly these
+task deploy:staging:remote -- develop --all             # all three
+task deploy:staging:remote -- develop --dry-run         # show the plan only
+task deploy:staging:remote -- develop --skip-ci-check
 ```
 
 No `git checkout` required — you can be on a feature branch with uncommitted
@@ -690,7 +700,7 @@ task git:pr:checks                          # watch CI
 task git:pr:ready                           # mark ready, get review, merge
 
 # 5. Stage from develop
-task deploy:staging:remote -- develop       # db + backend + frontend
+task deploy:staging:remote -- develop       # changed components (db → backend → frontend); --all for all
 task deploy:staging:status                  # confirm SHAs match develop
 #    → manual QA on https://develop.joinmovida.com
 
@@ -885,7 +895,7 @@ All require `REF` (a develop commit). Runs from an isolated `.worktrees/ref-<sha
 | `task deploy:staging:remote:db -- <ref>` | Alembic migrations → Neon develop |
 | `task deploy:staging:remote:backend -- <ref>` | Stage secrets + fly deploy + smoke test |
 | `task deploy:staging:remote:frontend -- <ref>` | Build + wrangler pages deploy --branch=develop |
-| `task deploy:staging:remote -- <ref>` | All three in sequence |
+| `task deploy:staging:remote -- <ref> [comps] [--all] [--dry-run] [--skip-ci-check]` | Changed components (or listed / all) in sequence |
 
 ### Deploy — Prod Remote (atomic)
 

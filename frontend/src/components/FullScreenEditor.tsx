@@ -20,6 +20,9 @@ export interface FullScreenEditorProps {
     ctaLabel?: string;
     onCta?: () => void;
     ctaDisabled?: boolean;
+    /** Optional secondary button shown left of the default CTA. */
+    secondaryLabel?: string;
+    onSecondary?: () => void;
     variant?: 'sheet' | 'modal';
     children: React.ReactNode;
 }
@@ -32,6 +35,8 @@ export default function FullScreenEditor({
     ctaLabel,
     onCta,
     ctaDisabled = false,
+    secondaryLabel,
+    onSecondary,
     variant = 'sheet',
     children,
 }: FullScreenEditorProps) {
@@ -54,7 +59,7 @@ export default function FullScreenEditor({
         </svg>
     );
 
-    const defaultFooter = ctaLabel ? (
+    const ctaButton = ctaLabel ? (
         <button
             type="button"
             onClick={onCta}
@@ -65,6 +70,19 @@ export default function FullScreenEditor({
             {ctaLabel}
         </button>
     ) : null;
+    const defaultFooter = ctaButton && secondaryLabel ? (
+        <div className="flex items-center gap-2">
+            <button
+                type="button"
+                onClick={onSecondary}
+                className="inline-flex shrink-0 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas text-sm font-semibold px-3 py-2 transition"
+                data-testid="full-screen-editor-secondary"
+            >
+                {secondaryLabel}
+            </button>
+            <div className="flex-1">{ctaButton}</div>
+        </div>
+    ) : ctaButton;
     const footerContent = footer ?? defaultFooter;
 
     const panel = (
