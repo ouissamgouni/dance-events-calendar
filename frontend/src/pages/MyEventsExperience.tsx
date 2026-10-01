@@ -100,6 +100,12 @@ export default function MyEventsExperience() {
     };
     const activeTabEventIds = useMemo(() => activeEvents.map(e => e.event_id), [activeEvents]);
 
+    const tabCounts = useMemo(() => ({
+        upcoming: eventsForMyEventsTab(events, 'upcoming', isSaved, isAttending).length,
+        saved: eventsForMyEventsTab(events, 'saved', isSaved, isAttending).length,
+        past: eventsForMyEventsTab(events, 'past', isSaved, isAttending).length,
+    }), [events, isSaved, isAttending]);
+
     return (
         <div ref={rootRef} className="relative flex min-h-0 flex-1 flex-col bg-canvas">
             <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 bg-surface border-b border-line">
@@ -110,9 +116,10 @@ export default function MyEventsExperience() {
                 <nav aria-label="My Events" className="grid grid-cols-3 border-b border-line bg-surface">
                     {tabs.map((tab) => {
                         const active = activeTab === tab.id;
+                        const count = tabCounts[tab.id];
                         return (
                             <button key={tab.id} type="button" role="tab" aria-selected={active} onClick={() => { setActiveTab(tab.id); setSearchOpen(false); }} className={`relative py-4 text-sm font-medium transition ${active ? 'text-action' : 'text-ink hover:text-action'}`}>
-                                {tab.label}
+                                {tab.label}{count > 0 && ` (${count})`}
                                 {active && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-action" />}
                             </button>
                         );
