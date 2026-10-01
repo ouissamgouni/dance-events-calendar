@@ -228,7 +228,7 @@ export default function ForYouPage() {
 
     const youMightLikeLens = useForYouLens({
         enabled: !!user,
-        fetchArgs: { startDate: forYouStartDate, profiles: 'me' },
+        fetchArgs: { startDate: forYouStartDate, profiles: 'me', excludeMine: true },
         resetKey: forYouResetKey,
     });
     const friendsGoingLens = useForYouLens({
@@ -287,6 +287,8 @@ export default function ForYouPage() {
 
     const [rawYourNextEvents, setRawYourNextEvents] = useState<CalendarEvent[]>([]);
     const [yourNextEventsLoading, setYourNextEventsLoading] = useState(true);
+    // Refetches after an RSVP keep the rail mounted; hiding it shifts the page under the user.
+    const yourNextLoadedRef = useRef(false);
     useEffect(() => {
         if (!user) {
             setRawYourNextEvents([]);
@@ -294,16 +296,17 @@ export default function ForYouPage() {
             return;
         }
         if (attendingEventsLoading) {
-            setYourNextEventsLoading(true);
+            if (!yourNextLoadedRef.current) setYourNextEventsLoading(true);
             return;
         }
         if (attendingEventIds.length === 0) {
             setRawYourNextEvents([]);
             setYourNextEventsLoading(false);
+            yourNextLoadedRef.current = true;
             return;
         }
         let cancelled = false;
-        setYourNextEventsLoading(true);
+        if (!yourNextLoadedRef.current) setYourNextEventsLoading(true);
         fetchEventsByIds(attendingEventIds)
             .then((evts) => {
                 if (cancelled) return;
@@ -314,6 +317,7 @@ export default function ForYouPage() {
                         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
                 );
                 setYourNextEventsLoading(false);
+                yourNextLoadedRef.current = true;
             })
             .catch(() => {
                 if (!cancelled) setYourNextEventsLoading(false);
@@ -405,7 +409,7 @@ export default function ForYouPage() {
                         <YourNextEventsRail
                             events={yourNextEvents}
                             onEventClick={handleEventClick}
-                            loading={attendingEventsLoading || yourNextEventsLoading}
+                            loading={yourNextEventsLoading}
                         />
                         <LensTrail
                             title="You might like"

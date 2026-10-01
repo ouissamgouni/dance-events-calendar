@@ -9,6 +9,7 @@ interface ForYouLensFetchArgs {
     interestSource?: 'follows' | 'friends';
     interestKind?: 'any' | 'going' | 'saved';
     profiles?: 'me';
+    excludeMine?: boolean;
 }
 
 interface UseForYouLensOptions {

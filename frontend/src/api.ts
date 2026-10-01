@@ -156,6 +156,7 @@ export async function fetchEventsPage(
         interestUserHandles?: string[];
         interestMatch?: 'any' | 'all';
         profiles?: 'me';
+        excludeMine?: boolean;
         limit: number;
         offset?: number;
     },
@@ -179,6 +180,7 @@ export async function fetchEventsPage(
     for (const h of params.interestUserHandles ?? []) searchParams.append('interest_user_handle', h);
     if (params.interestMatch === 'all') searchParams.set('interest_match', 'all');
     if (params.profiles) searchParams.set('profiles', params.profiles);
+    if (params.excludeMine) searchParams.set('exclude_mine', 'true');
     searchParams.set('limit', String(params.limit));
     if (params.offset) searchParams.set('offset', String(params.offset));
     const qs = searchParams.toString();

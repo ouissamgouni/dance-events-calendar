@@ -55,15 +55,16 @@ test_plan:
         badge.
 
     - id: 3
-      title: "Save/Going CTA removes the card from the lens"
+      title: "Saved/Going events are excluded from the lens on reload"
       description: >
         On the first "You might like" card, click the Save icon, then
         reload /for-you.
       expected: >
-        The saved event no longer appears in "You might like", but it does
-        not enter "Your next event" because that section is Going-only.
-        Repeat with the Going icon on a different card: it becomes the compact
-        next-event card after the Going context updates.
+        Right after clicking Save the card stays in place. After reload the
+        saved event no longer appears in "You might like", and it does not
+        enter "Your next event" because that section is Going-only.
+        Repeat with the Going icon on a different card: after reload it is
+        gone from "You might like" and shows as the compact next-event card.
 
     - id: 4
       title: "'+ more' reveals cards, then paginates"
