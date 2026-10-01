@@ -20,6 +20,9 @@ export interface FullScreenEditorProps {
     ctaLabel?: string;
     onCta?: () => void;
     ctaDisabled?: boolean;
+    /** Optional secondary button shown left of the default CTA. */
+    secondaryLabel?: string;
+    onSecondary?: () => void;
     variant?: 'sheet' | 'modal';
     children: React.ReactNode;
 }
@@ -32,6 +35,8 @@ export default function FullScreenEditor({
     ctaLabel,
     onCta,
     ctaDisabled = false,
+    secondaryLabel,
+    onSecondary,
     variant = 'sheet',
     children,
 }: FullScreenEditorProps) {
@@ -49,22 +54,35 @@ export default function FullScreenEditor({
     }, [onBack]);
 
     const backIcon = (
-        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 4 6 10l6 6" />
         </svg>
     );
 
-    const defaultFooter = ctaLabel ? (
+    const ctaButton = ctaLabel ? (
         <button
             type="button"
             onClick={onCta}
             disabled={ctaDisabled}
-            className="inline-flex w-full items-center justify-center bg-action hover:bg-action text-white text-sm font-semibold px-3 py-2 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex min-h-11 w-full items-center justify-center bg-action hover:opacity-90 text-white text-sm font-semibold px-4 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="full-screen-editor-cta"
         >
             {ctaLabel}
         </button>
     ) : null;
+    const defaultFooter = ctaButton && secondaryLabel ? (
+        <div className="flex items-center gap-2">
+            <button
+                type="button"
+                onClick={onSecondary}
+                className="inline-flex min-h-11 shrink-0 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas text-sm font-semibold px-4 transition"
+                data-testid="full-screen-editor-secondary"
+            >
+                {secondaryLabel}
+            </button>
+            <div className="flex-1">{ctaButton}</div>
+        </div>
+    ) : ctaButton;
     const footerContent = footer ?? defaultFooter;
 
     const panel = (
@@ -72,15 +90,15 @@ export default function FullScreenEditor({
             className={
                 variant === 'modal'
                     ? 'full-screen-editor-panel w-full max-w-2xl max-h-[min(85dvh,calc(100dvh-4rem))] bg-surface border border-line shadow-xl flex flex-col'
-                    : 'full-screen-editor-panel bg-surface flex flex-col h-full'
+                    : 'full-screen-editor-panel bg-surface flex min-h-0 flex-1 flex-col'
             }
             data-testid="full-screen-editor"
         >
-            <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-2">
+            <div className="flex min-h-14 items-center justify-between gap-2 border-b border-line px-2 py-1">
                 <button
                     type="button"
                     onClick={onBack}
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-ink hover:text-action"
+                    className="inline-flex min-h-11 items-center gap-1.5 px-2 text-base font-semibold text-ink hover:text-action"
                     aria-label="Back to filters"
                     data-testid="full-screen-editor-back"
                 >
@@ -89,11 +107,11 @@ export default function FullScreenEditor({
                 </button>
                 {headerAction}
             </div>
-            <div className="flex-1 overflow-y-auto bg-canvas px-3 py-3">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-4 py-4">
                 {children}
             </div>
             {footerContent && (
-                <div className="border-t border-line bg-canvas px-3 py-2">
+                <div className="border-t border-line bg-canvas px-4 py-3">
                     {footerContent}
                 </div>
             )}
@@ -113,9 +131,10 @@ export default function FullScreenEditor({
         );
     }
 
+    // Sheet variant renders in-flow; FilterSheet sizes the panel around it.
     return (
         <div
-            className="absolute inset-0 z-[10] flex flex-col"
+            className="flex min-h-0 flex-1 flex-col"
             role="dialog"
             aria-modal="true"
             aria-label={title}

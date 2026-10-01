@@ -139,10 +139,10 @@ describe('SaveEventButton visibility', () => {
 
         const sheet = await screen.findByRole('dialog', { name: 'Saved!' })
         expect(sheet).toHaveAttribute('aria-modal', 'true')
-        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-base')
+        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-sm')
         expect(screen.getByRole('radiogroup', { name: 'Saved event visibility' })).toHaveClass('flex', 'w-full')
         expect(screen.getAllByRole('radio')).toHaveLength(3)
-        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-12', 'text-base')
+        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-12', 'text-sm')
         expect(within(sheet).getByRole('button', { name: 'Unsave' })).toHaveClass('text-danger')
         expect(within(sheet).getByRole('button', { name: 'Done' })).toBeInTheDocument()
     })

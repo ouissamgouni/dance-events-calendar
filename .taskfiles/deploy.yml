@@ -235,6 +235,99 @@ tasks:
         fi
 
   # ──────────────────────────────────────────────────────────────────────────
+  # Recap: what an orchestrator run deployed, by comparing refs/deploys/<env>/*
+  # against a snapshot taken before the run.
+  #   ENV=prod|staging  BEFORE="db=<sha|-> backend=<sha|-> frontend=<sha|->"
+  #   FAILED=<component> (optional — the component that stopped the run)
+  # Not internal: release.yml / shell loops call it via `task deploy:_recap`.
+  # ──────────────────────────────────────────────────────────────────────────
+
+  _recap:
+    silent: true
+    cmds:
+      - |
+        ENV="{{.ENV}}"; FAILED="{{.FAILED}}"
+        for P in {{.BEFORE}}; do
+          eval "B_${P%%=*}=\${P#*=}"
+        done
+        get() { eval "echo \"\${$1_$2}\""; }
+        comp_path() {
+          case "$1" in
+            db) echo "backend/db/alembic" ;;
+            backend) echo "backend" ;;
+            frontend) echo "frontend" ;;
+          esac
+        }
+        label() {
+          T=""
+          if [ -z "$2" ]; then
+            T="(none)"
+          elif [ "$ENV" = "prod" ]; then
+            T=$(git describe --tags --exact-match --match "$1-v*" "$2" 2>/dev/null || true)
+          fi
+          if [ -z "$T" ]; then T=$(git rev-parse --short=7 "$2"); fi
+          echo "$T"
+        }
+
+        git fetch origin "+refs/deploys/$ENV/*:refs/deploys/$ENV/*" --quiet 2>/dev/null || true
+
+        if [ "$ENV" = "prod" ]; then
+          TITLE="PRODUCTION"; BE_URL="https://movida.fly.dev"
+          FE_URL="https://joinmovida.com (alias: https://movida.pages.dev)"
+          OPEN="open:isolated:prod"; DBCHECK="db:check:prod"; LOGS="fly:logs"
+        else
+          TITLE="REMOTE STAGING"; BE_URL="https://movida-staging.fly.dev"
+          FE_URL="https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
+          OPEN="open:isolated:staging:remote"; DBCHECK="db:check:staging:remote"; LOGS="logs:staging:remote"
+        fi
+
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════════════"
+        echo "  RECAP — $TITLE"
+        echo ""
+        DONE=""
+        for C in db backend frontend; do
+          B=$(get B "$C")
+          if [ "$B" = "-" ]; then B=""; fi
+          A=$(git rev-parse --verify --quiet "refs/deploys/$ENV/$C" 2>/dev/null || true)
+          if [ "$C" = "$FAILED" ]; then
+            printf "  ❌ %-9s failed — still %s\n" "$C" "$(label "$C" "$B")"
+          elif [ "$A" = "$B" ]; then
+            printf "  ·  %-9s unchanged (%s)\n" "$C" "$(label "$C" "$B")"
+          else
+            DONE="$DONE $C"
+            if [ -n "$B" ]; then
+              N=$(git rev-list --count --no-merges "$B..$A" -- "$(comp_path "$C")" 2>/dev/null || echo "?")
+              INFO="$N commits"
+              if [ "$N" = "0" ]; then INFO="no new commits (rollback/redeploy)"; fi
+            else
+              INFO="first deploy"
+            fi
+            printf "  ✅ %-9s %s → %s  (%s)\n" "$C" "$(label "$C" "$B")" "$(label "$C" "$A")" "$INFO"
+            if [ -n "$B" ]; then
+              git log --oneline --no-merges -8 "$B..$A" -- "$(comp_path "$C")" 2>/dev/null | sed 's/^/        /'
+              if [ "$N" != "?" ] && [ "$N" -gt 8 ]; then echo "        … $((N-8)) more"; fi
+            fi
+          fi
+        done
+
+        if [ -z "$DONE" ]; then
+          echo ""
+          echo "  Nothing was deployed."
+          echo "═══════════════════════════════════════════════════════════════════════"
+          exit 0
+        fi
+        echo ""
+        case " $DONE " in *" backend "*) echo "  Backend:  $BE_URL" ;; esac
+        case " $DONE " in *" frontend "*) echo "  Frontend: $FE_URL" ;; esac
+        echo ""
+        echo "  Verify:"
+        echo "    task $OPEN    → open in isolated browser"
+        case " $DONE " in *" db "*) echo "    task $DBCHECK    → DB migration state" ;; esac
+        case " $DONE " in *" backend "*) echo "    task $LOGS    → backend logs" ;; esac
+        echo "═══════════════════════════════════════════════════════════════════════"
+
+  # ──────────────────────────────────────────────────────────────────────────
   # Status: what is currently deployed
   # ──────────────────────────────────────────────────────────────────────────
 
@@ -950,50 +1043,136 @@ tasks:
           PROJECT_NAME: "{{.PROJECT_NAME}}"
 
   staging:remote:
-    desc: "Full remote staging deploy: DB migrations + backend (secrets+fly) +
-      frontend. REF must be a develop commit (e.g., task deploy:staging:remote
-      -- develop)."
-    vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
-    deps:
-      - task: _prepare-ref-staging
-        vars: { REF: "{{.REF}}" }
+    desc: "Remote staging deploy of components changed since their last staging
+      deploy (db → backend → frontend). Args after --: <ref> [db backend
+      frontend] [--all] [--dry-run] [--skip-ci-check]."
+    silent: true
     cmds:
       - |
-        SHORT=$(git rev-parse --short=7 "{{.REF}}^{commit}")
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        TASK_SKIP="{{.SKIP_CI_CHECK | default ""}}"
+        [ -n "$TASK_SKIP" ] && export SKIP_CI_CHECK="$TASK_SKIP"
+
+        usage() {
+          echo "Usage: task deploy:staging:remote -- <ref> [db] [backend] [frontend] [--all] [--dry-run] [--skip-ci-check]"
+          echo "  <ref>            develop commit/branch (e.g. develop, abc1234)"
+          echo "  (default)        deploy only components whose files differ from the staging-deployed SHA"
+          echo "  db backend ...   deploy exactly these components"
+          echo "  --all            deploy all three"
+          echo "  --dry-run        show the plan and exit"
+          echo "  --skip-ci-check  skip CI green-check before deploy"
+        }
+
+        REF="{{.REF}}"; ALL=""; DRY=""; LIST=""
+        set -- {{.CLI_ARGS}}
+        for ARG in "$@"; do
+          case "$ARG" in
+            --all) ALL=1 ;;
+            --dry-run) DRY=1 ;;
+            --skip-ci-check) export SKIP_CI_CHECK=1 ;;
+            -h|--help) usage; exit 0 ;;
+            -*) echo "❌ Unknown flag '$ARG'."; usage; exit 1 ;;
+            *)
+              if [ -z "$REF" ]; then
+                REF="$ARG"
+              else
+                case "$ARG" in
+                  db|backend|frontend) LIST="$LIST $ARG" ;;
+                  *) echo "❌ Unknown component '$ARG'."; usage; exit 1 ;;
+                esac
+              fi ;;
+          esac
+        done
+        if [ -z "$REF" ]; then
+          echo "❌ REF required."; usage; exit 1
+        fi
+
+        # Echo-based: a non-zero function return trips errexit in Task's shell.
+        listed() {
+          case " $LIST " in *" $1 "*) echo 1 ;; esac
+        }
+        get() { eval "echo \"\${$1_$2}\""; }
+        comp_path() {
+          case "$1" in
+            db) echo "backend/db/alembic" ;;
+            backend) echo "backend" ;;
+            frontend) echo "frontend" ;;
+          esac
+        }
+
+        git fetch origin develop --quiet 2>/dev/null || true
+        git fetch origin '+refs/deploys/staging/*:refs/deploys/staging/*' --quiet 2>/dev/null || true
+        REF_SHA=$(git rev-parse --verify --quiet "$REF^{commit}" 2>/dev/null || true)
+        if [ -z "$REF_SHA" ]; then
+          echo "❌ Git ref '$REF' not found locally or on origin."; exit 1
+        fi
+        SHORT=$(git rev-parse --short=7 "$REF_SHA")
+
+        for C in db backend frontend; do
+          CUR=$(git rev-parse --verify --quiet "refs/deploys/staging/$C" 2>/dev/null || true)
+          if [ -n "$CUR" ]; then
+            CUR_NAME=$(git rev-parse --short=7 "$CUR")
+            # diff (not rev-list) so redeploying an older ref (rollback) is detected too
+            FILES=$(git diff --name-only "$CUR" "$REF_SHA" -- "$(comp_path "$C")" 2>/dev/null | wc -l | tr -d ' ')
+            CH="$FILES files changed"
+          else
+            CUR_NAME="(none)"; FILES=1; CH="never deployed"
+          fi
+          SEL=""
+          if [ -n "$ALL" ]; then
+            SEL=1
+          elif [ -n "$LIST" ]; then
+            SEL=$(listed "$C")
+          elif [ "$FILES" != "0" ]; then
+            SEL=1
+          fi
+          eval "SEL_$C=\$SEL; CUR_$C=\$CUR_NAME; CH_$C=\$CH"
+        done
+
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "  Deploying REMOTE STAGING"
-        echo "  Ref:      {{.REF}} ($SHORT) — from worktree .worktrees/ref-$SHORT"
+        echo "  Ref:      $REF ($SHORT) — from worktree .worktrees/ref-$SHORT"
         echo "  Backend:  https://movida-staging.fly.dev"
         echo "  Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - echo "━━━━ [1/3] DB migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - task: staging:remote:db
-        vars: { REF: "{{.REF}}" }
-      - echo "━━━━ [2/3] Backend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - task: staging:remote:backend
-        vars: { REF: "{{.REF}}" }
-      - echo "━━━━ [3/3] Frontend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - task: staging:remote:frontend
-        vars: { REF: "{{.REF}}" }
-      - |
         echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Remote staging fully deployed"
-        echo "   Backend:  https://movida-staging.fly.dev"
-        echo "   Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
-        echo ""
-        echo "Verify:"
-        echo "   task open:isolated:staging:remote              → Open in isolated browser"
-        echo "   task open:isolated:staging:remote COUNT=2      → Multi-user QA"
-        echo "   task deploy:staging:status  → what is currently deployed"
-        echo "   task db:check:staging:remote   → DB migration state"
-        echo "   task db:check:tags-drift:staging:remote → reference-tag drift vs scenarios/staging/"
-        echo "   task logs:staging:remote       → backend logs"
-        echo ""
-        echo "If reference data needs to match scenarios/staging/ exactly:"
-        echo "   task db:seed:staging:remote"
-        echo "═══════════════════════════════════════════════════════════════"
+        printf "  %-3s  %-9s %-10s %s\n" "" "COMPONENT" "DEPLOYED" "CHANGES"
+        ANY=""
+        for C in db backend frontend; do
+          MARK="[ ]"
+          if [ -n "$(get SEL $C)" ]; then MARK="[x]"; ANY=1; fi
+          printf "  %-3s  %-9s %-10s %s\n" "$MARK" "$C" "$(get CUR $C)" "$(get CH $C)"
+        done
+        if [ -n "$SKIP_CI_CHECK" ]; then echo "  ⏭️  CI green-check will be skipped."; fi
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        if [ -z "$ANY" ]; then
+          echo "Nothing to deploy (use --all or list components to force)."
+          exit 0
+        fi
+        if [ -n "$DRY" ]; then
+          echo ""
+          echo "Dry run — would run:"
+          for C in db backend frontend; do
+            if [ -n "$(get SEL $C)" ]; then echo "  task deploy:staging:remote:$C REF=$REF"; fi
+          done
+          exit 0
+        fi
+
+        BEFORE=""
+        for C in db backend frontend; do
+          BEFORE="$BEFORE $C=$(git rev-parse --verify --quiet "refs/deploys/staging/$C" 2>/dev/null || echo -)"
+        done
+        FAILED=""
+        for C in db backend frontend; do
+          [ -n "$(get SEL $C)" ] || continue
+          echo ""
+          echo "━━━━ $C ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if ! task deploy:staging:remote:$C REF="$REF"; then
+            echo "❌ $C deploy failed; stopping."; FAILED="$C"; break
+          fi
+        done
+        task deploy:_recap ENV=staging BEFORE="$BEFORE" FAILED="$FAILED"
+        [ -z "$FAILED" ] || exit 1
 
   # ══════════════════════════════════════════════════════════════════════════
   # PROD REMOTE — worktree-aware orchestrators (interactive use)
@@ -1183,6 +1362,11 @@ tasks:
             LOG=$(git log --oneline "$CUR..$REF^{commit}" 2>/dev/null | head -20)
           fi
           printf "current=%s → next=%s%s\n%s" "$CUR_NAME" "$REF" "$DIFF" "$LOG"
+      BEFORE:
+        sh: |
+          for C in db backend frontend; do
+            printf "%s=%s " "$C" "$(git rev-parse --verify --quiet "refs/deploys/prod/$C" 2>/dev/null || echo -)"
+          done
     deps:
       - task: _prepare-ref-prod
         vars: { REF: "{{.REF}}" }
@@ -1210,24 +1394,8 @@ tasks:
       - echo "━━━━ [3/3] Frontend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - task: prod:remote:frontend
         vars: { REF: "{{.REF}}" }
-      - |
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Production fully deployed"
-        echo "   Backend:  https://movida.fly.dev"
-        echo "   Frontend: https://joinmovida.com (alias: https://movida.pages.dev)"
-        echo ""
-        echo "Verify:"
-        echo "   task open:isolated:prod              → Open in isolated browser"
-        echo "   task open:isolated:prod COUNT=2      → Multi-user smoke check"
-        echo "   task deploy:prod:status  → what is currently deployed"
-        echo "   task db:check:prod          → DB migration state"
-        echo "   task db:check:tags-drift:prod → reference-tag drift vs scenarios/prod/"
-        echo "   task fly:logs               → backend logs"
-        echo ""
-        echo "If reference data needs to match scenarios/prod/ exactly:"
-        echo "   task db:seed:prod"
-        echo "═══════════════════════════════════════════════════════════════"
+      - task: _recap
+        vars: { ENV: prod, BEFORE: "{{.BEFORE}}" }
 
   # ──────────────────────────────────────────────────────────────────────────
   # STAGING LOCAL — docker-compose

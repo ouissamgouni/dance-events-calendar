@@ -43,7 +43,7 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
 
     return (
         <div
-            className={`fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm ${floating ? 'px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]' : ''} ${layer === 'transient' ? 'z-[12000]' : 'z-[10000]'}`}
+            className={`fixed inset-0 flex items-end justify-center bg-black/50 animate-fade-in ${floating ? 'px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]' : ''} ${layer === 'transient' ? 'z-[12000]' : 'z-[10000]'}`}
             onClick={onClose}
         >
             <div
@@ -65,7 +65,7 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
                         <div className="min-w-0">
                             <h3 className={`${titleClass} font-bold text-ink`}>{title}</h3>
                             {subtitle ? (
-                                <p className={`mt-0.5 line-clamp-2 text-ink-soft ${floating ? 'text-base leading-6' : 'text-sm leading-5'}`}>{subtitle}</p>
+                                <p className="mt-0.5 line-clamp-2 text-sm leading-5 text-ink-soft">{subtitle}</p>
                             ) : null}
                         </div>
                     </div>

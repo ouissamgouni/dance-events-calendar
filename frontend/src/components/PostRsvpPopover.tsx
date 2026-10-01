@@ -74,7 +74,7 @@ export default function PostRsvpPopover({
             onClose={onClose}
         >
             {isAnon && (
-                <p className="text-base leading-6 text-ink-soft">
+                <p className="text-sm leading-5 text-ink-soft">
                     Sign in to keep this across devices.
                 </p>
             )}

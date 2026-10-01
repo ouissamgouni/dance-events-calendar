@@ -159,7 +159,7 @@ export default function TagFilterPills({
                 aria-disabled={disabled}
                 aria-pressed={active}
                 // eslint-disable-next-line no-restricted-syntax -- pill-shaped tag chips match the provided filter-sheet design reference
-                className={`relative flex w-full items-center justify-between rounded-full border-2 px-3 py-2 text-xs font-medium transition ${active ? 'border-blue-600 bg-blue-50 text-gray-900' : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
+                className={`relative flex min-h-11 w-full items-center justify-between rounded-full border-2 px-3 py-2 text-[13px] font-medium transition ${active ? 'border-blue-600 bg-blue-50 text-gray-900' : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
                     } ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}
             >
                 <span className="flex items-center gap-2 truncate flex-1">
@@ -203,7 +203,7 @@ export default function TagFilterPills({
                 <div className="flex justify-end pt-2">
                     <button
                         onClick={onClear}
-                        className="text-xs font-medium text-ink-soft hover:text-ink transition"
+                        className="min-h-11 text-[13px] font-medium text-ink-soft hover:text-ink transition"
                         aria-label="Clear selection"
                     >
                         Clear selection

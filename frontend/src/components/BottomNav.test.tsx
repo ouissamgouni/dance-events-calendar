@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext'
@@ -21,6 +21,18 @@ function renderAt(path: string, browseNavEnabled = false) {
 }
 
 describe('BottomNav', () => {
+    it('collapses to a grab strip on the fullscreen browse map and reveals on tap', () => {
+        renderAt('/browse?view=map')
+        const navOffset = () => document.documentElement.style.getPropertyValue('--bottom-nav-offset')
+        expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
+        expect(navOffset()).toBe('16px')
+        fireEvent.click(screen.getByTestId('bottom-nav-reveal'))
+        expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
+        expect(navOffset()).toBe('64px')
+        fireEvent.pointerDown(document.body)
+        expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
+        expect(navOffset()).toBe('16px')
+    })
     it('renders the four primary destinations', () => {
         renderAt('/')
         expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()

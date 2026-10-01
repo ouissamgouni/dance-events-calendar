@@ -245,9 +245,17 @@ tasks:
         listed() {
           case " $LIST " in *" $1 "*) echo 1 ;; esac
         }
+        snapshot() {
+          git fetch origin '+refs/deploys/prod/*:refs/deploys/prod/*' --quiet 2>/dev/null || true
+          for C in db backend frontend; do
+            printf "%s=%s " "$C" "$(git rev-parse --verify --quiet "refs/deploys/prod/$C" 2>/dev/null || echo -)"
+          done
+        }
 
         # ── Interactive (default) ────────────────────────────────────────────
         if [ -z "$FAST" ] && [ -z "$DRY" ]; then
+          BEFORE=$(snapshot)
+          FAILED=""
           for C in db backend frontend; do
             if [ -n "$LIST" ]; then
               [ -n "$(listed "$C")" ] || continue
@@ -259,10 +267,12 @@ tasks:
                 *) echo "→ skipped $C"; continue ;;
               esac
             fi
-            task release:prod:$C || { echo "❌ $C release aborted; stopping."; exit 1; }
+            if ! task release:prod:$C; then
+              echo "❌ $C release aborted; stopping."; FAILED="$C"; break
+            fi
           done
-          echo ""
-          echo "✅ Release complete."
+          task deploy:_recap ENV=prod BEFORE="$BEFORE" FAILED="$FAILED"
+          [ -z "$FAILED" ] || exit 1
           exit 0
         fi
 
@@ -390,14 +400,18 @@ tasks:
           exit 0
         fi
 
+        BEFORE=$(snapshot)
+        FAILED=""
         for C in db backend frontend; do
           [ -n "$(get SEL $C)" ] || continue
           echo ""
           echo "━━━━ Releasing $C-$(get VER $C) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          task release:prod:$C VERSION="$(get VER $C)" YES=1 || { echo "❌ $C release aborted; stopping."; exit 1; }
+          if ! task release:prod:$C VERSION="$(get VER $C)" YES=1; then
+            echo "❌ $C release aborted; stopping."; FAILED="$C"; break
+          fi
         done
-        echo ""
-        echo "✅ Release complete."
+        task deploy:_recap ENV=prod BEFORE="$BEFORE" FAILED="$FAILED"
+        [ -z "$FAILED" ] || exit 1
 
   # Backward-compat: `task release:default` is what `task release` resolves to.
   default:

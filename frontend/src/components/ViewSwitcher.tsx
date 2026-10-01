@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 export type ExploreView = 'list' | 'map' | 'calendar';
 
 interface ViewSwitcherProps {
@@ -29,6 +31,9 @@ const labels: Record<ExploreView, string> = {
     calendar: 'Calendar',
 };
 
+/** Vertical map space taken by the floating switcher (h-12 control + 12px gap). */
+export const VIEW_SWITCHER_BAND_PX = 60;
+
 function ViewIcon({ view }: { view: ExploreView }) {
     if (view === 'map') {
         return (
@@ -54,17 +59,12 @@ function ViewIcon({ view }: { view: ExploreView }) {
 }
 
 export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible, previewOffsetPx, onCreate, createExpanded, mobileLabelsEnabled = true }: ViewSwitcherProps) {
-    // When a map preview sheet is open, sit just above it at the bottom of the
-    // map. The preview lives inside the fullscreen map shell, whose bottom edge
-    // is lifted above the bottom nav (64px + safe-area), so we add that inset to
-    // the measured sheet height — otherwise the control floats over the card.
-    // Until the first measure lands, fall back to a conservative estimate rather
-    // than a fixed class that can overlap the preview card.
+    // Float just above the map preview card, or near the map's bottom edge.
+    // The map ends above the mobile bottom nav (64px + safe-area) but reaches
+    // the viewport bottom from md up, where the nav is hidden.
     const previewOpen = !!mapPreviewVisible;
     const measuredOffset = previewOffsetPx != null && previewOffsetPx > 0 ? previewOffsetPx : 220;
-    const bottomClass = previewOpen
-        ? ''
-        : 'bottom-[calc(80px+env(safe-area-inset-bottom))]';
+    const offsetPx = previewOpen ? measuredOffset + 12 : 16;
     const destinationClass = mobileLabelsEnabled
         ? 'inline-flex h-11 items-center justify-center gap-2 px-3 text-ink transition hover:bg-blue-100'
         : 'inline-flex h-11 w-11 items-center justify-center text-ink transition hover:bg-blue-100 lg:w-auto lg:gap-2 lg:px-3';
@@ -77,8 +77,8 @@ export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible,
     return (
         <nav
             aria-label="Change event view"
-            className={`pointer-events-none fixed inset-x-4 z-[8000] flex items-center justify-between md:bottom-4 ${bottomClass}`}
-            style={previewOpen ? { bottom: `calc(64px + env(safe-area-inset-bottom) + ${measuredOffset + 12}px)` } : undefined}
+            className={`pointer-events-none fixed inset-x-4 z-[8000] flex items-center justify-between transition-[bottom] bottom-[calc(var(--bottom-nav-offset,64px)+env(safe-area-inset-bottom)+var(--map-preview-offset))] md:bottom-[var(--map-preview-offset)]`}
+            style={{ '--map-preview-offset': `${offsetPx}px` } as CSSProperties}
             data-testid="view-switcher"
         >
             <div className="pointer-events-auto flex items-center border-2 border-blue-100 bg-blue-50 shadow-xl" data-testid="view-switcher-destinations">

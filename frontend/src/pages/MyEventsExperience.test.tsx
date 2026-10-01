@@ -164,7 +164,7 @@ describe('MyEventsExperience view modes', () => {
         await user.click(screen.getByRole('button', { name: 'Map view' }));
         expect(screen.getByTestId('event-map')).toHaveAttribute('data-route-on', 'false');
         expect(screen.getByRole('button', { name: 'Show route' })).toHaveAttribute('aria-pressed', 'false');
-        await waitFor(() => expect(screen.getByTestId('view-switcher').getAttribute('style')).toContain('256px'));
+        await waitFor(() => expect(screen.getByTestId('view-switcher').getAttribute('style')).toContain('--map-preview-offset: 192px'));
     });
 
     it('opens and closes the contextual event search from the floating control', async () => {

@@ -35,6 +35,8 @@ interface Props {
     /** Reports the sheet's pixel height so a floating map control can sit
      * just above it instead of overlapping. */
     onHeightChange?: (height: number) => void;
+    /** Hides the preview (× button or swipe down). */
+    onCollapse?: () => void;
 }
 
 /**
@@ -65,8 +67,9 @@ export default function MyEventsMapPreview({
     followingBadgeEnabled = false,
     showProgramAction = false,
     onHeightChange,
+    onCollapse,
 }: Props) {
-    const pointerStart = useRef<number | null>(null);
+    const pointerStart = useRef<{ x: number; y: number } | null>(null);
     const sheetRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
@@ -82,79 +85,106 @@ export default function MyEventsMapPreview({
         };
     }, [onHeightChange]);
 
-    const finishSwipe = (clientX: number) => {
+    const finishSwipe = (clientX: number, clientY: number) => {
         if (pointerStart.current == null) return;
-        const distance = clientX - pointerStart.current;
+        const dx = clientX - pointerStart.current.x;
+        const dy = clientY - pointerStart.current.y;
         pointerStart.current = null;
-        if (distance < -48 && hasNext) onNext();
-        if (distance > 48 && hasPrevious) onPrevious();
+        if (Math.abs(dy) > Math.abs(dx)) {
+            if (dy > 48) onCollapse?.();
+            return;
+        }
+        if (dx < -48 && hasNext) onNext();
+        if (dx > 48 && hasPrevious) onPrevious();
     };
 
     return (
         <div
             ref={sheetRef}
-            role="group"
-            aria-label={sequence != null ? `Event ${sequence}: ${event.title}` : event.title}
-            tabIndex={0}
-            onPointerDown={(pointerEvent) => { pointerStart.current = pointerEvent.clientX; }}
-            onPointerUp={(pointerEvent) => finishSwipe(pointerEvent.clientX)}
-            onPointerCancel={() => { pointerStart.current = null; }}
-            onKeyDown={(keyEvent) => {
-                if (keyEvent.key === 'ArrowLeft' && hasPrevious) onPrevious();
-                if (keyEvent.key === 'ArrowRight' && hasNext) onNext();
-            }}
-            className="shrink-0 border-t border-line bg-surface px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-xl focus:outline-none"
-            data-testid="my-events-map-preview"
+            className="relative z-[760] shrink-0"
         >
-            <div className="mx-auto flex max-w-6xl items-center gap-2">
-                <button
-                    type="button"
-                    onClick={onPrevious}
-                    disabled={!hasPrevious}
-                    aria-label="Previous event"
-                    className="shrink-0 inline-flex h-9 w-7 items-center justify-center text-ink transition hover:text-action disabled:cursor-not-allowed disabled:opacity-0"
-                >
-                    <ChevronLeft className="h-6 w-6" aria-hidden="true" />
-                </button>
-                <div className="min-w-0 flex-1">
-                    <EventCard
-                        event={event}
-                        onOpen={onOpen}
-                        dateSequence={sequence}
-                        borderless
-                        twoLineTitle
-                        showAvatars={showAvatars}
-                        showTags={showTags}
-                        showReviews={showReviews}
-                        showPrice={showPrice}
-                        showActions={showActions}
-                        actions={actions}
-                        showRatings={showRatings}
-                        followingBadgeEnabled={followingBadgeEnabled}
-                        goingIconVariant="hand"
-                        bottomSlot={showProgramAction ? <ProgramAction event={event} /> : undefined}
-                        testId="my-events-map-card"
-                    />
+            <div
+                role="group"
+                aria-label={sequence != null ? `Event ${sequence}: ${event.title}` : event.title}
+                tabIndex={0}
+                onPointerDown={(pointerEvent) => { pointerStart.current = { x: pointerEvent.clientX, y: pointerEvent.clientY }; }}
+                onPointerUp={(pointerEvent) => finishSwipe(pointerEvent.clientX, pointerEvent.clientY)}
+                onPointerCancel={() => { pointerStart.current = null; }}
+                onKeyDown={(keyEvent) => {
+                    if (keyEvent.key === 'ArrowLeft' && hasPrevious) onPrevious();
+                    if (keyEvent.key === 'ArrowRight' && hasNext) onNext();
+                }}
+                className="relative w-full touch-none overflow-hidden rounded-t-card bg-surface px-1 pb-2 shadow-[0_-4px_16px_rgba(15,23,42,0.12)] animate-slide-up focus:outline-none"
+                data-testid="my-events-map-preview"
+            >
+                <div className="flex h-5 items-center justify-center">
+                    {/* eslint-disable-next-line no-restricted-syntax -- drag handle is a pill by design */}
+                    <span className="h-1 w-10 rounded-full bg-line" aria-hidden />
+                    {onCollapse && (
+                        <button
+                            type="button"
+                            onClick={onCollapse}
+                            aria-label="Hide event preview"
+                            className="absolute right-0 top-0 z-[3] flex h-7 w-11 items-center justify-center text-muted transition hover:bg-canvas hover:text-ink-soft"
+                            data-testid="map-preview-collapse"
+                        >
+                            ✕
+                        </button>
+                    )}
                 </div>
-                <button
-                    type="button"
-                    onClick={onNext}
-                    disabled={!hasNext}
-                    aria-label="Next event"
-                    className="shrink-0 inline-flex h-9 w-7 items-center justify-center text-ink transition hover:text-action disabled:cursor-not-allowed disabled:opacity-0"
-                >
-                    <ChevronRight className="h-6 w-6" aria-hidden="true" />
-                </button>
+                <div className="flex items-center gap-0.5">
+                    <button
+                        type="button"
+                        onClick={onPrevious}
+                        disabled={!hasPrevious}
+                        aria-label="Previous event"
+                        className="shrink-0 inline-flex h-9 w-10 items-center justify-center text-ink transition hover:text-action disabled:cursor-not-allowed disabled:opacity-0"
+                    >
+                        <ChevronLeft className="h-6 w-6" aria-hidden="true" />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                        <EventCard
+                            event={event}
+                            onOpen={onOpen}
+                            dateSequence={sequence}
+                            dateTopRow
+                            borderless
+                            compact
+                            tagsFitWidth
+                            twoLineTitle
+                            showAvatars={showAvatars}
+                            showTags={showTags}
+                            showReviews={showReviews}
+                            showPrice={showPrice}
+                            showActions={showActions}
+                            actions={actions}
+                            showRatings={showRatings}
+                            followingBadgeEnabled={followingBadgeEnabled}
+                            goingIconVariant="hand"
+                            bottomSlot={showProgramAction ? <ProgramAction event={event} /> : undefined}
+                            testId="my-events-map-card"
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onNext}
+                        disabled={!hasNext}
+                        aria-label="Next event"
+                        className="shrink-0 inline-flex h-9 w-10 items-center justify-center text-ink transition hover:text-action disabled:cursor-not-allowed disabled:opacity-0"
+                    >
+                        <ChevronRight className="h-6 w-6" aria-hidden="true" />
+                    </button>
+                </div>
+                {count != null && count > 1 && index != null && index >= 0 && (
+                    <ScrollDotsIndicator
+                        count={count}
+                        activeIndex={index}
+                        onSelect={(i) => onSelectIndex?.(i)}
+                        label="Event position"
+                        className="mx-auto mt-1"
+                    />
+                )}
             </div>
-            {count != null && count > 1 && index != null && index >= 0 && (
-                <ScrollDotsIndicator
-                    count={count}
-                    activeIndex={index}
-                    onSelect={(i) => onSelectIndex?.(i)}
-                    label="Event position"
-                    className="mx-auto mt-2"
-                />
-            )}
         </div>
     );
 }
