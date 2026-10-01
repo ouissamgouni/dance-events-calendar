@@ -185,29 +185,28 @@ export default function GoingButton({
             toggleAttending(eventId, defaultAudience).then((ok) => {
                 if (ok) {
                     maybeFireShareConversion();
-                    showPostRsvp(
-                        defaultAudience !== 'private'
-                            ? 'signed-in-default-share'
-                            : 'signed-in',
-                    );
                 } else {
+                    setPostRsvpVariant(null);
                     errorToast.show("Couldn't mark you as going \u2014 try again", 3200);
                 }
             });
+            showPostRsvp(
+                defaultAudience !== 'private'
+                    ? 'signed-in-default-share'
+                    : 'signed-in',
+            );
             return;
         }
         toggleAttending(eventId).then((ok) => {
             if (ok) {
-                // Anonymous users always get the unified popover (Sign-in
-                // CTA + Share). Showing both options every time is
-                // consistent with the signed-in flow and ensures the
-                // share funnel is never skipped.
                 maybeFireShareConversion();
-                showPostRsvp('anon');
             } else {
+                setPostRsvpVariant(null);
                 errorToast.show("Couldn't mark you as going \u2014 try again", 3200);
             }
         });
+        // Anonymous users always get the unified popover (Sign-in CTA + Share).
+        showPostRsvp('anon');
     };
 
     const openEditShare = (e: React.MouseEvent<HTMLButtonElement>) => {

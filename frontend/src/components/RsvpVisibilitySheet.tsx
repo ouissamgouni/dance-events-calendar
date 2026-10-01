@@ -108,7 +108,7 @@ export default function RsvpVisibilitySheet({
         };
     }, [anchorRef, isMobile, onClose]);
 
-    const btnSize = isMobile ? 'min-h-12 text-base' : 'min-h-11 text-sm';
+    const btnSize = 'min-h-11 text-sm';
     const secondaryTone = secondaryAction?.tone === 'danger' ? 'text-danger' : 'text-ink';
     const primaryClass = `flex ${btnSize} flex-1 items-center justify-center rounded-field bg-action px-4 py-2 font-semibold text-white hover:opacity-90`;
     const primary = primaryAction ?? { label: 'Done', onClick: onClose };
@@ -141,7 +141,7 @@ export default function RsvpVisibilitySheet({
             {audience && onAudienceChange && (
                 <div>
                     {question && (
-                        <p className={`${isMobile ? 'mb-3 text-lg leading-7' : 'mb-2 text-sm font-medium'} text-ink`}>
+                        <p className="mb-2 text-sm font-medium text-ink">
                             {question}
                         </p>
                     )}
@@ -152,7 +152,7 @@ export default function RsvpVisibilitySheet({
                         ariaLabel={pickerAriaLabel}
                     />
                     {description && (
-                        <p className={`${isMobile ? 'mt-3 text-xs leading-6' : 'mt-2 text-sm leading-5'} text-ink-soft`}>
+                        <p className="mt-2 text-xs leading-5 text-ink-soft">
                             {description}
                         </p>
                     )}
@@ -166,11 +166,11 @@ export default function RsvpVisibilitySheet({
             <BottomSheet
                 title={title}
                 subtitle={subtitle}
-                titleSize="xl"
+                titleSize="large"
                 variant="floating"
                 onClose={onClose}
                 layer="transient"
-                headerLeading={<span aria-hidden className="text-3xl leading-none">{emoji}</span>}
+                headerLeading={<span aria-hidden className="text-2xl leading-none">{emoji}</span>}
                 footer={footer}
             >
                 {body}
