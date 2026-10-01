@@ -608,6 +608,14 @@ task release:prod:backend
 
 # Aggregate (prompts y/N for each component in db → backend → frontend order):
 task release:prod
+task release:prod -- backend frontend   # only these components, no y/N prompt
+
+# Fast: preselects components changed on main since their prod deploy,
+# suggests next tags, one [Y/e/n] confirmation, then no further prompts:
+task release:prod -- --fast
+task release:prod -- --fast backend     # only backend
+task release:prod -- --dry-run          # print the --fast plan and exit
+task release:prod -- --fast --skip-ci-check
 ```
 
 **Inspecting releases vs deploys:**
@@ -696,6 +704,7 @@ task git:release:merge
 
 # 8. Tag + deploy per component
 task release:prod                           # interactive: prompts y/N for db, backend, frontend
+#    or: task release:prod -- --fast         # changed components, suggested tags, one confirm
 #    → enforces order: db → backend → frontend
 
 # 9. Verify
@@ -1023,8 +1032,10 @@ Scenario stop tasks (`stop:scenario`, `stop:scenario:all`) close their isolated 
 | `task git:pr:merge` | Squash merge |
 | `task git:release:prepare` | Create develop → main release PR |
 | `task git:release:tag -- v1.0.0` | Tag release on main |
-| `task release:prod -- v1.0.0` | Tag main + remote prod deploy (combined) |
+| `task release:prod:backend -- v1.0.0` | Tag backend-v1.0.0 on main + remote prod deploy (also `:frontend`, `:db`) |
 | `task release:prod` | Interactive: suggest next patch (BUMP=minor/major to override) |
+| `task release:prod -- --fast [comps]` | Auto-detect changed components, one confirmation, tag + deploy |
+| `task release:prod -- --dry-run [comps]` | Print the `--fast` plan without tagging or deploying |
 | `task deploy:prod:status\|staging` | Show what's currently deployed per component |
 | `task deploy:prod:current` | Print the currently deployed prod backend tag |
 

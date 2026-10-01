@@ -175,7 +175,7 @@ tasks:
           echo "Next steps (latest tag: $LATEST):"
           echo "   task git:release:tag -- $NEXT          → Tag the release"
           echo "   task deploy:prod:remote -- $NEXT       → Deploy tagged release to prod"
-          echo "   task release:prod -- $NEXT             → Tag + deploy (combined)"
+          echo "   task release:prod -- --fast            → Tag + deploy changed components (one confirm)"
           echo "   task release:prod                      → Interactive: prompts for version"
           echo ""
           echo "⚠️  Don't forget to cherry-pick into develop if needed:"
@@ -270,7 +270,7 @@ tasks:
         echo "Next steps (latest tag: $LATEST):"
         echo "   task git:release:tag -- $NEXT          → Tag the release"
         echo "   task deploy:prod:remote -- $NEXT       → Deploy tagged release to prod"
-        echo "   task release:prod -- $NEXT             → Tag + deploy (combined)"
+        echo "   task release:prod -- --fast            → Tag + deploy changed components (one confirm)"
         echo "   task release:prod                      → Interactive: prompts for version"
   release:tag:
     desc: Tag a release on main and push (e.g., task git:release:tag -- v1.2.0)
@@ -332,7 +332,6 @@ tasks:
         echo ""
         echo "Next steps:"
         echo "   task deploy:prod:remote -- $VERSION         → Deploy to prod (no checkout needed)"
-        echo "   task release:prod -- $VERSION               → Tag + deploy (combined)"
 
   release:tag-component:
     desc: "Tag a per-component release on main and push

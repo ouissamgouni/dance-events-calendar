@@ -258,6 +258,8 @@ tasks:
         echo "  task release:prod:db       -- v1.2.0   Tag db-v1.2.0 + migrate"
         echo "  task release:prod:backend              Interactive (suggests next patch)"
         echo "  task release:prod                      Aggregate: prompts per component"
+        echo "  task release:prod -- --fast            Changed components + suggested tags, one confirm"
+        echo "  task release:prod -- --dry-run         Show the --fast plan only"
         echo "  task deploy:prod:remote:backend  -- backend-v1.2.0  Deploy only"
         echo "  task deploy:prod:status                Released vs deployed (drift)"
         echo "  task deploy:prod:status:diff           All components commits/files vs origin/main"
