@@ -33,6 +33,12 @@ describe('BottomNav', () => {
         expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
         expect(navOffset()).toBe('16px')
     })
+    it('collapses to a grab strip on the calendar view', () => {
+        renderAt('/calendar')
+        expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByTestId('bottom-nav-reveal'))
+        expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
+    })
     it('renders the four primary destinations', () => {
         renderAt('/')
         expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
