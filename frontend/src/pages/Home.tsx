@@ -25,7 +25,6 @@ import type { FilterSheetSection } from '../components/FilterSheet';
 import AreaEditor from '../components/AreaEditor';
 import AreaMapPreview from '../components/AreaMapPreview';
 import TagFilterPills from '../components/TagFilterPills';
-import MoreFiltersEditor from '../components/MoreFiltersEditor';
 import SearchProfileFlow from '../components/SearchProfileFlow';
 import { usePreferences } from '../context/PreferencesContext';
 import { useActiveProfile } from '../hooks/useActiveProfile';
@@ -245,7 +244,7 @@ function writeExplorerStateToSearchParams(
 
 export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerViewConfig }) {
     const { user, loading: authLoading } = useAuth();
-    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerViewControlLabelsEnabled, summaryTwoLineEnabled } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerViewControlLabelsEnabled, summaryTwoLineEnabled, promoCodesEnabled } = useFeatureFlags();
     const mapFollowingBadgeOverlay = true;
     const mapTrendingOverlay = true;
     const location = useLocation();
@@ -301,6 +300,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             : 'any',
     );
     const userTouchedReachRef = useRef(searchParams.has('reach'));
+    const [discountOnly, setDiscountOnly] = useState(() => searchParams.get('discount') === '1');
+    const discountFilterActive = discountOnly && promoCodesEnabled;
     // Tracks whether the user has manually toggled a tag in this session.
     // While false, we still mirror late-arriving pref changes (e.g. after
     // sign-in hydrates server prefs) into ``activeTagIds`` so the explorer
@@ -649,8 +650,18 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     );
     const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
     const [explorerPreviewHeight, setExplorerPreviewHeight] = useState(0);
-    const [explorerPreviewCollapsed, setExplorerPreviewCollapsed] = useState(false);
+    const [explorerPreviewCollapsed, setExplorerPreviewCollapsed] = useState(true);
     const [explorerFitAllToken, setExplorerFitAllToken] = useState(0);
+    const [summaryBarHeight, setSummaryBarHeight] = useState(0);
+    const summaryBarObserverRef = useRef<ResizeObserver | null>(null);
+    const summaryBarRef = useCallback((el: HTMLDivElement | null) => {
+        summaryBarObserverRef.current?.disconnect();
+        summaryBarObserverRef.current = null;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        const ro = new ResizeObserver(() => setSummaryBarHeight(el.offsetHeight));
+        ro.observe(el);
+        summaryBarObserverRef.current = ro;
+    }, []);
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
     const [calMapBounds, setCalMapBounds] = useState<MapBounds | null>(null);
@@ -752,6 +763,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         if (reachFilter !== 'any') next.set('reach', reachFilter);
         else if (userTouchedReachRef.current || searchParams.has('reach')) next.set('reach', 'any');
         else next.delete('reach');
+        if (discountOnly) next.set('discount', '1');
+        else next.delete('discount');
         // Reflect the fullscreen map view in the URL so it is shareable and
         // survives reload; the back button returns to the list.
         if (mapFullscreen) next.set('view', 'map');
@@ -759,7 +772,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         if (next.toString() !== searchParams.toString()) {
             setSearchParams(next, { replace: true });
         }
-    }, [activeTagIds, endDate, interestKind, interestMatch, interestSource, interestUserHandles, mapFullscreen, reachFilter, searchParams, setSearchParams, sortBy, startDate, viewMode]);
+    }, [activeTagIds, discountOnly, endDate, interestKind, interestMatch, interestSource, interestUserHandles, mapFullscreen, reachFilter, searchParams, setSearchParams, sortBy, startDate, viewMode]);
 
     // Events query source: Explorer pulls the date/interest-filtered set once
     // and applies the active area + tag filters client-side. The live map
@@ -927,6 +940,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         setActiveTagIds(new Set());
         userTouchedReachRef.current = true;
         setReachFilter('any');
+        setDiscountOnly(false);
         setInterestSource(config.peopleFilterMinimum ? 'follows' : null);
         setInterestKind(config.peopleFilterMinimum ? config.defaultInterestKind : 'any');
         setInterestUserHandles([]);
@@ -940,6 +954,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         userTouchedTagsRef.current = true;
         setPreserveViewportAfterSearch(false);
         setActiveTagIds(new Set());
+        setDiscountOnly(false);
         setInterestSource(config.peopleFilterMinimum ? 'follows' : null);
         setInterestKind(config.peopleFilterMinimum ? config.defaultInterestKind : 'any');
         setInterestUserHandles([]);
@@ -965,6 +980,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         setActiveTagIds(new Set(prefs.tagIds));
         userTouchedReachRef.current = true;
         setReachFilter(activeProfile?.reach_filter ?? 'any');
+        setDiscountOnly(false);
         setInterestSource(config.peopleFilterMinimum ? 'follows' : null);
         setInterestKind(config.defaultInterestKind);
         setInterestUserHandles([]);
@@ -1044,10 +1060,12 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         + (interestSource ? 1 : 0)
         + (interestUserHandles.length ? 1 : 0)
         + (areaSessionOverride ? 1 : 0)
-        + (dateRangeDiffers ? 1 : 0);
+        + (dateRangeDiffers ? 1 : 0)
+        + (discountFilterActive ? 1 : 0);
     const calendarActiveFilterCount = activeTagIds.size
         + (interestSource ? 1 : 0)
-        + (interestUserHandles.length ? 1 : 0);
+        + (interestUserHandles.length ? 1 : 0)
+        + (discountFilterActive ? 1 : 0);
 
     // Map fullscreen toggle (mobile only — desktop layout already gives the
     // map a tall column). Declared earlier (near the URL sync effect).
@@ -1112,14 +1130,17 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     }, [events, effectiveArea, viewMode]);
 
     const filteredEvents = useMemo(
-        () => filterEventsByTags(events, activeTagIds, tagGroups).filter((event) => eventMatchesReach(event, reachFilter)),
-        [events, activeTagIds, reachFilter, tagGroups],
+        () => filterEventsByTags(events, activeTagIds, tagGroups)
+            .filter((event) => eventMatchesReach(event, reachFilter))
+            .filter((event) => !discountFilterActive || !!event.has_active_promo_codes),
+        [events, activeTagIds, reachFilter, tagGroups, discountFilterActive],
     );
 
     const explorerMatchingEvents = useMemo(
         () => {
             const tagFiltered = filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups)
-                .filter((event) => eventMatchesReach(event, reachFilter));
+                .filter((event) => eventMatchesReach(event, reachFilter))
+                .filter((event) => !discountFilterActive || !!event.has_active_promo_codes);
             // Hide events whose end time is already in the past — the
             // backend's ``startDate`` filter can still return an event
             // that started earlier today but wrapped past midnight into
@@ -1129,7 +1150,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             const now = Date.now();
             return tagFiltered.filter((e) => !e.end || new Date(e.end).getTime() >= now);
         },
-        [areaScopedEvents, activeTagIds, reachFilter, tagGroups],
+        [areaScopedEvents, activeTagIds, reachFilter, tagGroups, discountFilterActive],
     );
 
     // Keep the mobile map miniature always framed on the current results.
@@ -1172,7 +1193,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                     )
                     : evts;
                 const matching = filterEventsByTags(areaFiltered, activeTagIds, tagGroups)
-                    .filter((event) => eventMatchesReach(event, reachFilter));
+                    .filter((event) => eventMatchesReach(event, reachFilter))
+                    .filter((event) => !discountFilterActive || !!event.has_active_promo_codes);
                 if (matching.length > 0) {
                     setNextAvailableEventBatch({
                         endDate: formatDate(windowEnd),
@@ -1191,7 +1213,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         return () => {
             cancelled = true;
         };
-    }, [viewMode, endDate, interestSource, interestKind, interestUserHandles, interestMatch, effectiveArea, matchedSearchProfile, activeTagIds, reachFilter, tagGroups]);
+    }, [viewMode, endDate, interestSource, interestKind, interestUserHandles, interestMatch, effectiveArea, matchedSearchProfile, activeTagIds, reachFilter, tagGroups, discountFilterActive]);
 
     const selectedExplorerMapEvent = useMemo(
         () => explorerMatchingEvents.find((event) => event.event_id === selectedExplorerMapEventId) ?? null,
@@ -1199,8 +1221,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     );
 
     // Mobile explorer map preview: a persistent bottom sheet (mirroring My
-    // Events) previews an event and pages through the list. It defaults to
-    // the first matching event so the sheet is never empty.
+    // Events) previews an event and pages through the list. It stays closed
+    // when the map opens until a marker is tapped.
     const explorerPreviewEvent = (mapFullscreen && !isDesktop && !explorerPreviewCollapsed)
         ? (selectedExplorerMapEvent ?? explorerMatchingEvents[0] ?? null)
         : null;
@@ -1210,7 +1232,10 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     const [prevMapFullscreen, setPrevMapFullscreen] = useState(mapFullscreen);
     if (prevMapFullscreen !== mapFullscreen) {
         setPrevMapFullscreen(mapFullscreen);
-        if (mapFullscreen) setExplorerPreviewCollapsed(false);
+        if (mapFullscreen) {
+            setExplorerPreviewCollapsed(true);
+            setSelectedExplorerMapEventId(null);
+        }
     }
     const collapseExplorerPreview = useCallback(() => {
         setExplorerPreviewCollapsed(true);
@@ -1294,7 +1319,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             else activeByGroup.set(slug, [id]);
         }
 
-        const countSourceEvents = viewMode === 'explorer' ? areaScopedEvents : events;
+        const countSourceEvents = (viewMode === 'explorer' ? areaScopedEvents : events)
+            .filter((e) => !discountFilterActive || !!e.has_active_promo_codes);
         const eventTagSets = countSourceEvents.map((e) => new Set((e.tags ?? []).map((t) => t.id)));
 
         for (const g of tagGroups) {
@@ -1319,7 +1345,17 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             }
         }
         return map;
-    }, [events, areaScopedEvents, viewMode, tagGroups, activeTagIds]);
+    }, [events, areaScopedEvents, viewMode, tagGroups, activeTagIds, discountFilterActive]);
+
+    const discountMatchCount = useMemo(() => {
+        const source = viewMode === 'explorer' ? areaScopedEvents : events;
+        // eslint-disable-next-line react-hooks/purity -- render-time clock snapshot for past-event filter
+        const now = Date.now();
+        return filterEventsByTags(source, activeTagIds, tagGroups)
+            .filter((e) => eventMatchesReach(e, reachFilter) && !!e.has_active_promo_codes)
+            .filter((e) => viewMode !== 'explorer' || !e.end || new Date(e.end).getTime() >= now)
+            .length;
+    }, [events, areaScopedEvents, viewMode, tagGroups, activeTagIds, reachFilter]);
 
     const handleDatesChange = useCallback((start: Date, end: Date) => {
         setVisibleRange((prev) => {
@@ -1584,11 +1620,56 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
 
     // Icon mapping for "more" filter groups based on their slugs
     const moreGroupIcons: Record<string, React.ReactNode> = {
-        venue: <img src="/venue.png" alt="" className="h-4 w-4" />,
-        scale: <img src="/size.png" alt="" className="h-4 w-4" />,
-        level: <img src="/speedometer.png" alt="" className="h-4 w-4" />,
-        misc: <img src="/more.png" alt="" className="h-4 w-4" />,
+        venue: <img src="/venue.png" alt="" className="h-5 w-5" />,
+        scale: <img src="/size.png" alt="" className="h-5 w-5" />,
+        level: <img src="/speedometer.png" alt="" className="h-5 w-5" />,
+        misc: <img src="/more.png" alt="" className="h-5 w-5" />,
     };
+
+    // Groups with no matching events (and no selection) are noise, so hide them.
+    const visibleMoreGroups = moreGroups.filter((g) =>
+        g.tags.some((t) => activeTagIds.has(t.id) || (tagCountMap.get(t.id) ?? 0) > 0),
+    );
+    const moreSelCount = moreGroups.reduce((acc, g) => acc + groupSelCount(g), 0) + (discountFilterActive ? 1 : 0);
+    const moreSubsections: FilterSheetSection[] = [
+        ...(promoCodesEnabled ? [{
+            id: 'more-discount',
+            label: 'Has discount',
+            summary: '',
+            customRow: (
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={discountOnly}
+                    onClick={() => {
+                        setDiscountOnly((v) => !v);
+                        setPreserveViewportAfterSearch(false);
+                        bumpAutoFit();
+                    }}
+                    className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-canvas"
+                    data-testid="discount-toggle"
+                >
+                    <img src="/promo-code.png" alt="" aria-hidden="true" className="h-5 w-5 shrink-0 object-contain" />
+                    <span className="shrink-0 text-[15px] font-medium text-ink">Has discount</span>
+                    <span className="ml-auto text-[13px] text-ink-soft">{discountMatchCount}</span>
+                    {/* eslint-disable-next-line no-restricted-syntax -- toggle switch track is circular by design */}
+                    <span className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition ${discountOnly ? 'bg-action' : 'bg-line'}`} aria-hidden="true">
+                        {/* eslint-disable-next-line no-restricted-syntax -- toggle switch knob is circular by design */}
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition ${discountOnly ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                    </span>
+                </button>
+            ),
+        }] : []),
+        ...visibleMoreGroups.map((g) => ({
+            id: `more-${g.slug}`,
+            label: g.label,
+            icon: moreGroupIcons[g.slug],
+            size: 'compact' as const,
+            summary: groupSummary(g, 'Any'),
+            badge: groupSelCount(g) || undefined,
+            render: () => renderGroupPills(g),
+        })),
+    ];
 
     const explorerFilterSections: FilterSheetSection[] = [
         // Dates are driven by calendar navigation in calendar view, so the
@@ -1711,25 +1792,15 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             badge: groupSelCount(formatGroup) || undefined,
             render: () => renderGroupPills(formatGroup),
         }] : []),
-        ...(moreGroups.length > 0 ? [{
+        ...(moreSubsections.length > 0 ? [{
             id: 'more',
             label: 'More filters',
             icon: <img src="/more.png" alt="" className="h-5 w-5" />,
             group: 'Other filters',
-            summary: (() => {
-                const n = moreGroups.reduce((acc, g) => acc + groupSelCount(g), 0);
-                return n > 0 ? `${n} selected` : 'None';
-            })(),
-            badge: moreGroups.reduce((acc, g) => acc + groupSelCount(g), 0) || undefined,
-            render: () => (
-                <MoreFiltersEditor
-                    groups={moreGroups}
-                    renderGroup={renderGroupPills}
-                    selCount={groupSelCount}
-                    summary={(g) => groupSummary(g, 'Any')}
-                    groupIcons={moreGroupIcons}
-                />
-            ),
+            size: 'compact' as const,
+            summary: moreSelCount > 0 ? `${moreSelCount} selected` : 'None',
+            badge: moreSelCount || undefined,
+            subsections: moreSubsections,
         }] : []),
     ];
 
@@ -1767,6 +1838,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 interestUserPeople={interestUserPeople}
                 interestMatch={interestMatch}
                 onEditPeople={() => openFilterSheet('people')}
+                discountActive={discountFilterActive}
+                onEditDiscount={() => openFilterSheet('more')}
                 loading={loading}
                 onOpenFilters={() => openFilterSheet(null)}
             />
@@ -1803,7 +1876,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 )}
                 {(!loading || initialLoadDone.current) && !error && (
                     <>
-                        <div className="sticky top-0 z-40 bg-canvas">
+                        <div ref={summaryBarRef} className="sticky top-0 z-40 bg-canvas">
                             {renderFilterSummaryBar({ singleLine: viewMode === 'calendar' })}
                         </div>
                     </>
@@ -2060,6 +2133,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                         viewMode={calendarViewMode}
                         onViewModeChange={setMobileCalendarView}
                         rangeSelector="mobile"
+                        stickyToolbarTop={summaryBarHeight}
                         sinceDate={sinceDate ?? undefined}
                         onDatesChange={handleDatesChange}
                         onEventClick={handleEventClick}

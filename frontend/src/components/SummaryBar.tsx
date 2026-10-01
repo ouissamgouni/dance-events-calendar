@@ -63,6 +63,10 @@ export interface SummaryBarProps {
     interestMatch: InterestMatch;
     onEditPeople?: () => void;
 
+    // "Has discount" chip, lowest priority (collapses first).
+    discountActive?: boolean;
+    onEditDiscount?: () => void;
+
     // Remaining-filters control. Always rendered as "+X ⚙" (or just "⚙" when
     // nothing extra is active) so the full filter sheet is always reachable.
     onOpenFilters?: () => void;
@@ -187,7 +191,7 @@ const AREA_COMPACT_LABEL_MAX_WIDTH = 48;
 // Every chip carries the same icon its filter-sheet section uses, so the
 // summary bar reads as a compact echo of the open Filters sheet.
 
-type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people';
+type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people' | 'discount';
 type PillVariant = 'compact' | 'full';
 
 interface SummaryLayout {
@@ -218,6 +222,8 @@ export default function SummaryBar(props: SummaryBarProps) {
         interestUserHandles,
         interestUserPeople,
         onEditPeople,
+        discountActive = false,
+        onEditDiscount,
         onOpenFilters,
     } = props;
 
@@ -273,8 +279,9 @@ export default function SummaryBar(props: SummaryBarProps) {
         list.push('period', 'area');
         if (danceGroup) list.push('dance');
         if (reachGroup) list.push('reach');
+        if (discountActive && onEditDiscount) list.push('discount');
         return list;
-    }, [danceGroup, danceSel.count, reachGroup, peopleActive, onEditPeople]);
+    }, [danceGroup, danceSel.count, reachGroup, peopleActive, onEditPeople, discountActive, onEditDiscount]);
 
     // ---- Measurement-based collapse -----------------------------------
     const containerRef = useRef<HTMLDivElement>(null);
@@ -501,6 +508,19 @@ export default function SummaryBar(props: SummaryBarProps) {
                     />
                 );
             }
+            case 'discount':
+                return (
+                    <Pill
+                        key={pillKey}
+                        icon={<img src="/promo-code.png" alt="" aria-hidden="true" className={ICON_CLS} />}
+                        label="Discount"
+                        title="Has discount"
+                        onClick={onEditDiscount}
+                        testId={tid('summary-chip-discount')}
+                        maxWidth={maxWidth}
+                        {...measurementProps}
+                    />
+                );
         }
     };
 

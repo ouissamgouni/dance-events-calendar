@@ -20,6 +20,8 @@ interface Props {
     onEventHover?: (eventId: string | null) => void;
     offMapEventIds?: Set<string>;
     layout?: 'page' | 'fill' | 'remaining-map';
+    /** When set, the date/range toolbar sticks at this top offset (px). */
+    stickyToolbarTop?: number;
 }
 
 const MIN_REMAINING_MAP_HEIGHT = 200;
@@ -60,6 +62,7 @@ export default function CalendarMapWorkspace({
     onEventHover,
     offMapEventIds,
     layout = 'page',
+    stickyToolbarTop,
 }: Props) {
     const calendarRef = useRef<FullCalendar>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -128,7 +131,11 @@ export default function CalendarMapWorkspace({
 
     return (
         <section className={layout === 'fill' || remainingMapLayout ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : ''} data-testid="calendar-map-workspace">
-            <div className={`flex shrink-0 flex-wrap items-center gap-3 border-b border-line bg-surface px-3 py-2 ${layout === 'fill' ? '' : layout === 'page' ? 'mt-4 mb-4' : 'mb-4'}`}>
+            <div
+                className={`flex shrink-0 flex-wrap items-center gap-3 border-b border-line bg-surface px-3 py-2 ${stickyToolbarTop !== undefined ? 'sticky z-30' : ''} ${layout === 'fill' ? '' : layout === 'page' ? 'mt-4 mb-4' : 'mb-4'}`}
+                style={stickyToolbarTop !== undefined ? { top: stickyToolbarTop } : undefined}
+                data-testid="calendar-toolbar"
+            >
                 <div className="flex items-center gap-2">
                     <div className="flex">
                         <button type="button" className="inline-flex h-9 w-9 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas" onClick={() => calendarRef.current?.getApi().prev()} aria-label="Previous calendar period">

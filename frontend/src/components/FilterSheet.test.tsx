@@ -120,3 +120,32 @@ describe('FilterSheet mobile sizing', () => {
         expect(onClose).toHaveBeenCalledOnce();
     });
 });
+
+describe('FilterSheet nested subsections', () => {
+    it('opens a subsection in its own editor and returns to the parent list', async () => {
+        const user = userEvent.setup();
+        const nested: FilterSheetSection[] = [{
+            id: 'more',
+            label: 'More filters',
+            summary: 'None',
+            size: 'compact',
+            subsections: [
+                { id: 'more-toggle', label: 'Toggle', summary: '', customRow: <button data-testid="nested-toggle">t</button> },
+                { id: 'more-venue', label: 'Venue', summary: 'Any', size: 'compact', render: () => <div>venue pills</div> },
+            ],
+        }];
+        render(<FilterSheet open onClose={vi.fn()} sections={nested} activeFilterCount={0} matchingEventCount={5} />);
+
+        await user.click(screen.getByTestId('filter-sheet-row-more'));
+        expect(screen.getByTestId('nested-toggle')).toBeInTheDocument();
+        expect(screen.getByTestId('filter-sheet-panel')).not.toHaveClass('filter-sheet-panel--full');
+
+        await user.click(screen.getByTestId('filter-sheet-row-more-venue'));
+        expect(screen.getByText('venue pills')).toBeInTheDocument();
+        expect(screen.getByTestId('full-screen-editor-back')).toHaveTextContent('Venue');
+
+        await user.click(screen.getByTestId('full-screen-editor-back'));
+        expect(screen.getByTestId('filter-sheet-row-more-venue')).toBeInTheDocument();
+        expect(screen.queryByText('venue pills')).toBeNull();
+    });
+});
