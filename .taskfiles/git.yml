@@ -17,7 +17,7 @@ tasks:
       NAME: "{{.CLI_ARGS}}"
       CURRENT_BRANCH:
         sh: git branch --show-current
-    deps: [ _check-clean ]
+    deps: [_check-clean]
     prompt: |
       Create feature/{{.NAME}} from develop branch?
 
@@ -35,7 +35,7 @@ tasks:
       NAME: "{{.CLI_ARGS}}"
       CURRENT_BRANCH:
         sh: git branch --show-current
-    deps: [ _check-clean ]
+    deps: [_check-clean]
     prompt: |
       Create fix/{{.NAME}} from develop branch?
 
@@ -53,7 +53,7 @@ tasks:
       NAME: "{{.CLI_ARGS}}"
       CURRENT_BRANCH:
         sh: git branch --show-current
-    deps: [ _check-clean ]
+    deps: [_check-clean]
     prompt: |
       Create hotfix/{{.NAME}} from main branch?
 
@@ -175,7 +175,7 @@ tasks:
           echo "Next steps (latest tag: $LATEST):"
           echo "   task git:release:tag -- $NEXT          → Tag the release"
           echo "   task deploy:prod:remote -- $NEXT       → Deploy tagged release to prod"
-          echo "   task release:prod -- $NEXT             → Tag + deploy (combined)"
+          echo "   task release:prod -- --fast            → Tag + deploy changed components (one confirm)"
           echo "   task release:prod                      → Interactive: prompts for version"
           echo ""
           echo "⚠️  Don't forget to cherry-pick into develop if needed:"
@@ -270,15 +270,15 @@ tasks:
         echo "Next steps (latest tag: $LATEST):"
         echo "   task git:release:tag -- $NEXT          → Tag the release"
         echo "   task deploy:prod:remote -- $NEXT       → Deploy tagged release to prod"
-        echo "   task release:prod -- $NEXT             → Tag + deploy (combined)"
+        echo "   task release:prod -- --fast            → Tag + deploy changed components (one confirm)"
         echo "   task release:prod                      → Interactive: prompts for version"
   release:tag:
     desc: Tag a release on main and push (e.g., task git:release:tag -- v1.2.0)
     vars:
       VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
-    deps: [ _provision-main-worktree ]
+    deps: [_provision-main-worktree]
     preconditions:
-      - sh: "[ -n \"{{.VERSION}}\" ]"
+      - sh: '[ -n "{{.VERSION}}" ]'
         msg: |
           ❌ VERSION required
 
@@ -332,7 +332,6 @@ tasks:
         echo ""
         echo "Next steps:"
         echo "   task deploy:prod:remote -- $VERSION         → Deploy to prod (no checkout needed)"
-        echo "   task release:prod -- $VERSION               → Tag + deploy (combined)"
 
   release:tag-component:
     desc: "Tag a per-component release on main and push
@@ -342,11 +341,11 @@ tasks:
       COMPONENT: "{{.COMPONENT}}"
       VERSION: "{{.VERSION}}"
       TAG: "{{.COMPONENT}}-{{.VERSION}}"
-      REUSE: "{{.REUSE | default \"0\"}}"
-      FORCE: "{{.FORCE | default \"0\"}}"
-    deps: [ _provision-main-worktree ]
+      REUSE: '{{.REUSE | default "0"}}'
+      FORCE: '{{.FORCE | default "0"}}'
+    deps: [_provision-main-worktree]
     preconditions:
-      - sh: "echo \"{{.COMPONENT}}\" | grep -Eq \"^(db|backend|frontend)$\""
+      - sh: 'echo "{{.COMPONENT}}" | grep -Eq "^(db|backend|frontend)$"'
         msg: "COMPONENT must be db, backend, or frontend"
       - sh: "echo \"{{.VERSION}}\" | grep -Eq \"^v[0-9]+\\.[0-9]+\\.[0-9]+$\""
         msg: "VERSION must be vX.Y.Z (got '{{.VERSION}}')"
@@ -488,7 +487,8 @@ tasks:
   # ════════════════════════════════════════════════════════════════
 
   worktree:create:
-    desc: "Create a worktree for any branch (e.g., task git:worktree:create -- main,
+    desc:
+      "Create a worktree for any branch (e.g., task git:worktree:create -- main,
       or task git:worktree:create -- origin/develop)"
     vars:
       BRANCH: "{{if .BRANCH}}{{.BRANCH}}{{else}}{{.CLI_ARGS}}{{end}}"
@@ -619,7 +619,7 @@ tasks:
   _check-clean:
     internal: true
     preconditions:
-      - sh: "[ -z \"$(git status --porcelain)\" ]"
+      - sh: '[ -z "$(git status --porcelain)" ]'
         msg: |
           ❌ Working directory is not clean.
           Commit or stash your changes first.
@@ -665,8 +665,9 @@ tasks:
   _resolve-ref:
     internal: true
     preconditions:
-      - sh: "git rev-parse --verify \"{{.REF}}\" >/dev/null 2>&1 || git fetch origin
-          \"{{.REF}}\" 2>/dev/null"
+      - sh:
+          'git rev-parse --verify "{{.REF}}" >/dev/null 2>&1 || git fetch origin
+          "{{.REF}}" 2>/dev/null'
         msg: |
           ❌ Cannot resolve git ref: {{.REF}}
           Make sure the branch/tag exists locally or on origin.

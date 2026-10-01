@@ -41,7 +41,7 @@ users:
     onboarded_at: null
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (2).jpg
+    avatar: uifaces-human-avatar (10).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Amira%20Haddad
   - email: picks@joinmovida.com
     name: Movida Picks
@@ -209,7 +209,7 @@ users:
     account_visibility: friends
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar: uifaces-human-avatar (10).jpg
+    avatar: uifaces-human-avatar (2).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Sofia%20Torres
   - email: milan.horvat@joinmovida.com
     name: Milan Horvat

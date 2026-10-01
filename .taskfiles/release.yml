@@ -19,16 +19,19 @@ version: "3"
 #
 # Override the suggested bump with BUMP=patch|minor|major (default: patch).
 #
-# Flags (can be combined):
-#   AUTO_VERSION=1     — auto-accept suggested versions (no retyping)
-#   SKIP_CONFIRM=1     — skip "Release this component?" confirmation prompts
-#   SKIP_CI_CHECK=1    — skip CI status checks before deployment
+# Aggregate args (after `--`, can be combined):
+#   --fast             — auto-detect changed components + suggested tags, one
+#                        summary confirmation, then tag + deploy without prompts
+#   --dry-run          — print the --fast plan (and commands) and exit
+#   --skip-ci-check    — skip CI status checks before deployment
+#   db backend frontend — restrict to these components
 #
 # Examples:
-#   task release:prod -- --skip-confirm                  (all components, versions prompted)
-#   task release:prod -- --auto-version                  (choose components, auto-accept versions)
-#   task release:prod -- --skip-confirm --auto-version   (fully automated: all components, no prompts)
-#   task release:prod -- --skip-ci-check --skip-confirm  (skip CI + confirmations)
+#   task release:prod -- --fast                    (changed components, one confirm)
+#   task release:prod -- --fast backend frontend   (only these, one confirm)
+#   task release:prod -- --dry-run                 (show what --fast would do)
+#   task release:prod -- backend                   (interactive, backend only)
+#   task release:prod -- --fast --skip-ci-check
 # ════════════════════════════════════════════════════════════════════════════
 
 tasks:
@@ -128,18 +131,11 @@ tasks:
             echo "      (or :staging:remote:cwd:${COMPONENT} to test on staging first)"
           fi
           echo "═══════════════════════════════════════════════════════════════"
-          # Check if AUTO_VERSION is set; if so, skip the prompt
-          AUTO_VER="{{.AUTO_VERSION | default ""}}"
-          if [ "$AUTO_VER" = "1" ]; then
-            VERSION="$SUGGESTED"
-            echo "→ Auto-accepting suggested version: ${COMPONENT}-$VERSION"
-          else
-            printf "Type the version to release [%s]: " "$SUGGESTED"
-            read -r INPUT
-            VERSION="${INPUT:-$SUGGESTED}"
-            echo ""
-            echo "→ Releasing ${COMPONENT}-$VERSION"
-          fi
+          printf "Type the version to release [%s]: " "$SUGGESTED"
+          read -r INPUT
+          VERSION="${INPUT:-$SUGGESTED}"
+          echo ""
+          echo "→ Releasing ${COMPONENT}-$VERSION"
         fi
         # Single dispatch: tag, then deploy. No re-exec — this script is the
         # only place that drives the chain, so the parent task cannot run it
@@ -153,7 +149,12 @@ tasks:
           rm -f .git/.last-release-tag
           echo "→ Deploying chosen tag: $DEPLOY_TAG"
         fi
-        task deploy:prod:remote:"$COMPONENT" REF="$DEPLOY_TAG"
+        # YES=1: caller (release:prod --fast) already confirmed the plan.
+        if [ "{{.YES | default ""}}" = "1" ]; then
+          task --yes deploy:prod:remote:"$COMPONENT" REF="$DEPLOY_TAG"
+        else
+          task deploy:prod:remote:"$COMPONENT" REF="$DEPLOY_TAG"
+        fi
 
   # ──────────────────────────────────────────────────────────────────────────
   # Per-component release tasks
@@ -197,61 +198,206 @@ tasks:
   # ──────────────────────────────────────────────────────────────────────────
   # Aggregator: release one or more components in sequence
   #
-  # Walks db → backend → frontend, prompting for each (skip with empty input).
-  # Each accepted component runs its full tag-and-deploy flow before moving on.
+  # Default (interactive): walks db → backend → frontend, prompting y/N for
+  # each (or only the components listed after `--`), then the per-component
+  # version + deploy prompts.
+  #
+  # --fast: preselects components with commits on origin/main (in their path)
+  # since refs/deploys/prod/<component>, suggests the next tag for each, asks
+  # once [Y/e/n], then tags + deploys with no further prompts.
+  # --dry-run: prints the --fast plan and the commands it would run.
   # ──────────────────────────────────────────────────────────────────────────
 
   prod:
-    desc: "Release one or more components to prod. Supports --auto-version, --skip-confirm, --skip-ci-check flags."
+    desc: "Release components to prod. Args after --: --fast, --dry-run, --skip-ci-check, [db backend frontend]."
+    silent: true
+    vars:
+      BUMP: '{{.BUMP | default "patch"}}'
     cmds:
-      - |
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "  RELEASE TO PRODUCTION (per-component)"
-        echo ""
-        echo "  Flags:"
-        echo "    --auto-version   Auto-accept suggested versions (no retyping)"
-        echo "    --skip-confirm   Skip 'Release this component?' prompts"
-        echo "    --skip-ci-check  Skip CI status checks before deployment"
-        echo ""
-        echo "  You will be prompted for each component (db, backend, frontend)."
-        echo "  Press Enter on an empty line to skip a component."
-        echo "  For per-component shortcuts, use:"
-        echo "    task release:prod:backend  -- v1.2.0"
-        echo "    task release:prod:frontend -- v1.2.0"
-        echo "    task release:prod:db       -- v1.2.0"
-        echo "═══════════════════════════════════════════════════════════════"
       - |
         TASK_SKIP="{{.SKIP_CI_CHECK | default ""}}"
         [ -n "$TASK_SKIP" ] && export SKIP_CI_CHECK="$TASK_SKIP"
-        TASK_AUTO="{{.AUTO_VERSION | default ""}}"
-        [ -n "$TASK_AUTO" ] && export AUTO_VERSION="$TASK_AUTO"
-        SKIP_CONFIRM="{{.SKIP_CONFIRM | default ""}}"
 
-        # If SKIP_CONFIRM is set, release all components without prompting
-        if [ "$SKIP_CONFIRM" = "1" ]; then
-          for COMPONENT in db backend frontend; do
-            echo ""
-            echo "→ Releasing $COMPONENT..."
-            task release:prod:${COMPONENT} || { echo "❌ ${COMPONENT} release aborted; stopping."; exit 1; }
+        usage() {
+          echo "Usage: task release:prod -- [--fast] [--dry-run] [--skip-ci-check] [db] [backend] [frontend]"
+          echo "  (no flag)        interactive: prompts per component, version, deploy"
+          echo "  --fast           auto-detect changes + suggested tags, one confirmation"
+          echo "  --dry-run        show the --fast plan and exit"
+          echo "  --skip-ci-check  skip CI green-check before deploy"
+          echo "  db backend ...   restrict to these components"
+          echo "  BUMP=minor|major override the suggested bump (default: patch)"
+        }
+
+        FAST=""; DRY=""; LIST=""
+        set -- {{.CLI_ARGS}}
+        for ARG in "$@"; do
+          case "$ARG" in
+            --fast) FAST=1 ;;
+            --dry-run) DRY=1 ;;
+            --skip-ci-check) export SKIP_CI_CHECK=1 ;;
+            -h|--help) usage; exit 0 ;;
+            db|backend|frontend) LIST="$LIST $ARG" ;;
+            *) echo "❌ Unknown argument '$ARG'."; usage; exit 1 ;;
+          esac
+        done
+
+        # Echo-based: a non-zero function return trips errexit in Task's shell.
+        listed() {
+          case " $LIST " in *" $1 "*) echo 1 ;; esac
+        }
+
+        # ── Interactive (default) ────────────────────────────────────────────
+        if [ -z "$FAST" ] && [ -z "$DRY" ]; then
+          for C in db backend frontend; do
+            if [ -n "$LIST" ]; then
+              [ -n "$(listed "$C")" ] || continue
+            else
+              printf "\nRelease %s? [y/N] " "$C"
+              read -r ANS
+              case "$ANS" in
+                y|Y|yes) ;;
+                *) echo "→ skipped $C"; continue ;;
+              esac
+            fi
+            task release:prod:$C || { echo "❌ $C release aborted; stopping."; exit 1; }
           done
-        else
-          # Default: interactive prompts per component
-          for COMPONENT in db backend frontend; do
-            printf "\nRelease %s? [y/N] " "$COMPONENT"
-            read -r ANS
-            case "$ANS" in
-              y|Y|yes)
-                task release:prod:${COMPONENT} || { echo "❌ ${COMPONENT} release aborted; stopping."; exit 1; }
-                ;;
-              *)
-                echo "→ skipped ${COMPONENT}"
-                ;;
-            esac
-          done
+          echo ""
+          echo "✅ Release complete."
+          exit 0
         fi
+
+        # ── Fast / dry-run: build the plan ───────────────────────────────────
+        get() { eval "echo \"\${$1_$2}\""; }
+        comp_path() {
+          case "$1" in
+            db) echo "backend/db/alembic" ;;
+            backend) echo "backend" ;;
+            frontend) echo "frontend" ;;
+          esac
+        }
+        suggest() {
+          BASE=$(git tag -l "$1-v*" --sort=-version:refname | head -1)
+          [ -z "$BASE" ] && BASE=$(git tag -l "v*" --sort=-version:refname | head -1)
+          [ -z "$BASE" ] && BASE="$1-v0.0.0"
+          CORE=$(echo "$BASE" | sed -E "s/^$1-//; s/^v//; s/-.*$//")
+          MAJ=$(echo "$CORE" | cut -d. -f1); MAJ=${MAJ:-0}
+          MIN=$(echo "$CORE" | cut -d. -f2); MIN=${MIN:-0}
+          PAT=$(echo "$CORE" | cut -d. -f3); PAT=${PAT:-0}
+          case "{{.BUMP}}" in
+            major) MAJ=$((MAJ+1)); MIN=0; PAT=0 ;;
+            minor) MIN=$((MIN+1)); PAT=0 ;;
+            *) PAT=$((PAT+1)) ;;
+          esac
+          echo "v$MAJ.$MIN.$PAT"
+        }
+
+        echo "→ Fetching origin/main, tags and prod deploy refs..."
+        git fetch origin main --tags --quiet 2>/dev/null || true
+        git fetch origin '+refs/deploys/prod/*:refs/deploys/prod/*' --quiet 2>/dev/null || true
+
+        for C in db backend frontend; do
+          CUR=$(git rev-parse --verify --quiet "refs/deploys/prod/$C" 2>/dev/null || true)
+          if [ -n "$CUR" ]; then
+            CUR_NAME=$(git describe --tags --exact-match --match "$C-v*" "$CUR" 2>/dev/null \
+              || git describe --tags --always "$CUR" 2>/dev/null || echo "$CUR")
+            N=$(git rev-list --count "$CUR..origin/main" -- "$(comp_path "$C")" 2>/dev/null || echo "?")
+          else
+            CUR_NAME="(none)"
+            N="new"
+          fi
+          SEL=""
+          if [ -n "$LIST" ]; then
+            SEL=$(listed "$C")
+          elif [ "$N" != "0" ]; then
+            SEL=1
+          fi
+          V=$(suggest "$C")
+          eval "SEL_$C=\$SEL; VER_$C=\$V; CUR_$C=\$CUR_NAME; N_$C=\$N"
+        done
+
+        show_plan() {
+          echo ""
+          echo "═══════════════════════════════════════════════════════════════════════"
+          echo "  RELEASE TO PRODUCTION — plan"
+          echo ""
+          printf "  %-3s  %-9s %-28s %-22s %s\n" "" "COMPONENT" "DEPLOYED" "NEXT TAG" "CHANGES"
+          for C in db backend frontend; do
+            MARK="[ ]"; [ -n "$(get SEL $C)" ] && MARK="[x]"
+            CH="$(get N $C) commits"; [ "$(get N $C)" = "new" ] && CH="never deployed"
+            printf "  %-3s  %-9s %-28s %-22s %s\n" "$MARK" "$C" "$(get CUR $C)" "$C-$(get VER $C)" "$CH"
+          done
+          if ! git diff --quiet HEAD -- 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+            echo ""
+            echo "  ⚠️  Uncommitted local changes will NOT be deployed (tags on main only)."
+          fi
+          [ -n "$SKIP_CI_CHECK" ] && echo "  ⏭️  CI green-check will be skipped."
+          echo "═══════════════════════════════════════════════════════════════════════"
+        }
+
+        if [ -n "$DRY" ]; then
+          show_plan
+          echo ""
+          echo "Dry run — would run:"
+          ANY=""
+          for C in db backend frontend; do
+            if [ -n "$(get SEL $C)" ]; then
+              ANY=1
+              echo "  task release:prod:$C VERSION=$(get VER $C) YES=1"
+            fi
+          done
+          [ -z "$ANY" ] && echo "  (nothing — no component selected)"
+          exit 0
+        fi
+
+        while true; do
+          show_plan
+          printf "Proceed? [Y]es / [e]dit / [n]o: "
+          read -r ANS
+          case "$ANS" in
+            ""|y|Y|yes) break ;;
+            e|E|edit)
+              for C in db backend frontend; do
+                if [ -n "$(get SEL $C)" ]; then DEF=y; HINT="Y/n"; else DEF=n; HINT="y/N"; fi
+                printf "  Release %s? [%s] " "$C" "$HINT"
+                read -r A
+                case "${A:-$DEF}" in
+                  y|Y|yes)
+                    eval "SEL_$C=1"
+                    printf "    Version [%s]: " "$(get VER $C)"
+                    read -r V
+                    if [ -n "$V" ]; then
+                      if echo "$V" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+                        eval "VER_$C=\$V"
+                      else
+                        echo "    ❌ '$V' is not vX.Y.Z — keeping $(get VER $C)"
+                      fi
+                    fi
+                    ;;
+                  *) eval "SEL_$C=" ;;
+                esac
+              done
+              ;;
+            *) echo "Aborted."; exit 0 ;;
+          esac
+        done
+
+        ANY=""
+        for C in db backend frontend; do
+          if [ -n "$(get SEL $C)" ]; then ANY=1; fi
+        done
+        if [ -z "$ANY" ]; then
+          echo "Nothing to release."
+          exit 0
+        fi
+
+        for C in db backend frontend; do
+          [ -n "$(get SEL $C)" ] || continue
+          echo ""
+          echo "━━━━ Releasing $C-$(get VER $C) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          task release:prod:$C VERSION="$(get VER $C)" YES=1 || { echo "❌ $C release aborted; stopping."; exit 1; }
+        done
         echo ""
-        echo "✅ Aggregate release complete."
+        echo "✅ Release complete."
 
   # Backward-compat: `task release:default` is what `task release` resolves to.
   default:

@@ -160,7 +160,7 @@ describe('MyEventsExperience view modes', () => {
         expect(screen.getByTestId('map-preview')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '1 without map location · List' })).toBeInTheDocument();
 
-        await user.click(screen.getByRole('tab', { name: 'Saved' }));
+        await user.click(screen.getByRole('tab', { name: /^Saved/ }));
         await user.click(screen.getByRole('button', { name: 'Map view' }));
         expect(screen.getByTestId('event-map')).toHaveAttribute('data-route-on', 'false');
         expect(screen.getByRole('button', { name: 'Show route' })).toHaveAttribute('aria-pressed', 'false');
