@@ -1,15 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
-import AudiencePicker from './AudiencePicker';
-import BottomSheet from './BottomSheet';
+import RsvpVisibilitySheet from './RsvpVisibilitySheet';
 import { trackSave } from '../utils/tracking';
-import useMediaQuery from '../hooks/useMediaQuery';
 import type { ShareAudience } from '../api';
 
 interface Props {
@@ -22,35 +19,11 @@ interface Props {
     labelClassName?: string;
 }
 
-interface PopoverPos { top: number; left: number; }
-
-const POPOVER_WIDTH = 272;
-
-/**
- * Compute fixed-position coordinates for the audience popover. Clamps
- * horizontally and — when there isn't enough room below the trigger
- * for ``popoverHeight`` — flips ABOVE the trigger so the popover isn't
- * clipped at the bottom of the viewport (a recurring problem on event
- * cards near the page footer).
- */
-function computePopoverPos(
-    trigger: HTMLElement,
-    popoverWidth: number,
-    popoverHeight: number = 220,
-): PopoverPos {
-    const r = trigger.getBoundingClientRect();
-    const margin = 8;
-    const desiredLeft = r.left + r.width / 2 - popoverWidth / 2;
-    const maxLeft = window.innerWidth - popoverWidth - margin;
-    const left = Math.max(margin, Math.min(desiredLeft, maxLeft));
-    const spaceBelow = window.innerHeight - r.bottom - margin;
-    const spaceAbove = r.top - margin;
-    const top =
-        spaceBelow >= popoverHeight || spaceBelow >= spaceAbove
-            ? r.bottom + 6
-            : Math.max(margin, r.top - popoverHeight - 6);
-    return { top, left };
-}
+const SAVED_AUDIENCE_DESCRIPTIONS: Record<ShareAudience, string> = {
+    public: 'Anyone who can view your profile will see this in your saved list.',
+    friends: 'Only your mutual followers will see this in your saved list.',
+    private: 'Only you can see this in your saved list.',
+};
 
 export default function SaveEventButton({
     eventId,
@@ -60,54 +33,19 @@ export default function SaveEventButton({
     className = '',
     labelClassName = '',
 }: Props) {
-    const { isSaved, toggleSave, getSavedAudience, setSavedAudience } = useSavedEvents();
+    const { isSaved, toggleSave, setSavedAudience } = useSavedEvents();
     const { user } = useAuth();
     const { appAuthGateEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const location = useLocation();
     const navigate = useNavigate();
-    const isMobile = useMediaQuery('(max-width: 639px)');
     const saved = isSaved(eventId);
     const buttonRef = useRef<HTMLButtonElement | null>(null);
-    const popoverRef = useRef<HTMLDivElement | null>(null);
     const toast = useAnchoredToast(buttonRef);
     const nudge = useSignInNudge('save');
     const [showNudge, setShowNudge] = useState(false);
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [pendingAudience, setPendingAudience] = useState<ShareAudience>('private');
-    const [popoverPos, setPopoverPos] = useState<PopoverPos | null>(null);
-
-    useEffect(() => {
-        if (!popoverOpen || isMobile || !buttonRef.current) return;
-        const update = () => {
-            if (buttonRef.current) {
-                setPopoverPos(computePopoverPos(buttonRef.current, POPOVER_WIDTH));
-            }
-        };
-        update();
-        window.addEventListener('scroll', update, true);
-        window.addEventListener('resize', update);
-        return () => {
-            window.removeEventListener('scroll', update, true);
-            window.removeEventListener('resize', update);
-        };
-    }, [isMobile, popoverOpen]);
-
-    useEffect(() => {
-        if (!popoverOpen || isMobile) return;
-        const onDocClick = (e: MouseEvent) => {
-            const t = e.target as Node;
-            if (popoverRef.current?.contains(t) || buttonRef.current?.contains(t)) return;
-            setPopoverOpen(false);
-        };
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPopoverOpen(false); };
-        document.addEventListener('mousedown', onDocClick);
-        document.addEventListener('keydown', onKey);
-        return () => {
-            document.removeEventListener('mousedown', onDocClick);
-            document.removeEventListener('keydown', onKey);
-        };
-    }, [isMobile, popoverOpen]);
 
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
         if (stopPropagation) event.stopPropagation();
@@ -120,13 +58,6 @@ export default function SaveEventButton({
             navigate(`/login?next=${next}`);
             return;
         }
-        if (saved && user) {
-            // Already saved + signed-in: open popover with audience picker
-            // + "Unsave" instead of toggling off blindly. Mirrors GoingButton.
-            setPendingAudience(getSavedAudience(eventId));
-            setPopoverOpen(true);
-            return;
-        }
         const wasSaved = saved;
         let nudgeShown = false;
         if (!wasSaved && !user && nudge.shouldShow) {
@@ -136,13 +67,12 @@ export default function SaveEventButton({
         }
         if (!wasSaved && user) {
             // Signed-in first-time save: emit the save with the user's
-            // account-level default audience (privacy-by-default: friends),
-            // optimistically flip local state, then open the visibility
-            // popover so the user can adjust on the fly — parity with the
-            // post-RSVP popover that GoingButton shows.
+            // account-level default audience, optimistically flip local state,
+            // then open the visibility popover so the user can adjust on the
+            // fly — parity with the post-RSVP popover that GoingButton shows.
             const defaultAudience: ShareAudience =
                 user.share_attendance_default_audience
-                ?? (user.share_attendance_default === false ? 'private' : 'friends');
+                ?? (user.share_attendance_default === false ? 'private' : 'public');
             toggleSave(eventId).then((ok) => {
                 if (!ok) {
                     toast.show("Couldn't save \u2014 try again", 3200);
@@ -178,8 +108,7 @@ export default function SaveEventButton({
         });
     };
 
-    const unsave = (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.stopPropagation();
+    const unsave = () => {
         toast.hide();
         setPopoverOpen(false);
         toggleSave(eventId).then((ok) => {
@@ -187,103 +116,23 @@ export default function SaveEventButton({
         });
     };
 
-    const visibilityDetails = (
-        <>
-            <p className={isMobile ? 'mb-3 text-base leading-6 text-ink-soft' : 'mb-2 text-[11px] text-ink-soft'}>
-                Who can see you saved this event?
-            </p>
-            <AudiencePicker
-                value={pendingAudience}
-                onChange={handlePopoverAudienceChange}
-                size={isMobile ? 'sheet' : 'full'}
-                ariaLabel="Saved event visibility"
-            />
-            <p className={isMobile ? 'mt-3 text-sm leading-5 text-ink-soft' : 'mt-1.5 text-[11px] text-ink-soft'}>
-                {pendingAudience === 'public'
-                    ? 'Anyone who can view your profile will see this in your saved list.'
-                    : pendingAudience === 'friends'
-                        ? 'Only your mutual followers will see this in your saved list.'
-                        : 'Only you can see this in your saved list.'}
-            </p>
-        </>
-    );
+    const closePopover = useCallback(() => setPopoverOpen(false), []);
 
-    const visibilityActions = (
-        <div className="flex w-full items-center justify-between gap-2">
-            <button
-                type="button"
-                onClick={unsave}
-                className="min-h-11 rounded-field px-3 py-2 text-sm font-semibold text-danger hover:bg-canvas"
-            >
-                Unsave
-            </button>
-            <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setPopoverOpen(false); }}
-                className="min-h-11 rounded-field border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink"
-            >
-                Close
-            </button>
-        </div>
-    );
-
-    const popover = popoverOpen && (isMobile ? createPortal(
-        <BottomSheet
-            title="Saved event visibility"
+    const popover = popoverOpen ? (
+        <RsvpVisibilitySheet
+            anchorRef={buttonRef}
+            emoji="🔖"
+            title="Saved!"
             subtitle={eventTitle}
-            titleSize="large"
-            onClose={() => setPopoverOpen(false)}
-            layer="transient"
-            footer={visibilityActions}
-        >
-            {visibilityDetails}
-        </BottomSheet>,
-        document.body,
-    ) : popoverPos && createPortal(
-        <div
-            ref={popoverRef}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="Saved event visibility"
-            style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
-            className="z-[12000] border border-line bg-surface p-3 shadow-xl text-left"
-        >
-            <p className="text-xs font-medium text-ink mb-2">Edit visibility</p>
-            <p className="text-[11px] text-ink-soft mb-2">
-                Who can see you saved this event?
-            </p>
-            <AudiencePicker
-                value={pendingAudience}
-                onChange={handlePopoverAudienceChange}
-                size="full"
-                ariaLabel="Saved event visibility"
-            />
-            <p className="text-[11px] text-ink-soft mt-1.5">
-                {pendingAudience === 'public'
-                    ? 'Anyone who can view your profile will see this in your saved list.'
-                    : pendingAudience === 'friends'
-                        ? 'Only your mutual followers will see this in your saved list.'
-                        : 'Only you can see this in your saved list.'}
-            </p>
-            <div className="mt-3 flex items-center justify-between gap-2">
-                <button
-                    type="button"
-                    onClick={unsave}
-                    className="text-xs px-2 py-1 text-rose-600 hover:bg-rose-50"
-                >
-                    Unsave
-                </button>
-                <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setPopoverOpen(false); }}
-                    className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
-                >
-                    Close
-                </button>
-            </div>
-        </div>,
-        document.body,
-    ));
+            question="Who can see you saved this event?"
+            audience={pendingAudience}
+            onAudienceChange={handlePopoverAudienceChange}
+            pickerAriaLabel="Saved event visibility"
+            description={SAVED_AUDIENCE_DESCRIPTIONS[pendingAudience]}
+            secondaryAction={{ label: 'Unsave', onClick: unsave, tone: 'danger' }}
+            onClose={closePopover}
+        />
+    ) : null;
 
     const nudgeNode = showNudge && !user ? (
         <SignInNudge
@@ -300,7 +149,7 @@ export default function SaveEventButton({
                     ref={buttonRef}
                     onClick={handleClick}
                     className={`flex h-10 items-center gap-2 rounded-xl bg-action-tile px-3 text-sm transition-colors focus-visible:outline-none ${className} ${saved ? 'text-saved' : 'text-ink-soft hover:text-ink'}`.trim()}
-                    aria-label={saved ? 'Edit saved visibility' : 'Save event'}
+                    aria-label={saved ? 'Unsave event' : 'Save event'}
                 >
                     <span className="flex h-[22px] w-[22px] items-center justify-center" aria-hidden="true">
                         <svg
@@ -334,7 +183,7 @@ export default function SaveEventButton({
                 ref={buttonRef}
                 onClick={handleClick}
                 className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-action-tile transition-colors focus-visible:outline-none ${className} ${saved ? 'text-saved' : 'text-ink-soft hover:text-ink'}`.trim()}
-                aria-label={saved ? 'Edit saved visibility' : 'Save event'}
+                aria-label={saved ? 'Unsave event' : 'Save event'}
             >
                 <span className="flex h-[22px] w-[22px] items-center justify-center" aria-hidden="true">
                     <svg

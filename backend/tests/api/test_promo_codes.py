@@ -253,6 +253,8 @@ def test_admin_approve_creates_submitter_notification(client, session, event, fl
         select(Notification).where(Notification.kind == "promo_code_approved")
     ).all()
     assert len(notifs) == 1
+    assert notifs[0].context == "OK20"
+    assert notifs[0].description is None
 
 
 @pytest.mark.unit
@@ -277,6 +279,8 @@ def test_admin_reject_persists_notes_and_notification(client, session, event, fl
         select(Notification).where(Notification.kind == "promo_code_rejected")
     ).all()
     assert len(notifs) == 1
+    assert notifs[0].context == "BADCODE"
+    assert notifs[0].description == "Spam content."
 
 
 # ── Owner edit + delete ──────────────────────────────────────────────

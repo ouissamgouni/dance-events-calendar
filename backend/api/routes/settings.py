@@ -247,6 +247,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         web_push_enabled=app_settings.get_web_push_enabled(session),
         reminder_lead_hours=app_settings.get_reminder_lead_hours(session),
         activity_digest_schedule=app_settings.get_activity_digest_schedule(session),
+        interest_match_push_schedule=app_settings.get_interest_match_push_schedule(
+            session
+        ),
         interest_match_max_events_per_email=app_settings.get_interest_match_max_events_per_email(
             session
         ),
@@ -762,6 +765,17 @@ def update_settings(
         else:
             row = SiteSetting(
                 key="activity_digest_schedule", value=body.activity_digest_schedule
+            )
+        session.add(row)
+
+    if body.interest_match_push_schedule is not None:
+        row = session.get(SiteSetting, "interest_match_push_schedule")
+        if row:
+            row.value = body.interest_match_push_schedule
+        else:
+            row = SiteSetting(
+                key="interest_match_push_schedule",
+                value=body.interest_match_push_schedule,
             )
         session.add(row)
 

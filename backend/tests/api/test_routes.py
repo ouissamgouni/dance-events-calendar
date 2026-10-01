@@ -1471,6 +1471,7 @@ class TestPendingReviewEndpoints:
             start=datetime(2099, 6, 1, 20, 0),
             end=datetime(2099, 6, 1, 23, 0),
             review_status="pending",
+            updated_at=datetime(2020, 1, 1, tzinfo=UTC),
         )
         cal = CalendarSetting(
             calendar_id="cal-1", name="Test", enabled=True, color="#ff0000"
@@ -1486,6 +1487,7 @@ class TestPendingReviewEndpoints:
             resp = client.post("/api/admin/events/evt-1/review")
             assert resp.status_code == 200
             assert resp.json()["review_status"] == "reviewed"
+            assert event.updated_at.year > 2020
         finally:
             app.dependency_overrides.clear()
 

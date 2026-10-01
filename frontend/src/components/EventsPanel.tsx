@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AdminEventStatus, CalendarEvent, SeriesGroup, DuplicateGroup } from '../types';
+import type { AdminEventStatus, CalendarEvent, EventInterestReach, SeriesGroup, DuplicateGroup } from '../types';
 import type {
     AdminEventGeoStatus,
     EventFilterParams,
@@ -65,6 +65,35 @@ const PRESET_TITLES: Record<EventsPanelPreset, string> = {
     pending: 'Pending Review',
     ungeolocated: 'Ungeolocated Events',
 };
+
+const ENGAGEMENT_TOOLTIP = 'Visitors who accepted analytics cookies only; admins excluded.';
+
+export function MatchesCell({ reach }: { reach?: EventInterestReach | null }) {
+    if (!reach) return <span className="text-muted">—</span>;
+    if (!reach.eligible) {
+        return (
+            <span
+                className="text-muted"
+                title={`No saved-search alerts: ${reach.ineligible_reason ?? 'unknown'} · ${reach.already_notified_users} notified earlier`}
+            >
+                —
+            </span>
+        );
+    }
+    if (reach.matched_users === 0) {
+        return <span className="text-muted" title="No saved search matches this event">0</span>;
+    }
+    const notYet = reach.would_alert_app;
+    const notified = reach.matched_users - notYet;
+    const summary =
+        `${notified} of ${reach.matched_users} matching users notified (${reach.matched_profiles} saved searches)` +
+        (notYet > 0 ? ` · ${notYet} not notified yet, alerted on next event update` : '');
+    return (
+        <span className={notYet > 0 ? 'font-medium text-amber-700' : 'text-ink'} title={summary}>
+            {notified}/{reach.matched_users}
+        </span>
+    );
+}
 
 export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId }: Props) {
     const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -542,7 +571,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             )}
 
             <div
-                className={`fixed top-0 right-0 h-full w-[720px] max-w-full bg-surface shadow-lg border-l border-line z-50 transform transition-transform duration-200 ease-in-out flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-[1100px] max-w-[95vw] bg-surface shadow-lg border-l border-line z-50 transform transition-transform duration-200 ease-in-out flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas shrink-0">
@@ -721,6 +750,9 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-20">Status</th>
                                     <th className="px-2 py-2 text-center font-semibold text-ink-soft uppercase tracking-wide w-10">Geo</th>
                                     <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Tags</th>
+                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24" title="Users whose saved searches match: notified / matching">Matches</th>
+                                    <th className="px-2 py-2 text-right font-semibold text-ink-soft uppercase tracking-wide w-12" title={ENGAGEMENT_TOOLTIP}>Views</th>
+                                    <th className="px-2 py-2 text-right font-semibold text-ink-soft uppercase tracking-wide w-12" title={ENGAGEMENT_TOOLTIP}>Clicks</th>
                                     <th className="px-2 py-2 w-16"></th>
                                 </tr>
                             </thead>
@@ -819,6 +851,18 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                                     <span className="text-[9px] text-muted">+{event.tags.length - 2}</span>
                                                 )}
                                             </div>
+                                        </td>
+                                        <td className="px-2 py-1.5">
+                                            <MatchesCell reach={event.interest_reach} />
+                                        </td>
+                                        <td
+                                            className="px-2 py-1.5 text-right text-ink-soft"
+                                            title={`${event.unique_viewers ?? 0} unique viewers`}
+                                        >
+                                            {event.view_count ?? 0}
+                                        </td>
+                                        <td className="px-2 py-1.5 text-right text-ink-soft">
+                                            {event.link_clicks ?? 0}
                                         </td>
                                         <td className="px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
                                             {getAdminEventStatus(event) === 'pending' && (

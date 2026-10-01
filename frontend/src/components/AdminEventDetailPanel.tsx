@@ -16,6 +16,7 @@ import AdminEventDetailContent from './AdminEventDetailContent';
 import EventImageEditor from './EventImageEditor';
 import EventReviewsSection from './EventReviewsSection';
 import EventMessagesSection from './EventMessagesSection';
+import AdminEventNotificationsSection from './AdminEventNotificationsSection';
 import EventMap from './EventMap';
 import type { CalendarEvent, DuplicateGroup, SeriesGroup } from '../types';
 
@@ -56,6 +57,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
     const [seriesSearchLoading, setSeriesSearchLoading] = useState(false);
     const [communityExpanded, setCommunityExpanded] = useState(false);
     const [messagesExpanded, setMessagesExpanded] = useState(false);
+    const [notificationsExpanded, setNotificationsExpanded] = useState(false);
 
     const isOpen = eventId !== null;
 
@@ -300,7 +302,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
 
             {/* Panel */}
             <div
-                className={`fixed top-0 right-0 h-full w-[520px] max-w-full shadow-xl border-l border-line z-[60] flex flex-col transform transition-transform duration-200 ease-in-out ${getAdminEventPanelClass(event)} ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-[820px] max-w-[95vw] shadow-xl border-l border-line z-[60] flex flex-col transform transition-transform duration-200 ease-in-out ${getAdminEventPanelClass(event)} ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 {/* Header */}
                 <div className="flex items-start justify-between px-5 py-3 border-b border-line bg-transparent shrink-0">
@@ -591,6 +593,21 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                             eventId={event.event_id}
                                             isPast={new Date(event.end).getTime() < Date.now()}
                                         />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mt-4 border border-line overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setNotificationsExpanded((v) => !v)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-canvas transition"
+                                >
+                                    <span className="text-muted text-[10px]">{notificationsExpanded ? '▾' : '▸'}</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">Notifications</span>
+                                </button>
+                                {notificationsExpanded && (
+                                    <div className="border-t border-line px-3 pb-3">
+                                        <AdminEventNotificationsSection event={event} />
                                     </div>
                                 )}
                             </div>

@@ -59,7 +59,7 @@ export default function AudiencePicker({
             <div
                 role="radiogroup"
                 aria-label={ariaLabel}
-                className={`${isSheet ? 'flex w-full' : 'inline-flex'} border border-line`}
+                className={`${isSheet ? 'flex w-full overflow-hidden rounded-field' : 'inline-flex'} border border-line`}
             >
                 {tiers.map((opt) => {
                     const active = value === opt.value;
@@ -76,7 +76,7 @@ export default function AudiencePicker({
                                 if (!active) onClick(onChange, opt.value);
                             }}
                             className={
-                                `${isSheet ? 'min-h-11 min-w-0 flex-1 px-2 py-2 text-sm' : 'px-2.5 py-1.5 text-xs'} font-medium transition border-l first:border-l-0 border-line ` +
+                                `${isSheet ? 'inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 px-2 py-2 text-base' : 'px-2.5 py-1.5 text-xs font-medium'} transition border-l first:border-l-0 border-line ` +
                                 (active
                                     ? 'bg-action text-white'
                                     : 'bg-surface text-ink-soft hover:bg-canvas') +
@@ -85,7 +85,7 @@ export default function AudiencePicker({
                         >
                             <span aria-hidden>{opt.icon}</span>
                             {size !== 'compact' && (
-                                <span className="ml-1.5">{opt.label}</span>
+                                <span className={isSheet ? '' : 'ml-1.5'}>{opt.label}</span>
                             )}
                         </button>
                     );
@@ -93,7 +93,7 @@ export default function AudiencePicker({
             </div>
             {showZeroFriendsHint && (
                 <p
-                    className={`${isSheet ? 'mt-2 text-sm leading-5' : 'mt-1 text-[11px]'} text-ink-soft`}
+                    className={`${isSheet ? 'mt-3 text-sm leading-5' : 'mt-1 text-[11px]'} text-ink-soft`}
                     data-testid="audience-zero-friends-hint"
                 >
                     Visible to 0 people — you have no friends yet.{' '}

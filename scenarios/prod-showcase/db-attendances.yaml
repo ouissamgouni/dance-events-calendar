@@ -1,4 +1,12 @@
 attendances:
+  - event_id: alfama-thursday-salsa-autumn
+    email: lucia.navarro@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: alfama-thursday-salsa-next
+    email: lucia.navarro@joinmovida.com
+    share_publicly: true
+    share_audience: friends
   - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
     email: elena.moreau@joinmovida.com
     share_publicly: true

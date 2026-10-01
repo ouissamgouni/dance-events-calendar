@@ -30,3 +30,14 @@ def record_delivery(
             delivered_at=when or datetime.now(timezone.utc),
         )
     )
+
+
+def tracked_url(url: str, notification_id: Optional[int], channel: str) -> str:
+    """Append ``via``/``nid`` so the app can report the open/click
+    (``POST /api/notifications/{id}/opened``). Keeps any ``#fragment`` last."""
+    if notification_id is None:
+        return url
+    path, sep, fragment = url.partition("#")
+    joiner = "&" if "?" in path else "?"
+    out = f"{path}{joiner}via={channel}&nid={notification_id}"
+    return f"{out}#{fragment}" if sep else out

@@ -504,6 +504,12 @@ def admin_decide_claim(
             recipient_user_id=claim.user_id,
             actor_user_id=claim.user_id,
             kind="organizer_claim_decided",
+            context=claim.status,
+            description=(
+                claim.admin_notes[:255]
+                if claim.status == "rejected" and claim.admin_notes
+                else None
+            ),
         )
     )
 

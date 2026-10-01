@@ -6,6 +6,7 @@ from html import escape
 
 from backend.config.loader import get_public_app_url, get_smtp_config
 from backend.services.email_tokens import make_unsubscribe_token
+from backend.services.notification_delivery import tracked_url
 
 logger = logging.getLogger(__name__)
 APP_NAME = "Movida"
@@ -359,7 +360,11 @@ def _people_suggestions_html(suggestions: list[dict]) -> str:
 
 
 def send_event_reminder_email(
-    user, event, when_label: str, include_ask_cta: bool = False
+    user,
+    event,
+    when_label: str,
+    include_ask_cta: bool = False,
+    notification_id: int | None = None,
 ) -> bool:
     """Email a user a reminder for an event they're going to.
 
@@ -371,8 +376,9 @@ def send_event_reminder_email(
     if not user.email:
         return False
     app = get_public_app_url()
-    event_url = f"{app}/event/{escape(str(event.event_id))}"
-    ask_url = f"{event_url}/ask"
+    base_event_url = f"{app}/event/{event.event_id}"
+    event_url = escape(tracked_url(base_event_url, notification_id, "email"))
+    ask_url = escape(tracked_url(f"{base_event_url}/ask", notification_id, "email"))
     title = escape(event.title or "your event")
     title_link = (
         f'<a href="{event_url}" style="color:#1d4ed8;text-decoration:none">{title}</a>'
@@ -410,7 +416,9 @@ def send_event_reminder_email(
     return _send_email(user.email, subject, html, "event reminder")
 
 
-def send_event_review_prompt_email(user, event, friend_proof=None) -> bool:
+def send_event_review_prompt_email(
+    user, event, friend_proof=None, notification_id: int | None = None
+) -> bool:
     """Email a user a nudge to rate an event they went to, some hours after
     it ended (see ``services/review_prompt_service.py``).
 
@@ -422,7 +430,9 @@ def send_event_review_prompt_email(user, event, friend_proof=None) -> bool:
     if not user.email:
         return False
     app = get_public_app_url()
-    event_url = f"{app}/event/{escape(str(event.event_id))}/review"
+    event_url = escape(
+        tracked_url(f"{app}/event/{event.event_id}/review", notification_id, "email")
+    )
     title = escape(event.title or "the event")
     title_link = (
         f'<a href="{event_url}" style="color:#1d4ed8;text-decoration:none">{title}</a>'
@@ -665,7 +675,13 @@ def event_message_action_phrase(kind: str, category: str | None) -> str:
 
 
 def send_event_message_instant_email(
-    user, actor, event, kind: str, category: str | None, snippet: str | None
+    user,
+    actor,
+    event,
+    kind: str,
+    category: str | None,
+    snippet: str | None,
+    notification_id: int | None = None,
 ) -> bool:
     """Email a user immediately about a new event-message post/reply when the
     admin has enabled instant delivery for event messages (instead of waiting
@@ -687,7 +703,9 @@ def send_event_message_instant_email(
     event_title = event.title if event and event.title else "an event"
     subject = f"{actor_name} {action} {event_title}"
     app = get_public_app_url()
-    event_url = f"{app}/event/{escape(str(event.event_id))}#messages"
+    event_url = escape(
+        tracked_url(f"{app}/event/{event.event_id}#messages", notification_id, "email")
+    )
     title_link = (
         f'<a href="{event_url}" style="color:#1d4ed8;text-decoration:none">'
         f"{escape(event_title)}</a>"

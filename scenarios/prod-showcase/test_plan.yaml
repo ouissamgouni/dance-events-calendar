@@ -188,3 +188,19 @@ test_plan:
         The app launches standalone on the private HTTPS origin, keeps Elena's
         session, and registers notification permission and a push subscription.
       verification: "Installed navigation, safe-area layout, and notification state work on mobile."
+
+    - id: 18
+      title: "Tour every notification type"
+      description: |
+        Sign in as Alex Navarro (@alex-navarro) and open the notifications
+        sheet, then repeat as Penny Valdez (@penny-valdez).
+      expected: |
+        Alex's inbox mixes a follow request with Approve/Decline, Follow back,
+        new friend, approved request, grouped friends going, friend saved,
+        plan activity, planned-session change, reminder, review prompt,
+        interest match, promo code added, discussion post and reply, friend
+        review, suggested event, and milestones. Penny's inbox shows promo
+        code approved and rejected, organizer claim decision, program
+        available and updated, a reminder with Ask a question, and a review
+        prompt naming a friend.
+      verification: "Each row deep-links to its subject and neither inbox is dominated by interest matches."

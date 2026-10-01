@@ -32,7 +32,7 @@ from backend.db.database import get_engine
 from backend.db.models import CachedEvent, Notification, User, UserEventAttendance
 from backend.services.email import send_event_reminder_email
 from backend.services.event_visibility import apply_event_visibility
-from backend.services.notification_delivery import record_delivery
+from backend.services.notification_delivery import record_delivery, tracked_url
 from backend.services.push_service import send_push
 
 logger = logging.getLogger(__name__)
@@ -144,9 +144,11 @@ def run_once() -> dict:
     emailed_ids: list[int] = []
     for user, event, ask in to_email:
         when_label = _format_when(event.start, user.timezone)
-        if send_event_reminder_email(user, event, when_label, include_ask_cta=ask):
+        nid = notif_ids.get((user.id, event.event_id))
+        if send_event_reminder_email(
+            user, event, when_label, include_ask_cta=ask, notification_id=nid
+        ):
             emailed += 1
-            nid = notif_ids.get((user.id, event.event_id))
             if nid is not None:
                 emailed_ids.append(nid)
 
@@ -155,16 +157,18 @@ def run_once() -> dict:
     pushed = 0
     pushed_ids: list[int] = []
     for user_id, title, event_id, ask in to_push:
+        nid = notif_ids.get((user_id, event_id))
         delivered = send_push(
             user_id,
             title="Event reminder",
             body=f"{title or 'An event'} is coming up.",
-            url=f"/event/{event_id}/ask" if ask else f"/event/{event_id}",
+            url=tracked_url(
+                f"/event/{event_id}/ask" if ask else f"/event/{event_id}", nid, "push"
+            ),
             tag=f"reminder:{event_id}",
         )
         pushed += delivered
         if delivered:
-            nid = notif_ids.get((user_id, event_id))
             if nid is not None:
                 pushed_ids.append(nid)
 

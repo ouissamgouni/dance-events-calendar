@@ -112,6 +112,27 @@ class TestIncludePastFilter:
         ids = {e["event_id"] for e in resp.json()["items"]}
         assert ids == {"evt-past", "evt-future"}
 
+    def test_rows_include_views_clicks_and_alert_reach(self, client, engine):
+        from backend.db.models import EventLinkClick, EventView
+
+        _seed_calendar(engine)
+        _seed_events(engine)
+        with Session(engine) as s:
+            s.add(EventView(event_id="evt-future", device_id="d1"))
+            s.add(EventView(event_id="evt-future", device_id="d1"))
+            s.add(EventView(event_id="evt-future", device_id="d2"))
+            s.add(EventLinkClick(event_id="evt-future", url="https://x.test"))
+            s.commit()
+
+        resp = client.get("/api/admin/events")
+
+        row = resp.json()["items"][0]
+        assert row["view_count"] == 3
+        assert row["unique_viewers"] == 2
+        assert row["link_clicks"] == 1
+        assert row["interest_reach"]["eligible"] is False
+        assert row["interest_reach"]["ineligible_reason"] == "pending review"
+
     def test_filter_options_excludes_blocked_events_from_geo_counts(
         self, client, engine
     ):

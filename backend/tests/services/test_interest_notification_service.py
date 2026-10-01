@@ -608,3 +608,73 @@ def test_run_once_excludes_deleted_users(session):
         select(Notification).where(Notification.kind == svc.INTEREST_EVENT)
     ).all()
     assert notifs == []
+
+
+# --- interest_reach_for_events (admin stats) ---------------------------------
+
+
+def test_interest_reach_counts_matches_notified_and_channels(session, monkeypatch):
+    from backend.db.models import PushSubscription
+
+    monkeypatch.setattr(svc, "get_web_push_enabled", lambda *_: True)
+    monkeypatch.setattr(
+        svc, "get_vapid_config", lambda: {"private_key": "k", "public_key": "p"}
+    )
+    monkeypatch.setattr(svc, "get_activity_digest_email_enabled", lambda *_: True)
+    dance_group = _make_tag_group(session, "dance")
+    salsa = _make_tag(session, dance_group, "salsa")
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_profile(session, alice, label="Home", dance_tags=[salsa])
+    _make_profile(session, alice, label="Trip", dance_tags=[salsa])
+    bob = _make_user(
+        session, "bob@example.com", "bob", email_interest_matches_enabled=False
+    )
+    _make_profile(session, bob, dance_tags=[salsa])
+    carol = _make_user(session, "carol@example.com", "carol")
+    _make_profile(session, carol, dance_tags=[salsa])
+    session.add(
+        PushSubscription(
+            user_id=bob.id, endpoint="https://push/b", p256dh="x", auth="y"
+        )
+    )
+    session.add(
+        Notification(
+            recipient_user_id=carol.id,
+            actor_user_id=carol.id,
+            kind=svc.INTEREST_EVENT,
+            event_id="ev-1",
+        )
+    )
+    event = _make_event(session, "ev-1")
+    _tag_event(session, event.event_id, salsa)
+
+    reach = svc.interest_reach_for_events(session, [event])["ev-1"]
+
+    assert reach["eligible"] is True
+    assert reach["matched_profiles"] == 4
+    assert reach["matched_users"] == 3
+    assert reach["already_notified_users"] == 1
+    assert reach["would_alert_app"] == 2  # alice + bob; carol already notified
+    assert reach["would_alert_email"] == 1  # bob opted out of email
+    assert reach["would_alert_push"] == 1  # only bob has a device
+
+
+def test_interest_reach_reports_ineligible_reason(session):
+    dance_group = _make_tag_group(session, "dance")
+    salsa = _make_tag(session, dance_group, "salsa")
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_profile(session, alice, dance_tags=[salsa])
+    no_geo = _make_event(session, "ev-nogeo", lat=None, lng=None)
+    pending = _make_event(session, "ev-pending")
+    pending.review_status = "pending"
+    session.add(pending)
+    session.commit()
+    for e in (no_geo, pending):
+        _tag_event(session, e.event_id, salsa)
+
+    reach = svc.interest_reach_for_events(session, [no_geo, pending])
+
+    assert reach["ev-nogeo"]["ineligible_reason"] == "not geolocated"
+    assert reach["ev-pending"]["ineligible_reason"] == "pending review"
+    assert reach["ev-pending"]["matched_users"] == 0

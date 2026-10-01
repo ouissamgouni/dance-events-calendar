@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from backend.api.deps import require_admin
 from backend.api.main import app
@@ -210,3 +210,56 @@ class TestAdminNotificationsLog:
         # The "new_follower"/digest notification never got a push delivery
         # row recorded, so it must not appear under the push filter.
         assert all(i["kind"] != "new_follower" for i in body["items"])
+
+
+@pytest.mark.unit
+class TestAdminEventNotificationStats:
+    def test_counts_distinct_notifications_per_kind_and_channel(self, client, engine):
+        from backend.db.models import CachedEvent, CalendarSetting
+
+        _seed(engine)
+        now = datetime.now(timezone.utc)
+        with Session(engine) as s:
+            s.add(
+                CalendarSetting(calendar_id="cal", name="C", color="#abc", enabled=True)
+            )
+            s.add(
+                CachedEvent(
+                    event_id="evt-1",
+                    calendar_id="cal",
+                    title="Evt",
+                    start=now + timedelta(days=3),
+                    end=now + timedelta(days=3, hours=2),
+                    review_status="reviewed",
+                )
+            )
+            interest = s.exec(
+                select(Notification).where(Notification.event_id == "evt-1")
+            ).one()
+            # A resend adds a second push row for the same notification.
+            _add_delivery(s, interest.id, "push", now)
+            s.commit()
+
+        resp = client.get("/api/admin/events/evt-1/notification-stats")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["by_kind"] == [
+            {
+                "kind": "interest_event",
+                "app": 1,
+                "email": 0,
+                "push": 1,
+                "users": 1,
+                "app_reads": 0,
+                "push_opens": 0,
+                "email_clicks": 0,
+            }
+        ]
+        assert body["total_users"] == 1
+        assert body["interest"]["already_notified_users"] == 1
+        assert body["interest"]["ineligible_reason"] == "not geolocated"
+
+    def test_unknown_event_returns_404(self, client, engine):
+        resp = client.get("/api/admin/events/nope/notification-stats")
+        assert resp.status_code == 404

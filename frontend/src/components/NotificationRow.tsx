@@ -405,6 +405,41 @@ export default function NotificationRow({
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
             </>
         );
+    } else if (item.kind === 'promo_code_approved' || item.kind === 'promo_code_rejected') {
+        body = (
+            <>
+                <p className={specialTitle}>
+                    <span className="text-ink-soft">Your promo code for</span>{' '}
+                    <span className="font-medium text-ink">
+                        {item.event_title || 'an event'}
+                    </span>{' '}
+                    <span className="text-ink-soft">
+                        {item.kind === 'promo_code_approved' ? 'was approved' : "wasn't approved"}
+                    </span>
+                </p>
+                {item.context && (
+                    <p className={`${subLabelSize} text-amber-600 mt-0.5`}>Code: {item.context}</p>
+                )}
+                {item.description && <p className={descClass}>{item.description}</p>}
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
+    } else if (item.kind === 'organizer_claim_decided') {
+        const outcome =
+            item.context === 'approved'
+                ? 'was approved'
+                : item.context === 'rejected'
+                    ? "wasn't approved"
+                    : 'was reviewed';
+        body = (
+            <>
+                <p className={specialTitle}>
+                    <span className="text-ink-soft">Your organizer claim {outcome}</span>
+                </p>
+                {item.description && <p className={descClass}>{item.description}</p>}
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
     } else if (item.kind === 'event_review_prompt') {
         body = (
             <>

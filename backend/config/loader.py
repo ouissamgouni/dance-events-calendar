@@ -327,6 +327,13 @@ def get_interest_match_notifications_enabled() -> bool:
     return True if parsed is None else parsed
 
 
+def get_interest_match_push_schedule() -> str:
+    """Interest-match push cadence (``"<days> @ HH:MM"`` user-local, or ``"instant"``)."""
+    return (
+        os.getenv("INTEREST_MATCH_PUSH_SCHEDULE", "").strip() or "tue,thu,sat @ 19:00"
+    )
+
+
 # Bump this when the onboarding wizard changes in a way that requires
 # every existing user to walk through it again (e.g. a new required
 # step or PRD-driven data capture). The onboarding gate compares this

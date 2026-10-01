@@ -38,6 +38,7 @@ from backend.services.app_settings import (
     get_digest_v2_enabled,
     get_digest_per_kind_cap,
     get_digest_max_items,
+    get_interest_match_push_schedule,
 )
 from backend.config.loader import get_public_app_url
 from backend.db.database import get_engine
@@ -56,7 +57,7 @@ from backend.services.email import (
     send_activity_digest_email,
     send_activity_digest_v2_email,
 )
-from backend.services.notification_delivery import record_delivery
+from backend.services.notification_delivery import record_delivery, tracked_url
 from backend.services.notifications import filter_privacy_safe_notifications
 from backend.services.event_visibility import eligible_event_ids
 from backend.services.event_images import resolve_event_image
@@ -178,6 +179,9 @@ _WEEKDAY_MAP = {
     "sun": 6,
 }
 _DEFAULT_SCHEDULE = ({1, 4}, 9, 0)  # tue+fri @ 09:00 local
+# Scheduled interest pushes only go out this long after the slot time, so a
+# late-evening match rolls to the next slot instead of pushing at night.
+_INTEREST_PUSH_WINDOW = timedelta(hours=3)
 
 
 def _parse_schedule(spec: str) -> tuple[set[int], int, int]:
@@ -222,6 +226,7 @@ def _slot_status(
     weekdays: set[int],
     hour: int,
     minute: int,
+    last_sent_attr: str = "last_digest_sent_at",
 ) -> str:
     """Return why ``user`` is or isn't in their digest slot right now.
 
@@ -236,7 +241,7 @@ def _slot_status(
         return "wrong_weekday"
     if (now_local.hour, now_local.minute) < (hour, minute):
         return "before_scheduled_time"
-    last = user.last_digest_sent_at
+    last = getattr(user, last_sent_attr)
     if last is not None:
         if last.tzinfo is None:
             last = last.replace(tzinfo=timezone.utc)
@@ -255,6 +260,23 @@ def _is_user_in_slot(
     """True when ``now`` is at or past today's scheduled slot in user TZ
     and we have not already sent within this local calendar day."""
     return _slot_status(user, now_utc, weekdays, hour, minute) == "in_slot"
+
+
+def _interest_push_due(
+    user: User,
+    now_utc: datetime,
+    weekdays: set[int],
+    hour: int,
+    minute: int,
+) -> bool:
+    if (
+        _slot_status(user, now_utc, weekdays, hour, minute, "last_interest_push_at")
+        != "in_slot"
+    ):
+        return False
+    now_local = now_utc.astimezone(_user_local_tz(user))
+    slot_local = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return now_local < slot_local + _INTEREST_PUSH_WINDOW
 
 
 def _message_action(kind: str, category: str | None) -> str:
@@ -278,6 +300,7 @@ def _render_line(
     description: str | None = None,
     milestone_names: list[str] | None = None,
     milestone_count: int | None = None,
+    notification_id: int | None = None,
 ) -> str:
     """Return an escaped HTML snippet describing one notification.
 
@@ -309,8 +332,11 @@ def _render_line(
     if event and event.title:
         title_text = escape(event.title)
         if event.event_id:
+            event_href = tracked_url(
+                f"{app}/event/{event.event_id}", notification_id, "email"
+            )
             title = (
-                f'<a href="{app}/event/{escape(str(event.event_id))}" '
+                f'<a href="{escape(event_href)}" '
                 f'style="color:#1d4ed8;text-decoration:underline">{title_text}</a>'
             )
         else:
@@ -535,6 +561,11 @@ def run_once(
     cutoff_old = now - _MAX_AGE
     weekdays, sched_hour, sched_minute = _parse_schedule(get_activity_digest_schedule())
     max_events_per_interest_email = get_interest_match_max_events_per_email()
+    interest_push_spec = get_interest_match_push_schedule().strip().lower()
+    interest_push_instant = interest_push_spec == "instant"
+    interest_push_sched = (
+        None if interest_push_instant else _parse_schedule(interest_push_spec)
+    )
 
     with Session(get_engine()) as session:
         # Per-feature admin routing: which email vehicle(s) each activity
@@ -678,6 +709,8 @@ def run_once(
         email_by_recipient: dict = {}
         instant_by_recipient: dict = {}
         push_by_recipient: dict = {}
+        interest_push_due: dict = {}
+        interest_push_deferred = 0
         for n in pending:
             recipient = users.get(n.recipient_user_id)
             if not recipient or recipient.deleted_at is not None:
@@ -733,6 +766,18 @@ def run_once(
             # call, regardless of ``force``. Digest-only features are
             # skipped: their push is owned by a dedicated service.
             if (resend or n.pushed_at is None) and feature not in _DIGEST_ONLY_FEATURES:
+                if (
+                    feature == "interest_matches"
+                    and interest_push_sched is not None
+                    and not (force or resend)
+                ):
+                    if recipient.id not in interest_push_due:
+                        interest_push_due[recipient.id] = _interest_push_due(
+                            recipient, now_utc, *interest_push_sched
+                        )
+                    if not interest_push_due[recipient.id]:
+                        interest_push_deferred += 1
+                        continue
                 push_by_recipient.setdefault(recipient.id, []).append(n)
 
         # Cap the number of notifications included per recipient in THIS
@@ -863,9 +908,13 @@ def run_once(
                 )
             if group_header_html is not None and event is not None and event.title:
                 event_title = escape(event.title)
+                event_href = tracked_url(
+                    f"{get_public_app_url().rstrip('/')}/event/{event.event_id}",
+                    n.id,
+                    "email",
+                )
                 group_item_html = (
-                    f'<a href="{get_public_app_url().rstrip("/")}/event/'
-                    f'{escape(str(event.event_id))}" '
+                    f'<a href="{escape(event_href)}" '
                     f'style="color:#1d4ed8;text-decoration:underline">{event_title}</a>'
                 )
             return {
@@ -882,6 +931,7 @@ def run_once(
                         None if n.kind in _MILESTONE_KINDS else milestone_names[:3]
                     ),
                     milestone_count=len(milestone_names),
+                    notification_id=n.id,
                 ),
                 "group_key": (
                     str(n.actor_user_id)
@@ -1033,6 +1083,7 @@ def run_once(
                         milestone_names=[
                             item.context or "a new achievement" for item in group
                         ],
+                        notification_id=group[-1].id,
                     )
                     for group in logical_groups
                 ]
@@ -1070,10 +1121,56 @@ def run_once(
         )
         instant_emails = _send_email_groups(instant_groups)
 
+        def _interest_push_payload(
+            notifications: list[Notification],
+        ) -> tuple[str, str, str]:
+            def _start_key(n: Notification) -> tuple[int, float]:
+                event = events.get(n.event_id) if n.event_id else None
+                if event is None or event.start is None:
+                    return (1, 0.0)
+                start = event.start
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
+                return (0, start.timestamp())
+
+            headline = min(notifications, key=_start_key)
+            event = events.get(headline.event_id) if headline.event_id else None
+            count = len({n.event_id for n in notifications})
+            event_title = (event.title if event and event.title else "An event")[:60]
+            subline = _card_subline(event)
+            body = f"{event_title} · {subline}" if subline else event_title
+            if count > 1:
+                return (
+                    f"{count} new events match your alerts",
+                    f"{body} +{count - 1} more",
+                    tracked_url(
+                        "/notifications?kind=interest_event", headline.id, "push"
+                    ),
+                )
+            alert = _interest_alert_names(headline)[0]
+            url = (
+                f"/event/{headline.event_id}" if headline.event_id else "/notifications"
+            )
+            return f"New match: {alert}", body, tracked_url(url, headline.id, "push")
+
         pushed = 0
         for (recipient_id, feature), notifs in push_groups.items():
             visible = [n for n in notifs if not _skip_past(n)]
             if not visible:
+                continue
+            if feature == "interest_matches":
+                title, body, url = _interest_push_payload(visible)
+                delivered = send_push(
+                    recipient_id,
+                    title=title,
+                    body=body,
+                    url=url,
+                    tag=_push_tag_for(feature),
+                )
+                pushed += delivered
+                if delivered:
+                    for n in visible:
+                        record_delivery(session, n.id, "push", now)
                 continue
             logical_groups = _logical_groups(visible)
             first_group = logical_groups[0]
@@ -1094,12 +1191,11 @@ def run_once(
             )
             extra = len(logical_groups) - 1
             body = first if extra <= 0 else f"{first} and {extra} more"
-            title = "New match on Movida" if feature == "interest_matches" else "Movida"
             delivered = send_push(
                 recipient_id,
-                title=title,
+                title="Movida",
                 body=body,
-                url="/notifications",
+                url=tracked_url("/notifications", first_notification.id, "push"),
                 tag=_push_tag_for(feature),
             )
             pushed += delivered
@@ -1126,6 +1222,11 @@ def run_once(
         for n in included_for_push:
             n.pushed_at = now
             stamped += 1
+            if n.kind == "interest_event":
+                user = users.get(n.recipient_user_id)
+                if user is not None:
+                    user.last_interest_push_at = now
+                    session.add(user)
         for rid in email_recipients:
             user = users.get(rid)
             if user is not None:
@@ -1135,7 +1236,8 @@ def run_once(
 
     logger.info(
         "Activity digest run: %d emails, %d pushes, %d stamped, %d off-schedule "
-        "(wrong_weekday=%d before_scheduled_time=%d already_sent_today=%d), %d recipient(s) capped",
+        "(wrong_weekday=%d before_scheduled_time=%d already_sent_today=%d), %d recipient(s) capped, "
+        "%d interest push(es) deferred to schedule",
         digests,
         pushed,
         stamped,
@@ -1144,6 +1246,7 @@ def run_once(
         skip_reason_counts.get("before_scheduled_time", 0),
         skip_reason_counts.get("already_sent_today", 0),
         len(capped_recipient_ids),
+        interest_push_deferred,
     )
     return {
         "digests": digests,
@@ -1151,6 +1254,7 @@ def run_once(
         "pushed": pushed,
         "stamped": stamped,
         "skipped_off_schedule": skipped_off_schedule,
+        "interest_push_deferred": interest_push_deferred,
         "skip_reasons": skip_reason_counts,
         "delivered_recipients": [
             str(rid) for rid in (email_recipients | push_recipients)

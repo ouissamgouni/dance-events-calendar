@@ -211,140 +211,91 @@ function ProfileHeader({
     });
     return (
         <div className="border border-line bg-surface px-4 py-4 sm:px-5">
-            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-                <Avatar
-                    url={profile.avatar_url}
-                    name={profile.display_name || profile.handle}
-                />
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="truncate text-lg font-semibold leading-tight text-ink sm:text-xl">
-                                    {profile.display_name || `@${profile.handle}`}
-                                </h1>
-                                {profile.is_verified_organizer && (
-                                    <VerifiedBadge />
-                                )}
-                                {profile.is_admin_managed && (
-                                    <CuratorBadge />
-                                )}
-                            </div>
-                            <div className="mt-0.5 text-sm leading-tight text-ink-soft">@{profile.handle}</div>
+            <div className="flex flex-col items-center gap-3 sm:gap-4">
+                <div className="flex w-full items-end gap-4">
+                    <Avatar
+                        url={profile.avatar_url}
+                        name={profile.display_name || profile.handle}
+                    />
+                    <div className="flex flex-1 justify-around sm:justify-start sm:gap-10 pb-2">
+                        <div className="flex flex-col items-center sm:items-start">
+                            <div className="text-lg font-semibold text-ink">{profile.followers_count}</div>
+                            <div className="text-xs text-ink-soft">followers</div>
                         </div>
-                        {profile.is_self ? (
-                            <Link
-                                to="/account"
-                                className="shrink-0 border border-line bg-surface px-3.5 py-1.5 text-sm font-medium text-ink transition hover:bg-canvas"
-                            >
-                                Edit profile
-                            </Link>
-                        ) : (
-                            <div className="flex shrink-0 items-stretch gap-1">
-                                <FollowButton
-                                    profile={profile}
-                                    onClick={onFollow}
-                                    busy={followBusy}
-                                    isAuthenticated={isAuthenticated}
-                                />
-                                {/* Phase B: Follow implies calendar subscription.
-                                    The bell toggle controls notify_new_events on
-                                    that implied subscription — only meaningful
-                                    while following. */}
-                                {isAuthenticated && profile.is_following && profile.is_subscribed && (
-                                    <NotifyBellToggle
-                                        enabled={profile.notify_new_events}
-                                        onChange={onNotifyToggle}
-                                        busy={notifyBusy}
-                                    />
-                                )}
+                        <div className="flex flex-col items-center sm:items-start">
+                            <div className="text-lg font-semibold text-ink">{profile.following_count}</div>
+                            <div className="text-xs text-ink-soft">following</div>
+                        </div>
+                        {!profile.is_self && profile.mutual_friend_count > 0 && (
+                            <div className="flex flex-col items-center sm:items-start">
+                                <div className="text-lg font-semibold text-ink">{profile.mutual_friend_count}</div>
+                                <div className="text-xs text-ink-soft">mutual friend{profile.mutual_friend_count === 1 ? '' : 's'}</div>
                             </div>
                         )}
                     </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
-                        <span>
-                            <strong className="text-ink">{profile.followers_count}</strong>{' '}
-                            followers
-                        </span>
-                        <span>
-                            <strong className="text-ink">{profile.following_count}</strong>{' '}
-                            following
-                        </span>
-                        {!profile.is_self && profile.mutual_friend_count > 0 && (
-                            <span>
-                                <strong className="text-ink">
-                                    {profile.mutual_friend_count}
-                                </strong>{' '}
-                                mutual friend{profile.mutual_friend_count === 1 ? '' : 's'}
-                            </span>
+                </div>
+                <div className="w-full text-left">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h1 className="text-lg font-semibold leading-tight text-ink sm:text-xl">
+                            {profile.display_name || `@${profile.handle}`}
+                        </h1>
+                        {profile.is_verified_organizer && (
+                            <VerifiedBadge />
                         )}
-                        <span className="whitespace-nowrap text-muted">Joined {memberSince}</span>
+                        {profile.is_admin_managed && (
+                            <CuratorBadge />
+                        )}
                     </div>
-                    {profile.bio && (
-                        <p className="mt-2 text-sm text-ink whitespace-pre-line break-words">
-                            {profile.bio}
-                        </p>
-                    )}
-                    {!profile.is_self && profile.mutual_subscribers_count > 0 && (
+                    <div className="mt-0.5 text-sm leading-tight text-ink-soft">
+                        @{profile.handle} · <span className="whitespace-nowrap text-muted">Joined {memberSince}</span>
+                    </div>
+                </div>
+                {profile.bio && (
+                    <p className="w-full mt-2 text-sm text-ink whitespace-pre-line break-words">
+                        {profile.bio}
+                    </p>
+                )}
+                {!profile.is_self && profile.mutual_subscribers_count > 0 && (
+                    <div className="w-full">
                         <MutualSubscribersLine
                             previews={profile.mutual_subscribers}
                             total={profile.mutual_subscribers_count}
                         />
-                    )}
-                    {/* Phase E (E10): trust pill on verified-organizer profiles
-                        when any of the viewer's friends already follow them. */}
-                    {profile.is_verified_organizer &&
-                        !profile.is_self &&
-                        (profile.mutual_friends_who_follow ?? 0) > 0 && (
-                            <p
-                                className="mt-1.5 inline-block border border-line bg-canvas px-2 py-1 text-[11px] text-ink"
-                                data-testid="mutual-friends-who-follow-pill"
-                            >
-                                Followed by{' '}
-                                <strong className="text-ink">
-                                    {profile.mutual_friends_who_follow}
-                                </strong>{' '}
-                                of your friend{profile.mutual_friends_who_follow === 1 ? '' : 's'}
-                            </p>
+                    </div>
+                )}
+                {profile.is_self ? (
+                    <Link
+                        to="/account"
+                        className="w-full border border-line bg-surface px-3.5 py-1.5 text-sm font-medium text-ink text-center transition hover:bg-canvas"
+                    >
+                        Edit profile
+                    </Link>
+                ) : (
+                    <div className="flex w-full items-stretch gap-1 sm:max-w-xs">
+                        <FollowButton
+                            profile={profile}
+                            onClick={onFollow}
+                            busy={followBusy}
+                            isAuthenticated={isAuthenticated}
+                        />
+                        {/* Phase B: Follow implies calendar subscription.
+                            The bell toggle controls notify_new_events on
+                            that implied subscription — only meaningful
+                            while following. */}
+                        {isAuthenticated && profile.is_following && profile.is_subscribed && (
+                            <NotifyBellToggle
+                                enabled={profile.notify_new_events}
+                                onChange={onNotifyToggle}
+                                busy={notifyBusy}
+                            />
                         )}
-                    <FollowHintBanner profile={profile} isAuthenticated={isAuthenticated} />
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
 
-/**
- * Small contextual hint shown under the Follow button explaining the
- * symmetric-follow semantics:
- *
- * - Not following / they don't follow you: "Follow them so they see you in their friends list"
- * - Not following / they follow you (back): "Follow them back — you'll appear in each other's friend lists"
- * - You follow / they don't follow you: "They haven't followed back yet — they won't see you as a friend"
- * - Mutual (already friends): nothing.
- */
-function FollowHintBanner({
-    profile,
-    isAuthenticated,
-}: {
-    profile: PublicProfile;
-    isAuthenticated: boolean;
-}) {
-    if (!isAuthenticated || profile.is_self || profile.is_friend) return null;
-    let message: string;
-    if (!profile.is_following && profile.follows_you) {
-        message = "They follow you back — follow them so you appear in each other's friends list.";
-    } else if (!profile.is_following) {
-        message = "Follow them so they see you in their friends list.";
-    } else {
-        message = "They haven't followed back yet — they won't see you as a friend.";
-    }
-    return (
-        <div className="text-xs text-ink-soft max-w-xs leading-snug">
-            {message}
-        </div>
-    );
-}
 
 function FollowButton({
     profile,
@@ -385,7 +336,7 @@ function FollowButton({
         label = 'Follow';
         primary = true;
     }
-    const baseCls = 'shrink-0 px-3.5 py-1.5 text-sm font-medium transition disabled:opacity-50';
+    const baseCls = 'flex-1 px-3.5 py-1.5 text-sm font-medium transition disabled:opacity-50';
     const cls = primary
         ? `${baseCls} bg-action text-white hover:bg-action`
         : `${baseCls} border border-line bg-surface text-ink hover:bg-canvas`;
@@ -475,13 +426,13 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
             <img
                 src={url}
                 alt={name}
-                className="h-14 w-14 rounded-full bg-slate-100 object-cover"
+                className="h-20 w-20 rounded-full bg-slate-100 object-cover"
             />
         );
     }
     const initial = (name || '?').trim().charAt(0).toUpperCase();
     return (
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-200 text-lg font-semibold text-ink-soft">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-200 text-2xl font-semibold text-ink-soft">
             {initial}
         </div>
     );
@@ -842,7 +793,7 @@ function MutualSubscribersLine({
     const remaining = Math.max(0, total - named.length);
     return (
         <p className="mt-2 text-xs text-ink-soft">
-            Subscribed to by{' '}
+            Followed by{' '}
             {named.map((u, i) => (
                 <span key={u.handle}>
                     {i > 0 ? (i === named.length - 1 && remaining === 0 ? ' and ' : ', ') : ''}
@@ -862,7 +813,7 @@ function MutualSubscribersLine({
                     </span>
                 </>
             )}{' '}
-            you know.
+            you follow.
         </p>
     );
 }

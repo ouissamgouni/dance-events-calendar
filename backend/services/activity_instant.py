@@ -181,6 +181,7 @@ def dispatch_activity_instant(
                 ),
                 subject_key=n.subject_key,
                 description=n.description,
+                notification_id=n.id,
             )
             for n in notifs
         ]

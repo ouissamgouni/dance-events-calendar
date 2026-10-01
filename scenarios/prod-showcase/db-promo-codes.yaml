@@ -29,3 +29,9 @@ promo_codes:
     code: ATLANTIC10
     description: Community discount submitted for the Atlantic Salsa Weekender.
     status: pending
+  - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    submitter_email: penny.valdez@joinmovida.com
+    code: SANJA20
+    description: 20% off full passes for the Christmas edition.
+    status: rejected
+    admin_notes: The organizer confirmed a maximum community discount of 5% for this edition.

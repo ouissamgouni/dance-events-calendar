@@ -40,7 +40,14 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from backend.services.app_settings import get_interest_match_notifications_enabled
+from backend.services.app_settings import (
+    get_activity_digest_email_enabled,
+    get_feature_email_digest,
+    get_feature_email_instant,
+    get_interest_match_notifications_enabled,
+    get_web_push_enabled,
+)
+from backend.config.loader import get_vapid_config
 from backend.services.notification_delivery import record_delivery
 from backend.services.profile_geography import profile_contains_point
 from backend.services.reach import reach_matches
@@ -49,6 +56,7 @@ from backend.db.models import (
     CachedEvent,
     EventTag,
     Notification,
+    PushSubscription,
     SiteSetting,
     Tag,
     TagGroup,
@@ -56,7 +64,10 @@ from backend.db.models import (
     UserInterestProfile,
     UserInterestProfileTag,
 )
-from backend.services.event_visibility import apply_event_visibility
+from backend.services.event_visibility import (
+    apply_event_visibility,
+    show_pending_events_enabled,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -400,3 +411,119 @@ def preview_matches_for_users(user_ids: set, lookback_hours: int) -> dict:
             bucket["new_events"] += 1
 
     return {"candidates_scanned": len(events), "per_user": per_user}
+
+
+def _ineligible_reason(
+    event: CachedEvent, now: datetime, show_pending: bool
+) -> str | None:
+    if event.deleted_at is not None:
+        return "deleted"
+    if event.is_hidden:
+        return "hidden"
+    if event.review_status == "pending" and not show_pending:
+        return "pending review"
+    start = event.start
+    if start is not None and start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if start is None or start <= now:
+        return "past"
+    if event.latitude is None or event.longitude is None:
+        return "not geolocated"
+    return None
+
+
+def interest_reach_for_events(
+    session: Session, events: list[CachedEvent]
+) -> dict[str, dict]:
+    """Per event: saved searches/users it matches, users already notified, and
+    how many alerts per channel it would still trigger given each matched
+    user's delivery settings. Read-only (no Notification rows are created)."""
+    now = _utcnow()
+    show_pending = show_pending_events_enabled(session)
+    scan_enabled = get_interest_match_notifications_enabled(session)
+    out: dict[str, dict] = {}
+    eligible: list[CachedEvent] = []
+    for event in events:
+        reason = _ineligible_reason(event, now, show_pending)
+        if reason is None and not scan_enabled:
+            reason = "interest alerts disabled"
+        out[event.event_id] = {
+            "eligible": reason is None,
+            "ineligible_reason": reason,
+            "matched_profiles": 0,
+            "matched_users": 0,
+            "already_notified_users": 0,
+            "would_alert_app": 0,
+            "would_alert_email": 0,
+            "would_alert_push": 0,
+        }
+        if reason is None:
+            eligible.append(event)
+
+    event_ids = [e.event_id for e in events]
+    notified: set[tuple] = set()
+    if event_ids:
+        notified = set(
+            session.exec(
+                select(Notification.recipient_user_id, Notification.event_id)
+                .where(Notification.kind == INTEREST_EVENT)
+                .where(Notification.event_id.in_(event_ids))  # type: ignore[union-attr]
+            ).all()
+        )
+    for _user_id, event_id in notified:
+        out[event_id]["already_notified_users"] += 1
+
+    matches = _find_matches(session, eligible)
+    if not matches:
+        return out
+
+    new_pairs = [key for key in matches if key not in notified]
+    user_ids = {uid for uid, _ in new_pairs}
+    users = (
+        {
+            u.id: u
+            for u in session.exec(select(User).where(User.id.in_(user_ids))).all()  # type: ignore[union-attr]
+        }
+        if user_ids
+        else {}
+    )
+    push_user_ids = (
+        set(
+            session.exec(
+                select(PushSubscription.user_id).where(
+                    PushSubscription.user_id.in_(user_ids)  # type: ignore[union-attr]
+                )
+            ).all()
+        )
+        if user_ids
+        else set()
+    )
+    email_instant = get_feature_email_instant("interest_matches", session)
+    email_digest = get_feature_email_digest("interest_matches", session)
+    email_on = get_activity_digest_email_enabled(session) and (
+        email_instant or email_digest
+    )
+    vapid = get_vapid_config()
+    push_on = get_web_push_enabled(session) and bool(
+        vapid.get("private_key") and vapid.get("public_key")
+    )
+
+    for (user_id, event_id), labels in matches.items():
+        stats = out[event_id]
+        stats["matched_profiles"] += len(labels)
+        stats["matched_users"] += 1
+        if (user_id, event_id) in notified:
+            continue
+        user = users.get(user_id)
+        if user is None:
+            continue
+        stats["would_alert_app"] += 1
+        if (
+            email_on
+            and user.email_interest_matches_enabled
+            and (email_instant or user.digest_email_enabled)
+        ):
+            stats["would_alert_email"] += 1
+        if push_on and user.push_interest_matches_enabled and user_id in push_user_ids:
+            stats["would_alert_push"] += 1
+    return out

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import GoingButton from './GoingButton'
@@ -164,15 +164,19 @@ describe('GoingButton visibility', () => {
 
         const confirmationSheet = await screen.findByRole('dialog', { name: "You're going!" })
         expect(confirmationSheet).toHaveAttribute('aria-modal', 'true')
-        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-sm')
+        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-base')
         expect(screen.getByRole('radiogroup', { name: 'Attendance visibility' })).toHaveClass('flex', 'w-full')
-        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-11', 'text-sm')
+        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-12', 'text-base')
+        expect(within(confirmationSheet).getByRole('button', { name: 'Share event' })).toBeInTheDocument()
 
-        await user.click(screen.getByRole('button', { name: 'Close' }))
+        await user.click(within(confirmationSheet).getByRole('button', { name: 'Done' }))
         await user.click(screen.getByRole('button', { name: 'Not going' }))
 
-        const editSheet = screen.getByRole('dialog', { name: 'RSVP visibility' })
+        const editSheet = screen.getByRole('dialog', { name: "You're going!" })
         expect(editSheet).toHaveAttribute('aria-modal', 'true')
         expect(screen.getByRole('radiogroup', { name: 'Attendance visibility' })).toHaveClass('flex', 'w-full')
+        expect(within(editSheet).getByRole('button', { name: 'Not going' })).toHaveClass('text-danger')
+        expect(within(editSheet).getByRole('button', { name: 'Done' })).toBeInTheDocument()
+        expect(within(editSheet).queryByRole('checkbox')).not.toBeInTheDocument()
     })
 })

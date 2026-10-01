@@ -383,6 +383,8 @@ def test_admin_full_approve_sets_organizer_and_badge(client, session, events, fl
     ).first()
     assert notif is not None
     assert notif.kind == "organizer_claim_decided"
+    assert notif.context == "approved"
+    assert notif.description is None
 
 
 @pytest.mark.unit

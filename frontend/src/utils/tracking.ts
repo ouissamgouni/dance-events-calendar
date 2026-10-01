@@ -1,4 +1,4 @@
-import { trackEventView, trackEventSave, trackEventAttendance, trackLinkClick, trackExport, trackShare } from '../api';
+import { trackEventView, trackEventSave, trackEventAttendance, trackLinkClick, trackExport, trackShare, markNotificationOpened } from '../api';
 import { getDeviceId } from './deviceId';
 import { isAnalyticsDisabled, umamiTrack } from './umami';
 
@@ -98,6 +98,13 @@ export function trackLink(eventId: string, url: string): void {
     if (!readConsent().analytics) return;
     trackLinkClick(eventId, url, getConsentedDeviceId()).catch(() => { });
     umamiTrack('link_clicked');
+}
+
+/** A push was tapped / an email link clicked (`?via=&nid=` deep link). */
+export function trackNotificationOpen(notificationId: number, channel: 'push' | 'email'): void {
+    if (!readConsent().analytics) return;
+    markNotificationOpened(notificationId, channel).catch(() => { });
+    umamiTrack('notification_opened', { channel });
 }
 
 /** Track an export. */

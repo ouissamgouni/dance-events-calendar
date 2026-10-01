@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import SaveEventButton from './SaveEventButton'
@@ -29,7 +29,7 @@ function LocationProbe() {
 // SaveEventButton drives the SavedEventsContext optimistic-save flow end to
 // end: a click issues POST /api/track/event-save and flips local state. We
 // assert via the button's accessible name, which toggles between
-// "Save event" (not saved) and "Edit saved visibility" (saved).
+// "Save event" (not saved) and "Unsave event" (saved).
 
 describe('SaveEventButton (anonymous)', () => {
     it('optimistically marks the event saved on a successful write', async () => {
@@ -42,7 +42,7 @@ describe('SaveEventButton (anonymous)', () => {
         await user.click(button)
 
         await waitFor(() => {
-            const savedButton = screen.getByRole('button', { name: 'Edit saved visibility' })
+            const savedButton = screen.getByRole('button', { name: 'Unsave event' })
             expect(savedButton).toHaveClass('text-saved', 'bg-action-tile')
             expect(savedButton.querySelector('[data-icon-family="bookmark"][data-icon-state="saved"]')).toHaveAttribute('fill', 'currentColor')
         })
@@ -66,7 +66,7 @@ describe('SaveEventButton (anonymous)', () => {
             expect(screen.getByText(/couldn’t save|couldn't save/i)).toBeInTheDocument(),
         )
         expect(
-            screen.queryByRole('button', { name: 'Edit saved visibility' }),
+            screen.queryByRole('button', { name: 'Unsave event' }),
         ).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Save event' })).toBeInTheDocument()
     })
@@ -137,11 +137,50 @@ describe('SaveEventButton visibility', () => {
 
         await user.click(await screen.findByRole('button', { name: 'Save event' }))
 
-        const sheet = await screen.findByRole('dialog', { name: 'Saved event visibility' })
+        const sheet = await screen.findByRole('dialog', { name: 'Saved!' })
         expect(sheet).toHaveAttribute('aria-modal', 'true')
-        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-sm')
+        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-base')
         expect(screen.getByRole('radiogroup', { name: 'Saved event visibility' })).toHaveClass('flex', 'w-full')
         expect(screen.getAllByRole('radio')).toHaveLength(3)
-        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-11', 'text-sm')
+        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-12', 'text-base')
+        expect(within(sheet).getByRole('button', { name: 'Unsave' })).toHaveClass('text-danger')
+        expect(within(sheet).getByRole('button', { name: 'Done' })).toBeInTheDocument()
+    })
+
+    it('unsaves directly without opening a sheet when the event is already saved', async () => {
+        useMobileViewport()
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+        )
+        const { user } = renderWithProviders(<SaveEventButton eventId="evt-unsave" eventTitle="Summer Salsa Social" />)
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+        const sheet = await screen.findByRole('dialog', { name: 'Saved!' })
+        await user.click(within(sheet).getByRole('button', { name: 'Done' }))
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Unsave event' }))
+
+        expect(await screen.findByRole('button', { name: 'Save event' })).toBeInTheDocument()
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('defaults to public audience for users without a saved preference', async () => {
+        useMobileViewport()
+        server.use(
+            http.get('*/api/auth/me', () =>
+                HttpResponse.json(makeUser({ share_attendance_default_audience: undefined })),
+            ),
+        )
+        const { user } = renderWithProviders(
+            <SaveEventButton eventId="evt-default-public" eventTitle="Summer Salsa Social" />,
+        )
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+
+        await screen.findByRole('dialog', { name: 'Saved!' })
+        const radios = screen.getAllByRole('radio')
+        expect(radios[0]).toBeChecked()
+        expect(screen.getByText('Anyone who can view your profile will see this in your saved list.')).toBeInTheDocument()
     })
 })

@@ -176,6 +176,8 @@ class User(SQLModel, table=True):
     # this user. Used by the digest scheduler to avoid re-sending within
     # a single scheduled window (see ``activity_email.run_once``).
     last_digest_sent_at: Optional[datetime] = Field(default=None)
+    # Same-day dedup for the scheduled interest-match push.
+    last_interest_push_at: Optional[datetime] = Field(default=None)
     # --- Re-engagement / notification preferences ---
     # IANA timezone (e.g. "Europe/Paris") captured client-side and used to
     # format reminder/digest email times. Defaults to UTC for legacy
@@ -1862,6 +1864,9 @@ class Notification(SQLModel, table=True):
     # at most one path — ``instant_emailed_at`` and ``emailed_at`` are never
     # both set for the same row.
     instant_emailed_at: Optional[datetime] = Field(default=None, index=True)
+    # First tap on a push / first click on an email link for this notification.
+    push_opened_at: Optional[datetime] = Field(default=None)
+    email_clicked_at: Optional[datetime] = Field(default=None)
     # Free-text context for kinds that need extra message copy beyond
     # actor/event, e.g. ``interest_event`` stores the matched profile
     # label(s) (comma-joined) so the digest/in-app renderers can say

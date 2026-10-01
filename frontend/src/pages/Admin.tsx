@@ -268,6 +268,7 @@ export default function Admin() {
     const [reminderLeadHours, setReminderLeadHours] = useState(24);
     const [eventMessageCtaMinGoing, setEventMessageCtaMinGoing] = useState(3);
     const [digestSchedule, setDigestSchedule] = useState('tue,fri @ 09:00');
+    const [interestPushSchedule, setInterestPushSchedule] = useState('tue,thu,sat @ 19:00');
     const [reviewPromptEnabled, setReviewPromptEnabled] = useState(true);
     const [eventReviewSizeStepEnabled, setEventReviewSizeStepEnabled] = useState(true);
     const [reviewPromptDelayHours, setReviewPromptDelayHours] = useState(3);
@@ -456,6 +457,7 @@ export default function Admin() {
             setReminderLeadHours(s.reminder_lead_hours ?? 24);
             setEventMessageCtaMinGoing(s.event_message_cta_min_going ?? 3);
             setDigestSchedule(s.activity_digest_schedule ?? 'tue,fri @ 09:00');
+            setInterestPushSchedule(s.interest_match_push_schedule ?? 'tue,thu,sat @ 19:00');
             setReviewPromptEnabled(s.review_prompt_enabled ?? true);
             setEventReviewSizeStepEnabled(s.event_review_size_step_enabled ?? true);
             setReviewPromptDelayHours(s.review_prompt_delay_hours ?? 3);
@@ -1294,6 +1296,23 @@ export default function Admin() {
         } catch {
             setDigestSchedule(prev);
             setMessage('Failed to update digest schedule.');
+        }
+    };
+
+    const handleInterestPushScheduleChange = async (value: string) => {
+        const v = value.trim().toLowerCase();
+        if (v !== 'instant' && !/^([a-z]{3})(,[a-z]{3})*\s*@\s*\d{1,2}:\d{2}$/.test(v)) {
+            setMessage('Push schedule must look like "tue,thu,sat @ 19:00" or "instant".');
+            return;
+        }
+        const prev = interestPushSchedule;
+        setInterestPushSchedule(v);
+        try {
+            await updateSettings({ interest_match_push_schedule: v });
+            setMessage(`Interest push schedule set to "${v}".`);
+        } catch {
+            setInterestPushSchedule(prev);
+            setMessage('Failed to update interest push schedule.');
         }
     };
 
@@ -2691,6 +2710,22 @@ export default function Admin() {
                                             onKeyDown={(e) => e.key === 'Enter' && handleInterestMatchMaxEventsChange(interestMatchMaxEventsPerEmail)}
                                             className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             aria-label="Max events per interest-match email"
+                                        />
+                                    </div>
+                                    <div className="border-t border-card-line pt-2.5 space-y-1">
+                                        <span className="text-[11px] font-medium text-ink">Push schedule</span>
+                                        <p className="text-[10px] text-muted">
+                                            One combined push per slot, in each user's timezone (sent within 3h of the slot). Format: <code className="font-mono">dow[,dow] @ HH:MM</code> or <code className="font-mono">instant</code>.
+                                        </p>
+                                        <input
+                                            type="text"
+                                            value={interestPushSchedule}
+                                            onChange={(e) => setInterestPushSchedule(e.target.value)}
+                                            onBlur={(e) => handleInterestPushScheduleChange(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleInterestPushScheduleChange(interestPushSchedule)}
+                                            placeholder="tue,thu,sat @ 19:00"
+                                            className="w-full text-[11px] font-mono border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
+                                            aria-label="Interest push schedule"
                                         />
                                     </div>
                                     <div className="flex items-center gap-4 border-t border-card-line pt-2.5">

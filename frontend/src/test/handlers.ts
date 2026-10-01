@@ -223,6 +223,7 @@ export const handlers = [
             web_push_enabled: false,
             reminder_lead_hours: 24,
             activity_digest_schedule: 'tue,fri @ 09:00',
+            interest_match_push_schedule: 'tue,thu,sat @ 19:00',
             interest_match_max_events_per_email: 10,
             review_prompt_enabled: true,
             review_prompt_delay_hours: 3,

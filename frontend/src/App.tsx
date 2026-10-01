@@ -62,6 +62,7 @@ import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
+import { useNotificationOpenAttribution } from './hooks/useNotificationOpenAttribution';
 
 /** Location state used to keep the origin page mounted behind `/suggest`. */
 interface ModalLocationState {
@@ -154,6 +155,8 @@ function AppShell() {
   useEffect(() => {
     if (analyticsConsent) umamiPageView();
   }, [location.pathname, analyticsConsent]);
+
+  useNotificationOpenAttribution();
 
   useLayoutEffect(() => {
     // An overlay route leaves the page behind it mounted — resetting its scroll

@@ -265,6 +265,16 @@ def get_activity_digest_schedule(session: Optional[Session] = None) -> str:
     return override or DEFAULT_DIGEST_SCHEDULE
 
 
+def get_interest_match_push_schedule(session: Optional[Session] = None) -> str:
+    s, opened = _open_session(session)
+    try:
+        override = _get_str_row(s, "interest_match_push_schedule")
+    finally:
+        if opened:
+            s.close()
+    return override or loader.get_interest_match_push_schedule()
+
+
 def get_interest_match_max_events_per_email(session: Optional[Session] = None) -> int:
     """Max number of matched events shown inline in an interest-match
     digest email before the rest are collapsed behind a "Discover more"

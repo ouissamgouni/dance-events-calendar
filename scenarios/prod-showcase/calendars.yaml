@@ -31,6 +31,14 @@ calendars:
   enabled: false
   default_tags:
   - reach:local
+- id: f557cbef64e85715cf25b09d71da1adfa7fb102f16299a5b5fd8652cc1228969@group.calendar.google.com
+  name: Salsa Bachata - Int
+  color: '#4f46e5'
+  enabled: true
+  default_tags:
+  - dance-style:bachata
+  - dance-style:salsa
+  - reach:international
 - id: c9f97611396839b34602d48cc6fe04555217e5f924d4c3ef11d184af36be2234@group.calendar.google.com
   name: Salsa | Mambo - Int
   color: '#2563eb'

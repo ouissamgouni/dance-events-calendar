@@ -77,7 +77,7 @@ export function initialFormState(
         promoDescription: '',
         promoSourceUrl: '',
         going: signedIn,
-        goingAudience: audience ?? 'friends',
+        goingAudience: audience ?? 'public',
         submitterName: name ?? '',
         submitterEmail: email ?? '',
         website: '',

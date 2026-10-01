@@ -1,6 +1,6 @@
 import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanCount, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleContributor, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
-import type { SharedMyPlanResponse } from './types';
+import type { AdminEventNotificationStats, SharedMyPlanResponse } from './types';
 
 declare const __VITE_API_URL__: string;
 
@@ -673,6 +673,7 @@ export interface SiteSettings {
      * ``<mon|tue|...>[,<day>...] @ HH:MM`` interpreted in each recipient's
      * ``User.timezone``. Default = twice a week (``tue,fri @ 09:00``). */
     activity_digest_schedule?: string;
+    interest_match_push_schedule?: string;
     /** Max matched events shown inline in an interest-match digest email
      * before the rest collapse behind a "Discover more" link to "For
      * you". 1-50, client default 10. */
@@ -2389,6 +2390,15 @@ export async function markNotificationRead(id: number): Promise<NotificationItem
     });
     const data = await parseJsonResponse<NotificationItem>(res, 'Failed to mark notification read');
     return normalizeNotificationItem(data);
+}
+
+export async function markNotificationOpened(id: number, channel: 'push' | 'email'): Promise<void> {
+    await fetch(`${BASE}/notifications/${id}/opened`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel }),
+        credentials: 'include',
+    });
 }
 
 export async function markAllNotificationsRead(): Promise<{ count: number }> {
@@ -4961,6 +4971,15 @@ export async function fetchEventDuplicateCandidates(
         credentials: 'include',
     });
     return parseJsonResponse<DuplicateGroupListResponse>(res, 'Failed to fetch duplicate candidates');
+}
+
+export async function fetchAdminEventNotificationStats(
+    eventId: string,
+): Promise<AdminEventNotificationStats> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/notification-stats`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<AdminEventNotificationStats>(res, 'Failed to fetch event notification stats');
 }
 
 // --- Admin: event series grouping ---
