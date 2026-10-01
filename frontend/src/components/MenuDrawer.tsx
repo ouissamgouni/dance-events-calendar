@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { firstNameOf } from '../utils/displayName';
+import useBackToClose from '../hooks/useBackToClose';
 
 /**
  * Primary menu drawer opened by the header burger (top-right). Holds the
@@ -18,6 +19,8 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
         onClose();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.pathname]);
+
+    useBackToClose(onClose, open);
 
     useEffect(() => {
         if (!open) return;

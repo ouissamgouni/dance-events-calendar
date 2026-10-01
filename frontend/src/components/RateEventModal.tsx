@@ -13,6 +13,7 @@ import {
 import { trackRatingDeleted, trackRatingSubmitFailed, trackRatingSubmitted } from '../utils/tracking';
 import { SENTIMENTS, SENTIMENT_META } from '../utils/reviewSentiment';
 import { ConfirmDialog } from './AppDialog';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface Props {
     eventId: string;
@@ -201,6 +202,8 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
     const [error, setError] = useState('');
     const [thanks, setThanks] = useState(false);
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+    useBackToClose(onClose, !submitting);
 
     useEffect(() => {
         fetchAspectTagGroups().then(setAspectGroups).catch(() => setAspectGroups([]));

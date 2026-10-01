@@ -4,6 +4,7 @@ import { fetchNotifications, type NotificationItem } from '../api';
 import { useNotifications } from '../context/NotificationsContext';
 import { resolveNotificationDestination } from '../utils/notificationRender';
 import NotificationRow from './NotificationRow';
+import useBackToClose from '../hooks/useBackToClose';
 
 /**
  * Slide-in side panel triggered by the header bell.
@@ -51,6 +52,8 @@ export default function NotificationsPanel({
         markSeen();
         markAllRead();
     }, [open, load, markSeen, markAllRead]);
+
+    useBackToClose(onClose, open);
 
     // Close on Escape for keyboard a11y.
     useEffect(() => {

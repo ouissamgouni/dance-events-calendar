@@ -11,6 +11,7 @@ import { seriesToAggregate } from '../hooks/useCommunityExperience';
 import { useScrollDots } from '../hooks/useScrollDots';
 import { SENTIMENT_META } from '../utils/reviewSentiment';
 import ScrollDotsIndicator from './ScrollDots';
+import useBackToClose from '../hooks/useBackToClose';
 
 /** Max tags shown on a compact review card before the rest collapse into "+N more". */
 const CARD_TAGS_SHOWN = 5;
@@ -39,6 +40,7 @@ function cardTags(r: EventReviewPublic): CardTag[] {
 
 /** Full review popover — shows the complete feedback (all tags + comment). */
 function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onClose: () => void }) {
+    useBackToClose(onClose);
     const meta = review.overall_sentiment ? SENTIMENT_META[review.overall_sentiment] : null;
     const initials =
         review.reviewer_label.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';

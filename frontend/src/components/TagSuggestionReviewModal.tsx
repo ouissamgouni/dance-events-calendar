@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { TagSuggestionResponse, TagGroup } from '../types';
 import { approveTagSuggestion, rejectTagSuggestion, createTag } from '../api';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface FlatTag {
     id: number;
@@ -40,6 +41,7 @@ export default function TagSuggestionReviewModal({
     const [rejectMode, setRejectMode] = useState(false);
     const [adminNotes, setAdminNotes] = useState(suggestion.admin_notes ?? '');
     const [descExpanded, setDescExpanded] = useState(false);
+    useBackToClose(onClose, !saving);
 
     // Assign-existing-tag state
     const [assignTagId, setAssignTagId] = useState<number | ''>('');

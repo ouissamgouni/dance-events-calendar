@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 
 // FullScreenEditor — shared shell for a single filter dimension's editor,
 // pushed over the FilterSheet as a full-screen screen (mobile) or a
@@ -40,6 +41,7 @@ export default function FullScreenEditor({
     variant = 'sheet',
     children,
 }: FullScreenEditorProps) {
+    useBackToClose(onBack);
     // Escape returns to the section list rather than closing the whole sheet,
     // matching the visible back affordance.
     useEffect(() => {

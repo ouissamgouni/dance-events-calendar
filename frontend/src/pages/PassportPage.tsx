@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useToast } from '../components/Toast';
+import useBackToClose from '../hooks/useBackToClose';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
 import PassportView, { type PassportTab } from '../components/PassportView';
 import MilestoneCarousel from '../components/MilestoneCarousel';
@@ -57,6 +58,7 @@ const PASSPORT_SECTION_TOGGLES: {
  * fallback). Visibility/section changes persist via PATCH /me/visibility.
  */
 function SharePassportModal({ handle, onClose }: { handle: string; onClose: () => void }) {
+    useBackToClose(onClose);
     const toast = useToast();
     const [profile, setProfile] = useState<PublicProfile | null>(null);
     const [requireSignin, setRequireSignin] = useState(false);
@@ -364,6 +366,7 @@ function SharePassportMenu({
     const [menuOpen, setMenuOpen] = useState(false);
     const [modal, setModal] = useState<'link' | 'card' | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+    useBackToClose(() => setMenuOpen(false), menuOpen);
 
     useEffect(() => {
         if (!menuOpen) return;
@@ -484,6 +487,7 @@ function SharePassportCardModal({
     mapEvents: PassportMapEvent[] | null;
     onClose: () => void;
 }) {
+    useBackToClose(onClose);
     const toast = useToast();
     const currentYear = new Date().getFullYear();
     const [scope, setScope] = useState<ShareScope>('all');

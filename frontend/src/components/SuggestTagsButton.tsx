@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { TagGroup } from '../types';
 import { submitTagSuggestion } from '../api';
 import TagsPicker, { type TagsPickerValue } from './TagsPicker';
+import useBackToClose from '../hooks/useBackToClose';
 
 export interface InlineTagSuggestion {
     tag_id?: number;
@@ -57,6 +58,8 @@ export default function SuggestTagsButton({
         }
         onChange(out);
     }, [value, mode, onChange]);
+
+    useBackToClose(onClose, !isEmbedded);
 
     useEffect(() => {
         if (isEmbedded) return;

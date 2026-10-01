@@ -1025,17 +1025,17 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     }, []);
     const closeFilterSheet = useCallback(() => {
         setFilterSheetOpen(false);
-        if (searchParams.has('sheet')) {
+    }, []);
+    // Strip ?sheet on open, not on close: a replace while open would overwrite
+    // the sheet's Back-to-close history entry.
+    useEffect(() => {
+        if (location.pathname === '/browse' && searchParams.get('sheet') === '1') {
+            setFilterSheetOpen(true);
             const next = new URLSearchParams(searchParams);
             next.delete('sheet');
             setSearchParams(next, { replace: true });
         }
-    }, [searchParams, setSearchParams]);
-    useEffect(() => {
-        if (location.pathname === '/browse' && searchParams.get('sheet') === '1') {
-            setFilterSheetOpen(true);
-        }
-    }, [location.pathname, searchParams]);
+    }, [location.pathname, searchParams, setSearchParams]);
     const defaultDateRange = useMemo(() => defaultExplorerDateRange(defaultExplorerPeriod), [defaultExplorerPeriod]);
     const dateRangeDiffers =
         startDate !== defaultDateRange.startDate || endDate !== defaultDateRange.endDate;

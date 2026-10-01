@@ -8,6 +8,7 @@ import { REACH_FILTER_LABELS } from '../utils/reach';
 import { bboxSearchArea, searchAreaFromProfile } from '../utils/searchArea';
 import ProfileDraftEditor from './ProfileDraftEditor';
 import { useToast } from './Toast';
+import useBackToClose from '../hooks/useBackToClose';
 
 type Confirmation =
     | { kind: 'default'; profile: InterestProfile }
@@ -81,6 +82,7 @@ function ProfileCard({
 }
 
 function Sheet({ children, onClose, label, wide = false }: { children: ReactNode; onClose: () => void; label: string; wide?: boolean }) {
+    useBackToClose(onClose);
     return createPortal(
         <div className="fixed inset-0 z-[11000] flex items-end bg-slate-900/40 sm:items-center sm:justify-center sm:p-4" onClick={onClose}>
             <div role="dialog" aria-modal="true" aria-label={label} onClick={(event) => event.stopPropagation()} className={`max-h-[92dvh] w-full overflow-y-auto rounded-t-card bg-surface p-3 shadow-xl sm:rounded-card ${wide ? 'sm:max-w-lg' : 'sm:max-w-sm'}`}>

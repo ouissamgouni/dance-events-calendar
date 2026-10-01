@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { ChevronLeft, X } from 'lucide-react';
+import useBackToClose from '../../hooks/useBackToClose';
 
 interface Props {
     title: string;
@@ -19,6 +20,7 @@ interface Props {
  * open, and every sub-editor confirms with `Done`/`Save` instead.
  */
 export default function SubPage({ title, onBack, backIcon = 'close', footer, children }: Props) {
+    useBackToClose(onBack);
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;

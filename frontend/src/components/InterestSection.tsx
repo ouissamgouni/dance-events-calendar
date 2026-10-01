@@ -32,6 +32,7 @@ import {
 import type { Attendee, AttendanceSummary } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useAttendanceInvalidationKey } from '../context/AttendanceSummariesContext';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface Props {
     eventId: string;
@@ -681,6 +682,7 @@ function GoingModal({
     isPast?: boolean;
     onClose: () => void;
 }) {
+    useBackToClose(onClose);
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();

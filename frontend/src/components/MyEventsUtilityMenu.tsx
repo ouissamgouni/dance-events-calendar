@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { CalendarDays, CalendarPlus, FileSpreadsheet, Share2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { createShareToken, exportIcs, exportXlsx, getShareToken, getCalendarFeedUrl, getAppShareUrl } from '../api';
@@ -34,6 +35,7 @@ export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUti
     const [status, setStatus] = useState('');
     const [existingToken, setExistingToken] = useState<string | null>(null);
     const [tokenLoading, setTokenLoading] = useState(false);
+    useBackToClose(() => setOpen(false), open);
 
     useEffect(() => {
         if (!open) return;

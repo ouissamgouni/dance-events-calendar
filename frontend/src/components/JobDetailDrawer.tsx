@@ -16,6 +16,7 @@ import type {
 import { getSyncJob, retryCalendarInJob } from '../api';
 import { useToast } from './Toast';
 import CalendarRunPanel from './CalendarRunPanel';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface JobDetailDrawerProps {
     jobId: string;
@@ -62,6 +63,8 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
     const [retrying, setRetrying] = useState<string | null>(null);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const toast = useToast();
+    useBackToClose(onClose);
+    useBackToClose(() => setOpenCalId(null), openCalId !== null);
 
     const refresh = async () => {
         try {

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import AudiencePicker from './AudiencePicker';
 import BottomSheet from './BottomSheet';
 import useMediaQuery from '../hooks/useMediaQuery';
+import useBackToClose from '../hooks/useBackToClose';
 import { useAuth } from '../context/AuthContext';
 import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { updateMyVisibility, type ShareAudience } from '../api';
@@ -83,6 +84,7 @@ export default function RsvpVisibilitySheet({
     const { rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
     const [remember, setRemember] = useState(() => getRememberAudience(user?.user_id) ?? true);
     const showRemember = rsvpRememberVisibilityEnabled && !!user && !!audience && !!onAudienceChange;
+    useBackToClose(onClose);
 
     const handleDone = () => {
         if (showRemember && user) {

@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface Props {
     title: string;
@@ -27,6 +28,7 @@ interface Props {
 export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, dismissible = true, footer, children }: Props) {
     const floating = variant === 'floating';
     const titleClass = titleSize === 'xl' ? 'text-2xl' : titleSize === 'large' ? 'text-lg' : 'text-base';
+    useBackToClose(onClose, dismissible);
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && dismissible) {

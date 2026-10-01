@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { CalendarDays, Share2, Trash2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import {
@@ -25,6 +26,7 @@ export default function MyPlanUtilityMenu({ eventId, audience, onAudienceChange 
     const [status, setStatus] = useState('');
     const [token, setToken] = useState<string | null>(null);
     const [tokenLoading, setTokenLoading] = useState(false);
+    useBackToClose(() => setOpen(false), open);
 
     useEffect(() => {
         if (!open) return;

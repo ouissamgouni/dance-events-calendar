@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -276,6 +277,8 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
     useEffect(() => {
         load(0, true);
     }, [load]);
+
+    useBackToClose(onClose);
 
     // Close on Escape.
     useEffect(() => {
