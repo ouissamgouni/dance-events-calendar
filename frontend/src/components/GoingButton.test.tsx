@@ -304,6 +304,10 @@ describe('GoingButton visibility', () => {
         expect(await screen.findByRole('button', { name: 'Not going' })).toBeInTheDocument()
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
+        await user.click(await screen.findByRole('button', { name: 'Visibility: Friends \u2014 edit' }))
+        expect(await screen.findByRole('dialog', { name: "You're going!" })).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Done' }))
+
         await user.click(screen.getByRole('button', { name: 'Not going' }))
         expect(await screen.findByRole('dialog', { name: "You're going!" })).toBeInTheDocument()
     })

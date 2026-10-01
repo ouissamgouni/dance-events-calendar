@@ -99,6 +99,12 @@ export function setRememberAudience(identity: string | null | undefined, remembe
     }
 }
 
+export const AUDIENCE_TIER_LABELS: Record<ShareAudience, string> = {
+    public: 'Public',
+    friends: 'Friends',
+    private: 'Private',
+};
+
 export const ATTENDANCE_AUDIENCE_DESCRIPTIONS: Record<ShareAudience, string> = {
     public: 'You will appear in the attendee list to anyone who can view this event.',
     friends: 'Only your mutual followers will see your name in the attendee list.',

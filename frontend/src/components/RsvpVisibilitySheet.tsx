@@ -22,7 +22,7 @@ type PrimaryAction =
 
 interface Props {
     anchorRef: RefObject<HTMLElement | null>;
-    emoji: string;
+    emoji: ReactNode;
     title: string;
     subtitle?: string;
     question?: string;

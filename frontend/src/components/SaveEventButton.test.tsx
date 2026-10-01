@@ -179,6 +179,11 @@ describe('SaveEventButton visibility', () => {
         expect(await screen.findByRole('button', { name: 'Unsave event' })).toBeInTheDocument()
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
+        await user.click(await screen.findByRole('button', { name: 'Visibility: Friends \u2014 edit' }))
+        await screen.findByRole('dialog', { name: 'Saved!' })
+        expect(screen.getByRole('radio', { name: /^Friends/ })).toHaveAttribute('aria-checked', 'true')
+        await user.click(screen.getByRole('button', { name: 'Done' }))
+
         await user.click(screen.getByRole('button', { name: 'Unsave event' }))
         await screen.findByRole('dialog', { name: 'Saved!' })
         expect(screen.getByRole('radio', { name: /^Friends/ })).toHaveAttribute('aria-checked', 'true')
