@@ -1,12 +1,9 @@
-import { useEffect, type RefObject } from 'react';
+import { type RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SquareArrowOutUpRight } from 'lucide-react';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
-import useMediaQuery from '../hooks/useMediaQuery';
 import { ATTENDANCE_AUDIENCE_DESCRIPTIONS } from '../utils/audiencePreference';
 import type { ShareAudience } from '../api';
-
-const AUTO_DISMISS_MS = 5000;
 
 export type PostRsvpVariant = 'anon' | 'signed-in-default-share' | 'signed-in';
 
@@ -41,14 +38,6 @@ export default function PostRsvpPopover({
     onAudienceChange,
 }: Props) {
     const location = useLocation();
-    const isMobile = useMediaQuery('(max-width: 639px)');
-
-    // Mobile sheet has an explicit Done button, so only the desktop popover auto-dismisses.
-    useEffect(() => {
-        if (isMobile) return;
-        const t = setTimeout(onClose, AUTO_DISMISS_MS);
-        return () => clearTimeout(t);
-    }, [isMobile, onClose]);
 
     const next = encodeURIComponent(location.pathname + location.search);
     const isAnon = variant === 'anon';

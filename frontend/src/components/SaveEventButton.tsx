@@ -6,8 +6,7 @@ import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/Featur
 import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
-import { trackSave } from '../utils/tracking';
-import { defaultRsvpAudienceFor, setLastUsedAudience } from '../utils/audiencePreference';
+import { defaultRsvpAudienceFor, getRememberAudience, setLastUsedAudience } from '../utils/audiencePreference';
 import type { ShareAudience } from '../api';
 
 interface Props {
@@ -34,9 +33,9 @@ export default function SaveEventButton({
     className = '',
     labelClassName = '',
 }: Props) {
-    const { isSaved, toggleSave, setSavedAudience } = useSavedEvents();
+    const { isSaved, toggleSave, setSavedAudience, getSavedAudience } = useSavedEvents();
     const { user } = useAuth();
-    const { appAuthGateEnabled } = useOptionalFeatureFlags();
+    const { appAuthGateEnabled, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const location = useLocation();
     const navigate = useNavigate();
@@ -60,6 +59,11 @@ export default function SaveEventButton({
             return;
         }
         const wasSaved = saved;
+        if (wasSaved && user) {
+            setPendingAudience(getSavedAudience(eventId));
+            setPopoverOpen(true);
+            return;
+        }
         let nudgeShown = false;
         if (!wasSaved && !user && nudge.shouldShow) {
             nudge.markShown();
@@ -72,16 +76,16 @@ export default function SaveEventButton({
             // then open the visibility popover so the user can adjust on the
             // fly — parity with the post-RSVP popover that GoingButton shows.
             const defaultAudience = defaultRsvpAudienceFor(user);
-            toggleSave(eventId).then((ok) => {
+            const skipSheet = rsvpRememberVisibilityEnabled && getRememberAudience(user.user_id) === true;
+            toggleSave(eventId, defaultAudience).then((ok) => {
                 if (!ok) {
                     toast.show("Couldn't save \u2014 try again", 3200);
                     return;
                 }
-                // Persist the chosen default on the row so the local
-                // audience map and the subscribers' fan-out tier agree.
-                trackSave(eventId, 'save', defaultAudience)
-                    .then(() => setSavedAudience(eventId, defaultAudience))
-                    .catch(() => { /* row exists with default; non-fatal */ });
+                if (skipSheet) {
+                    toast.show('Saved', 1400);
+                    return;
+                }
                 setPendingAudience(defaultAudience);
                 setPopoverOpen(true);
             });

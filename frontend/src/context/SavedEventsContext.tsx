@@ -33,7 +33,7 @@ interface SavedEventsContextValue {
      * write failure. Callers are expected to surface success / failure
      * feedback (e.g. anchored toast) themselves.
      */
-    toggleSave: (eventId: string) => Promise<boolean>;
+    toggleSave: (eventId: string, audience?: ShareAudience) => Promise<boolean>;
     /** Per-event audience for the current user. Defaults to 'private' if unknown. */
     getSavedAudience: (eventId: string) => ShareAudience;
     /**
@@ -151,16 +151,17 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
         return () => { cancelled = true; };
     }, [idKey]);
 
-    const toggleSave = useCallback((eventId: string): Promise<boolean> => {
+    const toggleSave = useCallback((eventId: string, audience?: ShareAudience): Promise<boolean> => {
         const wasSaved = savedIds.has(eventId);
         const action: 'save' | 'unsave' = wasSaved ? 'unsave' : 'save';
         // Optimistic local flip — the user sees the change immediately.
         const optimistic = new Set(savedIds);
         if (wasSaved) optimistic.delete(eventId); else optimistic.add(eventId);
         setSavedIds(optimistic);
+        if (!wasSaved && audience) setAudienceMap((prev) => ({ ...prev, [eventId]: audience }));
         invalidateSummary(eventId);
 
-        return trackSave(eventId, action).then(() => true).catch(() => {
+        return trackSave(eventId, action, wasSaved ? undefined : audience).then(() => true).catch(() => {
             // Rollback on functional-state failure so the UI doesn't lie
             // about server state. The caller is responsible for surfacing
             // a user-visible error (anchored toast).

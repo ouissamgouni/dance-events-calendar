@@ -715,6 +715,8 @@ export interface SiteSettings {
     review_prompt_enabled?: boolean;
     /** Show the optional event-size question in the review wizard. */
     event_review_size_step_enabled?: boolean;
+    /** Show the 'remember my choice' checkbox in RSVP/save visibility sheets. */
+    rsvp_remember_visibility_enabled?: boolean;
     /** Hours after an event's end before the review prompt fires. 1-720,
      * client default 3. */
     review_prompt_delay_hours?: number;

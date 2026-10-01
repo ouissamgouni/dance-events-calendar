@@ -13,6 +13,7 @@ import { useAnchoredToast } from './AnchoredToast';
 import {
     ATTENDANCE_AUDIENCE_DESCRIPTIONS,
     defaultRsvpAudienceFor,
+    getRememberAudience,
     setLastUsedAudience,
 } from '../utils/audiencePreference';
 
@@ -123,7 +124,7 @@ export default function GoingButton({
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user } = useAuth();
-    const { goingButtonIconVariant, appAuthGateEnabled } = useOptionalFeatureFlags();
+    const { goingButtonIconVariant, appAuthGateEnabled, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const location = useLocation();
     const navigate = useNavigate();
@@ -179,17 +180,20 @@ export default function GoingButton({
             //      when the account-level default is unset).
             //   3. Legacy boolean fallback for very old payloads.
             const defaultAudience = defaultRsvpAudienceFor(user);
+            const skipSheet = rsvpRememberVisibilityEnabled && getRememberAudience(user.user_id) === true;
             // Always RSVP immediately with the default audience — no extra
             // confirmation click. The post-RSVP popover surfaces an inline
             // picker so the user can change visibility on the fly.
             toggleAttending(eventId, defaultAudience).then((ok) => {
                 if (ok) {
                     maybeFireShareConversion();
+                    if (skipSheet) errorToast.show(isPast ? 'You attended!' : "You're going!", 1400);
                 } else {
                     setPostRsvpVariant(null);
                     errorToast.show("Couldn't mark you as going \u2014 try again", 3200);
                 }
             });
+            if (skipSheet) return;
             showPostRsvp(
                 defaultAudience !== 'private'
                     ? 'signed-in-default-share'

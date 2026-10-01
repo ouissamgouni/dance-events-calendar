@@ -147,7 +147,7 @@ describe('SaveEventButton visibility', () => {
         expect(within(sheet).getByRole('button', { name: 'Done' })).toBeInTheDocument()
     })
 
-    it('unsaves directly without opening a sheet when the event is already saved', async () => {
+    it('opens the visibility sheet with an Unsave action when the event is already saved', async () => {
         useMobileViewport()
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
@@ -160,9 +160,28 @@ describe('SaveEventButton visibility', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
         await user.click(screen.getByRole('button', { name: 'Unsave event' }))
+        const editSheet = await screen.findByRole('dialog', { name: 'Saved!' })
+        await user.click(within(editSheet).getByRole('button', { name: 'Unsave' }))
 
         expect(await screen.findByRole('button', { name: 'Save event' })).toBeInTheDocument()
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('skips the sheet on a new save once the choice is remembered', async () => {
+        useMobileViewport()
+        localStorage.setItem('audience.remember.user-1', '1')
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+        )
+        const { user } = renderWithProviders(<SaveEventButton eventId="evt-remembered" eventTitle="Summer Salsa Social" />)
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+        expect(await screen.findByRole('button', { name: 'Unsave event' })).toBeInTheDocument()
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Unsave event' }))
+        await screen.findByRole('dialog', { name: 'Saved!' })
+        expect(screen.getByRole('radio', { name: /^Friends/ })).toHaveAttribute('aria-checked', 'true')
     })
 
     it('defaults to public audience for users without a saved preference', async () => {
@@ -201,6 +220,29 @@ describe('SaveEventButton visibility', () => {
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
         await waitFor(() =>
             expect(localStorage.getItem('audience.lastUsed.user-1')).toBe('private'),
+        )
+    })
+
+    it('saves the picked audience as account default when remember is checked', async () => {
+        useMobileViewport()
+        const patches: unknown[] = []
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.patch('*/api/social/me/visibility', async ({ request }) => {
+                patches.push(await request.json())
+                return HttpResponse.json({})
+            }),
+        )
+        const { user } = renderWithProviders(<SaveEventButton eventId="evt-remember" eventTitle="Summer Salsa Social" />)
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+        await screen.findByRole('dialog', { name: 'Saved!' })
+        expect(screen.getByRole('checkbox', { name: 'Remember my choice for next time' })).toBeChecked()
+        await user.click(screen.getByRole('radio', { name: /^Private/ }))
+        await user.click(screen.getByRole('button', { name: 'Done' }))
+
+        await waitFor(() =>
+            expect(patches).toEqual([{ share_attendance_default_audience: 'private' }]),
         )
     })
 })

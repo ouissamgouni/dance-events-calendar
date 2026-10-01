@@ -11,6 +11,8 @@ interface Props {
     headerLeading?: ReactNode;
     headerAction?: ReactNode;
     showClose?: boolean;
+    /** When false, backdrop click and Escape don't close the sheet. */
+    dismissible?: boolean;
     /** Sticky footer content, typically a primary confirm button. */
     footer?: ReactNode;
     children: ReactNode;
@@ -22,12 +24,12 @@ interface Props {
  * footer clear of the iOS home indicator. The body scrolls independently so the
  * sheet never grows past 85% of the viewport height.
  */
-export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, footer, children }: Props) {
+export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, dismissible = true, footer, children }: Props) {
     const floating = variant === 'floating';
     const titleClass = titleSize === 'xl' ? 'text-2xl' : titleSize === 'large' ? 'text-lg' : 'text-base';
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
+            if (e.key === 'Escape' && dismissible) {
                 e.stopPropagation();
                 onClose();
             }
@@ -39,12 +41,12 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
             document.removeEventListener('keydown', onKey);
             document.body.style.overflow = previousOverflow;
         };
-    }, [onClose]);
+    }, [onClose, dismissible]);
 
     return (
         <div
             className={`fixed inset-0 flex items-end justify-center bg-black/50 animate-fade-in ${floating ? 'px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]' : ''} ${layer === 'transient' ? 'z-[12000]' : 'z-[10000]'}`}
-            onClick={onClose}
+            onClick={dismissible ? onClose : undefined}
         >
             <div
                 role="dialog"
