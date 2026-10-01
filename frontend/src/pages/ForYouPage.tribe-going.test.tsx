@@ -30,7 +30,7 @@ describe('LensTrail tribe-going pagination', () => {
         delete (HTMLElement.prototype as { scrollWidth?: number }).scrollWidth;
     });
 
-    it('renders the shared scroll dots for the friends-going trail', () => {
+    it('renders the shared scroll dots for the tribe-going trail', () => {
         const events = Array.from({ length: 6 }, (_, index) => ({
             event_id: `evt-${index}`,
             title: `Event ${index}`,

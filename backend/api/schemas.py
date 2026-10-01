@@ -86,6 +86,10 @@ class EventResponse(BaseModel):
     # Going-only mutual-friend signal used by attendee avatar stacks.
     friends_going_count: int = 0
     friends_going_preview: list["FriendMini"] = []
+    # Going-only signal from all approved followees, audience-gated per row.
+    # Used by the dedicated "Your tribe is going" rail.
+    tribe_going_count: int = 0
+    tribe_going_preview: list["FriendMini"] = []
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None

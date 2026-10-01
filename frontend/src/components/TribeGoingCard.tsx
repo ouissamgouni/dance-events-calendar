@@ -136,7 +136,7 @@ export default function TribeGoingCard({ event, onClick }: TribeGoingCardProps) 
                     className="absolute right-[14px] top-[14px] h-[76px] w-[68px] rounded-lg object-cover"
                     onError={() => setImageFailed(true)}
                     draggable={false}
-                    data-testid="friends-going-event-image"
+                    data-testid="tribe-going-event-image"
                 />
             )}
 

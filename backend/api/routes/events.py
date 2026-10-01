@@ -143,32 +143,37 @@ def _set_event_list_cache_headers(
         response.headers["Cache-Control"] = "public, max-age=60"
 
 
-def _following_friend_signals(
+def _relationship_signals(
     session: Session,
     viewer: Optional[User],
     event_ids: list[str],
     *,
+    source: str = "friends",
     preview_limit: int = 5,
     include_saved: bool = True,
 ) -> tuple[dict[str, int], dict[str, list[dict]]]:
-    """Return ``(counts, previews)`` for the viewer's mutual friends who
-    are going to, and optionally have saved, each event.
+    """Return ``(counts, previews)`` for the viewer's selected relationships
+    who are going to, and optionally have saved, each event.
 
-    ``counts`` maps event_id → total friend count.
-    ``previews`` maps event_id → up to ``preview_limit`` friend mini
+    ``counts`` maps event_id → total relationship count.
+    ``previews`` maps event_id → up to ``preview_limit`` person mini
     dicts ``{user_id, handle, display_name, avatar_url}``, sorted alphabetically
     by display_name for stable rendering. Audience-gated via
-    ``_audience_passes`` and deduplicated per (event, friend) so a
-    friend who both saved and is going still counts once.
+    ``_audience_passes`` and deduplicated per (event, person) so a
+    person who both saved and is going still counts once.
     """
     if not event_ids or viewer is None or viewer.id is None:
         return {}, {}
-    friend_ids = _viewer_friend_ids(session, viewer)
-    if not friend_ids:
+    relationship_ids = (
+        _viewer_followed_ids(session, viewer)
+        if source == "follows"
+        else _viewer_friend_ids(session, viewer)
+    )
+    if not relationship_ids:
         return {}, {}
-    friend_by_id: dict = {}
-    for f in session.exec(select(User).where(User.id.in_(friend_ids))).all():
-        friend_by_id[f.id] = f
+    user_by_id: dict = {}
+    for user in session.exec(select(User).where(User.id.in_(relationship_ids))).all():
+        user_by_id[user.id] = user
 
     pairs: set[tuple[str, object]] = set()
 
@@ -178,11 +183,11 @@ def _following_friend_signals(
             UserEventAttendance.user_id,
             UserEventAttendance.share_audience,
         )
-        .where(UserEventAttendance.user_id.in_(friend_ids))
+        .where(UserEventAttendance.user_id.in_(relationship_ids))
         .where(UserEventAttendance.event_id.in_(event_ids))
     ).all()
     for event_id, owner_id, share_audience in going_rows:
-        owner = friend_by_id.get(owner_id)
+        owner = user_by_id.get(owner_id)
         if owner is None or not event_id:
             continue
         if _audience_passes(session, viewer, owner, share_audience or "private"):
@@ -195,11 +200,11 @@ def _following_friend_signals(
                 UserSavedEvent.user_id,
                 UserSavedEvent.audience,
             )
-            .where(UserSavedEvent.user_id.in_(friend_ids))
+            .where(UserSavedEvent.user_id.in_(relationship_ids))
             .where(UserSavedEvent.event_id.in_(event_ids))
         ).all()
         for event_id, owner_id, audience in saved_rows:
-            owner = friend_by_id.get(owner_id)
+            owner = user_by_id.get(owner_id)
             if owner is None or not event_id:
                 continue
             if _audience_passes(session, viewer, owner, audience or "private"):
@@ -212,7 +217,7 @@ def _following_friend_signals(
     counts: dict[str, int] = {eid: len(ids) for eid, ids in by_event.items()}
     previews: dict[str, list[dict]] = {}
     for eid, ids in by_event.items():
-        owners = [friend_by_id[oid] for oid in ids if oid in friend_by_id]
+        owners = [user_by_id[oid] for oid in ids if oid in user_by_id]
         owners.sort(key=lambda u: (u.display_name or "").lower())
         previews[eid] = [
             {
@@ -845,9 +850,11 @@ def get_events(
     following_previews: dict[str, list[dict]] = {}
     friends_going_counts: dict[str, int] = {}
     friends_going_previews: dict[str, list[dict]] = {}
+    tribe_going_counts: dict[str, int] = {}
+    tribe_going_previews: dict[str, list[dict]] = {}
     following_on = feature_settings.get("following_badge_enabled", "").lower() == "true"
     if event_ids and current_user is not None and following_on:
-        following_counts, following_previews = _following_friend_signals(
+        following_counts, following_previews = _relationship_signals(
             session, current_user, event_ids
         )
     if (
@@ -857,8 +864,21 @@ def get_events(
             following_on or (interest_source == "friends" and interest_kind == "going")
         )
     ):
-        friends_going_counts, friends_going_previews = _following_friend_signals(
+        friends_going_counts, friends_going_previews = _relationship_signals(
             session, current_user, event_ids, include_saved=False
+        )
+    if (
+        event_ids
+        and current_user is not None
+        and interest_source == "follows"
+        and interest_kind == "going"
+    ):
+        tribe_going_counts, tribe_going_previews = _relationship_signals(
+            session,
+            current_user,
+            event_ids,
+            source="follows",
+            include_saved=False,
         )
     # Batch-fetch tags
     tags_map = get_event_tags(session, event_ids)
@@ -907,6 +927,8 @@ def get_events(
             following_friends_preview=following_previews.get(e.event_id, []),
             friends_going_count=friends_going_counts.get(e.event_id, 0),
             friends_going_preview=friends_going_previews.get(e.event_id, []),
+            tribe_going_count=tribe_going_counts.get(e.event_id, 0),
+            tribe_going_preview=tribe_going_previews.get(e.event_id, []),
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -1230,11 +1252,11 @@ def get_events_by_ids(
     friends_going_counts: dict[str, int] = {}
     friends_going_previews: dict[str, list[dict]] = {}
     if event_ids and current_user is not None and _following_badge_enabled(session):
-        following_counts, following_previews = _following_friend_signals(
+        following_counts, following_previews = _relationship_signals(
             session, current_user, event_ids
         )
     if event_ids and current_user is not None:
-        friends_going_counts, friends_going_previews = _following_friend_signals(
+        friends_going_counts, friends_going_previews = _relationship_signals(
             session, current_user, event_ids, include_saved=False
         )
 
