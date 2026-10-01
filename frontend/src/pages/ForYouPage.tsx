@@ -15,7 +15,7 @@ import { isTrendingScore } from '../utils/trending';
 import YourNextEventsRail from '../components/YourNextEventsRail';
 import RailEventCard from '../components/RailEventCard';
 import EventCard from '../components/EventCard';
-import FriendsAreGoingCard from '../components/FriendsAreGoingCard';
+import TribeGoingCard from '../components/TribeGoingCard';
 import ShareExperienceCard from '../components/ShareExperienceCard';
 import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
 import SectionHeading, { type SectionHeadingAction } from '../components/SectionHeading';
@@ -29,6 +29,23 @@ export function timeOfDayGreeting(hour: number): string {
     if (hour < 12) return 'Good morning';
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
+}
+
+export function TribeGoingEmptyState({ followingCount }: { followingCount: number }) {
+    if (followingCount > 0) {
+        return <>No one in your tribe is going to anything upcoming yet.</>;
+    }
+    return (
+        <>
+            <p className="mb-2">Follow people to see where your tribe is going.</p>
+            <Link
+                to="/tribe/people"
+                className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+                Build your tribe
+            </Link>
+        </>
+    );
 }
 
 function toApiDate(date: Date): string {
@@ -58,7 +75,7 @@ interface LensTrailProps {
     contextLabel: string;
     testId: string;
     headerAction?: SectionHeadingAction;
-    cardVariant?: 'default' | 'friends-going';
+    cardVariant?: 'default' | 'tribe-going';
     /** Opt this trail into the date-first EventCard layout when the flag is on. */
     dateFirstEligible?: boolean;
 }
@@ -72,8 +89,8 @@ export function LensTrail(props: LensTrailProps) {
         cardVariant = 'default', dateFirstEligible = false,
     } = props;
     const { showRatings } = useFeatureFlags();
-    const friendsGoing = cardVariant === 'friends-going';
-    const dateFirst = dateFirstEligible && !friendsGoing;
+    const tribeGoing = cardVariant === 'tribe-going';
+    const dateFirst = dateFirstEligible && !tribeGoing;
     const [displayCap, setDisplayCap] = useState(DISPLAY_CAP);
     const visibleEvents = events.slice(0, displayCap);
     const hasLocalMore = events.length > visibleEvents.length;
@@ -100,13 +117,13 @@ export function LensTrail(props: LensTrailProps) {
             ) : (
                 <div
                     ref={scrollerRef}
-                    className={`flex overflow-x-auto scrollbar-hide py-2 ${friendsGoing ? 'snap-x snap-mandatory gap-3' : 'gap-2'}`}
+                    className={`flex overflow-x-auto scrollbar-hide py-2 ${tribeGoing ? 'snap-x snap-mandatory gap-3' : 'gap-2'}`}
                     aria-label={title}
                 >
                     {visibleEvents.map((event) => {
-                        if (friendsGoing) {
+                        if (tribeGoing) {
                             return (
-                                <FriendsAreGoingCard
+                                <TribeGoingCard
                                     key={event.event_id}
                                     event={event}
                                     onClick={onEventClick}
@@ -231,12 +248,12 @@ export default function ForYouPage() {
         fetchArgs: { startDate: forYouStartDate, profiles: 'me', excludeMine: true },
         resetKey: forYouResetKey,
     });
-    const friendsGoingLens = useForYouLens({
+    const tribeGoingLens = useForYouLens({
         enabled: !!user,
         fetchArgs: {
             startDate: forYouStartDate,
             area: forYouArea,
-            interestSource: 'friends',
+            interestSource: 'follows',
             interestKind: 'going',
         },
         resetKey: forYouResetKey,
@@ -261,23 +278,23 @@ export default function ForYouPage() {
             .filter((event) => new Date(event.end).getTime() >= now)
             .sort((a, b) => (b.popularity_score ?? 0) - (a.popularity_score ?? 0));
     }, [youMightLikeLens.events]);
-    const friendsGoingEvents = useMemo(() => {
+    const tribeGoingEvents = useMemo(() => {
         // eslint-disable-next-line react-hooks/purity -- render-time clock snapshot for past-event filter
         const now = Date.now();
-        return friendsGoingLens.events
+        return tribeGoingLens.events
             .filter((event) => new Date(event.end).getTime() >= now)
             .sort(
-                (a, b) => (b.friends_going_count ?? 0) - (a.friends_going_count ?? 0)
+                (a, b) => (b.tribe_going_count ?? 0) - (a.tribe_going_count ?? 0)
                     || new Date(a.start).getTime() - new Date(b.start).getTime(),
             );
-    }, [friendsGoingLens.events]);
+    }, [tribeGoingLens.events]);
 
     const seenScopeIds = useMemo(
         () => [
             ...youMightLikeLens.events.map((event) => event.event_id),
-            ...friendsGoingLens.events.map((event) => event.event_id),
+            ...tribeGoingLens.events.map((event) => event.event_id),
         ],
-        [youMightLikeLens.events, friendsGoingLens.events],
+        [youMightLikeLens.events, tribeGoingLens.events],
     );
     const { newEventIds, markSeen } = useSeenEvents(seenScopeIds);
     const newEvents = useMemo(
@@ -440,31 +457,19 @@ export default function ForYouPage() {
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
                         <LensTrail
-                            title="Friends are going"
-                            testId="for-you-following-friends-going"
-                            contextLabel="friends going event"
-                            cardVariant="friends-going"
+                            title="Your tribe is going"
+                            testId="for-you-tribe-going"
+                            contextLabel="tribe going event"
+                            cardVariant="tribe-going"
                             headerAction={{
                                 label: 'See all',
-                                to: '/tribe/calendars?interest_source=friends&interest_kind=going',
+                                to: '/tribe/calendars?interest_source=follows&interest_kind=going',
                             }}
-                            emptyContent={(
-                                (user?.following_count ?? 0) === 0 ? (
-                                    <>
-                                        <p className="mb-2">You&apos;re not following anyone yet.</p>
-                                        <Link
-                                            to="/tribe/discover"
-                                            className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
-                                        >
-                                            Build your tribe
-                                        </Link>
-                                    </>
-                                ) : 'No friends are going to anything upcoming yet.'
-                            )}
-                            events={friendsGoingEvents}
-                            hasMore={friendsGoingLens.hasMore}
-                            loading={friendsGoingLens.loading}
-                            onLoadMore={friendsGoingLens.loadMore}
+                            emptyContent={<TribeGoingEmptyState followingCount={user?.following_count ?? 0} />}
+                            events={tribeGoingEvents}
+                            hasMore={tribeGoingLens.hasMore}
+                            loading={tribeGoingLens.loading}
+                            onLoadMore={tribeGoingLens.loadMore}
                             onEventClick={handleEventClick}
                             hoveredEventId={hoveredEventId}
                             onEventHover={onEventHover}

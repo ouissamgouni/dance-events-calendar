@@ -13,9 +13,9 @@ describe('MyCalendar event filter initialization', () => {
 });
 
 describe('MyCalendar interest query initialization', () => {
-    it('opens the friends-going scope from the For You See all link', () => {
-        const search = '?interest_source=friends&interest_kind=going';
-        expect(initialInterestSource(search)).toBe('friends');
+    it('opens the following-going scope from the For You See all link', () => {
+        const search = '?interest_source=follows&interest_kind=going';
+        expect(initialInterestSource(search)).toBe('follows');
         expect(initialInterestKind(search)).toBe('going');
     });
 

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { CalendarEvent, FriendMini } from '../types';
 import { renderWithProviders } from '../test/render';
-import TribeGoingCard from './FriendsAreGoingCard';
+import TribeGoingCard from './TribeGoingCard';
 
 const friends: FriendMini[] = [
     { user_id: '1', handle: 'martina', display_name: 'Martina Rossi', avatar_url: '/martina.jpg' },
@@ -48,7 +48,7 @@ describe('TribeGoingCard', () => {
         renderCard();
 
         expect(screen.getByTestId('tribe-going-card')).toHaveClass('h-[150px]', 'w-[240px]', 'snap-start', 'rounded-card');
-        expect(screen.getByTestId('friends-going-event-image')).toHaveAttribute('src', '/event.jpg');
+        expect(screen.getByTestId('tribe-going-event-image')).toHaveAttribute('src', '/event.jpg');
         expect(within(screen.getByTestId('tribe-going-avatars')).getAllByRole('link')).toHaveLength(4);
         expect(screen.getByRole('link', { name: 'See 2 more people going' })).toHaveTextContent('+2');
         expect(screen.getByAltText('Martina')).toHaveClass('h-[32px]', 'w-[32px]');
@@ -59,8 +59,8 @@ describe('TribeGoingCard', () => {
 
     it('removes a failed image without reserving a placeholder slot', () => {
         renderCard();
-        fireEvent.error(screen.getByTestId('friends-going-event-image'));
-        expect(screen.queryByTestId('friends-going-event-image')).not.toBeInTheDocument();
+        fireEvent.error(screen.getByTestId('tribe-going-event-image'));
+        expect(screen.queryByTestId('tribe-going-event-image')).not.toBeInTheDocument();
         expect(screen.getByText('Martina, Christian, Mido').parentElement).not.toHaveClass('pr-20');
     });
 
@@ -86,7 +86,7 @@ describe('TribeGoingCard', () => {
 
         expect(screen.getByText('Martina')).toBeInTheDocument();
         expect(screen.getByText('is going to')).toBeInTheDocument();
-        expect(screen.queryByTestId('friends-going-event-image')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('tribe-going-event-image')).not.toBeInTheDocument();
         expect(screen.queryByRole('link', { name: /more people going/ })).not.toBeInTheDocument();
     });
 });

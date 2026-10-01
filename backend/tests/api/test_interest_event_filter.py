@@ -312,13 +312,24 @@ def test_follows_includes_one_way_followee_public_activity(client, world):
     _login(client, "carol@example.com")
     r = client.get(
         "/api/events",
-        params={"interest_source": "follows", "interest_kind": "any"},
+        params={"interest_source": "follows", "interest_kind": "going"},
     )
     assert r.status_code == 200
-    ids = {e["event_id"] for e in r.json()}
+    events = r.json()
+    ids = {e["event_id"] for e in events}
     # Carol follows alice one-way: she sees alice's public attendance
     # but NOT alice's friends-audience saved event.
     assert ids == {"evt-alice-public"}
+    event = events[0]
+    assert event["tribe_going_count"] == 1
+    assert event["tribe_going_preview"] == [
+        {
+            "user_id": str(world["alice"].id),
+            "handle": "alice",
+            "display_name": "Alice",
+            "avatar_url": None,
+        }
+    ]
 
 
 def test_follows_friends_audience_hidden_from_one_way_follower(client, world):
@@ -335,12 +346,15 @@ def test_follows_superset_of_friends_for_mutual(client, world):
     _login(client, "alice@example.com")
     r = client.get(
         "/api/events",
-        params={"interest_source": "follows", "interest_kind": "any"},
+        params={"interest_source": "follows", "interest_kind": "going"},
     )
     assert r.status_code == 200
-    ids = {e["event_id"] for e in r.json()}
+    events = r.json()
+    ids = {e["event_id"] for e in events}
     # Alice follows bob (mutual): sees bob's friends-audience activity.
-    assert ids == {"evt-going", "evt-saved"}
+    assert ids == {"evt-going"}
+    assert events[0]["tribe_going_count"] == 1
+    assert events[0]["tribe_going_preview"][0]["handle"] == "bob"
 
 
 # --- Visibility gate per-row -----------------------------------------------

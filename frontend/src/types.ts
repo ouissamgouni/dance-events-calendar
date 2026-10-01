@@ -136,6 +136,9 @@ export interface CalendarEvent {
     /** Going-only mutual-friend signal used by attendee avatar stacks. */
     friends_going_count?: number;
     friends_going_preview?: FriendMini[];
+    /** Going-only signal from all approved followees, audience-gated per RSVP. */
+    tribe_going_count?: number;
+    tribe_going_preview?: FriendMini[];
     price_min: number | null;
     price_max: number | null;
     price_currency: string | null;
