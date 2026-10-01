@@ -163,10 +163,6 @@ export default function NotificationsPanel({
                                     item={n}
                                     variant="panel"
                                     onClick={() => handleRowClick(n)}
-                                    onSavedSearchClick={() => {
-                                        onClose();
-                                        navigate('/saved-searches');
-                                    }}
                                     onFollowedBack={(handle) => {
                                         setItems((prev) =>
                                             prev

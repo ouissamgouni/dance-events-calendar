@@ -124,7 +124,6 @@ export default function NotificationRow({
     busy = false,
     onMarkRead,
     onClick,
-    onSavedSearchClick,
     onFollowedBack,
 }: {
     item: NotificationItem;
@@ -132,7 +131,6 @@ export default function NotificationRow({
     busy?: boolean;
     onMarkRead?: () => void;
     onClick?: () => void;
-    onSavedSearchClick?: () => void;
     onFollowedBack?: (handle: string) => void;
 }) {
     const navigate = useNavigate();
@@ -263,8 +261,10 @@ export default function NotificationRow({
     const actorCount = item.actor_count ?? actorsList.length;
     const isAvatarKind = AVATAR_KINDS.has(item.kind);
     const isMulti = isAvatarKind && actorCount > 1;
+    const isInterestGroup =
+        item.kind === 'interest_event' && (item.matched_event_count ?? 1) > 1;
 
-    const thumbNode: ReactNode = item.event_image_url ? (
+    const thumbNode: ReactNode = item.event_image_url && !isInterestGroup ? (
         <img
             src={item.event_image_url}
             alt=""
@@ -333,36 +333,61 @@ export default function NotificationRow({
         );
     } else if (item.kind === 'interest_event') {
         const label = item.context || 'saved search';
-        body = (
-            <>
-                <p className={specialTitle}>
-                    <span className="font-medium text-ink">
-                        {item.event_title || 'An event'}
-                    </span>{' '}
-                    <span className="text-ink-soft">
-                        matched your{' '}
-                        <button
-                            type="button"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                if (isPanel && onSavedSearchClick) {
-                                    onSavedSearchClick();
-                                } else {
-                                    navigate('/saved-searches');
-                                }
-                            }}
-                            className="text-action underline hover:text-action"
-                        >
-                            {label}
-                        </button>{' '}
-                        alert
-                    </span>
-                </p>
-                <p className={timeClass}>
-                    {formatRelative(item.created_at)}
-                </p>
-            </>
-        );
+        const labelNode = <span className="font-medium text-ink">{label}</span>;
+        const matchCount = item.matched_event_count ?? 1;
+        const matched = item.matched_events ?? [];
+        if (isInterestGroup) {
+            const thumbs = matched.slice(0, 3).filter((m) => m.image_url);
+            const titles = matched.slice(0, 2).map((m) => m.title || 'An event');
+            const moreCount = matchCount - titles.length;
+            body = (
+                <>
+                    <p className={specialTitle}>
+                        <span className="font-medium text-ink">{matchCount} new events</span>{' '}
+                        <span className="text-ink-soft">match your</span> {labelNode}{' '}
+                        <span className="text-ink-soft">
+                            {label.includes(',') ? 'alerts' : 'alert'}
+                        </span>
+                    </p>
+                    {titles.length > 0 && (
+                        <div className={`${subLabelSize} mt-1.5 flex items-center gap-2 min-w-0 text-ink-soft`}>
+                            {thumbs.length > 0 && (
+                                <div className="flex shrink-0" aria-hidden="true">
+                                    {thumbs.map((m, i) => (
+                                        <img
+                                            key={m.event_id}
+                                            src={m.image_url ?? undefined}
+                                            alt=""
+                                            className={`w-6 h-6 object-cover bg-slate-100 ring-2 ring-surface ${i > 0 ? '-ml-1.5' : ''}`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                            <span className="truncate min-w-0">{titles.join(' · ')}</span>
+                            {moreCount > 0 && (
+                                <span className="shrink-0">+{moreCount} more</span>
+                            )}
+                        </div>
+                    )}
+                    <p className={timeClass}>{formatRelative(item.created_at)}</p>
+                </>
+            );
+        } else {
+            body = (
+                <>
+                    <p className={specialTitle}>
+                        <span className="font-medium text-ink">
+                            {item.event_title || 'An event'}
+                        </span>{' '}
+                        <span className="text-ink-soft">matched your</span> {labelNode}{' '}
+                        <span className="text-ink-soft">alert</span>
+                    </p>
+                    <p className={timeClass}>
+                        {formatRelative(item.created_at)}
+                    </p>
+                </>
+            );
+        }
     } else if (item.kind === 'event_reminder') {
         const startLabel = item.event_start
             ? new Date(item.event_start).toLocaleString([], {

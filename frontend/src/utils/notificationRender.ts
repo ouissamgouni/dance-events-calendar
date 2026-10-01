@@ -105,6 +105,10 @@ export function resolveNotificationDestination(item: NotificationItem): string {
         case 'schedule_program_available':
         case 'schedule_program_updated':
             return `/event/${item.event_id}/program`;
+        case 'interest_event':
+            return (item.matched_event_count ?? 1) > 1
+                ? `/notifications?kind=interest_event${item.matched_day ? `&day=${item.matched_day}` : ''}`
+                : `/event/${item.event_id}`;
         default:
             return `/event/${item.event_id}`;
     }
@@ -122,24 +126,26 @@ export function formatRelative(iso: string): string {
     return new Date(iso).toLocaleDateString();
 }
 
-/** The five activity-feed filter categories shown as pills. */
+/** Activity-feed filter categories shown as pills. Must mirror
+ *  CATEGORY_KINDS in backend/api/routes/notifications.py. */
 export type NotificationCategory =
-    | 'events'
-    | 'network'
+    | 'plans'
+    | 'matches'
+    | 'people'
     | 'reviews'
     | 'milestones'
     | 'others';
 
 const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> = {
-    subscription_going: 'events',
-    subscription_saved: 'events',
-    subscription_suggested: 'events',
-    interest_event: 'events',
-    event_reminder: 'events',
-    new_follower: 'network',
-    new_friend: 'network',
-    follow_request: 'network',
-    follow_request_approved: 'network',
+    subscription_going: 'people',
+    subscription_saved: 'people',
+    subscription_suggested: 'people',
+    interest_event: 'matches',
+    event_reminder: 'plans',
+    new_follower: 'people',
+    new_friend: 'people',
+    follow_request: 'people',
+    follow_request_approved: 'people',
     subscription_review: 'reviews',
     event_review_prompt: 'reviews',
     subscription_milestone: 'milestones',
@@ -148,13 +154,13 @@ const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> =
     promo_code_rejected: 'others',
     promo_code_added: 'others',
     organizer_claim_decided: 'others',
-    event_message: 'others',
-    event_message_reply: 'others',
+    event_message: 'plans',
+    event_message_reply: 'plans',
     event_message_reported: 'others',
-    planned_session_changed: 'events',
-    plan_session_added: 'events',
-    schedule_program_available: 'events',
-    schedule_program_updated: 'events',
+    planned_session_changed: 'plans',
+    plan_session_added: 'people',
+    schedule_program_available: 'plans',
+    schedule_program_updated: 'plans',
 };
 
 /** Which filter-pill category a notification kind belongs to. */

@@ -11,17 +11,19 @@ Notifications are produced by the fan-out helpers in
 write paths.
 """
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, date, datetime, time, timedelta, timezone, tzinfo
 from typing import Optional
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlmodel import Session, col, select
 
 from backend.api.deps import require_user
 from backend.api.schemas import (
     NotificationActor,
+    NotificationEventSummary,
     NotificationItem,
     NotificationListResponse,
     NotificationMilestoneSummary,
@@ -101,6 +103,60 @@ ACTOR_PREVIEW_CAP = 12
 # feed has no deep pagination, so a generous window keeps grouping correct
 # without a GROUP BY round-trip.
 AGGREGATION_WINDOW = 200
+# Matched events previewed on a day-grouped interest row.
+MATCHED_EVENTS_CAP = 20
+
+# Feed filter pills; must mirror frontend/src/utils/notificationRender.ts.
+# Kinds outside every listed set fall into "others".
+CATEGORY_KINDS: dict[str, set[str]] = {
+    "plans": {
+        "event_reminder",
+        "planned_session_changed",
+        "schedule_program_available",
+        "schedule_program_updated",
+        "event_message",
+        "event_message_reply",
+    },
+    "matches": {"interest_event"},
+    "people": {
+        "subscription_going",
+        "subscription_saved",
+        "subscription_suggested",
+        "plan_session_added",
+        "new_follower",
+        "new_friend",
+        "follow_request",
+        "follow_request_approved",
+    },
+    "reviews": {"subscription_review", "event_review_prompt"},
+    "milestones": {"subscription_milestone", "milestone_unlocked"},
+}
+# Tribe > Activity feed: friend/follow-triggered kinds only.
+SOCIAL_KINDS = CATEGORY_KINDS["people"] | {
+    "subscription_review",
+    "subscription_milestone",
+}
+VALID_CATEGORIES = set(CATEGORY_KINDS) | {"others", "social"}
+
+
+def _apply_category(statement, category: str):
+    if category == "social":
+        return statement.where(col(Notification.kind).in_(SOCIAL_KINDS))
+    if category == "others":
+        listed = set().union(*CATEGORY_KINDS.values())
+        return statement.where(col(Notification.kind).not_in(listed))
+    return statement.where(col(Notification.kind).in_(CATEGORY_KINDS[category]))
+
+
+def _user_tz(user: User) -> tzinfo:
+    try:
+        return ZoneInfo(user.timezone or "UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        return UTC
+
+
+def _local_date(notification: Notification, tz: tzinfo):
+    return _as_utc(notification.created_at).astimezone(tz).date()
 
 
 def _apply_visibility(statement, session: Session):
@@ -117,9 +173,13 @@ def _apply_visibility(statement, session: Session):
     )
 
 
-def _aggregation_key(notification: Notification) -> tuple:
+def _aggregation_key(
+    notification: Notification, interest_tz: Optional[tzinfo] = None
+) -> tuple:
     if notification.kind in COLLAPSIBLE_KINDS and notification.event_id is not None:
         return ("__event__", notification.kind, notification.event_id)
+    if notification.kind == "interest_event" and interest_tz is not None:
+        return ("__interest__", _local_date(notification, interest_tz))
     if notification.kind in MILESTONE_KINDS:
         return (
             "__milestone__",
@@ -136,6 +196,7 @@ def _hydrate(
     rows: list[Notification],
     *,
     viewer_id=None,
+    interest_tz: Optional[tzinfo] = None,
 ) -> list[NotificationItem]:
     if not rows:
         return []
@@ -205,7 +266,7 @@ def _hydrate(
     order: list[tuple] = []
     groups: dict[tuple, dict] = {}
     for r in rows:
-        key = _aggregation_key(r)
+        key = _aggregation_key(r, interest_tz)
         g = groups.get(key)
         if g is None:
             g = {
@@ -242,6 +303,29 @@ def _hydrate(
             if rep.kind in MILESTONE_KINDS
             else []
         )
+        is_interest_group = key[0] == "__interest__"
+        matched_events: list[NotificationEventSummary] = []
+        context = rep.context
+        if is_interest_group:
+            for m in g["members"][:MATCHED_EVENTS_CAP]:
+                if m.event_id is None:
+                    continue
+                me = events.get(m.event_id)
+                matched_events.append(
+                    NotificationEventSummary(
+                        event_id=m.event_id,
+                        title=me.title if me else None,
+                        start=_as_utc(me.start if me else None),
+                        image_url=me.image_url if me else None,
+                    )
+                )
+            labels = [
+                label.strip()
+                for m in g["members"]
+                for label in (m.context or "").split(",")
+                if label.strip()
+            ]
+            context = ", ".join(dict.fromkeys(labels))[:200] or None
         items.append(
             NotificationItem(
                 id=rep.id,
@@ -263,7 +347,10 @@ def _hydrate(
                     for member in milestone_members
                     if member.subject_key is not None
                 ],
-                context=rep.context,
+                matched_events=matched_events,
+                matched_event_count=len(g["members"]) if is_interest_group else 1,
+                matched_day=key[1] if is_interest_group else None,
+                context=context,
                 subject_key=rep.subject_key,
                 schedule_session_id=(
                     UUID(rep.group_key)
@@ -290,6 +377,14 @@ def list_notifications(
         description="Filter to one kind (subscription_going|subscription_suggested)",
     ),
     unread_only: bool = Query(default=False),
+    category: Optional[str] = Query(
+        default=None,
+        description="Filter pill: plans|matches|people|reviews|milestones|others|social",
+    ),
+    day: Optional[date] = Query(
+        default=None,
+        description="Recipient-local day (YYYY-MM-DD) of interest matches to list",
+    ),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
@@ -297,12 +392,27 @@ def list_notifications(
 ):
     if kind is not None and kind not in VALID_KINDS:
         raise HTTPException(status_code=400, detail="Invalid kind")
+    if category is not None and category not in VALID_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Invalid category")
 
     base = select(Notification).where(Notification.recipient_user_id == user.id)
     if kind is not None:
         base = base.where(Notification.kind == kind)
+    if category is not None:
+        base = _apply_category(base, category)
     if unread_only:
         base = base.where(Notification.read_at.is_(None))
+    tz = _user_tz(user)
+    if day is not None:
+        start = datetime.combine(day, time.min, tzinfo=tz).astimezone(UTC)
+        end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=tz).astimezone(
+            UTC
+        )
+        base = (
+            base.where(Notification.kind == "interest_event")
+            .where(Notification.created_at >= start.replace(tzinfo=None))
+            .where(Notification.created_at < end.replace(tzinfo=None))
+        )
 
     base = _apply_visibility(base, session)
     unread_statement = (
@@ -314,6 +424,24 @@ def list_notifications(
     unread_rows = filter_privacy_safe_notifications(
         session, list(session.exec(unread_statement).all())
     )
+
+    grouped_unread = len({_aggregation_key(row, tz) for row in unread_rows})
+
+    # Flat interest matches never aggregate, so page in SQL past the window.
+    if kind == "interest_event" or category == "matches" or day is not None:
+        total = session.exec(select(func.count()).select_from(base.subquery())).one()
+        page_rows = session.exec(
+            base.order_by(col(Notification.created_at).desc())
+            .offset(offset)
+            .limit(limit)
+        ).all()
+        return NotificationListResponse(
+            items=_hydrate(session, list(page_rows), viewer_id=user.id),
+            total=total,
+            unread_count=grouped_unread,
+            limit=limit,
+            offset=offset,
+        )
 
     # Scan a capped newest-first window, aggregate collapsible rows into
     # multi-actor items, then paginate the grouped result. ``total`` becomes
@@ -328,11 +456,13 @@ def list_notifications(
             ).all()
         ),
     )
-    aggregated = _hydrate(session, rows, viewer_id=user.id)
+    # Interest matches collapse per local day only in the unfiltered feed;
+    # the Matches pill / ?kind= deep link list them one per row.
+    group_tz = tz if kind is None and category is None else None
+    aggregated = _hydrate(session, rows, viewer_id=user.id, interest_tz=group_tz)
     grouped_total = len(aggregated)
     page = aggregated[offset : offset + limit]
 
-    grouped_unread = len({_aggregation_key(row) for row in unread_rows})
     return NotificationListResponse(
         items=page,
         total=grouped_total,
@@ -356,7 +486,8 @@ def unread_count(
     rows = filter_privacy_safe_notifications(
         session, list(session.exec(statement).all())
     )
-    return UnreadCountResponse(count=len({_aggregation_key(row) for row in rows}))
+    tz = _user_tz(user)
+    return UnreadCountResponse(count=len({_aggregation_key(row, tz) for row in rows}))
 
 
 @router.post("/{notification_id}/read", response_model=NotificationItem)
@@ -402,6 +533,19 @@ def mark_read(
             .where(Notification.event_id == row.event_id)
             .where(Notification.read_at.is_(None))
         ).all()
+    elif row.kind == "interest_event":
+        tz = _user_tz(user)
+        day = _local_date(row, tz)
+        siblings = [
+            sib
+            for sib in session.exec(
+                select(Notification)
+                .where(Notification.recipient_user_id == user.id)
+                .where(Notification.kind == row.kind)
+                .where(Notification.read_at.is_(None))
+            ).all()
+            if _local_date(sib, tz) == day
+        ]
     else:
         siblings = [row] if row.read_at is None else []
     for sib in siblings:

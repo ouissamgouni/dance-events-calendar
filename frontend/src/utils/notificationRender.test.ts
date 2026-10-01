@@ -70,17 +70,26 @@ describe('subscription_saved', () => {
 });
 
 describe('notificationCategory', () => {
-    it('maps event kinds to "events"', () => {
-        expect(notificationCategory('subscription_going')).toBe('events');
-        expect(notificationCategory('subscription_saved')).toBe('events');
-        expect(notificationCategory('event_reminder')).toBe('events');
-        expect(notificationCategory('schedule_program_available')).toBe('events');
+    it('maps own-plan kinds to "plans"', () => {
+        expect(notificationCategory('event_reminder')).toBe('plans');
+        expect(notificationCategory('schedule_program_available')).toBe('plans');
+        expect(notificationCategory('planned_session_changed')).toBe('plans');
+        expect(notificationCategory('event_message')).toBe('plans');
+        expect(notificationCategory('event_message_reply')).toBe('plans');
+        expect(notificationCategory('event_message_reported')).toBe('others');
     });
 
-    it('maps follow/friend kinds to "network"', () => {
-        expect(notificationCategory('new_follower')).toBe('network');
-        expect(notificationCategory('new_friend')).toBe('network');
-        expect(notificationCategory('follow_request')).toBe('network');
+    it('maps interest matches to "matches"', () => {
+        expect(notificationCategory('interest_event')).toBe('matches');
+    });
+
+    it('maps follow and followee activity kinds to "people"', () => {
+        expect(notificationCategory('subscription_going')).toBe('people');
+        expect(notificationCategory('subscription_saved')).toBe('people');
+        expect(notificationCategory('plan_session_added')).toBe('people');
+        expect(notificationCategory('new_follower')).toBe('people');
+        expect(notificationCategory('new_friend')).toBe('people');
+        expect(notificationCategory('follow_request')).toBe('people');
     });
 
     it('maps review kinds to "reviews"', () => {
