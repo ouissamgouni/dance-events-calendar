@@ -420,7 +420,9 @@ def test_suggested_fan_out_on_admin_approval(client, session):
         json={
             "title": "Suggested Salsa",
             "start": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
-            "end": (datetime.now(timezone.utc) + timedelta(days=2, hours=2)).isoformat(),
+            "end": (
+                datetime.now(timezone.utc) + timedelta(days=2, hours=2)
+            ).isoformat(),
             "all_day": False,
         },
     )
@@ -467,7 +469,9 @@ def test_anonymous_suggestion_no_fan_out(client, session):
         json={
             "title": "Anon Salsa",
             "start": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
-            "end": (datetime.now(timezone.utc) + timedelta(days=2, hours=2)).isoformat(),
+            "end": (
+                datetime.now(timezone.utc) + timedelta(days=2, hours=2)
+            ).isoformat(),
             "all_day": False,
         },
     )
@@ -616,6 +620,140 @@ def test_filter_by_kind(client, session):
     data = r.json()
     assert data["total"] == 1
     assert data["items"][0]["kind"] == "subscription_suggested"
+
+
+def _seed_interest(
+    session: Session, recipient: User, event_id: str, created_at: datetime, context: str
+) -> Notification:
+    n = Notification(
+        recipient_user_id=recipient.id,
+        actor_user_id=recipient.id,
+        kind="interest_event",
+        event_id=event_id,
+        context=context,
+        created_at=created_at,
+    )
+    session.add(n)
+    session.commit()
+    session.refresh(n)
+    return n
+
+
+def test_interest_matches_grouped_per_local_day_only_in_all(client, session):
+    _make_calendar(session)
+    for eid in ("ev-a", "ev-b", "ev-c"):
+        _make_event(session, eid, title=eid)
+    bob = _make_user(session, "bob@example.com", "bob")
+    bob.timezone = "Europe/Paris"
+    session.add(bob)
+    session.commit()
+    # 22:30Z / 23:30Z are Oct 1 in Paris; 21:00Z is still Sep 30 there.
+    late = _seed_interest(
+        session,
+        bob,
+        "ev-a",
+        datetime(2026, 9, 30, 23, 30, tzinfo=timezone.utc),
+        "Salsa",
+    )
+    _seed_interest(
+        session,
+        bob,
+        "ev-b",
+        datetime(2026, 9, 30, 22, 30, tzinfo=timezone.utc),
+        "Local, Salsa",
+    )
+    earlier = _seed_interest(
+        session, bob, "ev-c", datetime(2026, 9, 30, 21, 0, tzinfo=timezone.utc), "Salsa"
+    )
+
+    _login(client, "bob@example.com")
+    items = client.get("/api/notifications").json()["items"]
+    assert [i["matched_event_count"] for i in items] == [2, 1]
+    assert [e["event_id"] for e in items[0]["matched_events"]] == ["ev-a", "ev-b"]
+    assert items[0]["context"] == "Salsa, Local"
+    assert [i["matched_day"] for i in items] == ["2026-10-01", "2026-09-30"]
+    assert client.get("/api/notifications/unread-count").json() == {"count": 2}
+
+    day = client.get("/api/notifications?category=matches&day=2026-10-01").json()
+    assert day["total"] == 2
+    assert [i["event_id"] for i in day["items"]] == ["ev-a", "ev-b"]
+    prev_day = client.get(
+        "/api/notifications?kind=interest_event&day=2026-09-30"
+    ).json()
+    assert [i["event_id"] for i in prev_day["items"]] == ["ev-c"]
+
+    flat = client.get("/api/notifications?category=matches").json()
+    assert flat["total"] == 3
+    assert client.get("/api/notifications?kind=interest_event").json()["total"] == 3
+
+    assert client.post(f"/api/notifications/{late.id}/read").status_code == 200
+    session.expire_all()
+    unread = session.exec(
+        select(Notification).where(Notification.read_at.is_(None))
+    ).all()
+    assert [n.id for n in unread] == [earlier.id]
+
+
+def test_category_filter_not_starved_by_interest_matches(client, session):
+    _make_calendar(session)
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    follow = _seed_one_notif(session, bob, alice, kind="new_follower", event_id=None)
+    follow.created_at = datetime.now(timezone.utc) - timedelta(days=2)
+    session.add(follow)
+    now = datetime.now(timezone.utc)
+    for i in range(205):
+        session.add(
+            CachedEvent(
+                event_id=f"ev-m{i}",
+                calendar_id="cal-test",
+                title=f"Match {i}",
+                start=now + timedelta(days=1),
+                end=now + timedelta(days=1, hours=2),
+                all_day=False,
+                review_status="reviewed",
+            )
+        )
+        session.add(
+            Notification(
+                recipient_user_id=bob.id,
+                actor_user_id=bob.id,
+                kind="interest_event",
+                event_id=f"ev-m{i}",
+                created_at=now - timedelta(minutes=i),
+            )
+        )
+    session.commit()
+
+    _login(client, "bob@example.com")
+    people = client.get("/api/notifications?category=people").json()
+    assert [i["kind"] for i in people["items"]] == ["new_follower"]
+    social = client.get("/api/notifications?category=social").json()
+    assert [i["kind"] for i in social["items"]] == ["new_follower"]
+    assert client.get("/api/notifications?category=bogus").status_code == 400
+
+    matches = client.get(
+        "/api/notifications?category=matches&limit=10&offset=200"
+    ).json()
+    assert matches["total"] == 205
+    assert [i["event_id"] for i in matches["items"]] == [
+        f"ev-m{i}" for i in range(200, 205)
+    ]
+
+
+def test_event_discussion_kinds_live_under_plans(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-1")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _seed_one_notif(session, bob, alice, kind="event_message")
+    _seed_one_notif(session, bob, alice, kind="event_message_reported")
+
+    _login(client, "bob@example.com")
+    plans = client.get("/api/notifications?category=plans").json()
+    assert [i["kind"] for i in plans["items"]] == ["event_message"]
+    others = client.get("/api/notifications?category=others").json()
+    assert [i["kind"] for i in others["items"]] == ["event_message_reported"]
 
 
 def test_unread_count(client, session):

@@ -140,7 +140,7 @@ describe('NotificationsPage (milestone rows)', () => {
         await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/u/alice'))
     })
 
-    it('opens saved searches when the alert label is clicked', async () => {
+    it('renders the alert label as plain text and opens the matched event on row click', async () => {
         server.use(
             http.get('*/api/notifications', () =>
                 HttpResponse.json({
@@ -177,16 +177,19 @@ describe('NotificationsPage (milestone rows)', () => {
             </MemoryRouter>,
         )
 
-        await user.click(await screen.findByRole('button', { name: 'Europe & nearby' }))
-        expect(navigateMock).toHaveBeenCalledWith('/saved-searches')
-        expect(navigateMock).not.toHaveBeenCalledWith('/event/ev-match')
+        expect(await screen.findByText('Europe & nearby')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Europe & nearby' })).not.toBeInTheDocument()
+        await user.click(screen.getByText('Oslo Training Weekender'))
+        expect(navigateMock).toHaveBeenCalledWith('/event/ev-match')
+        expect(navigateMock).not.toHaveBeenCalledWith('/saved-searches')
     })
 
-    it('filters by ?kind= from a push deep link and clears it', async () => {
-        const requestedKinds: (string | null)[] = []
+    it('opens the Matches pill from a ?kind=interest_event push deep link', async () => {
+        const requests: { kind: string | null; category: string | null; day: string | null }[] = []
         server.use(
             http.get('*/api/notifications', ({ request }) => {
-                requestedKinds.push(new URL(request.url).searchParams.get('kind'))
+                const sp = new URL(request.url).searchParams
+                requests.push({ kind: sp.get('kind'), category: sp.get('category'), day: sp.get('day') })
                 return HttpResponse.json({ items: [], total: 0, unread_count: 0, limit: 50, offset: 0 })
             }),
         )
@@ -198,13 +201,94 @@ describe('NotificationsPage (milestone rows)', () => {
             </MemoryRouter>,
         )
 
-        const chip = await screen.findByRole('button', { name: /show all notifications/i })
-        expect(chip).toHaveTextContent('Saved-search matches')
-        await waitFor(() => expect(requestedKinds).toContain('interest_event'))
+        await waitFor(() =>
+            expect(requests.at(-1)).toEqual({ kind: null, category: 'matches', day: null }),
+        )
+        expect(screen.queryByRole('button', { name: /show all notifications/i })).not.toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Manage alerts' })).toHaveAttribute('href', '/saved-searches')
+
+        await user.click(screen.getByRole('button', { name: /^All$/ }))
+        await waitFor(() => expect(requests.at(-1)).toEqual({ kind: null, category: null, day: null }))
+    })
+
+    it('scopes the Matches pill to one day from a grouped-row deep link', async () => {
+        const requests: (string | null)[] = []
+        server.use(
+            http.get('*/api/notifications', ({ request }) => {
+                const sp = new URL(request.url).searchParams
+                requests.push(sp.get('day'))
+                return HttpResponse.json({ items: [], total: 4, unread_count: 0, limit: 50, offset: 0 })
+            }),
+        )
+        const user = userEvent.setup()
+
+        render(
+            <MemoryRouter initialEntries={['/notifications?kind=interest_event&day=2026-06-25']}>
+                <NotificationsPage />
+            </MemoryRouter>,
+        )
+
+        await waitFor(() => expect(requests.at(-1)).toBe('2026-06-25'))
+        const chip = await screen.findByRole('button', { name: 'Show all matches' })
+        expect(chip).toHaveTextContent('4 matches')
 
         await user.click(chip)
-        await waitFor(() => expect(requestedKinds.at(-1)).toBeNull())
-        expect(screen.queryByRole('button', { name: /show all notifications/i })).not.toBeInTheDocument()
+        await waitFor(() => expect(requests.at(-1)).toBeNull())
+    })
+
+    it('renders a day-grouped interest row as one tap target to that day of matches', async () => {
+        const matched = Array.from({ length: 5 }, (_, i) => ({
+            event_id: `ev-${i}`,
+            title: `Match ${i}`,
+            start: null,
+            image_url: null,
+        }))
+        server.use(
+            http.get('*/api/notifications', () =>
+                HttpResponse.json({
+                    items: [
+                        {
+                            id: 94,
+                            kind: 'interest_event',
+                            event_id: 'ev-0',
+                            event_title: 'Match 0',
+                            event_start: null,
+                            context: 'Salsa, Local',
+                            matched_events: matched,
+                            matched_event_count: 5,
+                            matched_day: '2026-06-25',
+                            actor: {
+                                handle: 'bob',
+                                display_name: 'Bob',
+                                avatar_url: null,
+                                is_verified_organizer: false,
+                            },
+                            created_at: '2026-06-25T10:00:00Z',
+                            read_at: null,
+                        },
+                    ],
+                    total: 1,
+                    unread_count: 1,
+                    limit: 50,
+                    offset: 0,
+                }),
+            ),
+        )
+        const user = userEvent.setup()
+
+        render(
+            <MemoryRouter>
+                <NotificationsPage />
+            </MemoryRouter>,
+        )
+
+        expect(await screen.findByText('5 new events')).toBeInTheDocument()
+        expect(screen.getByText('Match 0 · Match 1')).toBeInTheDocument()
+        expect(screen.getByText('+3 more')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Match 0' })).not.toBeInTheDocument()
+
+        await user.click(screen.getByText('Match 0 · Match 1'))
+        expect(navigateMock).toHaveBeenLastCalledWith('/notifications?kind=interest_event&day=2026-06-25')
     })
 })
 
@@ -338,26 +422,27 @@ describe('NotificationsPage (redesigned rows)', () => {
         expect(screen.getByText(/are going to/i)).toBeInTheDocument()
     })
 
-    it('filters the feed by category pill', async () => {
+    it('filters the feed by category pill on the server', async () => {
+        const going = notif({ id: 7, kind: 'subscription_going', event_title: 'Salsa Night' })
+        const follower = notif({
+            id: 8,
+            kind: 'new_follower',
+            event_id: null,
+            event_title: null,
+            actor: actor({ handle: 'ben', display_name: 'Ben' }),
+        })
         server.use(
-            http.get('*/api/notifications', () =>
-                HttpResponse.json({
-                    items: [
-                        notif({ id: 7, kind: 'subscription_going', event_title: 'Salsa Night' }),
-                        notif({
-                            id: 8,
-                            kind: 'new_follower',
-                            event_id: null,
-                            event_title: null,
-                            actor: actor({ handle: 'ben', display_name: 'Ben' }),
-                        }),
-                    ],
-                    total: 2,
-                    unread_count: 2,
+            http.get('*/api/notifications', ({ request }) => {
+                const category = new URL(request.url).searchParams.get('category')
+                const items = category === 'plans' ? [] : [going, follower]
+                return HttpResponse.json({
+                    items,
+                    total: items.length,
+                    unread_count: 0,
                     limit: 50,
                     offset: 0,
-                }),
-            ),
+                })
+            }),
         )
 
         const user = userEvent.setup()
@@ -371,9 +456,36 @@ describe('NotificationsPage (redesigned rows)', () => {
         expect(await screen.findByText(/Salsa Night/)).toBeInTheDocument()
         expect(screen.getByText(/started following you/i)).toBeInTheDocument()
 
-        await user.click(screen.getByRole('button', { name: /Network/i }))
+        await user.click(screen.getByRole('button', { name: /My plans/i }))
 
+        expect(await screen.findByText(/No notifications yet/)).toBeInTheDocument()
         expect(screen.queryByText(/Salsa Night/)).not.toBeInTheDocument()
-        expect(screen.getByText(/started following you/i)).toBeInTheDocument()
+    })
+
+    it('loads the next page with Load more', async () => {
+        const offsets: (string | null)[] = []
+        server.use(
+            http.get('*/api/notifications', ({ request }) => {
+                const offset = new URL(request.url).searchParams.get('offset')
+                offsets.push(offset)
+                const item = offset
+                    ? notif({ id: 10, event_title: 'Second Page Party' })
+                    : notif({ id: 9, event_title: 'First Page Party' })
+                return HttpResponse.json({ items: [item], total: 2, unread_count: 0, limit: 50, offset: 0 })
+            }),
+        )
+        const user = userEvent.setup()
+
+        render(
+            <MemoryRouter>
+                <NotificationsPage />
+            </MemoryRouter>,
+        )
+
+        expect(await screen.findByText(/First Page Party/)).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Load more' }))
+        expect(await screen.findByText(/Second Page Party/)).toBeInTheDocument()
+        expect(offsets.at(-1)).toBe('1')
+        expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
     })
 })

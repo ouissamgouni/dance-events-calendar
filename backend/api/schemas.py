@@ -2947,6 +2947,13 @@ class NotificationMilestoneSummary(BaseModel):
     description: Optional[str] = None
 
 
+class NotificationEventSummary(BaseModel):
+    event_id: str
+    title: Optional[str] = None
+    start: Optional[datetime] = None
+    image_url: Optional[str] = None
+
+
 class NotificationItem(BaseModel):
     """A single in-app notification row.
 
@@ -2974,6 +2981,12 @@ class NotificationItem(BaseModel):
     actor_count: int = 1
     member_ids: list[int] = []
     milestones: list[NotificationMilestoneSummary] = Field(default_factory=list)
+    # Day-grouped ``interest_event`` rows: matched events (newest first, capped)
+    # and the total match count. Empty / 1 for ungrouped rows.
+    matched_events: list[NotificationEventSummary] = Field(default_factory=list)
+    matched_event_count: int = 1
+    # Recipient-local day of a grouped interest row; deep-links the Matches tab.
+    matched_day: Optional[date] = None
     context: Optional[str] = None
 
     subject_key: Optional[str] = None

@@ -2294,6 +2294,13 @@ export interface NotificationMilestoneSummary {
     description?: string | null;
 }
 
+export interface NotificationEventSummary {
+    event_id: string;
+    title: string | null;
+    start: string | null;
+    image_url: string | null;
+}
+
 export interface NotificationItem {
     id: number;
     kind: NotificationKind;
@@ -2315,6 +2322,12 @@ export interface NotificationItem {
     member_ids?: number[];
     /** Milestones folded into one evaluation batch. Empty for other kinds. */
     milestones?: NotificationMilestoneSummary[];
+    /** Day-grouped `interest_event` rows: matched events (newest first,
+     *  capped) and the total match count. */
+    matched_events?: NotificationEventSummary[];
+    matched_event_count?: number;
+    /** Recipient-local YYYY-MM-DD of a day-grouped `interest_event` row. */
+    matched_day?: string | null;
     /** Extra rendering context, e.g. the matched interest profile label(s)
      *  for `interest_event` rows (comma-joined when multiple profiles
      *  matched). Null for kinds that don't use it. */
@@ -2341,6 +2354,15 @@ export interface NotificationListResponse {
     offset: number;
 }
 
+export type NotificationCategoryFilter =
+    | 'plans'
+    | 'matches'
+    | 'people'
+    | 'reviews'
+    | 'milestones'
+    | 'others'
+    | 'social';
+
 const ISO_TIMESTAMP_WITHOUT_TZ_RE =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
 
@@ -2359,10 +2381,19 @@ function normalizeNotificationItem(item: NotificationItem): NotificationItem {
 }
 
 export async function fetchNotifications(
-    opts?: { kind?: NotificationKind; unreadOnly?: boolean; limit?: number; offset?: number },
+    opts?: {
+        kind?: NotificationKind;
+        category?: NotificationCategoryFilter;
+        day?: string;
+        unreadOnly?: boolean;
+        limit?: number;
+        offset?: number;
+    },
 ): Promise<NotificationListResponse> {
     const sp = new URLSearchParams();
     if (opts?.kind) sp.set('kind', opts.kind);
+    if (opts?.category) sp.set('category', opts.category);
+    if (opts?.day) sp.set('day', opts.day);
     if (opts?.unreadOnly) sp.set('unread_only', 'true');
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));

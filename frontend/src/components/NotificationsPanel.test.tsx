@@ -263,7 +263,7 @@ describe('NotificationsPanel (event reminders)', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('opens saved searches from an alert label instead of the matched event', async () => {
+  it('opens the matched event on row click; the alert label is plain text', async () => {
     server.use(
       http.get('*/api/notifications', () =>
         HttpResponse.json({
@@ -301,9 +301,11 @@ describe('NotificationsPanel (event reminders)', () => {
       </MemoryRouter>,
     )
 
-    await user.click(await screen.findByRole('button', { name: 'Europe & nearby' }))
-    expect(navigateMock).toHaveBeenCalledWith('/saved-searches')
-    expect(navigateMock).not.toHaveBeenCalledWith('/event/ev-match')
+    expect(await screen.findByText('Europe & nearby')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Europe & nearby' })).not.toBeInTheDocument()
+    await user.click(screen.getByText('Oslo Training Weekender'))
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/event/ev-match'))
+    expect(navigateMock).not.toHaveBeenCalledWith('/saved-searches')
     expect(onClose).toHaveBeenCalled()
   })
 
