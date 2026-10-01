@@ -12,6 +12,7 @@ vi.mock('../api', () => ({
     blockEvent: vi.fn(),
     dismissDuplicateGroup: vi.fn(),
     fetchAdminEvent: vi.fn(),
+    fetchAdminEventNotificationStats: vi.fn(),
     fetchEventDuplicateCandidates: vi.fn(),
     fetchEventSeriesCandidates: vi.fn(),
     fetchSeriesGroups: vi.fn(),
@@ -78,6 +79,48 @@ beforeEach(() => {
     Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    })
+})
+
+describe('AdminEventDetailPanel notifications section', () => {
+    it('shows interest reach + channel counts and refetches when the event reloads', async () => {
+        const stats = (matched: number) => ({
+            interest: {
+                eligible: true,
+                ineligible_reason: null,
+                matched_profiles: matched,
+                matched_users: matched,
+                already_notified_users: 1,
+                would_alert_app: 2,
+                would_alert_email: 1,
+                would_alert_push: 1,
+            },
+            by_kind: [{
+                kind: 'interest_event', users: 3, app: 3, email: 1, push: 2,
+                app_reads: 2, push_opens: 1, email_clicks: 0,
+            }],
+            total_users: 3,
+        })
+        vi.mocked(api.fetchAdminEventNotificationStats)
+            .mockResolvedValueOnce(stats(4))
+            .mockResolvedValueOnce(stats(7))
+        const event = makeEvent()
+        renderPanel(event)
+
+        await userEvent.click(await screen.findByRole('button', { name: /notifications/i }))
+
+        expect(await screen.findByText('Saved-search match')).toBeInTheDocument()
+        expect(screen.getByText('4 users', { selector: 'strong' })).toBeInTheDocument()
+        expect(screen.getByText('2 notified · 2 not notified yet')).toBeInTheDocument()
+        expect(
+            screen.getByText('3 in-app (2 read) · 1 email (0 clicked) · 2 push (1 opened)'),
+        ).toBeInTheDocument()
+
+        vi.mocked(api.fetchAdminEvent).mockResolvedValue({ ...event, title: 'Renamed' })
+        await userEvent.click(screen.getByRole('button', { name: 'Refresh event' }))
+
+        await waitFor(() => expect(api.fetchAdminEventNotificationStats).toHaveBeenCalledTimes(2))
+        expect(await screen.findByText('7 users', { selector: 'strong' })).toBeInTheDocument()
     })
 })
 

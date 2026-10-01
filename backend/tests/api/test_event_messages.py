@@ -384,7 +384,7 @@ def test_instant_delivery_fires_at_post_time(client, session, event, monkeypatch
     monkeypatch.setattr(
         em_instant,
         "send_event_message_instant_email",
-        lambda user, actor, ev, kind, category, snippet: (
+        lambda user, actor, ev, kind, category, snippet, **_: (
             sent.append((user.email, actor.display_name, kind, category, snippet))
             or True
         ),

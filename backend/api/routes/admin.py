@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 from backend.api.deps import require_admin
 from backend.api.schemas import (
     AdminEventResponse,
+    AdminEventNotificationStatsResponse,
     AdminBulkEngagementItem,
     AdminBulkEngagementRequest,
     AdminBulkEngagementResponse,
@@ -31,6 +32,7 @@ from backend.api.schemas import (
     EventFilterOptionsResponse,
     EventIdsResponse,
     EventImageFromUrlRequest,
+    EventInterestReach,
     EventUpdateRequest,
     FilterOption,
     ForceInterestMatchSendRequest,
@@ -721,6 +723,12 @@ def notifications_effective_config(
             app_settings.get_activity_digest_schedule(session),
             app_settings._get_str_row(session, "activity_digest_schedule") is not None,
             app_settings.DEFAULT_DIGEST_SCHEDULE,
+        ),
+        "interest_match_push_schedule": _entry(
+            app_settings.get_interest_match_push_schedule(session),
+            app_settings._get_str_row(session, "interest_match_push_schedule")
+            is not None,
+            loader.get_interest_match_push_schedule(),
         ),
         "review_prompt_enabled": _entry(
             app_settings.get_review_prompt_enabled(session),
@@ -1844,6 +1852,36 @@ def list_admin_events(
         for e in events
     ]
 
+    from backend.services.interest_notification_service import (
+        interest_reach_for_events,
+    )
+
+    reach_map = interest_reach_for_events(session, list(events))
+    view_map = {
+        event_id: (int(views), int(viewers))
+        for event_id, views, viewers in session.exec(
+            select(
+                EventView.event_id,
+                func.count(EventView.id),
+                func.count(func.distinct(EventView.device_id)),
+            )
+            .where(EventView.event_id.in_(event_ids))
+            .group_by(EventView.event_id)
+        ).all()
+    }
+    click_map = dict(
+        session.exec(
+            select(EventLinkClick.event_id, func.count(EventLinkClick.id))
+            .where(EventLinkClick.event_id.in_(event_ids))
+            .group_by(EventLinkClick.event_id)
+        ).all()
+    )
+    for item in items:
+        reach = reach_map.get(item.event_id)
+        item.interest_reach = EventInterestReach(**reach) if reach else None
+        item.view_count, item.unique_viewers = view_map.get(item.event_id, (0, 0))
+        item.link_clicks = int(click_map.get(item.event_id, 0))
+
     return PaginatedEventsResponse(items=items, total=total)
 
 
@@ -2205,11 +2243,15 @@ def review_event(
     _admin: dict = Depends(require_admin),
 ):
     """Mark a single event as reviewed."""
+    from datetime import datetime as _dt, timezone
+
     event = session.get(CachedEvent, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
     event.review_status = "reviewed"
+    # Re-enters the interest-match scan window (pending events were skipped).
+    event.updated_at = _dt.now(timezone.utc)
     session.add(event)
     session.commit()
     session.refresh(event)
@@ -2231,6 +2273,8 @@ def bulk_review_events(
     _admin: dict = Depends(require_admin),
 ):
     """Mark multiple events as reviewed."""
+    from datetime import datetime as _dt, timezone
+
     events = session.exec(
         select(CachedEvent).where(
             CachedEvent.event_id.in_(body.event_ids),
@@ -2238,8 +2282,10 @@ def bulk_review_events(
             CachedEvent.deleted_at == None,
         )
     ).all()
+    now = _dt.now(timezone.utc)
     for event in events:
         event.review_status = "reviewed"
+        event.updated_at = now
         session.add(event)
     session.commit()
     return {"marked_reviewed": len(events)}
@@ -2625,6 +2671,71 @@ def get_admin_event(
         color=cal.color if cal else None,
         tags=event_tags.get(event_id, []),
         blocked=_get_blocked_event(session, event_id),
+    )
+
+
+@router.get(
+    "/events/{event_id}/notification-stats",
+    response_model=AdminEventNotificationStatsResponse,
+)
+def get_admin_event_notification_stats(
+    event_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    from backend.services.interest_notification_service import (
+        interest_reach_for_events,
+    )
+
+    event = session.get(CachedEvent, event_id)
+    if not event or event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    rows = session.exec(
+        select(
+            Notification.kind,
+            NotificationDelivery.channel,
+            func.count(func.distinct(Notification.id)),
+        )
+        .join(
+            NotificationDelivery,
+            NotificationDelivery.notification_id == Notification.id,
+        )
+        .where(Notification.event_id == event_id)
+        .group_by(Notification.kind, NotificationDelivery.channel)
+    ).all()
+    by_kind: dict[str, dict[str, int]] = {}
+    for kind, channel, count in rows:
+        if channel in ("app", "email", "push"):
+            by_kind.setdefault(kind, {})[channel] = int(count)
+    for kind, users, app_reads, push_opens, email_clicks in session.exec(
+        select(
+            Notification.kind,
+            func.count(func.distinct(Notification.recipient_user_id)),
+            func.count(Notification.read_at),
+            func.count(Notification.push_opened_at),
+            func.count(Notification.email_clicked_at),
+        )
+        .where(Notification.event_id == event_id)
+        .group_by(Notification.kind)
+    ).all():
+        by_kind.setdefault(kind, {}).update(
+            users=int(users),
+            app_reads=int(app_reads),
+            push_opens=int(push_opens),
+            email_clicks=int(email_clicks),
+        )
+
+    total_users = session.exec(
+        select(func.count(func.distinct(Notification.recipient_user_id))).where(
+            Notification.event_id == event_id
+        )
+    ).one()
+
+    return AdminEventNotificationStatsResponse(
+        interest=interest_reach_for_events(session, [event])[event_id],
+        by_kind=[{"kind": kind, **counts} for kind, counts in sorted(by_kind.items())],
+        total_users=int(total_users or 0),
     )
 
 

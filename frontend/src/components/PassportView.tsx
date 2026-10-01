@@ -257,9 +257,9 @@ function buildMilestoneCategories(data: PassportResponse): MilestoneCategoryMode
     });
 }
 
-function MilestoneStateIcons({ cards }: { cards: MilestoneCardModel[] }) {
+function MilestoneStateIcons({ cards, wrap }: { cards: MilestoneCardModel[]; wrap?: boolean }) {
     return (
-        <span className="flex min-h-5 items-center justify-end gap-1.5 overflow-hidden" aria-hidden="true">
+        <span className={`flex min-h-5 items-center ${wrap ? 'justify-start flex-wrap' : 'justify-end overflow-hidden'} gap-1.5`} aria-hidden="true">
             {cards.map((card) => (
                 <span
                     key={card.key}
@@ -283,19 +283,21 @@ function MilestoneCategoryRow({ category, onOpen }: { category: MilestoneCategor
             type="button"
             onClick={onOpen}
             aria-label={`${category.label}, ${category.unlockedCount} / ${category.cards.length} unlocked`}
-            className="grid min-h-16 w-full grid-cols-[2.25rem_minmax(0,1fr)_auto_1.25rem] items-center gap-3 rounded-card border border-card-line bg-surface/60 p-3 text-left transition hover:border-line hover:bg-surface"
+            className="grid min-h-16 w-full grid-cols-[2.25rem_minmax(0,1fr)_1.25rem] items-center gap-3 rounded-card border border-card-line bg-surface/60 p-3 text-left transition hover:border-line hover:bg-surface"
         >
             <span className={`flex h-9 w-9 items-center justify-center self-center rounded-lg border ${MILESTONE_CATEGORY_META[category.key].progressClass}`}>
                 <CategoryIcon category={category.key} />
             </span>
-            <span className="min-w-[6.5rem] flex-1">
+            <span className="flex min-w-0 flex-col">
                 <span className="block truncate text-sm font-semibold text-ink">{category.label}</span>
                 <span className="block text-[11px] tabular-nums text-ink-soft">
                     {category.unlockedCount} / {category.cards.length} unlocked
                 </span>
+                <div className="mt-1">
+                    <MilestoneStateIcons cards={category.cards} wrap />
+                </div>
             </span>
-            <MilestoneStateIcons cards={category.cards} />
-            <ChevronRight className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
+            <ChevronRight className="h-5 w-5 shrink-0 self-center text-muted" aria-hidden="true" />
         </button>
     );
 }

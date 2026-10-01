@@ -44,6 +44,7 @@ OVERLAY_FILES = (
     "db-promo-codes.yaml",
     "db-organizer-claims.yaml",
     "db-schedules.yaml",
+    "db-notifications.yaml",
 )
 USER_REFERENCE_FILES = (
     "overlay-events.yaml",
@@ -55,8 +56,17 @@ USER_REFERENCE_FILES = (
     "db-organizer-claims.yaml",
     "db-interest-profiles.yaml",
     "db-schedules.yaml",
+    "db-notifications.yaml",
 )
-USER_REFERENCE_KEYS = {"email", "submitter_email", "follower", "followee", "user"}
+USER_REFERENCE_KEYS = {
+    "email",
+    "submitter_email",
+    "follower",
+    "followee",
+    "user",
+    "recipient",
+    "actor",
+}
 FORBIDDEN_ENTITY_PATTERN = re.compile(
     r"\b(?:demo|example|fake|showcase|synthetic|test)\b", re.IGNORECASE
 )

@@ -13,6 +13,11 @@ organizer_claims:
         decision: approved
       - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
         decision: approved
+  - submitter_email: penny.valdez@joinmovida.com
+    kind: badge
+    grant_badge: true
+    status: rejected
+    admin_notes: Organizer badges are reserved for event teams; ambassadors keep contributor access.
   - submitter_email: rave.republic@joinmovida.com
     kind: badge
     grant_badge: true

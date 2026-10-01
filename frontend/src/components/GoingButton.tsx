@@ -1,19 +1,17 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { UserRoundCheck, UserRoundPlus } from 'lucide-react';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
-import { updateMyVisibility, type ShareAudience } from '../api';
+import type { ShareAudience } from '../api';
 import { trackShareConversion } from '../utils/tracking';
 import { getActiveReferral } from '../hooks/useReferralAttribution';
 import PostRsvpPopover, { type PostRsvpVariant } from './PostRsvpPopover';
-import AudiencePicker from './AudiencePicker';
+import RsvpVisibilitySheet from './RsvpVisibilitySheet';
 import { useAnchoredToast } from './AnchoredToast';
-import BottomSheet from './BottomSheet';
-import useMediaQuery from '../hooks/useMediaQuery';
 import {
+    ATTENDANCE_AUDIENCE_DESCRIPTIONS,
     defaultRsvpAudienceFor,
     setLastUsedAudience,
 } from '../utils/audiencePreference';
@@ -113,37 +111,6 @@ function AudienceTierIcon({ audience, className }: { audience: ShareAudience; cl
     );
 }
 
-interface PopoverPos { top: number; left: number; }
-
-/**
- * Compute fixed-position coordinates for a popover anchored under a trigger
- * element. Clamps horizontally to the viewport so cards near the right edge
- * don't push the popover off-screen. When there isn't enough room below the
- * trigger for ``popoverHeight``, flip ABOVE the trigger so the popover
- * (which contains primary actions) is never clipped at the bottom of the
- * viewport — a recurring problem on event cards near the page footer.
- */
-function computePopoverPos(
-    trigger: HTMLElement,
-    popoverWidth: number,
-    popoverHeight: number = 260,
-): PopoverPos {
-    const r = trigger.getBoundingClientRect();
-    const margin = 8;
-    const desiredLeft = r.left + r.width / 2 - popoverWidth / 2;
-    const maxLeft = window.innerWidth - popoverWidth - margin;
-    const left = Math.max(margin, Math.min(desiredLeft, maxLeft));
-    const spaceBelow = window.innerHeight - r.bottom - margin;
-    const spaceAbove = r.top - margin;
-    const top =
-        spaceBelow >= popoverHeight || spaceBelow >= spaceAbove
-            ? r.bottom + 6
-            : Math.max(margin, r.top - popoverHeight - 6);
-    return { top, left };
-}
-
-const POPOVER_WIDTH = 272; // Tailwind w-68 equiv (matches className below).
-
 export default function GoingButton({
     eventId,
     eventTitle,
@@ -155,61 +122,21 @@ export default function GoingButton({
     iconVariant,
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
-    const { user, refreshUser } = useAuth();
+    const { user } = useAuth();
     const { goingButtonIconVariant, appAuthGateEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const location = useLocation();
     const navigate = useNavigate();
-    const isMobile = useMediaQuery('(max-width: 639px)');
     const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
     const going = isAttending(eventId);
 
     const triggerRef = useRef<HTMLButtonElement | null>(null);
-    const popoverRef = useRef<HTMLDivElement | null>(null);
     const errorToast = useAnchoredToast(triggerRef);
-    // 'confirm' = off→going prompt, 'edit' = already going, edit visibility.
-    const [popoverKind, setPopoverKind] = useState<'confirm' | 'edit' | null>(null);
+    const [editOpen, setEditOpen] = useState(false);
     const [pendingAudience, setPendingAudience] = useState<ShareAudience>('private');
-    const [rememberDefault, setRememberDefault] = useState<boolean>(false);
-    const [popoverPos, setPopoverPos] = useState<PopoverPos | null>(null);
     // Unified post-RSVP popover (replaces the old inline toast + separate
     // share-nudge stack). Only one is ever visible at a time.
     const [postRsvpVariant, setPostRsvpVariant] = useState<PostRsvpVariant | null>(null);
-
-    // Position the popover under the trigger and keep it positioned on
-    // scroll/resize while open.
-    useEffect(() => {
-        if (!popoverKind || isMobile || !triggerRef.current) return;
-        const update = () => {
-            if (triggerRef.current) {
-                setPopoverPos(computePopoverPos(triggerRef.current, POPOVER_WIDTH));
-            }
-        };
-        update();
-        window.addEventListener('scroll', update, true);
-        window.addEventListener('resize', update);
-        return () => {
-            window.removeEventListener('scroll', update, true);
-            window.removeEventListener('resize', update);
-        };
-    }, [isMobile, popoverKind]);
-
-    // Close popover on outside click / Escape.
-    useEffect(() => {
-        if (!popoverKind || isMobile) return;
-        const onDocClick = (e: MouseEvent) => {
-            const t = e.target as Node;
-            if (popoverRef.current?.contains(t) || triggerRef.current?.contains(t)) return;
-            setPopoverKind(null);
-        };
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPopoverKind(null); };
-        document.addEventListener('mousedown', onDocClick);
-        document.addEventListener('keydown', onKey);
-        return () => {
-            document.removeEventListener('mousedown', onDocClick);
-            document.removeEventListener('keydown', onKey);
-        };
-    }, [isMobile, popoverKind]);
 
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         if (stopPropagation) e.stopPropagation();
@@ -230,8 +157,7 @@ export default function GoingButton({
             if (user) {
                 setPostRsvpVariant(null);
                 setPendingAudience(getAudience(eventId));
-                setRememberDefault(false);
-                setPopoverKind('edit');
+                setEditOpen(true);
                 return;
             }
             setPostRsvpVariant(null);
@@ -284,39 +210,10 @@ export default function GoingButton({
         });
     };
 
-    const persistRememberIfNeeded = useCallback((value: ShareAudience) => {
-        if (!rememberDefault) return;
-        const current = user?.share_attendance_default_audience
-            ?? (user?.share_attendance_default ? 'public' : 'private');
-        if (current === value) return;
-        // Refresh AuthContext after success so subsequent RSVPs read the
-        // new default without requiring a page reload.
-        updateMyVisibility({ share_attendance_default_audience: value })
-            .then(() => refreshUser())
-            .catch(() => { /* ignore */ });
-    }, [rememberDefault, user?.share_attendance_default, user?.share_attendance_default_audience, refreshUser]);
-
-    const confirmGoing = (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.stopPropagation();
-        errorToast.hide();
-        const audience = pendingAudience;
-        setPopoverKind(null);
-        toggleAttending(eventId, audience).then((ok) => {
-            if (ok) {
-                persistRememberIfNeeded(audience);
-                maybeFireShareConversion();
-                showPostRsvp(audience !== 'private' ? 'signed-in-default-share' : 'signed-in');
-            } else {
-                errorToast.show("Couldn't mark you as going \u2014 try again", 3200);
-            }
-        });
-    };
-
     const openEditShare = (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
         setPendingAudience(getAudience(eventId));
-        setRememberDefault(false);
-        setPopoverKind('edit');
+        setEditOpen(true);
     };
 
     const goingLabel = isPast ? 'Attended' : 'Going';
@@ -383,7 +280,6 @@ export default function GoingButton({
             anchorRef={triggerRef}
             variant={postRsvpVariant}
             eventTitle={eventTitle}
-            userName={user?.name ?? null}
             isPast={isPast}
             onClose={dismissPostRsvp}
             onShare={shareEventNow}
@@ -392,222 +288,44 @@ export default function GoingButton({
         />
     ) : null;
 
-    // Live-apply handler: in the ``edit`` flow every audience click writes
-    // through to the server immediately (no explicit Save button). The
-    // ``confirm`` flow still requires an explicit "I'm going" click since
-    // the RSVP itself hasn't happened yet.
+    // Live-apply: every audience click in the edit sheet writes through immediately.
     const handlePopoverAudienceChange = (next: ShareAudience) => {
         setPendingAudience(next);
-        if (popoverKind !== 'edit') return;
         setAudience(eventId, next).then((ok) => {
             if (!ok) {
                 errorToast.show("Couldn't update visibility \u2014 try again", 3200);
                 return;
             }
             if (user?.user_id) setLastUsedAudience(user.user_id, next);
-            // When the user has opted in to "make default", persist the new
-            // value as the account-level default too.
-            if (rememberDefault) {
-                updateMyVisibility({ share_attendance_default_audience: next })
-                    .then(() => refreshUser())
-                    .catch(() => { /* ignore */ });
-            }
         });
     };
 
-    const visibilityDetails = (
-        <>
-            <p className={isMobile ? 'mb-3 text-base leading-6 text-ink-soft' : 'mb-2 text-[11px] text-ink-soft'}>
-                Who can see you in the attendee list?
-            </p>
-            <AudiencePicker
-                value={pendingAudience}
-                onChange={handlePopoverAudienceChange}
-                size={isMobile ? 'sheet' : 'full'}
-                ariaLabel="Attendance visibility"
-            />
-            <p className={isMobile ? 'mt-3 text-sm leading-5 text-ink-soft' : 'mt-1.5 text-[11px] text-ink-soft'}>
-                {pendingAudience === 'public'
-                    ? 'You will appear in the attendee list to anyone who can view this event.'
-                    : pendingAudience === 'friends'
-                        ? 'Only your mutual followers will see your name in the attendee list.'
-                        : 'You will be counted but not named.'}
-            </p>
-            {popoverKind === 'edit' && (
-                <label className={`${isMobile ? 'mt-4 text-sm leading-5' : 'mt-2 text-[11px]'} flex items-start gap-2 text-ink-soft cursor-pointer`}>
-                    <input
-                        type="checkbox"
-                        checked={rememberDefault}
-                        onChange={(e) => {
-                            const checked = e.target.checked;
-                            setRememberDefault(checked);
-                            if (checked) {
-                                updateMyVisibility({ share_attendance_default_audience: pendingAudience })
-                                    .then(() => refreshUser())
-                                    .catch(() => { /* ignore */ });
-                            }
-                        }}
-                        className="mt-0.5"
-                    />
-                    <span>Make this my default for future events</span>
-                </label>
-            )}
-        </>
-    );
-
-    const stopGoing = (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.stopPropagation();
+    const stopGoing = () => {
         errorToast.hide();
-        setPopoverKind(null);
+        setEditOpen(false);
         setPostRsvpVariant(null);
         toggleAttending(eventId).then((ok) => {
             if (!ok) errorToast.show("Couldn't update \u2014 try again", 3200);
         });
     };
 
-    const visibilityActions = (
-        <div className="flex w-full items-center justify-between gap-2">
-            {popoverKind === 'edit' ? (
-                <button
-                    type="button"
-                    onClick={stopGoing}
-                    className="min-h-11 rounded-field px-3 py-2 text-sm font-semibold text-danger hover:bg-canvas"
-                >
-                    {unmarkLabel}
-                </button>
-            ) : <span />}
-            <div className="flex gap-2">
-                <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
-                    className="min-h-11 rounded-field border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink"
-                >
-                    {popoverKind === 'confirm' ? 'Cancel' : 'Close'}
-                </button>
-                {popoverKind === 'confirm' && (
-                    <button
-                        type="button"
-                        onClick={confirmGoing}
-                        className="min-h-11 rounded-field bg-action px-4 py-2 text-sm font-semibold text-white"
-                    >
-                        {markLabel}
-                    </button>
-                )}
-            </div>
-        </div>
-    );
+    const closeEdit = useCallback(() => setEditOpen(false), []);
 
-    const popover = popoverKind && (isMobile ? createPortal(
-        <BottomSheet
-            title={popoverKind === 'confirm' ? (isPast ? 'You attended!' : "You're going!") : 'RSVP visibility'}
+    const popover = editOpen ? (
+        <RsvpVisibilitySheet
+            anchorRef={triggerRef}
+            emoji="🎉"
+            title={isPast ? 'You attended!' : "You're going!"}
             subtitle={eventTitle}
-            titleSize="large"
-            onClose={() => setPopoverKind(null)}
-            layer="transient"
-            footer={visibilityActions}
-        >
-            {visibilityDetails}
-        </BottomSheet>,
-        document.body,
-    ) : popoverPos && createPortal(
-        <div
-            ref={popoverRef}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="Attendance visibility"
-            style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
-            className="z-[12000] border border-line bg-surface p-3 shadow-xl text-left"
-        >
-            <p className="text-xs font-medium text-ink mb-2">
-                {popoverKind === 'confirm' ? "You're going!" : 'Edit visibility'}
-            </p>
-            <p className="text-[11px] text-ink-soft mb-2">
-                Who can see you in the attendee list?
-            </p>
-            <AudiencePicker
-                value={pendingAudience}
-                onChange={handlePopoverAudienceChange}
-                size="full"
-                ariaLabel="Attendance visibility"
-            />
-            <p className="text-[11px] text-ink-soft mt-1.5">
-                {pendingAudience === 'public'
-                    ? 'You will appear in the attendee list to anyone who can view this event.'
-                    : pendingAudience === 'friends'
-                        ? 'Only your mutual followers will see your name in the attendee list.'
-                        : 'You will be counted but not named.'}
-            </p>
-            {/* Only offer to save a new default when the user is editing
-                 visibility on an existing attendance; in the initial confirm
-                 flow the preference is managed from /account. Toggling this
-                 ON also persists the current selection as the new default
-                 immediately, so the user doesn't have to re-pick. */}
-            {popoverKind === 'edit' && (
-                <label className="mt-2 flex items-start gap-2 text-[11px] text-ink-soft cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={rememberDefault}
-                        onChange={(e) => {
-                            const checked = e.target.checked;
-                            setRememberDefault(checked);
-                            if (checked) {
-                                // Persist the currently-selected audience as
-                                // the account-level default right away so the
-                                // checkbox doesn't require an additional click.
-                                updateMyVisibility({ share_attendance_default_audience: pendingAudience })
-                                    .then(() => refreshUser())
-                                    .catch(() => { /* ignore */ });
-                            }
-                        }}
-                        className="mt-0.5"
-                    />
-                    <span>Make this my default for future events</span>
-                </label>
-            )}
-            <div className="mt-3 flex items-center justify-between gap-2">
-                {popoverKind === 'edit' ? (
-                    <button
-                        type="button"
-                        onClick={stopGoing}
-                        className="text-xs px-2 py-1 text-rose-600 hover:bg-rose-50"
-                    >
-                        {unmarkLabel}
-                    </button>
-                ) : (
-                    <span />
-                )}
-                <div className="flex gap-2">
-                    {popoverKind === 'confirm' ? (
-                        <>
-                            <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
-                                className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={confirmGoing}
-                                className="text-xs px-3 py-1 bg-action text-white hover:bg-action"
-                            >
-                                {markLabel}
-                            </button>
-                        </>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
-                            className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
-                        >
-                            Close
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div>,
-        document.body,
-    ));
+            question="Who can see you in the attendee list?"
+            audience={pendingAudience}
+            onAudienceChange={handlePopoverAudienceChange}
+            pickerAriaLabel="Attendance visibility"
+            description={ATTENDANCE_AUDIENCE_DESCRIPTIONS[pendingAudience]}
+            secondaryAction={{ label: unmarkLabel, onClick: stopGoing, tone: 'danger' }}
+            onClose={closeEdit}
+        />
+    ) : null;
 
     if (appearance === 'pill') {
         // When the user is going AND signed-in, render the pill as a unified

@@ -88,6 +88,17 @@ interest_profiles:
     reach_tags: ["reach:international"]
     matches_enabled: true
     is_active: true
+  - user: lucia.navarro@joinmovida.com
+    label: Bachata - Vienna 25km
+    area_label: Vienna
+    min_lat: 47.9834
+    min_lng: 16.0360
+    max_lat: 48.4330
+    max_lng: 16.7116
+    dance_tags: ["dance-style:bachata"]
+    reach_tags: []
+    matches_enabled: true
+    is_active: true
   - user: leo.martin@joinmovida.com
     label: Salsa + Mambo - Brussels 25km
     area_label: Brussels

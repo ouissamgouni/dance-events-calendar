@@ -26,7 +26,7 @@ from backend.services.email import (
     send_event_message_instant_email,
 )
 from backend.services.event_visibility import event_is_user_facing
-from backend.services.notification_delivery import record_delivery
+from backend.services.notification_delivery import record_delivery, tracked_url
 from backend.services.push_service import send_push, webpush_configured
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,13 @@ def dispatch_event_message_instant(
             and getattr(recipient, "email_event_messages_enabled", True)
             and n.instant_emailed_at is None
             and send_event_message_instant_email(
-                recipient, actor, event, n.kind, n.context, n.description
+                recipient,
+                actor,
+                event,
+                n.kind,
+                n.context,
+                n.description,
+                notification_id=n.id,
             )
         ):
             n.instant_emailed_at = now
@@ -108,7 +114,7 @@ def dispatch_event_message_instant(
                 recipient.id,
                 title=title,
                 body=n.description or "",
-                url=event_url,
+                url=tracked_url(event_url, n.id, "push"),
                 tag=f"event-messages-{event.event_id}",
             ):
                 n.pushed_at = now

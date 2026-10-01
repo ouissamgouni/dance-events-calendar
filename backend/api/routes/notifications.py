@@ -25,6 +25,7 @@ from backend.api.schemas import (
     NotificationItem,
     NotificationListResponse,
     NotificationMilestoneSummary,
+    NotificationOpenedRequest,
     UnreadCountResponse,
 )
 from backend.db.database import get_session
@@ -410,6 +411,39 @@ def mark_read(
         session.commit()
         session.refresh(row)
     return _hydrate(session, [row], viewer_id=user.id)[0]
+
+
+@router.post("/{notification_id}/opened", status_code=204)
+def mark_opened(
+    notification_id: int,
+    payload: NotificationOpenedRequest,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    row = session.get(Notification, notification_id)
+    if row is None or row.recipient_user_id != user.id:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    now = datetime.now(timezone.utc)
+    if payload.channel == "push":
+        # A combined push covers every row stamped in the same dispatch run.
+        rows = (
+            session.exec(
+                select(Notification)
+                .where(Notification.recipient_user_id == user.id)
+                .where(Notification.kind == row.kind)
+                .where(Notification.pushed_at == row.pushed_at)
+                .where(Notification.push_opened_at.is_(None))
+            ).all()
+            if row.pushed_at is not None and row.kind == "interest_event"
+            else ([row] if row.push_opened_at is None else [])
+        )
+        for r in rows:
+            r.push_opened_at = now
+            session.add(r)
+    elif row.email_clicked_at is None:
+        row.email_clicked_at = now
+        session.add(row)
+    session.commit()
 
 
 @router.post("/read-all", response_model=UnreadCountResponse)

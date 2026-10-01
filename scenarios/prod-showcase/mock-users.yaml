@@ -75,7 +75,7 @@ users:
     handle: penny-valdez
     account_visibility: public
     bio: Festival ambassador sharing offers and practical travel tips with dancers.
-    avatar: uifaces-human-avatar (4).jpg
+    avatar: uifaces-human-avatar (24).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Penny%20Valdez
   - email: maya.rivera@joinmovida.com
     name: Maya Rivera
@@ -275,3 +275,12 @@ users:
     share_attendance_default_audience: public
     avatar: uifaces-human-avatar (27).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Leila%20Bauer
+  - email: alex.navarro@joinmovida.com
+    name: Alex Navarro
+    handle: alex-navarro
+    account_visibility: public
+    bio: Salsa and bachata social dancer from Lisbon, planning her first festival season.
+    share_attendance_default: true
+    share_attendance_default_audience: friends
+    avatar: uifaces-human-avatar (22).jpg
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Alex%20Navarro

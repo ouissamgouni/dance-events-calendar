@@ -146,6 +146,10 @@ export interface CalendarEvent {
     is_blocked?: boolean;
     block_reason?: AdminEventBlockReason | null;
     block_reason_detail?: string | null;
+    /** Admin list only: interest-alert reach + consented engagement counts. */
+    interest_reach?: EventInterestReach | null;
+    unique_viewers?: number | null;
+    link_clicks?: number | null;
     links: LinkItem[] | null;
     tags: Tag[];
     /** Server-computed: at least one approved, non-expired promo code exists.
@@ -511,6 +515,35 @@ export interface DuplicateGroup {
 export interface DuplicateGroupListResponse {
     items: DuplicateGroup[];
     total: number;
+}
+
+export interface EventInterestReach {
+    eligible: boolean;
+    ineligible_reason: string | null;
+    matched_profiles: number;
+    matched_users: number;
+    already_notified_users: number;
+    would_alert_app: number;
+    would_alert_email: number;
+    would_alert_push: number;
+}
+
+export interface NotificationChannelCounts {
+    app: number;
+    email: number;
+    push: number;
+}
+
+export interface AdminEventNotificationStats {
+    interest: EventInterestReach;
+    by_kind: (NotificationChannelCounts & {
+        kind: string;
+        users: number;
+        app_reads: number;
+        push_opens: number;
+        email_clicks: number;
+    })[];
+    total_users: number;
 }
 
 export interface DuplicateScanLogEntry {

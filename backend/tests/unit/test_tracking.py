@@ -85,6 +85,18 @@ class TestTrackingEndpoints:
         )
         assert resp.status_code == 422
 
+    @pytest.mark.parametrize(
+        "source", ["share", "push", "email", "explore", "text-search"]
+    )
+    def test_track_event_view_accepts_attribution_sources(self, client, source):
+        c, session = client
+        with patch("backend.api.routes.tracking._update_view_geo", new=AsyncMock()):
+            resp = c.post(
+                "/api/track/event-view", json={"event_id": "ev1", "source": source}
+            )
+        assert resp.status_code == 201
+        assert session._added[0].source == source
+
     def test_track_link_click(self, client):
         c, session = client
         with patch("backend.api.routes.tracking._update_click_geo", new=AsyncMock()):
@@ -163,9 +175,7 @@ class TestEventSaveUserSavedEvent:
 
             # Analytics row still keyed by payload device_id.
             event_save = next(
-                call.args[0]
-                for call in added
-                if isinstance(call.args[0], EventSave)
+                call.args[0] for call in added if isinstance(call.args[0], EventSave)
             )
             assert event_save.device_id == "dev-abc"
 

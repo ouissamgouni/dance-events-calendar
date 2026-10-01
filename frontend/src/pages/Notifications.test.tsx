@@ -181,6 +181,31 @@ describe('NotificationsPage (milestone rows)', () => {
         expect(navigateMock).toHaveBeenCalledWith('/saved-searches')
         expect(navigateMock).not.toHaveBeenCalledWith('/event/ev-match')
     })
+
+    it('filters by ?kind= from a push deep link and clears it', async () => {
+        const requestedKinds: (string | null)[] = []
+        server.use(
+            http.get('*/api/notifications', ({ request }) => {
+                requestedKinds.push(new URL(request.url).searchParams.get('kind'))
+                return HttpResponse.json({ items: [], total: 0, unread_count: 0, limit: 50, offset: 0 })
+            }),
+        )
+        const user = userEvent.setup()
+
+        render(
+            <MemoryRouter initialEntries={['/notifications?kind=interest_event']}>
+                <NotificationsPage />
+            </MemoryRouter>,
+        )
+
+        const chip = await screen.findByRole('button', { name: /show all notifications/i })
+        expect(chip).toHaveTextContent('Saved-search matches')
+        await waitFor(() => expect(requestedKinds).toContain('interest_event'))
+
+        await user.click(chip)
+        await waitFor(() => expect(requestedKinds.at(-1)).toBeNull())
+        expect(screen.queryByRole('button', { name: /show all notifications/i })).not.toBeInTheDocument()
+    })
 })
 
 const actor = (over: Record<string, unknown> = {}) => ({

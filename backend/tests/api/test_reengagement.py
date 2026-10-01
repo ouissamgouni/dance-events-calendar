@@ -221,7 +221,7 @@ def test_reminder_ask_cta_gated_by_going_threshold(session, monkeypatch):
     monkeypatch.setattr(
         reminder_service,
         "send_event_reminder_email",
-        lambda u, e, w, include_ask_cta=False: (
+        lambda u, e, w, include_ask_cta=False, **_: (
             seen.append((e.event_id, include_ask_cta)) or True
         ),
     )
@@ -284,7 +284,7 @@ def test_reminder_email_optout_keeps_inapp(session, monkeypatch):
     monkeypatch.setattr(
         reminder_service,
         "send_event_reminder_email",
-        lambda u, e, w: sent.append(e) or True,
+        lambda u, e, w, **_: sent.append(e) or True,
     )
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
@@ -365,7 +365,7 @@ def test_review_prompt_created_for_ended_going_event(session, monkeypatch):
     monkeypatch.setattr(
         review_prompt_service,
         "send_event_review_prompt_email",
-        lambda u, e, friend_proof=None: sent.append(e.event_id) or True,
+        lambda u, e, friend_proof=None, **_: sent.append(e.event_id) or True,
     )
     monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
 
@@ -441,7 +441,7 @@ def test_review_prompt_skips_already_rated(session, monkeypatch):
     monkeypatch.setattr(
         review_prompt_service,
         "send_event_review_prompt_email",
-        lambda u, e, friend_proof=None: sent.append(e.event_id) or True,
+        lambda u, e, friend_proof=None, **_: sent.append(e.event_id) or True,
     )
     monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
 
@@ -469,7 +469,7 @@ def test_review_prompt_email_optout_keeps_inapp(session, monkeypatch):
     monkeypatch.setattr(
         review_prompt_service,
         "send_event_review_prompt_email",
-        lambda u, e, friend_proof=None: sent.append(e) or True,
+        lambda u, e, friend_proof=None, **_: sent.append(e) or True,
     )
     monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
 
@@ -502,7 +502,7 @@ def test_review_prompt_backfills_email_after_toggle(session, monkeypatch):
     monkeypatch.setattr(
         review_prompt_service,
         "send_event_review_prompt_email",
-        lambda u, e, friend_proof=None: sent.append(e.event_id) or True,
+        lambda u, e, friend_proof=None, **_: sent.append(e.event_id) or True,
     )
     monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
 
@@ -548,7 +548,7 @@ def test_review_prompt_no_backfill_once_rated(session, monkeypatch):
     monkeypatch.setattr(
         review_prompt_service,
         "send_event_review_prompt_email",
-        lambda u, e, friend_proof=None: sent.append(e.event_id) or True,
+        lambda u, e, friend_proof=None, **_: sent.append(e.event_id) or True,
     )
     monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
 
@@ -747,7 +747,7 @@ def test_run_once_sets_friend_context_and_email_variant(session, monkeypatch):
     monkeypatch.setattr(
         review_prompt_service,
         "send_event_review_prompt_email",
-        lambda u, e, friend_proof=None: captured.append(friend_proof) or True,
+        lambda u, e, friend_proof=None, **_: captured.append(friend_proof) or True,
     )
     monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
 
@@ -1644,6 +1644,212 @@ def test_activity_digest_gates_on_scheduled_slot(session, monkeypatch):
     # next slot, but ARE stamped for push (already delivered).
     assert n.emailed_at is None
     assert n.pushed_at is not None
+
+
+def _freeze_activity_now(monkeypatch, holder: dict) -> None:
+    class _FakeDateTime:
+        @staticmethod
+        def now(tz=None):
+            return holder["now"].astimezone(tz) if tz else holder["now"]
+
+    monkeypatch.setattr("backend.services.activity_email.datetime", _FakeDateTime)
+
+
+def _interest_notif(session: Session, user: User, event_id: str) -> Notification:
+    n = _notif(
+        session,
+        recipient=user,
+        actor=user,
+        kind="interest_event",
+        event_id=event_id,
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+    )
+    n.context = "Home"
+    session.add(n)
+    session.commit()
+    return n
+
+
+def test_interest_push_waits_for_schedule_slot_and_window(session, monkeypatch):
+    push_calls: list = []
+    monkeypatch.setattr(
+        activity_email, "send_activity_digest_v2_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(
+        activity_email,
+        "send_push",
+        lambda recipient_id, **kw: push_calls.append(kw) or 1,
+    )
+    monkeypatch.setattr(
+        "backend.services.activity_email.get_interest_match_push_schedule",
+        lambda: "tue,thu,sat @ 19:00",
+    )
+    holder = {"now": datetime(2026, 7, 6, 19, 30, tzinfo=timezone.utc)}  # Monday
+    _freeze_activity_now(monkeypatch, holder)
+
+    bob = _make_user(session, "bob@example.com", "bob", timezone="UTC")
+    _make_event(session, "ev-1")
+    n = _interest_notif(session, bob, "ev-1")
+
+    stats = activity_email.run_once()
+    assert stats["interest_push_deferred"] == 1
+    assert push_calls == []
+    session.refresh(n)
+    assert n.pushed_at is None
+
+    holder["now"] = datetime(2026, 7, 7, 19, 30, tzinfo=timezone.utc)  # Tuesday in slot
+    stats = activity_email.run_once()
+    assert stats["pushed"] == 1
+    session.refresh(n)
+    session.refresh(bob)
+    assert n.pushed_at is not None
+    assert bob.last_interest_push_at is not None
+
+    # Already pushed today -> a later match waits for the next slot.
+    _make_event(session, "ev-2")
+    later = _interest_notif(session, bob, "ev-2")
+    holder["now"] = datetime(2026, 7, 7, 20, 0, tzinfo=timezone.utc)
+    assert activity_email.run_once()["interest_push_deferred"] == 1
+
+    # Thursday but past the 3h window after 19:00 -> still deferred.
+    holder["now"] = datetime(2026, 7, 9, 22, 30, tzinfo=timezone.utc)
+    assert activity_email.run_once()["interest_push_deferred"] == 1
+    session.refresh(later)
+    assert later.pushed_at is None
+    assert len(push_calls) == 1
+
+
+def test_interest_push_force_bypasses_schedule(session, monkeypatch):
+    push_calls: list = []
+    monkeypatch.setattr(
+        activity_email, "send_activity_digest_v2_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(
+        activity_email,
+        "send_push",
+        lambda recipient_id, **kw: push_calls.append(kw) or 1,
+    )
+    monkeypatch.setattr(
+        "backend.services.activity_email.get_interest_match_push_schedule",
+        lambda: "sun @ 03:00",
+    )
+    bob = _make_user(session, "bob@example.com", "bob", timezone="UTC")
+    _make_event(session, "ev-1")
+    _interest_notif(session, bob, "ev-1")
+
+    assert activity_email.run_once(force=True)["pushed"] == 1
+    assert len(push_calls) == 1
+
+
+def test_interest_push_combines_matches_and_names_soonest_event(session, monkeypatch):
+    push_calls: list = []
+    monkeypatch.setattr(
+        activity_email, "send_activity_digest_v2_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(
+        activity_email,
+        "send_push",
+        lambda recipient_id, **kw: push_calls.append(kw) or 1,
+    )
+    monkeypatch.setattr(
+        "backend.services.activity_email.get_interest_match_push_schedule",
+        lambda: "instant",
+    )
+    bob = _make_user(session, "bob@example.com", "bob")
+    soon = datetime.now(timezone.utc) + timedelta(days=2)
+    _make_event(
+        session, "ev-late", title="Late Congress", start=soon + timedelta(days=30)
+    )
+    _make_event(session, "ev-soon", title="Soon Social", start=soon)
+    _interest_notif(session, bob, "ev-late")
+    _interest_notif(session, bob, "ev-soon")
+
+    assert activity_email.run_once()["pushed"] == 1
+    assert len(push_calls) == 1
+    call = push_calls[0]
+    assert call["title"] == "2 new events match your alerts"
+    assert call["body"].startswith("Soon Social · ")
+    assert call["body"].endswith(" +1 more")
+    assert call["url"].startswith("/notifications?kind=interest_event&via=push&nid=")
+
+
+def test_interest_push_single_match_links_to_event(session, monkeypatch):
+    push_calls: list = []
+    monkeypatch.setattr(
+        activity_email, "send_activity_digest_v2_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(
+        activity_email,
+        "send_push",
+        lambda recipient_id, **kw: push_calls.append(kw) or 1,
+    )
+    monkeypatch.setattr(
+        "backend.services.activity_email.get_interest_match_push_schedule",
+        lambda: "instant",
+    )
+    bob = _make_user(session, "bob@example.com", "bob")
+    _make_event(session, "ev-1", title="Solo Social")
+    _interest_notif(session, bob, "ev-1")
+
+    activity_email.run_once()
+    assert push_calls[0]["title"] == "New match: Home"
+    assert push_calls[0]["body"].startswith("Solo Social · ")
+    assert push_calls[0]["url"].startswith("/event/ev-1?via=push&nid=")
+
+
+def test_notification_opened_push_marks_combined_push_siblings(client, session):
+    bob = _make_user(session, "bob@example.com", "bob")
+    pushed_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    _make_event(session, "ev-1")
+    _make_event(session, "ev-2")
+    a = _interest_notif(session, bob, "ev-1")
+    b = _interest_notif(session, bob, "ev-2")
+    other = _notif(
+        session, recipient=bob, actor=bob, kind="event_reminder", event_id="ev-1"
+    )
+    for n in (a, b, other):
+        n.pushed_at = pushed_at
+        session.add(n)
+    session.commit()
+    _login(client, "bob@example.com")
+
+    r = client.post(f"/api/notifications/{a.id}/opened", json={"channel": "push"})
+
+    assert r.status_code == 204
+    for n in (a, b, other):
+        session.refresh(n)
+    assert a.push_opened_at is not None
+    assert b.push_opened_at is not None
+    assert other.push_opened_at is None
+
+
+def test_notification_opened_email_is_first_touch_and_recipient_scoped(client, session):
+    bob = _make_user(session, "bob@example.com", "bob")
+    _make_user(session, "eve@example.com", "eve")
+    _make_event(session, "ev-1")
+    n = _interest_notif(session, bob, "ev-1")
+
+    _login(client, "eve@example.com")
+    assert (
+        client.post(
+            f"/api/notifications/{n.id}/opened", json={"channel": "email"}
+        ).status_code
+        == 404
+    )
+
+    _login(client, "bob@example.com")
+    assert (
+        client.post(
+            f"/api/notifications/{n.id}/opened", json={"channel": "email"}
+        ).status_code
+        == 204
+    )
+    session.refresh(n)
+    first = n.email_clicked_at
+    assert first is not None
+    client.post(f"/api/notifications/{n.id}/opened", json={"channel": "email"})
+    session.refresh(n)
+    assert n.email_clicked_at == first
 
 
 def test_activity_digest_and_push_skip_anonymous_review(session, monkeypatch):

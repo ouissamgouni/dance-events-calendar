@@ -53,7 +53,7 @@ from backend.db.models import (
     UserFollow,
 )
 from backend.services.email import send_event_review_prompt_email
-from backend.services.notification_delivery import record_delivery
+from backend.services.notification_delivery import record_delivery, tracked_url
 from backend.services.push_service import send_push
 
 logger = logging.getLogger(__name__)
@@ -277,9 +277,11 @@ def run_once() -> dict:
     emailed = 0
     emailed_ids: list[int] = []
     for user, event, phrase in to_email:
-        if send_event_review_prompt_email(user, event, friend_proof=phrase):
+        nid = notif_ids.get((user.id, event.event_id))
+        if send_event_review_prompt_email(
+            user, event, friend_proof=phrase, notification_id=nid
+        ):
             emailed += 1
-            nid = notif_ids.get((user.id, event.event_id))
             if nid is not None:
                 emailed_ids.append(nid)
 
@@ -287,16 +289,16 @@ def run_once() -> dict:
     pushed_ids: list[int] = []
     for user_id, title, event_id, phrase in to_push:
         push_title, push_body = review_prompt_push_copy(title, phrase)
+        nid = notif_ids.get((user_id, event_id))
         delivered = send_push(
             user_id,
             title=push_title,
             body=push_body,
-            url=f"/event/{event_id}/review",
+            url=tracked_url(f"/event/{event_id}/review", nid, "push"),
             tag=f"review-prompt:{event_id}",
         )
         pushed += delivered
         if delivered:
-            nid = notif_ids.get((user_id, event_id))
             if nid is not None:
                 pushed_ids.append(nid)
 

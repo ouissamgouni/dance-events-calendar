@@ -180,7 +180,14 @@ export default function EventDetailPage() {
                 if (cancelled) return;
                 setEvent(e);
                 setTitleValue(e.title);
-                trackView(eventId, searchParams.get('src') ?? 'direct');
+                const via = searchParams.get('via');
+                // `src` carries the share code on share links, not a view source.
+                const source = via === 'push' || via === 'email'
+                    ? via
+                    : searchParams.get('ref') === 'share'
+                        ? 'share'
+                        : searchParams.get('src') ?? 'direct';
+                trackView(eventId, source);
             })
             .catch(() => { if (!cancelled) setError(true); })
             .finally(() => { if (!cancelled) setLoading(false); });

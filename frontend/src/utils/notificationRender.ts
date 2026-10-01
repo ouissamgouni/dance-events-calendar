@@ -42,12 +42,6 @@ export function getNotificationVerb(item: NotificationItem): string {
             return 'wants to follow you';
         case 'follow_request_approved':
             return 'approved your follow request';
-        case 'promo_code_approved':
-            return 'approved your promo code for';
-        case 'promo_code_rejected':
-            return 'rejected your promo code for';
-        case 'organizer_claim_decided':
-            return 'reviewed your organizer claim';
         case 'event_message':
             switch (item.context) {
                 case 'question':
@@ -168,4 +162,8 @@ export function notificationCategory(
     kind: NotificationItem['kind'],
 ): NotificationCategory {
     return CATEGORY_BY_KIND[kind] ?? 'others';
+}
+
+export function isNotificationKind(value: string): value is NotificationItem['kind'] {
+    return Object.prototype.hasOwnProperty.call(CATEGORY_BY_KIND, value);
 }

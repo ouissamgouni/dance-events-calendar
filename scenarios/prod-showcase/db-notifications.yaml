@@ -1,0 +1,199 @@
+# Curated inboxes: Lucía (dancer) and Penny (contributor) each surface a
+# broad mix of notification kinds. Rows already emitted by seeded follows or
+# messages are retimed rather than duplicated.
+notifications:
+  # Alex Navarro
+  - recipient: alex.navarro@joinmovida.com
+    actor: theo.novak@joinmovida.com
+    kind: follow_request
+    minutes_ago: 12
+  - recipient: alex.navarro@joinmovida.com
+    kind: event_reminder
+    event_id: alfama-thursday-salsa-next
+    minutes_ago: 35
+  - recipient: alex.navarro@joinmovida.com
+    actor: sofia.torres@joinmovida.com
+    kind: subscription_going
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    minutes_ago: 50
+  - recipient: alex.navarro@joinmovida.com
+    actor: camille.laurent@joinmovida.com
+    kind: subscription_going
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    minutes_ago: 70
+  - recipient: alex.navarro@joinmovida.com
+    actor: penny.valdez@joinmovida.com
+    kind: subscription_going
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    minutes_ago: 95
+  - recipient: alex.navarro@joinmovida.com
+    actor: samir.ivanov@joinmovida.com
+    kind: new_follower
+    minutes_ago: 140
+  - recipient: alex.navarro@joinmovida.com
+    actor: sofia.torres@joinmovida.com
+    kind: plan_session_added
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    group_key: 30000000-0000-4000-8000-000000001703
+    context: Mambo Partnerwork Lab
+    description: 3 sessions planned
+    minutes_ago: 180
+  - recipient: alex.navarro@joinmovida.com
+    actor: operations@joinmovida.com
+    kind: planned_session_changed
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    subject_key: "publication:2"
+    group_key: 30000000-0000-4000-8000-000000001606
+    context: Secrets to Social Dancing
+    description: "Secrets to Social Dancing: has a new time."
+    minutes_ago: 260
+  - recipient: alex.navarro@joinmovida.com
+    actor: victor.schmidt@joinmovida.com
+    kind: event_message_reply
+    event_id: alfama-thursday-salsa-next
+    context: question
+    description: It is smooth wood and there is a small changing room beside reception.
+    minutes_ago: 380
+  - recipient: alex.navarro@joinmovida.com
+    actor: camille.laurent@joinmovida.com
+    kind: follow_request_approved
+    minutes_ago: 480
+  - recipient: alex.navarro@joinmovida.com
+    kind: promo_code_added
+    event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+    context: Sanja1
+    minutes_ago: 600
+  - recipient: alex.navarro@joinmovida.com
+    kind: interest_event
+    event_id: vienna-bachata-nights
+    context: Bachata - Vienna 25km
+    minutes_ago: 720
+  - recipient: alex.navarro@joinmovida.com
+    kind: event_review_prompt
+    event_id: alfama-thursday-salsa-autumn
+    minutes_ago: 1100
+  - recipient: alex.navarro@joinmovida.com
+    actor: sofia.torres@joinmovida.com
+    kind: new_friend
+    minutes_ago: 1500
+    read: true
+  - recipient: alex.navarro@joinmovida.com
+    actor: sofia.torres@joinmovida.com
+    kind: new_follower
+    minutes_ago: 1500
+    read: true
+  - recipient: alex.navarro@joinmovida.com
+    actor: sofia.torres@joinmovida.com
+    kind: subscription_saved
+    event_id: rome-latin-social
+    minutes_ago: 1800
+    read: true
+  - recipient: alex.navarro@joinmovida.com
+    actor: clara.dubois@joinmovida.com
+    kind: subscription_review
+    event_id: alfama-thursday-salsa-autumn
+    minutes_ago: 2000
+    read: true
+  - recipient: alex.navarro@joinmovida.com
+    actor: maya.rivera@joinmovida.com
+    kind: event_message
+    event_id: alfama-thursday-salsa-next
+    context: question
+    description: Is the floor suitable for suede soles, and is there a changing area?
+    minutes_ago: 2600
+    read: true
+  - recipient: alex.navarro@joinmovida.com
+    actor: rita.petrov@joinmovida.com
+    kind: event_message
+    event_id: alfama-thursday-salsa-next
+    context: meetup
+    description: Anyone else joining the beginner class before the social?
+    minutes_ago: 2900
+    read: true
+  - recipient: alex.navarro@joinmovida.com
+    actor: penny.valdez@joinmovida.com
+    kind: subscription_suggested
+    event_id: london-salsa-sessions
+    minutes_ago: 3300
+    read: true
+  - recipient: alex.navarro@joinmovida.com
+    actor: sofia.torres@joinmovida.com
+    kind: subscription_milestone
+    subject_key: first_event
+    context: First Steps
+    description: Attended your first event
+    minutes_ago: 4000
+    read: true
+  - recipient: alex.navarro@joinmovida.com
+    kind: milestone_unlocked
+    subject_key: first_event
+    context: First Steps
+    description: Attended your first event
+    minutes_ago: 4300
+    read: true
+
+  # Penny Valdez
+  - recipient: penny.valdez@joinmovida.com
+    kind: promo_code_rejected
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    context: SALSA50
+    description: This code has expired. Feel free to share a current one.
+    minutes_ago: 25
+  - recipient: penny.valdez@joinmovida.com
+    kind: event_reminder
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    context: ask
+    minutes_ago: 60
+  - recipient: penny.valdez@joinmovida.com
+    actor: alex.navarro@joinmovida.com
+    kind: new_follower
+    minutes_ago: 120
+  - recipient: penny.valdez@joinmovida.com
+    kind: promo_code_approved
+    event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    context: EARLYBIRD
+    minutes_ago: 180
+  - recipient: penny.valdez@joinmovida.com
+    kind: schedule_program_updated
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    subject_key: "publication:2"
+    context: "16"
+    description: The event program has changed. Review the latest schedule.
+    minutes_ago: 260
+  - recipient: penny.valdez@joinmovida.com
+    kind: event_review_prompt
+    event_id: barcelona-salsa-beach-party
+    context: Elena Moreau
+    minutes_ago: 900
+  - recipient: penny.valdez@joinmovida.com
+    kind: organizer_claim_decided
+    context: approved
+    minutes_ago: 1440
+    read: true
+  - recipient: penny.valdez@joinmovida.com
+    actor: clara.dubois@joinmovida.com
+    kind: event_message
+    event_id: london-salsa-sessions
+    context: meetup
+    description: First-time visitors, shall we meet by registration before the welcome class?
+    minutes_ago: 1700
+    read: true
+  - recipient: penny.valdez@joinmovida.com
+    actor: elena.moreau@joinmovida.com
+    kind: new_follower
+    minutes_ago: 2880
+    read: true
+  - recipient: penny.valdez@joinmovida.com
+    kind: promo_code_approved
+    event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    context: MOVIDA10
+    minutes_ago: 4320
+    read: true
+  - recipient: penny.valdez@joinmovida.com
+    kind: schedule_program_available
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    subject_key: "publication:1"
+    context: "16"
+    description: The program is live. Browse sessions and build your plan.
+    minutes_ago: 8640
+    read: true

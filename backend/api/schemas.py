@@ -422,9 +422,7 @@ class ScheduleImportDocument(BaseModel):
             contributor_ids = {row.external_id for row in self.contributors}
             for schedule_session in self.sessions:
                 assignments = schedule_session.contributors or []
-                keys = [
-                    (row.contributor_external_id, row.role) for row in assignments
-                ]
+                keys = [(row.contributor_external_id, row.role) for row in assignments]
                 if len(keys) != len(set(keys)):
                     raise ValueError("Duplicate session contributor")
                 missing = {
@@ -683,7 +681,7 @@ class EventViewRequest(BaseModel):
     device_id: Optional[str] = Field(default=None, max_length=64)
     source: Optional[str] = Field(
         default=None,
-        pattern="^(calendar|calendar-map|explorer-list|explorer-map|my-calendar|direct)$",
+        pattern="^(calendar|calendar-map|explorer-list|explorer-map|my-calendar|direct|explore|text-search|share|push|email)$",
     )
 
 
@@ -1362,6 +1360,8 @@ class SiteSettingsResponse(BaseModel):
     # Times are interpreted in each recipient's ``User.timezone``.
     # Default = twice a week on Tuesday + Friday at 09:00 local.
     activity_digest_schedule: str = "tue,fri @ 09:00"
+    # Interest-match push cadence (same format, user-local) or "instant".
+    interest_match_push_schedule: str = "tue,thu,sat @ 19:00"
     # Max matched events shown inline in an interest-match digest email
     # before the rest collapse behind a "Discover more" link to "For you".
     interest_match_max_events_per_email: int = 10
@@ -1650,6 +1650,11 @@ class SiteSettingsUpdateRequest(BaseModel):
         # Loose validation — parsed strictly server-side. Frontend
         # provides a builder UI so the raw string is rarely edited.
         pattern=r"^([a-z]{3})(,[a-z]{3})*\s*@\s*\d{1,2}:\d{2}$",
+        max_length=64,
+    )
+    interest_match_push_schedule: Optional[str] = Field(
+        default=None,
+        pattern=r"^(instant|([a-z]{3})(,[a-z]{3})*\s*@\s*\d{1,2}:\d{2})$",
         max_length=64,
     )
     # Max matched events shown inline in an interest-match digest email
@@ -2091,16 +2096,53 @@ class BulkTagSuggestionRunResponse(BaseModel):
 # --- Admin Events: Paginated List & Filter Options ---
 
 
+class EventInterestReach(BaseModel):
+    eligible: bool
+    ineligible_reason: Optional[str] = None
+    matched_profiles: int = 0
+    matched_users: int = 0
+    already_notified_users: int = 0
+    would_alert_app: int = 0
+    would_alert_email: int = 0
+    would_alert_push: int = 0
+
+
 class AdminEventResponse(EventResponse):
     source_description: Optional[str] = None
     status: Literal["pending", "reviewed", "blocked"] = "reviewed"
     block_reason: Optional[Literal["deleted", "duplicate", "rejected"]] = None
     block_reason_detail: Optional[str] = None
+    # List-only metrics (None on single-event endpoints).
+    interest_reach: Optional[EventInterestReach] = None
+    unique_viewers: Optional[int] = None
+    link_clicks: Optional[int] = None
 
 
 class PaginatedEventsResponse(BaseModel):
     items: list[AdminEventResponse]
     total: int
+
+
+class NotificationChannelCounts(BaseModel):
+    app: int = 0
+    email: int = 0
+    push: int = 0
+
+
+class EventNotificationKindStats(NotificationChannelCounts):
+    kind: str
+    users: int = 0
+    app_reads: int = 0
+    push_opens: int = 0
+    email_clicks: int = 0
+
+
+class AdminEventNotificationStatsResponse(BaseModel):
+    interest: EventInterestReach
+    # Distinct notifications delivered per channel (re-sends counted once).
+    by_kind: list[EventNotificationKindStats]
+    # Distinct users notified about the event, across all kinds.
+    total_users: int = 0
 
 
 # --- Admin: near-duplicate event detection & review ---
@@ -2952,6 +2994,10 @@ class NotificationListResponse(BaseModel):
 
 class UnreadCountResponse(BaseModel):
     count: int
+
+
+class NotificationOpenedRequest(BaseModel):
+    channel: Literal["push", "email"]
 
 
 class SubscribedEventVia(BaseModel):

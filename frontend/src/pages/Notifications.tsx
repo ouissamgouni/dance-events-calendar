@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Calendar,
     Inbox,
@@ -7,6 +8,7 @@ import {
     MoreHorizontal,
     Trophy,
     Users,
+    X,
 } from 'lucide-react';
 import {
     fetchNotifications,
@@ -16,6 +18,7 @@ import {
 import { useNotifications } from '../context/NotificationsContext';
 import NotificationRow from '../components/NotificationRow';
 import {
+    isNotificationKind,
     notificationCategory,
     type NotificationCategory,
 } from '../utils/notificationRender';
@@ -63,10 +66,13 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
     const [error, setError] = useState<string | null>(null);
     const [busyId, setBusyId] = useState<number | null>(null);
     const [busyAll, setBusyAll] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const rawKind = searchParams.get('kind');
+    const kindFilter = !socialOnly && rawKind && isNotificationKind(rawKind) ? rawKind : null;
 
     const load = useCallback(async () => {
         try {
-            const res = await fetchNotifications({ limit: 50 });
+            const res = await fetchNotifications({ limit: 50, kind: kindFilter ?? undefined });
             const now = new Date().toISOString();
             // Visiting the page acknowledges the queue: rows render as
             // already read, mirroring how Instagram/Facebook treat
@@ -76,7 +82,7 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load notifications');
         }
-    }, []);
+    }, [kindFilter]);
 
     useEffect(() => {
         load();
@@ -153,6 +159,23 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
             )}
 
             <div className="flex items-center gap-2 mb-3 overflow-x-auto">
+                {kindFilter && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const next = new URLSearchParams(searchParams);
+                            next.delete('kind');
+                            setSearchParams(next, { replace: true });
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-2 border border-action bg-action text-white whitespace-nowrap shrink-0"
+                        aria-label="Show all notifications"
+                    >
+                        <span className="text-sm font-medium">
+                            {kindFilter === 'interest_event' ? 'Saved-search matches' : 'Filtered'}
+                        </span>
+                        <X size={16} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                )}
                 {CATEGORY_PILLS.filter((p) => !(socialOnly && p.key === 'others')).map((p) => (
                     <CategoryPill
                         key={p.key}

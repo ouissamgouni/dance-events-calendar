@@ -1,4 +1,10 @@
 saves:
+  - event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+    email: lucia.navarro@joinmovida.com
+    audience: friends
+  - event_id: rome-latin-social
+    email: sofia.torres@joinmovida.com
+    audience: friends
   - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
     email: elena.moreau@joinmovida.com
     audience: friends

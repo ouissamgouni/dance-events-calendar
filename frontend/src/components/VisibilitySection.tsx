@@ -544,7 +544,7 @@ function ShareAttendanceDefaultPicker({
     onError: (msg: string) => void;
 }) {
     const [saving, setSaving] = useState(false);
-    const value: ShareAudience = profile.share_attendance_default_audience ?? 'friends';
+    const value: ShareAudience = profile.share_attendance_default_audience ?? 'public';
     return (
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">

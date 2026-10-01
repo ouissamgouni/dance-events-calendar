@@ -3,9 +3,11 @@ import { useEffect, type ReactNode } from 'react';
 interface Props {
     title: string;
     subtitle?: string;
-    titleSize?: 'default' | 'large';
+    titleSize?: 'default' | 'large' | 'xl';
     onClose: () => void;
     layer?: 'modal' | 'transient';
+    /** ``floating`` = inset card with rounded corners and a drag handle. */
+    variant?: 'default' | 'floating';
     headerLeading?: ReactNode;
     headerAction?: ReactNode;
     showClose?: boolean;
@@ -20,7 +22,9 @@ interface Props {
  * footer clear of the iOS home indicator. The body scrolls independently so the
  * sheet never grows past 85% of the viewport height.
  */
-export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', headerLeading, headerAction, showClose = true, footer, children }: Props) {
+export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, footer, children }: Props) {
+    const floating = variant === 'floating';
+    const titleClass = titleSize === 'xl' ? 'text-2xl' : titleSize === 'large' ? 'text-lg' : 'text-base';
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
@@ -39,7 +43,7 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
 
     return (
         <div
-            className={`fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm ${layer === 'transient' ? 'z-[12000]' : 'z-[10000]'}`}
+            className={`fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm ${floating ? 'px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]' : ''} ${layer === 'transient' ? 'z-[12000]' : 'z-[10000]'}`}
             onClick={onClose}
         >
             <div
@@ -47,15 +51,21 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
                 aria-modal="true"
                 aria-label={title}
                 onClick={(e) => e.stopPropagation()}
-                className="flex max-h-[85dvh] w-full max-w-lg flex-col bg-surface shadow-2xl animate-slide-up sm:rounded-t-card"
+                className={`flex max-h-[85dvh] w-full max-w-lg flex-col bg-surface shadow-2xl animate-slide-up ${floating ? 'overflow-hidden rounded-card' : 'sm:rounded-t-card'}`}
             >
-                <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
-                    <div className="flex min-w-0 items-start gap-2">
+                {floating ? (
+                    <div className="flex shrink-0 justify-center pt-2" aria-hidden>
+                        {/* eslint-disable-next-line no-restricted-syntax -- drag handle is a pill by design */}
+                        <span className="h-1 w-10 rounded-full bg-line" />
+                    </div>
+                ) : null}
+                <div className={`flex shrink-0 justify-between border-b border-line px-4 ${floating ? 'items-start pt-2 pb-4' : 'items-center py-3'}`}>
+                    <div className={`flex min-w-0 items-start ${floating ? 'gap-3' : 'gap-2'}`}>
                         {headerLeading}
                         <div className="min-w-0">
-                            <h3 className={`${titleSize === 'large' ? 'text-lg' : 'text-base'} font-bold text-ink`}>{title}</h3>
+                            <h3 className={`${titleClass} font-bold text-ink`}>{title}</h3>
                             {subtitle ? (
-                                <p className="mt-0.5 line-clamp-2 text-sm leading-5 text-ink-soft">{subtitle}</p>
+                                <p className={`mt-0.5 line-clamp-2 text-ink-soft ${floating ? 'text-base leading-6' : 'text-sm leading-5'}`}>{subtitle}</p>
                             ) : null}
                         </div>
                     </div>
@@ -74,10 +84,10 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
                     </div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
+                <div className={`min-h-0 flex-1 overflow-y-auto px-4 ${floating ? 'py-4' : 'py-3'}`}>{children}</div>
 
                 {footer ? (
-                    <div className="shrink-0 border-t border-line px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+                    <div className={`shrink-0 border-t border-line px-4 ${floating ? 'py-3' : 'pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]'}`}>
                         {footer}
                     </div>
                 ) : null}

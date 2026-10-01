@@ -77,3 +77,9 @@ export function defaultRsvpAudienceFor(user: RsvpAudienceUser): ShareAudience {
         ?? getLastUsedAudience(user.user_id)
         ?? (user.share_attendance_default === false ? 'private' : 'public');
 }
+
+export const ATTENDANCE_AUDIENCE_DESCRIPTIONS: Record<ShareAudience, string> = {
+    public: 'You will appear in the attendee list to anyone who can view this event.',
+    friends: 'Only your mutual followers will see your name in the attendee list.',
+    private: 'You will be counted but not named.',
+};

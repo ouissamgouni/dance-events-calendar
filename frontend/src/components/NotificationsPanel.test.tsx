@@ -141,6 +141,63 @@ describe('NotificationsPanel (event reminders)', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('renders self-addressed promo and organizer claim decisions without an actor name', async () => {
+    const actor = {
+      handle: 'penny',
+      display_name: 'Penny',
+      avatar_url: null,
+      is_verified_organizer: false,
+    }
+    server.use(
+      http.get('*/api/notifications', () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 50,
+              kind: 'promo_code_rejected',
+              event_id: 'ev-promo',
+              event_title: 'Rooftop Salsa Social',
+              event_start: null,
+              context: 'BADCODE',
+              description: 'Code is expired.',
+              actor,
+              created_at: '2026-06-25T10:00:00Z',
+              read_at: null,
+            },
+            {
+              id: 51,
+              kind: 'organizer_claim_decided',
+              event_id: null,
+              event_title: null,
+              event_start: null,
+              context: 'approved',
+              actor,
+              created_at: '2026-06-25T09:00:00Z',
+              read_at: null,
+            },
+          ],
+          total: 2,
+          unread_count: 2,
+          limit: 20,
+          offset: 0,
+        }),
+      ),
+    )
+
+    render(
+      <MemoryRouter>
+        <NotificationsPanel open onClose={vi.fn()} />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/your promo code for/i)).toBeInTheDocument()
+    expect(screen.getByText(/wasn't approved/i)).toBeInTheDocument()
+    expect(screen.getByText(/code: badcode/i)).toBeInTheDocument()
+    expect(screen.getByText('Code is expired.')).toBeInTheDocument()
+    expect(screen.getByText(/your organizer claim was approved/i)).toBeInTheDocument()
+    expect(screen.queryByText('Penny')).not.toBeInTheDocument()
+  })
+
   it('renders a grouped milestone row and routes to the passport on click', async () => {
     server.use(
       http.get('*/api/notifications', () =>

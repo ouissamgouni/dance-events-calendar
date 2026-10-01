@@ -153,6 +153,12 @@ def _notify_submitter(session: Session, promo: EventPromoCode, kind: str) -> Non
         actor_user_id=promo.submitter_user_id,
         kind=kind,
         event_id=promo.event_id,
+        context=promo.code,
+        description=(
+            promo.admin_notes[:255]
+            if kind == "promo_code_rejected" and promo.admin_notes
+            else None
+        ),
     )
     session.add(notif)
 

@@ -168,6 +168,8 @@ class DatabaseSeeder:
         self._seed_suggested_notifications(scenario_dir / "db-events.yaml")
         self._seed_promo_codes(scenario_dir / "db-promo-codes.yaml")
         self._seed_organizer_claims(scenario_dir / "db-organizer-claims.yaml")
+        # Must run last so it can retime rows emitted by the fan-outs above.
+        self._seed_notifications(scenario_dir / "db-notifications.yaml")
         default_settings_path = SCENARIOS_DIR / "default" / "settings.yaml"
         if scenario_dir.resolve() != default_settings_path.parent.resolve():
             self._seed_site_settings(default_settings_path)
@@ -2229,6 +2231,103 @@ class DatabaseSeeder:
             fanned += fan_out_suggested(self.session, actor, event_id)
         if fanned:
             logger.info("Emitted %d subscription_suggested notifications", fanned)
+
+    def _seed_notifications(self, path: Path) -> None:
+        """Upsert curated in-app ``Notification`` rows from db-notifications.yaml.
+
+        For inboxes that fan-out side effects can't produce (reminders,
+        milestones, schedule and promo decisions). A row matching
+        ``(recipient, kind, actor, event_id[, subject_key])`` — e.g. one
+        already emitted by a seeded follow — is retimed instead of
+        duplicated. Rows are stamped emailed/pushed so the dispatcher
+        doesn't replay history on its first tick. Structure::
+
+            notifications:
+              - recipient: alice@example.com
+                actor: bob@example.com     # optional, defaults to recipient
+                kind: event_reminder
+                event_id: ev-1             # optional
+                context: "..."             # optional
+                description: "..."         # optional
+                subject_key: "..."         # optional
+                group_key: "..."           # optional
+                minutes_ago: 30            # optional, default 0
+                read: false                # optional, default false
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        rows = data.get("notifications") or []
+        if not rows:
+            return
+
+        from backend.api.routes.notifications import VALID_KINDS
+        from backend.db.models import Notification
+        from backend.services.notification_delivery import record_delivery
+
+        def _user(email: str | None) -> User | None:
+            email = (email or "").strip().lower()
+            if not email:
+                return None
+            return self.session.exec(select(User).where(User.email == email)).first()
+
+        now = datetime.now(timezone.utc)
+        seeded = 0
+        for entry in rows:
+            if not isinstance(entry, dict):
+                continue
+            kind = entry.get("kind")
+            if kind not in VALID_KINDS:
+                logger.warning("Skipping notification: unknown kind %r", kind)
+                continue
+            recipient = _user(entry.get("recipient"))
+            actor = _user(entry.get("actor")) if entry.get("actor") else recipient
+            if recipient is None or actor is None:
+                logger.warning("Skipping notification: user not found %r", entry)
+                continue
+            event_id = entry.get("event_id")
+            subject_key = entry.get("subject_key")
+            created_at = now - timedelta(minutes=int(entry.get("minutes_ago") or 0))
+
+            q = select(Notification).where(
+                Notification.recipient_user_id == recipient.id,
+                Notification.kind == kind,
+                Notification.actor_user_id == actor.id,
+            )
+            q = (
+                q.where(Notification.event_id == event_id)
+                if event_id
+                else q.where(Notification.event_id.is_(None))  # type: ignore[union-attr]
+            )
+            if subject_key:
+                q = q.where(Notification.subject_key == subject_key)
+            notif = self.session.exec(q).first()
+            if notif is None:
+                notif = Notification(
+                    recipient_user_id=recipient.id,
+                    actor_user_id=actor.id,
+                    kind=kind,
+                    event_id=event_id,
+                    subject_key=subject_key,
+                )
+                self.session.add(notif)
+                self.session.flush()
+                record_delivery(self.session, notif.id, "app", created_at)
+                seeded += 1
+            for field in ("context", "description", "group_key"):
+                if entry.get(field) is not None:
+                    setattr(notif, field, str(entry[field]))
+            notif.created_at = created_at
+            notif.read_at = created_at if entry.get("read") else None
+            notif.emailed_at = created_at
+            notif.pushed_at = created_at
+            self.session.add(notif)
+        self.session.flush()
+        if seeded:
+            logger.info("Seeded %d curated notifications", seeded)
 
     def _seed_ratings(self, path: Path) -> None:
         """Pre-seed EventRating rows from db-events.yaml `ratings:` list.
