@@ -22,6 +22,8 @@ export interface EventCardProps {
     /** Two-row header layout: date + title + Save on the top row, the rest
      * below full-width. Used by the For You rails; overrides the left rail. */
     dateHeaderRow?: boolean;
+    /** Single-line date (and actions) above the title instead of the left rail. */
+    dateTopRow?: boolean;
     /** Allow the title to wrap to two lines (line-clamp-2) instead of a
      * single truncated line. Used by the map previews. */
     twoLineTitle?: boolean;
@@ -33,6 +35,8 @@ export interface EventCardProps {
     widthClass?: string;
     /** Drop the border + shadow (bottom-sheet previews). */
     borderless?: boolean;
+    /** Denser layout for space-constrained previews: smaller thumbnail and avatars, tighter padding. */
+    compact?: boolean;
     highlighted?: boolean;
     // Element toggles
     showAvatars?: boolean;
@@ -92,11 +96,13 @@ export default function EventCard({
     onHover,
     dateRail = true,
     dateHeaderRow = false,
+    dateTopRow = false,
     twoLineTitle = true,
     dateSequence,
     showImage = true,
     widthClass,
     borderless = false,
+    compact = false,
     highlighted = false,
     showAvatars = true,
     showTags = true,
@@ -159,8 +165,9 @@ export default function EventCard({
 
     // The two-row header layout replaces the left date rail with an inline
     // date + title + Save top row; the schedule line then shows time only.
-    const showLeftRail = dateRail && !dateHeaderRow;
-    const scheduleShowsTime = showLeftRail || dateHeaderRow;
+    const showLeftRail = dateRail && !dateHeaderRow && !dateTopRow;
+    const scheduleShowsTime = showLeftRail || dateHeaderRow || dateTopRow;
+    const inlineActions = dateTopRow && topActions.length > 0;
 
     const border = borderless
         ? ''
@@ -169,7 +176,7 @@ export default function EventCard({
     const width = widthClass ? `${widthClass} shrink-0` : 'w-full';
     const { imageVisible, node: imageSlot } = useEventCardImage(event, {
         show: showImage && !isPast,
-        className: 'mr-3 aspect-video w-28 shrink-0 rounded-none',
+        className: `mr-3 aspect-video ${compact ? 'w-20' : 'w-28'} shrink-0 rounded-none`,
     });
 
     // Shared building blocks so the two header layouts (left rail vs. two-row)
@@ -211,10 +218,10 @@ export default function EventCard({
         <div className="mt-1 flex items-center gap-1">{popularityBadgesInner}</div>
     ) : null;
     const avatarsBlock = showAvatars ? (
-        <div className="mt-2.5">
+        <div className={compact ? 'mt-1.5' : 'mt-2.5'}>
             <AttendeeAvatarStack
                 eventId={event.event_id}
-                size="md"
+                size={compact ? 'sm' : 'md'}
                 goingFriendsPreview={followingBadgeEnabled ? event.friends_going_preview : undefined}
                 hideIfOnlyCurrentUser={hideAvatarsIfOnlyCurrentUser}
             />
@@ -353,7 +360,7 @@ export default function EventCard({
                     </div>
                 </>
             ) : (
-                <div className="pointer-events-none relative z-[1] flex min-w-0 flex-row px-4 py-3">
+                <div className={`pointer-events-none relative z-[1] flex min-w-0 flex-row ${borderless ? 'px-2' : 'px-4'} ${compact ? 'py-2' : 'py-3'}`}>
                     {showLeftRail && (
                         <div className="flex shrink-0 self-stretch">
                             <EventDateRail
@@ -364,7 +371,45 @@ export default function EventCard({
                         </div>
                     )}
                     <div className={`relative z-[1] flex min-w-0 flex-1 flex-col ${showLeftRail ? 'pl-3' : ''}`}>
-                        {topActions.length > 0 && (
+                        {dateTopRow && (
+                            <div className="mb-1 flex min-h-6 items-center justify-between gap-2">
+                                <span className="flex min-w-0 items-center gap-1.5 leading-tight" aria-hidden="true" data-testid="event-card-date-top-row">
+                                    {dateSequence != null && (
+                                        // eslint-disable-next-line no-restricted-syntax -- journey order badge is a circle by design
+                                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-action px-1 text-[11px] font-extrabold leading-none text-white shadow-sm" data-testid="event-date-sequence">
+                                            {dateSequence}
+                                        </span>
+                                    )}
+                                    <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-weekday'}>
+                                        {start.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()}
+                                    </span>
+                                    <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-month'}>
+                                        {start.toLocaleDateString(undefined, { month: 'short' }).toUpperCase()}
+                                    </span>
+                                    <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-day'}>{start.getDate()}</span>
+                                </span>
+                                {inlineActions && (
+                                    <div
+                                        className="pointer-events-auto flex shrink-0 items-center gap-1"
+                                        data-testid={actionsTestId}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onKeyDown={(e) => e.stopPropagation()}
+                                    >
+                                        <CardActionCluster
+                                            eventId={event.event_id}
+                                            eventTitle={event.title}
+                                            isSavedFlag={isSavedFlag}
+                                            isPast={isPast}
+                                            include={topActions}
+                                            showSaveStats={eventCardSaveShowStatsEnabled}
+                                            showGoingStats={eventCardImgoingShowStatsEnabled}
+                                            goingIconVariant={goingIconVariant}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {topActions.length > 0 && !inlineActions && (
                             <div
                                 className="pointer-events-auto absolute top-0 right-0 z-[2] flex items-center gap-1"
                                 data-testid={actionsTestId}
@@ -389,7 +434,7 @@ export default function EventCard({
                             <div className={`flex min-w-0 flex-1 flex-col ${imageSlot ? 'min-h-[5rem] justify-between' : ''}`}>
                                 <div className="min-w-0">
                                     <h3
-                                        className={`min-w-0 ${twoLineTitle ? 'line-clamp-2' : 'truncate'} text-sm font-semibold leading-snug text-ink group-hover:text-action ${topActions.length > 0 ? 'pr-14' : ''}`}
+                                        className={`min-w-0 ${twoLineTitle ? 'line-clamp-2' : 'truncate'} text-sm font-semibold leading-snug text-ink group-hover:text-action ${topActions.length > 0 && !inlineActions ? 'pr-14' : ''}`}
                                         title={event.title}
                                     >
                                         {newDot}

@@ -520,8 +520,12 @@ body {
 }
 
 .filter-sheet-panel {
-  height: min(90dvh, calc(100dvh - 2.75rem));
+  max-height: min(90dvh, calc(100dvh - 2.75rem));
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.filter-sheet-panel--full {
+  height: min(90dvh, calc(100dvh - 2.75rem));
 }
 
 .filter-sheet-section {

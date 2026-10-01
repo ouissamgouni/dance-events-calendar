@@ -235,6 +235,99 @@ tasks:
         fi
 
   # ──────────────────────────────────────────────────────────────────────────
+  # Recap: what an orchestrator run deployed, by comparing refs/deploys/<env>/*
+  # against a snapshot taken before the run.
+  #   ENV=prod|staging  BEFORE="db=<sha|-> backend=<sha|-> frontend=<sha|->"
+  #   FAILED=<component> (optional — the component that stopped the run)
+  # Not internal: release.yml / shell loops call it via `task deploy:_recap`.
+  # ──────────────────────────────────────────────────────────────────────────
+
+  _recap:
+    silent: true
+    cmds:
+      - |
+        ENV="{{.ENV}}"; FAILED="{{.FAILED}}"
+        for P in {{.BEFORE}}; do
+          eval "B_${P%%=*}=\${P#*=}"
+        done
+        get() { eval "echo \"\${$1_$2}\""; }
+        comp_path() {
+          case "$1" in
+            db) echo "backend/db/alembic" ;;
+            backend) echo "backend" ;;
+            frontend) echo "frontend" ;;
+          esac
+        }
+        label() {
+          T=""
+          if [ -z "$2" ]; then
+            T="(none)"
+          elif [ "$ENV" = "prod" ]; then
+            T=$(git describe --tags --exact-match --match "$1-v*" "$2" 2>/dev/null || true)
+          fi
+          if [ -z "$T" ]; then T=$(git rev-parse --short=7 "$2"); fi
+          echo "$T"
+        }
+
+        git fetch origin "+refs/deploys/$ENV/*:refs/deploys/$ENV/*" --quiet 2>/dev/null || true
+
+        if [ "$ENV" = "prod" ]; then
+          TITLE="PRODUCTION"; BE_URL="https://movida.fly.dev"
+          FE_URL="https://joinmovida.com (alias: https://movida.pages.dev)"
+          OPEN="open:isolated:prod"; DBCHECK="db:check:prod"; LOGS="fly:logs"
+        else
+          TITLE="REMOTE STAGING"; BE_URL="https://movida-staging.fly.dev"
+          FE_URL="https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
+          OPEN="open:isolated:staging:remote"; DBCHECK="db:check:staging:remote"; LOGS="logs:staging:remote"
+        fi
+
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════════════"
+        echo "  RECAP — $TITLE"
+        echo ""
+        DONE=""
+        for C in db backend frontend; do
+          B=$(get B "$C")
+          if [ "$B" = "-" ]; then B=""; fi
+          A=$(git rev-parse --verify --quiet "refs/deploys/$ENV/$C" 2>/dev/null || true)
+          if [ "$C" = "$FAILED" ]; then
+            printf "  ❌ %-9s failed — still %s\n" "$C" "$(label "$C" "$B")"
+          elif [ "$A" = "$B" ]; then
+            printf "  ·  %-9s unchanged (%s)\n" "$C" "$(label "$C" "$B")"
+          else
+            DONE="$DONE $C"
+            if [ -n "$B" ]; then
+              N=$(git rev-list --count --no-merges "$B..$A" -- "$(comp_path "$C")" 2>/dev/null || echo "?")
+              INFO="$N commits"
+              if [ "$N" = "0" ]; then INFO="no new commits (rollback/redeploy)"; fi
+            else
+              INFO="first deploy"
+            fi
+            printf "  ✅ %-9s %s → %s  (%s)\n" "$C" "$(label "$C" "$B")" "$(label "$C" "$A")" "$INFO"
+            if [ -n "$B" ]; then
+              git log --oneline --no-merges -8 "$B..$A" -- "$(comp_path "$C")" 2>/dev/null | sed 's/^/        /'
+              if [ "$N" != "?" ] && [ "$N" -gt 8 ]; then echo "        … $((N-8)) more"; fi
+            fi
+          fi
+        done
+
+        if [ -z "$DONE" ]; then
+          echo ""
+          echo "  Nothing was deployed."
+          echo "═══════════════════════════════════════════════════════════════════════"
+          exit 0
+        fi
+        echo ""
+        case " $DONE " in *" backend "*) echo "  Backend:  $BE_URL" ;; esac
+        case " $DONE " in *" frontend "*) echo "  Frontend: $FE_URL" ;; esac
+        echo ""
+        echo "  Verify:"
+        echo "    task $OPEN    → open in isolated browser"
+        case " $DONE " in *" db "*) echo "    task $DBCHECK    → DB migration state" ;; esac
+        case " $DONE " in *" backend "*) echo "    task $LOGS    → backend logs" ;; esac
+        echo "═══════════════════════════════════════════════════════════════════════"
+
+  # ──────────────────────────────────────────────────────────────────────────
   # Status: what is currently deployed
   # ──────────────────────────────────────────────────────────────────────────
 
@@ -1065,29 +1158,21 @@ tasks:
           exit 0
         fi
 
+        BEFORE=""
+        for C in db backend frontend; do
+          BEFORE="$BEFORE $C=$(git rev-parse --verify --quiet "refs/deploys/staging/$C" 2>/dev/null || echo -)"
+        done
+        FAILED=""
         for C in db backend frontend; do
           [ -n "$(get SEL $C)" ] || continue
           echo ""
           echo "━━━━ $C ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          task deploy:staging:remote:$C REF="$REF" || { echo "❌ $C deploy failed; stopping."; exit 1; }
+          if ! task deploy:staging:remote:$C REF="$REF"; then
+            echo "❌ $C deploy failed; stopping."; FAILED="$C"; break
+          fi
         done
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Remote staging deployed"
-        echo "   Backend:  https://movida-staging.fly.dev"
-        echo "   Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
-        echo ""
-        echo "Verify:"
-        echo "   task open:isolated:staging:remote              → Open in isolated browser"
-        echo "   task open:isolated:staging:remote COUNT=2      → Multi-user QA"
-        echo "   task deploy:staging:status  → what is currently deployed"
-        echo "   task db:check:staging:remote   → DB migration state"
-        echo "   task db:check:tags-drift:staging:remote → reference-tag drift vs scenarios/staging/"
-        echo "   task logs:staging:remote       → backend logs"
-        echo ""
-        echo "If reference data needs to match scenarios/staging/ exactly:"
-        echo "   task db:seed:staging:remote"
-        echo "═══════════════════════════════════════════════════════════════"
+        task deploy:_recap ENV=staging BEFORE="$BEFORE" FAILED="$FAILED"
+        [ -z "$FAILED" ] || exit 1
 
   # ══════════════════════════════════════════════════════════════════════════
   # PROD REMOTE — worktree-aware orchestrators (interactive use)
@@ -1277,6 +1362,11 @@ tasks:
             LOG=$(git log --oneline "$CUR..$REF^{commit}" 2>/dev/null | head -20)
           fi
           printf "current=%s → next=%s%s\n%s" "$CUR_NAME" "$REF" "$DIFF" "$LOG"
+      BEFORE:
+        sh: |
+          for C in db backend frontend; do
+            printf "%s=%s " "$C" "$(git rev-parse --verify --quiet "refs/deploys/prod/$C" 2>/dev/null || echo -)"
+          done
     deps:
       - task: _prepare-ref-prod
         vars: { REF: "{{.REF}}" }
@@ -1304,24 +1394,8 @@ tasks:
       - echo "━━━━ [3/3] Frontend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - task: prod:remote:frontend
         vars: { REF: "{{.REF}}" }
-      - |
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Production fully deployed"
-        echo "   Backend:  https://movida.fly.dev"
-        echo "   Frontend: https://joinmovida.com (alias: https://movida.pages.dev)"
-        echo ""
-        echo "Verify:"
-        echo "   task open:isolated:prod              → Open in isolated browser"
-        echo "   task open:isolated:prod COUNT=2      → Multi-user smoke check"
-        echo "   task deploy:prod:status  → what is currently deployed"
-        echo "   task db:check:prod          → DB migration state"
-        echo "   task db:check:tags-drift:prod → reference-tag drift vs scenarios/prod/"
-        echo "   task fly:logs               → backend logs"
-        echo ""
-        echo "If reference data needs to match scenarios/prod/ exactly:"
-        echo "   task db:seed:prod"
-        echo "═══════════════════════════════════════════════════════════════"
+      - task: _recap
+        vars: { ENV: prod, BEFORE: "{{.BEFORE}}" }
 
   # ──────────────────────────────────────────────────────────────────────────
   # STAGING LOCAL — docker-compose

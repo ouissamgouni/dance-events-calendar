@@ -18,7 +18,7 @@ import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel from '../components/EventListPanel';
 import MyEventsMapPreview from '../components/MyEventsMapPreview';
 import SummaryBar from '../components/SummaryBar';
-import ViewSwitcher from '../components/ViewSwitcher';
+import ViewSwitcher, { VIEW_SWITCHER_BAND_PX } from '../components/ViewSwitcher';
 import type { ExploreView } from '../components/ViewSwitcher';
 import FilterSheet from '../components/FilterSheet';
 import type { FilterSheetSection } from '../components/FilterSheet';
@@ -649,6 +649,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     );
     const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
     const [explorerPreviewHeight, setExplorerPreviewHeight] = useState(0);
+    const [explorerPreviewCollapsed, setExplorerPreviewCollapsed] = useState(false);
+    const [explorerFitAllToken, setExplorerFitAllToken] = useState(0);
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
     const [calMapBounds, setCalMapBounds] = useState<MapBounds | null>(null);
@@ -1199,12 +1201,21 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     // Mobile explorer map preview: a persistent bottom sheet (mirroring My
     // Events) previews an event and pages through the list. It defaults to
     // the first matching event so the sheet is never empty.
-    const explorerPreviewEvent = (mapFullscreen && !isDesktop)
+    const explorerPreviewEvent = (mapFullscreen && !isDesktop && !explorerPreviewCollapsed)
         ? (selectedExplorerMapEvent ?? explorerMatchingEvents[0] ?? null)
         : null;
     const explorerPreviewIndex = explorerPreviewEvent
         ? explorerMatchingEvents.findIndex((event) => event.event_id === explorerPreviewEvent.event_id)
         : -1;
+    const [prevMapFullscreen, setPrevMapFullscreen] = useState(mapFullscreen);
+    if (prevMapFullscreen !== mapFullscreen) {
+        setPrevMapFullscreen(mapFullscreen);
+        if (mapFullscreen) setExplorerPreviewCollapsed(false);
+    }
+    const collapseExplorerPreview = useCallback(() => {
+        setExplorerPreviewCollapsed(true);
+        setExplorerFitAllToken((n) => n + 1);
+    }, []);
     const stepExplorerMapPreview = useCallback((delta: number) => {
         setSelectedExplorerMapEventId((currentId) => {
             const anchorId = currentId ?? explorerMatchingEvents[0]?.event_id ?? null;
@@ -1378,6 +1389,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     const handleExplorerMapMarkerSelect = useCallback((evt: CalendarEvent) => {
         setSelectedExplorerMapEventId(evt.event_id);
         setHoveredEventId(evt.event_id);
+        setExplorerPreviewCollapsed(false);
     }, []);
 
     const handleCloseModal = useCallback(() => {
@@ -1503,10 +1515,6 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
 
     const renderReachFilter = () => (
         <div>
-            <div className="mb-2 flex items-center gap-1 text-xs font-semibold text-ink">
-                <span>Event reach</span>
-                <span title="Any includes events without a reach classification" aria-label="Any includes unclassified events">ⓘ</span>
-            </div>
             <div role="group" aria-label="Event reach" className="grid grid-cols-3 border border-line">
                 {(['any', 'regional_plus', 'international'] as const).map((choice) => (
                     <button
@@ -1520,14 +1528,15 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                             bumpAutoFit();
                         }}
                         className={reachFilter === choice
-                            ? 'flex min-h-14 flex-col items-center justify-center gap-1 bg-blue-50 px-2 text-xs font-semibold text-action'
-                            : 'flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-semibold text-ink'}
+                            ? 'flex min-h-16 flex-col items-center justify-center gap-1.5 bg-blue-50 px-2 text-sm font-semibold text-action'
+                            : 'flex min-h-16 flex-col items-center justify-center gap-1.5 px-2 text-sm font-semibold text-ink'}
                     >
-                        <img src={REACH_FILTER_ICON_SRC[choice]} alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
+                        <img src={REACH_FILTER_ICON_SRC[choice]} alt="" aria-hidden="true" className="h-6 w-6 object-contain" />
                         {REACH_FILTER_LABELS[choice]}
                     </button>
                 ))}
             </div>
+            <p className="mt-2 text-[13px] text-ink-soft">Any includes events without a reach classification.</p>
         </div>
     );
 
@@ -1587,8 +1596,9 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         ...(viewMode === 'calendar' ? [] : [{
             id: 'dates',
             label: 'Dates',
-            icon: <img src="/calendar.png" alt="" className="h-4 w-4" />,
+            icon: <img src="/calendar.png" alt="" className="h-5 w-5" />,
             group: 'Dates',
+            size: 'compact' as const,
             summary: endDate ? `${fmtDateShort(startDate)} – ${fmtDateShort(endDate)}` : 'Any',
             render: () => (
                 <DateRangePicker startDate={startDate} endDate={endDate} onChange={handleDateRangeChange} />
@@ -1597,7 +1607,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         {
             id: 'area',
             label: 'Area',
-            icon: <img src="/map.png" alt="" className="h-4 w-4" />,
+            icon: <img src="/map.png" alt="" className="h-5 w-5" />,
             group: 'Search profile',
             groupVariant: 'boxed' as const,
             summary: areaSummary,
@@ -1608,7 +1618,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 <button
                     type="button"
                     onClick={() => setSearchProfileStep('picker')}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-ink hover:text-action"
+                    className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-ink hover:text-action"
                     data-testid="search-profile-selector"
                 >
                     <span className="truncate">
@@ -1632,18 +1642,20 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         ...(danceGroup ? [{
             id: 'dance',
             label: 'Dance styles',
-            icon: <img src="/dance.png" alt="" className="h-4 w-4" />,
+            icon: <img src="/dance.png" alt="" className="h-5 w-5" />,
             group: 'Search profile',
             groupVariant: 'boxed' as const,
+            size: 'compact' as const,
             summary: groupSummary(danceGroup, 'Any'),
             render: () => renderGroupPills(danceGroup),
         }] : []),
         ...(reachGroup ? [{
             id: 'reach',
             label: 'Event reach',
-            icon: <img src="/scale.png" alt="" className="h-4 w-4" />,
+            icon: <img src="/scale.png" alt="" className="h-5 w-5" />,
             group: 'Search profile',
             groupVariant: 'boxed' as const,
+            size: 'compact' as const,
             summary: REACH_FILTER_LABELS[reachFilter],
             render: renderReachFilter,
         }] : []),
@@ -1656,11 +1668,11 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             groupVariant: 'boxed' as const,
             summary: '',
             customRow: (
-                <div className="flex justify-end px-4 py-2">
+                <div className="flex justify-end px-4">
                     <button
                         type="button"
                         onClick={() => setSearchProfileStep('save')}
-                        className="text-xs font-medium text-action hover:opacity-80"
+                        className="min-h-11 text-[13px] font-medium text-action hover:opacity-80"
                         data-testid="search-profile-save-action"
                     >
                         Save profile
@@ -1671,7 +1683,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         {
             id: 'people',
             label: 'People',
-            icon: <img src="/high-five.png" alt="" className="h-4 w-4" />,
+            icon: <img src="/high-five.png" alt="" className="h-5 w-5" />,
             group: 'Other filters',
             summary: peopleSummary,
             preview: (interestUserHandles.length > 0) ? (
@@ -1692,8 +1704,9 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         ...(formatGroup ? [{
             id: 'format',
             label: 'Event format',
-            icon: <img src="/category.png" alt="" className="h-4 w-4" />,
+            icon: <img src="/category.png" alt="" className="h-5 w-5" />,
             group: 'Other filters',
+            size: 'compact' as const,
             summary: groupSummary(formatGroup, 'Any'),
             badge: groupSelCount(formatGroup) || undefined,
             render: () => renderGroupPills(formatGroup),
@@ -1701,7 +1714,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         ...(moreGroups.length > 0 ? [{
             id: 'more',
             label: 'More filters',
-            icon: <img src="/more.png" alt="" className="h-4 w-4" />,
+            icon: <img src="/more.png" alt="" className="h-5 w-5" />,
             group: 'Other filters',
             summary: (() => {
                 const n = moreGroups.reduce((acc, g) => acc + groupSelCount(g), 0);
@@ -1720,13 +1733,13 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         }] : []),
     ];
 
-    const renderFilterSummaryBar = (opts?: { className?: string }) => {
+    const renderFilterSummaryBar = (opts?: { className?: string; singleLine?: boolean }) => {
         const isCal = viewMode === 'calendar';
         const count = isCal ? calendarVisibleEvents.length : explorerMatchingEvents.length;
         return (
             <SummaryBar
                 className={opts?.className}
-                twoLine={summaryTwoLineEnabled}
+                twoLine={summaryTwoLineEnabled && !opts?.singleLine}
                 totalCount={count}
                 visibleCount={count}
                 startDate={isCal ? calendarSummaryRange.startDate : startDate}
@@ -1791,7 +1804,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 {(!loading || initialLoadDone.current) && !error && (
                     <>
                         <div className="sticky top-0 z-40 bg-canvas">
-                            {renderFilterSummaryBar()}
+                            {renderFilterSummaryBar({ singleLine: viewMode === 'calendar' })}
                         </div>
                     </>
                 )}
@@ -1840,12 +1853,17 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                     <div
                                         className={
                                             mapFullscreen
-                                                ? 'explorer-map-shell fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] md:bottom-0 top-[calc(64px+env(safe-area-inset-top))] z-[8000] bg-surface overflow-hidden flex flex-col'
+                                                ? 'explorer-map-shell fixed inset-x-0 bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] transition-[bottom] md:bottom-0 top-[calc(64px+env(safe-area-inset-top))] z-[8000] bg-surface overflow-hidden flex flex-col'
                                                 : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden flex flex-col'
                                         }
                                         data-testid="explorer-map-shell"
                                         data-fullscreen={mapFullscreen ? 'true' : 'false'}
                                     >
+                                        {mapFullscreen && !isDesktop && (
+                                            <div className="relative z-[702] flex shrink-0 items-center border-b border-line bg-surface" data-testid="map-fullscreen-header">
+                                                {renderFilterSummaryBar({ className: 'flex-1 min-w-0', singleLine: true })}
+                                            </div>
+                                        )}
                                         <div className="relative flex min-h-0 flex-1">
                                             <EventMap
                                                 events={explorerMatchingEvents}
@@ -1867,6 +1885,11 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                 showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
                                                 showTrendingOverlay={mapTrendingOverlay}
                                                 compact={false}
+                                                selectedEventId={explorerPreviewEvent ? selectedExplorerMapEventId : null}
+                                                fitAllToken={explorerFitAllToken}
+                                                obscuredInsets={mapFullscreen && !isDesktop
+                                                    ? { top: 0, bottom: VIEW_SWITCHER_BAND_PX }
+                                                    : undefined}
                                             />
                                             {/* Search-this-area pill. Appears when
                                     the user has panned/zoomed away from the
@@ -1878,7 +1901,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                 <button
                                                     type="button"
                                                     onClick={handleSearchThisArea}
-                                                    className={`absolute left-1/2 -translate-x-1/2 z-[703] inline-flex items-center gap-1 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-action text-xs font-semibold px-3 py-1.5 shadow-md transition ${mapFullscreen && !isDesktop ? 'top-14' : 'top-2'}`}
+                                                    className="absolute top-2 left-1/2 -translate-x-1/2 z-[703] inline-flex items-center gap-1 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-action text-xs font-semibold px-3 py-1.5 shadow-md transition"
                                                     data-testid="map-search-this-area"
                                                 >
                                                     Search this area
@@ -1899,11 +1922,6 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                     {mapFullscreen ? '×' : '⤢'}
                                                 </button>
                                             )}
-                                            {mapFullscreen && !isDesktop && (
-                                                <div className="absolute top-0 inset-x-0 z-[702] flex items-center bg-surface/95 backdrop-blur" data-testid="map-fullscreen-header">
-                                                    {renderFilterSummaryBar({ className: 'flex-1 min-w-0' })}
-                                                </div>
-                                            )}
                                         </div>
                                         {mapFullscreen && !isDesktop && explorerPreviewEvent && (
                                             <MyEventsMapPreview
@@ -1918,12 +1936,12 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                 onOpen={() => handleExplorerMapEventClick(explorerPreviewEvent)}
                                                 showAvatars
                                                 showTags
-                                                showReviews
                                                 showPrice
                                                 showActions
                                                 showRatings={!!showRatings}
                                                 followingBadgeEnabled={followingBadgeEnabled}
                                                 onHeightChange={setExplorerPreviewHeight}
+                                                onCollapse={collapseExplorerPreview}
                                             />
                                         )}
                                     </div>
@@ -2061,6 +2079,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                 newEventIds={newEventIds}
                                 popularityThreshold={popularityThreshold}
                                 onMarkSeen={markSeen}
+                                cooperativeGestures={!isDesktop}
                             />
                         )}
                     />

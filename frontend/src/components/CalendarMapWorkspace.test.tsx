@@ -26,7 +26,7 @@ vi.mock('./Calendar', () => ({
 describe('CalendarMapWorkspace', () => {
     afterEach(() => vi.restoreAllMocks());
 
-    it('shares range controls, visible dates and the map-only toggle', async () => {
+    it('shares range controls, visible dates and the collapsible calendar', async () => {
         const user = userEvent.setup();
         const onViewModeChange = vi.fn();
         const onDatesChange = vi.fn();
@@ -49,11 +49,15 @@ describe('CalendarMapWorkspace', () => {
         await user.click(screen.getByRole('button', { name: '30d' }));
         expect(onViewModeChange).toHaveBeenCalledWith('month');
 
-        const mapOnlyButton = screen.getByRole('button', { name: 'Show map only' });
-        expect(mapOnlyButton).toHaveTextContent('Map only');
-        await user.click(mapOnlyButton);
+        const hideButton = screen.getByRole('button', { name: 'Hide calendar' });
+        expect(hideButton).toHaveAttribute('aria-expanded', 'true');
+        expect(hideButton).toHaveAttribute('aria-controls', screen.getByTestId('calendar-container').id);
+        await user.click(hideButton);
         expect(screen.getByTestId('map')).toHaveAttribute('data-calendar-visible', 'false');
-        expect(screen.getByRole('button', { name: 'Show calendar and map' })).toHaveTextContent('Calendar + map');
+        const showButton = screen.getByRole('button', { name: 'Show calendar' });
+        expect(showButton).toHaveAttribute('aria-expanded', 'false');
+        await user.click(showButton);
+        expect(screen.getByTestId('map')).toHaveAttribute('data-calendar-visible', 'true');
     });
 
     it('renders a calendar-only workspace without map controls', async () => {

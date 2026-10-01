@@ -1,6 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type FullCalendar from '@fullcalendar/react';
-import { CalendarDays, ChevronLeft, ChevronRight, Map } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import type { CalendarViewMode } from './Calendar';
 
@@ -68,6 +68,8 @@ export default function CalendarMapWorkspace({
     const [title, setTitle] = useState('');
     const [remainingMapHeight, setRemainingMapHeight] = useState(0);
     const remainingMapLayout = layout === 'remaining-map';
+    const collapsible = !!map && !remainingMapLayout;
+    const calendarId = useId();
 
     const measureRemainingMap = useCallback(() => {
         if (!remainingMapLayout || !map) {
@@ -107,7 +109,7 @@ export default function CalendarMapWorkspace({
         <div className={`flex shrink-0 gap-1 bg-canvas p-1 ${rangeSelector === 'mobile' ? 'sm:hidden' : ''}`} aria-label="Calendar range">
             <button
                 type="button"
-                className={`px-2 py-1 text-xs font-medium transition ${viewMode === '3week' ? 'bg-surface text-ink shadow-sm' : 'text-ink-soft hover:text-ink'}`}
+                className={`px-2 py-1.5 text-xs font-medium transition ${viewMode === '3week' ? 'bg-surface text-ink shadow-sm' : 'text-ink-soft hover:text-ink'}`}
                 onClick={() => onViewModeChange('3week')}
                 aria-pressed={viewMode === '3week'}
             >
@@ -115,7 +117,7 @@ export default function CalendarMapWorkspace({
             </button>
             <button
                 type="button"
-                className={`px-2 py-1 text-xs font-medium transition ${viewMode === 'month' ? 'bg-surface text-ink shadow-sm' : 'text-ink-soft hover:text-ink'}`}
+                className={`px-2 py-1.5 text-xs font-medium transition ${viewMode === 'month' ? 'bg-surface text-ink shadow-sm' : 'text-ink-soft hover:text-ink'}`}
                 onClick={() => onViewModeChange('month')}
                 aria-pressed={viewMode === 'month'}
             >
@@ -126,56 +128,59 @@ export default function CalendarMapWorkspace({
 
     return (
         <section className={layout === 'fill' || remainingMapLayout ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : ''} data-testid="calendar-map-workspace">
-            <div className={`flex shrink-0 flex-wrap items-center gap-3 ${layout === 'fill' ? 'border-b border-line bg-surface px-3 py-2' : 'mb-4'}`}>
+            <div className={`flex shrink-0 flex-wrap items-center gap-3 border-b border-line bg-surface px-3 py-2 ${layout === 'fill' ? '' : layout === 'page' ? 'mt-4 mb-4' : 'mb-4'}`}>
                 <div className="flex items-center gap-2">
                     <div className="flex">
-                        <button type="button" className="inline-flex h-8 w-8 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas" onClick={() => calendarRef.current?.getApi().prev()} aria-label="Previous calendar period">
-                            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                        <button type="button" className="inline-flex h-9 w-9 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas" onClick={() => calendarRef.current?.getApi().prev()} aria-label="Previous calendar period">
+                            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                         </button>
-                        <button type="button" className="h-8 border-y border-line bg-surface px-2.5 text-xs font-medium text-ink hover:bg-canvas" onClick={() => calendarRef.current?.getApi().today()}>
+                        <button type="button" className="h-8 border-y border-line bg-surface px-3 text-xs font-medium text-ink hover:bg-canvas" onClick={() => calendarRef.current?.getApi().today()}>
                             Today
                         </button>
-                        <button type="button" className="inline-flex h-8 w-8 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas" onClick={() => calendarRef.current?.getApi().next()} aria-label="Next calendar period">
-                            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                        <button type="button" className="inline-flex h-9 w-9 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas" onClick={() => calendarRef.current?.getApi().next()} aria-label="Next calendar period">
+                            <ChevronRight className="h-5 w-5" aria-hidden="true" />
                         </button>
                     </div>
-                    <h2 className="whitespace-nowrap text-xs font-semibold text-ink sm:text-sm">{title}</h2>
+                    <h2 className="whitespace-nowrap text-xs font-semibold text-ink">{title}</h2>
                 </div>
                 {rangeControls}
-                {map && !remainingMapLayout && (
-                    <button
-                        type="button"
-                        onClick={() => setCalendarVisible((visible) => !visible)}
-                        className="inline-flex h-8 items-center justify-center gap-1.5 border border-line bg-surface px-2 text-xs font-medium text-ink transition hover:bg-canvas"
-                        aria-pressed={!calendarVisible}
-                        aria-label={calendarVisible ? 'Show map only' : 'Show calendar and map'}
-                        title={calendarVisible ? 'Show map only' : 'Show calendar and map'}
-                        data-testid="calendar-map-toggle"
-                    >
-                        {calendarVisible ? <Map className="h-4 w-4" aria-hidden="true" /> : <CalendarDays className="h-4 w-4" aria-hidden="true" />}
-                        <span>{calendarVisible ? 'Map only' : 'Calendar + map'}</span>
-                    </button>
-                )}
             </div>
             <div ref={contentRef} className={remainingMapLayout ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-2' : layout === 'fill' ? 'flex min-h-0 flex-1 flex-col gap-2 p-2 lg:flex-row' : 'flex flex-col gap-6 lg:flex-row'} data-testid="calendar-map-content">
-                <div ref={calendarContainerRef} className={!map || calendarVisible
-                    ? remainingMapLayout ? 'min-h-0 min-w-0 max-h-full shrink-0 overflow-auto' : layout === 'fill' ? 'min-h-0 min-w-0 flex-1 overflow-auto' : 'min-w-0 flex-1'
-                    : 'calendar-hide-grid h-0 overflow-hidden'
-                } data-testid="calendar-container">
-                    <Suspense fallback={<p className="py-20 text-center text-sm text-muted">Loading calendar…</p>}>
-                        <Calendar
-                            ref={calendarRef}
-                            events={events}
-                            initialDate={initialDate}
-                            sinceDate={sinceDate}
-                            onDatesChange={handleDatesChange}
-                            onEventClick={onEventClick}
-                            hoveredEventId={hoveredEventId}
-                            onEventHover={onEventHover}
-                            offMapEventIds={offMapEventIds}
-                            viewMode={viewMode}
-                        />
-                    </Suspense>
+                <div className={!collapsible ? 'contents' : calendarVisible ? `flex min-w-0 flex-1 flex-col ${layout === 'fill' ? 'min-h-0' : ''}` : 'flex shrink-0 flex-col lg:self-start'}>
+                    {collapsible && (
+                        <button
+                            type="button"
+                            onClick={() => setCalendarVisible((visible) => !visible)}
+                            className={calendarVisible
+                                ? 'inline-flex h-7 shrink-0 items-center gap-1 self-end px-2 text-xs font-medium text-ink-soft transition hover:text-ink'
+                                : 'flex h-10 w-full shrink-0 items-center justify-between gap-2 border border-line bg-surface px-3 text-sm font-medium text-ink transition hover:bg-canvas'}
+                            aria-expanded={calendarVisible}
+                            aria-controls={calendarId}
+                            data-testid="calendar-map-toggle"
+                        >
+                            <span>{calendarVisible ? 'Hide calendar' : 'Show calendar'}</span>
+                            {calendarVisible ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-5 w-5" aria-hidden="true" />}
+                        </button>
+                    )}
+                    <div ref={calendarContainerRef} id={calendarId} className={!map || calendarVisible
+                        ? remainingMapLayout ? 'min-h-0 min-w-0 max-h-full shrink-0 overflow-auto' : layout === 'fill' ? 'min-h-0 min-w-0 flex-1 overflow-auto' : 'min-w-0 flex-1'
+                        : 'calendar-hide-grid h-0 overflow-hidden'
+                    } data-testid="calendar-container">
+                        <Suspense fallback={<p className="py-20 text-center text-sm text-muted">Loading calendar…</p>}>
+                            <Calendar
+                                ref={calendarRef}
+                                events={events}
+                                initialDate={initialDate}
+                                sinceDate={sinceDate}
+                                onDatesChange={handleDatesChange}
+                                onEventClick={onEventClick}
+                                hoveredEventId={hoveredEventId}
+                                onEventHover={onEventHover}
+                                offMapEventIds={offMapEventIds}
+                                viewMode={viewMode}
+                            />
+                        </Suspense>
+                    </div>
                 </div>
                 {map && (!remainingMapLayout || remainingMapHeight > 0) && (
                     <div className={calendarVisible

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import FullScreenEditor from './FullScreenEditor';
 
 // FilterSheet — the explorer's filter hub. In sectioned mode it renders a
@@ -28,6 +28,9 @@ export interface FilterSheetSection {
     badge?: number;
     /** Renders the sub-editor body for this section. Omit for ``customRow``. */
     render?: () => React.ReactNode;
+    /** Mobile sheet height for the sub-editor: ``compact`` hugs its content
+     *  (keeps short editors in thumb reach); ``full`` (default) fills the sheet. */
+    size?: 'compact' | 'full';
     /** Optional right-aligned header action inside the sub-editor. */
     headerAction?: React.ReactNode;
     /** Custom sub-editor footer; when omitted the default CTA is used. */
@@ -80,6 +83,7 @@ export interface FilterSheetProps {
 }
 
 const SAVE_DEFAULTS_ID = '__save_defaults__';
+const SWIPE_CLOSE_PX = 48;
 
 export default function FilterSheet({
     open,
@@ -96,6 +100,7 @@ export default function FilterSheet({
 }: FilterSheetProps) {
     const sectioned = !!sections && sections.length > 0;
     const [activeSectionId, setActiveSectionId] = useState<string | null>(initialSectionId);
+    const swipeStartY = useRef<number | null>(null);
 
     // On open, honor a deep-link section; on close, reset navigation so the
     // next open starts from the section list (unless deep-linked again).
@@ -125,8 +130,18 @@ export default function FilterSheet({
 
     if (!open) return null;
 
+    const isSheet = variant === 'sheet';
+    const swipeHandlers = {
+        onPointerDown: (e: React.PointerEvent) => { swipeStartY.current = e.clientY; },
+        onPointerUp: (e: React.PointerEvent) => {
+            const start = swipeStartY.current;
+            swipeStartY.current = null;
+            if (start != null && e.clientY - start > SWIPE_CLOSE_PX) onClose();
+        },
+    };
+
     const chevron = (
-        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
             <path d="M8 4l6 6-6 6" />
         </svg>
     );
@@ -136,13 +151,16 @@ export default function FilterSheet({
         : `Show ${matchingEventCount} event${matchingEventCount === 1 ? '' : 's'}`;
 
     const header = (
-        <div className="flex items-center justify-between border-b border-line px-3 py-2">
-            <h2 className="text-sm font-semibold text-ink">Filters</h2>
+        <div
+            className={`flex items-center justify-between border-b border-line pl-4 pr-1 py-1 ${isSheet ? 'touch-none' : ''}`}
+            {...(isSheet ? swipeHandlers : {})}
+        >
+            <h2 className="text-base font-semibold text-ink">Filters</h2>
             <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close filters"
-                className="inline-flex h-7 w-7 items-center justify-center text-ink-soft hover:text-ink hover:bg-canvas"
+                className="inline-flex h-11 w-11 items-center justify-center text-xl text-ink-soft hover:text-ink hover:bg-canvas"
             >
                 ×
             </button>
@@ -150,24 +168,14 @@ export default function FilterSheet({
     );
 
     const footer = (
-        <div className="border-t border-line bg-canvas px-3 py-2 flex flex-col gap-2">
-            {saveDefaults && saveDefaults.options.length > 0 && (
-                <button
-                    type="button"
-                    onClick={() => setActiveSectionId(SAVE_DEFAULTS_ID)}
-                    className="text-xs text-action hover:underline underline-offset-2 text-left"
-                    data-testid="filter-sheet-save-defaults"
-                >
-                    Save current as my defaults…
-                </button>
-            )}
+        <div className="border-t border-line bg-canvas px-4 pb-3 flex flex-col gap-1">
             <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                     {onReset && (
                         <button
                             type="button"
                             onClick={onReset}
-                            className="text-xs text-ink-soft hover:text-ink underline-offset-2 hover:underline"
+                            className="min-h-11 text-[13px] text-ink-soft hover:text-ink underline-offset-2 hover:underline"
                             data-testid="filter-sheet-reset"
                         >
                             Reset to defaults
@@ -177,21 +185,31 @@ export default function FilterSheet({
                         type="button"
                         onClick={onClearAll}
                         disabled={!onClearAll || activeFilterCount === 0}
-                        className="text-xs text-ink-soft hover:text-ink underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
+                        className="min-h-11 text-[13px] text-ink-soft hover:text-ink underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
                         data-testid="filter-sheet-clear-all"
                     >
                         Clear all
                     </button>
                 </div>
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="inline-flex items-center bg-action hover:bg-action text-white text-sm font-semibold px-3 py-1.5 shadow-sm transition"
-                    data-testid="filter-sheet-apply"
-                >
-                    {ctaLabel}
-                </button>
+                {saveDefaults && saveDefaults.options.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => setActiveSectionId(SAVE_DEFAULTS_ID)}
+                        className="min-h-11 text-[13px] text-action hover:underline underline-offset-2 text-right"
+                        data-testid="filter-sheet-save-defaults"
+                    >
+                        Save as defaults…
+                    </button>
+                )}
             </div>
+            <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex min-h-11 w-full items-center justify-center bg-action hover:opacity-90 text-white text-sm font-semibold px-4 shadow-sm transition"
+                data-testid="filter-sheet-apply"
+            >
+                {ctaLabel}
+            </button>
         </div>
     );
 
@@ -209,18 +227,18 @@ export default function FilterSheet({
                 <button
                     type="button"
                     onClick={() => setActiveSectionId(section.id)}
-                    className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-canvas"
+                    className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-canvas"
                     data-testid={`filter-sheet-row-${section.id}`}
                 >
                     {section.icon && <span className="shrink-0 text-ink-soft">{section.icon}</span>}
-                    <span className="shrink-0 text-sm font-medium text-ink">{section.label}</span>
+                    <span className="shrink-0 text-[15px] font-medium text-ink">{section.label}</span>
                     {section.badge ? (
-                        <span className="shrink-0 inline-flex h-4 min-w-4 items-center justify-center bg-blue-100 px-1 text-[10px] font-semibold text-blue-700">
+                        <span className="shrink-0 inline-flex h-5 min-w-5 items-center justify-center bg-blue-100 px-1 text-[11px] font-semibold text-blue-700">
                             {section.badge}
                         </span>
                     ) : null}
                     <span
-                        className={`ml-auto truncate text-xs ${summaryMuted ? 'text-muted' : 'text-ink-soft'}`}
+                        className={`ml-auto truncate text-[13px] ${summaryMuted ? 'text-muted' : 'text-ink-soft'}`}
                         data-testid={`filter-sheet-summary-${section.id}`}
                     >
                         {section.summary}
@@ -252,9 +270,9 @@ export default function FilterSheet({
                     return (
                         <div key={grp.group ?? `_${i}`}>
                             {(grp.group || groupHeaderAction) && (
-                                <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-1.5 border-b border-line">
+                                <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-2 border-b border-line">
                                     {grp.group && (
-                                        <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
+                                        <div className="text-xs font-semibold uppercase tracking-wider text-ink-soft">
                                             {grp.group}
                                         </div>
                                     )}
@@ -283,44 +301,68 @@ export default function FilterSheet({
         ? sections!.find((s) => s.id === activeSectionId && s.render) ?? null
         : null;
 
-    const panelInner = (
+    const editor = activeSection ? (
+        <FullScreenEditor
+            title={activeSection.label}
+            onBack={() => setActiveSectionId(null)}
+            headerAction={activeSection.headerAction}
+            footer={activeSection.footer}
+            ctaLabel={activeSection.footer ? undefined : ctaLabel}
+            onCta={onClose}
+            secondaryLabel="More filters"
+            onSecondary={() => setActiveSectionId(null)}
+            variant={variant}
+        >
+            {activeSection.render?.()}
+        </FullScreenEditor>
+    ) : activeSectionId === SAVE_DEFAULTS_ID && saveDefaults ? (
+        <SaveDefaultsEditor
+            options={saveDefaults.options}
+            onSave={saveDefaults.onSave}
+            onBack={() => setActiveSectionId(null)}
+            variant={variant}
+        />
+    ) : null;
+
+    // Mobile: the editor replaces the list in-flow so the panel hugs its height.
+    const panelInner = isSheet ? (
+        <>
+            <div
+                className="flex shrink-0 touch-none justify-center pt-2 pb-1.5"
+                aria-hidden="true"
+                data-testid="filter-sheet-handle"
+                {...swipeHandlers}
+            >
+                {/* eslint-disable-next-line no-restricted-syntax -- grab handle is a pill by design */}
+                <span className="h-1 w-10 rounded-full bg-line" />
+            </div>
+            {editor ?? (
+                <>
+                    {header}
+                    {body}
+                    {footer}
+                </>
+            )}
+        </>
+    ) : (
         <>
             {header}
             {body}
             {footer}
-            {activeSection && (
-                <FullScreenEditor
-                    title={activeSection.label}
-                    onBack={() => setActiveSectionId(null)}
-                    headerAction={activeSection.headerAction}
-                    footer={activeSection.footer}
-                    ctaLabel={activeSection.footer ? undefined : ctaLabel}
-                    onCta={onClose}
-                    secondaryLabel="More filters"
-                    onSecondary={() => setActiveSectionId(null)}
-                    variant={variant}
-                >
-                    {activeSection.render?.()}
-                </FullScreenEditor>
-            )}
-            {activeSectionId === SAVE_DEFAULTS_ID && saveDefaults && (
-                <SaveDefaultsEditor
-                    options={saveDefaults.options}
-                    onSave={saveDefaults.onSave}
-                    onBack={() => setActiveSectionId(null)}
-                    variant={variant}
-                />
-            )}
+            {editor}
         </>
     );
+
+    const sheetFull = !!activeSection && (activeSection.size ?? 'full') === 'full';
 
     const panel = (
         <div
             className={
                 variant === 'modal'
                     ? 'filter-modal-panel relative overflow-hidden w-full max-w-2xl h-[min(85dvh,calc(100dvh-4rem))] bg-surface border border-line shadow-xl flex flex-col'
-                    : 'filter-sheet-panel relative overflow-hidden bg-surface border-t border-line shadow-xl flex flex-col'
+                    : `filter-sheet-panel ${sheetFull ? 'filter-sheet-panel--full' : ''} relative overflow-hidden bg-surface border-t border-line shadow-xl flex flex-col animate-slide-up`
             }
+            data-testid="filter-sheet-panel"
         >
             {panelInner}
         </div>

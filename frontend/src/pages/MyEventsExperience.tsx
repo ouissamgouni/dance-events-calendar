@@ -9,7 +9,7 @@ import MyEventsAddSearch from '../components/MyEventsAddSearch';
 import MyEventsList from '../components/MyEventsList';
 import MyEventsMapPreview from '../components/MyEventsMapPreview';
 import MyEventsUtilityMenu from '../components/MyEventsUtilityMenu';
-import ViewSwitcher from '../components/ViewSwitcher';
+import ViewSwitcher, { VIEW_SWITCHER_BAND_PX } from '../components/ViewSwitcher';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
@@ -45,6 +45,9 @@ export default function MyEventsExperience() {
     const [modalEvent, setModalEvent] = useState<CalendarEvent | null>(null);
     const [searchOpen, setSearchOpen] = useState(false);
     const [mapPreviewHeight, setMapPreviewHeight] = useState(0);
+    const [previewCollapsed, setPreviewCollapsed] = useState(false);
+    const [centeredEventId, setCenteredEventId] = useState<string | null>(null);
+    const [fitAllToken, setFitAllToken] = useState(0);
     const [calendarRange, setCalendarRange] = useState<{ start: Date; end: Date } | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
@@ -96,7 +99,10 @@ export default function MyEventsExperience() {
     };
     const selectIndex = (index: number) => {
         const item = sequence[index];
-        if (item) setSelectedIds((current) => ({ ...current, [activeTab]: item.event.event_id }));
+        if (item) {
+            setSelectedIds((current) => ({ ...current, [activeTab]: item.event.event_id }));
+            setCenteredEventId(item.event.event_id);
+        }
     };
     const activeTabEventIds = useMemo(() => activeEvents.map(e => e.event_id), [activeEvents]);
 
@@ -118,7 +124,7 @@ export default function MyEventsExperience() {
                         const active = activeTab === tab.id;
                         const count = tabCounts[tab.id];
                         return (
-                            <button key={tab.id} type="button" role="tab" aria-selected={active} onClick={() => { setActiveTab(tab.id); setSearchOpen(false); }} className={`relative py-4 text-sm font-medium transition ${active ? 'text-action' : 'text-ink hover:text-action'}`}>
+                            <button key={tab.id} type="button" role="tab" aria-selected={active} onClick={() => { setActiveTab(tab.id); setSearchOpen(false); setPreviewCollapsed(false); setCenteredEventId(null); }} className={`relative py-4 text-sm font-medium transition ${active ? 'text-action' : 'text-ink hover:text-action'}`}>
                                 {tab.label}{count > 0 && ` (${count})`}
                                 {active && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-action" />}
                             </button>
@@ -163,7 +169,11 @@ export default function MyEventsExperience() {
                             <EventMap
                                 events={sequence.map(({ event }) => event)}
                                 hoveredEventId={selected?.event.event_id ?? null}
-                                onMarkerSelect={(event) => setSelectedIds((current) => ({ ...current, [activeTab]: event.event_id }))}
+                                onMarkerSelect={(event) => {
+                                    setSelectedIds((current) => ({ ...current, [activeTab]: event.event_id }));
+                                    setCenteredEventId(event.event_id);
+                                    setPreviewCollapsed(false);
+                                }}
                                 disablePopups
                                 fitMarkersControl
                                 journeySequence={sequenceNumbers}
@@ -172,13 +182,16 @@ export default function MyEventsExperience() {
                                     ? () => setRoutes((current) => ({ ...current, [activeTab]: !current[activeTab] }))
                                     : undefined}
                                 journeySelectedEventId={selected?.event.event_id}
+                                selectedEventId={centeredEventId}
+                                fitAllToken={fitAllToken}
+                                obscuredInsets={{ top: 0, bottom: VIEW_SWITCHER_BAND_PX }}
                             />
                         ) : <div className="flex h-full items-center justify-center px-6 text-center"><p className="text-sm text-ink-soft">No events with map locations in this view.</p></div>}
                         <div className={`absolute right-3 z-[750] flex items-center gap-2 ${myEventsRouteEnabled && sequence.length > 1 ? 'top-14' : 'top-3'}`}>
                             {activeEvents.length > sequence.length && <button type="button" onClick={() => changeView('list')} className="bg-surface px-3 py-2 text-xs font-medium text-ink shadow-md">{activeEvents.length - sequence.length} without map location · List</button>}
                         </div>
                     </div>
-                    {selected && (
+                    {selected && !previewCollapsed && (
                         <MyEventsMapPreview
                             event={selected.event}
                             sequence={selected.sequence}
@@ -196,6 +209,11 @@ export default function MyEventsExperience() {
                             actions={activeTab === 'saved' ? ['going'] : undefined}
                             showProgramAction={activeTab === 'upcoming'}
                             onHeightChange={setMapPreviewHeight}
+                            onCollapse={() => {
+                                setPreviewCollapsed(true);
+                                setCenteredEventId(null);
+                                setFitAllToken((n) => n + 1);
+                            }}
                         />
                     )}
                 </div>
@@ -203,7 +221,7 @@ export default function MyEventsExperience() {
             <ViewSwitcher
                 currentView={view}
                 onSelect={changeView}
-                mapPreviewVisible={!searchOpen && view === 'map' && selected !== null}
+                mapPreviewVisible={!searchOpen && view === 'map' && selected !== null && !previewCollapsed}
                 previewOffsetPx={mapPreviewHeight}
                 onCreate={() => setSearchOpen((open) => !open)}
                 createExpanded={searchOpen}

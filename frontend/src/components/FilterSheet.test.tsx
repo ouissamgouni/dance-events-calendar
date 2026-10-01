@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FilterSheet from './FilterSheet';
 import type { FilterSheetSection } from './FilterSheet';
@@ -79,5 +79,44 @@ describe('FilterSheet grouping', () => {
         await user.click(clear);
         expect(onReset).toHaveBeenCalledOnce();
         expect(onClearAll).toHaveBeenCalledOnce();
+    });
+});
+
+describe('FilterSheet mobile sizing', () => {
+    const editorSections = (): FilterSheetSection[] => [
+        { id: 'reach', label: 'Event reach', summary: 'Any', size: 'compact', render: () => <div>reach editor</div> },
+        { id: 'area', label: 'Area', summary: 'Any', render: () => <div>area editor</div> },
+    ];
+
+    it('hugs content for compact editors and fills the sheet for full ones', async () => {
+        const user = userEvent.setup();
+        render(
+            <FilterSheet open onClose={vi.fn()} sections={editorSections()} activeFilterCount={0} matchingEventCount={5} />,
+        );
+        const panel = screen.getByTestId('filter-sheet-panel');
+        expect(panel).not.toHaveClass('filter-sheet-panel--full');
+
+        await user.click(screen.getByTestId('filter-sheet-row-reach'));
+        expect(screen.getByText('reach editor')).toBeInTheDocument();
+        expect(screen.queryByTestId('filter-sheet-row-area')).toBeNull();
+        expect(panel).not.toHaveClass('filter-sheet-panel--full');
+
+        await user.click(screen.getByTestId('full-screen-editor-back'));
+        await user.click(screen.getByTestId('filter-sheet-row-area'));
+        expect(panel).toHaveClass('filter-sheet-panel--full');
+    });
+
+    it('closes on a downward swipe from the handle', () => {
+        const onClose = vi.fn();
+        render(
+            <FilterSheet open onClose={onClose} sections={editorSections()} activeFilterCount={0} matchingEventCount={5} />,
+        );
+        const handle = screen.getByTestId('filter-sheet-handle');
+        fireEvent.pointerDown(handle, { clientY: 100 });
+        fireEvent.pointerUp(handle, { clientY: 110 });
+        expect(onClose).not.toHaveBeenCalled();
+        fireEvent.pointerDown(handle, { clientY: 100 });
+        fireEvent.pointerUp(handle, { clientY: 200 });
+        expect(onClose).toHaveBeenCalledOnce();
     });
 });

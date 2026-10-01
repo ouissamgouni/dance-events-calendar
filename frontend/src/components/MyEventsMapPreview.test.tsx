@@ -91,6 +91,35 @@ describe('MyEventsMapPreview', () => {
         expect(screen.getByRole('button', { name: 'Next event' })).toBeDisabled();
     });
 
+    it('collapses via the close button and a downward swipe', () => {
+        const onCollapse = vi.fn();
+        const onNext = vi.fn();
+        renderWithProviders(
+            <FeatureFlagsProvider>
+                <MyEventsMapPreview
+                    event={event}
+                    hasPrevious
+                    hasNext
+                    onPrevious={vi.fn()}
+                    onNext={onNext}
+                    onOpen={vi.fn()}
+                    onCollapse={onCollapse}
+                />
+            </FeatureFlagsProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Hide event preview' }));
+        const preview = screen.getByTestId('my-events-map-preview');
+        fireEvent.pointerDown(preview, { clientX: 100, clientY: 100 });
+        fireEvent.pointerUp(preview, { clientX: 90, clientY: 200 });
+
+        expect(onCollapse).toHaveBeenCalledTimes(2);
+        expect(onNext).not.toHaveBeenCalled();
+        expect(screen.getByTestId('event-card-date-top-row')).toBeInTheDocument();
+        expect(preview).toHaveClass('rounded-t-card');
+        expect(preview.parentElement).not.toHaveClass('absolute');
+    });
+
     it('shows My Plan in an Upcoming map preview when the shared count is positive', async () => {
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
