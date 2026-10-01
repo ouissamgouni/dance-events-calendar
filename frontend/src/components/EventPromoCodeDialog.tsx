@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { submitEventPromoCode, updateEventPromoCode } from '../api';
@@ -34,6 +35,8 @@ export default function EventPromoCodeDialog({ eventId, promo, onClose, onSubmit
     } : emptyValue);
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+
+    useBackToClose(onClose, !submitting);
 
     useEffect(() => {
         const previousOverflow = document.body.style.overflow;

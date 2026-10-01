@@ -8,13 +8,14 @@ const SWIPE_PX = 16;
  * Mobile sticky primary navigation. Hidden on md+ (desktop uses the
  * horizontal DesktopNav in the header instead). Selected destination gets a
  * primary-colour icon + label and a top indicator bar; others stay neutral.
- * On the fullscreen Explorer map it collapses to a grab strip; revealing it
+ * On the fullscreen Explorer map and calendar view it collapses to a grab strip; revealing it
  * pushes page content up via `--bottom-nav-offset`.
  */
 export default function BottomNav() {
     const { pathname, search } = useLocation();
     const navDestinations = useNavDestinations();
-    const collapsible = pathname === '/browse' && new URLSearchParams(search).get('view') === 'map';
+    const collapsible = pathname === '/calendar'
+        || (pathname === '/browse' && new URLSearchParams(search).get('view') === 'map');
     const [revealed, setRevealed] = useState(false);
     const locationKey = `${pathname}${search}`;
     const [prevLocationKey, setPrevLocationKey] = useState(locationKey);

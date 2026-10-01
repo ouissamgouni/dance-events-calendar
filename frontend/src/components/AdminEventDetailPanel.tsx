@@ -3,6 +3,7 @@ import { Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { blockEvent, dismissDuplicateGroup, fetchAdminEvent, fetchEventDuplicateCandidates, keepDuplicateEvent, unblockEvent, updateEvent, fetchEventSeriesCandidates, splitSeriesMember, addEventsToSeries, fetchSeriesGroups } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
+import useBackToClose from '../hooks/useBackToClose';
 import {
     ADMIN_EVENT_HIDDEN_CHIP_CLASS,
     ADMIN_EVENT_STATUS_CHIP_CLASSES,
@@ -103,6 +104,8 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
             .catch(() => setSeriesGroups([]))
             .finally(() => setSeriesLoading(false));
     }, [eventId]);
+
+    useBackToClose(onClose, isOpen);
 
     // Keyboard close
     useEffect(() => {

@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CalendarStatus } from '../api';
 import CalendarRunPanel from './CalendarRunPanel';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface CalendarDetailDrawerProps {
     cal: CalendarStatus;
@@ -34,6 +35,7 @@ export default function CalendarDetailDrawer({
     const isRunning = cal.status === 'running' && isActive(jobStatus);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const resizingRef = useRef(false);
+    useBackToClose(onClose);
 
     // Poll when running and not paused
     useEffect(() => {

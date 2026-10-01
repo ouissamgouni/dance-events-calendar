@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties, DOMAttributes } from 'react';
 import type { CalendarEvent } from '../types';
 import EventDetailsPanel from './EventDetailsPanel';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface Props {
     event: CalendarEvent;
@@ -48,6 +49,7 @@ function getPanelStyle(anchorRect: DOMRect | null): CSSProperties {
 
 export default function EventAnchoredDetailPanel({ event, anchorRect, onClose, onEdit, source }: Props) {
     const panelRef = useRef<HTMLDivElement>(null);
+    useBackToClose(onClose);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {

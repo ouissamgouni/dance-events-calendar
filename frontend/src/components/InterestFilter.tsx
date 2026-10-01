@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { Link } from 'react-router-dom';
 import { fetchMyFollowing, fetchInterestSummary } from '../api';
 import type { FollowUser, InterestSummaryItem } from '../api';
@@ -312,6 +313,8 @@ export function InterestFilterChips({
     // Filter is only actually applied once the viewer has explicitly
     // picked a scope or at least one person — nothing is on by default.
     const filterActive = interestSource !== null || interestUserHandles.length > 0;
+
+    useBackToClose(() => setOverlayOpen(false), overlayOpen);
 
     useEffect(() => {
         if (!overlayOpen) return;

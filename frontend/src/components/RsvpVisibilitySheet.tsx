@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import AudiencePicker from './AudiencePicker';
 import BottomSheet from './BottomSheet';
 import useMediaQuery from '../hooks/useMediaQuery';
-import type { ShareAudience } from '../api';
+import useBackToClose from '../hooks/useBackToClose';
+import { useAuth } from '../context/AuthContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
+import { updateMyVisibility, type ShareAudience } from '../api';
+import { getRememberAudience, setRememberAudience } from '../utils/audiencePreference';
 
 interface SecondaryAction {
     label: string;
@@ -19,7 +23,7 @@ type PrimaryAction =
 
 interface Props {
     anchorRef: RefObject<HTMLElement | null>;
-    emoji: string;
+    emoji: ReactNode;
     title: string;
     subtitle?: string;
     question?: string;
@@ -75,8 +79,24 @@ export default function RsvpVisibilitySheet({
     onClose,
 }: Props) {
     const isMobile = useMediaQuery('(max-width: 639px)');
-    const popoverRef = useRef<HTMLDivElement | null>(null);
     const [pos, setPos] = useState<PopoverPos | null>(null);
+    const { user, refreshUser } = useAuth();
+    const { rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
+    const [remember, setRemember] = useState(() => getRememberAudience(user?.user_id) ?? true);
+    const showRemember = rsvpRememberVisibilityEnabled && !!user && !!audience && !!onAudienceChange;
+    useBackToClose(onClose);
+
+    const handleDone = () => {
+        if (showRemember && user) {
+            setRememberAudience(user.user_id, remember);
+            if (remember && audience && audience !== user.share_attendance_default_audience) {
+                updateMyVisibility({ share_attendance_default_audience: audience })
+                    .then(() => refreshUser())
+                    .catch(() => { /* best-effort; per-event audience already applied */ });
+            }
+        }
+        onClose();
+    };
 
     useEffect(() => {
         if (isMobile) return;
@@ -92,26 +112,10 @@ export default function RsvpVisibilitySheet({
         };
     }, [anchorRef, isMobile]);
 
-    useEffect(() => {
-        if (isMobile) return;
-        const onDocClick = (e: MouseEvent) => {
-            const t = e.target as Node;
-            if (popoverRef.current?.contains(t) || anchorRef.current?.contains(t)) return;
-            onClose();
-        };
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('mousedown', onDocClick);
-        document.addEventListener('keydown', onKey);
-        return () => {
-            document.removeEventListener('mousedown', onDocClick);
-            document.removeEventListener('keydown', onKey);
-        };
-    }, [anchorRef, isMobile, onClose]);
-
     const btnSize = 'min-h-11 text-sm';
     const secondaryTone = secondaryAction?.tone === 'danger' ? 'text-danger' : 'text-ink';
     const primaryClass = `flex ${btnSize} flex-1 items-center justify-center rounded-field bg-action px-4 py-2 font-semibold text-white hover:opacity-90`;
-    const primary = primaryAction ?? { label: 'Done', onClick: onClose };
+    const primary = primaryAction ?? { label: 'Done', onClick: handleDone };
 
     const footer = (
         <div className="flex gap-3">
@@ -156,6 +160,17 @@ export default function RsvpVisibilitySheet({
                             {description}
                         </p>
                     )}
+                    {showRemember && (
+                        <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-ink">
+                            <input
+                                type="checkbox"
+                                checked={remember}
+                                onChange={(e) => setRemember(e.target.checked)}
+                                className="h-4 w-4 accent-action"
+                            />
+                            Remember my choice for next time
+                        </label>
+                    )}
                 </div>
             )}
         </>
@@ -170,6 +185,7 @@ export default function RsvpVisibilitySheet({
                 variant="floating"
                 onClose={onClose}
                 layer="transient"
+                dismissible={false}
                 headerLeading={<span aria-hidden className="text-2xl leading-none">{emoji}</span>}
                 footer={footer}
             >
@@ -183,7 +199,6 @@ export default function RsvpVisibilitySheet({
 
     return createPortal(
         <div
-            ref={popoverRef}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-label={title}

@@ -20,6 +20,7 @@ interface RsvpAudienceUser {
 }
 
 const KEY_PREFIX = 'audience.lastUsed.';
+const REMEMBER_KEY_PREFIX = 'audience.remember.';
 
 const VALID: ReadonlyArray<ShareAudience> = ['public', 'friends', 'private'];
 
@@ -77,6 +78,32 @@ export function defaultRsvpAudienceFor(user: RsvpAudienceUser): ShareAudience {
         ?? getLastUsedAudience(user.user_id)
         ?? (user.share_attendance_default === false ? 'private' : 'public');
 }
+
+/** Whether the user ticked "Remember my choice"; ``null`` when never answered. */
+export function getRememberAudience(identity: string | null | undefined): boolean | null {
+    if (!identity) return null;
+    try {
+        const raw = window.localStorage.getItem(`${REMEMBER_KEY_PREFIX}${identity}`);
+        return raw === null ? null : raw === '1';
+    } catch {
+        return null;
+    }
+}
+
+export function setRememberAudience(identity: string | null | undefined, remember: boolean): void {
+    if (!identity) return;
+    try {
+        window.localStorage.setItem(`${REMEMBER_KEY_PREFIX}${identity}`, remember ? '1' : '0');
+    } catch {
+        /* swallow quota / disabled-storage errors */
+    }
+}
+
+export const AUDIENCE_TIER_LABELS: Record<ShareAudience, string> = {
+    public: 'Public',
+    friends: 'Friends',
+    private: 'Private',
+};
 
 export const ATTENDANCE_AUDIENCE_DESCRIPTIONS: Record<ShareAudience, string> = {
     public: 'You will appear in the attendee list to anyone who can view this event.',

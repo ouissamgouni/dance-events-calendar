@@ -314,6 +314,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         event_review_size_step_enabled=app_settings.get_event_review_size_step_enabled(
             session
         ),
+        rsvp_remember_visibility_enabled=app_settings.get_rsvp_remember_visibility_enabled(
+            session
+        ),
         review_prompt_delay_hours=app_settings.get_review_prompt_delay_hours(session),
         review_prompt_lookback_hours=app_settings.get_review_prompt_lookback_hours(
             session
@@ -798,6 +801,13 @@ def update_settings(
             session,
             "event_review_size_step_enabled",
             body.event_review_size_step_enabled,
+        )
+
+    if body.rsvp_remember_visibility_enabled is not None:
+        _set_bool_setting(
+            session,
+            "rsvp_remember_visibility_enabled",
+            body.rsvp_remember_visibility_enabled,
         )
 
     if body.review_prompt_delay_hours is not None:

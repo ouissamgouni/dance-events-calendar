@@ -9,6 +9,7 @@ import {
     rejectTagSuggestion,
 } from '../api';
 import { SENTIMENT_META } from '../utils/reviewSentiment';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface Props {
     rating: AdminRating;
@@ -22,6 +23,8 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
     const [linked, setLinked] = useState<TagSuggestionResponse[]>([]);
     const [loadingLinked, setLoadingLinked] = useState(false);
     const [error, setError] = useState('');
+
+    useBackToClose(onClose, !submitting);
 
     useEffect(() => {
         if (rating.linked_tag_suggestion_ids.length === 0) {

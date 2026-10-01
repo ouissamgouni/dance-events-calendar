@@ -52,7 +52,7 @@ describe('PostRsvpPopover', () => {
         expect(onClose).toHaveBeenCalledOnce()
     })
 
-    it('keeps the anchored, auto-dismissing presentation on desktop', () => {
+    it('keeps the anchored presentation on desktop without auto-dismiss', () => {
         vi.useFakeTimers()
         setMobileViewport(false)
         const anchor = document.createElement('button')
@@ -75,6 +75,8 @@ describe('PostRsvpPopover', () => {
         expect(popover).toHaveStyle({ position: 'fixed' })
 
         act(() => vi.advanceTimersByTime(5000))
-        expect(onClose).toHaveBeenCalledOnce()
+        expect(onClose).not.toHaveBeenCalled()
+        fireEvent.mouseDown(document.body)
+        expect(onClose).not.toHaveBeenCalled()
     })
 })

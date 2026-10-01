@@ -24,6 +24,7 @@ settings:
   milestone_notifications_enabled: true
   review_prompt_enabled: true
   event_review_size_step_enabled: true
+  rsvp_remember_visibility_enabled: true
   event_card_imgoing_location_bottom_enabled: true
   explorer_event_card_card_style_enabled: true
   explorer_view_control_labels_enabled: true

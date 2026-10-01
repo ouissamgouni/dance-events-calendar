@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { Eye } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
@@ -6,8 +7,8 @@ import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/Featur
 import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
-import { trackSave } from '../utils/tracking';
-import { defaultRsvpAudienceFor, setLastUsedAudience } from '../utils/audiencePreference';
+import AudienceTierIcon from './AudienceTierIcon';
+import { AUDIENCE_TIER_LABELS, defaultRsvpAudienceFor, getRememberAudience, setLastUsedAudience } from '../utils/audiencePreference';
 import type { ShareAudience } from '../api';
 
 interface Props {
@@ -26,6 +27,14 @@ const SAVED_AUDIENCE_DESCRIPTIONS: Record<ShareAudience, string> = {
     private: 'Only you can see this in your saved list.',
 };
 
+function SavedBookmarkIcon({ className }: { className: string }) {
+    return (
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={1.7} className={`text-saved ${className}`} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4V5z" />
+        </svg>
+    );
+}
+
 export default function SaveEventButton({
     eventId,
     eventTitle,
@@ -34,9 +43,9 @@ export default function SaveEventButton({
     className = '',
     labelClassName = '',
 }: Props) {
-    const { isSaved, toggleSave, setSavedAudience } = useSavedEvents();
+    const { isSaved, toggleSave, setSavedAudience, getSavedAudience } = useSavedEvents();
     const { user } = useAuth();
-    const { appAuthGateEnabled } = useOptionalFeatureFlags();
+    const { appAuthGateEnabled, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const location = useLocation();
     const navigate = useNavigate();
@@ -60,6 +69,11 @@ export default function SaveEventButton({
             return;
         }
         const wasSaved = saved;
+        if (wasSaved && user) {
+            setPendingAudience(getSavedAudience(eventId));
+            setPopoverOpen(true);
+            return;
+        }
         let nudgeShown = false;
         if (!wasSaved && !user && nudge.shouldShow) {
             nudge.markShown();
@@ -72,16 +86,31 @@ export default function SaveEventButton({
             // then open the visibility popover so the user can adjust on the
             // fly — parity with the post-RSVP popover that GoingButton shows.
             const defaultAudience = defaultRsvpAudienceFor(user);
-            toggleSave(eventId).then((ok) => {
+            const skipSheet = rsvpRememberVisibilityEnabled && getRememberAudience(user.user_id) === true;
+            toggleSave(eventId, defaultAudience).then((ok) => {
                 if (!ok) {
                     toast.show("Couldn't save \u2014 try again", 3200);
                     return;
                 }
-                // Persist the chosen default on the row so the local
-                // audience map and the subscribers' fan-out tier agree.
-                trackSave(eventId, 'save', defaultAudience)
-                    .then(() => setSavedAudience(eventId, defaultAudience))
-                    .catch(() => { /* row exists with default; non-fatal */ });
+                if (skipSheet) {
+                    toast.show('Saved', 3000, {
+                        leading: <SavedBookmarkIcon className="h-3.5 w-3.5" />,
+                        action: {
+                            icon: (
+                                <>
+                                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                                    <AudienceTierIcon audience={defaultAudience} className="h-3.5 w-3.5" />
+                                </>
+                            ),
+                            label: `Visibility: ${AUDIENCE_TIER_LABELS[defaultAudience]} \u2014 edit`,
+                            onClick: () => {
+                                setPendingAudience(defaultAudience);
+                                setPopoverOpen(true);
+                            },
+                        },
+                    });
+                    return;
+                }
                 setPendingAudience(defaultAudience);
                 setPopoverOpen(true);
             });
@@ -124,7 +153,7 @@ export default function SaveEventButton({
     const popover = popoverOpen ? (
         <RsvpVisibilitySheet
             anchorRef={buttonRef}
-            emoji="🔖"
+            emoji={<SavedBookmarkIcon className="h-6 w-6" />}
             title="Saved!"
             subtitle={eventTitle}
             question="Who can see you saved this event?"

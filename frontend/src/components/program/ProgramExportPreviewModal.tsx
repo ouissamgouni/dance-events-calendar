@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import type { ProgramExport, ProgramExportSession } from '../../types';
 import PrintableSchedule from './PrintableSchedule';
+import useBackToClose from '../../hooks/useBackToClose';
 
 interface Props {
     program: ProgramExport;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function ProgramExportPreviewModal({ program, days, sessions, eyebrow, onClose }: Props) {
+    useBackToClose(onClose);
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') onClose();

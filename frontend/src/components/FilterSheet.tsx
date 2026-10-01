@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import FullScreenEditor from './FullScreenEditor';
+import useBackToClose from '../hooks/useBackToClose';
 
 // FilterSheet — the explorer's filter hub. In sectioned mode it renders a
 // list of filter dimensions (Area, Dates, Dance styles, Event reach, Event
@@ -111,6 +112,8 @@ export default function FilterSheet({
         setNavSync({ open, initialSectionId });
         setActiveSectionId(open ? initialSectionId : null);
     }
+
+    useBackToClose(onClose, open);
 
     // Lock body scroll while open and close on Escape (only from the section
     // list — sub-editors handle their own Escape to step back).

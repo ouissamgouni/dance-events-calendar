@@ -82,6 +82,12 @@ export const handlers = [
     http.post('*/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
     http.delete('*/api/auth/me', () => new HttpResponse(null, { status: 204 })),
 
+    // ── Visibility (RSVP sheet "remember my choice") ────────────────────────
+    http.patch('*/api/social/me/visibility', async ({ request }) => {
+        const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
+        return HttpResponse.json(makeProfile({ is_self: true, ...body }))
+    }),
+
     // ── Notification preferences ────────────────────────────────────────────
     // Echoes the patched fields back over the server defaults. Tests that need
     // to assert the request body refine this with `server.use(...)`.

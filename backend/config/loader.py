@@ -257,6 +257,12 @@ def get_event_review_size_step_enabled() -> bool:
     return True if parsed is None else parsed
 
 
+def get_rsvp_remember_visibility_enabled() -> bool:
+    """Show the 'remember my choice' checkbox in RSVP/save sheets. Default True."""
+    parsed = _parse_bool(os.getenv("RSVP_REMEMBER_VISIBILITY_ENABLED"))
+    return True if parsed is None else parsed
+
+
 def get_review_prompt_delay_hours() -> int:
     """Hours after an event's end to send the review prompt. Default 3."""
     raw = os.getenv("REVIEW_PROMPT_DELAY_HOURS", "3")

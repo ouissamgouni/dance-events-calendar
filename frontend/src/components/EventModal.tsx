@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { CalendarEvent } from '../types';
 import EventDetailsPanel from './EventDetailsPanel';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface Props {
     event: CalendarEvent;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function EventModal({ event, onClose, onEdit, source }: Props) {
+    useBackToClose(onClose);
     // Close on Escape
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {

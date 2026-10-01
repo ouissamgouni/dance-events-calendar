@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface ConfirmDialogProps {
     open: boolean;
@@ -145,6 +146,7 @@ export function PromptDialog({
 }
 
 function useDialogEscape(open: boolean, onCancel: () => void) {
+    useBackToClose(onCancel, open);
     useEffect(() => {
         if (!open) return;
         const handler = (event: KeyboardEvent) => {

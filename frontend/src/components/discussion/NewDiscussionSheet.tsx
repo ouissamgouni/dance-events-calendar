@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import useBackToClose from '../../hooks/useBackToClose';
 import { postEventMessage, type EventMessage, type EventMessageCategory } from '../../api';
 import { useToast } from '../Toast';
 import { DISCUSSION_CATEGORY_ORDER, discussionMeta } from './discussionLabels';
@@ -23,6 +24,8 @@ export default function NewDiscussionSheet({ eventId, initialCategory, onPosted,
     const [category, setCategory] = useState<EventMessageCategory>(initialCategory ?? 'question');
     const [body, setBody] = useState('');
     const [posting, setPosting] = useState(false);
+
+    useBackToClose(onClose);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };

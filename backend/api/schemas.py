@@ -1399,6 +1399,8 @@ class SiteSettingsResponse(BaseModel):
     review_prompt_enabled: bool = True
     # Show the optional event-size question in the review wizard.
     event_review_size_step_enabled: bool = True
+    # Show the 'remember my choice' checkbox in RSVP/save visibility sheets.
+    rsvp_remember_visibility_enabled: bool = True
     # Hours after an event's end before the review prompt fires.
     review_prompt_delay_hours: int = 3
     # How far past the delay window review_prompt_service scans for newly
@@ -1687,6 +1689,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     milestone_unlocked_email_digest: Optional[bool] = None
     review_prompt_enabled: Optional[bool] = None
     event_review_size_step_enabled: Optional[bool] = None
+    rsvp_remember_visibility_enabled: Optional[bool] = None
     review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
     review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
     for_you_review_window_days: Optional[int] = Field(default=None, ge=1, le=3650)

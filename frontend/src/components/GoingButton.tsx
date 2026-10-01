@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { UserRoundCheck, UserRoundPlus } from 'lucide-react';
+import { Eye, UserRoundCheck, UserRoundPlus } from 'lucide-react';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
@@ -10,9 +10,12 @@ import { getActiveReferral } from '../hooks/useReferralAttribution';
 import PostRsvpPopover, { type PostRsvpVariant } from './PostRsvpPopover';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
 import { useAnchoredToast } from './AnchoredToast';
+import AudienceTierIcon from './AudienceTierIcon';
 import {
     ATTENDANCE_AUDIENCE_DESCRIPTIONS,
+    AUDIENCE_TIER_LABELS,
     defaultRsvpAudienceFor,
+    getRememberAudience,
     setLastUsedAudience,
 } from '../utils/audiencePreference';
 
@@ -85,32 +88,6 @@ function AttendanceIcon({
         : <RaisedHandIcon solid={solid} className={className} />;
 }
 
-/** Heroicons globe / users / lock—current per-event audience tier on the
- *  Going pill. Mirrors the icons rendered by ``AudiencePicker``
- *  (🌐/👥/🔒) so the user can see at a glance who's seeing the RSVP. */
-function AudienceTierIcon({ audience, className }: { audience: ShareAudience; className: string }) {
-    if (audience === 'public') {
-        return (
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor" className={className}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0a8.949 8.949 0 0 0 4.951-1.488A3.987 3.987 0 0 0 13 16h-2a3.987 3.987 0 0 0-3.951 3.512A8.948 8.948 0 0 0 12 21Zm3-11.25a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h18M12 3a13.5 13.5 0 0 1 0 18M12 3a13.5 13.5 0 0 0 0 18" />
-            </svg>
-        );
-    }
-    if (audience === 'friends') {
-        return (
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor" className={className}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
-            </svg>
-        );
-    }
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor" className={className}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-        </svg>
-    );
-}
-
 export default function GoingButton({
     eventId,
     eventTitle,
@@ -123,7 +100,7 @@ export default function GoingButton({
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user } = useAuth();
-    const { goingButtonIconVariant, appAuthGateEnabled } = useOptionalFeatureFlags();
+    const { goingButtonIconVariant, appAuthGateEnabled, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const location = useLocation();
     const navigate = useNavigate();
@@ -179,17 +156,37 @@ export default function GoingButton({
             //      when the account-level default is unset).
             //   3. Legacy boolean fallback for very old payloads.
             const defaultAudience = defaultRsvpAudienceFor(user);
+            const skipSheet = rsvpRememberVisibilityEnabled && getRememberAudience(user.user_id) === true;
             // Always RSVP immediately with the default audience — no extra
             // confirmation click. The post-RSVP popover surfaces an inline
             // picker so the user can change visibility on the fly.
             toggleAttending(eventId, defaultAudience).then((ok) => {
                 if (ok) {
                     maybeFireShareConversion();
+                    if (skipSheet) {
+                        errorToast.show(isPast ? 'You attended' : "You're going", 3000, {
+                            leading: '🎉',
+                            action: {
+                                icon: (
+                                    <>
+                                        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                                        <AudienceTierIcon audience={defaultAudience} className="h-3.5 w-3.5" />
+                                    </>
+                                ),
+                                label: `Visibility: ${AUDIENCE_TIER_LABELS[defaultAudience]} \u2014 edit`,
+                                onClick: () => {
+                                    setPendingAudience(defaultAudience);
+                                    setEditOpen(true);
+                                },
+                            },
+                        });
+                    }
                 } else {
                     setPostRsvpVariant(null);
                     errorToast.show("Couldn't mark you as going \u2014 try again", 3200);
                 }
             });
+            if (skipSheet) return;
             showPostRsvp(
                 defaultAudience !== 'private'
                     ? 'signed-in-default-share'

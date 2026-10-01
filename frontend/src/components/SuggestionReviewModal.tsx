@@ -8,6 +8,7 @@ import {
     type SuggestionOccurrence,
 } from '../api';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface Props {
     suggestion: EventSuggestion;
@@ -59,6 +60,7 @@ export default function SuggestionReviewModal({ suggestion, calendars, allTags =
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
     const [occurrences, setOccurrences] = useState<SuggestionOccurrence[]>([]);
     const tagsById = useMemo(() => new Map(allTags.map((t) => [t.id, t])), [allTags]);
+    useBackToClose(onClose, !saving);
 
     useEffect(() => {
         // Single-date suggestions have nothing extra to show, so the list is
