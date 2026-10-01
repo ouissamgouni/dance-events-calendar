@@ -21,7 +21,7 @@ const BROWSE_DESTINATION: NavDestination = {
     id: 'browse',
     label: 'Browse',
     path: '/browse',
-    icon: '/filter.png',
+    icon: '/find-event.png',
     isActive: (p) => p.startsWith('/browse') || p === '/calendar',
 };
 

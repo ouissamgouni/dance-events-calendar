@@ -116,12 +116,12 @@ export function getDateRangePresetOptions(today = new Date()): DateRangePresetOp
     });
 
     return [
-        { key: 'this_weekend', label: 'Weekend', mobileLabel: 'Wknd', start: formatDate(thisWeekendStart), end: formatDate(thisWeekendEnd), group: 'this' },
-        { key: 'next_weekend', label: 'Weekend', mobileLabel: 'Wknd', start: formatDate(nextWeekendStart), end: formatDate(nextWeekendEnd), group: 'next' },
-        { key: 'next_7_days', label: '7 days', mobileLabel: '7d', start: formatDate(today), end: formatDate(next7Days), group: 'next' },
-        { key: 'next_30_days', label: '30 days', mobileLabel: '30d', start: formatDate(today), end: formatDate(next30Days), group: 'next' },
-        { key: 'next_3_months', label: '3 months', mobileLabel: '3mo', start: formatDate(today), end: formatDate(next3Months), group: 'next' },
-        { key: 'next_6_months', label: '6 months', mobileLabel: '6mo', start: formatDate(today), end: formatDate(next6Months), group: 'next' },
+        { key: 'this_weekend', label: 'This weekend', mobileLabel: 'Wknd', start: formatDate(thisWeekendStart), end: formatDate(thisWeekendEnd), group: 'this' },
+        { key: 'next_weekend', label: 'Next weekend', mobileLabel: 'Wknd', start: formatDate(nextWeekendStart), end: formatDate(nextWeekendEnd), group: 'next' },
+        { key: 'next_7_days', label: 'Next 7 days', mobileLabel: '7d', start: formatDate(today), end: formatDate(next7Days), group: 'next' },
+        { key: 'next_30_days', label: 'Next 30 days', mobileLabel: '30d', start: formatDate(today), end: formatDate(next30Days), group: 'next' },
+        { key: 'next_3_months', label: 'Next 3 months', mobileLabel: '3mo', start: formatDate(today), end: formatDate(next3Months), group: 'next' },
+        { key: 'next_6_months', label: 'Next 6 months', mobileLabel: '6mo', start: formatDate(today), end: formatDate(next6Months), group: 'next' },
         ...seasonPresets,
     ];
 }
