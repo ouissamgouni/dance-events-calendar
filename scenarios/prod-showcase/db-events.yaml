@@ -5165,6 +5165,7 @@ events:
   title: Salsa Sunset Amalfi Coast 2027
   description: A magical summer salsa weekend on the stunning Amalfi Coast. Early
     bird special with code AMALFI15 for 15% off!
+  image: 08_salsa_sunset_amalfi_coast_2027.png
   location: Salerno, Amalfi Coast, Italy
   city: Salerno
   country: Italy
@@ -5187,6 +5188,7 @@ events:
   title: Lisboa Beach Bachata Social 2027
   description: Portuguese summer bachata vibes by the sea. Use code CASCAIS10 for
     10% off all passes!
+  image: 09_lisboa_beach_bachata_social_2027.png
   location: Cascais, Lisbon Coast, Portugal
   city: Cascais
   country: Portugal
@@ -5209,6 +5211,7 @@ events:
   title: Costa Brava Salsa Summer Festival 2027
   description: Vibrant energy of Costa Brava with multiple salsa socials and beach
     parties. Early bird code COSTABRAVA20 for 20% off!
+  image: 10_costa_brava_salsa_summer_festival_2027.png
   location: Tossa de Mar, Costa Brava, Spain
   city: Tossa de Mar
   country: Spain
@@ -5230,6 +5233,7 @@ events:
   title: Greek Islands Bachata Retreat 2027
   description: An exclusive bachata retreat on the beautiful Greek islands. Dance
     under the stars with international dancers.
+  image: 11_greek_islands_bachata_retreat_2027.png
   location: Mykonos, Greece
   city: Mykonos
   country: Greece
@@ -5252,6 +5256,7 @@ events:
   title: Côte d'Azur Salsa Social 2027
   description: The elegance of the French Riviera while dancing salsa and bachata.
     Beachfront socials and sunset dancing.
+  image: 12_cote_dazur_salsa_social_2027.png
   location: Antibes, French Riviera, France
   city: Antibes
   country: France
@@ -5268,6 +5273,183 @@ events:
   - dance-style:salsa
   - dance-style:bachata
   - misc:beach-side
+  - reach:international
+- id: porto-kizomba-weekender
+  calendar_id: movida-community-events
+  title: Porto Kizomba Weekender
+  description: Three days of kizomba and semba workshops with riverside socials every
+    night along the Douro.
+  location: Armazém 22, Porto, Portugal
+  city: Porto
+  country: Portugal
+  country_code: PT
+  latitude: 41.1406
+  longitude: -8.6136
+  start: w1 Fri 20:00
+  end: w1 Sun 23:00
+  price_min: 95
+  price_currency: EUR
+  price_is_free: false
+  tags:
+  - format:weekender
+  - dance-style:kizomba
+  - dance-style:semba
+  - reach:international
+- id: seville-salsa-weekender
+  calendar_id: movida-community-events
+  title: Seville Salsa Weekender
+  description: Cuban salsa and rueda workshops by day, patio socials with live son
+    and timba by night in Triana.
+  image: 01_seville_salsa_weekender.png
+  location: Casa Triana, Seville, Spain
+  city: Seville
+  country: Spain
+  country_code: ES
+  latitude: 37.3826
+  longitude: -6.0026
+  start: w2 Fri 19:00
+  end: w2 Sun 22:00
+  price_min: 110
+  price_currency: EUR
+  price_is_free: false
+  tags:
+  - format:weekender
+  - dance-style:salsa
+  - dance-style:cuban
+  - dance-style:rueda
+  - misc:live-band
+  - reach:international
+- id: milan-bachata-weekender
+  calendar_id: movida-community-events
+  title: Milan Bachata Weekender
+  description: Sensual and Dominican bachata tracks with international instructors
+    and late-night socials by the Navigli canals.
+  image: 02_milan_bachata_weekender.png
+  location: Navigli Dance Loft, Milan, Italy
+  city: Milan
+  country: Italy
+  country_code: IT
+  latitude: 45.4519
+  longitude: 9.1755
+  start: w4 Fri 20:00
+  end: w4 Sun 23:00
+  price_min: 120
+  price_currency: EUR
+  price_is_free: false
+  tags:
+  - format:weekender
+  - dance-style:bachata
+  - reach:international
+- id: budapest-salsa-weekender
+  calendar_id: movida-community-events
+  title: Budapest Salsa Weekender
+  description: On1 and On2 salsa workshops, a Danube boat party on Saturday, and a
+    thermal bath recovery social on Sunday.
+  image: 03_budapest_salsa_weekender.png
+  location: Danube Ballroom, Budapest, Hungary
+  city: Budapest
+  country: Hungary
+  country_code: HU
+  latitude: 47.4979
+  longitude: 19.0402
+  start: w5 Fri 20:00
+  end: w5 Sun 23:00
+  price_min: 85
+  price_currency: EUR
+  price_is_free: false
+  tags:
+  - format:weekender
+  - dance-style:salsa
+  - dance-style:mambo
+  - reach:international
+- id: brussels-latin-weekender
+  calendar_id: movida-community-events
+  title: Brussels Latin Weekender
+  description: Salsa, bachata, and kizomba rooms all weekend in the heart of Brussels,
+    with shows on Saturday night.
+  image: 04_brussels_latin_weekender.png
+  location: Atelier Sablon, Brussels, Belgium
+  city: Brussels
+  country: Belgium
+  country_code: BE
+  latitude: 50.8403
+  longitude: 4.3555
+  start: w7 Fri 20:00
+  end: w7 Sun 22:00
+  price_min: 75
+  price_currency: EUR
+  price_is_free: false
+  tags:
+  - format:weekender
+  - dance-style:salsa
+  - dance-style:bachata
+  - dance-style:kizomba
+  - reach:international
+- id: copenhagen-zouk-weekender
+  calendar_id: movida-community-events
+  title: Copenhagen Zouk Weekender
+  description: Brazilian zouk workshops for all levels and cosy harbourside socials
+    in Nyhavn.
+  image: 05_copenhagen_zouk_weekender.png
+  location: Nyhavn Dance Hall, Copenhagen, Denmark
+  city: Copenhagen
+  country: Denmark
+  country_code: DK
+  latitude: 55.6798
+  longitude: 12.5907
+  start: w8 Fri 19:00
+  end: w8 Sun 22:00
+  price_min: 950
+  price_currency: DKK
+  price_is_free: false
+  tags:
+  - format:weekender
+  - dance-style:zouk
+  - reach:international
+- id: athens-bachata-weekender
+  calendar_id: movida-community-events
+  title: Athens Bachata Weekender
+  description: A warm winter bachata escape with workshops in Gazi and a rooftop social
+    facing the Acropolis.
+  image: 06_athens_bachata_weekender.png
+  location: Gazi Arts Hall, Athens, Greece
+  city: Athens
+  country: Greece
+  country_code: GR
+  latitude: 37.9784
+  longitude: 23.7128
+  start: w10 Fri 20:00
+  end: w10 Sun 23:00
+  price_min: 90
+  price_currency: EUR
+  price_is_free: false
+  tags:
+  - format:weekender
+  - dance-style:bachata
+  - venue:rooftop
+  - reach:international
+- id: dublin-salsa-christmas-weekender
+  calendar_id: movida-community-events
+  title: Dublin Salsa Christmas Weekender
+  description: A festive salsa and bachata weekend with workshops, a Christmas jumper
+    social, and live music on Saturday.
+  image: 07_dublin_salsa_christmas_weekender.png
+  location: Liffey Ballroom, Dublin, Ireland
+  city: Dublin
+  country: Ireland
+  country_code: IE
+  latitude: 53.3464
+  longitude: -6.2631
+  start: w11 Fri 19:00
+  end: w11 Sun 22:00
+  price_min: 80
+  price_currency: EUR
+  price_is_free: false
+  tags:
+  - format:weekender
+  - dance-style:salsa
+  - dance-style:bachata
+  - misc:live-band
   - reach:international
 event_series:
 - canonical_title: Alfama Thursday Salsa
@@ -6267,6 +6449,382 @@ ratings:
   - atmosphere:welcoming-inclusive
   audience_tags:
   - audience:music-lovers
+  comment_status: approved
+  status: approved
+- event_id: porto-kizomba-weekender
+  email: ines.lopez@joinmovida.com
+  overall_sentiment: amazing
+  comment: Last year's edition was magical, semba workshops in the afternoon and riverside
+    socials until late.
+  aspect_scores:
+    workshop: 5
+    atmosphere: 5
+  aspect_tags:
+  - workshop:great-instructor
+  - atmosphere:great-atmosphere
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: porto-kizomba-weekender
+  email: leo.martin@joinmovida.com
+  overall_sentiment: great
+  comment: Smooth connection on the floor all weekend and the DJs played real kizomba,
+    not just remixes.
+  aspect_scores:
+    music: 5
+    atmosphere: 4
+  aspect_tags:
+  - music:great-dj
+  - atmosphere:respectful-dancers
+  audience_tags:
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: porto-kizomba-weekender
+  email: amira.haddad@joinmovida.com
+  overall_sentiment: amazing
+  comment: Came alone and left with friends from six countries. Porto hospitality
+    at its best.
+  aspect_scores:
+    atmosphere: 5
+    organization: 5
+  aspect_tags:
+  - atmosphere:welcoming-inclusive
+  - atmosphere:international-crowd
+  - organization:friendly-staff
+  audience_tags:
+  - audience:meet-new-people
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: seville-salsa-weekender
+  email: ana.garcia@joinmovida.com
+  overall_sentiment: amazing
+  comment: The live son band on the patio on Saturday was unforgettable.
+  aspect_scores:
+    music: 5
+    atmosphere: 5
+  aspect_tags:
+  - music:live-band
+  - atmosphere:great-atmosphere
+  audience_tags:
+  - audience:music-lovers
+  comment_status: approved
+  status: approved
+- event_id: seville-salsa-weekender
+  email: mateo.vega@joinmovida.com
+  overall_sentiment: great
+  comment: Rueda workshops were so much fun and very well explained, even for newcomers
+    to Cuban style.
+  aspect_scores:
+    workshop: 5
+    organization: 4
+  aspect_tags:
+  - workshop:clear-explanations
+  - workshop:good-partner-rotation
+  - organization:good-schedule
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: seville-salsa-weekender
+  email: sofia.torres@joinmovida.com
+  overall_sentiment: great
+  comment: Great value pass, and Triana is the perfect base for tapas between workshops.
+  aspect_scores:
+    value: 5
+    venue-quality: 4
+  aspect_tags:
+  - value:worth-it
+  - venue-quality:beautiful-venue
+  audience_tags:
+  - audience:travelers
+  - audience:foodies
+  comment_status: approved
+  status: approved
+- event_id: seville-salsa-weekender
+  email: omar.costa@joinmovida.com
+  overall_sentiment: amazing
+  comment: Friendliest salsa crowd I have danced with in Spain.
+  aspect_scores:
+    atmosphere: 5
+  aspect_tags:
+  - atmosphere:friendly-crowd
+  - atmosphere:easy-find-partners
+  audience_tags:
+  - audience:meet-new-people
+  comment_status: approved
+  status: approved
+- event_id: milan-bachata-weekender
+  email: elena.moreau@joinmovida.com
+  overall_sentiment: amazing
+  comment: World class instructors and a beautiful loft with a perfect wooden floor.
+  aspect_scores:
+    workshop: 5
+    venue-quality: 5
+  aspect_tags:
+  - workshop:great-instructor
+  - venue-quality:great-dance-floor
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: milan-bachata-weekender
+  email: pablo.rossi@joinmovida.com
+  overall_sentiment: great
+  comment: Clear separation between sensual and Dominican tracks, I improved a lot
+    in one weekend.
+  aspect_scores:
+    workshop: 5
+    organization: 4
+  aspect_tags:
+  - workshop:good-level
+  - workshop:useful-material
+  - organization:well-organized
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: milan-bachata-weekender
+  email: nina.khan@joinmovida.com
+  overall_sentiment: great
+  comment: Stylish crowd, great DJs, and aperitivo by the canals before every social.
+  aspect_scores:
+    music: 5
+    atmosphere: 4
+  aspect_tags:
+  - music:great-playlist
+  - atmosphere:great-atmosphere
+  audience_tags:
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: budapest-salsa-weekender
+  email: milan.horvat@joinmovida.com
+  overall_sentiment: amazing
+  comment: The Danube boat party at sunset was the highlight of my dance year.
+  aspect_scores:
+    atmosphere: 5
+    venue-quality: 5
+  aspect_tags:
+  - atmosphere:high-energy
+  - venue-quality:beautiful-venue
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: budapest-salsa-weekender
+  email: victor.schmidt@joinmovida.com
+  overall_sentiment: great
+  comment: Solid On2 track with great teachers, and incredibly good value for a full
+    pass.
+  aspect_scores:
+    workshop: 5
+    value: 5
+  aspect_tags:
+  - workshop:great-instructor
+  - value:great-package
+  audience_tags:
+  - audience:workshop-lovers
+  - audience:budget-friendly
+  comment_status: approved
+  status: approved
+- event_id: budapest-salsa-weekender
+  email: rita.petrov@joinmovida.com
+  overall_sentiment: great
+  comment: Sunday thermal bath social was such a clever idea, perfect recovery after
+    two long nights.
+  aspect_scores:
+    organization: 5
+    atmosphere: 4
+  aspect_tags:
+  - organization:good-schedule
+  - atmosphere:friendly-crowd
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: brussels-latin-weekender
+  email: camille.laurent@joinmovida.com
+  overall_sentiment: great
+  comment: Three rooms meant there was always something for me, and switching between
+    styles was easy.
+  aspect_scores:
+    music: 5
+    organization: 4
+  aspect_tags:
+  - music:good-variety
+  - organization:well-organized
+  audience_tags:
+  - audience:music-lovers
+  comment_status: approved
+  status: approved
+- event_id: brussels-latin-weekender
+  email: noah.kim@joinmovida.com
+  overall_sentiment: amazing
+  comment: The Saturday shows were inspiring and the social after went until sunrise.
+  aspect_scores:
+    shows: 5
+    atmosphere: 5
+  aspect_tags:
+  - shows:great-performances
+  - shows:inspiring
+  - atmosphere:high-energy
+  audience_tags:
+  - audience:performance-lovers
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: brussels-latin-weekender
+  email: leila.bauer@joinmovida.com
+  overall_sentiment: great
+  comment: Central location, quick check-in, and a really welcoming mix of locals
+    and travellers.
+  aspect_scores:
+    venue-quality: 5
+    organization: 5
+  aspect_tags:
+  - venue-quality:easy-access
+  - organization:smooth-check-in
+  - atmosphere:good-mix-of-dancers
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: copenhagen-zouk-weekender
+  email: nadia.fischer@joinmovida.com
+  overall_sentiment: amazing
+  comment: Such a warm zouk community, the hygge vibe at the harbour socials is real.
+  aspect_scores:
+    atmosphere: 5
+    venue-quality: 4
+  aspect_tags:
+  - atmosphere:welcoming-inclusive
+  - venue-quality:comfortable
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: copenhagen-zouk-weekender
+  email: theo.novak@joinmovida.com
+  overall_sentiment: great
+  comment: My first zouk weekender, and the beginner track made me feel confident
+    by Sunday.
+  aspect_scores:
+    workshop: 5
+    organization: 4
+  aspect_tags:
+  - workshop:good-pacing
+  - workshop:clear-explanations
+  - organization:good-communication
+  audience_tags:
+  - audience:first-social
+  comment_status: approved
+  status: approved
+- event_id: copenhagen-zouk-weekender
+  email: jonas.meyer@joinmovida.com
+  overall_sentiment: great
+  comment: Beautiful flowy music all night and a floor with plenty of space for head
+    movements.
+  aspect_scores:
+    music: 5
+    venue-quality: 5
+  aspect_tags:
+  - music:smooth-transitions
+  - venue-quality:spacious
+  audience_tags:
+  - audience:music-lovers
+  comment_status: approved
+  status: approved
+- event_id: athens-bachata-weekender
+  email: zara.benali@joinmovida.com
+  overall_sentiment: amazing
+  comment: Dancing bachata on the rooftop with the Acropolis lit up behind us, absolutely
+    unreal.
+  aspect_scores:
+    venue-quality: 5
+    atmosphere: 5
+  aspect_tags:
+  - venue-quality:beautiful-venue
+  - atmosphere:great-atmosphere
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: athens-bachata-weekender
+  email: samir.ivanov@joinmovida.com
+  overall_sentiment: great
+  comment: Very well organised, everything started on time and the hosts were lovely.
+  aspect_scores:
+    organization: 5
+    atmosphere: 4
+  aspect_tags:
+  - organization:started-on-time
+  - organization:friendly-staff
+  audience_tags:
+  - audience:meet-new-people
+  comment_status: approved
+  status: approved
+- event_id: athens-bachata-weekender
+  email: maya.rivera@joinmovida.com
+  overall_sentiment: great
+  comment: Great teachers, fun partner rotation, and the best souvlaki breaks of any
+    weekender.
+  aspect_scores:
+    workshop: 4
+    value: 5
+  aspect_tags:
+  - workshop:good-partner-rotation
+  - value:worth-it
+  audience_tags:
+  - audience:workshop-lovers
+  - audience:foodies
+  comment_status: approved
+  status: approved
+- event_id: dublin-salsa-christmas-weekender
+  email: bruno.santos@joinmovida.com
+  overall_sentiment: amazing
+  comment: The Christmas jumper social is the most joyful night of the year, everyone
+    dancing with a smile.
+  aspect_scores:
+    atmosphere: 5
+    music: 5
+  aspect_tags:
+  - atmosphere:friendly-crowd
+  - atmosphere:high-energy
+  - music:great-energy
+  audience_tags:
+  - audience:meet-new-people
+  comment_status: approved
+  status: approved
+- event_id: dublin-salsa-christmas-weekender
+  email: clara.dubois@joinmovida.com
+  overall_sentiment: great
+  comment: Live band on Saturday was brilliant, and the ballroom floor is lovely to
+    dance on.
+  aspect_scores:
+    music: 5
+    venue-quality: 5
+  aspect_tags:
+  - music:live-band
+  - venue-quality:great-dance-floor
+  audience_tags:
+  - audience:music-lovers
+  comment_status: approved
+  status: approved
+- event_id: dublin-salsa-christmas-weekender
+  email: ivo.diallo@joinmovida.com
+  overall_sentiment: great
+  comment: Warm Irish welcome, a clear schedule, and free mince pies at every social.
+  aspect_scores:
+    organization: 5
+    atmosphere: 5
+  aspect_tags:
+  - organization:good-schedule
+  - atmosphere:welcoming-inclusive
+  audience_tags:
+  - audience:travelers
   comment_status: approved
   status: approved
 emit_suggested:

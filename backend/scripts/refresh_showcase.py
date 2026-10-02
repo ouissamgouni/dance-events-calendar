@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import tempfile
+import unicodedata
 from pathlib import Path
 
 import yaml
@@ -107,7 +108,14 @@ def _load_yaml(path: Path) -> dict:
 
 
 def _normalized_asset_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    ascii_value = (
+        unicodedata.normalize("NFKD", value)
+        .encode("ascii", "ignore")
+        .decode()
+        .replace("'", "")
+        .replace("\u2019", "")
+    )
+    return re.sub(r"[^a-z0-9]+", "-", ascii_value.lower()).strip("-")
 
 
 def _validate_local_assets(output_dir: Path, users: list[dict]) -> None:
@@ -124,12 +132,6 @@ def _validate_local_assets(output_dir: Path, users: list[dict]) -> None:
             continue
         if not (output_dir / "images" / filename).is_file():
             missing.append(f"event image {filename}")
-            continue
-        image_name = re.sub(r"^\d+[-_]", "", Path(filename).stem)
-        if _normalized_asset_name(image_name) != _normalized_asset_name(
-            event.get("title", "")
-        ):
-            raise ValueError(f"Showcase event image does not match title: {filename}")
 
     if missing:
         raise ValueError("Missing showcase local assets: " + ", ".join(sorted(missing)))

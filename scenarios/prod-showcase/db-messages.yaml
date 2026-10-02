@@ -323,3 +323,171 @@ messages:
     event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
     email: camille.laurent@joinmovida.com
     body: Count me in, mulled wine first!
+  - key: porto-room
+    event_id: porto-kizomba-weekender
+    email: amira.haddad@joinmovida.com
+    category: accommodation
+    body: Booked a flat in Ribeira for the weekend, two beds still free.
+  - reply_to: porto-room
+    event_id: porto-kizomba-weekender
+    email: ines.lopez@joinmovida.com
+    body: I would love one! Is it walkable to Armazém 22?
+  - reply_to: porto-room
+    event_id: porto-kizomba-weekender
+    email: amira.haddad@joinmovida.com
+    body: About ten minutes along the river, a lovely walk after the socials.
+  - key: porto-question
+    event_id: porto-kizomba-weekender
+    email: leo.martin@joinmovida.com
+    category: question
+    body: Is the semba track OK for someone who mostly dances urban kiz?
+  - reply_to: porto-question
+    event_id: porto-kizomba-weekender
+    email: ines.lopez@joinmovida.com
+    body: Definitely, last year it started from the basics of the walk and built up nicely.
+  - key: seville-meetup
+    event_id: seville-salsa-weekender
+    email: sofia.torres@joinmovida.com
+    category: meetup
+    body: Tapas crawl in Triana on Friday before the opening social, who is in?
+  - reply_to: seville-meetup
+    event_id: seville-salsa-weekender
+    email: mateo.vega@joinmovida.com
+    body: Yes! I know a great spot on Calle Betis.
+  - reply_to: seville-meetup
+    event_id: seville-salsa-weekender
+    email: omar.costa@joinmovida.com
+    body: Count me in, see you at the bridge at 17h.
+  - key: seville-question
+    event_id: seville-salsa-weekender
+    email: ana.garcia@joinmovida.com
+    category: question
+    body: Does anyone know which band is playing the patio social this year?
+  - reply_to: seville-question
+    event_id: seville-salsa-weekender
+    email: mateo.vega@joinmovida.com
+    body: The organizers hinted it is a son cubano group from Cádiz, should be amazing.
+  - key: milan-ride
+    event_id: milan-bachata-weekender
+    email: pablo.rossi@joinmovida.com
+    category: ride
+    body: Driving from Turin on Friday afternoon, three seats free.
+  - reply_to: milan-ride
+    event_id: milan-bachata-weekender
+    email: nina.khan@joinmovida.com
+    body: I would love a seat, I can meet you at Porta Nuova.
+  - key: milan-question
+    event_id: milan-bachata-weekender
+    email: elena.moreau@joinmovida.com
+    category: question
+    body: Can you switch between the sensual and Dominican tracks during the weekend?
+  - reply_to: milan-question
+    event_id: milan-bachata-weekender
+    email: pablo.rossi@joinmovida.com
+    body: Yes, the full pass covers both, I mixed them last year.
+  - key: budapest-boat
+    event_id: budapest-salsa-weekender
+    email: rita.petrov@joinmovida.com
+    category: question
+    body: Is the Danube boat party included in the full pass?
+  - reply_to: budapest-boat
+    event_id: budapest-salsa-weekender
+    email: milan.horvat@joinmovida.com
+    body: It is, just bring a jacket, it gets chilly on deck after sunset.
+  - key: budapest-room
+    event_id: budapest-salsa-weekender
+    email: victor.schmidt@joinmovida.com
+    category: accommodation
+    body: Looking for a roommate near Deák Ferenc tér from Friday to Monday.
+  - reply_to: budapest-room
+    event_id: budapest-salsa-weekender
+    email: rita.petrov@joinmovida.com
+    body: Me too, let us share, I will message you.
+  - key: brussels-meetup
+    event_id: brussels-latin-weekender
+    email: camille.laurent@joinmovida.com
+    category: meetup
+    body: Waffles and coffee at the Grand Place on Saturday morning before the workshops?
+  - reply_to: brussels-meetup
+    event_id: brussels-latin-weekender
+    email: leila.bauer@joinmovida.com
+    body: Perfect start to the day, I am in.
+  - reply_to: brussels-meetup
+    event_id: brussels-latin-weekender
+    email: noah.kim@joinmovida.com
+    body: Same here, 9:30 by the town hall?
+  - key: brussels-tickets
+    event_id: brussels-latin-weekender
+    email: noah.kim@joinmovida.com
+    category: tickets
+    body: Are Saturday-only passes available, or just the full weekend?
+  - reply_to: brussels-tickets
+    event_id: brussels-latin-weekender
+    email: camille.laurent@joinmovida.com
+    body: They sell party-only passes at the door, but the full pass is better value.
+  - key: copenhagen-question
+    event_id: copenhagen-zouk-weekender
+    email: theo.novak@joinmovida.com
+    category: question
+    body: Total zouk beginner here, is the weekend still a good idea?
+  - reply_to: copenhagen-question
+    event_id: copenhagen-zouk-weekender
+    email: nadia.fischer@joinmovida.com
+    body: Absolutely, the beginner track is excellent and everyone is so patient.
+  - reply_to: copenhagen-question
+    event_id: copenhagen-zouk-weekender
+    email: jonas.meyer@joinmovida.com
+    body: Agreed, I started at this weekender too. Bring comfy shoes!
+  - key: copenhagen-ride
+    event_id: copenhagen-zouk-weekender
+    email: jonas.meyer@joinmovida.com
+    category: ride
+    body: Driving from Hamburg on Friday morning, two seats left.
+  - reply_to: copenhagen-ride
+    event_id: copenhagen-zouk-weekender
+    email: nadia.fischer@joinmovida.com
+    body: I would take one, can we split the ferry?
+  - key: athens-meetup
+    event_id: athens-bachata-weekender
+    email: zara.benali@joinmovida.com
+    category: meetup
+    body: Acropolis visit on Saturday morning before the workshops, anyone joining?
+  - reply_to: athens-meetup
+    event_id: athens-bachata-weekender
+    email: maya.rivera@joinmovida.com
+    body: Yes please! Let us go early to beat the queue.
+  - reply_to: athens-meetup
+    event_id: athens-bachata-weekender
+    email: samir.ivanov@joinmovida.com
+    body: Joining too, I will book tickets for the three of us.
+  - key: athens-question
+    event_id: athens-bachata-weekender
+    email: samir.ivanov@joinmovida.com
+    category: question
+    body: Is the rooftop social heated in December?
+  - reply_to: athens-question
+    event_id: athens-bachata-weekender
+    email: zara.benali@joinmovida.com
+    body: There are heaters and blankets, and once you dance you will not need them.
+  - key: dublin-question
+    event_id: dublin-salsa-christmas-weekender
+    email: clara.dubois@joinmovida.com
+    category: question
+    body: Is the Christmas jumper mandatory for Saturday? Asking for a friend.
+  - reply_to: dublin-question
+    event_id: dublin-salsa-christmas-weekender
+    email: bruno.santos@joinmovida.com
+    body: Not mandatory, but there is a prize for the best one!
+  - reply_to: dublin-question
+    event_id: dublin-salsa-christmas-weekender
+    email: ivo.diallo@joinmovida.com
+    body: Mine has flashing lights this year, the competition is on.
+  - key: dublin-room
+    event_id: dublin-salsa-christmas-weekender
+    email: ivo.diallo@joinmovida.com
+    category: accommodation
+    body: Sharing a flat near Temple Bar, one room still free for the weekend.
+  - reply_to: dublin-room
+    event_id: dublin-salsa-christmas-weekender
+    email: clara.dubois@joinmovida.com
+    body: I am interested, sending you a message now.

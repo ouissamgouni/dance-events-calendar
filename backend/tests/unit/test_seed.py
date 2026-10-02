@@ -866,6 +866,46 @@ class TestDatabaseSeeder:
         assert milestone.read_at is None
         assert milestone.pushed_at is not None
 
+    def test_seed_notifications_buries_uncurated_rows(self, tmp_path, monkeypatch):
+        scenarios_dir = tmp_path / "scenarios"
+        scenario_dir = scenarios_dir / "notifs"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: alice@example.com\n    name: Alice\n    handle: alice\n"
+            "  - email: bob@example.com\n    name: Bob\n    handle: bob\n"
+        )
+        (scenario_dir / "db-follows.yaml").write_text(
+            "emit_notifications: true\n"
+            "follows:\n  - follower: bob\n    followee: alice\n"
+        )
+        (scenario_dir / "db-notifications.yaml").write_text(
+            "notifications:\n"
+            "  - recipient: alice@example.com\n"
+            "    kind: milestone_unlocked\n"
+            "    subject_key: first_event\n"
+            "    minutes_ago: 30\n"
+        )
+        monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+            alice = session.exec(select(User).where(User.handle == "alice")).one()
+            rows = session.exec(
+                select(Notification).where(Notification.recipient_user_id == alice.id)
+            ).all()
+
+        by_kind = {row.kind: row for row in rows}
+        follower = by_kind["new_follower"]
+        assert follower.created_at < by_kind["milestone_unlocked"].created_at
+        assert follower.read_at is not None
+        assert by_kind["milestone_unlocked"].read_at is None
+
     def test_seed_generated_events_fixture(self, tmp_path, monkeypatch):
         scenario_dir = tmp_path / "generated"
         scenario_dir.mkdir(parents=True)
