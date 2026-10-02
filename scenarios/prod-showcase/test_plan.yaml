@@ -204,3 +204,15 @@ test_plan:
         available and updated, a reminder with Ask a question, and a review
         prompt naming a friend.
       verification: "Each row deep-links to its subject and neither inbox is dominated by interest matches."
+
+    - id: 19
+      title: "Write reviews for past weekenders"
+      description: |
+        Sign in as Penny Valdez (@penny-valdez), open My Events > Past, and
+        review each previous weekender edition she attended.
+      expected: |
+        Penny's only past events are the previous Seville, Milan, Budapest,
+        Brussels, and Athens weekender editions, none reviewed by her yet.
+        All but Athens already show community reviews and attendees, and each
+        links to its upcoming edition through the series.
+      verification: "Submitted reviews appear on the event and roll up into the upcoming edition."
