@@ -322,6 +322,19 @@ class TestSettingsEndpoint:
         )
         assert resp.status_code == 422
 
+    def test_explorer_list_page_size_default_and_update(self, sqlite_client):
+        client, _engine = sqlite_client
+
+        assert client.get("/api/settings").json()["explorer_list_page_size"] == 20
+
+        resp = client.put("/api/settings", json={"explorer_list_page_size": 15})
+        assert resp.status_code == 200
+        assert client.get("/api/settings").json()["explorer_list_page_size"] == 15
+
+        for bad in (0, 101):
+            resp = client.put("/api/settings", json={"explorer_list_page_size": bad})
+            assert resp.status_code == 422
+
     def test_admin_can_update_going_button_icon_variant(self, sqlite_client):
         client, engine = sqlite_client
 

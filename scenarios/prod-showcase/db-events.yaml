@@ -5238,6 +5238,132 @@ events:
       - format:weekender
       - dance-style:bachata
       - reach:international
+  - id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    calendar_id: sea.sun.salsa@group.calendar.google.com
+    title: Salsa Sunset Amalfi Coast 2026
+    description: Join us for a magical summer salsa weekend on the stunning Amalfi Coast. Experience authentic Italian hospitality combined with world-class salsa dancing and breathtaking seaside views. Early bird special - Use code AMALFI15 for 15% off when booking by May 31st!
+    location: Salerno, Amalfi Coast
+    city: Salerno
+    country: Italy
+    country_code: IT
+    latitude: 40.6822
+    longitude: 14.7671
+    start: "2026-06-20T18:00:00+00:00"
+    end: "2026-06-23T22:00:00+00:00"
+    all_day: false
+    price_min: 250.0
+    price_max: 250.0
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - dance-style:salsa
+      - dance-style:salsa
+      - dance-style:bachata
+      - format:weekender
+      - misc:beach-side
+      - reach:international
+      - venue:outdoor
+  - id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    calendar_id: sea.sun.salsa@group.calendar.google.com
+    title: Lisboa Beach Bachata Social 2026
+    description: Portuguese summer bachata vibes by the sea. Dance, enjoy local wine, and make friends from around the world in beautiful Cascais. Community discount CASCAIS10 gives you 10% off all passes!
+    location: Cascais, Lisbon Coast
+    city: Cascais
+    country: Portugal
+    country_code: PT
+    latitude: 38.6953
+    longitude: -9.4167
+    start: "2026-07-05T19:00:00+00:00"
+    end: "2026-07-08T23:00:00+00:00"
+    all_day: false
+    price_min: 200.0
+    price_max: 200.0
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - dance-style:salsa
+      - dance-style:bachata
+      - format:social
+      - format:weekender
+      - misc:beach-side
+      - reach:international
+      - venue:outdoor
+  - id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    calendar_id: sea.sun.salsa@group.calendar.google.com
+    title: Costa Brava Salsa Summer Festival 2026
+    description: Experience the vibrant energy of Costa Brava with multiple salsa socials, beach parties, and workshops. A perfect blend of dance and Mediterranean lifestyle. Early bird offer - Book before June 10th with code COSTABRAVA20 for 20% off!
+    location: Tossa de Mar, Costa Brava
+    city: Tossa de Mar
+    country: Spain
+    country_code: ES
+    latitude: 41.7371
+    longitude: 2.9480
+    start: "2026-06-27T20:00:00+00:00"
+    end: "2026-06-30T23:00:00+00:00"
+    all_day: false
+    price_min: 180.0
+    price_max: 180.0
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - dance-style:salsa
+      - dance-style:mambo
+      - format:social
+      - format:festival
+      - misc:beach-side
+      - reach:international
+      - venue:outdoor
+  - id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    calendar_id: sea.sun.salsa@group.calendar.google.com
+    title: Greek Islands Bachata Retreat 2026
+    description: An exclusive bachata retreat on the beautiful Greek islands. Dance under the stars, enjoy traditional Greek cuisine, and connect with dancers from all over Europe.
+    location: Mykonos, Greece
+    city: Mykonos
+    country: Greece
+    country_code: GR
+    latitude: 37.4467
+    longitude: 25.3289
+    start: "2026-07-12T20:00:00+00:00"
+    end: "2026-07-16T02:00:00+00:00"
+    all_day: false
+    price_min: 320.0
+    price_max: 320.0
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - dance-style:bachata
+      - format:social
+      - format:weekender
+      - misc:beach-side
+      - misc:trip
+      - reach:international
+      - venue:outdoor
+  - id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    calendar_id: sea.sun.salsa@group.calendar.google.com
+    title: Côte d'Azur Salsa Social 2026
+    description: Discover the elegance of the French Riviera while dancing salsa and bachata. Enjoy beachfront socials, sunset dancing, and exquisite French cuisine.
+    location: Antibes, French Riviera
+    city: Antibes
+    country: France
+    country_code: FR
+    latitude: 43.5808
+    longitude: 7.1239
+    start: "2026-07-18T19:30:00+00:00"
+    end: "2026-07-21T23:00:00+00:00"
+    all_day: false
+    price_min: 280.0
+    price_max: 280.0
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - dance-style:salsa
+      - dance-style:mambo
+      - dance-style:bachata
+      - format:social
+      - format:weekender
+      - misc:beach-side
+      - reach:international
+      - venue:outdoor
 event_series:
   - canonical_title: Alfama Thursday Salsa
     status: resolved

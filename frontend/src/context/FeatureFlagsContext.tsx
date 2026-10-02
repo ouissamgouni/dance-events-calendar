@@ -20,6 +20,8 @@ export interface FeatureFlags {
     /** Relative ceiling (1-100). Effective cap is
      * ``min(trendingTopN, ceil(visibleCount * trendingTopPercent / 100))``. */
     trendingTopPercent: number;
+    /** Cards shown in the browse list before (and per) "+ N more". */
+    explorerListPageSize: number;
     eventColorBarColor: string;
     tagSortMode: 'group' | 'event_count';
     goingButtonIconVariant: 'hand' | 'person';
@@ -95,6 +97,7 @@ const defaultFlags: FeatureFlags = {
     trendingFloorGoing: 3,
     trendingTopN: 3,
     trendingTopPercent: 100,
+    explorerListPageSize: 20,
     eventColorBarColor: DEFAULT_EVENT_COLOR_BAR_COLOR,
     tagSortMode: 'group',
     goingButtonIconVariant: 'hand',
@@ -161,6 +164,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     trendingFloorGoing: s.trending_floor_going ?? 3,
                     trendingTopN: s.trending_top_n ?? 3,
                     trendingTopPercent: s.trending_top_percent ?? 100,
+                    explorerListPageSize: s.explorer_list_page_size ?? 20,
                     eventColorBarColor: s.event_color_bar_color || DEFAULT_EVENT_COLOR_BAR_COLOR,
                     tagSortMode: s.tag_sort_mode === 'event_count' ? 'event_count' : 'group',
                     goingButtonIconVariant: s.going_button_icon_variant === 'person' ? 'person' : 'hand',
