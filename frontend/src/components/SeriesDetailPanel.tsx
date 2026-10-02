@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import {
     addEventsToSeries,
     approveSeriesGroup,
@@ -32,6 +33,7 @@ function statusBadge(status: string) {
 }
 
 export default function SeriesDetailPanel({ series, onClose, onChanged, onOpenEvent }: Props) {
+    useBackToClose(onClose);
     const [draft, setDraft] = useState<SeriesGroup | null>(series);
     const [title, setTitle] = useState(series?.canonical_title ?? '');
     const [acting, setActing] = useState(false);

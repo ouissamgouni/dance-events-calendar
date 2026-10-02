@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import {
     fetchEventPromoCodes,
     deleteEventPromoCode,
@@ -43,6 +44,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
     const [editingPromo, setEditingPromo] = useState<PromoCode | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
+    useBackToClose(() => setOpenPromoId(null), openPromoId !== null);
 
     useEffect(() => {
         if (!visible) return;

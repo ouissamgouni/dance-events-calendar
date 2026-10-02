@@ -1,10 +1,10 @@
 attendances:
   - event_id: alfama-thursday-salsa-autumn
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: friends
   - event_id: alfama-thursday-salsa-next
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: friends
   - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
@@ -900,7 +900,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 64p6aohmcksm8b9ic4s30b9kc4rm2bb26csjgb9lchhm6db570o3cdj660
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: private
   - event_id: 64p6aohmcksm8b9ic4s30b9kc4rm2bb26csjgb9lchhm6db570o3cdj660
@@ -964,7 +964,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 6dgj0d1oc5h68bb1ccqjgb9k6so3cb9pc9h68b9jcphjcd9ic4r34p3160
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: 6dgj0d1oc5h68bb1ccqjgb9k6so3cb9pc9h68b9jcphjcd9ic4r34p3160
@@ -1020,7 +1020,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
@@ -1032,7 +1032,7 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: private
   - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
@@ -1044,7 +1044,7 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: private
   - event_id: 6di38dj36grjibb2ckr34b9k6cpjabb2c8oj2b9m6ss3cchk61h64dhpco
@@ -1060,7 +1060,7 @@ attendances:
     share_publicly: true
     share_audience: friends
   - event_id: 6di38dj36grjibb2ckr34b9k6cpjabb2c8oj2b9m6ss3cchk61h64dhpco
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: private
   - event_id: 6di38dj36grjibb2ckr34b9k6cpjabb2c8oj2b9m6ss3cchk61h64dhpco
@@ -1192,7 +1192,7 @@ attendances:
     share_publicly: true
     share_audience: private
   - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: private
   - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
@@ -1240,7 +1240,7 @@ attendances:
     share_publicly: false
     share_audience: public
   - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: friends
   - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
@@ -1248,7 +1248,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: friends
   - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
@@ -1308,7 +1308,7 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: 6sojioj3cli3ab9j71j3gb9k61hjebb268s64b9n68r6cp1mcdj3iphk6s
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: public
   - event_id: 6sojioj3cli3ab9j71j3gb9k61hjebb268s64b9n68r6cp1mcdj3iphk6s
@@ -1328,7 +1328,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 6sojioj3cli3ab9j71j3gb9k61hjebb268s64b9n68r6cp1mcdj3iphk6s
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: private
   - event_id: 6sq34ohhc8ojebb56tgj2b9k70o32b9o74rj0bb26pi62oj170s30pho6o
@@ -1368,7 +1368,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 6sq34ohhc8ojebb56tgj2b9k70o32b9o74rj0bb26pi62oj170s30pho6o
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: 6sq34ohhc8ojebb56tgj2b9k70o32b9o74rj0bb26pi62oj170s30pho6o
@@ -1380,7 +1380,7 @@ attendances:
     share_publicly: false
     share_audience: private
   - event_id: 6sqj2pb474s62bb5c4s3eb9k6hh64b9ocpi30bb271i32cpm6oq62phj60
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: 6sqj2pb474s62bb5c4s3eb9k6hh64b9ocpi30bb271i32cpm6oq62phj60
@@ -1420,7 +1420,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 6tgjaohj68q66b9o6dj36b9k6hhj6b9ochi68b9k60s34c9mccsj8dr368
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: friends
   - event_id: 6tgjaohj68q66b9o6dj36b9k6hhj6b9ochi68b9k60s34c9mccsj8dr368
@@ -1432,7 +1432,7 @@ attendances:
     share_publicly: true
     share_audience: private
   - event_id: 6tgjaohj68q66b9o6dj36b9k6hhj6b9ochi68b9k60s34c9mccsj8dr368
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: private
   - event_id: 6tgjaohj68q66b9o6dj36b9k6hhj6b9ochi68b9k60s34c9mccsj8dr368
@@ -1444,7 +1444,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 70p3coj669im8b9mccq62b9kc4r36b9o6op6abb66dhj2c9lcksm4d1oco
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: private
   - event_id: 70p3coj669im8b9mccq62b9kc4r36b9o6op6abb66dhj2c9lcksm4d1oco
@@ -1488,7 +1488,7 @@ attendances:
     share_publicly: true
     share_audience: friends
   - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
@@ -1532,7 +1532,7 @@ attendances:
     share_publicly: true
     share_audience: friends
   - event_id: 71j36dj56gqm6b9oc5gjgb9k75hjeb9pckqjabb26lhjic9k6go3gd9h60
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: friends
   - event_id: 71j36dj56gqm6b9oc5gjgb9k75hjeb9pckqjabb26lhjic9k6go3gd9h60
@@ -1592,11 +1592,11 @@ attendances:
     share_publicly: false
     share_audience: public
   - event_id: 75j6aoho6gs3abb575gm2b9kcgsm4bb16kom6b9g6dhm8ohl65gjccph74
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: 75j6aoho6gs3abb575gm2b9kcgsm4bb16kom6b9g6dhm8ohl65gjccph74
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: friends
   - event_id: 75j6aoho6gs3abb575gm2b9kcgsm4bb16kom6b9g6dhm8ohl65gjccph74
@@ -1660,7 +1660,7 @@ attendances:
     share_publicly: true
     share_audience: private
   - event_id: c4pm2opickpm8b9h6grj2b9kc8pjebb1cosm8bb1cos36ohh64sm6e1j6c
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: c4pm2opickpm8b9h6grj2b9kc8pjebb1cosm8bb1cos36ohh64sm6e1j6c
@@ -1700,7 +1700,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
@@ -1748,7 +1748,7 @@ attendances:
     share_publicly: true
     share_audience: private
   - event_id: ccom4e1mccsm4b9p60s3ab9k6gomab9o6pi32b9ncgpm6cpl70qmad366g
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: friends
   - event_id: ccom4e1mccsm4b9p60s3ab9k6gomab9o6pi32b9ncgpm6cpl70qmad366g
@@ -1760,7 +1760,7 @@ attendances:
     share_publicly: true
     share_audience: private
   - event_id: ccom4e1mccsm4b9p60s3ab9k6gomab9o6pi32b9ncgpm6cpl70qmad366g
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: private
   - event_id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
@@ -1792,7 +1792,7 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: ccp34c1i74q6cb9g60o32b9kckpjabb1c9gjib9o71h68o9ickr62ob5cc
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: private
   - event_id: ccp34c1i74q6cb9g60o32b9kckpjabb1c9gjib9o71h68o9ickr62ob5cc
@@ -1824,7 +1824,7 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: cdij0ohj6kq38bb664qjeb9k60pm4b9o74o3cb9oc8sj4dpgcoq66e1ico
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: friends
   - event_id: cdij0ohj6kq38bb664qjeb9k60pm4b9o74o3cb9oc8sj4dpgcoq66e1ico
@@ -1840,7 +1840,7 @@ attendances:
     share_publicly: true
     share_audience: friends
   - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: friends
   - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
@@ -1848,7 +1848,7 @@ attendances:
     share_publicly: true
     share_audience: friends
   - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: public
   - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
@@ -1860,7 +1860,7 @@ attendances:
     share_publicly: false
     share_audience: private
   - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: friends
   - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
@@ -1872,7 +1872,7 @@ attendances:
     share_publicly: true
     share_audience: friends
   - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: private
   - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
@@ -1880,7 +1880,7 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: friends
   - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
@@ -1900,7 +1900,7 @@ attendances:
     share_publicly: false
     share_audience: public
   - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: public
   - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
@@ -1916,7 +1916,7 @@ attendances:
     share_publicly: true
     share_audience: private
   - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: private
   - event_id: ggsoet7q3uatndg60q6gfholok
@@ -1944,7 +1944,7 @@ attendances:
     share_publicly: false
     share_audience: private
   - event_id: ggsoet7q3uatndg60q6gfholok
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: ggsoet7q3uatndg60q6gfholok
@@ -1960,11 +1960,11 @@ attendances:
     share_publicly: false
     share_audience: private
   - event_id: iegt52l4i38v5smu07mnrcdlns
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: public
   - event_id: iegt52l4i38v5smu07mnrcdlns
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: iegt52l4i38v5smu07mnrcdlns
@@ -1976,7 +1976,7 @@ attendances:
     share_publicly: false
     share_audience: public
   - event_id: iegt52l4i38v5smu07mnrcdlns
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: friends
   - event_id: iegt52l4i38v5smu07mnrcdlns
@@ -1992,7 +1992,7 @@ attendances:
     share_publicly: false
     share_audience: public
   - event_id: iegt52l4i38v5smu07mnrcdlns
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: friends
   - event_id: iegt52l4i38v5smu07mnrcdlns
@@ -2012,7 +2012,7 @@ attendances:
     share_publicly: false
     share_audience: public
   - event_id: imgjf21msul58hop4dd7ukgkbo
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: private
   - event_id: imgjf21msul58hop4dd7ukgkbo
@@ -2072,7 +2072,7 @@ attendances:
     share_publicly: false
     share_audience: public
   - event_id: suggestion-1ecd43cb-35f6-4287-bb96-2a2904e62a7c
-    email: lucia.navarro@joinmovida.com
+    email: alex.navarro@joinmovida.com
     share_publicly: false
     share_audience: private
   - event_id: suggestion-1ecd43cb-35f6-4287-bb96-2a2904e62a7c

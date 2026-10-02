@@ -48,18 +48,18 @@ follows:
     followee: jonas.meyer@joinmovida.com
   - follower: theo.novak@joinmovida.com
     followee: ana.garcia@joinmovida.com
-  - follower: lucia.navarro@joinmovida.com
+  - follower: alex.navarro@joinmovida.com
     followee: sofia.torres@joinmovida.com
   - follower: sofia.torres@joinmovida.com
-    followee: lucia.navarro@joinmovida.com
-  - follower: lucia.navarro@joinmovida.com
+    followee: alex.navarro@joinmovida.com
+  - follower: alex.navarro@joinmovida.com
     followee: camille.laurent@joinmovida.com
-  - follower: lucia.navarro@joinmovida.com
+  - follower: alex.navarro@joinmovida.com
     followee: clara.dubois@joinmovida.com
-  - follower: lucia.navarro@joinmovida.com
+  - follower: alex.navarro@joinmovida.com
     followee: penny.valdez@joinmovida.com
   - follower: samir.ivanov@joinmovida.com
-    followee: lucia.navarro@joinmovida.com
+    followee: alex.navarro@joinmovida.com
   - follower: theo.novak@joinmovida.com
-    followee: lucia.navarro@joinmovida.com
+    followee: alex.navarro@joinmovida.com
     status: pending

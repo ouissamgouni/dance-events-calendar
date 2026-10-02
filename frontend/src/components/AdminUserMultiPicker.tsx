@@ -7,6 +7,7 @@
  * are shown as removable chips under the button.
  */
 import { useEffect, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { fetchAdminUsers, type AdminUserRow } from '../api';
 import { FeatureStatusCell, PushSubscriptionCell } from './NotificationStatusBadges';
 
@@ -33,6 +34,7 @@ export default function AdminUserMultiPicker({ selected, onChange, placeholder, 
     const [results, setResults] = useState<AdminUserRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [staged, setStaged] = useState<AdminUserRow[]>(selected);
+    useBackToClose(() => setOpen(false), open);
 
     // Re-seed the staged selection each time the modal opens so cancelling
     // discards any in-progress changes.

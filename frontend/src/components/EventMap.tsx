@@ -279,6 +279,9 @@ interface Props {
     fitAllToken?: number;
     /** Map area hidden behind floating UI; selection pans and marker fits avoid it. */
     obscuredInsets?: MapInsets;
+    /** Enable marker clustering. When false, all markers render individually (overlapping).
+     * Defaults to true. Used by Passport map to show every pin. */
+    clustering?: boolean;
 }
 
 interface PopupPortal {
@@ -998,6 +1001,7 @@ function MarkerClusterLayer({
     journeySequence,
     journeySelectedEventId,
     pinnedEventId,
+    clustering,
 }: {
     events: CalendarEvent[];
     hoveredEventId?: string | null;
@@ -1025,6 +1029,8 @@ function MarkerClusterLayer({
     journeySelectedEventId?: string | null;
     /** Drawn outside the cluster group so it stays visible at any zoom. */
     pinnedEventId?: string | null;
+    /** Enable marker clustering. Defaults to true. */
+    clustering?: boolean;
 }) {
     const map = useMap();
     const [popupPortals, setPopupPortals] = useState<PopupPortal[]>([]);
@@ -1032,35 +1038,44 @@ function MarkerClusterLayer({
     const pinnedIdRef = useRef(pinnedEventId);
     const journeySelectedIdRef = useRef(journeySelectedEventId);
     const pinnedMarkerRef = useRef<L.Marker | null>(null);
+    const layerGroupRef = useRef<L.FeatureGroup | L.MarkerClusterGroup | null>(null);
     useEffect(() => {
         pinnedIdRef.current = pinnedEventId;
         journeySelectedIdRef.current = journeySelectedEventId;
     }, [journeySelectedEventId, pinnedEventId]);
 
     useEffect(() => {
-        const clusterGroup = L.markerClusterGroup({
-            chunkedLoading: true,
-            disableClusteringAtZoom: 16,
-            iconCreateFunction: makeClusterIcon,
-            maxClusterRadius: 30,
-            showCoverageOnHover: false,
-            spiderfyOnMaxZoom: true,
-            zoomToBoundsOnClick: true,
-        });
-        clusterGroupRef.current = clusterGroup;
-        map.addLayer(clusterGroup);
+        let layerGroup: L.FeatureGroup | L.MarkerClusterGroup;
+        if (clustering ?? true) {
+            layerGroup = L.markerClusterGroup({
+                chunkedLoading: true,
+                disableClusteringAtZoom: 16,
+                iconCreateFunction: makeClusterIcon,
+                maxClusterRadius: 30,
+                showCoverageOnHover: false,
+                spiderfyOnMaxZoom: true,
+                zoomToBoundsOnClick: true,
+            });
+            clusterGroupRef.current = layerGroup as L.MarkerClusterGroup;
+        } else {
+            layerGroup = L.featureGroup();
+            clusterGroupRef.current = null;
+        }
+        layerGroupRef.current = layerGroup;
+        map.addLayer(layerGroup);
 
         return () => {
-            map.removeLayer(clusterGroup);
+            map.removeLayer(layerGroup);
+            layerGroupRef.current = null;
             clusterGroupRef.current = null;
         };
-    }, [clusterGroupRef, map]);
+    }, [clusterGroupRef, map, clustering]);
 
     useEffect(() => {
-        const clusterGroup = clusterGroupRef.current;
-        if (!clusterGroup) return;
+        const layerGroup = layerGroupRef.current;
+        if (!layerGroup) return;
 
-        clusterGroup.clearLayers();
+        layerGroup.clearLayers();
         markerRefs.current.clear();
 
         const nextPortals: PopupPortal[] = [];
@@ -1106,7 +1121,7 @@ function MarkerClusterLayer({
                 map.addLayer(marker);
                 pinnedMarkerRef.current = marker;
             } else {
-                clusterGroup.addLayer(marker);
+                layerGroup.addLayer(marker);
             }
             if (popupHost) {
                 nextPortals.push({
@@ -1122,7 +1137,7 @@ function MarkerClusterLayer({
         setPopupPortals(nextPortals);
 
         return () => {
-            clusterGroup.clearLayers();
+            layerGroup.clearLayers();
             if (pinnedMarkerRef.current) {
                 map.removeLayer(pinnedMarkerRef.current);
                 pinnedMarkerRef.current = null;
@@ -1130,26 +1145,26 @@ function MarkerClusterLayer({
             markerRefs.current.clear();
             setPopupPortals([]);
         };
-    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, journeySequence, map, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+    }, [layerGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, journeySequence, map, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
 
     useEffect(() => {
-        const clusterGroup = clusterGroupRef.current;
-        if (!clusterGroup) return;
+        const layerGroup = layerGroupRef.current;
+        if (!layerGroup) return;
         const next = (pinnedEventId && markerRefs.current.get(pinnedEventId)) || null;
         const prev = pinnedMarkerRef.current;
         if (prev === next) return;
         if (prev) {
             map.removeLayer(prev);
             prev.setZIndexOffset(0);
-            clusterGroup.addLayer(prev);
+            layerGroup.addLayer(prev);
         }
         pinnedMarkerRef.current = next;
         if (next) {
-            clusterGroup.removeLayer(next);
+            layerGroup.removeLayer(next);
             next.setZIndexOffset(PINNED_Z_OFFSET);
             map.addLayer(next);
         }
-    }, [clusterGroupRef, map, markerRefs, pinnedEventId]);
+    }, [layerGroupRef, map, markerRefs, pinnedEventId]);
 
     // Swap the hovered marker's icon in place (highlighted vs normal) without
     // rebuilding the whole layer. Rebuilding on every hover change (as the
@@ -1207,7 +1222,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null, selectedEventId = null, fitAllToken, obscuredInsets }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null, selectedEventId = null, fitAllToken, obscuredInsets, clustering = true }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -1384,6 +1399,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 journeySequence={journeySequence}
                 journeySelectedEventId={journeySelectedEventId}
                 pinnedEventId={selectedEventId}
+                clustering={clustering}
             />
         </MapContainer>
     );

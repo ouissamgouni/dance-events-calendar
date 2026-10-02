@@ -54,7 +54,7 @@ export default function TrendingEventsBanner({
         <>
             <button
                 type="button"
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-base font-semibold text-ink hover:text-ink focus:outline-none focus:ring-2 focus:ring-rose-300"
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-base font-semibold text-ink hover:text-ink focus:outline-none"
                 aria-expanded={!collapsed}
                 onClick={() => setCollapsed((value) => !value)}
             >

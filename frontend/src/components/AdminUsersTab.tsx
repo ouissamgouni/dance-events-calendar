@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import {
     fetchAdminUsers,
     adminDeleteUser,
@@ -762,6 +763,7 @@ function MergeUsersDialog({
     const [fieldError, setFieldError] = useState<string | null>(null);
     const [searching, setSearching] = useState(false);
     const [searchError, setSearchError] = useState<string | null>(null);
+    useBackToClose(onCancel, open);
 
     useEffect(() => {
         if (!open) return;

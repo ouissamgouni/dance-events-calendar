@@ -55,10 +55,18 @@ function onPopState() {
         const top = stack[stack.length - 1];
         if (top && (marker === undefined || marker < top.id)) {
             carryUrl(top.href);
-            // Re-push before closing so a refused close (e.g. a discard-confirm
-            // dialog) keeps its entry, and anything it opens stacks above it.
-            pushEntry(top);
+            const depth = stack.length - 1;
+            stack.pop();
             flushSync(() => top.close());
+            // Refused close (cleanup didn't run): restore it. Only push in this case —
+            // Chrome marks the page entry skippable when it pushes without a user gesture.
+            if (top.removal === undefined) {
+                if (stack.length > depth) stack.splice(depth, 0, top);
+                else {
+                    pushEntry(top);
+                    stack.push(top);
+                }
+            }
             return;
         }
     }

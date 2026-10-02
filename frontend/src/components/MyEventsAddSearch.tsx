@@ -10,9 +10,10 @@ interface Props {
     tab: MyEventsTab;
     onSuggest: () => void;
     onComplete?: () => void;
+    onClose: () => void;
 }
 
-export default function MyEventsAddSearch({ tab, onSuggest, onComplete }: Props) {
+export default function MyEventsAddSearch({ tab, onSuggest, onComplete, onClose }: Props) {
     const { isAttending, toggleAttending } = useAttendingEvents();
     const { isSaved, toggleSave } = useSavedEvents();
     const [selected, setSelected] = useState<EventSearchResult | null>(null);
@@ -46,6 +47,8 @@ export default function MyEventsAddSearch({ tab, onSuggest, onComplete }: Props)
         <div className="bg-surface" data-testid="my-events-add-search">
             <ExplorerEventSearch
                 embedded
+                overlay
+                onClose={onClose}
                 dateScope={tab === 'past' ? 'past' : 'upcoming'}
                 excludeAttended={tab === 'past'}
                 onSelectEvent={() => undefined}

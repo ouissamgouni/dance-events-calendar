@@ -17,6 +17,7 @@ import ProfileDraftEditor, {
     type ProfileDraftView,
 } from './ProfileDraftEditor';
 import { ConfirmDialog } from './AppDialog';
+import useBackToClose from '../hooks/useBackToClose';
 import {
     bboxSearchArea,
     searchAreaFromProfile,
@@ -80,6 +81,7 @@ function FlowShell({
     onAction: () => void;
     children: React.ReactNode;
 }) {
+    useBackToClose(onAction);
     const panel = (
         <div
             className="w-full max-w-sm max-h-[min(85dvh,calc(100dvh-4rem))] bg-surface border border-line shadow-xl flex flex-col rounded-card overflow-hidden"

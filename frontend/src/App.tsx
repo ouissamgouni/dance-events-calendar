@@ -62,6 +62,7 @@ import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
+import { hasBrowseFilterParams, readBrowseSession } from './utils/browseSession';
 import { useNotificationOpenAttribution } from './hooks/useNotificationOpenAttribution';
 
 /** Location state used to keep the origin page mounted behind `/suggest`. */
@@ -89,6 +90,17 @@ function SuggestEventRoute() {
 function LegacyRedirect({ to }: { to: string }) {
   const location = useLocation();
   return <Navigate to={`${to}${location.search}${location.hash}`} replace />;
+}
+
+// Bare /browse entries (nav, rails) resume this tab's last filters; links with filters win.
+// Also wraps /calendar so Home keeps its instance when switching views.
+function BrowseRoute() {
+  const location = useLocation();
+  const current = new URLSearchParams(location.search);
+  const saved = location.pathname !== '/browse' || hasBrowseFilterParams(current) ? null : readBrowseSession();
+  if (!saved || !hasBrowseFilterParams(saved.params)) return <Home />;
+  for (const [key, value] of saved.params) current.append(key, value);
+  return <Navigate to={{ pathname: location.pathname, search: current.toString(), hash: location.hash }} state={location.state} replace />;
 }
 
 function LegacySavedSearchEditRedirect() {
@@ -206,8 +218,8 @@ function AppShell() {
                 <Route path="/onboarding/local" element={<OnboardingWizard />} />
                 <Route path="/onboarding/follow" element={<OnboardingWizard />} />
                 <Route path="/r/:code" element={<ReferralLanding />} />
-                <Route path="/calendar" element={<Home />} />
-                <Route path="/browse" element={<Home />} />
+                <Route path="/calendar" element={<BrowseRoute />} />
+                <Route path="/browse" element={<BrowseRoute />} />
                 <Route path="/search" element={<TextSearchPage />} />
                 <Route path="/search/results" element={<TextSearchPage />} />
                 <Route path="/explore" element={<LegacyRedirect to="/" />} />

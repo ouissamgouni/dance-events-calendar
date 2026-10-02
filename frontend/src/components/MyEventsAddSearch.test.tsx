@@ -16,7 +16,7 @@ describe('MyEventsAddSearch', () => {
             }),
         );
         const onSuggest = vi.fn();
-        const { user } = renderWithProviders(<MyEventsAddSearch tab="past" onSuggest={onSuggest} />);
+        const { user } = renderWithProviders(<MyEventsAddSearch tab="past" onSuggest={onSuggest} onClose={vi.fn()} />);
 
         expect(screen.getByText('Searching past events only. Type at least 2 letters to find past events.')).toBeInTheDocument();
         await user.type(screen.getByRole('textbox', { name: 'Search events to add' }), 'salsa');
@@ -30,6 +30,14 @@ describe('MyEventsAddSearch', () => {
         expect(onSuggest).toHaveBeenCalledOnce();
     });
 
+    it('closes the overlay from the back button', async () => {
+        const onClose = vi.fn();
+        const { user } = renderWithProviders(<MyEventsAddSearch tab="past" onSuggest={vi.fn()} onClose={onClose} />);
+
+        await user.click(screen.getByRole('button', { name: 'Close search' }));
+        expect(onClose).toHaveBeenCalledOnce();
+    });
+
     it.each(['upcoming', 'saved'] as const)('searches only upcoming events from the %s tab', async (tab) => {
         let requestedUrl = '';
         server.use(
@@ -38,7 +46,7 @@ describe('MyEventsAddSearch', () => {
                 return HttpResponse.json([]);
             }),
         );
-        const { user } = renderWithProviders(<MyEventsAddSearch tab={tab} onSuggest={vi.fn()} />);
+        const { user } = renderWithProviders(<MyEventsAddSearch tab={tab} onSuggest={vi.fn()} onClose={vi.fn()} />);
 
         await user.type(screen.getByRole('textbox', { name: 'Search events to add' }), 'salsa');
         await waitFor(() => expect(requestedUrl).not.toBe(''));
@@ -82,7 +90,7 @@ describe('MyEventsAddSearch', () => {
         );
         const { user } = renderWithProviders(
             <FeatureFlagsProvider>
-                <MyEventsAddSearch tab="upcoming" onSuggest={vi.fn()} />
+                <MyEventsAddSearch tab="upcoming" onSuggest={vi.fn()} onClose={vi.fn()} />
             </FeatureFlagsProvider>,
         );
 

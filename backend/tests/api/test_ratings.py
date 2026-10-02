@@ -1004,6 +1004,9 @@ def test_batch_aggregate_pools_series_count_for_upcoming_edition(client, session
     # Past edition keeps its own count; the upcoming edition pools the series'.
     assert by_id[past.event_id] == 2
     assert by_id[upcoming.event_id] == 2
+    # The unreviewed upcoming edition must not drag the series mood down.
+    moods = {a["event_id"]: a["average_mood"] for a in resp.json()}
+    assert moods[upcoming.event_id] == pytest.approx(5.0)
 
 
 @pytest.mark.unit

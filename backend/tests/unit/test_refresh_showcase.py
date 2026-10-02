@@ -20,7 +20,6 @@ from backend.scripts.refresh_showcase import (
     load_showcase_config,
     merge_synthetic_overlay,
     validate_showcase_fixtures,
-    validate_synthetic_counts,
     validate_overlays,
 )
 
@@ -141,28 +140,17 @@ def test_build_snapshot_selects_exact_events_and_expands_series():
 
 
 @pytest.mark.unit
-def test_load_showcase_config_keeps_exact_ids_and_counts(tmp_path):
+def test_load_showcase_config_keeps_exact_ids(tmp_path):
     (tmp_path / "showcase.yaml").write_text(
         "production:\n"
         "  required_ids: [event-1, event-1]\n"
-        "  required_series_ids: [42]\n"
-        "synthetic_counts:\n"
-        "  events: 12\n"
-        "  series: 1\n"
-        "  ratings: 7\n"
-        "  messages: 10\n",
+        "  required_series_ids: [42]\n",
         encoding="utf-8",
     )
 
     assert load_showcase_config(tmp_path) == {
         "required_ids": ["event-1"],
         "required_series_ids": [42],
-        "synthetic_counts": {
-            "events": 12,
-            "series": 1,
-            "ratings": 7,
-            "messages": 10,
-        },
     }
 
 
@@ -178,21 +166,6 @@ def test_build_snapshot_rejects_missing_required_event():
                 required_series_ids=[],
                 image_base_url="https://cdn.example",
             )
-
-
-@pytest.mark.unit
-def test_validate_synthetic_counts_rejects_drift(tmp_path):
-    (tmp_path / "overlay-events.yaml").write_text(
-        "events:\n  - id: fake-event\nevent_series: []\nratings: []\n",
-        encoding="utf-8",
-    )
-    (tmp_path / "db-messages.yaml").write_text("messages: []\n", encoding="utf-8")
-
-    with pytest.raises(ValueError, match="events: expected 2, found 1"):
-        validate_synthetic_counts(
-            tmp_path,
-            {"events": 2, "series": 0, "ratings": 0, "messages": 0},
-        )
 
 
 @pytest.mark.unit

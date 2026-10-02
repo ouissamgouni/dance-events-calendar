@@ -686,7 +686,7 @@ body {
 }
 
 .event-list-count {
-  font-size: 0.8rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #475569;
 }
@@ -698,7 +698,7 @@ body {
 }
 
 .sort-btn {
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   padding: 0.125rem 0;
   border-radius: 0;
   border: none;

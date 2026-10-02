@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import {
     dismissDuplicateGroup,
     fetchDuplicateGroups,
@@ -20,6 +21,7 @@ const TABS = ['pending', 'resolved', 'history'] as const;
 type Tab = typeof TABS[number];
 
 export default function DuplicatesPanel({ isOpen, onClose, onOpenEvent }: Props) {
+    useBackToClose(onClose, isOpen);
     const [activeTab, setActiveTab] = useState<Tab>('pending');
     const [groups, setGroups] = useState<DuplicateGroup[]>([]);
     const [history, setHistory] = useState<DuplicateScanLogEntry[]>([]);

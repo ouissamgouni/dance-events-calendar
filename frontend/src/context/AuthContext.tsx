@@ -11,6 +11,7 @@ import {
     type PreferredAreaPayload,
 } from '../api';
 import { rotateDeviceId } from '../utils/deviceId';
+import { clearBrowseSession } from '../utils/browseSession';
 import { clearUmamiBaseContext, setAnalyticsDisabled, setUmamiBaseContext, umamiIdentify } from '../utils/umami';
 import {
     trackLoginCompleted,
@@ -203,6 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // browser (potentially a different user) cannot inherit anonymous
         // activity that happened during this user's session.
         rotateDeviceId();
+        clearBrowseSession();
         clearUmamiBaseContext();
         setAnalyticsDisabled(false);
         setUser(null);
@@ -212,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         generation.current++;
         await apiDeleteMe();
         rotateDeviceId();
+        clearBrowseSession();
         clearUmamiBaseContext();
         setAnalyticsDisabled(false);
         setUser(null);

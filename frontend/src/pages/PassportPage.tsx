@@ -911,6 +911,7 @@ function AttendedEventConfirmModal({
     const [loadError, setLoadError] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const [saving, setSaving] = useState(false);
+    useBackToClose(onClose, !saving);
 
     useEffect(() => {
         let cancelled = false;
@@ -1062,7 +1063,7 @@ function AddPastEventControl({ onAdded, onOpenSubmitEvent }: { onAdded: () => vo
                 small
                 triggerIcon="plus"
                 triggerLabel="Add event"
-                portal
+                overlay
                 onSelectEvent={(id) => setConfirmId(id)}
                 onOpenSubmitEvent={onOpenSubmitEvent}
                 resultPurpose="select"

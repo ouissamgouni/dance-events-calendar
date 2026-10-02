@@ -216,7 +216,7 @@ schedules:
         session_id: "30000000-0000-4000-8000-000000001703"
       - email: elena.moreau@joinmovida.com
         session_id: "30000000-0000-4000-8000-000000001801"
-      - email: lucia.navarro@joinmovida.com
+      - email: alex.navarro@joinmovida.com
         session_id: "30000000-0000-4000-8000-000000001606"
       - email: sofia.torres@joinmovida.com
         session_id: "30000000-0000-4000-8000-000000001601"

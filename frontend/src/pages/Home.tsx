@@ -49,6 +49,7 @@ import {
     toProfileGeometry,
     type SearchArea,
 } from '../utils/searchArea';
+import { readBrowseSession, saveBrowseSession, touchBrowseSession, type BrowseAreaOverride } from '../utils/browseSession';
 
 // Worldwide bbox shortcut reused by the area sheet's "Anywhere" apply path.
 const WORLDWIDE_AREA: PreferredAreaPayload =
@@ -379,11 +380,10 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     // touching their saved prefs, OR a one-click switch back to the
     // hardcoded "Europe & nearby" preset. Reload resets it (matches design
     // doc).
-    const [areaSessionOverride, setAreaSessionOverride] = useState<
-        | { kind: 'show-all' }
-        | { kind: 'preset'; area: SearchArea }
-        | null
-    >(config.areaMode === 'show-all' ? { kind: 'show-all' } : null);
+    const [areaSessionOverride, setAreaSessionOverride] = useState<BrowseAreaOverride>(() => {
+        if (config.areaMode === 'show-all') return { kind: 'show-all' };
+        return location.pathname === '/browse' ? readBrowseSession()?.area ?? null : null;
+    });
 
     // Parse explicit bbox from the URL exactly once on mount; treat the four
     // params as all-or-nothing to match the backend validator.
@@ -648,6 +648,36 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         }),
         [interestUserHandles, followingIndex],
     );
+    const filterScrollKey = useMemo(() => JSON.stringify([
+        [...activeTagIds].sort((a, b) => a - b),
+        reachFilter,
+        discountOnly,
+        interestSource,
+        interestKind,
+        interestUserHandles,
+        interestMatch,
+        startDate,
+        endDate,
+        areaSessionOverride,
+    ]), [activeTagIds, reachFilter, discountOnly, interestSource, interestKind, interestUserHandles, interestMatch, startDate, endDate, areaSessionOverride]);
+    const rootRef = useRef<HTMLDivElement>(null);
+    const prevFilterScrollKeyRef = useRef(filterScrollKey);
+    // Set by the list's "extend period" CTA, which should keep the user's position.
+    const skipNextFilterScrollResetRef = useRef(false);
+    const [scrollResetToken, setScrollResetToken] = useState(0);
+    useEffect(() => {
+        if (prevFilterScrollKeyRef.current === filterScrollKey) return;
+        prevFilterScrollKeyRef.current = filterScrollKey;
+        if (skipNextFilterScrollResetRef.current) {
+            skipNextFilterScrollResetRef.current = false;
+            return;
+        }
+        if (viewMode !== 'explorer') return;
+        setScrollResetToken((n) => n + 1);
+        // Mobile list scrolls with App's <main>, not this page's own <main>.
+        rootRef.current?.closest('main')?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, [filterScrollKey, viewMode]);
     const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
     const [explorerPreviewHeight, setExplorerPreviewHeight] = useState(0);
     const [explorerPreviewCollapsed, setExplorerPreviewCollapsed] = useState(true);
@@ -773,6 +803,15 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             setSearchParams(next, { replace: true });
         }
     }, [activeTagIds, discountOnly, endDate, interestKind, interestMatch, interestSource, interestUserHandles, mapFullscreen, reachFilter, searchParams, setSearchParams, sortBy, startDate, viewMode]);
+
+    const persistBrowseSession = config.variant === 'explorer' && location.pathname === '/browse';
+    useEffect(() => {
+        if (persistBrowseSession) saveBrowseSession(searchParams, areaSessionOverride);
+    }, [persistBrowseSession, searchParams, areaSessionOverride]);
+    useEffect(() => {
+        if (!persistBrowseSession) return;
+        return () => touchBrowseSession();
+    }, [persistBrowseSession]);
 
     // Events query source: Explorer pulls the date/interest-filtered set once
     // and applies the active area + tag filters client-side. The live map
@@ -920,6 +959,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         userTouchedDateRangeRef.current = true;
         setPreserveViewportAfterSearch(false);
         setExtendingPeriod(true);
+        skipNextFilterScrollResetRef.current = true;
         setEndDate(nextAvailableEventBatch.endDate);
         bumpAutoFit();
         // ``loading`` flips back to false in the events fetch effect; mirror
@@ -1863,7 +1903,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     ) : undefined;
 
     return (
-        <div className="min-h-screen bg-[#f8fafc]">
+        <div ref={rootRef} className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
                 {loading && !initialLoadDone.current && (
                     <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted" role="status" aria-live="polite">
@@ -1915,6 +1955,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                             tagsAsBadge
                                             tribeCard={config.cardVariant === 'tribe'}
                                             headerSlot={trendingBanner}
+                                            scrollResetKey={String(scrollResetToken)}
                                         />
                                     </div>
                                 </div>
@@ -2122,6 +2163,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                     tagsAsBadge
                                     tribeCard={config.cardVariant === 'tribe'}
                                     headerSlot={trendingBanner}
+                                    scrollResetKey={String(scrollResetToken)}
                                 />
                             </div>
                         </div>

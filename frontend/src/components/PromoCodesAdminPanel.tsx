@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { Link } from 'react-router-dom';
 import {
     approveAdminPromoCode,
@@ -31,6 +32,7 @@ function statusBadge(status: string) {
 }
 
 export default function PromoCodesAdminPanel({ isOpen, onClose, onOpenEvent }: Props) {
+    useBackToClose(onClose, isOpen);
     const [activeTab, setActiveTab] = useState<Tab>('pending');
     const [rows, setRows] = useState<PromoCodeAdmin[]>([]);
     const [loading, setLoading] = useState(false);

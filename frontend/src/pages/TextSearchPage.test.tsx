@@ -3,12 +3,19 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchEventsByIds, searchEventsPage } from '../api';
 import TextSearchPage from './TextSearchPage';
+import { trackView } from '../utils/tracking';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 
 vi.mock('../api', () => ({ fetchEventsByIds: vi.fn(), searchEventsPage: vi.fn() }));
 vi.mock('../components/CardActionCluster', () => ({ default: () => <span data-testid="card-actions" /> }));
 vi.mock('../components/AttendeeAvatarStack', () => ({ default: () => <span data-testid="card-avatars" /> }));
 vi.mock('../components/CardReviewsLine', () => ({ default: () => <span data-testid="card-reviews" /> }));
+vi.mock('../components/EventModal', () => ({
+    default: ({ event, onClose }: { event: { title: string }; onClose: () => void }) => (
+        <div role="dialog" aria-label={event.title}><button type="button" onClick={onClose}>Close modal</button></div>
+    ),
+}));
+vi.mock('../utils/tracking', () => ({ trackView: vi.fn() }));
 
 function LocationProbe() {
     const location = useLocation();
@@ -173,5 +180,56 @@ describe('TextSearchPage', () => {
         await waitFor(() => expect(screen.getByTestId('location-probe')).toHaveTextContent('/search?q=prague&scope=all'));
         await waitFor(() => expect(searchEventsPage).toHaveBeenLastCalledWith('prague', { limit: 3, dateScope: 'all' }));
         expect(screen.getByRole('link', { name: 'Show all 12 matching events' })).toHaveAttribute('href', '/search/results?q=prague&scope=all');
+    });
+
+    it('opens a hydrated result in the event modal without leaving search', async () => {
+        vi.mocked(searchEventsPage).mockResolvedValue({
+            results: [{ event_id: 'prague-1', title: 'Prague Salsa Marathon', start: '2099-09-24T18:00:00Z', location: 'Palace Hall', city: 'Prague', country: 'Czechia', matched_fields: ['title'], matched_tags: [] }],
+            total: 1,
+            hasMore: false,
+        });
+        vi.mocked(fetchEventsByIds).mockResolvedValue([{
+            event_id: 'prague-1', calendar_id: 'calendar-1', title: 'Prague Salsa Marathon', description: null, image_url: null, location: 'Palace Hall', city: 'Prague', country: 'Czechia', latitude: null, longitude: null, start: '2099-09-24T18:00:00Z', end: '2099-09-25T02:00:00Z', all_day: false, color: null, view_count: 0, price_min: null, price_max: null, price_currency: null, price_is_free: false, links: null, tags: [],
+        }]);
+        render(
+            <MemoryRouter initialEntries={['/search?q=prague']}>
+                <FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}>
+                    <LocationProbe />
+                    <Routes><Route path="/search" element={<TextSearchPage />} /></Routes>
+                </FeatureFlagsContext.Provider>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Open Prague Salsa Marathon' }));
+        expect(await screen.findByRole('dialog', { name: 'Prague Salsa Marathon' })).toBeInTheDocument();
+        expect(trackView).toHaveBeenCalledWith('prague-1', 'text-search');
+        expect(screen.getByTestId('location-probe')).toHaveTextContent('/search?q=prague');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close modal' }));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('falls back to the event page when a result could not be hydrated', async () => {
+        vi.mocked(searchEventsPage).mockResolvedValue({
+            results: [{ event_id: 'prague-1', title: 'Prague Salsa Marathon', start: '2099-09-24T18:00:00Z', location: null, city: 'Prague', country: 'Czechia', matched_fields: ['title'], matched_tags: [] }],
+            total: 1,
+            hasMore: false,
+        });
+        vi.mocked(fetchEventsByIds).mockResolvedValue([]);
+        render(
+            <MemoryRouter initialEntries={['/search?q=prague']}>
+                <FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}>
+                    <LocationProbe />
+                    <Routes>
+                        <Route path="/search" element={<TextSearchPage />} />
+                        <Route path="/event/:id" element={<p>Event page</p>} />
+                    </Routes>
+                </FeatureFlagsContext.Provider>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByText('Prague Salsa Marathon'));
+        expect(await screen.findByText('Event page')).toBeInTheDocument();
+        expect(screen.getByTestId('location-probe')).toHaveTextContent('/event/prague-1?src=text-search');
     });
 });

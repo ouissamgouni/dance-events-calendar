@@ -1,6 +1,7 @@
 /** Shared owner, profile, and public Dance Passport presentation. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { Link } from 'react-router-dom';
 import {
     ArrowRight,
@@ -363,6 +364,7 @@ function MilestoneDetailCard({ card, category }: { card: MilestoneCardModel; cat
 }
 
 function MilestoneCategorySheet({ category, onClose }: { category: MilestoneCategoryModel; onClose: () => void }) {
+    useBackToClose(onClose);
     return (
         <div
             className="fixed inset-0 z-[11000] flex items-end justify-center bg-black/50 backdrop-blur-sm"
@@ -563,6 +565,7 @@ function FilterableEventMap({
                     showFollowingBadgeOverlay={false}
                     showTrendingOverlay={false}
                     cooperativeGestures
+                    clustering={false}
                 />
             </div>
             <div className="bg-surface">

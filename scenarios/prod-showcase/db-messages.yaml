@@ -46,3 +46,280 @@ messages:
     email: rita.petrov@joinmovida.com
     category: meetup
     body: Anyone else joining the beginner class before the social?
+  - reply_to: lisbon-meetup
+    event_id: alfama-thursday-salsa-next
+    email: noah.kim@joinmovida.com
+    body: Count me in, it really helped me warm up last time.
+  - key: alfama-summer-lost
+    event_id: alfama-thursday-salsa-summer
+    email: ines.lopez@joinmovida.com
+    category: lost_found
+    body: I left a black fan near the DJ booth. Did anyone pick it up?
+  - reply_to: alfama-summer-lost
+    event_id: alfama-thursday-salsa-summer
+    email: maya.rivera@joinmovida.com
+    body: The hosts collected a few items at the end, ask at reception next Thursday.
+  - key: alfama-autumn-thanks
+    event_id: alfama-thursday-salsa-autumn
+    email: clara.dubois@joinmovida.com
+    category: other
+    body: Does anyone know the name of the last song the DJ played?
+  - reply_to: alfama-autumn-thanks
+    event_id: alfama-thursday-salsa-autumn
+    email: victor.schmidt@joinmovida.com
+    body: I think it was a Grupo Niche classic, I will ask the DJ.
+  - key: seine-question
+    event_id: seine-salsa-social
+    email: camille.laurent@joinmovida.com
+    category: question
+    body: Is there a cloakroom, or should we travel light?
+  - reply_to: seine-question
+    event_id: seine-salsa-social
+    email: sofia.torres@joinmovida.com
+    body: There are a few hooks by the entrance but it fills up fast.
+  - key: berlin-room
+    event_id: berlin-bachata-exchange
+    email: nadia.fischer@joinmovida.com
+    category: accommodation
+    body: Sharing a flat in Kreuzberg for the weekend, one bed still free.
+  - reply_to: berlin-room
+    event_id: berlin-bachata-exchange
+    email: jonas.meyer@joinmovida.com
+    body: Sent you a message, I would love to join.
+  - key: madrid-tickets
+    event_id: madrid-salsa-congress-night
+    email: milan.horvat@joinmovida.com
+    category: tickets
+    body: Selling one full pass, I can no longer make it.
+  - reply_to: madrid-tickets
+    event_id: madrid-salsa-congress-night
+    email: pablo.rossi@joinmovida.com
+    body: Interested! Is the name change allowed?
+  - reply_to: madrid-tickets
+    event_id: madrid-salsa-congress-night
+    email: milan.horvat@joinmovida.com
+    body: Yes, the organizers do it for free by email.
+  - key: canal-meetup
+    event_id: canal-bachata-sunday
+    email: leila.bauer@joinmovida.com
+    category: meetup
+    body: Grabbing dinner near the canal before the social, anyone joining?
+  - reply_to: canal-meetup
+    event_id: canal-bachata-sunday
+    email: ines.lopez@joinmovida.com
+    body: Yes please, see you at the entrance at 18h.
+  - key: barcelona-question
+    event_id: barcelona-salsa-beach-party
+    email: alex.navarro@joinmovida.com
+    category: question
+    body: Is there a wooden floor on the sand or are we dancing barefoot?
+  - reply_to: barcelona-question
+    event_id: barcelona-salsa-beach-party
+    email: mateo.vega@joinmovida.com
+    body: There is a wooden platform near the bar, the rest is sand.
+  - key: vienna-ride
+    event_id: vienna-bachata-nights
+    email: clara.dubois@joinmovida.com
+    category: ride
+    body: Driving from Bratislava on Friday evening, two seats available.
+  - reply_to: vienna-ride
+    event_id: vienna-bachata-nights
+    email: penny.valdez@joinmovida.com
+    body: I would love a seat, can we meet at the main station?
+  - key: rome-question
+    event_id: rome-latin-social
+    email: ana.garcia@joinmovida.com
+    category: question
+    body: What is the split between salsa and bachata during the night?
+  - reply_to: rome-question
+    event_id: rome-latin-social
+    email: sofia.torres@joinmovida.com
+    body: Usually three salsa, two bachata, with a short kizomba set at the end.
+  - key: zurich-meetup
+    event_id: zurich-kizomba-social
+    email: nadia.fischer@joinmovida.com
+    category: meetup
+    body: First time at this social, anyone up for a drink by the lake before?
+  - reply_to: zurich-meetup
+    event_id: zurich-kizomba-social
+    email: milan.horvat@joinmovida.com
+    body: Sure, I will be there around 19:30.
+  - key: nyc-question
+    event_id: new-york-mambo-reunion
+    email: bruno.santos@joinmovida.com
+    category: question
+    body: Did anyone record the opening show? Would love to watch it again.
+  - reply_to: nyc-question
+    event_id: new-york-mambo-reunion
+    email: nina.khan@joinmovida.com
+    body: The organizers posted a video on their page this week.
+  - key: seoul-room
+    event_id: seoul-bachata-weekender
+    email: amira.haddad@joinmovida.com
+    category: accommodation
+    body: Any hotel recommendations within walking distance of the studio?
+  - reply_to: seoul-room
+    event_id: seoul-bachata-weekender
+    email: samir.ivanov@joinmovida.com
+    body: I stayed near Hongik University station, about ten minutes away.
+  - key: amalfi-ride
+    event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: elena.moreau@joinmovida.com
+    category: ride
+    body: Renting a car from Naples airport on Friday, three seats free.
+  - reply_to: amalfi-ride
+    event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: ines.lopez@joinmovida.com
+    body: I land at 14h, would that work for you?
+  - key: cascais-question
+    event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: zara.benali@joinmovida.com
+    category: question
+    body: Is the train from Lisbon running late enough to get back after the party?
+  - reply_to: cascais-question
+    event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: leila.bauer@joinmovida.com
+    body: The last train is around 1:30, so sharing a taxi is easier.
+  - key: costa-brava-room
+    event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: omar.costa@joinmovida.com
+    category: accommodation
+    body: Looking for two people to share an apartment near the beach.
+  - reply_to: costa-brava-room
+    event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: pablo.rossi@joinmovida.com
+    body: My partner and I are interested, sending you a message.
+  - key: mykonos-question
+    event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: theo.novak@joinmovida.com
+    category: question
+    body: Are ferry transfers included in the retreat package?
+  - reply_to: mykonos-question
+    event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: amira.haddad@joinmovida.com
+    body: Only the airport transfer last year, the ferry was extra.
+  - key: antibes-meetup
+    event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: samir.ivanov@joinmovida.com
+    category: meetup
+    body: Sunset swim before the first social on Saturday, who is in?
+  - reply_to: antibes-meetup
+    event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: bruno.santos@joinmovida.com
+    body: Great idea, I will bring a speaker.
+  - key: b2m-room
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: leo.martin@joinmovida.com
+    category: accommodation
+    body: Two of us are sharing an apartment in Old Town, one more spot available.
+  - reply_to: b2m-room
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: victor.schmidt@joinmovida.com
+    body: I would take it, how far is it from Slovanský dům?
+  - reply_to: b2m-room
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: leo.martin@joinmovida.com
+    body: About eight minutes on foot, perfect after the late parties.
+  - key: b2m-question
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: clara.dubois@joinmovida.com
+    category: question
+    body: Is the bootcamp suitable for intermediate on2 dancers?
+  - reply_to: b2m-question
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: maya.rivera@joinmovida.com
+    body: Yes, there are separate intermediate and advanced tracks every day.
+  - key: b2m-meetup
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: maya.rivera@joinmovida.com
+    category: meetup
+    body: Coffee before the Thursday opening workshops? Meeting at the main entrance.
+  - key: allstars-room
+    event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+    email: sofia.torres@joinmovida.com
+    category: accommodation
+    body: Looking for a roommate at the Verdi hotel for Friday to Monday.
+  - reply_to: allstars-room
+    event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+    email: elena.moreau@joinmovida.com
+    body: I am still looking too, let us share!
+  - key: allstars-ride
+    event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+    email: mateo.vega@joinmovida.com
+    category: ride
+    body: Driving from Vienna on Friday morning, three seats available.
+  - reply_to: allstars-ride
+    event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+    email: noah.kim@joinmovida.com
+    body: Could you pick me up near Wien Hauptbahnhof?
+  - key: allstars-question
+    event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+    email: noah.kim@joinmovida.com
+    category: question
+    body: Is there a cross body salsa room every night?
+  - reply_to: allstars-question
+    event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+    email: sofia.torres@joinmovida.com
+    body: Yes, last year salsa had its own room alongside bachata and kizomba.
+  - key: transilvania-room
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: omar.costa@joinmovida.com
+    category: accommodation
+    body: Looking for a roommate at the Grand Hotel Napoca from Thursday to Monday.
+  - reply_to: transilvania-room
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: jonas.meyer@joinmovida.com
+    body: I still need a room too, happy to split it.
+  - reply_to: transilvania-room
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: omar.costa@joinmovida.com
+    body: Perfect, I will add you to the booking.
+  - key: transilvania-costume
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: ana.garcia@joinmovida.com
+    category: question
+    body: Is there a dress code for the Dracula themed party?
+  - reply_to: transilvania-costume
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: rita.petrov@joinmovida.com
+    body: Black and red is the theme, many people go full gothic. It is so much fun!
+  - key: transilvania-ride
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: rita.petrov@joinmovida.com
+    category: ride
+    body: Driving from Bucharest on Thursday morning, two seats left.
+  - reply_to: transilvania-ride
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: ana.garcia@joinmovida.com
+    body: I would love one, I land at Otopeni on Wednesday night.
+  - key: salsa-grand-tickets
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: camille.laurent@joinmovida.com
+    category: tickets
+    body: Has anyone heard when the blind early tickets go on sale?
+  - reply_to: salsa-grand-tickets
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: milan.horvat@joinmovida.com
+    body: The organizers said next week on their page, they sold out fast last year.
+  - key: salsa-grand-room
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: nina.khan@joinmovida.com
+    category: accommodation
+    body: Is it worth staying at the Sheraton or are there cheaper places nearby?
+  - reply_to: salsa-grand-room
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: bruno.santos@joinmovida.com
+    body: The festival rate at the Sheraton was good, and you never need a coat between parties.
+  - reply_to: salsa-grand-room
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: nina.khan@joinmovida.com
+    body: Great tip, booking it now.
+  - key: salsa-grand-meetup
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: milan.horvat@joinmovida.com
+    category: meetup
+    body: Christmas market walk on Saturday afternoon before the evening social, who is in?
+  - reply_to: salsa-grand-meetup
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: camille.laurent@joinmovida.com
+    body: Count me in, mulled wine first!

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { createPortal } from 'react-dom';
 import { fetchTagSynonyms, createTagSynonym, deleteTagSynonym } from '../api';
 import type { TagSynonymResponse } from '../api';
@@ -26,6 +27,7 @@ export default function TagSynonymsEditor({ tagId, tagLabel, onClose }: Props) {
     // containers (e.g. the Tag Categories scroll panel) cannot clip it.
     const anchorRef = useRef<HTMLSpanElement | null>(null);
     const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+    useBackToClose(onClose);
 
     useEffect(() => {
         fetchTagSynonyms(tagId)

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { CalendarSetting, EventSuggestion, Tag } from '../types';
 import type { AdminTagGroup } from '../api';
@@ -351,6 +352,7 @@ export default function Admin() {
     const [expandedDefaultTagsCalId, setExpandedDefaultTagsCalId] = useState<string | null>(null);
     const [expandedRulesCalId, setExpandedRulesCalId] = useState<string | null>(null);
     const [openMenuCalId, setOpenMenuCalId] = useState<string | null>(null);
+    useBackToClose(() => setOpenMenuCalId(null), openMenuCalId !== null);
     const [confirmReseedOpen, setConfirmReseedOpen] = useState(false);
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const allTags = useMemo<Tag[]>(() => tagGroups.flatMap((g) => g.tags), [tagGroups]);

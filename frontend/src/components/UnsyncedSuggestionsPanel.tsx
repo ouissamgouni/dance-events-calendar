@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import type { EventSuggestion, CalendarSetting } from '../types';
 import { syncSuggestionToGoogle } from '../api';
 import SuggestionReviewModal from './SuggestionReviewModal';
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function UnsyncedSuggestionsPanel({ isOpen, onClose, suggestions, calendars, onUpdated, onRefresh }: Props) {
+    useBackToClose(onClose, isOpen);
     const [syncingId, setSyncingId] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [reviewingSuggestion, setReviewingSuggestion] = useState<EventSuggestion | null>(null);

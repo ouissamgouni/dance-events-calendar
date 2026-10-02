@@ -78,9 +78,3 @@ production:
     - imgjf21msul58hop4dd7ukgkbo
     - 6tgjaohj68q66b9o6dj36b9k6hhj6b9ochi68b9k60s34c9mccsj8dr368
   required_series_ids: []
-
-synthetic_counts:
-  events: 14
-  series: 1
-  ratings: 7
-  messages: 10

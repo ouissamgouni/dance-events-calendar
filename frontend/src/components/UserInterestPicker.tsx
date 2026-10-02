@@ -30,6 +30,7 @@ import {
     type UserSearchResult,
 } from '../api';
 import UserResultCard, { type UserCardModel } from './UserResultCard';
+import useBackToClose from '../hooks/useBackToClose';
 
 interface Props {
     onPick: (handle: string) => void;
@@ -46,6 +47,7 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
     const debounced = useDebounced(q, 250);
     const [activeIdx, setActiveIdx] = useState(0);
+    useBackToClose(onClose);
 
     // Click-outside / Esc to close. The picker does not preserve state
     // — re-opening starts fresh, matching the header search.

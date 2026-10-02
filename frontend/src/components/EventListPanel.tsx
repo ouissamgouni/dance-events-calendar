@@ -88,6 +88,8 @@ interface EventListPanelProps {
     /** Optional content rendered at the very top of the scrolling list
      * (e.g. the trending trail rail). Scrolls away with the results. */
     headerSlot?: React.ReactNode;
+    /** When this value changes, the list scroller jumps back to the top. */
+    scrollResetKey?: string;
 }
 
 export interface EventListCardProps {
@@ -435,6 +437,7 @@ export default function EventListPanel({
     orderByFollows = false,
     tribeCard = false,
     headerSlot,
+    scrollResetKey,
 }: EventListPanelProps) {
     const { user } = useAuth();
     const { isSaved } = useSavedEvents();
@@ -466,6 +469,13 @@ export default function EventListPanel({
         }
         setVisibleCount(pageSize);
     }, [events, pageSize]);
+
+    const prevScrollResetKeyRef = useRef(scrollResetKey);
+    useEffect(() => {
+        if (prevScrollResetKeyRef.current === scrollResetKey) return;
+        prevScrollResetKeyRef.current = scrollResetKey;
+        if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    }, [scrollResetKey]);
 
     const updateFade = useCallback(() => {
         const el = scrollRef.current;

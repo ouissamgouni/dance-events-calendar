@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import useBackToClose from '../../hooks/useBackToClose';
 import { Check, ChevronLeft, X } from 'lucide-react';
 import type { SiteSettings } from '../../api';
 import { fetchSettings, fetchTagGroups, submitSuggestion } from '../../api';
@@ -74,6 +75,7 @@ export default function SuggestEventWizard({ onClose }: Props) {
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
     const [confirmingClose, setConfirmingClose] = useState(false);
+    useBackToClose(() => setConfirmingClose(false), confirmingClose);
     const appliedUserDefaults = useRef(false);
 
     const [state, setState] = useState<SuggestFormState>(() =>

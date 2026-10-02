@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import type { AdminEventStatus, CalendarEvent, EventInterestReach, SeriesGroup, DuplicateGroup } from '../types';
 import type {
     AdminEventGeoStatus,
@@ -96,6 +97,7 @@ export function MatchesCell({ reach }: { reach?: EventInterestReach | null }) {
 }
 
 export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId }: Props) {
+    useBackToClose(onClose, isOpen);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(0);

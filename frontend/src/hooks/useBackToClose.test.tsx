@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import useBackToClose from './useBackToClose'
@@ -45,6 +45,19 @@ describe('useBackToClose', () => {
 
         await back()
         await waitFor(() => expect(screen.queryByText('outer')).not.toBeInTheDocument())
+        unmount()
+    })
+
+    it('Back does not push a history entry when the overlay closes', async () => {
+        const { unmount } = render(<Harness />)
+        fireEvent.click(screen.getByText('open outer'))
+        await waitFor(() => expect((window.history.state as { __overlay?: number })?.__overlay).toBeDefined())
+
+        // Gesture-less pushes make Chrome's back button skip the page entry.
+        const pushSpy = vi.spyOn(window.history, 'pushState')
+        await back()
+        await waitFor(() => expect(screen.queryByText('outer')).not.toBeInTheDocument())
+        expect(pushSpy).not.toHaveBeenCalled()
         unmount()
     })
 

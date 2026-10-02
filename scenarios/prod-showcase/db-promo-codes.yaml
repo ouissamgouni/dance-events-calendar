@@ -38,18 +38,18 @@ promo_codes:
   - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
     submitter_email: sea.sun.salsa@joinmovida.com
     code: AMALFI15
-    description: 15% off for early birds booking by May 31st. Valid for all ticket types.
-    expires_at: "2026-05-31T00:00:00"
+    description: 15% off for early birds. Valid for all ticket types.
+    expires_at: "2030-06-30T00:00:00"
     status: approved
   - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
     submitter_email: sea.sun.salsa@joinmovida.com
     code: CASCAIS10
     description: Community discount - 10% off all passes for the Lisboa Beach Bachata Social.
-    expires_at: "2026-06-30T00:00:00"
+    expires_at: "2030-06-30T00:00:00"
     status: approved
   - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
     submitter_email: sea.sun.salsa@joinmovida.com
     code: COSTABRAVA20
-    description: Early bird special - 20% off festival passes when booked before June 10th.
-    expires_at: "2026-06-10T00:00:00"
+    description: Early bird special - 20% off festival passes.
+    expires_at: "2030-06-30T00:00:00"
     status: approved
