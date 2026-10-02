@@ -422,8 +422,8 @@ events:
     country_code: ES
     latitude: 37.3826
     longitude: -6.0026
-    start: w2 Fri 19:00
-    end: w2 Sun 22:00
+    start: w1 Fri 19:00
+    end: w1 Sun 22:00
     price_min: 110
     price_currency: EUR
     price_is_free: false
@@ -465,8 +465,8 @@ events:
     country_code: HU
     latitude: 47.4979
     longitude: 19.0402
-    start: w5 Fri 20:00
-    end: w5 Sun 23:00
+    start: w2 Fri 20:00
+    end: w2 Sun 23:00
     price_min: 85
     price_currency: EUR
     price_is_free: false
