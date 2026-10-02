@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import SaveEventButton from './SaveEventButton'
+import GoingButton from './GoingButton'
 import { renderWithProviders } from '../test/render'
 import { server } from '../test/server'
 import { makeUser } from '../test/handlers'
@@ -249,5 +250,34 @@ describe('SaveEventButton visibility', () => {
         expect(localStorage.getItem('audience.remember.saved.user-1')).toBe('1')
         expect(localStorage.getItem('audience.remember.user-1')).toBeNull()
         expect(patches).toEqual([])
+    })
+
+    it.each([
+        ['with an account default', 'friends'],
+        ['without an account default', undefined],
+    ] as const)('does not leak a remembered save choice into the next RSVP (%s)', async (_label, accountDefault) => {
+        useMobileViewport()
+        server.use(
+            http.get('*/api/auth/me', () =>
+                HttpResponse.json(makeUser({ share_attendance_default_audience: accountDefault })),
+            ),
+        )
+        const { user } = renderWithProviders(
+            <>
+                <SaveEventButton eventId="evt-save-first" eventTitle="Save me" />
+                <GoingButton eventId="evt-go-next" eventTitle="Go me" />
+            </>,
+        )
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+        await screen.findByRole('dialog', { name: 'Saved!' })
+        await user.click(screen.getByRole('radio', { name: /^Private/ }))
+        await user.click(screen.getByRole('button', { name: 'Done' }))
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: "I'm going" }))
+        await screen.findByRole('dialog', { name: "You're going!" })
+        const expected = accountDefault === 'friends' ? /^Friends/ : /^Public/
+        expect(screen.getByRole('radio', { name: expected })).toHaveAttribute('aria-checked', 'true')
     })
 })
