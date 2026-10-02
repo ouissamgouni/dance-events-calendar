@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from slowapi import Limiter
 from backend.api.rate_limit import client_ip
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from backend.api.deps import get_current_user_optional
@@ -86,42 +86,32 @@ def create_share_token(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
-    """Return (or create) a stable share token. When authed it is keyed by user."""
-    if current_user is not None:
-        # User-scoped: one token per user, follows them across devices.
-        existing = session.exec(
-            select(ShareToken).where(ShareToken.user_id == current_user.id)
-        ).first()
-        if existing:
-            return ShareTokenResponse(token=existing.token)
-        # Reuse the device's token if there is one (claim it for the user).
-        device_share = session.exec(
-            select(ShareToken).where(ShareToken.device_id == payload.device_id)
-        ).first()
-        if device_share is not None and device_share.user_id is None:
-            device_share.user_id = current_user.id
-            session.add(device_share)
-            session.commit()
-            return ShareTokenResponse(token=device_share.token)
-        token = str(uuid.uuid4())
-        session.add(
-            ShareToken(
-                token=token,
-                device_id=payload.device_id,
-                user_id=current_user.id,
-            )
-        )
-        session.commit()
-        return ShareTokenResponse(token=token)
+    """Return (or create) the signed-in user's stable share token."""
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="Sign in to share your calendar")
 
     existing = session.exec(
-        select(ShareToken).where(ShareToken.device_id == payload.device_id)
+        select(ShareToken).where(ShareToken.user_id == current_user.id)
     ).first()
     if existing:
         return ShareTokenResponse(token=existing.token)
-
+    # Reuse the device's token if there is one (claim it for the user).
+    device_share = session.exec(
+        select(ShareToken).where(ShareToken.device_id == payload.device_id)
+    ).first()
+    if device_share is not None and device_share.user_id is None:
+        device_share.user_id = current_user.id
+        session.add(device_share)
+        session.commit()
+        return ShareTokenResponse(token=device_share.token)
     token = str(uuid.uuid4())
-    session.add(ShareToken(token=token, device_id=payload.device_id))
+    session.add(
+        ShareToken(
+            token=token,
+            device_id=payload.device_id,
+            user_id=current_user.id,
+        )
+    )
     session.commit()
     return ShareTokenResponse(token=token)
 
@@ -152,22 +142,10 @@ def get_share_token(
 def _scoped_event_ids(session: Session, share: ShareToken, scope: str) -> list[str]:
     """Collect the share owner's event ids for the requested scope.
 
-    ``scope`` is one of ``saved``, ``going`` or ``all``. User-scoped tokens
-    aggregate across all of the user's devices; legacy device-only tokens use
-    the device id alone.
+    ``scope`` is one of ``saved``, ``going`` or ``all``.
     """
-    if share.user_id is not None:
-        saved_pred = or_(
-            UserSavedEvent.user_id == share.user_id,
-            UserSavedEvent.device_id == share.device_id,
-        )
-        going_pred = or_(
-            UserEventAttendance.user_id == share.user_id,
-            UserEventAttendance.device_id == share.device_id,
-        )
-    else:
-        saved_pred = UserSavedEvent.device_id == share.device_id
-        going_pred = UserEventAttendance.device_id == share.device_id
+    saved_pred = UserSavedEvent.user_id == share.user_id
+    going_pred = UserEventAttendance.user_id == share.user_id
 
     ids: set[str] = set()
     if scope in ("saved", "all"):
@@ -217,7 +195,8 @@ def get_calendar_feed(
         scope = "all"
 
     share = session.exec(select(ShareToken).where(ShareToken.token == token)).first()
-    if not share:
+    # Legacy device-only tokens are no longer served.
+    if not share or share.user_id is None:
         raise HTTPException(status_code=404, detail="Share link not found")
 
     event_ids = _scoped_event_ids(session, share, scope)
@@ -290,32 +269,16 @@ def get_shared_calendar(
 ):
     """Return the live events list for the share token owner, optionally filtered by view."""
     share = session.exec(select(ShareToken).where(ShareToken.token == token)).first()
-    if not share:
+    # Legacy device-only tokens are no longer served.
+    if not share or share.user_id is None:
         raise HTTPException(status_code=404, detail="Share link not found")
 
-    # User-scoped tokens aggregate across all of the user's devices; otherwise
-    # fall back to the legacy device-only behavior. The shared calendar
-    # mirrors My Calendar: union of saved events and "I'm going" events.
-    if share.user_id is not None:
-        saved_query = select(UserSavedEvent).where(
-            or_(
-                UserSavedEvent.user_id == share.user_id,
-                UserSavedEvent.device_id == share.device_id,
-            )
-        )
-        attending_query = select(UserEventAttendance).where(
-            or_(
-                UserEventAttendance.user_id == share.user_id,
-                UserEventAttendance.device_id == share.device_id,
-            )
-        )
-    else:
-        saved_query = select(UserSavedEvent).where(
-            UserSavedEvent.device_id == share.device_id
-        )
-        attending_query = select(UserEventAttendance).where(
-            UserEventAttendance.device_id == share.device_id
-        )
+    # The shared calendar mirrors My Calendar: union of saved events and
+    # "I'm going" events across all of the owner's devices.
+    saved_query = select(UserSavedEvent).where(UserSavedEvent.user_id == share.user_id)
+    attending_query = select(UserEventAttendance).where(
+        UserEventAttendance.user_id == share.user_id
+    )
     saved_rows = session.exec(saved_query).all()
     attending_rows = session.exec(attending_query).all()
     saved_event_ids = {row.event_id for row in saved_rows}

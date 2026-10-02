@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import type { CalendarEvent, PendingReview } from '../types';
+import EventModal from '../components/EventModal';
 import { fetchEventsByIds, fetchMyPendingReviews } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { usePreferences } from '../context/PreferencesContext';
@@ -198,7 +199,6 @@ export function LensTrail(props: LensTrailProps) {
  * paginated / scoped so a slow lens never blocks the others.
  */
 export default function ForYouPage() {
-    const navigate = useNavigate();
     const { user } = useAuth();
     const { prefs } = usePreferences();
     const { attendingEventIds, loading: attendingEventsLoading } = useAttendingEvents();
@@ -213,6 +213,7 @@ export default function ForYouPage() {
     } = useFeatureFlags();
 
     const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
+    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
     const stickySearchSentinelRef = useRef<HTMLDivElement>(null);
     const [isSearchSticky, setIsSearchSticky] = useState(false);
     const onEventHover = useCallback((id: string | null) => setHoveredEventId(id), []);
@@ -378,8 +379,12 @@ export default function ForYouPage() {
     const handleEventClick = useCallback((evt: CalendarEvent) => {
         markSeen(evt.event_id);
         trackView(evt.event_id, 'explore');
-        navigate(`/event/${evt.event_id}?src=explore`);
-    }, [markSeen, navigate]);
+        setSelectedEvent(evt);
+    }, [markSeen]);
+
+    const handleCloseModal = useCallback(() => {
+        setSelectedEvent(null);
+    }, []);
 
     const trendingDecoration = trendingEnabled && showPopularity;
     const firstName = firstNameOf(user?.name, user?.handle);
@@ -526,6 +531,14 @@ export default function ForYouPage() {
                     </div>
                 )}
             </main>
+
+            {selectedEvent && (
+                <EventModal
+                    event={selectedEvent}
+                    onClose={handleCloseModal}
+                    source="explore"
+                />
+            )}
         </div>
     );
 }

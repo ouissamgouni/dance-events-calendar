@@ -11,6 +11,10 @@ vi.mock('../api', () => ({
     fetchEventsByIds: vi.fn(),
 }));
 
+vi.mock('../context/AuthContext', () => ({
+    useAuth: () => ({ user: null }),
+}));
+
 vi.mock('../context/SavedEventsContext', () => ({
     useSavedEvents: () => ({
         savedEventIds: ['mapped', 'outside', 'unmapped'],
