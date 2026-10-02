@@ -2240,7 +2240,11 @@ class DatabaseSeeder:
         ``(recipient, kind, actor, event_id[, subject_key])`` — e.g. one
         already emitted by a seeded follow — is retimed instead of
         duplicated. Rows are stamped emailed/pushed so the dispatcher
-        doesn't replay history on its first tick. Structure::
+        doesn't replay history on its first tick. Milestone rows are
+        generated up-front (instead of by the scheduler at "now"), and any
+        uncurated row in a curated recipient's inbox is retimed, read,
+        below their oldest curated row so the inbox opens on the curated
+        story. Structure::
 
             notifications:
               - recipient: alice@example.com
@@ -2266,7 +2270,16 @@ class DatabaseSeeder:
 
         from backend.api.routes.notifications import VALID_KINDS
         from backend.db.models import Notification
+        from backend.services import milestone_notification_service as milestones
         from backend.services.notification_delivery import record_delivery
+
+        for user_id in milestones._candidate_user_ids(self.session):
+            user = self.session.get(User, user_id)
+            if user is not None and user.deleted_at is None:
+                milestones._create_milestone_notifications(
+                    self.session, user, [], [], {}
+                )
+        self.session.flush()
 
         def _user(email: str | None) -> User | None:
             email = (email or "").strip().lower()
@@ -2276,6 +2289,7 @@ class DatabaseSeeder:
 
         now = datetime.now(timezone.utc)
         seeded = 0
+        curated: dict[int, list[Notification]] = {}
         for entry in rows:
             if not isinstance(entry, dict):
                 continue
@@ -2325,6 +2339,25 @@ class DatabaseSeeder:
             notif.emailed_at = created_at
             notif.pushed_at = created_at
             self.session.add(notif)
+            curated.setdefault(recipient.id, []).append(notif)
+        self.session.flush()
+
+        for recipient_id, kept in curated.items():
+            kept_ids = {n.id for n in kept}
+            oldest = min(n.created_at for n in kept)
+            others = self.session.exec(
+                select(Notification)
+                .where(Notification.recipient_user_id == recipient_id)
+                .where(Notification.id.not_in(kept_ids))  # type: ignore[union-attr]
+                .order_by(Notification.created_at.desc(), Notification.id.desc())  # type: ignore[union-attr]
+            ).all()
+            for i, notif in enumerate(others, start=1):
+                buried_at = oldest - timedelta(minutes=i)
+                notif.created_at = buried_at
+                notif.read_at = buried_at
+                notif.emailed_at = notif.emailed_at or buried_at
+                notif.pushed_at = notif.pushed_at or buried_at
+                self.session.add(notif)
         self.session.flush()
         if seeded:
             logger.info("Seeded %d curated notifications", seeded)

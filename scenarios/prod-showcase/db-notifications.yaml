@@ -66,7 +66,7 @@ notifications:
   - recipient: alex.navarro@joinmovida.com
     kind: interest_event
     event_id: vienna-bachata-nights
-    context: Bachata - Vienna 25km
+    context: Salsa + Bachata - Europe
     minutes_ago: 720
   - recipient: alex.navarro@joinmovida.com
     kind: event_review_prompt
@@ -134,50 +134,48 @@ notifications:
 
   # Penny Valdez
   - recipient: penny.valdez@joinmovida.com
-    kind: promo_code_rejected
-    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
-    context: SALSA50
-    description: This code has expired. Feel free to share a current one.
-    minutes_ago: 25
-  - recipient: penny.valdez@joinmovida.com
-    kind: event_reminder
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    context: ask
-    minutes_ago: 60
-  - recipient: penny.valdez@joinmovida.com
-    actor: alex.navarro@joinmovida.com
-    kind: new_follower
-    minutes_ago: 120
+    kind: organizer_claim_decided
+    context: approved
+    minutes_ago: 8
   - recipient: penny.valdez@joinmovida.com
     kind: promo_code_approved
     event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
     context: EARLYBIRD
-    minutes_ago: 180
+    minutes_ago: 25
   - recipient: penny.valdez@joinmovida.com
-    kind: schedule_program_updated
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    subject_key: "publication:2"
-    context: "16"
-    description: The event program has changed. Review the latest schedule.
-    minutes_ago: 260
-  - recipient: penny.valdez@joinmovida.com
-    kind: event_review_prompt
-    event_id: barcelona-salsa-beach-party
-    context: Elena Moreau
-    minutes_ago: 900
-  - recipient: penny.valdez@joinmovida.com
-    kind: organizer_claim_decided
-    context: approved
-    minutes_ago: 1440
-    read: true
+    actor: alex.navarro@joinmovida.com
+    kind: new_follower
+    minutes_ago: 60
   - recipient: penny.valdez@joinmovida.com
     actor: clara.dubois@joinmovida.com
     kind: event_message
     event_id: london-salsa-sessions
     context: meetup
     description: First-time visitors, shall we meet by registration before the welcome class?
-    minutes_ago: 1700
-    read: true
+    minutes_ago: 110
+  - recipient: penny.valdez@joinmovida.com
+    kind: schedule_program_updated
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    subject_key: "publication:2"
+    context: "16"
+    description: The event program has changed. Review the latest schedule.
+    minutes_ago: 180
+  - recipient: penny.valdez@joinmovida.com
+    kind: promo_code_rejected
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    context: SALSA50
+    description: This code has expired. Feel free to share a current one.
+    minutes_ago: 260
+  - recipient: penny.valdez@joinmovida.com
+    kind: event_reminder
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    context: ask
+    minutes_ago: 420
+  - recipient: penny.valdez@joinmovida.com
+    kind: event_review_prompt
+    event_id: barcelona-salsa-beach-party
+    context: Elena Moreau
+    minutes_ago: 900
   - recipient: penny.valdez@joinmovida.com
     actor: elena.moreau@joinmovida.com
     kind: new_follower
