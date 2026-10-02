@@ -565,6 +565,7 @@ function FilterableEventMap({
                     showFollowingBadgeOverlay={false}
                     showTrendingOverlay={false}
                     cooperativeGestures
+                    clustering={false}
                 />
             </div>
             <div className="bg-surface">

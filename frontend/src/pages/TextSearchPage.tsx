@@ -4,6 +4,8 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { fetchEventsByIds, searchEventsPage, type EventSearchResult } from '../api';
 import type { CalendarEvent } from '../types';
 import SearchEventCard from '../components/SearchEventCard';
+import EventModal from '../components/EventModal';
+import { trackView } from '../utils/tracking';
 
 const PREVIEW_LIMIT = 3;
 const PAGE_SIZE = 20;
@@ -37,6 +39,17 @@ export default function TextSearchPage() {
     const [total, setTotal] = useState(0);
     const [hasMore, setHasMore] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+    const openResult = (eventId: string) => {
+        const event = eventsById.get(eventId);
+        if (!event) {
+            navigate(`/event/${eventId}?src=text-search`);
+            return;
+        }
+        trackView(eventId, 'text-search');
+        setSelectedEvent(event);
+    };
 
     useEffect(() => setInput(query), [query]);
     useEffect(() => {
@@ -145,7 +158,7 @@ export default function TextSearchPage() {
                                     key={result.event_id}
                                     result={result}
                                     event={eventsById.get(result.event_id)}
-                                    onOpen={() => navigate(`/event/${result.event_id}?src=text-search`)}
+                                    onOpen={() => openResult(result.event_id)}
                                     showPastLabel={includePast}
                                     testId="text-search-event-card"
                                 />
@@ -156,6 +169,13 @@ export default function TextSearchPage() {
                     )}
                 </div>
             </div>
+            {selectedEvent && (
+                <EventModal
+                    event={selectedEvent}
+                    onClose={() => setSelectedEvent(null)}
+                    source="text-search"
+                />
+            )}
         </div>
     );
 }

@@ -1144,6 +1144,106 @@ ratings:
       - audience:meet-new-people
     comment_status: approved
     status: approved
+  - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: ana.garcia@joinmovida.com
+    overall_sentiment: amazing
+    comment: Four nights of dancing until dawn, and the themed parties were unforgettable.
+    aspect_scores: { atmosphere: 5, music: 5 }
+    aspect_tags:
+      - atmosphere:high-energy
+      - music:great-dj
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: omar.costa@joinmovida.com
+    overall_sentiment: great
+    comment: Huge international crowd and rooms for every style, easy to find partners.
+    aspect_scores: { atmosphere: 5, organization: 4 }
+    aspect_tags:
+      - atmosphere:international-crowd
+      - atmosphere:easy-find-partners
+      - organization:well-organized
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: rita.petrov@joinmovida.com
+    overall_sentiment: amazing
+    comment: Brilliant workshops and the Saturday shows gave me goosebumps.
+    aspect_scores: { workshop: 5, shows: 5 }
+    aspect_tags:
+      - workshop:great-instructor
+      - shows:great-performances
+    audience_tags:
+      - audience:workshop-lovers
+      - audience:performance-lovers
+    comment_status: approved
+    status: approved
+  - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: jonas.meyer@joinmovida.com
+    overall_sentiment: great
+    comment: Having everything in the Grand Hotel Napoca made the weekend effortless.
+    aspect_scores: { venue-quality: 5, value: 4 }
+    aspect_tags:
+      - venue-quality:easy-access
+      - value:great-package
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: milan.horvat@joinmovida.com
+    overall_sentiment: amazing
+    comment: A magical Christmas salsa weekend, the Sheraton ballroom floor was perfect.
+    aspect_scores: { venue-quality: 5, atmosphere: 5 }
+    aspect_tags:
+      - venue-quality:great-dance-floor
+      - venue-quality:beautiful-venue
+      - atmosphere:great-atmosphere
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: camille.laurent@joinmovida.com
+    overall_sentiment: amazing
+    comment: World class mambo artists and socials day and night, worth every euro.
+    aspect_scores: { workshop: 5, value: 5 }
+    aspect_tags:
+      - workshop:great-instructor
+      - value:worth-it
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: bruno.santos@joinmovida.com
+    overall_sentiment: great
+    comment: Smooth check-in, clear schedule, and the Christmas market just next door.
+    aspect_scores: { organization: 5, venue-quality: 4 }
+    aspect_tags:
+      - organization:smooth-check-in
+      - organization:good-schedule
+      - venue-quality:easy-access
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: nina.khan@joinmovida.com
+    overall_sentiment: great
+    comment: Great DJs and a warm, elegant crowd that made newcomers feel welcome.
+    aspect_scores: { music: 5, atmosphere: 4 }
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:welcoming-inclusive
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
 
 emit_suggested:
   - event_id: london-salsa-sessions

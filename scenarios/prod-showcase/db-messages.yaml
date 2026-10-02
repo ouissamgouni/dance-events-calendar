@@ -261,3 +261,65 @@ messages:
     event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
     email: sofia.torres@joinmovida.com
     body: Yes, last year salsa had its own room alongside bachata and kizomba.
+  - key: transilvania-room
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: omar.costa@joinmovida.com
+    category: accommodation
+    body: Looking for a roommate at the Grand Hotel Napoca from Thursday to Monday.
+  - reply_to: transilvania-room
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: jonas.meyer@joinmovida.com
+    body: I still need a room too, happy to split it.
+  - reply_to: transilvania-room
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: omar.costa@joinmovida.com
+    body: Perfect, I will add you to the booking.
+  - key: transilvania-costume
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: ana.garcia@joinmovida.com
+    category: question
+    body: Is there a dress code for the Dracula themed party?
+  - reply_to: transilvania-costume
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: rita.petrov@joinmovida.com
+    body: Black and red is the theme, many people go full gothic. It is so much fun!
+  - key: transilvania-ride
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: rita.petrov@joinmovida.com
+    category: ride
+    body: Driving from Bucharest on Thursday morning, two seats left.
+  - reply_to: transilvania-ride
+    event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: ana.garcia@joinmovida.com
+    body: I would love one, I land at Otopeni on Wednesday night.
+  - key: salsa-grand-tickets
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: camille.laurent@joinmovida.com
+    category: tickets
+    body: Has anyone heard when the blind early tickets go on sale?
+  - reply_to: salsa-grand-tickets
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: milan.horvat@joinmovida.com
+    body: The organizers said next week on their page, they sold out fast last year.
+  - key: salsa-grand-room
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: nina.khan@joinmovida.com
+    category: accommodation
+    body: Is it worth staying at the Sheraton or are there cheaper places nearby?
+  - reply_to: salsa-grand-room
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: bruno.santos@joinmovida.com
+    body: The festival rate at the Sheraton was good, and you never need a coat between parties.
+  - reply_to: salsa-grand-room
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: nina.khan@joinmovida.com
+    body: Great tip, booking it now.
+  - key: salsa-grand-meetup
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: milan.horvat@joinmovida.com
+    category: meetup
+    body: Christmas market walk on Saturday afternoon before the evening social, who is in?
+  - reply_to: salsa-grand-meetup
+    event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    email: camille.laurent@joinmovida.com
+    body: Count me in, mulled wine first!
