@@ -150,6 +150,10 @@ export default function EventDetailPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [event, user, authLoading]);
 
+    // Flag set when a deep link opens a tab other than overview; triggers scroll-into-view of tabs bar.
+    const scrollToTabsRef = useRef(initialTab !== 'overview');
+    const tabsBarRef = useRef<HTMLDivElement>(null);
+
 
     // Scroll to the community reviews section when arriving via a
     // `#community` link (e.g. clicking a Review button on a card, modal, or
@@ -158,6 +162,7 @@ export default function EventDetailPage() {
     // once the event (and the section) has rendered.
     useEffect(() => {
         if (location.hash !== '#community' || !event) return;
+        scrollToTabsRef.current = true;
         setActiveTab('reviews');
     }, [location.hash, event]);
 
@@ -165,8 +170,20 @@ export default function EventDetailPage() {
     // an event-message notification). Mirrors the `#community` handler above.
     useEffect(() => {
         if (location.hash !== '#messages' || !event) return;
+        scrollToTabsRef.current = true;
         setActiveTab('discussion');
     }, [location.hash, event]);
+
+    // Scroll tabs bar into view when a deep link (e.g. ?tab=, #community, #messages, /review, /ask)
+    // opens a tab other than overview. This ensures the tab header is visible on initial load.
+    useEffect(() => {
+        if (!scrollToTabsRef.current || !event || editMode) return;
+        const raf = requestAnimationFrame(() => {
+            tabsBarRef.current?.scrollIntoView({ block: 'start' });
+            scrollToTabsRef.current = false;
+        });
+        return () => cancelAnimationFrame(raf);
+    }, [event, editMode, activeTab]);
 
     // Capture `?ref=share&src=` from the URL so any subsequent RSVP on
     // this event can be attributed back to the originating share_code.
@@ -380,7 +397,7 @@ export default function EventDetailPage() {
                             <div className="mt-4 lg:mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8">
                                 <div className="min-w-0">
                                     {/* Tabs stay pinned while the active section scrolls. */}
-                                    <div className="sticky top-0 z-20 -mx-3 lg:mx-0">
+                                    <div className="sticky top-0 z-20 -mx-3 lg:mx-0" ref={tabsBarRef}>
                                         <EventDetailTabsBar
                                             active={activeTab}
                                             onSelect={(t) => goToTab(t)}
