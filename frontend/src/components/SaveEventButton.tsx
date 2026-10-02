@@ -8,7 +8,7 @@ import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
 import AudienceTierIcon from './AudienceTierIcon';
-import { AUDIENCE_TIER_LABELS, defaultRsvpAudienceFor, getRememberAudience, setLastUsedAudience } from '../utils/audiencePreference';
+import { AUDIENCE_TIER_LABELS, defaultSavedAudienceFor, getRememberAudience, setLastUsedAudience } from '../utils/audiencePreference';
 import type { ShareAudience } from '../api';
 
 interface Props {
@@ -20,12 +20,6 @@ interface Props {
     className?: string;
     labelClassName?: string;
 }
-
-const SAVED_AUDIENCE_DESCRIPTIONS: Record<ShareAudience, string> = {
-    public: 'Anyone who can view your profile will see this in your saved list.',
-    friends: 'Only your mutual followers will see this in your saved list.',
-    private: 'Only you can see this in your saved list.',
-};
 
 function SavedBookmarkIcon({ className }: { className: string }) {
     return (
@@ -85,8 +79,8 @@ export default function SaveEventButton({
             // account-level default audience, optimistically flip local state,
             // then open the visibility popover so the user can adjust on the
             // fly — parity with the post-RSVP popover that GoingButton shows.
-            const defaultAudience = defaultRsvpAudienceFor(user);
-            const skipSheet = rsvpRememberVisibilityEnabled && getRememberAudience(user.user_id) === true;
+            const defaultAudience = defaultSavedAudienceFor(user);
+            const skipSheet = rsvpRememberVisibilityEnabled && getRememberAudience(user.user_id, 'saved') === true;
             toggleSave(eventId, defaultAudience).then((ok) => {
                 if (!ok) {
                     toast.show("Couldn't save \u2014 try again", 3200);
@@ -136,7 +130,7 @@ export default function SaveEventButton({
                 toast.show("Couldn't update visibility \u2014 try again", 3200);
                 return;
             }
-            if (user?.user_id) setLastUsedAudience(user.user_id, next);
+            if (user?.user_id) setLastUsedAudience(user.user_id, next, 'saved');
         });
     };
 
@@ -153,14 +147,13 @@ export default function SaveEventButton({
     const popover = popoverOpen ? (
         <RsvpVisibilitySheet
             anchorRef={buttonRef}
-            emoji={<SavedBookmarkIcon className="h-6 w-6" />}
+            kind="saved"
+            emoji={<SavedBookmarkIcon className="h-5 w-5" />}
             title="Saved!"
             subtitle={eventTitle}
-            question="Who can see you saved this event?"
             audience={pendingAudience}
             onAudienceChange={handlePopoverAudienceChange}
-            pickerAriaLabel="Saved event visibility"
-            description={SAVED_AUDIENCE_DESCRIPTIONS[pendingAudience]}
+            pickerAriaLabel="Who can see you saved this event?"
             secondaryAction={{ label: 'Unsave', onClick: unsave, tone: 'danger' }}
             onClose={closePopover}
         />

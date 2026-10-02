@@ -139,10 +139,10 @@ describe('SaveEventButton visibility', () => {
 
         const sheet = await screen.findByRole('dialog', { name: 'Saved!' })
         expect(sheet).toHaveAttribute('aria-modal', 'true')
-        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-sm')
-        expect(screen.getByRole('radiogroup', { name: 'Saved event visibility' })).toHaveClass('flex', 'w-full')
+        expect(screen.getByText('Summer Salsa Social')).toHaveClass('truncate', 'text-sm')
+        expect(screen.getByRole('radiogroup', { name: 'Who can see you saved this event?' })).toHaveClass('flex', 'w-full')
         expect(screen.getAllByRole('radio')).toHaveLength(3)
-        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-12', 'text-sm')
+        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-10', 'text-sm')
         expect(within(sheet).getByRole('button', { name: 'Unsave' })).toHaveClass('text-danger')
         expect(within(sheet).getByRole('button', { name: 'Done' })).toBeInTheDocument()
     })
@@ -169,7 +169,7 @@ describe('SaveEventButton visibility', () => {
 
     it('skips the sheet on a new save once the choice is remembered', async () => {
         useMobileViewport()
-        localStorage.setItem('audience.remember.user-1', '1')
+        localStorage.setItem('audience.remember.saved.user-1', '1')
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
         )
@@ -205,10 +205,9 @@ describe('SaveEventButton visibility', () => {
         await screen.findByRole('dialog', { name: 'Saved!' })
         const radios = screen.getAllByRole('radio')
         expect(radios[0]).toBeChecked()
-        expect(screen.getByText('Anyone who can view your profile will see this in your saved list.')).toBeInTheDocument()
     })
 
-    it('uses the last-used audience when there is no account default and remembers changes', async () => {
+    it('uses the RSVP last-used audience as fallback and remembers changes separately', async () => {
         useMobileViewport()
         localStorage.setItem('audience.lastUsed.user-1', 'friends')
         server.use(
@@ -224,11 +223,12 @@ describe('SaveEventButton visibility', () => {
 
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
         await waitFor(() =>
-            expect(localStorage.getItem('audience.lastUsed.user-1')).toBe('private'),
+            expect(localStorage.getItem('audience.lastUsed.saved.user-1')).toBe('private'),
         )
+        expect(localStorage.getItem('audience.lastUsed.user-1')).toBe('friends')
     })
 
-    it('saves the picked audience as account default when remember is checked', async () => {
+    it('remembers the save choice without touching RSVP settings', async () => {
         useMobileViewport()
         const patches: unknown[] = []
         server.use(
@@ -242,12 +242,12 @@ describe('SaveEventButton visibility', () => {
 
         await user.click(await screen.findByRole('button', { name: 'Save event' }))
         await screen.findByRole('dialog', { name: 'Saved!' })
-        expect(screen.getByRole('checkbox', { name: 'Remember my choice for next time' })).toBeChecked()
+        expect(screen.getByRole('checkbox', { name: 'Remember my choice' })).toBeChecked()
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
         await user.click(screen.getByRole('button', { name: 'Done' }))
 
-        await waitFor(() =>
-            expect(patches).toEqual([{ share_attendance_default_audience: 'private' }]),
-        )
+        expect(localStorage.getItem('audience.remember.saved.user-1')).toBe('1')
+        expect(localStorage.getItem('audience.remember.user-1')).toBeNull()
+        expect(patches).toEqual([])
     })
 })

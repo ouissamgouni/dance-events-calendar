@@ -39,6 +39,15 @@ describe('BottomNav', () => {
         fireEvent.click(screen.getByTestId('bottom-nav-reveal'))
         expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
     })
+    it.each(['/event/abc', '/event/abc/program', '/series/x', '/notifications', '/account'])(
+        'collapses to a grab strip on %s',
+        (path) => {
+            renderAt(path)
+            expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
+            fireEvent.click(screen.getByTestId('bottom-nav-reveal'))
+            expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
+        },
+    )
     it('renders the four primary destinations', () => {
         renderAt('/')
         expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
