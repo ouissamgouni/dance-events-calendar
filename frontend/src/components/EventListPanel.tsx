@@ -479,6 +479,18 @@ export default function EventListPanel({
         updateFade();
     }, [events, updateFade]);
 
+    // Scroll to top when filters change (events array is replaced). This gives
+    // users immediate visibility of the filtered results rather than staying
+    // at their previous scroll position. Only triggered on external filter
+    // changes (events prop identity change), not on internal state mutations
+    // like sorting or pagination.
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (el) {
+            el.scrollTop = 0;
+        }
+    }, [events]);
+
     // Touch-device auto-mark-seen. Set up a single IntersectionObserver
     // scoped to the browser viewport (NOT ``scrollRef.current``): on
     // mobile the CSS in index.css switches ``.event-list-scroll`` to
