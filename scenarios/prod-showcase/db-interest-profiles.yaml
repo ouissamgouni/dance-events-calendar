@@ -88,7 +88,7 @@ interest_profiles:
     reach_tags: ["reach:international"]
     matches_enabled: true
     is_active: true
-  - user: lucia.navarro@joinmovida.com
+  - user: alex.navarro@joinmovida.com
     label: Bachata - Vienna 25km
     area_label: Vienna
     min_lat: 47.9834
