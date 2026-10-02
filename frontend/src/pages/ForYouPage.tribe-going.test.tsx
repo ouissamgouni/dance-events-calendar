@@ -128,7 +128,7 @@ describe('TribeGoingEmptyState', () => {
         renderWithProviders(<TribeGoingEmptyState followingCount={0} />);
 
         expect(screen.getByText('Follow people to see where your tribe is going.')).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Build your tribe' })).toHaveAttribute('href', '/tribe/people');
+        expect(screen.getByRole('link', { name: 'Build your tribe' })).toHaveAttribute('href', '/tribe/network');
     });
 
     it('uses a quiet no-events message when the tribe is already populated', () => {

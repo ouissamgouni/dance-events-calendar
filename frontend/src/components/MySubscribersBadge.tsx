@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchMySubscribers, removeMySubscriber, type SubscriberUser } from '../api';
 import { ConfirmDialog } from './AppDialog';
+import useBackToClose from '../hooks/useBackToClose';
 
 /**
  * Owner-only "N subscribers" pill that opens a modal listing the users
@@ -95,6 +96,7 @@ function SubscribersModal({
     const [error, setError] = useState<string | null>(null);
     const [busyHandle, setBusyHandle] = useState<string | null>(null);
     const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+    useBackToClose(onClose);
 
     useEffect(() => {
         fetchMySubscribers({ limit: 100 })

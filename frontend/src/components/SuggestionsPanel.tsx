@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import type { EventSuggestion, CalendarSetting, Tag } from '../types';
 import { syncSuggestionToGoogle } from '../api';
 import SuggestionReviewModal from './SuggestionReviewModal';
@@ -18,6 +19,7 @@ const TABS = ['all', 'pending', 'approved', 'rejected'] as const;
 type Tab = typeof TABS[number];
 
 export default function SuggestionsPanel({ isOpen, onClose, suggestions, calendars, allTags, onUpdated, onRefresh }: Props) {
+    useBackToClose(onClose, isOpen);
     const [activeTab, setActiveTab] = useState<Tab>('pending');
     const [reviewingSuggestion, setReviewingSuggestion] = useState<EventSuggestion | null>(null);
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     fetchEventsByIds,
@@ -88,6 +89,8 @@ function LegacyCalendar() {
     const exportMenuRef = useRef<HTMLDivElement | null>(null);
     const [exportScope, setExportScope] = useState<Filter>('all');
     const [subscribeOpen, setSubscribeOpen] = useState(false);
+    useBackToClose(() => setExportMenuOpen(false), exportMenuOpen);
+    useBackToClose(() => setSubscribeOpen(false), subscribeOpen);
     const [feedUrl, setFeedUrl] = useState('');
     const [feedStatus, setFeedStatus] = useState<'idle' | 'loading' | 'copied'>('idle');
     const [activeFilter, setActiveFilter] = useState<Filter>(() => initialEventFilter(location.search));

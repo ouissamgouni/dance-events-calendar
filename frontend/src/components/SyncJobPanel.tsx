@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import type { SyncJobRecord } from '../api';
 import { abortSyncJob, fetchSyncJobs, getCurrentSyncJob } from '../api';
 import JobDetailDrawer from './JobDetailDrawer';
@@ -151,6 +152,7 @@ function JobCard({
 }
 
 export default function SyncJobPanel({ isOpen, onClose, onJobComplete }: SyncJobPanelProps) {
+    useBackToClose(onClose, isOpen);
     const [current, setCurrent] = useState<SyncJobRecord | null>(null);
     const [history, setHistory] = useState<SyncJobRecord[]>([]);
     const [aborting, setAborting] = useState(false);

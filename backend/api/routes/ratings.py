@@ -946,7 +946,9 @@ def get_rating_aggregates_batch(
             for eid in member_event_ids:
                 total, dist, *_ = _aggregate_core(session, [eid])
                 mood = compute_mood_metrics(dist, min_reviews)
-                edition_moods[eid] = mood
+                # Unreviewed editions would drag the mean toward 0.
+                if mood.review_count > 0:
+                    edition_moods[eid] = mood
 
         # Build series roll-ups
         for series_id in resolved_series_ids:

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import {
     approveSeriesGroup,
     dismissSeriesGroup,
@@ -23,6 +24,7 @@ type Tab = typeof TABS[number];
 const PAGE_SIZE = 25;
 
 export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
+    useBackToClose(onClose, isOpen);
     const [activeTab, setActiveTab] = useState<Tab>('pending');
     const [groups, setGroups] = useState<SeriesGroup[]>([]);
     const [total, setTotal] = useState(0);

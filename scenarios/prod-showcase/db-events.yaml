@@ -5162,7 +5162,7 @@ events:
   - reach:international
 - id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
   calendar_id: movida-community-events
-  title: Salsa Sunset Amalfi Coast 2026
+  title: Salsa Sunset Amalfi Coast 2027
   description: A magical summer salsa weekend on the stunning Amalfi Coast. Early
     bird special with code AMALFI15 for 15% off!
   location: Salerno, Amalfi Coast, Italy
@@ -5171,8 +5171,8 @@ events:
   country_code: IT
   latitude: 40.6822
   longitude: 14.7671
-  start: '2026-06-20T18:00:00+00:00'
-  end: '2026-06-23T22:00:00+00:00'
+  start: '2027-06-19T18:00:00+00:00'
+  end: '2027-06-22T22:00:00+00:00'
   price_min: 250
   price_currency: EUR
   price_is_free: false
@@ -5184,7 +5184,7 @@ events:
   - reach:international
 - id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
   calendar_id: movida-community-events
-  title: Lisboa Beach Bachata Social 2026
+  title: Lisboa Beach Bachata Social 2027
   description: Portuguese summer bachata vibes by the sea. Use code CASCAIS10 for
     10% off all passes!
   location: Cascais, Lisbon Coast, Portugal
@@ -5193,8 +5193,8 @@ events:
   country_code: PT
   latitude: 38.6953
   longitude: -9.4167
-  start: '2026-07-05T19:00:00+00:00'
-  end: '2026-07-08T23:00:00+00:00'
+  start: '2027-07-04T19:00:00+00:00'
+  end: '2027-07-07T23:00:00+00:00'
   price_min: 200
   price_currency: EUR
   price_is_free: false
@@ -5206,7 +5206,7 @@ events:
   - reach:international
 - id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
   calendar_id: movida-community-events
-  title: Costa Brava Salsa Summer Festival 2026
+  title: Costa Brava Salsa Summer Festival 2027
   description: Vibrant energy of Costa Brava with multiple salsa socials and beach
     parties. Early bird code COSTABRAVA20 for 20% off!
   location: Tossa de Mar, Costa Brava, Spain
@@ -5215,8 +5215,8 @@ events:
   country_code: ES
   latitude: 41.7371
   longitude: 2.948
-  start: '2026-06-27T20:00:00+00:00'
-  end: '2026-06-30T23:00:00+00:00'
+  start: '2027-06-26T20:00:00+00:00'
+  end: '2027-06-29T23:00:00+00:00'
   price_min: 180
   price_currency: EUR
   price_is_free: false
@@ -5227,7 +5227,7 @@ events:
   - reach:international
 - id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
   calendar_id: movida-community-events
-  title: Greek Islands Bachata Retreat 2026
+  title: Greek Islands Bachata Retreat 2027
   description: An exclusive bachata retreat on the beautiful Greek islands. Dance
     under the stars with international dancers.
   location: Mykonos, Greece
@@ -5236,8 +5236,8 @@ events:
   country_code: GR
   latitude: 37.4467
   longitude: 25.3289
-  start: '2026-07-12T20:00:00+00:00'
-  end: '2026-07-16T02:00:00+00:00'
+  start: '2027-07-11T20:00:00+00:00'
+  end: '2027-07-15T02:00:00+00:00'
   price_min: 320
   price_currency: EUR
   price_is_free: false
@@ -5249,7 +5249,7 @@ events:
   - reach:international
 - id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
   calendar_id: movida-community-events
-  title: Côte d'Azur Salsa Social 2026
+  title: Côte d'Azur Salsa Social 2027
   description: The elegance of the French Riviera while dancing salsa and bachata.
     Beachfront socials and sunset dancing.
   location: Antibes, French Riviera, France
@@ -5258,8 +5258,8 @@ events:
   country_code: FR
   latitude: 43.5808
   longitude: 7.1239
-  start: '2026-07-18T19:30:00+00:00'
-  end: '2026-07-21T23:00:00+00:00'
+  start: '2027-07-17T19:30:00+00:00'
+  end: '2027-07-20T23:00:00+00:00'
   price_min: 280
   price_currency: EUR
   price_is_free: false
@@ -5382,6 +5382,775 @@ ratings:
   audience_tags:
   - audience:travelers
   - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: alfama-thursday-salsa-summer
+  email: rita.petrov@joinmovida.com
+  overall_sentiment: okay
+  comment: Lovely music, but the bar queue during the break was long.
+  aspect_scores:
+    music: 4
+    organization: 3
+  aspect_tags:
+  - music:great-dj
+  - organization:long-queue
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: alfama-thursday-salsa-autumn
+  email: victor.schmidt@joinmovida.com
+  overall_sentiment: great
+  comment: Easy to find partners all night and the hosts made newcomers feel at home.
+  aspect_scores:
+    atmosphere: 5
+    organization: 4
+  aspect_tags:
+  - atmosphere:easy-find-partners
+  - organization:friendly-staff
+  audience_tags:
+  - audience:meet-new-people
+  comment_status: approved
+  status: approved
+- event_id: seine-salsa-social
+  email: sofia.torres@joinmovida.com
+  overall_sentiment: great
+  comment: A charming free social with a friendly local crowd.
+  aspect_scores:
+    atmosphere: 4
+    value: 5
+  aspect_tags:
+  - atmosphere:friendly-crowd
+  - value:worth-it
+  audience_tags:
+  - audience:budget-friendly
+  comment_status: approved
+  status: approved
+- event_id: seine-salsa-social
+  email: camille.laurent@joinmovida.com
+  overall_sentiment: okay
+  comment: Nice vibe, though the floor got crowded after 22h.
+  aspect_scores:
+    atmosphere: 4
+    venue-quality: 2
+  aspect_tags:
+  - atmosphere:mostly-locals
+  - venue-quality:crowded
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: seine-salsa-social
+  email: theo.novak@joinmovida.com
+  overall_sentiment: great
+  comment: Good playlist and a relaxed atmosphere by the river.
+  aspect_scores:
+    music: 4
+    atmosphere: 4
+  aspect_tags:
+  - music:great-playlist
+  - atmosphere:great-atmosphere
+  audience_tags:
+  - audience:first-social
+  comment_status: approved
+  status: approved
+- event_id: berlin-bachata-exchange
+  email: nadia.fischer@joinmovida.com
+  overall_sentiment: great
+  comment: Workshops were well paced and the Saturday social was full of energy.
+  aspect_scores:
+    workshop: 4
+    atmosphere: 4
+  aspect_tags:
+  - workshop:good-pacing
+  - atmosphere:high-energy
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: berlin-bachata-exchange
+  email: jonas.meyer@joinmovida.com
+  overall_sentiment: okay
+  comment: Great teachers, but the hall was very warm in the afternoon.
+  aspect_scores:
+    workshop: 4
+    venue-quality: 2
+  aspect_tags:
+  - workshop:great-instructor
+  - venue-quality:too-hot
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: madrid-salsa-congress-night
+  email: pablo.rossi@joinmovida.com
+  overall_sentiment: great
+  comment: Strong lineup and a big, lively social floor.
+  aspect_scores:
+    shows: 4
+    atmosphere: 4
+  aspect_tags:
+  - shows:show-variety
+  - atmosphere:great-atmosphere
+  audience_tags:
+  - audience:high-energy-dancing
+  comment_status: approved
+  status: approved
+- event_id: madrid-salsa-congress-night
+  email: milan.horvat@joinmovida.com
+  overall_sentiment: okay
+  comment: Fun night overall, but the shows started late and check-in was slow.
+  aspect_scores:
+    shows: 3
+    organization: 2
+  aspect_tags:
+  - shows:delayed-shows
+  - organization:difficult-check-in
+  audience_tags:
+  - audience:performance-lovers
+  comment_status: approved
+  status: approved
+- event_id: canal-bachata-sunday
+  email: ines.lopez@joinmovida.com
+  overall_sentiment: great
+  comment: Clear workshops and a beautiful sunset social afterwards.
+  aspect_scores:
+    workshop: 4
+    venue-quality: 4
+  aspect_tags:
+  - workshop:clear-explanations
+  - venue-quality:beautiful-venue
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: canal-bachata-sunday
+  email: omar.costa@joinmovida.com
+  overall_sentiment: okay
+  comment: Good content, though the group was a bit big for one teacher pair.
+  aspect_scores:
+    workshop: 3
+  aspect_tags:
+  - workshop:useful-material
+  - workshop:overcrowded
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: canal-bachata-sunday
+  email: leila.bauer@joinmovida.com
+  overall_sentiment: great
+  comment: A relaxed Sunday with friendly dancers and good music.
+  aspect_scores:
+    atmosphere: 4
+    music: 4
+  aspect_tags:
+  - atmosphere:friendly-crowd
+  - music:good-variety
+  audience_tags:
+  - audience:meet-new-people
+  comment_status: approved
+  status: approved
+- event_id: barcelona-salsa-beach-party
+  email: mateo.vega@joinmovida.com
+  overall_sentiment: amazing
+  comment: Dancing salsa on the beach at sunset is hard to beat.
+  aspect_scores:
+    atmosphere: 5
+    venue-quality: 5
+  aspect_tags:
+  - atmosphere:great-atmosphere
+  - venue-quality:beautiful-venue
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: barcelona-salsa-beach-party
+  email: alex.navarro@joinmovida.com
+  overall_sentiment: okay
+  comment: Great setting, but sand made spinning tricky and the sound was quiet at
+    the back.
+  aspect_scores:
+    venue-quality: 3
+    music: 3
+  aspect_tags:
+  - venue-quality:beautiful-venue
+  - music:too-quiet
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: new-york-mambo-reunion
+  email: bruno.santos@joinmovida.com
+  overall_sentiment: great
+  comment: Great mambo energy and lots of familiar faces from across the Americas.
+  aspect_scores:
+    atmosphere: 5
+    music: 4
+  aspect_tags:
+  - atmosphere:international-crowd
+  - music:great-energy
+  audience_tags:
+  - audience:high-energy-dancing
+  comment_status: approved
+  status: approved
+- event_id: new-york-mambo-reunion
+  email: ivo.diallo@joinmovida.com
+  overall_sentiment: okay
+  comment: Good dancers, though the ventilation struggled late in the night.
+  aspect_scores:
+    atmosphere: 4
+    venue-quality: 2
+  aspect_tags:
+  - atmosphere:respectful-dancers
+  - venue-quality:poor-ventilation
+  audience_tags:
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: new-york-mambo-reunion
+  email: nina.khan@joinmovida.com
+  overall_sentiment: great
+  comment: Excellent DJs who kept the floor full until closing.
+  aspect_scores:
+    music: 5
+  aspect_tags:
+  - music:great-dj
+  audience_tags:
+  - audience:music-lovers
+  comment_status: approved
+  status: approved
+- event_id: seoul-bachata-weekender
+  email: samir.ivanov@joinmovida.com
+  overall_sentiment: great
+  comment: Well organized weekender with a very welcoming local community.
+  aspect_scores:
+    organization: 4
+    atmosphere: 5
+  aspect_tags:
+  - organization:well-organized
+  - atmosphere:welcoming-inclusive
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: seoul-bachata-weekender
+  email: zara.benali@joinmovida.com
+  overall_sentiment: okay
+  comment: Workshops were good, but the schedule changed a few times.
+  aspect_scores:
+    workshop: 4
+    organization: 2
+  aspect_tags:
+  - workshop:good-level
+  - organization:confusing-schedule
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: seoul-bachata-weekender
+  email: amira.haddad@joinmovida.com
+  overall_sentiment: great
+  comment: Fantastic socials and a good mix of dancers at every level.
+  aspect_scores:
+    atmosphere: 4
+    music: 4
+  aspect_tags:
+  - atmosphere:good-mix-of-dancers
+  - music:good-variety
+  audience_tags:
+  - audience:meet-new-people
+  comment_status: approved
+  status: approved
+- event_id: vienna-bachata-nights
+  email: clara.dubois@joinmovida.com
+  overall_sentiment: great
+  comment: Went to the last edition, an elegant venue and a respectful crowd.
+  aspect_scores:
+    venue-quality: 5
+    atmosphere: 4
+  aspect_tags:
+  - venue-quality:beautiful-venue
+  - atmosphere:respectful-dancers
+  audience_tags:
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: vienna-bachata-nights
+  email: penny.valdez@joinmovida.com
+  overall_sentiment: okay
+  comment: Nice night last time, though the class ran over and the social started
+    late.
+  aspect_scores:
+    organization: 3
+    music: 4
+  aspect_tags:
+  - organization:started-late
+  - music:great-playlist
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: vienna-bachata-nights
+  email: maya.rivera@joinmovida.com
+  overall_sentiment: great
+  comment: A reliable Friday social with smooth DJ sets.
+  aspect_scores:
+    music: 4
+  aspect_tags:
+  - music:smooth-transitions
+  audience_tags:
+  - audience:music-lovers
+  comment_status: approved
+  status: approved
+- event_id: rome-latin-social
+  email: ana.garcia@joinmovida.com
+  overall_sentiment: great
+  comment: Previous edition was lovely, with a good balance of salsa and bachata.
+  aspect_scores:
+    music: 4
+    atmosphere: 4
+  aspect_tags:
+  - music:good-variety
+  - atmosphere:friendly-crowd
+  audience_tags:
+  - audience:meet-new-people
+  comment_status: approved
+  status: approved
+- event_id: rome-latin-social
+  email: leo.martin@joinmovida.com
+  overall_sentiment: okay
+  comment: Good dancers, but the room is small and fills up quickly.
+  aspect_scores:
+    venue-quality: 2
+    atmosphere: 4
+  aspect_tags:
+  - venue-quality:crowded
+  - atmosphere:mostly-locals
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: rome-latin-social
+  email: sofia.torres@joinmovida.com
+  overall_sentiment: great
+  comment: Easy to reach in the centre and a warm, welcoming crowd.
+  aspect_scores:
+    venue-quality: 4
+    atmosphere: 5
+  aspect_tags:
+  - venue-quality:easy-access
+  - atmosphere:welcoming-inclusive
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: zurich-kizomba-social
+  email: noah.kim@joinmovida.com
+  overall_sentiment: okay
+  comment: Intimate floor and good music, but pricey for a weekly social.
+  aspect_scores:
+    music: 4
+    value: 2
+  aspect_tags:
+  - music:great-playlist
+  - value:overpriced
+  audience_tags:
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: zurich-kizomba-social
+  email: nadia.fischer@joinmovida.com
+  overall_sentiment: great
+  comment: Cosy lakeside venue with respectful, connected dancers.
+  aspect_scores:
+    atmosphere: 5
+    venue-quality: 4
+  aspect_tags:
+  - atmosphere:respectful-dancers
+  - venue-quality:comfortable
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: zurich-kizomba-social
+  email: milan.horvat@joinmovida.com
+  overall_sentiment: great
+  comment: Good sound and a calm, focused atmosphere.
+  aspect_scores:
+    music: 4
+  aspect_tags:
+  - music:good-sound
+  audience_tags:
+  - audience:music-lovers
+  comment_status: approved
+  status: approved
+- event_id: london-salsa-sessions
+  email: rita.petrov@joinmovida.com
+  overall_sentiment: great
+  comment: Last session had great classes and a lively social afterwards.
+  aspect_scores:
+    workshop: 4
+    atmosphere: 4
+  aspect_tags:
+  - workshop:great-instructor
+  - atmosphere:high-energy
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: london-salsa-sessions
+  email: camille.laurent@joinmovida.com
+  overall_sentiment: okay
+  comment: Fun night, but the cloakroom queue was long at the end.
+  aspect_scores:
+    organization: 3
+    music: 4
+  aspect_tags:
+  - organization:long-queue
+  - music:great-dj
+  audience_tags:
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: london-salsa-sessions
+  email: jonas.meyer@joinmovida.com
+  overall_sentiment: amazing
+  comment: One of the best salsa nights in London, brilliant DJs.
+  aspect_scores:
+    music: 5
+    atmosphere: 5
+  aspect_tags:
+  - music:great-dj
+  - atmosphere:great-atmosphere
+  audience_tags:
+  - audience:music-lovers
+  comment_status: approved
+  status: approved
+- event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+  email: elena.moreau@joinmovida.com
+  overall_sentiment: great
+  comment: Last year's edition had stunning views and well run beach socials.
+  aspect_scores:
+    venue-quality: 5
+    organization: 4
+  aspect_tags:
+  - venue-quality:beautiful-venue
+  - organization:well-organized
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+  email: mateo.vega@joinmovida.com
+  overall_sentiment: okay
+  comment: Gorgeous location, but getting between venues took a while.
+  aspect_scores:
+    venue-quality: 3
+    value: 3
+  aspect_tags:
+  - venue-quality:hard-to-find
+  - value:great-package
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+  email: ines.lopez@joinmovida.com
+  overall_sentiment: great
+  comment: Great music and a relaxed holiday feel all weekend.
+  aspect_scores:
+    music: 4
+    atmosphere: 4
+  aspect_tags:
+  - music:great-playlist
+  - atmosphere:great-atmosphere
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+  email: zara.benali@joinmovida.com
+  overall_sentiment: great
+  comment: Sunset socials by the sea were the highlight of my summer.
+  aspect_scores:
+    atmosphere: 5
+    venue-quality: 4
+  aspect_tags:
+  - atmosphere:great-atmosphere
+  - venue-quality:beautiful-venue
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+  email: victor.schmidt@joinmovida.com
+  overall_sentiment: okay
+  comment: Good vibe, but the outdoor floor was a bit slippery in the evening.
+  aspect_scores:
+    atmosphere: 4
+    venue-quality: 2
+  aspect_tags:
+  - atmosphere:friendly-crowd
+  - venue-quality:slippery-floor
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+  email: leila.bauer@joinmovida.com
+  overall_sentiment: great
+  comment: Friendly organizers and a good mix of bachata and salsa.
+  aspect_scores:
+    organization: 4
+    music: 4
+  aspect_tags:
+  - organization:friendly-staff
+  - music:good-variety
+  audience_tags:
+  - audience:meet-new-people
+  comment_status: approved
+  status: approved
+- event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+  email: pablo.rossi@joinmovida.com
+  overall_sentiment: great
+  comment: Plenty of socials and beach parties, great energy throughout.
+  aspect_scores:
+    atmosphere: 5
+    music: 4
+  aspect_tags:
+  - atmosphere:high-energy
+  - music:great-energy
+  audience_tags:
+  - audience:high-energy-dancing
+  comment_status: approved
+  status: approved
+- event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+  email: alex.navarro@joinmovida.com
+  overall_sentiment: okay
+  comment: Good festival, though the main room was too hot on Saturday.
+  aspect_scores:
+    venue-quality: 2
+    music: 4
+  aspect_tags:
+  - venue-quality:too-hot
+  - music:great-dj
+  audience_tags:
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+  email: omar.costa@joinmovida.com
+  overall_sentiment: great
+  comment: Well organized and worth the early bird price.
+  aspect_scores:
+    organization: 4
+    value: 4
+  aspect_tags:
+  - organization:well-organized
+  - value:worth-it
+  audience_tags:
+  - audience:budget-friendly
+  comment_status: approved
+  status: approved
+- event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+  email: amira.haddad@joinmovida.com
+  overall_sentiment: great
+  comment: Dancing under the stars with an international crowd, unforgettable.
+  aspect_scores:
+    atmosphere: 5
+    venue-quality: 4
+  aspect_tags:
+  - atmosphere:international-crowd
+  - venue-quality:beautiful-venue
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+  email: theo.novak@joinmovida.com
+  overall_sentiment: okay
+  comment: Beautiful island, but the retreat felt expensive for what was included.
+  aspect_scores:
+    value: 2
+    venue-quality: 4
+  aspect_tags:
+  - value:hidden-costs
+  - venue-quality:beautiful-venue
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+  email: nina.khan@joinmovida.com
+  overall_sentiment: great
+  comment: Great teachers and a relaxed schedule with time to enjoy the island.
+  aspect_scores:
+    workshop: 4
+    organization: 4
+  aspect_tags:
+  - workshop:great-instructor
+  - organization:good-schedule
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+  email: bruno.santos@joinmovida.com
+  overall_sentiment: great
+  comment: Elegant beachfront socials and lovely sunset sets.
+  aspect_scores:
+    venue-quality: 5
+    music: 4
+  aspect_tags:
+  - venue-quality:beautiful-venue
+  - music:great-playlist
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+  email: ivo.diallo@joinmovida.com
+  overall_sentiment: okay
+  comment: Nice setting, but parking near the venue was difficult.
+  aspect_scores:
+    venue-quality: 3
+    atmosphere: 4
+  aspect_tags:
+  - venue-quality:poor-parking
+  - atmosphere:friendly-crowd
+  audience_tags:
+  - audience:relaxed-dancing
+  comment_status: approved
+  status: approved
+- event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+  email: samir.ivanov@joinmovida.com
+  overall_sentiment: great
+  comment: Good organization and a friendly mix of salsa and bachata dancers.
+  aspect_scores:
+    organization: 4
+    atmosphere: 4
+  aspect_tags:
+  - organization:good-communication
+  - atmosphere:good-mix-of-dancers
+  audience_tags:
+  - audience:meet-new-people
+  comment_status: approved
+  status: approved
+- event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+  email: maya.rivera@joinmovida.com
+  overall_sentiment: amazing
+  comment: The best mambo bootcamp I have attended, world class teachers and socials.
+  aspect_scores:
+    workshop: 5
+    atmosphere: 5
+  aspect_tags:
+  - workshop:great-instructor
+  - atmosphere:great-atmosphere
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+  email: leo.martin@joinmovida.com
+  overall_sentiment: amazing
+  comment: Slovanský dům is a stunning venue and the floor was perfect for spins.
+  aspect_scores:
+    venue-quality: 5
+    music: 5
+  aspect_tags:
+  - venue-quality:great-dance-floor
+  - venue-quality:beautiful-venue
+  - music:great-dj
+  audience_tags:
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+  email: clara.dubois@joinmovida.com
+  overall_sentiment: great
+  comment: Very well organized, clear schedule and a friendly international crowd.
+  aspect_scores:
+    organization: 5
+    atmosphere: 5
+  aspect_tags:
+  - organization:well-organized
+  - organization:good-schedule
+  - atmosphere:international-crowd
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+  email: victor.schmidt@joinmovida.com
+  overall_sentiment: amazing
+  comment: Pure on2 heaven, I came back with so much new material.
+  aspect_scores:
+    workshop: 5
+    music: 5
+  aspect_tags:
+  - workshop:useful-material
+  - music:great-energy
+  audience_tags:
+  - audience:workshop-lovers
+  - audience:high-energy-dancing
+  comment_status: approved
+  status: approved
+- event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+  email: elena.moreau@joinmovida.com
+  overall_sentiment: amazing
+  comment: Having workshops, socials and rooms all in one hotel makes it so easy to
+    enjoy.
+  aspect_scores:
+    organization: 5
+    venue-quality: 5
+  aspect_tags:
+  - organization:well-organized
+  - venue-quality:easy-access
+  audience_tags:
+  - audience:travelers
+  comment_status: approved
+  status: approved
+- event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+  email: noah.kim@joinmovida.com
+  overall_sentiment: great
+  comment: Amazing artist lineup and great DJs across every room.
+  aspect_scores:
+    workshop: 5
+    music: 4
+  aspect_tags:
+  - workshop:great-instructor
+  - music:great-dj
+  audience_tags:
+  - audience:workshop-lovers
+  comment_status: approved
+  status: approved
+- event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+  email: sofia.torres@joinmovida.com
+  overall_sentiment: amazing
+  comment: The spa between workshops and parties until sunrise, a perfect weekend.
+  aspect_scores:
+    atmosphere: 5
+    venue-quality: 5
+  aspect_tags:
+  - atmosphere:great-atmosphere
+  - venue-quality:beautiful-venue
+  audience_tags:
+  - audience:late-night-dancers
+  comment_status: approved
+  status: approved
+- event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
+  email: mateo.vega@joinmovida.com
+  overall_sentiment: great
+  comment: Great variety of styles and a really friendly crowd.
+  aspect_scores:
+    music: 5
+    atmosphere: 4
+  aspect_tags:
+  - music:good-variety
+  - atmosphere:friendly-crowd
+  audience_tags:
+  - audience:meet-new-people
   comment_status: approved
   status: approved
 emit_suggested:

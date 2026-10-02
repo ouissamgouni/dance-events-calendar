@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { decideOrganizerClaim, fetchAdminOrganizerClaims } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import type { OrganizerClaimAdmin, OrganizerClaimEvent } from '../types';
@@ -53,6 +54,7 @@ function initialDraft(claim: OrganizerClaimAdmin): DraftState {
 }
 
 export default function OrganizerClaimsAdminPanel({ isOpen, onClose }: Props) {
+    useBackToClose(onClose, isOpen);
     const [activeTab, setActiveTab] = useState<Tab>('pending');
     const [kindFilter, setKindFilter] = useState<KindFilter>('all');
     const [rows, setRows] = useState<OrganizerClaimAdmin[]>([]);

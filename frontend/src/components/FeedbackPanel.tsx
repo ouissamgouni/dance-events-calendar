@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import type { AdminRating } from '../types';
 import { fetchAdminRatings } from '../api';
 import RatingReviewModal from './RatingReviewModal';
@@ -17,6 +18,7 @@ type Tab = typeof TABS[number];
 const PAGE_SIZES = [25, 50, 100] as const;
 
 export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props) {
+    useBackToClose(onClose, isOpen);
     const [items, setItems] = useState<AdminRating[]>([]);
     const [total, setTotal] = useState(0);
     const [pendingTotal, setPendingTotal] = useState(0);

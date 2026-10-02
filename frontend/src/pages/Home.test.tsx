@@ -10,6 +10,7 @@ import { FeatureFlagsProvider } from '../context/FeatureFlagsContext';
 import { AttendanceSummariesProvider } from '../context/AttendanceSummariesContext';
 import { SavedEventsProvider } from '../context/SavedEventsContext';
 import { PreferencesProvider } from '../context/PreferencesContext';
+import { readBrowseSession } from '../utils/browseSession';
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
@@ -68,7 +69,11 @@ vi.mock('../components/EventMap', () => ({
 }));
 
 // Mock all the other components to avoid rendering the full page
-vi.mock('../components/EventListPanel', () => ({ default: () => <div /> }));
+vi.mock('../components/EventListPanel', () => ({
+    default: ({ onExtendPeriod, nextPeriodEventCount }: { onExtendPeriod?: () => void; nextPeriodEventCount?: number }) => (
+        nextPeriodEventCount ? <button type="button" onClick={onExtendPeriod}>Search next dates</button> : <div />
+    ),
+}));
 vi.mock('../components/FilterSheet', () => ({ default: () => <div /> }));
 vi.mock('../components/SummaryBar', () => ({
     default: ({ onClearArea }: { onClearArea?: () => void }) => (
@@ -294,5 +299,60 @@ describe('Home — mobile map mount with applied area', () => {
             expect(scrollSpy).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
         });
         scrollSpy.mockRestore();
+    });
+
+    it('keeps scroll position when extending the period from the list', async () => {
+        const user = userEvent.setup();
+        vi.mocked(fetchEvents).mockResolvedValue([
+            { event_id: 'e1', title: 'Later social', latitude: null, longitude: null, tags: [] } as unknown as Awaited<ReturnType<typeof fetchEvents>>[number],
+        ]);
+        const scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => { });
+        render(
+            <TestProviders initialEntries={['/browse']}>
+                <Home />
+            </TestProviders>,
+        );
+
+        const [clearArea] = await screen.findAllByRole('button', { name: 'Clear area' });
+        await user.click(clearArea);
+        const [extend] = await screen.findAllByRole('button', { name: 'Search next dates' });
+        scrollSpy.mockClear();
+        const callsBefore = vi.mocked(fetchEvents).mock.calls.length;
+        await user.click(extend);
+
+        await waitFor(() => {
+            expect(vi.mocked(fetchEvents).mock.calls.length).toBeGreaterThan(callsBefore);
+        });
+        expect(scrollSpy).not.toHaveBeenCalled();
+        scrollSpy.mockRestore();
+    });
+
+    it('saves Browse filters and the area override for the session', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestProviders initialEntries={['/browse?tag_ids=3&view=map']}>
+                <Home />
+            </TestProviders>,
+        );
+
+        const [clearArea] = await screen.findAllByRole('button', { name: 'Clear area' });
+        await user.click(clearArea);
+
+        await waitFor(() => {
+            const saved = readBrowseSession();
+            expect(saved?.params.get('tag_ids')).toBe('3');
+            expect(saved?.params.has('view')).toBe(false);
+            expect(saved?.area).toEqual({ kind: 'show-all' });
+        });
+    });
+
+    it('does not save filters outside Browse', async () => {
+        render(
+            <TestProviders initialEntries={['/calendar?tag_ids=3']}>
+                <Home />
+            </TestProviders>,
+        );
+        await screen.findAllByRole('button', { name: 'Clear area' });
+        expect(readBrowseSession()).toBeNull();
     });
 });

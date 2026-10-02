@@ -76,6 +76,22 @@ describe('ExplorerEventSearch', () => {
         });
     });
 
+    it('opens an overlay under the app header and closes it with Back', () => {
+        render(
+            <MemoryRouter>
+                <ExplorerEventSearch onSelectEvent={vi.fn()} small overlay triggerLabel="Add event" />
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add event' }));
+        const overlay = screen.getByRole('dialog', { name: 'Add event' });
+        expect(overlay).toHaveClass('fixed', 'top-[calc(64px+env(safe-area-inset-top))]');
+        expect(screen.getByRole('textbox', { name: 'Search events, places, or tags' })).toHaveFocus();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close search' }));
+        expect(screen.queryByRole('dialog', { name: 'Add event' })).not.toBeInTheDocument();
+    });
+
     it('opts past events into broad search without excluding attended events', async () => {
         vi.useFakeTimers();
         vi.mocked(fetchEventsByIds).mockResolvedValue([]);

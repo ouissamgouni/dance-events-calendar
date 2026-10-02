@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -126,6 +127,7 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
     const location = useLocation();
     const popoverRef = useRef<HTMLDivElement | null>(null);
     const [pos, setPos] = useState<PopoverPos | null>(null);
+    useBackToClose(onClose);
 
     // Position under the anchor and keep it positioned on scroll/resize.
     useEffect(() => {

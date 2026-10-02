@@ -140,9 +140,9 @@ export default function MyEventsExperience() {
                 )}
             </div>
             {activeLoading && <p className="py-20 text-center text-sm text-muted">Loading your events…</p>}
-            {!activeLoading && searchOpen && <div className="min-h-0 flex-1 overflow-y-auto"><MyEventsAddSearch tab={activeTab} onSuggest={openSuggest} onComplete={() => setSearchOpen(false)} /></div>}
-            {!activeLoading && !searchOpen && view === 'list' && <div className="min-h-0 flex-1 overflow-y-auto"><MyEventsList events={activeEvents} tab={activeTab} onEventClick={setModalEvent} /></div>}
-            {!activeLoading && !searchOpen && view === 'calendar' && (
+            {!activeLoading && searchOpen && <MyEventsAddSearch tab={activeTab} onSuggest={openSuggest} onComplete={() => setSearchOpen(false)} onClose={() => setSearchOpen(false)} />}
+            {!activeLoading && view === 'list' && <div className="min-h-0 flex-1 overflow-y-auto"><MyEventsList events={activeEvents} tab={activeTab} onEventClick={setModalEvent} /></div>}
+            {!activeLoading && view === 'calendar' && (
                 <CalendarMapWorkspace
                     events={activeEvents}
                     initialDate={activeEvents[0]?.start}
@@ -162,7 +162,7 @@ export default function MyEventsExperience() {
                     ) : undefined}
                 />
             )}
-            {!activeLoading && !searchOpen && view === 'map' && (
+            {!activeLoading && view === 'map' && (
                 <div className="relative flex min-h-0 flex-1 flex-col">
                     <div className="relative min-h-0 flex-1">
                         {sequence.length > 0 ? (
@@ -221,7 +221,7 @@ export default function MyEventsExperience() {
             <ViewSwitcher
                 currentView={view}
                 onSelect={changeView}
-                mapPreviewVisible={!searchOpen && view === 'map' && selected !== null && !previewCollapsed}
+                mapPreviewVisible={view === 'map' && selected !== null && !previewCollapsed}
                 previewOffsetPx={mapPreviewHeight}
                 onCreate={() => setSearchOpen((open) => !open)}
                 createExpanded={searchOpen}

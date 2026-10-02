@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchCurators, searchUsers, type UserSearchResult } from '../api';
+import useBackToClose from '../hooks/useBackToClose';
 
 /**
  * Header user-search box (Phase D, D.5).
@@ -141,6 +142,7 @@ export default function UserSearchBox() {
 
     // Below lg, the icon opens a fixed panel beneath the header.
     const [mobileExpanded, setMobileExpanded] = useState(false);
+    useBackToClose(() => { setOpen(false); setMobileExpanded(false); }, mobileExpanded);
     const mobileInputRef = useRef<HTMLInputElement>(null);
     useEffect(() => {
         if (mobileExpanded) mobileInputRef.current?.focus();

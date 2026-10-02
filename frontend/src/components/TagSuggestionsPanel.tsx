@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 import type { TagSuggestionResponse, TagGroup } from '../types';
 import {
     approveTagSuggestion,
@@ -25,6 +26,7 @@ const SOURCE_FILTERS = ['all', 'user', 'auto'] as const;
 type SourceFilter = typeof SOURCE_FILTERS[number];
 
 export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: Props) {
+    useBackToClose(onClose, isOpen);
     const [suggestions, setSuggestions] = useState<TagSuggestionResponse[]>([]);
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
     const [activeTab, setActiveTab] = useState<Tab>('pending');

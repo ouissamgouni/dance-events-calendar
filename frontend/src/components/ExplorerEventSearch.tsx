@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { ArrowLeft, Plus, Search, X } from 'lucide-react';
 import { fetchEventsByIds, searchEvents, type EventSearchDateScope, type EventSearchResult } from '../api';
 import type { CalendarEvent } from '../types';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
+import useBackToClose from '../hooks/useBackToClose';
 import SearchEventCard, { type SearchEventCardPurpose } from './SearchEventCard';
 
 interface ExplorerEventSearchProps {
@@ -36,14 +37,12 @@ interface ExplorerEventSearchProps {
     resultFilter?: (result: EventSearchResult) => boolean;
     onNoResultsAction?: () => void;
     noResultsActionLabel?: string;
-    /** Render the dropdown under document.body when an ancestor clips overflow. */
-    portal?: boolean;
+    /** Open as a full-screen overlay from the top of the page (like /search). */
+    overlay?: boolean;
+    /** Called when an embedded overlay is dismissed. */
+    onClose?: () => void;
     /** Browse opens event details with card actions; select delegates to a context confirmation flow. */
     resultPurpose?: SearchEventCardPurpose;
-}
-
-function OptionalPortal({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
-    return enabled ? createPortal(children, document.body) : children;
 }
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -75,7 +74,8 @@ export default function ExplorerEventSearch({
     resultFilter,
     onNoResultsAction,
     noResultsActionLabel = 'Suggest an event',
-    portal = false,
+    overlay = false,
+    onClose,
     resultPurpose = 'browse',
 }: ExplorerEventSearchProps) {
     const [open, setOpen] = useState(embedded);
@@ -88,11 +88,14 @@ export default function ExplorerEventSearch({
     const effectiveDateScope: EventSearchDateScope = pastToggle && pastChecked ? 'all' : dateScope;
     const containerRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
-    const triggerRef = useRef<HTMLButtonElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const [portalStyle, setPortalStyle] = useState<React.CSSProperties>();
     const debounced = useDebounced(q, 250);
     const { isAttending } = useAttendingEvents();
+    const close = () => {
+        if (embedded) onClose?.();
+        else setOpen(false);
+    };
+    useBackToClose(close, overlay ? open || embedded : open && !embedded);
 
     useEffect(() => {
         if (!open && !embedded) return;
@@ -112,29 +115,6 @@ export default function ExplorerEventSearch({
         document.addEventListener('mousedown', onDoc);
         return () => document.removeEventListener('mousedown', onDoc);
     }, []);
-
-    useEffect(() => {
-        if (!portal || !open) return;
-        const positionPanel = () => {
-            const trigger = triggerRef.current;
-            if (!trigger) return;
-            const rect = trigger.getBoundingClientRect();
-            const width = Math.min(320, window.innerWidth - 24);
-            setPortalStyle({
-                position: 'fixed',
-                top: rect.bottom + 4,
-                left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
-                width,
-            });
-        };
-        positionPanel();
-        window.addEventListener('resize', positionPanel);
-        window.addEventListener('scroll', positionPanel, true);
-        return () => {
-            window.removeEventListener('resize', positionPanel);
-            window.removeEventListener('scroll', positionPanel, true);
-        };
-    }, [open, portal]);
 
     useEffect(() => {
         if (!open && !embedded) return;
@@ -203,7 +183,7 @@ export default function ExplorerEventSearch({
     const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'Escape') {
             event.preventDefault();
-            setOpen(false);
+            close();
             return;
         }
         if (event.key === 'ArrowDown') {
@@ -222,21 +202,82 @@ export default function ExplorerEventSearch({
         }
     };
 
-    const panelClassName = portal
-        ? 'z-[8600] border border-line bg-surface shadow-lg'
-        : embedded
-            ? 'w-full border-y border-line bg-surface'
-            : compact
-                ? 'fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg'
-                : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-line bg-surface shadow-lg';
-    const panelStyle = portal
-        ? portalStyle
+    const panelClassName = embedded
+        ? 'w-full border-y border-line bg-surface'
         : compact
-            ? { top: 'calc(64px + env(safe-area-inset-top) + 6px)' }
-            : undefined;
+            ? 'fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg'
+            : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-line bg-surface shadow-lg';
+    const panelStyle = compact
+        ? { top: 'calc(64px + env(safe-area-inset-top) + 6px)' }
+        : undefined;
 
     // Desktop inline mode: show input directly instead of trigger button
-    const isDesktopInline = !embedded && !compact && !small;
+    const isDesktopInline = !embedded && !compact && !small && !overlay;
+    const inputLabel = embedded ? triggerLabel : 'Search events, places, or tags';
+
+    const resultsContent = (
+        <>
+            {term.length < 2 && (
+                <div className="bg-surface p-3 text-xs text-ink-soft">
+                    {guidancePrefix ? `${guidancePrefix} ` : ''}Type at least 2 letters to find {effectiveDateScope === 'all' ? 'events' : `${effectiveDateScope} events`}.
+                </div>
+            )}
+            {term.length >= 2 && loading && (
+                <div className="bg-surface p-3 text-xs text-ink-soft">Searching…</div>
+            )}
+            {term.length >= 2 && !loading && visibleResults.length === 0 && (
+                <div className="bg-surface p-3 text-xs text-ink-soft">
+                    No {effectiveDateScope === 'all' ? '' : `${effectiveDateScope} `}events match “{term}”.
+                    {effectiveDateScope !== 'upcoming' && !embedded && (
+                        <>
+                            {' '}
+                            <Link
+                                to="/calendar"
+                                onClick={reset}
+                                className="font-medium text-action hover:underline"
+                            >
+                                Browse the calendar
+                            </Link>{' '}
+                            to find past events with filters.
+                        </>
+                    )}
+                    {onNoResultsAction && (
+                        <button type="button" onClick={onNoResultsAction} className="ml-1 font-semibold text-action hover:underline">
+                            {noResultsActionLabel}
+                        </button>
+                    )}
+                </div>
+            )}
+            {visibleResults.map((row, index) => (
+                <div key={row.event_id} className="mb-1.5 last:mb-0">
+                    <SearchEventCard
+                        result={row}
+                        event={eventsById.get(row.event_id)}
+                        onOpen={() => selectEvent(row)}
+                        purpose={resultPurpose}
+                        showPastLabel={effectiveDateScope === 'all'}
+                        highlighted={index === activeIdx}
+                        testId={`explorer-event-search-result-${index}`}
+                    />
+                </div>
+            ))}
+        </>
+    );
+
+    const missingEventFooter = dateScope === 'past' && onOpenSubmitEvent && (
+        <div className="border-t border-line bg-surface px-3 py-2 text-center text-xs">
+            <button
+                type="button"
+                onClick={() => {
+                    onOpenSubmitEvent();
+                    reset();
+                }}
+                className="font-medium text-action hover:underline"
+            >
+                Missing event? Add it
+            </button>
+        </div>
+    );
 
     return (
         <div ref={containerRef} className={`relative ${className}`}>
@@ -284,7 +325,6 @@ export default function ExplorerEventSearch({
             {/* Mobile/compact: trigger button */}
             {!isDesktopInline && !embedded && (
                 <button
-                    ref={triggerRef}
                     type="button"
                     onClick={() => setOpen((value) => !value)}
                     aria-label={triggerLabel}
@@ -302,113 +342,108 @@ export default function ExplorerEventSearch({
                     {!compact && <span>{triggerLabel}</span>}
                 </button>
             )}
-            {(open || embedded) && (
-                <OptionalPortal enabled={portal}>
-                    <div ref={panelRef} className={panelClassName} style={panelStyle}>
-                        {!headerInline && (
-                            <div className="border-b border-line p-2">
-                                <div className="flex items-center gap-2">
-                                    {pastToggle && (
-                                        <label className="flex items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
-                                            <input
-                                                type="checkbox"
-                                                checked={pastChecked}
-                                                onChange={(event) => setPastChecked(event.target.checked)}
-                                                className="h-3.5 w-3.5"
-                                                data-testid="explorer-event-search-include-past"
-                                            />
-                                            Include past
-                                        </label>
-                                    )}
-                                    <div className="flex flex-1 items-center gap-2 border border-line bg-surface px-2 py-1.5">
-                                        <svg
-                                            viewBox="0 0 20 20"
-                                            fill="currentColor"
-                                            className="h-4 w-4 text-muted"
-                                            aria-hidden="true"
-                                        >
-                                            <path
-                                                fillRule="evenodd"
-                                                clipRule="evenodd"
-                                                d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
-                                            />
-                                        </svg>
+            {!overlay && (open || embedded) && (
+                <div ref={panelRef} className={panelClassName} style={panelStyle}>
+                    {!headerInline && (
+                        <div className="border-b border-line p-2">
+                            <div className="flex items-center gap-2">
+                                {pastToggle && (
+                                    <label className="flex items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
                                         <input
-                                            ref={inputRef}
-                                            type="text"
-                                            value={q}
-                                            onChange={(event) => setQ(event.target.value)}
-                                            onKeyDown={onKeyDown}
-                                            placeholder="Search events, places, or tags…"
-                                            aria-label={embedded ? triggerLabel : 'Search events, places, or tags'}
-                                            className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
+                                            type="checkbox"
+                                            checked={pastChecked}
+                                            onChange={(event) => setPastChecked(event.target.checked)}
+                                            className="h-3.5 w-3.5"
+                                            data-testid="explorer-event-search-include-past"
                                         />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        <div className="max-h-80 overflow-auto bg-canvas px-2 py-1.5">
-                            {term.length < 2 && (
-                                <div className="bg-surface p-3 text-xs text-ink-soft">
-                                    {guidancePrefix ? `${guidancePrefix} ` : ''}Type at least 2 letters to find {effectiveDateScope === 'all' ? 'events' : `${effectiveDateScope} events`}.
-                                </div>
-                            )}
-                            {term.length >= 2 && loading && (
-                                <div className="bg-surface p-3 text-xs text-ink-soft">Searching…</div>
-                            )}
-                            {term.length >= 2 && !loading && visibleResults.length === 0 && (
-                                <div className="bg-surface p-3 text-xs text-ink-soft">
-                                    No {effectiveDateScope === 'all' ? '' : `${effectiveDateScope} `}events match “{term}”.
-                                    {effectiveDateScope !== 'upcoming' && !embedded && (
-                                        <>
-                                            {' '}
-                                            <Link
-                                                to="/calendar"
-                                                onClick={reset}
-                                                className="font-medium text-action hover:underline"
-                                            >
-                                                Browse the calendar
-                                            </Link>{' '}
-                                            to find past events with filters.
-                                        </>
-                                    )}
-                                    {onNoResultsAction && (
-                                        <button type="button" onClick={onNoResultsAction} className="ml-1 font-semibold text-action hover:underline">
-                                            {noResultsActionLabel}
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                            {visibleResults.map((row, index) => (
-                                <div key={row.event_id} className="mb-1.5 last:mb-0">
-                                    <SearchEventCard
-                                        result={row}
-                                        event={eventsById.get(row.event_id)}
-                                        onOpen={() => selectEvent(row)}
-                                        purpose={resultPurpose}
-                                        showPastLabel={effectiveDateScope === 'all'}
-                                        highlighted={index === activeIdx}
-                                        testId={`explorer-event-search-result-${index}`}
+                                        Include past
+                                    </label>
+                                )}
+                                <div className="flex flex-1 items-center gap-2 border border-line bg-surface px-2 py-1.5">
+                                    <svg
+                                        viewBox="0 0 20 20"
+                                        fill="currentColor"
+                                        className="h-4 w-4 text-muted"
+                                        aria-hidden="true"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            clipRule="evenodd"
+                                            d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
+                                        />
+                                    </svg>
+                                    <input
+                                        ref={inputRef}
+                                        type="text"
+                                        value={q}
+                                        onChange={(event) => setQ(event.target.value)}
+                                        onKeyDown={onKeyDown}
+                                        placeholder="Search events, places, or tags…"
+                                        aria-label={inputLabel}
+                                        className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
                                     />
                                 </div>
-                            ))}
-                        </div>
-                        {dateScope === 'past' && onOpenSubmitEvent && (
-                            <div className="border-t border-line bg-surface px-3 py-2 text-center text-xs">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        onOpenSubmitEvent();
-                                        reset();
-                                    }}
-                                    className="font-medium text-action hover:underline"
-                                >
-                                    Missing event? Add it
-                                </button>
                             </div>
-                        )}
+                        </div>
+                    )}
+                    <div className="max-h-80 overflow-auto bg-canvas px-2 py-1.5">
+                        {resultsContent}
                     </div>
-                </OptionalPortal>
+                    {missingEventFooter}
+                </div>
+            )}
+            {overlay && (open || embedded) && createPortal(
+                <div
+                    ref={panelRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={triggerLabel}
+                    className="fixed inset-x-0 top-[calc(64px+env(safe-area-inset-top))] bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] md:bottom-0 z-[8500] flex flex-col bg-canvas"
+                    data-testid="explorer-event-search-overlay"
+                >
+                    <div className="shrink-0 border-b border-line bg-surface">
+                        <div className="mx-auto flex max-w-2xl items-center gap-2 p-3">
+                            <button type="button" onClick={close} aria-label="Close search" className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft hover:text-ink">
+                                <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+                            </button>
+                            <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-field bg-canvas px-3">
+                                <Search className="h-4 w-4 text-muted" aria-hidden="true" />
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={q}
+                                    onChange={(event) => setQ(event.target.value)}
+                                    onKeyDown={onKeyDown}
+                                    placeholder="Search events, places, or tags…"
+                                    aria-label={inputLabel}
+                                    className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
+                                />
+                                {q && (
+                                    <button type="button" onClick={() => setQ('')} aria-label="Clear search">
+                                        <X className="h-4 w-4 text-muted" aria-hidden="true" />
+                                    </button>
+                                )}
+                            </label>
+                            {pastToggle && (
+                                <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-ink-soft">
+                                    <input
+                                        type="checkbox"
+                                        checked={pastChecked}
+                                        onChange={(event) => setPastChecked(event.target.checked)}
+                                        className="h-4 w-4"
+                                        data-testid="explorer-event-search-include-past"
+                                    />
+                                    Past
+                                </label>
+                            )}
+                        </div>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                        <div className="mx-auto max-w-2xl px-3 py-3">{resultsContent}</div>
+                    </div>
+                    {missingEventFooter}
+                </div>,
+                document.body,
             )}
         </div>
     );

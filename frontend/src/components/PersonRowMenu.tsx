@@ -5,6 +5,7 @@
  * friend). Closes on outside click or Escape.
  */
 import { useEffect, useRef, useState } from 'react';
+import useBackToClose from '../hooks/useBackToClose';
 
 export interface RowMenuItem {
     label: string;
@@ -21,6 +22,7 @@ export default function PersonRowMenu({
 }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
+    useBackToClose(() => setOpen(false), open);
 
     useEffect(() => {
         if (!open) return;
