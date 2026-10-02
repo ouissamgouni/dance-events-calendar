@@ -14,6 +14,8 @@ interface Props {
     showClose?: boolean;
     /** When false, backdrop click and Escape don't close the sheet. */
     dismissible?: boolean;
+    /** Tighter spacing, one-line subtitle and no header divider. */
+    compact?: boolean;
     /** Sticky footer content, typically a primary confirm button. */
     footer?: ReactNode;
     children: ReactNode;
@@ -25,7 +27,7 @@ interface Props {
  * footer clear of the iOS home indicator. The body scrolls independently so the
  * sheet never grows past 85% of the viewport height.
  */
-export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, dismissible = true, footer, children }: Props) {
+export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, dismissible = true, compact = false, footer, children }: Props) {
     const floating = variant === 'floating';
     const titleClass = titleSize === 'xl' ? 'text-2xl' : titleSize === 'large' ? 'text-lg' : 'text-base';
     useBackToClose(onClose, dismissible);
@@ -63,13 +65,13 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
                         <span className="h-1 w-10 rounded-full bg-line" />
                     </div>
                 ) : null}
-                <div className={`flex shrink-0 justify-between border-b border-line px-4 ${floating ? 'items-start pt-2 pb-4' : 'items-center py-3'}`}>
-                    <div className={`flex min-w-0 items-start ${floating ? 'gap-3' : 'gap-2'}`}>
+                <div className={`flex shrink-0 justify-between px-4 ${compact ? 'items-center pt-1' : `border-b border-line ${floating ? 'items-start pt-2 pb-4' : 'items-center py-3'}`}`}>
+                    <div className={`flex min-w-0 ${compact ? 'items-center' : 'items-start'} ${floating ? 'gap-3' : 'gap-2'}`}>
                         {headerLeading}
                         <div className="min-w-0">
                             <h3 className={`${titleClass} font-bold text-ink`}>{title}</h3>
                             {subtitle ? (
-                                <p className="mt-0.5 line-clamp-2 text-sm leading-5 text-ink-soft">{subtitle}</p>
+                                <p className={`text-sm leading-5 text-ink-soft ${compact ? 'truncate' : 'mt-0.5 line-clamp-2'}`}>{subtitle}</p>
                             ) : null}
                         </div>
                     </div>
@@ -88,7 +90,7 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
                     </div>
                 </div>
 
-                <div className={`min-h-0 flex-1 overflow-y-auto px-4 ${floating ? 'py-4' : 'py-3'}`}>{children}</div>
+                <div className={`min-h-0 flex-1 overflow-y-auto px-4 ${compact ? 'pt-2 pb-4' : floating ? 'py-4' : 'py-3'}`}>{children}</div>
 
                 {footer ? (
                     <div className={`shrink-0 border-t border-line px-4 ${floating ? 'py-3' : 'pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]'}`}>

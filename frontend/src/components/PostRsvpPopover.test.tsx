@@ -38,10 +38,10 @@ describe('PostRsvpPopover', () => {
         )
 
         expect(screen.getByRole('dialog', { name: "You're going!" })).toHaveAttribute('aria-modal', 'true')
-        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-sm')
-        expect(screen.getByRole('radiogroup', { name: 'Attendance visibility' })).toHaveClass('flex', 'w-full')
-        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-12', 'text-sm')
-        expect(screen.getByText('Only your mutual followers will see your name in the attendee list.')).toBeInTheDocument()
+        expect(screen.getByText('Summer Salsa Social')).toHaveClass('truncate', 'text-sm')
+        expect(screen.getByRole('radiogroup', { name: 'Who can see you in the attendee list?' })).toHaveClass('flex', 'w-full')
+        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-10', 'text-sm')
+        expect(screen.queryByText('Only your mutual followers will see your name in the attendee list.')).not.toBeInTheDocument()
 
         act(() => vi.advanceTimersByTime(5000))
         expect(onClose).not.toHaveBeenCalled()
@@ -76,7 +76,9 @@ describe('PostRsvpPopover', () => {
 
         act(() => vi.advanceTimersByTime(5000))
         expect(onClose).not.toHaveBeenCalled()
-        fireEvent.mouseDown(document.body)
+        fireEvent.pointerDown(popover)
         expect(onClose).not.toHaveBeenCalled()
+        fireEvent.pointerDown(document.body)
+        expect(onClose).toHaveBeenCalledOnce()
     })
 })

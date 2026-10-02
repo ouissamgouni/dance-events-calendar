@@ -19,8 +19,15 @@ interface RsvpAudienceUser {
     share_attendance_default_audience?: ShareAudience;
 }
 
+/** Going keeps the legacy unprefixed keys so existing choices carry over. */
+export type AudienceKind = 'going' | 'saved';
+
 const KEY_PREFIX = 'audience.lastUsed.';
 const REMEMBER_KEY_PREFIX = 'audience.remember.';
+
+function kindPrefix(base: string, kind: AudienceKind): string {
+    return kind === 'saved' ? `${base}saved.` : base;
+}
 
 const VALID: ReadonlyArray<ShareAudience> = ['public', 'friends', 'private'];
 
@@ -28,16 +35,19 @@ function isAudience(value: unknown): value is ShareAudience {
     return typeof value === 'string' && (VALID as readonly string[]).includes(value);
 }
 
-function keyFor(identity: string | null | undefined): string | null {
+function keyFor(identity: string | null | undefined, kind: AudienceKind): string | null {
     if (!identity) return null;
-    return `${KEY_PREFIX}${identity}`;
+    return `${kindPrefix(KEY_PREFIX, kind)}${identity}`;
 }
 
 /** Read the last-used audience for the given user identity. Returns
  *  ``null`` when no hint is recorded (caller should fall back to the
  *  signed-in default — ``"public"`` post-refactor). */
-export function getLastUsedAudience(identity: string | null | undefined): ShareAudience | null {
-    const k = keyFor(identity);
+export function getLastUsedAudience(
+    identity: string | null | undefined,
+    kind: AudienceKind = 'going',
+): ShareAudience | null {
+    const k = keyFor(identity, kind);
     if (!k) return null;
     try {
         const raw = window.localStorage.getItem(k);
@@ -52,8 +62,9 @@ export function getLastUsedAudience(identity: string | null | undefined): ShareA
 export function setLastUsedAudience(
     identity: string | null | undefined,
     audience: ShareAudience,
+    kind: AudienceKind = 'going',
 ): void {
-    const k = keyFor(identity);
+    const k = keyFor(identity, kind);
     if (!k) return;
     try {
         window.localStorage.setItem(k, audience);
@@ -79,21 +90,33 @@ export function defaultRsvpAudienceFor(user: RsvpAudienceUser): ShareAudience {
         ?? (user.share_attendance_default === false ? 'private' : 'public');
 }
 
+/** Saves have no account-level default, so fall back to the RSVP one. */
+export function defaultSavedAudienceFor(user: RsvpAudienceUser): ShareAudience {
+    return getLastUsedAudience(user.user_id, 'saved') ?? defaultRsvpAudienceFor(user);
+}
+
 /** Whether the user ticked "Remember my choice"; ``null`` when never answered. */
-export function getRememberAudience(identity: string | null | undefined): boolean | null {
+export function getRememberAudience(
+    identity: string | null | undefined,
+    kind: AudienceKind = 'going',
+): boolean | null {
     if (!identity) return null;
     try {
-        const raw = window.localStorage.getItem(`${REMEMBER_KEY_PREFIX}${identity}`);
+        const raw = window.localStorage.getItem(`${kindPrefix(REMEMBER_KEY_PREFIX, kind)}${identity}`);
         return raw === null ? null : raw === '1';
     } catch {
         return null;
     }
 }
 
-export function setRememberAudience(identity: string | null | undefined, remember: boolean): void {
+export function setRememberAudience(
+    identity: string | null | undefined,
+    remember: boolean,
+    kind: AudienceKind = 'going',
+): void {
     if (!identity) return;
     try {
-        window.localStorage.setItem(`${REMEMBER_KEY_PREFIX}${identity}`, remember ? '1' : '0');
+        window.localStorage.setItem(`${kindPrefix(REMEMBER_KEY_PREFIX, kind)}${identity}`, remember ? '1' : '0');
     } catch {
         /* swallow quota / disabled-storage errors */
     }
@@ -103,10 +126,4 @@ export const AUDIENCE_TIER_LABELS: Record<ShareAudience, string> = {
     public: 'Public',
     friends: 'Friends',
     private: 'Private',
-};
-
-export const ATTENDANCE_AUDIENCE_DESCRIPTIONS: Record<ShareAudience, string> = {
-    public: 'You will appear in the attendee list to anyone who can view this event.',
-    friends: 'Only your mutual followers will see your name in the attendee list.',
-    private: 'You will be counted but not named.',
 };

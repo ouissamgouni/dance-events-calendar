@@ -184,9 +184,9 @@ describe('GoingButton visibility', () => {
 
         const confirmationSheet = await screen.findByRole('dialog', { name: "You're going!" })
         expect(confirmationSheet).toHaveAttribute('aria-modal', 'true')
-        expect(screen.getByText('Summer Salsa Social')).toHaveClass('line-clamp-2', 'text-sm')
-        expect(screen.getByRole('radiogroup', { name: 'Attendance visibility' })).toHaveClass('flex', 'w-full')
-        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-12', 'text-sm')
+        expect(screen.getByText('Summer Salsa Social')).toHaveClass('truncate', 'text-sm')
+        expect(screen.getByRole('radiogroup', { name: 'Who can see you in the attendee list?' })).toHaveClass('flex', 'w-full')
+        expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-10', 'text-sm')
         expect(within(confirmationSheet).getByRole('button', { name: 'Share event' })).toBeInTheDocument()
 
         await user.click(within(confirmationSheet).getByRole('button', { name: 'Done' }))
@@ -194,10 +194,37 @@ describe('GoingButton visibility', () => {
 
         const editSheet = screen.getByRole('dialog', { name: "You're going!" })
         expect(editSheet).toHaveAttribute('aria-modal', 'true')
-        expect(screen.getByRole('radiogroup', { name: 'Attendance visibility' })).toHaveClass('flex', 'w-full')
+        expect(screen.getByRole('radiogroup', { name: 'Who can see you in the attendee list?' })).toHaveClass('flex', 'w-full')
         expect(within(editSheet).getByRole('button', { name: 'Not going' })).toHaveClass('text-danger')
         expect(within(editSheet).getByRole('button', { name: 'Done' })).toBeInTheDocument()
-        expect(within(editSheet).getByRole('checkbox', { name: 'Remember my choice for next time' })).toBeChecked()
+        expect(within(editSheet).getByRole('checkbox', { name: 'Remember my choice' })).toBeChecked()
+    })
+
+    it('remembers the choice when the sheet is closed via the backdrop', async () => {
+        useMobileViewport()
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+        )
+        const { user } = renderGoingButton('evt-backdrop')
+
+        await user.click(await screen.findByRole('button', { name: "I'm going" }))
+        const sheet = await screen.findByRole('dialog', { name: "You're going!" })
+        await user.click(sheet.parentElement!)
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(localStorage.getItem('audience.remember.user-1')).toBe('1')
+    })
+
+    it('ignores a remembered save choice when RSVPing', async () => {
+        useMobileViewport()
+        localStorage.setItem('audience.remember.saved.user-1', '1')
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+        )
+        const { user } = renderGoingButton('evt-save-remembered')
+
+        await user.click(await screen.findByRole('button', { name: "I'm going" }))
+        expect(await screen.findByRole('dialog', { name: "You're going!" })).toBeInTheDocument()
     })
 
     it('remembers the audience picked in the post-RSVP sheet as last used', async () => {
@@ -230,7 +257,7 @@ describe('GoingButton visibility', () => {
 
         await user.click(await screen.findByRole('button', { name: "I'm going" }))
         await screen.findByRole('dialog', { name: "You're going!" })
-        expect(screen.getByRole('checkbox', { name: 'Remember my choice for next time' })).toBeChecked()
+        expect(screen.getByRole('checkbox', { name: 'Remember my choice' })).toBeChecked()
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
         expect(patches).toEqual([])
         await user.click(screen.getByRole('button', { name: 'Done' }))
@@ -283,7 +310,7 @@ describe('GoingButton visibility', () => {
 
         await user.click(await screen.findByRole('button', { name: "I'm going" }))
         await screen.findByRole('dialog', { name: "You're going!" })
-        await user.click(screen.getByRole('checkbox', { name: 'Remember my choice for next time' }))
+        await user.click(screen.getByRole('checkbox', { name: 'Remember my choice' }))
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
 
         await waitFor(() =>

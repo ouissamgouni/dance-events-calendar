@@ -40,7 +40,7 @@ users:
     bio: New to the local dance community and looking for welcoming socials.
     onboarded_at: null
     share_attendance_default: true
-    share_attendance_default_audience: friends
+    share_attendance_default_audience: public
     avatar: uifaces-human-avatar (10).jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Amira%20Haddad
   - email: picks@joinmovida.com

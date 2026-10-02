@@ -12,7 +12,6 @@ import RsvpVisibilitySheet from './RsvpVisibilitySheet';
 import { useAnchoredToast } from './AnchoredToast';
 import AudienceTierIcon from './AudienceTierIcon';
 import {
-    ATTENDANCE_AUDIENCE_DESCRIPTIONS,
     AUDIENCE_TIER_LABELS,
     defaultRsvpAudienceFor,
     getRememberAudience,
@@ -315,14 +314,13 @@ export default function GoingButton({
     const popover = editOpen ? (
         <RsvpVisibilitySheet
             anchorRef={triggerRef}
+            kind="going"
             emoji="🎉"
             title={isPast ? 'You attended!' : "You're going!"}
             subtitle={eventTitle}
-            question="Who can see you in the attendee list?"
             audience={pendingAudience}
             onAudienceChange={handlePopoverAudienceChange}
-            pickerAriaLabel="Attendance visibility"
-            description={ATTENDANCE_AUDIENCE_DESCRIPTIONS[pendingAudience]}
+            pickerAriaLabel="Who can see you in the attendee list?"
             secondaryAction={{ label: unmarkLabel, onClick: stopGoing, tone: 'danger' }}
             onClose={closeEdit}
         />

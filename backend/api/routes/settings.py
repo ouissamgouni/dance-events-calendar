@@ -189,6 +189,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         trending_floor_going=_get_int_setting(session, "trending_floor_going", 3),
         trending_top_n=_get_int_setting(session, "trending_top_n", 3),
         trending_top_percent=_get_int_setting(session, "trending_top_percent", 100),
+        explorer_list_page_size=_get_int_setting(
+            session, "explorer_list_page_size", 20
+        ),
         event_color_bar_color=_get_str_setting(
             session, "event_color_bar_color", "#64748b"
         ),
@@ -491,6 +494,17 @@ def update_settings(
         else:
             row = SiteSetting(
                 key="trending_top_percent", value=str(body.trending_top_percent)
+            )
+        session.add(row)
+
+    if body.explorer_list_page_size is not None:
+        row = session.get(SiteSetting, "explorer_list_page_size")
+        if row:
+            row.value = str(body.explorer_list_page_size)
+        else:
+            row = SiteSetting(
+                key="explorer_list_page_size",
+                value=str(body.explorer_list_page_size),
             )
         session.add(row)
 

@@ -1306,6 +1306,7 @@ class SiteSettingsResponse(BaseModel):
     # other card (e.g. 5 visible events @ 20% → effective cap of 1).
     trending_top_n: int = 3
     trending_top_percent: int = 100
+    explorer_list_page_size: int = 20
     event_color_bar_color: str = "#64748b"
     tag_sort_mode: str = "group"  # "group" | "event_count"
     default_explorer_period: DefaultExplorerPeriod = "next_3_months"
@@ -1623,6 +1624,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     trending_floor_going: Optional[int] = Field(default=None, ge=0, le=1000)
     trending_top_n: Optional[int] = Field(default=None, ge=1, le=50)
     trending_top_percent: Optional[int] = Field(default=None, ge=1, le=100)
+    explorer_list_page_size: Optional[int] = Field(default=None, ge=1, le=100)
     event_color_bar_color: Optional[str] = Field(
         default=None, pattern="^#[0-9a-fA-F]{6}$"
     )

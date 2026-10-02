@@ -2091,3 +2091,283 @@ attendances:
     email: picks@joinmovida.com
     share_publicly: true
     share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: alex.navarro@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: amira.haddad@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: camille.laurent@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: leila.bauer@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: mateo.vega@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: operations@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: penny.valdez@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: rave.republic@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: alex.navarro@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: amira.haddad@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: camille.laurent@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: leila.bauer@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: mateo.vega@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: penny.valdez@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: rave.republic@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: alex.navarro@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: amira.haddad@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: camille.laurent@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: leila.bauer@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: sea.sun.salsa@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: elena.moreau@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: leo.martin@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: ines.lopez@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: zara.benali@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: clara.dubois@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: mina.silva@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: theo.novak@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: ana.garcia@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: sea.sun.salsa@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: alex.navarro@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: penny.valdez@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: pablo.rossi@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: nina.khan@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: samir.ivanov@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: victor.schmidt@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: sofia.torres@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: sea.sun.salsa@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: leo.martin@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: ines.lopez@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: clara.dubois@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: jonas.meyer@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: mina.silva@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: theo.novak@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+    email: camille.laurent@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: sea.sun.salsa@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: elena.moreau@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: zara.benali@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: omar.costa@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: rita.petrov@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: ivo.diallo@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: nadia.fischer@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: bruno.santos@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: ana.garcia@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: leila.bauer@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: sea.sun.salsa@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: picks@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: clara.dubois@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: mina.silva@joinmovida.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: mateo.vega@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: amira.haddad@joinmovida.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: camille.laurent@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: leila.bauer@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: alex.navarro@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: penny.valdez@joinmovida.com
+    share_publicly: true
+    share_audience: friends

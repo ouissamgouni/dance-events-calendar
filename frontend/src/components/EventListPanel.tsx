@@ -175,11 +175,6 @@ const formatRailWeekday = (d: Date) =>
 const formatRailMonth = (d: Date) =>
     d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
 
-/** Initial number of events to render before the user taps Show more. */
-const INITIAL_VISIBLE = 10;
-/** How many additional events each Show more click reveals. */
-const SHOW_MORE_INCREMENT = 10;
-
 
 export function EventListCard({
     event,
@@ -443,7 +438,7 @@ export default function EventListPanel({
 }: EventListPanelProps) {
     const { user } = useAuth();
     const { isSaved } = useSavedEvents();
-    const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
+    const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerListPageSize: pageSize } = useFeatureFlags();
     const location = useLocation();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -461,7 +456,7 @@ export default function EventListPanel({
     // Progressive disclosure cap so the landing page doesn't dump hundreds
     // of events on first paint. Resets whenever the underlying ``events``
     // array identity changes (new filter / period / refetch).
-    const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+    const [visibleCount, setVisibleCount] = useState(pageSize);
     useEffect(() => {
         if (pendingExtendVisibleCountRef.current > 0) {
             const increment = pendingExtendVisibleCountRef.current;
@@ -469,8 +464,8 @@ export default function EventListPanel({
             setVisibleCount((current) => current + increment);
             return;
         }
-        setVisibleCount(INITIAL_VISIBLE);
-    }, [events]);
+        setVisibleCount(pageSize);
+    }, [events, pageSize]);
 
     const updateFade = useCallback(() => {
         const el = scrollRef.current;
@@ -623,7 +618,7 @@ export default function EventListPanel({
     const canRevealFutureEvents = !!onExtendPeriod && (nextPeriodEventCount ?? 0) > 0;
     const showAnonymousMoreEventsGate = gateMoreEventsForAnonymous
         && !user
-        && cappedVisible >= Math.min(INITIAL_VISIBLE, totalCount)
+        && cappedVisible >= Math.min(pageSize, totalCount)
         && (remainingInPeriod > 0 || canRevealFutureEvents);
     const hiddenEventCount = remainingInPeriod > 0
         ? remainingInPeriod
@@ -812,11 +807,11 @@ export default function EventListPanel({
                                 <div className="px-3 py-3 text-center">
                                     <button
                                         type="button"
-                                        onClick={() => setVisibleCount((n) => n + SHOW_MORE_INCREMENT)}
+                                        onClick={() => setVisibleCount((n) => n + pageSize)}
                                         className="inline-flex items-center justify-center border border-line bg-surface hover:bg-canvas text-ink text-xs font-semibold px-3 py-2 transition"
                                         data-testid="event-list-show-more"
                                     >
-                                        + {Math.min(SHOW_MORE_INCREMENT, remainingInPeriod)} more
+                                        + {Math.min(pageSize, remainingInPeriod)} more
                                     </button>
                                 </div>
                             )}

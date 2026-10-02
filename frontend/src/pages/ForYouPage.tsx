@@ -39,7 +39,7 @@ export function TribeGoingEmptyState({ followingCount }: { followingCount: numbe
         <>
             <p className="mb-2">Follow people to see where your tribe is going.</p>
             <Link
-                to="/tribe/people"
+                to="/tribe/network"
                 className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
                 Build your tribe

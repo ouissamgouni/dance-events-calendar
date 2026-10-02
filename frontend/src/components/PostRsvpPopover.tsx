@@ -2,7 +2,6 @@ import { type RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SquareArrowOutUpRight } from 'lucide-react';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
-import { ATTENDANCE_AUDIENCE_DESCRIPTIONS } from '../utils/audiencePreference';
 import type { ShareAudience } from '../api';
 
 export type PostRsvpVariant = 'anon' | 'signed-in-default-share' | 'signed-in';
@@ -46,18 +45,17 @@ export default function PostRsvpPopover({
     return (
         <RsvpVisibilitySheet
             anchorRef={anchorRef}
+            kind="going"
             emoji="🎉"
             title={isPast ? 'You attended!' : "You're going!"}
             subtitle={eventTitle}
-            question="Who can see you in the attendee list?"
             audience={showPicker ? audience : undefined}
             onAudienceChange={showPicker ? onAudienceChange : undefined}
-            pickerAriaLabel="Attendance visibility"
-            description={audience ? ATTENDANCE_AUDIENCE_DESCRIPTIONS[audience] : undefined}
+            pickerAriaLabel="Who can see you in the attendee list?"
             secondaryAction={{
                 label: 'Share event',
                 onClick: onShare,
-                icon: <SquareArrowOutUpRight aria-hidden className="h-5 w-5" strokeWidth={1.8} />,
+                icon: <SquareArrowOutUpRight aria-hidden className="h-4 w-4" strokeWidth={1.8} />,
             }}
             primaryAction={isAnon ? { label: 'Sign in', to: `/login?next=${next}` } : undefined}
             onClose={onClose}

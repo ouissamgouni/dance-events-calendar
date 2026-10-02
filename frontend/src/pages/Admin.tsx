@@ -230,6 +230,7 @@ export default function Admin() {
     const [trendingFloorGoing, setTrendingFloorGoing] = useState(3);
     const [trendingTopN, setTrendingTopN] = useState(3);
     const [trendingTopPercent, setTrendingTopPercent] = useState(100);
+    const [explorerListPageSize, setExplorerListPageSize] = useState(20);
     const [showPendingEvents, setShowPendingEvents] = useState(false);
     const [promoCodesEnabled, setPromoCodesEnabled] = useState(false);
     const [organizerClaimsEnabled, setOrganizerClaimsEnabled] = useState(false);
@@ -425,6 +426,7 @@ export default function Admin() {
             setTrendingFloorGoing(s.trending_floor_going ?? 3);
             setTrendingTopN(s.trending_top_n ?? 3);
             setTrendingTopPercent(s.trending_top_percent ?? 100);
+            setExplorerListPageSize(s.explorer_list_page_size ?? 20);
             setShowPendingEvents(s.show_pending_events ?? false);
             setPromoCodesEnabled(s.promo_codes_enabled ?? false);
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
@@ -1114,6 +1116,16 @@ export default function Admin() {
             await updateSettings({ trending_top_percent: value });
         } catch {
             setMessage('Failed to update trending top percent.');
+        }
+    };
+
+    const handleExplorerListPageSizeChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 100) return;
+        setExplorerListPageSize(value);
+        try {
+            await updateSettings({ explorer_list_page_size: value });
+        } catch {
+            setMessage('Failed to update browse list page size.');
         }
     };
 
@@ -2121,6 +2133,23 @@ export default function Admin() {
                                             <option key={choice.key} value={choice.key}>{choice.label}</option>
                                         ))}
                                     </select>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-card-line">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Browse list page size</span>
+                                        <p className="text-[10px] text-muted">Cards shown before &ldquo;+ N more&rdquo; (and per click)</p>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={100}
+                                        value={explorerListPageSize}
+                                        onChange={(e) => setExplorerListPageSize(Number(e.target.value))}
+                                        onBlur={(e) => handleExplorerListPageSizeChange(Number(e.target.value))}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleExplorerListPageSizeChange(explorerListPageSize)}
+                                        className="w-16 text-right text-[11px] border border-line px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-action"
+                                        data-testid="admin-explorer-list-page-size"
+                                    />
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-card-line">
                                     <div>

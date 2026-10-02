@@ -140,17 +140,12 @@ function AppShell() {
   const isMyEvents = location.pathname === '/my-events' || location.pathname === '/mine/calendar';
   const isProgram = /^\/event\/[^/]+\/program/.test(location.pathname);
 
-  // Full-screen flows (auth, onboarding) and leaf detail pages (event/series,
-  // admin, notifications, shared views) suppress the primary bottom nav.
+  // Full-screen flows (auth, onboarding), admin and shared views suppress the primary bottom nav.
   const hideBottomNav =
     location.pathname === '/login' ||
     location.pathname.startsWith('/onboarding/') ||
-    location.pathname.startsWith('/event/') ||
-    location.pathname.startsWith('/series/') ||
     location.pathname.startsWith('/admin') ||
-    location.pathname.startsWith('/notifications') ||
-    location.pathname.startsWith('/shared/') ||
-    location.pathname === '/account';
+    location.pathname.startsWith('/shared/');
 
   useEffect(() => {
     if (analyticsConsent) umamiPageView();

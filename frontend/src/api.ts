@@ -594,6 +594,7 @@ export interface SiteSettings {
     trending_floor_going?: number;
     trending_top_n?: number;
     trending_top_percent?: number;
+    explorer_list_page_size?: number;
     event_color_bar_color: string;
     tag_sort_mode: 'group' | 'event_count';
     default_explorer_period?: DateRangePresetKey;
@@ -3734,6 +3735,7 @@ export async function createShareToken(deviceId: string): Promise<{ token: strin
     const res = await fetch(`${BASE}/share/calendar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ device_id: deviceId }),
     });
     if (!res.ok) throw new Error('Failed to create share token');
