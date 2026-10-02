@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { EventDetailTab } from './EventSummary';
 
 interface TabDef {
@@ -31,9 +32,23 @@ interface Props {
  * tabs together.
  */
 export default function EventDetailTabsBar({ active, onSelect, variant = 'section', showProgram = false }: Props) {
+    const listRef = useRef<HTMLDivElement>(null);
+
+    // Keep the active tab visible in the horizontal scroller (e.g. Discussion opened from a link).
+    useEffect(() => {
+        const list = listRef.current;
+        const btn = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+        if (!list || !btn) return;
+        const left = btn.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft;
+        const right = left + btn.offsetWidth;
+        if (left < list.scrollLeft) list.scrollTo({ left });
+        else if (right > list.scrollLeft + list.clientWidth) list.scrollTo({ left: right - list.clientWidth });
+    }, [active, showProgram]);
+
     return (
         <div className={`bg-surface ${variant === 'entry' ? 'border-y border-line' : 'border-b border-line'}`}>
             <div
+                ref={listRef}
                 role="tablist"
                 aria-label="Event details"
                 className="flex flex-nowrap gap-1 overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
