@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import useBackToClose from '../hooks/useBackToClose';
 import { CalendarDays, CalendarPlus, FileSpreadsheet, Share2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { createShareToken, exportIcs, exportXlsx, getShareToken, getCalendarFeedUrl, getAppShareUrl } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { getDeviceId } from '../utils/deviceId';
 import ShareLinkRow from './ShareLinkRow';
 import type { MyEventsTab } from '../utils/myEvents';
@@ -30,11 +32,15 @@ const TAB_LABELS: Record<MyEventsTab, string> = {
 };
 
 export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUtilityMenuProps) {
+    const { user } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState('');
     const [status, setStatus] = useState('');
     const [existingToken, setExistingToken] = useState<string | null>(null);
     const [tokenLoading, setTokenLoading] = useState(false);
+    const [expanded, setExpanded] = useState<'share' | 'feed' | null>(null);
     useBackToClose(() => setOpen(false), open);
 
     useEffect(() => {
@@ -53,7 +59,7 @@ export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUti
 
     // Try to fetch existing token when sheet opens
     useEffect(() => {
-        if (!open) return;
+        if (!open || !user) return;
         const loadToken = async () => {
             setTokenLoading(true);
             try {
@@ -67,7 +73,12 @@ export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUti
             }
         };
         loadToken();
-    }, [open]);
+    }, [open, user]);
+
+    const goToSignIn = () => {
+        setOpen(false);
+        navigate(`/login?next=${encodeURIComponent(location.pathname + location.search)}`);
+    };
 
     const runDownload = async (kind: 'ics' | 'xlsx') => {
         if (eventIds.length === 0) return;
@@ -85,6 +96,8 @@ export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUti
     };
 
     const createAndShare = async () => {
+        if (!user) return goToSignIn();
+        setExpanded('share');
         setBusy('share');
         setStatus('');
         try {
@@ -105,6 +118,8 @@ export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUti
     };
 
     const createAndSubscribe = async () => {
+        if (!user) return goToSignIn();
+        setExpanded('feed');
         setBusy('feed');
         setStatus('');
         try {
@@ -128,7 +143,7 @@ export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUti
         <>
             <button
                 type="button"
-                onClick={() => { setStatus(''); setOpen(true); }}
+                onClick={() => { setStatus(''); setExpanded(null); setOpen(true); }}
                 aria-label="Share and export My Events"
                 aria-expanded={open}
                 className="inline-flex h-10 w-10 items-center justify-center text-ink hover:text-action"
@@ -142,100 +157,104 @@ export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUti
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="my-events-share-title"
-                        className="relative z-10 mx-auto max-h-[88dvh] w-full max-w-xl overflow-y-auto rounded-t-card bg-surface px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2 shadow-2xl"
+                        className="relative z-10 mx-auto flex max-h-[88dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-card bg-surface shadow-2xl"
                     >
-                        <div className="mx-auto mb-2 h-1 w-14 rounded-full bg-line" aria-hidden="true" />
-                        <div className="flex items-center justify-between py-2">
-                            <h2 id="my-events-share-title" className="text-xl font-bold text-ink">
-                                Share &amp; export: <span className="text-action">{tabLabel}</span>
-                            </h2>
-                            <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-canvas text-ink hover:text-action">
-                                <X className="h-6 w-6" aria-hidden="true" />
-                            </button>
+                        <div className="shrink-0 px-4 pt-2">
+                            <div className="mx-auto mb-2 h-1 w-14 rounded-full bg-line" aria-hidden="true" />
+                            <div className="flex items-center justify-between py-2">
+                                <h2 id="my-events-share-title" className="text-xl font-bold text-ink">
+                                    Share &amp; export: <span className="text-action">{tabLabel}</span>
+                                </h2>
+                                <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-canvas text-ink hover:text-action">
+                                    <X className="h-6 w-6" aria-hidden="true" />
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="mt-2 overflow-hidden rounded-card border border-line">
-                            <button type="button" onClick={createAndShare} disabled={!!busy} className={rowClass}>
-                                <span className={`${iconClass} bg-blue-50 text-action`}><Share2 className="h-6 w-6" aria-hidden="true" /></span>
-                                <span>
-                                    <span className="block text-base font-semibold text-ink">Share My Events</span>
-                                    <span className="mt-1 block text-sm text-ink-soft">Send a Movida link to your calendar</span>
-                                </span>
-                            </button>
-                            {existingToken && !tokenLoading && (
-                                <div className="border-t border-line p-3">
-                                    <ShareLinkRow
-                                        url={getAppShareUrl(existingToken, activeTab)}
-                                        onCopyClick={async () => {
-                                            await navigator.clipboard.writeText(getAppShareUrl(existingToken, activeTab));
-                                        }}
-                                        onShareClick={
-                                            navigator.share
-                                                ? async () => {
-                                                    await navigator.share({
-                                                        title: 'My Movida Calendar',
-                                                        url: getAppShareUrl(existingToken, activeTab),
-                                                    });
-                                                }
-                                                : undefined
-                                        }
-                                        isBusy={!!busy}
-                                        disabled={!!busy}
-                                    />
-                                </div>
-                            )}
-                            <button type="button" onClick={createAndSubscribe} disabled={!!busy} className={`${rowClass} border-t border-line`}>
-                                <span className={iconClass}><CalendarPlus className="h-6 w-6" aria-hidden="true" /></span>
-                                <span>
-                                    <span className="block text-base font-semibold text-ink">Subscribe in another calendar</span>
-                                    <span className="mt-1 block text-sm text-ink-soft">Keep your Movida events synced with your calendar. Copy the link and add it using Subscribe or Add from URL.</span>
-                                </span>
-                            </button>
-                            {existingToken && !tokenLoading && (
-                                <div className="border-t border-line p-3">
-                                    <ShareLinkRow
-                                        url={getCalendarFeedUrl(existingToken, activeTab)}
-                                        onCopyClick={async () => {
-                                            await navigator.clipboard.writeText(getCalendarFeedUrl(existingToken, activeTab));
-                                        }}
-                                        onShareClick={
-                                            navigator.share
-                                                ? async () => {
-                                                    await navigator.share({
-                                                        title: 'My Movida Calendar Feed',
-                                                        url: getCalendarFeedUrl(existingToken, activeTab),
-                                                    });
-                                                }
-                                                : undefined
-                                        }
-                                        isBusy={!!busy}
-                                        disabled={!!busy}
-                                    />
-                                </div>
-                            )}
+                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+                            <div className="mt-2 overflow-hidden rounded-card border border-line">
+                                <button type="button" onClick={createAndShare} disabled={!!busy} className={rowClass}>
+                                    <span className={`${iconClass} bg-blue-50 text-action`}><Share2 className="h-6 w-6" aria-hidden="true" /></span>
+                                    <span>
+                                        <span className="block text-base font-semibold text-ink">Share My Events</span>
+                                        <span className="mt-1 block text-sm text-ink-soft">{user ? 'Send a Movida link to your calendar' : 'Sign in to share your events'}</span>
+                                    </span>
+                                </button>
+                                {expanded === 'share' && existingToken && !tokenLoading && (
+                                    <div className="border-t border-line p-3">
+                                        <ShareLinkRow
+                                            url={getAppShareUrl(existingToken, activeTab)}
+                                            onCopyClick={async () => {
+                                                await navigator.clipboard.writeText(getAppShareUrl(existingToken, activeTab));
+                                            }}
+                                            onShareClick={
+                                                navigator.share
+                                                    ? async () => {
+                                                        await navigator.share({
+                                                            title: 'My Movida Calendar',
+                                                            url: getAppShareUrl(existingToken, activeTab),
+                                                        });
+                                                    }
+                                                    : undefined
+                                            }
+                                            isBusy={!!busy}
+                                            disabled={!!busy}
+                                        />
+                                    </div>
+                                )}
+                                <button type="button" onClick={createAndSubscribe} disabled={!!busy} className={`${rowClass} border-t border-line`}>
+                                    <span className={iconClass}><CalendarPlus className="h-6 w-6" aria-hidden="true" /></span>
+                                    <span>
+                                        <span className="block text-base font-semibold text-ink">Subscribe in another calendar</span>
+                                        <span className="mt-1 block text-sm text-ink-soft">{user ? 'Keep your Movida events synced with your calendar. Copy the link and add it using Subscribe or Add from URL.' : 'Sign in to get a live calendar link'}</span>
+                                    </span>
+                                </button>
+                                {expanded === 'feed' && existingToken && !tokenLoading && (
+                                    <div className="border-t border-line p-3">
+                                        <ShareLinkRow
+                                            url={getCalendarFeedUrl(existingToken, activeTab)}
+                                            onCopyClick={async () => {
+                                                await navigator.clipboard.writeText(getCalendarFeedUrl(existingToken, activeTab));
+                                            }}
+                                            onShareClick={
+                                                navigator.share
+                                                    ? async () => {
+                                                        await navigator.share({
+                                                            title: 'My Movida Calendar Feed',
+                                                            url: getCalendarFeedUrl(existingToken, activeTab),
+                                                        });
+                                                    }
+                                                    : undefined
+                                            }
+                                            isBusy={!!busy}
+                                            disabled={!!busy}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <h3 className="mb-3 mt-6 text-base font-semibold text-ink">Export</h3>
+                            <div className="overflow-hidden rounded-card border border-line">
+                                <button type="button" onClick={() => runDownload('ics')} disabled={!!busy || eventIds.length === 0} className={rowClass}>
+                                    <span className={iconClass}><CalendarDays className="h-6 w-6" aria-hidden="true" /></span>
+                                    <span>
+                                        <span className="block text-base font-semibold text-ink">Export calendar (.ics)</span>
+                                        <span className="mt-1 block text-sm text-ink-soft">Download for calendar apps</span>
+                                    </span>
+                                </button>
+                                <button type="button" onClick={() => runDownload('xlsx')} disabled={!!busy || eventIds.length === 0} className={`${rowClass} border-t border-line`}>
+                                    <span className={iconClass}><FileSpreadsheet className="h-6 w-6" aria-hidden="true" /></span>
+                                    <span>
+                                        <span className="block text-base font-semibold text-ink">Export spreadsheet (.xlsx)</span>
+                                        <span className="mt-1 block text-sm text-ink-soft">Download your events as a spreadsheet</span>
+                                    </span>
+                                </button>
+                            </div>
+
+
+                            {status && <p className="mt-4 text-sm text-ink-soft" role="status">{status}</p>}
+                            {busy && <p className="mt-2 text-sm text-muted">Working…</p>}
                         </div>
-
-                        <h3 className="mb-3 mt-6 text-base font-semibold text-ink">Export</h3>
-                        <div className="overflow-hidden rounded-card border border-line">
-                            <button type="button" onClick={() => runDownload('ics')} disabled={!!busy || eventIds.length === 0} className={rowClass}>
-                                <span className={iconClass}><CalendarDays className="h-6 w-6" aria-hidden="true" /></span>
-                                <span>
-                                    <span className="block text-base font-semibold text-ink">Export calendar (.ics)</span>
-                                    <span className="mt-1 block text-sm text-ink-soft">Download for calendar apps</span>
-                                </span>
-                            </button>
-                            <button type="button" onClick={() => runDownload('xlsx')} disabled={!!busy || eventIds.length === 0} className={`${rowClass} border-t border-line`}>
-                                <span className={iconClass}><FileSpreadsheet className="h-6 w-6" aria-hidden="true" /></span>
-                                <span>
-                                    <span className="block text-base font-semibold text-ink">Export spreadsheet (.xlsx)</span>
-                                    <span className="mt-1 block text-sm text-ink-soft">Download your events as a spreadsheet</span>
-                                </span>
-                            </button>
-                        </div>
-
-
-                        {status && <p className="mt-4 text-sm text-ink-soft" role="status">{status}</p>}
-                        {busy && <p className="mt-2 text-sm text-muted">Working…</p>}
                     </section>
                 </div>,
                 document.body,

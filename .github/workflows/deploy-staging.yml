@@ -63,10 +63,9 @@ jobs:
         run: npm install -g npm@11.6.2
 
       - name: Install Task
-        uses: arduino/setup-task@v2
-        with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sh -c "$(curl --location --fail https://taskfile.dev/install.sh)" -- -d -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install Fly CLI
         run: |

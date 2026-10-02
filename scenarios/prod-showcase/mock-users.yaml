@@ -153,7 +153,7 @@ users:
     account_visibility: public
     share_attendance_default: true
     share_attendance_default_audience: private
-    avatar: uifaces-human-avatar (24).jpg
+    avatar: mina.png
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Mina%20Silva
   - email: theo.novak@joinmovida.com
     name: Theo Novak

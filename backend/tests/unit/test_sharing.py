@@ -3,19 +3,24 @@
 import pytest
 from unittest.mock import MagicMock
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from backend.api.deps import get_current_user_optional
 from backend.api.main import app
 from backend.db.database import get_session
 from backend.db.models import (
     CachedEvent,
     CalendarSetting,
     ShareToken,
+    User,
     UserSavedEvent,
     UserEventAttendance,
 )
+
+OWNER_ID = UUID("11111111-1111-1111-1111-111111111111")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -34,6 +39,7 @@ def _mock_session():
 
     session.add.side_effect = mock_add
     session.delete.side_effect = mock_delete
+    session.get.return_value = None
     return session
 
 
@@ -66,11 +72,12 @@ def _sample_calendar(**overrides):
     return CalendarSetting(**defaults)
 
 
-def _sample_share_token(token="test-token-uuid", device_id="dev-abc"):
+def _sample_share_token(token="test-token-uuid", device_id="dev-abc", user_id=OWNER_ID):
     return ShareToken(
         id=1,
         token=token,
         device_id=device_id,
+        user_id=user_id,
         created_at=datetime(2026, 4, 29, 12, 0),
     )
 
@@ -95,15 +102,32 @@ def client():
     app.dependency_overrides.clear()
 
 
+@pytest.fixture
+def authed_client(client):
+    app.dependency_overrides[get_current_user_optional] = lambda: User(
+        id=OWNER_ID, email="owner@example.com"
+    )
+    return client
+
+
 # ── POST /api/share/calendar ──────────────────────────────────────────────────
 
 
 @pytest.mark.unit
 class TestCreateShareToken:
-    def test_creates_token_for_new_device(self, client):
+    def test_anonymous_request_is_rejected(self, client):
         c, session = client
+        app.dependency_overrides[get_current_user_optional] = lambda: None
 
-        # No existing token for this device
+        resp = c.post("/api/share/calendar", json={"device_id": "dev-new"})
+
+        assert resp.status_code == 401
+        assert not [o for o in session._added if isinstance(o, ShareToken)]
+
+    def test_creates_token_for_new_user(self, authed_client):
+        c, session = authed_client
+
+        # No existing token for this user or device
         def mock_exec(stmt):
             result = MagicMock()
             result.first.return_value = None
@@ -122,10 +146,11 @@ class TestCreateShareToken:
         added_tokens = [o for o in session._added if isinstance(o, ShareToken)]
         assert len(added_tokens) == 1
         assert added_tokens[0].device_id == "dev-new"
+        assert added_tokens[0].user_id == OWNER_ID
         session.commit.assert_called_once()
 
-    def test_returns_existing_token_for_known_device(self, client):
-        c, session = client
+    def test_returns_existing_token_for_user(self, authed_client):
+        c, session = authed_client
         existing = _sample_share_token(token="existing-uuid", device_id="dev-abc")
 
         def mock_exec(stmt):
@@ -144,18 +169,18 @@ class TestCreateShareToken:
         added_tokens = [o for o in session._added if isinstance(o, ShareToken)]
         assert len(added_tokens) == 0
 
-    def test_device_id_required(self, client):
-        c, _ = client
+    def test_device_id_required(self, authed_client):
+        c, _ = authed_client
         resp = c.post("/api/share/calendar", json={})
         assert resp.status_code == 422
 
-    def test_device_id_too_long(self, client):
-        c, _ = client
+    def test_device_id_too_long(self, authed_client):
+        c, _ = authed_client
         resp = c.post("/api/share/calendar", json={"device_id": "x" * 65})
         assert resp.status_code == 422
 
-    def test_device_id_empty_string(self, client):
-        c, _ = client
+    def test_device_id_empty_string(self, authed_client):
+        c, _ = authed_client
         resp = c.post("/api/share/calendar", json={"device_id": ""})
         assert resp.status_code == 422
 
@@ -336,6 +361,13 @@ class TestCalendarFeed:
 
         resp = c.get("/api/share/calendar/bad-token.ics")
         assert resp.status_code == 404
+
+    def test_unlinked_device_token_returns_404(self, client):
+        c, session = client
+        _feed_mock(session, share=_sample_share_token(user_id=None))
+
+        assert c.get("/api/share/calendar/test-token-uuid.ics").status_code == 404
+        assert c.get("/api/share/calendar/test-token-uuid").status_code == 404
 
     def test_going_scope_returns_calendar(self, client):
         c, session = client
