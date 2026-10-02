@@ -70,7 +70,11 @@ vi.mock('../components/EventMap', () => ({
 // Mock all the other components to avoid rendering the full page
 vi.mock('../components/EventListPanel', () => ({ default: () => <div /> }));
 vi.mock('../components/FilterSheet', () => ({ default: () => <div /> }));
-vi.mock('../components/SummaryBar', () => ({ default: () => <div /> }));
+vi.mock('../components/SummaryBar', () => ({
+    default: ({ onClearArea }: { onClearArea?: () => void }) => (
+        <button type="button" onClick={onClearArea}>Clear area</button>
+    ),
+}));
 vi.mock('../pages/Calendar', () => ({ default: () => <div /> }));
 vi.mock('../components/EventDetail', () => ({ default: () => <div /> }));
 vi.mock('../components/suggest/SuggestEventWizard', () => ({ default: () => <div /> }));
@@ -271,5 +275,24 @@ describe('Home — mobile map mount with applied area', () => {
             expect(location.startsWith('/browse?')).toBe(true);
             expect(new URLSearchParams(location.split('?')[1]).get('view')).toBe('map');
         });
+    });
+
+    it('scrolls back to top when a filter changes on Browse', async () => {
+        const user = userEvent.setup();
+        const scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => { });
+        render(
+            <TestProviders initialEntries={['/browse']}>
+                <Home />
+            </TestProviders>,
+        );
+
+        const [clearArea] = await screen.findAllByRole('button', { name: 'Clear area' });
+        scrollSpy.mockClear();
+        await user.click(clearArea);
+
+        await waitFor(() => {
+            expect(scrollSpy).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
+        });
+        scrollSpy.mockRestore();
     });
 });

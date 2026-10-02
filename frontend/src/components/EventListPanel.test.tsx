@@ -77,3 +77,27 @@ describe('EventListPanel page size', () => {
         expect(screen.getByTestId('event-list-more-events-gate')).toBeInTheDocument();
     });
 });
+
+describe('EventListPanel scrollResetKey', () => {
+    it('scrolls the list back to top when the key changes', () => {
+        authState.user = { id: 'u1' };
+        const props = {
+            events: makeEvents(3),
+            mapBounds: null,
+            onEventClick: () => { },
+            showPrices: false,
+            showPopularity: false,
+            sortBy: 'date' as const,
+            onSortChange: () => { },
+        };
+        const { container, rerender } = render(
+            <MemoryRouter><EventListPanel {...props} scrollResetKey="a" /></MemoryRouter>,
+        );
+        const scroller = container.querySelector('.event-list-scroll') as HTMLDivElement;
+        scroller.scrollTop = 200;
+        rerender(<MemoryRouter><EventListPanel {...props} scrollResetKey="a" /></MemoryRouter>);
+        expect(scroller.scrollTop).toBe(200);
+        rerender(<MemoryRouter><EventListPanel {...props} scrollResetKey="b" /></MemoryRouter>);
+        expect(scroller.scrollTop).toBe(0);
+    });
+});

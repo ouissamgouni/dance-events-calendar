@@ -266,7 +266,6 @@ def load_showcase_config(output_dir: Path) -> dict:
     production = config.get("production") or {}
     required_ids = production.get("required_ids") or []
     required_series_ids = production.get("required_series_ids") or []
-    synthetic_counts = config.get("synthetic_counts") or {}
     if not required_ids:
         raise ValueError("showcase.yaml production.required_ids must not be empty")
     if not all(isinstance(event_id, str) and event_id for event_id in required_ids):
@@ -275,46 +274,10 @@ def load_showcase_config(output_dir: Path) -> dict:
         raise ValueError(
             "showcase.yaml production.required_series_ids must contain integers"
         )
-    allowed_counts = {"events", "series", "ratings", "messages"}
-    unknown_counts = sorted(set(synthetic_counts) - allowed_counts)
-    if unknown_counts:
-        raise ValueError(
-            "showcase.yaml synthetic_counts has unknown keys: "
-            + ", ".join(unknown_counts)
-        )
-    if set(synthetic_counts) != allowed_counts or not all(
-        isinstance(count, int) and count >= 0 for count in synthetic_counts.values()
-    ):
-        raise ValueError(
-            "showcase.yaml synthetic_counts must define non-negative integer "
-            "events, series, ratings, and messages"
-        )
     return {
         "required_ids": list(dict.fromkeys(required_ids)),
         "required_series_ids": list(dict.fromkeys(required_series_ids)),
-        "synthetic_counts": synthetic_counts,
     }
-
-
-def validate_synthetic_counts(output_dir: Path, expected: dict[str, int]) -> None:
-    with (output_dir / "overlay-events.yaml").open(encoding="utf-8") as file:
-        overlay = yaml.safe_load(file) or {}
-    messages_path = output_dir / "db-messages.yaml"
-    with messages_path.open(encoding="utf-8") as file:
-        messages = yaml.safe_load(file) or {}
-    actual = {
-        "events": len(overlay.get("events") or []),
-        "series": len(overlay.get("event_series") or []),
-        "ratings": len(overlay.get("ratings") or []),
-        "messages": len(messages.get("messages") or []),
-    }
-    mismatches = [
-        f"{key}: expected {expected[key]}, found {actual[key]}"
-        for key in sorted(expected)
-        if expected[key] != actual[key]
-    ]
-    if mismatches:
-        raise ValueError("Synthetic showcase counts changed: " + "; ".join(mismatches))
 
 
 def merge_synthetic_overlay(
@@ -632,10 +595,7 @@ def write_snapshot(
     tag_doc: dict,
     event_doc: dict,
     manifest: dict,
-    *,
-    synthetic_counts: dict[str, int],
 ) -> None:
-    validate_synthetic_counts(output_dir, synthetic_counts)
     calendar_doc, event_doc = merge_synthetic_overlay(
         output_dir,
         calendar_doc,
@@ -707,7 +667,6 @@ def main() -> None:
     write_snapshot(
         output_dir,
         *documents,
-        synthetic_counts=config["synthetic_counts"],
     )
     logger.info(
         "Refreshed %s: %d events",

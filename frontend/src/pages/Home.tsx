@@ -648,6 +648,28 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         }),
         [interestUserHandles, followingIndex],
     );
+    const filterScrollKey = useMemo(() => JSON.stringify([
+        [...activeTagIds].sort((a, b) => a - b),
+        reachFilter,
+        discountOnly,
+        interestSource,
+        interestKind,
+        interestUserHandles,
+        interestMatch,
+        startDate,
+        endDate,
+        areaSessionOverride,
+    ]), [activeTagIds, reachFilter, discountOnly, interestSource, interestKind, interestUserHandles, interestMatch, startDate, endDate, areaSessionOverride]);
+    const rootRef = useRef<HTMLDivElement>(null);
+    const prevFilterScrollKeyRef = useRef(filterScrollKey);
+    useEffect(() => {
+        if (prevFilterScrollKeyRef.current === filterScrollKey) return;
+        prevFilterScrollKeyRef.current = filterScrollKey;
+        if (viewMode !== 'explorer') return;
+        // Mobile list scrolls with App's <main>, not this page's own <main>.
+        rootRef.current?.closest('main')?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, [filterScrollKey, viewMode]);
     const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
     const [explorerPreviewHeight, setExplorerPreviewHeight] = useState(0);
     const [explorerPreviewCollapsed, setExplorerPreviewCollapsed] = useState(true);
@@ -1863,7 +1885,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     ) : undefined;
 
     return (
-        <div className="min-h-screen bg-[#f8fafc]">
+        <div ref={rootRef} className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
                 {loading && !initialLoadDone.current && (
                     <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted" role="status" aria-live="polite">
@@ -1915,6 +1937,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                             tagsAsBadge
                                             tribeCard={config.cardVariant === 'tribe'}
                                             headerSlot={trendingBanner}
+                                            scrollResetKey={filterScrollKey}
                                         />
                                     </div>
                                 </div>
@@ -2122,6 +2145,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                     tagsAsBadge
                                     tribeCard={config.cardVariant === 'tribe'}
                                     headerSlot={trendingBanner}
+                                    scrollResetKey={filterScrollKey}
                                 />
                             </div>
                         </div>
