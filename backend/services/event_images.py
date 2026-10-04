@@ -12,6 +12,7 @@ import logging
 import os
 import socket
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -37,6 +38,8 @@ FULL_MAX_WIDTH = 1200
 WEBP_CONTENT_TYPE = "image/webp"
 REMOTE_FETCH_TIMEOUT = 10.0
 REMOTE_MAX_REDIRECTS = 3
+SUGGESTION_IMAGE_PREFIX = "suggestions/"
+STAGED_IMAGE_MAX_AGE = timedelta(hours=24)
 
 
 def get_max_bytes() -> int:
@@ -141,9 +144,23 @@ def store_event_image(
     return key
 
 
-def delete_event_image(base_key: Optional[str], client=None) -> None:
-    if not base_key:
-        return
+def suggestion_image_prefix(user_id) -> str:
+    return f"{SUGGESTION_IMAGE_PREFIX}{user_id}/"
+
+
+def store_suggestion_image(
+    user_id, data: bytes, content_type: Optional[str] = None
+) -> str:
+    """Stage a submitter's picture before the suggestion exists."""
+    base_key = f"{suggestion_image_prefix(user_id)}{uuid.uuid4().hex}"
+    return store_event_image("", data, content_type, base_key=base_key)
+
+
+def suggestion_image_exists(base_key: str) -> bool:
+    return object_storage.object_exists(_thumb_key(base_key))
+
+
+def _delete_image_objects(base_key: str, client=None) -> None:
     client = client or object_storage.get_client()
     prefix = f"{base_key}/"
     object_storage.delete_prefix(
@@ -151,6 +168,71 @@ def delete_event_image(base_key: Optional[str], client=None) -> None:
     )
     object_storage.delete_prefix(
         prefix, object_storage.get_private_bucket(), client=client
+    )
+
+
+def delete_event_image(base_key: Optional[str], client=None) -> None:
+    # Submitted pictures are shared by every occurrence; the sweep reclaims them.
+    if not base_key or base_key.startswith(SUGGESTION_IMAGE_PREFIX):
+        return
+    _delete_image_objects(base_key, client=client)
+
+
+def sweep_suggestion_images(session, now: Optional[datetime] = None) -> int:
+    """Delete stale submitter pictures no suggestion or event references."""
+    from sqlmodel import col, select
+
+    from backend.db.models import CachedEvent, EventSuggestion
+
+    cutoff = (now or datetime.now(timezone.utc)) - STAGED_IMAGE_MAX_AGE
+    client = object_storage.get_client()
+    newest: dict[str, datetime] = {}
+    for key, modified in object_storage.list_objects(
+        SUGGESTION_IMAGE_PREFIX, object_storage.get_public_bucket(), client=client
+    ):
+        base_key = key.rsplit("/", 1)[0]
+        if base_key not in newest or modified > newest[base_key]:
+            newest[base_key] = modified
+
+    stale = {key for key, modified in newest.items() if modified < cutoff}
+    if not stale:
+        return 0
+    referenced = set(
+        session.exec(
+            select(EventSuggestion.image_key).where(
+                col(EventSuggestion.image_key).in_(stale)
+            )
+        ).all()
+    ) | set(
+        session.exec(
+            select(CachedEvent.image_key).where(col(CachedEvent.image_key).in_(stale))
+        ).all()
+    )
+    removed = 0
+    for base_key in stale - referenced:
+        _delete_image_objects(base_key, client=client)
+        removed += 1
+    return removed
+
+
+def run_sweep_once() -> dict:
+    from sqlmodel import Session
+
+    from backend.db.database import get_engine
+
+    with Session(get_engine()) as session:
+        return {"removed": sweep_suggestion_images(session)}
+
+
+def _is_blocked_address(raw: str) -> bool:
+    address = ipaddress.ip_address(raw)
+    return (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_reserved
+        or address.is_multicast
+        or address.is_unspecified
     )
 
 
@@ -162,16 +244,16 @@ def _assert_public_host(host: str) -> None:
         raise ImageValidationError("Could not resolve the image host") from exc
 
     for info in infos:
-        address = ipaddress.ip_address(info[4][0])
-        if (
-            address.is_private
-            or address.is_loopback
-            or address.is_link_local
-            or address.is_reserved
-            or address.is_multicast
-            or address.is_unspecified
-        ):
+        if _is_blocked_address(info[4][0]):
             raise ImageValidationError("Image URL must point to a public host")
+
+
+def _assert_public_peer(response: httpx.Response) -> None:
+    # DNS can answer differently at connect time than in _assert_public_host.
+    stream = response.extensions.get("network_stream")
+    peer = stream.get_extra_info("server_addr") if stream is not None else None
+    if not peer or _is_blocked_address(peer[0]):
+        raise ImageValidationError("Image URL must point to a public host")
 
 
 def _validate_remote_url(url: str) -> None:
@@ -194,6 +276,7 @@ def fetch_remote_image(url: str) -> tuple[bytes, str]:
             with httpx.stream(
                 "GET", current, timeout=REMOTE_FETCH_TIMEOUT, follow_redirects=False
             ) as response:
+                _assert_public_peer(response)
                 if response.is_redirect:
                     location = response.headers.get("location")
                     if not location:

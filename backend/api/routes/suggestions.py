@@ -2,19 +2,35 @@ import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from slowapi import Limiter
 from backend.api.rate_limit import client_ip
 from sqlmodel import Session, col, select
 
-from backend.api.deps import get_client_ip, get_current_user_optional, require_admin
+from backend.api.deps import (
+    get_client_ip,
+    get_current_user_optional,
+    require_admin,
+    require_user,
+)
 from backend.db.models import User
 from backend.api.schemas import (
+    EventImageFromUrlRequest,
     EventSuggestionCreate,
     EventSuggestionPublicResponse,
     EventSuggestionResponse,
     GeocodeSuggestion,
     SuggestionApproveRequest,
+    SuggestionImageResponse,
     SuggestionOccurrence,
     SuggestionOccurrencesResponse,
     SuggestionRejectRequest,
@@ -37,6 +53,8 @@ from backend.db.models import (
     UserSavedEvent,
 )
 from backend.services.email import send_suggestion_notification
+from backend.services import event_images
+from backend.services.image_processing import ImageValidationError
 from backend.services.geocoding import geocode_location
 from backend.services.ip_geolocation import geolocate_ip
 from backend.services.reach import sync_event_reach
@@ -129,6 +147,9 @@ def _upsert_occurrences_from_suggestion(
                 price_is_free=suggestion.price_is_free,
                 review_status=review_status,
             )
+            # Pending previews stay unpictured until a curator has seen the image.
+            if review_status == "reviewed":
+                cached_event.image_key = suggestion.image_key
         else:
             cached_event.calendar_id = calendar_id
             cached_event.title = suggestion.title
@@ -351,6 +372,15 @@ def submit_suggestion(
 
     client_ip = get_client_ip(request)
 
+    if body.image_key and (
+        current_user is None
+        or not body.image_key.startswith(
+            event_images.suggestion_image_prefix(current_user.id)
+        )
+        or not event_images.suggestion_image_exists(body.image_key)
+    ):
+        raise HTTPException(status_code=400, detail="Image is not valid")
+
     suggestion = EventSuggestion(
         title=body.title,
         description=body.description,
@@ -390,6 +420,7 @@ def submit_suggestion(
         auto_save=body.auto_save,
         creator_going=bool(body.going) and current_user is not None,
         creator_going_audience=body.going_audience if body.going else None,
+        image_key=body.image_key,
     )
 
     session.add(suggestion)
@@ -445,6 +476,44 @@ def submit_suggestion(
         id=suggestion.id,
         message="Thank you! Your suggestion is under review.",
     )
+
+
+def _suggestion_image_response(key: str) -> SuggestionImageResponse:
+    thumb_url, _ = event_images.image_urls(key)
+    return SuggestionImageResponse(image_key=key, image_thumb_url=thumb_url)
+
+
+@router.post("/api/suggestions/images", response_model=SuggestionImageResponse)
+@limiter.limit("20/hour")
+async def upload_suggestion_image(
+    request: Request,
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+):
+    """Stage a picture for a suggestion the user is about to submit."""
+    try:
+        key = event_images.store_suggestion_image(
+            user.id, await file.read(), file.content_type
+        )
+    except ImageValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _suggestion_image_response(key)
+
+
+@router.post("/api/suggestions/images/from-url", response_model=SuggestionImageResponse)
+@limiter.limit("20/hour")
+def import_suggestion_image(
+    request: Request,
+    body: EventImageFromUrlRequest,
+    user: User = Depends(require_user),
+):
+    """Stage a picture fetched from a public https URL."""
+    try:
+        data, content_type = event_images.fetch_remote_image(str(body.url))
+        key = event_images.store_suggestion_image(user.id, data, content_type)
+    except ImageValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _suggestion_image_response(key)
 
 
 @router.get("/api/suggestions/geocode", response_model=list[GeocodeSuggestion])
@@ -636,6 +705,12 @@ def approve_suggestion(
     )
     event_id = events[0].event_id
 
+    # Preview rows were created pending, without the picture.
+    for event in events:
+        if event.image_key is None and suggestion.image_key:
+            event.image_key = suggestion.image_key
+            session.add(event)
+
     # Create EventTags from suggested_tag_ids
     if suggestion.suggested_tag_ids:
         for event in events:
@@ -765,6 +840,8 @@ def reject_suggestion(
 
     suggestion.status = "rejected"
     suggestion.admin_notes = body.admin_notes or suggestion.admin_notes
+    # Unreferenced pictures are reclaimed by event_images.sweep_suggestion_images.
+    suggestion.image_key = None
     suggestion.reviewed_at = datetime.now(timezone.utc)
     suggestion.reviewed_by = admin.get("email")
     events = list(

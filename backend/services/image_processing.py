@@ -17,15 +17,22 @@ class ImageValidationError(ValueError):
 def load_image(data: bytes) -> Image.Image:
     try:
         image = Image.open(io.BytesIO(data))
-        image = ImageOps.exif_transpose(image)
-        image.load()
+    except Image.DecompressionBombError as exc:
+        raise ImageValidationError("Image resolution is too large") from exc
     except (UnidentifiedImageError, OSError) as exc:
         raise ImageValidationError("File is not a readable image") from exc
 
     if image.format and f"image/{image.format.lower()}" not in ALLOWED_CONTENT_TYPES:
         raise ImageValidationError("Only JPEG, PNG and WebP images are supported")
+    # Image.open only reads the header, so this rejects bombs before decoding.
     if image.width * image.height > MAX_SOURCE_PIXELS:
         raise ImageValidationError("Image resolution is too large")
+
+    try:
+        image = ImageOps.exif_transpose(image)
+        image.load()
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ImageValidationError("File is not a readable image") from exc
     return image
 
 

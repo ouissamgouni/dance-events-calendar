@@ -1717,6 +1717,11 @@ class EventImageFromUrlRequest(BaseModel):
     url: HttpUrl
 
 
+class SuggestionImageResponse(BaseModel):
+    image_key: str
+    image_thumb_url: str
+
+
 class EventUpdateRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -1831,6 +1836,7 @@ class EventSuggestionCreate(BaseModel):
     # authenticated submitter's Calendar tab via UserSavedEvent. Has no
     # effect for anonymous submissions.
     auto_save: bool = True
+    image_key: Optional[str] = Field(default=None, max_length=200)
 
     @model_validator(mode="after")
     def _check_recurrence(self) -> "EventSuggestionCreate":
@@ -1894,6 +1900,21 @@ class EventSuggestionResponse(BaseModel):
     created_at: datetime
     reviewed_at: Optional[datetime] = None
     reviewed_by: Optional[str] = None
+    image_key: Optional[str] = None
+    image_url: Optional[str] = None
+    image_thumb_url: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _resolve_image_urls(self) -> "EventSuggestionResponse":
+        from backend.services.event_images import image_urls
+        from backend.services.object_storage import ObjectStorageError
+
+        if self.image_key:
+            try:
+                self.image_thumb_url, self.image_url = image_urls(self.image_key)
+            except ObjectStorageError:
+                pass
+        return self
 
 
 class EventSuggestionPublicResponse(BaseModel):
@@ -1935,6 +1956,8 @@ class SuggestionUpdateRequest(BaseModel):
     end: Optional[datetime] = None
     all_day: Optional[bool] = None
     admin_notes: Optional[str] = None
+    # Admins may only clear the submitter's picture, never point it elsewhere.
+    image_key: None = None
 
 
 # --- Tags / Categorization ---

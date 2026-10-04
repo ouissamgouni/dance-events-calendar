@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Link as LinkIcon, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { Image as ImageIcon, Link as LinkIcon, Tag as TagIcon, Trash2 } from 'lucide-react';
 import type { TagGroup } from '../../types';
+import ImagePage from './ImagePage';
 import LinkPage from './LinkPage';
 import MoreTagsPage from './MoreTagsPage';
+import Row from './Row';
 import {
     chipCls,
     fieldErrorCls,
@@ -22,6 +24,8 @@ interface Props {
     danceGroup: TagGroup | null;
     reachGroup: TagGroup | null;
     otherGroups: TagGroup[];
+    /** Signed in and the event pictures flag is on. */
+    imagesAllowed: boolean;
     /** Lets the shell hide its header and footer while a sub-page is open. */
     onSubPageChange: (open: boolean) => void;
 }
@@ -36,9 +40,10 @@ export default function Step2Details({
     danceGroup,
     reachGroup,
     otherGroups,
+    imagesAllowed,
     onSubPageChange,
 }: Props) {
-    const [page, setPage] = useState<'none' | 'link' | 'tags'>('none');
+    const [page, setPage] = useState<'none' | 'link' | 'tags' | 'image'>('none');
     const [linkIndex, setLinkIndex] = useState<number | null>(null);
 
     const errorFor = (field: FieldError['field']) => (error?.field === field ? error.message : null);
@@ -58,6 +63,10 @@ export default function Step2Details({
     };
     const openTags = () => {
         setPage('tags');
+        onSubPageChange(true);
+    };
+    const openImage = () => {
+        setPage('image');
         onSubPageChange(true);
     };
     const close = () => {
@@ -109,8 +118,31 @@ export default function Step2Details({
         );
     }
 
+    if (page === 'image') {
+        return <ImagePage value={state.image} onSave={(image) => patch({ image })} onClose={close} />;
+    }
+
     return (
         <div className="space-y-6">
+            {imagesAllowed ? (
+                <Row
+                    id="suggest-image"
+                    icon={ImageIcon}
+                    label="Cover photo"
+                    value={
+                        state.image ? (
+                            <img
+                                src={state.image.image_thumb_url}
+                                alt=""
+                                className="ml-auto h-9 w-16 rounded-field object-cover"
+                            />
+                        ) : undefined
+                    }
+                    placeholder="Add a photo"
+                    onClick={openImage}
+                />
+            ) : null}
+
             <textarea
                 id="suggest-description"
                 aria-label="Description"

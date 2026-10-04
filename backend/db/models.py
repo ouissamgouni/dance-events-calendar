@@ -1109,6 +1109,9 @@ class EventSuggestion(SQLModel, table=True):
     price_max: Optional[float] = Field(default=None)
     price_currency: Optional[str] = Field(default=None)
     price_is_free: Optional[bool] = Field(default=None)
+    # Submitter's picture (``suggestions/{user_id}/{uuid}``); shared by every
+    # occurrence once approved.
+    image_key: Optional[str] = Field(default=None, max_length=200)
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     reviewed_at: Optional[datetime] = Field(default=None)

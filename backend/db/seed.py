@@ -7,6 +7,7 @@ from itertools import cycle
 from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 import yaml
 from sqlmodel import Session, delete, select
@@ -2521,6 +2522,11 @@ class DatabaseSeeder:
             data = yaml.safe_load(f) or {}
 
         schedule_now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        today = date.today()
+        relative = {
+            "reference_monday": today - timedelta(days=today.weekday()),
+            "base_week": data.get("base_week", 0),
+        }
         for entry in data.get("schedules", []) or []:
             event_id = entry["event_id"]
             event = self.session.get(CachedEvent, event_id)
@@ -2536,7 +2542,7 @@ class DatabaseSeeder:
                     timezone=entry["timezone"],
                     day_start_hour=entry.get("day_start_hour", 6),
                     days=[
-                        self._schedule_day(day, schedule_now)
+                        self._schedule_day(day, schedule_now, **relative)
                         for day in entry.get("days", [])
                     ],
                 )
@@ -2546,7 +2552,7 @@ class DatabaseSeeder:
                 schedule.timezone = entry["timezone"]
                 schedule.day_start_hour = entry.get("day_start_hour", 6)
                 schedule.days = [
-                    self._schedule_day(day, schedule_now)
+                    self._schedule_day(day, schedule_now, **relative)
                     for day in entry.get("days", [])
                 ]
                 schedule.updated_at = datetime.now(timezone.utc)
@@ -2617,8 +2623,15 @@ class DatabaseSeeder:
                     "external_id": row.get("external_id"),
                     "title": row["title"],
                     "instructors": row.get("instructors"),
-                    "start": self._schedule_datetime(row["start"], schedule_now),
-                    "end": self._schedule_datetime(row["end"], schedule_now),
+                    "start": self._schedule_datetime(
+                        row["start"],
+                        schedule_now,
+                        tz_name=entry["timezone"],
+                        **relative,
+                    ),
+                    "end": self._schedule_datetime(
+                        row["end"], schedule_now, tz_name=entry["timezone"], **relative
+                    ),
                     "room_id": rooms[row["room"]].id if row.get("room") else None,
                     "venue_id": venues[row["venue"]].id if row.get("venue") else None,
                     "level_id": levels[row["level"]].id if row.get("level") else None,
@@ -2780,10 +2793,19 @@ class DatabaseSeeder:
 
     @staticmethod
     def _schedule_datetime(
-        value: str | datetime, reference_now: Optional[datetime] = None
+        value: str | datetime,
+        reference_now: Optional[datetime] = None,
+        reference_monday: Optional[date] = None,
+        base_week: int = 0,
+        tz_name: str = "UTC",
     ) -> datetime:
         if isinstance(value, datetime):
             return to_utc(value)
+        if reference_monday is not None:
+            # Week-relative values are wall-clock times in the schedule timezone.
+            resolved = resolve_relative_dt(value, reference_monday, base_week)
+            if resolved is not None:
+                return to_utc(resolved.replace(tzinfo=ZoneInfo(tz_name)))
         match = SCHEDULE_NOW_RE.match(value)
         if match:
             result = reference_now or datetime.now(timezone.utc)
@@ -2796,11 +2818,22 @@ class DatabaseSeeder:
         return to_utc(datetime.fromisoformat(value.replace("Z", "+00:00")))
 
     @staticmethod
-    def _schedule_day(value: str, reference_now: datetime) -> str:
+    def _schedule_day(
+        value: str,
+        reference_now: datetime,
+        reference_monday: Optional[date] = None,
+        base_week: int = 0,
+    ) -> str:
         if value == "today":
             return reference_now.date().isoformat()
         if value == "tomorrow":
             return (reference_now.date() + timedelta(days=1)).isoformat()
+        if reference_monday is not None:
+            resolved = resolve_relative_dt(
+                f"{value} 00:00", reference_monday, base_week
+            )
+            if resolved is not None:
+                return resolved.date().isoformat()
         return value
 
     def _seed_promo_codes(self, path: Path) -> None:

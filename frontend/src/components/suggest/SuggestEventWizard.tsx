@@ -142,6 +142,9 @@ export default function SuggestEventWizard({ onClose }: Props) {
         [tagGroups, danceGroup?.id, reachGroup?.id],
     );
 
+    // The upload endpoints require a session; anonymous submitters get no picker.
+    const imagesAllowed = Boolean(user) && settings?.event_images_enabled !== false;
+
     const requestClose = useCallback(() => {
         if (isDirty(state) && !success) {
             setConfirmingClose(true);
@@ -228,6 +231,7 @@ export default function SuggestEventWizard({ onClose }: Props) {
                         ? state.priceCurrency
                         : null,
                 auto_save: true,
+                image_key: imagesAllowed ? state.image?.image_key : undefined,
                 website: state.website,
                 screen_size: `${screen.width}x${screen.height}`,
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -339,6 +343,7 @@ export default function SuggestEventWizard({ onClose }: Props) {
                                 danceGroup={danceGroup}
                                 reachGroup={reachGroup}
                                 otherGroups={otherGroups}
+                                imagesAllowed={imagesAllowed}
                             />
                         ) : (
                             <Step3Publish {...stepProps} signedIn={Boolean(user)} />

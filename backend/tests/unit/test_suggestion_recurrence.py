@@ -297,6 +297,42 @@ class TestExtensionJob:
         }
 
 
+class TestSuggestionImage:
+    def test_pending_preview_stays_unpictured(self, engine):
+        with Session(engine) as session:
+            suggestion = _suggestion(
+                session,
+                recurrence_rule="RRULE:FREQ=WEEKLY;COUNT=3",
+                image_key="suggestions/u1/abc",
+            )
+            events = _materialize(session, suggestion, review_status="pending")
+
+            assert all(event.image_key is None for event in events)
+
+    def test_extension_pictures_new_occurrences(self, engine):
+        with Session(engine) as session:
+            suggestion = _suggestion(
+                session,
+                status="approved",
+                assigned_calendar_id=CALENDAR_ID,
+                recurrence_rule="RRULE:FREQ=WEEKLY",
+                image_key="suggestions/u1/abc",
+            )
+            _materialize(
+                session, suggestion, limit=2, horizon_end=START + timedelta(days=7)
+            )
+            suggestion_id = suggestion.id
+
+        recurrence_extension.run_once()
+
+        with Session(engine) as session:
+            rows = session.exec(
+                select(CachedEvent).where(CachedEvent.suggestion_id == suggestion_id)
+            ).all()
+            assert len(rows) > 2
+            assert all(row.image_key == "suggestions/u1/abc" for row in rows)
+
+
 class TestCreatorGoing:
     """The submitter's "I'm going" must cover the whole declared recurrence.
 
