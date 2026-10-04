@@ -173,7 +173,7 @@ notifications:
     minutes_ago: 420
   - recipient: penny.valdez@joinmovida.com
     kind: event_review_prompt
-    event_id: barcelona-salsa-beach-party
+    event_id: athens-bachata-weekender-previous
     context: Elena Moreau
     minutes_ago: 900
   - recipient: penny.valdez@joinmovida.com

@@ -55,19 +55,23 @@ self.addEventListener('push', (event) => {
         data = { body: '⚠️ Invalid push payload' };
     }
 
-    const title = data.title || '🚀 PUSH RECEIVED';
+    const title = data.title || 'Movida';
 
     const options = {
-        body: data.body || 'Service worker push event fired successfully',
+        body: data.body || '',
         icon: '/icons/icon-192.png',
         badge: '/icons/badge-72.png',
-        tag: 'debug-push',
         data: {
             url: data.url || '/',
-            debug: true,
-            raw: data,
         },
     };
+    // Same-tag pushes replace each other in the tray; renotify makes the
+    // replacement alert again instead of updating silently. renotify throws
+    // without a tag, so only set both together.
+    if (data.tag) {
+        options.tag = data.tag;
+        options.renotify = true;
+    }
 
     event.waitUntil(
         self.registration.showNotification(title, options)

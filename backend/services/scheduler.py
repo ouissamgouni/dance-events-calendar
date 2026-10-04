@@ -237,6 +237,7 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
     # cycle with the email/notification services.
     from backend.services import (
         activity_email,
+        event_images,
         interest_notification_service,
         milestone_notification_service,
         recurrence_extension,
@@ -286,6 +287,11 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
         except Exception:
             logger.exception("Recurring series extension failed")
             stats["recurrence"] = {"error": True}
+        try:
+            stats["suggestion_images"] = event_images.run_sweep_once()
+        except Exception:
+            logger.exception("Suggestion image sweep failed")
+            stats["suggestion_images"] = {"error": True}
         return stats
     finally:
         _release_dispatch_lock(lock_conn)

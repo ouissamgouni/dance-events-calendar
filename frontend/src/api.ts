@@ -3553,6 +3553,33 @@ export async function submitSuggestion(data: EventSuggestionCreate): Promise<{ i
     return res.json();
 }
 
+export interface SuggestionImage {
+    image_key: string;
+    image_thumb_url: string;
+}
+
+/** Stage a picture for a suggestion that has not been submitted yet. */
+export async function uploadSuggestionImage(file: File): Promise<SuggestionImage> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/suggestions/images`, {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+    });
+    return parseJsonResponse<SuggestionImage>(res, 'Failed to upload image');
+}
+
+export async function importSuggestionImageFromUrl(url: string): Promise<SuggestionImage> {
+    const res = await fetch(`${BASE}/suggestions/images/from-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<SuggestionImage>(res, 'Failed to import image');
+}
+
 export async function searchSuggestionAddress(query: string): Promise<GeocodeSuggestion[]> {
     const res = await fetch(`${BASE}/suggestions/geocode?q=${encodeURIComponent(query)}`);
     if (!res.ok) return [];

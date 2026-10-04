@@ -101,6 +101,19 @@ interest_profiles:
     reach_tags: ["reach:international"]
     matches_enabled: true
     is_active: true
+  - user: penny.valdez@joinmovida.com
+    label: Salsa + Bachata - Europe
+    area_label: Europe & nearby
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags:
+      - dance-style:salsa
+      - dance-style:bachata
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true
   - user: alex.navarro@joinmovida.com
     label: Bachata - Vienna 25km
     area_label: Vienna

@@ -1,4 +1,97 @@
 attendances:
+  # Penny's only past attendances: previous weekender editions to review.
+  - event_id: seville-salsa-weekender-previous
+    email: penny.valdez@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: seville-salsa-weekender-previous
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: seville-salsa-weekender-previous
+    email: mateo.vega@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: seville-salsa-weekender-previous
+    email: leila.bauer@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: seville-salsa-weekender-previous
+    email: sofia.torres@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: milan-bachata-weekender-previous
+    email: penny.valdez@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: milan-bachata-weekender-previous
+    email: elena.moreau@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: milan-bachata-weekender-previous
+    email: pablo.rossi@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: milan-bachata-weekender-previous
+    email: zara.benali@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: milan-bachata-weekender-previous
+    email: nina.khan@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: budapest-salsa-weekender-previous
+    email: penny.valdez@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: budapest-salsa-weekender-previous
+    email: victor.schmidt@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: budapest-salsa-weekender-previous
+    email: milan.horvat@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: budapest-salsa-weekender-previous
+    email: rita.petrov@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: brussels-latin-weekender-previous
+    email: penny.valdez@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: brussels-latin-weekender-previous
+    email: camille.laurent@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: brussels-latin-weekender-previous
+    email: noah.kim@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: brussels-latin-weekender-previous
+    email: bruno.santos@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: brussels-latin-weekender-previous
+    email: elena.moreau@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: athens-bachata-weekender-previous
+    email: penny.valdez@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: athens-bachata-weekender-previous
+    email: elena.moreau@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: athens-bachata-weekender-previous
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: athens-bachata-weekender-previous
+    email: samir.ivanov@joinmovida.com
+    share_publicly: true
+    share_audience: public
   - event_id: alfama-thursday-salsa-autumn
     email: alex.navarro@joinmovida.com
     share_publicly: true
@@ -323,10 +416,6 @@ attendances:
     email: rave.republic@joinmovida.com
     share_publicly: false
     share_audience: friends
-  - event_id: 6dgm8ohlccq6ab9o6dhm6b9k60pm4bb2cpgjebb16dijadj6cdh36e1h60
-    email: penny.valdez@joinmovida.com
-    share_publicly: true
-    share_audience: public
   - event_id: 6dgm8ohlccq6ab9o6dhm6b9k60pm4bb2cpgjebb16dijadj6cdh36e1h60
     email: maya.rivera@joinmovida.com
     share_publicly: false
@@ -2352,10 +2441,6 @@ attendances:
     share_publicly: false
     share_audience: private
   - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
-    email: penny.valdez@joinmovida.com
-    share_publicly: true
-    share_audience: friends
-  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
     email: rave.republic@joinmovida.com
     share_publicly: false
     share_audience: public
@@ -2379,10 +2464,6 @@ attendances:
     email: mateo.vega@joinmovida.com
     share_publicly: false
     share_audience: friends
-  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
-    email: penny.valdez@joinmovida.com
-    share_publicly: false
-    share_audience: private
   - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
     email: rave.republic@joinmovida.com
     share_publicly: true

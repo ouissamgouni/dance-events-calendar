@@ -500,6 +500,112 @@ class TestApproveSuggestion:
 
         app.dependency_overrides.clear()
 
+    def test_approve_pictures_the_pending_preview(self):
+        suggestion = _make_suggestion(
+            created_event_id="suggestion-live-1", image_key="suggestions/u1/abc"
+        )
+        preview = CachedEvent(
+            event_id="suggestion-live-1",
+            calendar_id="user-submissions",
+            title=suggestion.title,
+            start=suggestion.start,
+            end=suggestion.end,
+            review_status="pending",
+        )
+        mock_session = _mock_session_with_suggestions(suggestion)
+        base_get = mock_session.get
+        mock_session.get = lambda model, pk: (
+            preview
+            if model is CachedEvent and pk == preview.event_id
+            else base_get(model, pk)
+        )
+
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            resp = TestClient(app).post(
+                f"/api/admin/suggestions/{suggestion.id}/approve",
+                json={"calendar_id": "cal-1"},
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 200, resp.text
+        assert preview.image_key == "suggestions/u1/abc"
+
+
+@pytest.mark.unit
+class TestSuggestionImages:
+    @pytest.fixture(autouse=True)
+    def _public_base_url(self, monkeypatch):
+        monkeypatch.setenv("OBJECT_STORAGE_PUBLIC_BASE_URL", "https://cdn.test")
+
+    @staticmethod
+    def _user():
+        from uuid import uuid4
+
+        return User(
+            id=uuid4(),
+            email="alice@example.com",
+            provider="google",
+            provider_subject="mock|alice@example.com",
+        )
+
+    def _submit(self, user, image_key):
+        app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
+        app.dependency_overrides[get_current_user_optional] = lambda: user
+        try:
+            return TestClient(app).post(
+                "/api/suggestions",
+                json={
+                    "title": "Salsa",
+                    "start": "2026-06-15T20:00:00",
+                    "end": "2026-06-15T23:00:00",
+                    "image_key": image_key,
+                },
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_submit_rejects_image_for_anonymous(self):
+        resp = self._submit(None, "suggestions/someone/abc")
+        assert resp.status_code == 400
+
+    def test_submit_rejects_another_users_image(self):
+        resp = self._submit(self._user(), "suggestions/someone-else/abc")
+        assert resp.status_code == 400
+
+    def test_upload_requires_sign_in(self):
+        app.dependency_overrides[get_current_user_optional] = lambda: None
+        try:
+            resp = TestClient(app).post(
+                "/api/suggestions/images",
+                files={"file": ("a.png", b"x", "image/png")},
+            )
+        finally:
+            app.dependency_overrides.clear()
+        assert resp.status_code == 401
+
+    def test_upload_stages_under_the_users_prefix(self):
+        user = self._user()
+        app.dependency_overrides[get_current_user_optional] = lambda: user
+        try:
+            with patch(
+                "backend.services.event_images.store_event_image",
+                side_effect=lambda _id, _data, _type, base_key: base_key,
+            ):
+                resp = TestClient(app).post(
+                    "/api/suggestions/images",
+                    files={"file": ("a.png", b"x", "image/png")},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 200, resp.text
+        key = resp.json()["image_key"]
+        assert key.startswith(f"suggestions/{user.id}/")
+        assert resp.json()["image_thumb_url"] == f"https://cdn.test/{key}/thumb.webp"
+
 
 @pytest.mark.unit
 class TestRejectSuggestion:
@@ -574,6 +680,22 @@ class TestRejectSuggestion:
         assert any(isinstance(obj, BlockedEvent) for obj in store.values())
 
         app.dependency_overrides.clear()
+
+    def test_reject_drops_the_image_reference(self):
+        suggestion = _make_suggestion(image_key="suggestions/u1/abc")
+        mock_session = _mock_session_with_suggestions(suggestion)
+
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            resp = TestClient(app).post(
+                f"/api/admin/suggestions/{suggestion.id}/reject", json={}
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 200, resp.text
+        assert suggestion.image_key is None
 
 
 @pytest.mark.unit

@@ -727,6 +727,8 @@ export interface EventSuggestionCreate {
      * authenticated submitter's Calendar. Has no effect for anonymous
      * submissions. */
     auto_save?: boolean;
+    /** Key returned by `uploadSuggestionImage` / `importSuggestionImageFromUrl`. */
+    image_key?: string;
     website?: string; // honeypot
     screen_size?: string;
     timezone?: string;
@@ -769,6 +771,9 @@ export interface EventSuggestion {
     price_max?: number | null;
     price_currency?: string | null;
     price_is_free?: boolean | null;
+    image_key?: string | null;
+    image_url?: string | null;
+    image_thumb_url?: string | null;
     created_at: string;
     reviewed_at: string | null;
     reviewed_by: string | null;

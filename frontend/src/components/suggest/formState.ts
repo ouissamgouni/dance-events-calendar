@@ -1,3 +1,4 @@
+import type { SuggestionImage } from '../../api';
 import type { TagsPickerValue } from '../TagsPicker';
 import { NO_RECURRENCE, type RecurrenceState } from './recurrence';
 
@@ -43,6 +44,7 @@ export interface SuggestFormState {
     goingAudience: GoingAudience;
     submitterName: string;
     submitterEmail: string;
+    image: SuggestionImage | null;
     /** Honeypot — must stay empty for a real human. */
     website: string;
 }
@@ -80,6 +82,7 @@ export function initialFormState(
         goingAudience: audience ?? 'public',
         submitterName: name ?? '',
         submitterEmail: email ?? '',
+        image: null,
         website: '',
     };
 }
@@ -93,7 +96,8 @@ export function isDirty(state: SuggestFormState): boolean {
         state.start ||
         state.promoCode.trim() ||
         state.tagsValue.selectedTagIds.length ||
-        state.links.length,
+        state.links.length ||
+        state.image,
     );
 }
 

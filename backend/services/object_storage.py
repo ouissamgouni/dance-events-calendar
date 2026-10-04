@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from datetime import datetime
 from typing import Optional
 
 import boto3
@@ -255,6 +256,17 @@ def delete_prefix(prefix: str, bucket: str, client=None) -> int:
         client.delete_objects(Bucket=bucket, Delete={"Objects": keys})
         removed += len(keys)
     return removed
+
+
+def list_objects(prefix: str, bucket: str, client=None) -> list[tuple[str, datetime]]:
+    """Return ``(key, last_modified)`` for every object under ``prefix``."""
+    client = client or get_client()
+    paginator = client.get_paginator("list_objects_v2")
+    return [
+        (item["Key"], item["LastModified"])
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix)
+        for item in page.get("Contents", [])
+    ]
 
 
 def empty_bucket(bucket: str, client=None) -> int:

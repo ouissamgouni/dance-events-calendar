@@ -323,4 +323,50 @@ describe('SuggestEventWizard', () => {
         expect(await screen.findByText('Event already exists')).toBeInTheDocument()
         expect(screen.queryByText(/Your suggestion is under review/)).not.toBeInTheDocument()
     })
+
+    it('offers no cover photo to anonymous submitters', async () => {
+        setupTagGroups()
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+
+        await completeStep1(user)
+
+        expect(await screen.findByRole('button', { name: 'Salsa' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /^Cover photo/ })).not.toBeInTheDocument()
+    })
+
+    it('uploads a cover photo and submits its key', async () => {
+        setupSignedInUser()
+        setupTagGroups()
+        let payload: Record<string, unknown> | null = null
+        server.use(
+            http.post('*/api/suggestions/images', () =>
+                HttpResponse.json({
+                    image_key: 'suggestions/u1/abc',
+                    image_thumb_url: 'https://cdn.test/suggestions/u1/abc/thumb.webp',
+                }),
+            ),
+            http.post('*/api/suggestions', async ({ request }) => {
+                payload = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json({ message: 'under review' }, { status: 201 })
+            }),
+        )
+
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+        await completeStep1(user)
+
+        await user.click(await screen.findByRole('button', { name: /^Cover photo/ }))
+        expect(screen.queryByRole('button', { name: 'Submit Event' })).not.toBeInTheDocument()
+        await user.upload(
+            screen.getByTestId('suggest-image-file'),
+            new File(['img'], 'poster.png', { type: 'image/png' }),
+        )
+        expect(await screen.findByAltText('Cover photo preview')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Done' }))
+
+        await completeStep2(user)
+        await user.click(screen.getByRole('button', { name: 'Submit Event' }))
+
+        await screen.findByText(/Your event is live/)
+        expect(payload!.image_key).toBe('suggestions/u1/abc')
+    })
 })

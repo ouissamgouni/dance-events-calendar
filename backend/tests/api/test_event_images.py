@@ -2,7 +2,7 @@
 
 import io
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -87,6 +87,82 @@ def test_process_image_rejects_non_image_bytes():
 def test_fetch_remote_image_rejects_unsafe_urls(url):
     with pytest.raises(event_images.ImageValidationError):
         event_images.fetch_remote_image(url)
+
+
+def test_fetch_remote_image_rejects_private_peer_after_dns_check():
+    """DNS rebinding: the host resolved public, but the socket reached a private IP."""
+    stream = MagicMock()
+    stream.get_extra_info.return_value = ("10.0.0.5", 443)
+    response = MagicMock(extensions={"network_stream": stream})
+    stream_ctx = MagicMock()
+    stream_ctx.__enter__.return_value = response
+
+    with (
+        patch.object(event_images, "_assert_public_host"),
+        patch.object(event_images.httpx, "stream", return_value=stream_ctx),
+        pytest.raises(event_images.ImageValidationError),
+    ):
+        event_images.fetch_remote_image("https://example.com/a.jpg")
+
+
+def test_load_image_rejects_oversized_resolution_before_decoding(monkeypatch):
+    from backend.services import image_processing
+
+    monkeypatch.setattr(image_processing, "MAX_SOURCE_PIXELS", 100)
+    with (
+        patch.object(image_processing.ImageOps, "exif_transpose") as decode,
+        pytest.raises(event_images.ImageValidationError),
+    ):
+        image_processing.load_image(_png_bytes(20, 20))
+    decode.assert_not_called()
+
+
+# ── Submitter (suggestion) pictures ─────────────────────────────────
+
+
+def test_delete_event_image_keeps_shared_suggestion_pictures():
+    with patch.object(event_images, "_delete_image_objects") as delete:
+        event_images.delete_event_image("suggestions/u1/abc")
+        event_images.delete_event_image("events/e1/abc")
+
+    delete.assert_called_once_with("events/e1/abc", client=None)
+
+
+def test_sweep_removes_only_stale_unreferenced_pictures():
+    from backend.db.models import EventSuggestion
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    SQLModel.metadata.create_all(engine)
+    now = datetime(2030, 1, 2, tzinfo=timezone.utc)
+    old = now - timedelta(days=2)
+    objects = [
+        ("suggestions/u1/orphan/thumb.webp", old),
+        ("suggestions/u1/orphan/full.webp", old),
+        ("suggestions/u1/kept/thumb.webp", old),
+        ("suggestions/u1/fresh/thumb.webp", now),
+    ]
+    with Session(engine) as session:
+        session.add(
+            EventSuggestion(
+                title="T", start=START, end=END, image_key="suggestions/u1/kept"
+            )
+        )
+        session.commit()
+
+        with (
+            patch.object(event_images.object_storage, "get_client"),
+            patch.object(event_images.object_storage, "get_public_bucket"),
+            patch.object(
+                event_images.object_storage, "list_objects", return_value=objects
+            ),
+            patch.object(event_images, "_delete_image_objects") as delete,
+        ):
+            removed = event_images.sweep_suggestion_images(session, now=now)
+
+    assert removed == 1
+    assert delete.call_args.args == ("suggestions/u1/orphan",)
 
 
 # ── Serialization precedence ────────────────────────────────────────

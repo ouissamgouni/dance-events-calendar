@@ -124,6 +124,18 @@ class TestDatabaseSeeder:
         assert DatabaseSeeder._schedule_day("today", now) == "2026-09-24"
         assert DatabaseSeeder._schedule_day("tomorrow", now) == "2026-09-25"
 
+    def test_schedule_week_relative_times_use_schedule_timezone(self):
+        now = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+        monday = date(2026, 9, 28)
+
+        assert (
+            DatabaseSeeder._schedule_day("w7 Fri", now, reference_monday=monday)
+            == "2026-11-20"
+        )
+        assert DatabaseSeeder._schedule_datetime(
+            "w7 Fri 22:00", now, reference_monday=monday, tz_name="Europe/Brussels"
+        ) == datetime(2026, 11, 20, 21, 0, tzinfo=timezone.utc)
+
     def test_seed_device_id_stays_within_column_limit(self):
         event_id = "6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74"
         identity = "viewer@example.com"

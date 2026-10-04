@@ -152,6 +152,18 @@ async function mockApi(
             return
         }
 
+        if (path.endsWith('/api/suggestions/images') && req.method() === 'POST') {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    image_key: 'suggestions/user-1/abc',
+                    image_thumb_url: 'https://cdn.test/suggestions/user-1/abc/thumb.webp',
+                }),
+            })
+            return
+        }
+
         if (path.endsWith('/api/suggestions') && req.method() === 'POST') {
             onSuggestion((await req.postDataJSON()) as Payload)
             await route.fulfill({
@@ -261,6 +273,17 @@ test('logged-in user submits stepped event with going default on', async ({ page
     // Step 2 — Details (pricing deliberately lives on step 3)
     await expect(page.getByText('Step 2 of 3')).toBeVisible()
     await expect(page.getByText('Free event')).toHaveCount(0)
+
+    await page.getByRole('button', { name: /^Cover photo/ }).click()
+    await expect(page.getByRole('button', { name: 'Submit Event' })).toHaveCount(0)
+    await page.getByTestId('suggest-image-file').setInputFiles({
+        name: 'poster.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from('img'),
+    })
+    await expect(page.getByAltText('Cover photo preview')).toBeAttached()
+    await page.getByRole('button', { name: /^Done$/ }).click()
+
     await page.getByRole('button', { name: 'Salsa', exact: true }).click()
     await page.getByRole('button', { name: 'Local', exact: true }).click()
     await page.getByRole('button', { name: /^Next$/ }).click()
@@ -286,6 +309,7 @@ test('logged-in user submits stepped event with going default on', async ({ page
     await expect.poll(() => suggestionPayload?.going).toBe(true)
     await expect.poll(() => suggestionPayload?.going_audience).toBe('friends')
     await expect.poll(() => suggestionPayload?.recurrence_rule).toMatch(/^RRULE:FREQ=WEEKLY/)
+    await expect.poll(() => suggestionPayload?.image_key).toBe('suggestions/user-1/abc')
 })
 
 test('never scrolls horizontally at a 320px viewport', async ({ page }) => {

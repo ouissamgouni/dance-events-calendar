@@ -5,6 +5,7 @@ import {
     fetchSuggestionOccurrences,
     rejectSuggestion,
     syncSuggestionToGoogle,
+    updateSuggestion,
     type SuggestionOccurrence,
 } from '../api';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
@@ -125,6 +126,18 @@ export default function SuggestionReviewModal({ suggestion, calendars, allTags =
         }
     };
 
+    const handleRemoveImage = async () => {
+        setSaving(true);
+        setError('');
+        try {
+            onUpdated(await updateSuggestion(suggestion.id, { image_key: null }));
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to remove image.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const price = fmtPrice(suggestion);
 
     return (
@@ -206,6 +219,26 @@ export default function SuggestionReviewModal({ suggestion, calendars, allTags =
 
                                 {/* Suggestion details — read-only (event is editable after approval) */}
                                 <div className="space-y-3 mb-4">
+                                    {suggestion.image_thumb_url && (
+                                        <div>
+                                            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">Cover photo</p>
+                                            <img
+                                                src={suggestion.image_thumb_url}
+                                                alt="Submitted cover photo"
+                                                className="aspect-video w-64 object-cover"
+                                            />
+                                            {isPending && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRemoveImage}
+                                                    disabled={saving}
+                                                    className="mt-2 text-xs font-medium text-danger disabled:opacity-50"
+                                                >
+                                                    Remove image
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                     <Field label="Title" value={suggestion.title} />
                                     {suggestion.description && (
                                         <Field label="Description" value={suggestion.description} multiline />

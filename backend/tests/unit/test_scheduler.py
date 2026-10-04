@@ -158,6 +158,10 @@ class TestScheduler:
                 "backend.services.recurrence_extension.run_once",
                 return_value={"series_extended": 1, "occurrences_created": 4},
             ),
+            patch(
+                "backend.services.event_images.run_sweep_once",
+                return_value={"removed": 2},
+            ),
         ):
             stats = run_notification_dispatch_once()
 
@@ -168,6 +172,7 @@ class TestScheduler:
             "interest": {"candidates": 4, "created": 1},
             "activity": {"digests": 3, "pushed": 2},
             "recurrence": {"series_extended": 1, "occurrences_created": 4},
+            "suggestion_images": {"removed": 2},
         }
 
     def test_notification_dispatch_is_resilient_when_subtask_raises(self):
@@ -195,6 +200,10 @@ class TestScheduler:
             patch(
                 "backend.services.recurrence_extension.run_once",
                 return_value={"series_extended": 0, "occurrences_created": 0},
+            ),
+            patch(
+                "backend.services.event_images.run_sweep_once",
+                return_value={"removed": 0},
             ),
         ):
             stats = run_notification_dispatch_once()

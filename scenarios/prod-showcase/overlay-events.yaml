@@ -560,6 +560,113 @@ events:
       - dance-style:bachata
       - misc:live-band
       - reach:international
+  - id: seville-salsa-weekender-previous
+    calendar_id: movida-community-events
+    title: Seville Salsa Weekender
+    description: Cuban salsa and rueda workshops by day, patio socials with live son and timba by night in Triana.
+    image: 01_seville_salsa_weekender.png
+    location: Casa Triana, Seville, Spain
+    city: Seville
+    country: Spain
+    country_code: ES
+    latitude: 37.3826
+    longitude: -6.0026
+    start: w-19 Fri 19:00
+    end: w-19 Sun 22:00
+    price_min: 100
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:salsa
+      - dance-style:cuban
+      - dance-style:rueda
+      - misc:live-band
+      - reach:international
+  - id: milan-bachata-weekender-previous
+    calendar_id: movida-community-events
+    title: Milan Bachata Weekender
+    description: Sensual and Dominican bachata tracks with international instructors and late-night socials by the Navigli canals.
+    image: 02_milan_bachata_weekender.png
+    location: Navigli Dance Loft, Milan, Italy
+    city: Milan
+    country: Italy
+    country_code: IT
+    latitude: 45.4519
+    longitude: 9.1755
+    start: w-15 Fri 20:00
+    end: w-15 Sun 23:00
+    price_min: 110
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:bachata
+      - reach:international
+  - id: budapest-salsa-weekender-previous
+    calendar_id: movida-community-events
+    title: Budapest Salsa Weekender
+    description: On1 and On2 salsa workshops, a Danube boat party on Saturday, and a thermal bath recovery social on Sunday.
+    image: 03_budapest_salsa_weekender.png
+    location: Danube Ballroom, Budapest, Hungary
+    city: Budapest
+    country: Hungary
+    country_code: HU
+    latitude: 47.4979
+    longitude: 19.0402
+    start: w-11 Fri 20:00
+    end: w-11 Sun 23:00
+    price_min: 80
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:international
+  - id: brussels-latin-weekender-previous
+    calendar_id: movida-community-events
+    title: Brussels Latin Weekender
+    description: Salsa, bachata, and kizomba rooms all weekend in the heart of Brussels, with shows on Saturday night.
+    image: 04_brussels_latin_weekender.png
+    location: Atelier Sablon, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8403
+    longitude: 4.3555
+    start: w-7 Fri 20:00
+    end: w-7 Sun 22:00
+    price_min: 70
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: athens-bachata-weekender-previous
+    calendar_id: movida-community-events
+    title: Athens Bachata Weekender
+    description: A warm bachata escape with workshops in Gazi and a rooftop social facing the Acropolis.
+    image: 06_athens_bachata_weekender.png
+    location: Gazi Arts Hall, Athens, Greece
+    city: Athens
+    country: Greece
+    country_code: GR
+    latitude: 37.9784
+    longitude: 23.7128
+    start: w-4 Fri 20:00
+    end: w-4 Sun 23:00
+    price_min: 85
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:bachata
+      - venue:rooftop
+      - reach:international
 event_series:
   - canonical_title: Alfama Thursday Salsa
     status: resolved
@@ -568,6 +675,36 @@ event_series:
       - alfama-thursday-salsa-summer
       - alfama-thursday-salsa-autumn
       - alfama-thursday-salsa-next
+  - canonical_title: Seville Salsa Weekender
+    status: resolved
+    source: manual
+    members:
+      - seville-salsa-weekender-previous
+      - seville-salsa-weekender
+  - canonical_title: Milan Bachata Weekender
+    status: resolved
+    source: manual
+    members:
+      - milan-bachata-weekender-previous
+      - milan-bachata-weekender
+  - canonical_title: Budapest Salsa Weekender
+    status: resolved
+    source: manual
+    members:
+      - budapest-salsa-weekender-previous
+      - budapest-salsa-weekender
+  - canonical_title: Brussels Latin Weekender
+    status: resolved
+    source: manual
+    members:
+      - brussels-latin-weekender-previous
+      - brussels-latin-weekender
+  - canonical_title: Athens Bachata Weekender
+    status: resolved
+    source: manual
+    members:
+      - athens-bachata-weekender-previous
+      - athens-bachata-weekender
 
 ratings:
   - event_id: alfama-thursday-salsa-summer
@@ -910,7 +1047,7 @@ ratings:
     comment_status: approved
     status: approved
   - event_id: vienna-bachata-nights
-    email: penny.valdez@joinmovida.com
+    email: sofia.torres@joinmovida.com
     overall_sentiment: okay
     comment: Nice night last time, though the class ran over and the social started late.
     aspect_scores: { organization: 3, music: 4 }
@@ -1728,6 +1865,138 @@ ratings:
       - atmosphere:welcoming-inclusive
     audience_tags:
       - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: seville-salsa-weekender-previous
+    email: ana.garcia@joinmovida.com
+    overall_sentiment: amazing
+    comment: The live son band on the patio turned Saturday night into a real Cuban party.
+    aspect_scores: { music: 5, atmosphere: 5 }
+    aspect_tags:
+      - music:live-band
+      - atmosphere:great-atmosphere
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+  - event_id: seville-salsa-weekender-previous
+    email: mateo.vega@joinmovida.com
+    overall_sentiment: great
+    comment: Rueda workshops were clear and fun, even for dancers new to Cuban style.
+    aspect_scores: { workshop: 5, organization: 4 }
+    aspect_tags:
+      - workshop:clear-explanations
+      - organization:good-schedule
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: seville-salsa-weekender-previous
+    email: leila.bauer@joinmovida.com
+    overall_sentiment: okay
+    comment: Lovely workshops, but the patio got very crowded during the Saturday social.
+    aspect_scores: { workshop: 4, venue-quality: 2 }
+    aspect_tags:
+      - workshop:great-instructor
+      - venue-quality:crowded
+    audience_tags:
+      - audience:relaxed-dancing
+    comment_status: approved
+    status: approved
+  - event_id: milan-bachata-weekender-previous
+    email: elena.moreau@joinmovida.com
+    overall_sentiment: amazing
+    comment: Top instructors and a perfect wooden floor, I left with pages of notes.
+    aspect_scores: { workshop: 5, venue-quality: 5 }
+    aspect_tags:
+      - workshop:great-instructor
+      - venue-quality:great-dance-floor
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: milan-bachata-weekender-previous
+    email: pablo.rossi@joinmovida.com
+    overall_sentiment: great
+    comment: Well split levels between sensual and Dominican tracks, easy to pick the right class.
+    aspect_scores: { workshop: 4, organization: 4 }
+    aspect_tags:
+      - workshop:good-level
+      - organization:well-organized
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: milan-bachata-weekender-previous
+    email: zara.benali@joinmovida.com
+    overall_sentiment: okay
+    comment: Great DJs, but the Friday social started more than an hour late.
+    aspect_scores: { music: 4, organization: 2 }
+    aspect_tags:
+      - music:great-dj
+      - organization:started-late
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: budapest-salsa-weekender-previous
+    email: victor.schmidt@joinmovida.com
+    overall_sentiment: amazing
+    comment: Excellent On2 track and the Danube boat party was worth the trip alone.
+    aspect_scores: { workshop: 5, atmosphere: 5 }
+    aspect_tags:
+      - workshop:great-instructor
+      - atmosphere:high-energy
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: budapest-salsa-weekender-previous
+    email: milan.horvat@joinmovida.com
+    overall_sentiment: great
+    comment: Full pass included everything, from workshops to the thermal bath social.
+    aspect_scores: { value: 5, organization: 4 }
+    aspect_tags:
+      - value:great-package
+      - organization:well-organized
+    audience_tags:
+      - audience:budget-friendly
+    comment_status: approved
+    status: approved
+  - event_id: brussels-latin-weekender-previous
+    email: camille.laurent@joinmovida.com
+    overall_sentiment: great
+    comment: Three rooms with different styles meant there was always a floor for me.
+    aspect_scores: { music: 5, organization: 4 }
+    aspect_tags:
+      - music:good-variety
+      - organization:well-organized
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+  - event_id: brussels-latin-weekender-previous
+    email: noah.kim@joinmovida.com
+    overall_sentiment: great
+    comment: Inspiring Saturday shows and a truly international crowd on every floor.
+    aspect_scores: { shows: 5, atmosphere: 4 }
+    aspect_tags:
+      - shows:great-performances
+      - atmosphere:international-crowd
+    audience_tags:
+      - audience:performance-lovers
+    comment_status: approved
+    status: approved
+  - event_id: brussels-latin-weekender-previous
+    email: bruno.santos@joinmovida.com
+    overall_sentiment: okay
+    comment: Fun weekend, though the salsa room was too hot by midnight.
+    aspect_scores: { venue-quality: 2, music: 4 }
+    aspect_tags:
+      - venue-quality:too-hot
+      - music:great-dj
+    audience_tags:
+      - audience:late-night-dancers
     comment_status: approved
     status: approved
 
