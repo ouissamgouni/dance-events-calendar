@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { assetFileError, memoryStrip, showMemoriesRow } from './eventAssets';
+import {
+    assetFileError,
+    memoryStrip,
+    rememberMemoryVisibility,
+    rememberedMemoryVisibility,
+    revealsAttendance,
+    showMemoriesRow,
+} from './eventAssets';
 
 const summary = (overrides = {}) => ({
     ticket_count: 0,
@@ -37,5 +44,28 @@ describe('memoryStrip / showMemoriesRow', () => {
         expect(showMemoriesRow(summary({ can_add_memory: true }))).toBe(true);
         expect(showMemoriesRow(summary({ memory_count: 1 }))).toBe(true);
         expect(showMemoriesRow(undefined)).toBe(false);
+    });
+});
+
+describe('memory sharing helpers', () => {
+    it('warns only when sharing with attendees would reveal a non-public RSVP', () => {
+        expect(revealsAttendance('attendees', 'friends')).toBe(true);
+        expect(revealsAttendance('attendees', 'private')).toBe(true);
+        expect(revealsAttendance('attendees', undefined)).toBe(true);
+        expect(revealsAttendance('attendees', 'public')).toBe(false);
+        expect(revealsAttendance('friends', 'private')).toBe(false);
+    });
+
+    it('shows the row for memories shared by others', () => {
+        expect(showMemoriesRow(summary({ shared_memory_count: 2 }))).toBe(true);
+    });
+
+    it('remembers the last memory audience and ignores junk', () => {
+        localStorage.removeItem('movida_memory_visibility');
+        expect(rememberedMemoryVisibility()).toBe('friends');
+        rememberMemoryVisibility('attendees');
+        expect(rememberedMemoryVisibility()).toBe('attendees');
+        localStorage.setItem('movida_memory_visibility', 'public');
+        expect(rememberedMemoryVisibility()).toBe('friends');
     });
 });

@@ -8,6 +8,8 @@ const KIND_LABELS: Record<string, string> = {
     subscription_saved: 'Friend saved',
     subscription_suggested: 'Suggested',
     subscription_review: 'Friend review',
+    subscription_memories: 'Friend memories',
+    event_memories_shared: 'Attendee memories',
     event_reminder: 'Reminder',
     event_review_prompt: 'Review prompt',
     event_ticket_prompt: 'Ticket prompt',

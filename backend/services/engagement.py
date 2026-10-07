@@ -39,7 +39,11 @@ from backend.db.models import (
     UserEventAttendance,
     UserSavedEvent,
 )
-from backend.services.notifications import fan_out_going, withdraw_going
+from backend.services.notifications import (
+    fan_out_going,
+    sync_memory_notifications,
+    withdraw_going,
+)
 
 EngagementKind = Literal["save", "going"]
 EngagementAction = Literal["add", "remove"]
@@ -263,6 +267,8 @@ def _remove(
     was_shared = any(r.share_audience in ("public", "friends") for r in rows_g)
     for row in rows_g:
         session.delete(row)
+    if rows_g:
+        sync_memory_notifications(session, target_user.id, event_id)
     if rows_g and was_shared and fan_out:
         # Mirror tracking.py: revoke the fan-out so the row doesn't
         # linger in subscribers' feeds.

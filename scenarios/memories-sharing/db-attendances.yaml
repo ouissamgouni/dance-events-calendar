@@ -1,0 +1,26 @@
+attendances:
+  - {
+      event_id: evt-memshare-gala,
+      email: sara@example.com,
+      share_audience: friends,
+    }
+  - {
+      event_id: evt-memshare-gala,
+      email: fred@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-memshare-gala,
+      email: alex@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-memshare-gala,
+      email: gina@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-memshare-open,
+      email: sara@example.com,
+      share_audience: friends,
+    }

@@ -1,0 +1,42 @@
+# Cast for "memories-sharing" (privacy matrix for shared memories).
+#   * sara  — sharer. Going to the gala with a friends-only RSVP.
+#   * fred  — mutual friend, Going.
+#   * fiona — mutual friend, NOT Going.
+#   * alex  — stranger, Going.
+#   * olga  — stranger, not Going.
+#   * pat   — follows Sara one-way (not a friend), not Going.
+#   * gina  — fred's friend, Going; second sharer so fred's feed groups.
+users:
+  - email: sara@example.com
+    name: Sara (sharer)
+    handle: sara
+    account_visibility: public
+    passport_visibility: friends
+    passport_show_timeline: true
+  - email: fred@example.com
+    name: Fred (friend, went)
+    handle: fred
+    account_visibility: public
+  - email: fiona@example.com
+    name: Fiona (friend, didn't go)
+    handle: fiona
+    account_visibility: public
+  - email: alex@example.com
+    name: Alex (stranger, went)
+    handle: alex
+    account_visibility: public
+  - email: olga@example.com
+    name: Olga (stranger)
+    handle: olga
+    account_visibility: public
+  - email: pat@example.com
+    name: Pat (one-way follower)
+    handle: pat
+    account_visibility: public
+  - email: gina@example.com
+    name: Gina (fred's friend, went)
+    handle: gina
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

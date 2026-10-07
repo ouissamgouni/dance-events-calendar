@@ -302,7 +302,7 @@ def test_memory_visibility_by_viewer(env):
         )
 
     assert captions("mia") == ["attendees", "friends", "private"]
-    assert captions("fred") == ["friends"]
+    assert captions("fred") == ["attendees", "friends"]
     assert captions("ana") == ["attendees"]
     assert captions("stan") == []
 

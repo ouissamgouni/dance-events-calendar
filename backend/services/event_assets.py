@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
+from sqlalchemy.orm import aliased
 from sqlmodel import Session, col, select
 
 from backend.db.models import (
@@ -23,6 +24,7 @@ from backend.db.models import (
     EventUserAsset,
     SiteSetting,
     UserEventAttendance,
+    UserFollow,
 )
 from backend.services import object_storage
 from backend.services.image_processing import (
@@ -40,6 +42,7 @@ KIND_MEMORY = "memory"
 TICKET_KINDS = (KIND_TICKET, KIND_TICKET_LINK)
 FILE_KINDS = (KIND_TICKET, KIND_MEMORY)
 VISIBILITIES = ("private", "friends", "attendees")
+SHARED_VISIBILITIES = ("friends", "attendees")
 
 KEY_PREFIX = "event-assets/"
 PDF_CONTENT_TYPE = "application/pdf"
@@ -411,34 +414,63 @@ def asset_urls(asset: EventUserAsset, client=None) -> dict:
     return urls
 
 
+def friend_ids(session: Session, user_id: UUID) -> set[UUID]:
+    """Mutual (approved both ways) follows of ``user_id``."""
+    f1 = aliased(UserFollow)
+    f2 = aliased(UserFollow)
+    rows = session.exec(
+        select(f1.followee_id)
+        .join(
+            f2,
+            (f2.follower_id == f1.followee_id) & (f2.followee_id == f1.follower_id),
+        )
+        .where(f1.follower_id == user_id)
+        .where(f1.status == "approved")
+        .where(f2.status == "approved")
+    ).all()
+    return {r if isinstance(r, UUID) else UUID(str(r)) for r in rows}
+
+
 def visible_to(
     session: Session,
     viewer_id: UUID,
     asset: EventUserAsset,
     viewer_is_going: bool,
+    friends: Optional[set[UUID]] = None,
 ) -> bool:
-    from backend.api.deps import is_mutual_follow
-
+    """Owner always; memories shared as ``friends`` reach mutual follows and
+    ``attendees`` additionally reaches other Going users. Tickets never."""
     if asset.user_id == viewer_id:
         return True
-    if asset.kind != KIND_MEMORY or asset.visibility == "private":
+    if asset.kind != KIND_MEMORY or asset.visibility not in SHARED_VISIBILITIES:
         return False
-    if asset.visibility == "attendees":
-        return viewer_is_going
+    if asset.visibility == "attendees" and viewer_is_going:
+        return True
+    if friends is not None:
+        return asset.user_id in friends
+    from backend.api.deps import is_mutual_follow
+
     return is_mutual_follow(session, viewer_id, asset.user_id)
 
 
-def event_assets_for_viewer(
-    session: Session, viewer_id: UUID, event_id: str
-) -> list[EventUserAsset]:
-    """Assets the viewer may see: their own (while going) + shared memories."""
-    going_owner_ids = set(
+def _going_user_ids(session: Session, event_id: str) -> set[UUID]:
+    return set(
         session.exec(
             select(UserEventAttendance.user_id)
             .where(UserEventAttendance.event_id == event_id)
             .where(col(UserEventAttendance.user_id).is_not(None))
         ).all()
     )
+
+
+def event_assets_for_viewer(
+    session: Session,
+    viewer_id: UUID,
+    event_id: str,
+    friends: Optional[set[UUID]] = None,
+) -> list[EventUserAsset]:
+    """Assets the viewer may see: their own (while going) + shared memories."""
+    going_owner_ids = _going_user_ids(session, event_id)
     viewer_is_going = viewer_id in going_owner_ids
     assets = session.exec(
         select(EventUserAsset)
@@ -446,7 +478,77 @@ def event_assets_for_viewer(
         .where(col(EventUserAsset.user_id).in_(going_owner_ids))
         .order_by(col(EventUserAsset.created_at))
     ).all()
-    return [a for a in assets if visible_to(session, viewer_id, a, viewer_is_going)]
+    if friends is None and any(a.user_id != viewer_id for a in assets):
+        friends = friend_ids(session, viewer_id)
+    return [
+        a for a in assets if visible_to(session, viewer_id, a, viewer_is_going, friends)
+    ]
+
+
+def shared_memory_counts(
+    session: Session, viewer_id: UUID, event_ids: list[str]
+) -> dict[str, int]:
+    """Per event, how many of OTHER users' memories ``viewer_id`` may see."""
+    if not event_ids:
+        return {}
+    rows = session.exec(
+        select(EventUserAsset)
+        .join(
+            UserEventAttendance,
+            (UserEventAttendance.event_id == EventUserAsset.event_id)
+            & (UserEventAttendance.user_id == EventUserAsset.user_id),
+        )
+        .where(col(EventUserAsset.event_id).in_(event_ids))
+        .where(EventUserAsset.kind == KIND_MEMORY)
+        .where(EventUserAsset.user_id != viewer_id)
+        .where(col(EventUserAsset.visibility).in_(SHARED_VISIBILITIES))
+    ).all()
+    if not rows:
+        return {}
+    viewer_going = set(
+        session.exec(
+            select(UserEventAttendance.event_id)
+            .where(UserEventAttendance.user_id == viewer_id)
+            .where(col(UserEventAttendance.event_id).in_(event_ids))
+        ).all()
+    )
+    friends = friend_ids(session, viewer_id)
+    counts: dict[str, int] = {}
+    for asset in rows:
+        if visible_to(
+            session, viewer_id, asset, asset.event_id in viewer_going, friends
+        ):
+            counts[asset.event_id] = counts.get(asset.event_id, 0) + 1
+    return counts
+
+
+def friend_memories_by_event(
+    session: Session, owner_id: UUID, event_ids: list[str]
+) -> dict[str, list[EventUserAsset]]:
+    """``owner_id``'s shared memories on events they're still Going to.
+
+    Callers must already have checked the viewer is a mutual follow: both
+    shared levels reach friends, so no per-asset check is needed here.
+    """
+    if not event_ids:
+        return {}
+    rows = session.exec(
+        select(EventUserAsset)
+        .join(
+            UserEventAttendance,
+            (UserEventAttendance.event_id == EventUserAsset.event_id)
+            & (UserEventAttendance.user_id == EventUserAsset.user_id),
+        )
+        .where(EventUserAsset.user_id == owner_id)
+        .where(col(EventUserAsset.event_id).in_(event_ids))
+        .where(EventUserAsset.kind == KIND_MEMORY)
+        .where(col(EventUserAsset.visibility).in_(SHARED_VISIBILITIES))
+        .order_by(col(EventUserAsset.created_at))
+    ).all()
+    grouped: dict[str, list[EventUserAsset]] = {}
+    for row in rows:
+        grouped.setdefault(row.event_id, []).append(row)
+    return grouped
 
 
 def user_assets_by_event(

@@ -28,6 +28,10 @@ export function getNotificationVerb(item: NotificationItem): string {
             return `added ${item.context || 'a session'} to their plan for`;
         case 'subscription_review':
             return item.context === 'past_edition' ? 'reviewed an earlier edition of' : 'reviewed';
+        case 'subscription_memories':
+            return 'shared memories from';
+        case 'event_memories_shared':
+            return 'New memories were shared from';
         case 'subscription_milestone':
             return item.context
                 ? `reached a milestone: ${item.context}`
@@ -118,6 +122,12 @@ export function resolveNotificationDestination(item: NotificationItem): string {
             return `/event/${item.event_id}/ticket`;
         case 'event_memories_prompt':
             return `/event/${item.event_id}/memories`;
+        case 'subscription_memories':
+            return item.actor.handle && (item.actor_count ?? 1) <= 1
+                ? `/event/${item.event_id}?by=${encodeURIComponent(item.actor.handle)}#memories`
+                : `/event/${item.event_id}#memories`;
+        case 'event_memories_shared':
+            return `/event/${item.event_id}#memories`;
         case 'event_reminder':
             return item.context === 'ask'
                 ? `/event/${item.event_id}/ask`
@@ -193,6 +203,8 @@ const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> =
     follow_request: 'people',
     follow_request_approved: 'people',
     subscription_review: 'reviews',
+    subscription_memories: 'reviews',
+    event_memories_shared: 'reviews',
     event_review_prompt: 'reviews',
     event_ticket_prompt: 'plans',
     event_memories_prompt: 'reviews',

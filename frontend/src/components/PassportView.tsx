@@ -22,10 +22,12 @@ import EventModal, { EventIdModal } from './EventModal';
 import MemoriesStrip from './MemoriesStrip';
 import { isPlainClick } from '../utils/plainClick';
 import { useEventAssetSummary } from '../context/EventAssetSummaryContext';
+import { fetchFriendMemorySummaries } from '../api';
 import PassportActivityHeatmap from './PassportActivityHeatmap';
 import PassportSummaryCard from './PassportSummaryCard';
 import type {
     CalendarEvent,
+    FriendMemorySummary,
     PassportConsistency,
     PassportMapEvent,
     PassportMilestone,
@@ -513,7 +515,7 @@ function TimelineEventMemories({ eventId, children }: { eventId: string; childre
     );
 }
 
-function JourneyEntryRow({ entry, anchorMonth, highlighted, showMemories, onOpenEvent }: { entry: JourneyEntry; anchorMonth?: string | null; highlighted?: boolean; showMemories?: boolean; onOpenEvent: (eventId: string) => void }) {
+function JourneyEntryRow({ entry, anchorMonth, highlighted, showMemories, friendMemories, memoriesOwner, onOpenEvent }: { entry: JourneyEntry; anchorMonth?: string | null; highlighted?: boolean; showMemories?: boolean; friendMemories?: FriendMemorySummary; memoriesOwner?: string | null; onOpenEvent: (eventId: string) => void }) {
     const date = railDate(entry.date);
     const place = entry.event
         ? [entry.event.city, entry.event.country].filter(Boolean).join(', ') || entry.event.location
@@ -551,6 +553,15 @@ function JourneyEntryRow({ entry, anchorMonth, highlighted, showMemories, onOpen
                 {entry.event && (showMemories
                     ? <TimelineEventMemories eventId={entry.event.event_id}>{eventLink}</TimelineEventMemories>
                     : eventLink)}
+                {entry.event && friendMemories && friendMemories.memory_count > 0 && (
+                    <div className="px-1">
+                        <MemoriesStrip
+                            eventId={entry.event.event_id}
+                            by={memoriesOwner}
+                            summary={{ ...friendMemories, ticket_count: 0, can_add_memory: false, memory_window_closes_at: null }}
+                        />
+                    </div>
+                )}
                 {entry.markers.length > 0 && (
                     <div className="max-w-[420px] divide-y divide-orange-100">
                         {entry.markers.map((marker) => <MilestoneCard key={marker.key} marker={marker} />)}
@@ -759,6 +770,8 @@ export interface PassportViewProps {
     onTimelineSearch?: (query: string) => void;
     /** Owner view: show memory thumbnails under each timeline event. */
     showTimelineMemories?: boolean;
+    /** Friend's profile: handle whose shared memories to show (server-filtered). */
+    timelineMemoriesOwner?: string | null;
 }
 
 export default function PassportView({
@@ -783,6 +796,7 @@ export default function PassportView({
     onNeedMapEvents,
     onTimelineSearch,
     showTimelineMemories = false,
+    timelineMemoriesOwner = null,
 }: PassportViewProps) {
     const [tab, setTab] = useState<PassportTab>(initialTab);
     const [selectedCategory, setSelectedCategory] = useState<MilestoneCategoryKey | null>(null);
@@ -794,6 +808,21 @@ export default function PassportView({
     const hasCountries = sections.includes('countries');
     const categories = useMemo(() => buildMilestoneCategories(data), [data]);
     const activeCategory = categories.find((category) => category.key === selectedCategory) ?? null;
+
+    const [friendMemoryState, setFriendMemoryState] = useState<{ key: string; rows: Record<string, FriendMemorySummary> } | null>(null);
+    const friendMemoryIds = useMemo(() => timelineItems.map((item) => item.event_id).slice(0, 200), [timelineItems]);
+    const friendMemoryKey = timelineMemoriesOwner && hasJourney && friendMemoryIds.length
+        ? `${timelineMemoriesOwner}|${friendMemoryIds.join(',')}`
+        : null;
+    useEffect(() => {
+        if (!friendMemoryKey || !timelineMemoriesOwner) return;
+        let cancelled = false;
+        fetchFriendMemorySummaries(timelineMemoriesOwner, friendMemoryIds)
+            .then((rows) => { if (!cancelled) setFriendMemoryState({ key: friendMemoryKey, rows }); })
+            .catch(() => { /* Memories are optional on a friend's passport. */ });
+        return () => { cancelled = true; };
+    }, [friendMemoryKey, friendMemoryIds, timelineMemoriesOwner]);
+    const friendMemories = friendMemoryState && friendMemoryState.key === friendMemoryKey ? friendMemoryState.rows : undefined;
 
     const selectTab = useCallback((next: PassportTab) => {
         setSelectedCategory(null);
@@ -966,6 +995,8 @@ export default function PassportView({
                                                                 anchorMonth={entry.event ? monthAnchorIds.get(entry.event.event_id) ?? null : null}
                                                                 highlighted={entry.event != null && highlightMonth != null && entry.event.start.slice(0, 7) === highlightMonth}
                                                                 showMemories={showTimelineMemories}
+                                                                friendMemories={entry.event ? friendMemories?.[entry.event.event_id] : undefined}
+                                                                memoriesOwner={timelineMemoriesOwner}
                                                                 onOpenEvent={(id) => setOpenEvent({ id })}
                                                             />
                                                         ))}

@@ -142,3 +142,24 @@ describe('notificationCategory', () => {
         expect(notificationCategory('suggestion_change_discarded')).toBe('others');
     });
 });
+
+describe('memory notifications', () => {
+    const actor = { handle: 'mia', display_name: 'Mia', avatar_url: null, is_verified_organizer: false };
+
+    it('deep-links a single friend to their trail and a group to the tab', () => {
+        expect(resolveNotificationDestination(item({ kind: 'subscription_memories', actor, actor_count: 1 })))
+            .toBe('/event/evt-1?by=mia#memories');
+        expect(resolveNotificationDestination(item({ kind: 'subscription_memories', actor, actor_count: 3 })))
+            .toBe('/event/evt-1#memories');
+    });
+
+    it('never puts a sharer in the attendee summary link', () => {
+        expect(resolveNotificationDestination(item({ kind: 'event_memories_shared', actor })))
+            .toBe('/event/evt-1#memories');
+    });
+
+    it('files both kinds under reviews', () => {
+        expect(notificationCategory('subscription_memories')).toBe('reviews');
+        expect(notificationCategory('event_memories_shared')).toBe('reviews');
+    });
+});

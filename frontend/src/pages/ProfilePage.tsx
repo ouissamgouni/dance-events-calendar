@@ -614,6 +614,8 @@ function HostingTabContent({ handle }: { handle: string }) {
 }
 
 function PassportTabContent({ handle }: { handle: string }) {
+    const { user: viewer } = useAuth();
+    const memoriesEnabled = Boolean(useOptionalFeatureFlags().eventMemoriesEnabled);
     const [data, setData] = useState<SharedPassportResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -645,6 +647,7 @@ function PassportTabContent({ handle }: { handle: string }) {
             timelineItems={data.timeline_items}
             timelineMarkers={data.timeline_markers}
             mapEvents={data.events}
+            timelineMemoriesOwner={viewer && memoriesEnabled && !data.is_self && data.is_following ? data.handle ?? handle : null}
         />
     );
 }

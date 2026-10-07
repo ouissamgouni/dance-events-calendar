@@ -58,6 +58,8 @@ VALID_KINDS = {
     "subscription_suggested",
     "subscription_review",
     "subscription_milestone",
+    "subscription_memories",
+    "event_memories_shared",
     "new_follower",
     "new_friend",
     "follow_request",
@@ -108,6 +110,7 @@ COLLAPSIBLE_KINDS = {
     "subscription_saved",
     "subscription_suggested",
     "subscription_review",
+    "subscription_memories",
 }
 MILESTONE_KINDS = {"milestone_unlocked", "subscription_milestone"}
 RELATIONSHIP_KINDS = {"new_follower", "new_friend"}
@@ -146,13 +149,20 @@ CATEGORY_KINDS: dict[str, set[str]] = {
         "follow_request",
         "follow_request_approved",
     },
-    "reviews": {"subscription_review", "event_review_prompt", "event_memories_prompt"},
+    "reviews": {
+        "subscription_review",
+        "event_review_prompt",
+        "event_memories_prompt",
+        "subscription_memories",
+        "event_memories_shared",
+    },
     "milestones": {"subscription_milestone", "milestone_unlocked"},
 }
 # Tribe > Activity feed: friend/follow-triggered kinds only.
 SOCIAL_KINDS = CATEGORY_KINDS["people"] | {
     "subscription_review",
     "subscription_milestone",
+    "subscription_memories",
 }
 VALID_CATEGORIES = set(CATEGORY_KINDS) | {"others", "social"}
 

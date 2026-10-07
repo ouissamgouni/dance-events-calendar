@@ -28,6 +28,7 @@ from backend.db.models import (
     CalendarSubscription,
     EventMessage,
     EventRating,
+    EventUserAsset,
     Notification,
     User,
     UserEventAttendance,
@@ -51,6 +52,11 @@ SUBSCRIPTION_REVIEW = "subscription_review"
 # A followee unlocked a Dance Passport milestone; fanned out to their
 # subscribers. Event-less (keyed by ``subject_key`` = milestone key).
 SUBSCRIPTION_MILESTONE = "subscription_milestone"
+# A friend shared memory photos from an event (one row per friend+sharer+event).
+SUBSCRIPTION_MEMORIES = "subscription_memories"
+# Attendee-level memories exist on an event the recipient attended; the
+# recipient is also the actor so no sharer identity is attached.
+EVENT_MEMORIES_SHARED = "event_memories_shared"
 NEW_FOLLOWER = "new_follower"
 NEW_FRIEND = "new_friend"
 # Phase E (E8): pending follow request awaiting approval. The recipient
@@ -651,6 +657,183 @@ def withdraw_saved(
         .where(Notification.kind == SUBSCRIPTION_SAVED)
         .where(Notification.actor_user_id == actor.id)
         .where(Notification.event_id == event_id)
+    ).all()
+    for row in rows:
+        session.delete(row)
+    if rows:
+        session.flush()
+    return len(rows)
+
+
+def _reconcile_memory_rows(
+    session: Session,
+    *,
+    kind: str,
+    event_id: str,
+    existing: list[Notification],
+    desired: dict,
+) -> None:
+    """Make ``existing`` rows match ``desired`` ({recipient_id: actor_id}).
+
+    Kept rows are untouched so later uploads never re-alert a recipient.
+    """
+    kept = set()
+    for row in existing:
+        if desired.get(row.recipient_user_id) == row.actor_user_id:
+            kept.add(row.recipient_user_id)
+        else:
+            session.delete(row)
+    for recipient_id, actor_id in desired.items():
+        if recipient_id in kept:
+            continue
+        notif = Notification(
+            recipient_user_id=recipient_id,
+            actor_user_id=actor_id,
+            kind=kind,
+            event_id=event_id,
+        )
+        session.add(notif)
+        session.flush()
+        record_delivery(session, notif.id, "app")
+    session.flush()
+
+
+def _active_user_ids(session: Session, user_ids) -> set:
+    if not user_ids:
+        return set()
+    return set(
+        session.exec(
+            select(User.id)
+            .where(col(User.id).in_(list(user_ids)))
+            .where(col(User.deleted_at).is_(None))
+        ).all()
+    )
+
+
+def sync_memory_notifications(session: Session, actor_id: UUID, event_id: str) -> None:
+    """Reconcile memory notifications after ``actor_id``'s memories on
+    ``event_id`` changed (upload, visibility, delete, un-Going, unfriend).
+
+    - ``subscription_memories``: one row per mutual friend of the sharer
+      while they have any shared memory there (both levels reach friends).
+    - ``event_memories_shared``: one sharer-less row per Going user who can
+      see at least one non-friend's attendee-level memory. ``actor`` is the
+      recipient so the sharer's identity never travels with it.
+
+    Caller owns the transaction.
+    """
+    from backend.services import event_assets
+
+    session.flush()
+    enabled = event_assets.memories_enabled(session) and bool(
+        eligible_event_ids(session, [event_id])
+    )
+    going = event_assets._going_user_ids(session, event_id) if enabled else set()
+
+    friend_targets: dict = {}
+    actor = session.get(User, actor_id)
+    if enabled and actor_id in going and actor is not None and not actor.deleted_at:
+        shares = session.exec(
+            select(EventUserAsset.id)
+            .where(EventUserAsset.user_id == actor_id)
+            .where(EventUserAsset.event_id == event_id)
+            .where(EventUserAsset.kind == event_assets.KIND_MEMORY)
+            .where(col(EventUserAsset.visibility).in_(event_assets.SHARED_VISIBILITIES))
+            .limit(1)
+        ).first()
+        if shares is not None:
+            recipients = _active_user_ids(
+                session, event_assets.friend_ids(session, actor_id) - {actor_id}
+            )
+            friend_targets = {rid: actor_id for rid in recipients}
+    _reconcile_memory_rows(
+        session,
+        kind=SUBSCRIPTION_MEMORIES,
+        event_id=event_id,
+        existing=list(
+            session.exec(
+                select(Notification)
+                .where(Notification.kind == SUBSCRIPTION_MEMORIES)
+                .where(Notification.actor_user_id == actor_id)
+                .where(Notification.event_id == event_id)
+            ).all()
+        ),
+        desired=friend_targets,
+    )
+
+    attendee_targets: dict = {}
+    sharers = (
+        set(
+            session.exec(
+                select(EventUserAsset.user_id)
+                .where(EventUserAsset.event_id == event_id)
+                .where(EventUserAsset.kind == event_assets.KIND_MEMORY)
+                .where(EventUserAsset.visibility == "attendees")
+                .where(col(EventUserAsset.user_id).in_(going))
+            ).all()
+        )
+        if going
+        else set()
+    )
+    sharers = _active_user_ids(session, sharers)
+    if sharers:
+        friend_pairs = _mutual_pairs(session, sharers, going)
+        for rid in _active_user_ids(session, going):
+            if any(s != rid and (s, rid) not in friend_pairs for s in sharers):
+                attendee_targets[rid] = rid
+    _reconcile_memory_rows(
+        session,
+        kind=EVENT_MEMORIES_SHARED,
+        event_id=event_id,
+        existing=list(
+            session.exec(
+                select(Notification)
+                .where(Notification.kind == EVENT_MEMORIES_SHARED)
+                .where(Notification.event_id == event_id)
+            ).all()
+        ),
+        desired=attendee_targets,
+    )
+
+
+def _mutual_pairs(session: Session, left: set, right: set) -> set:
+    """``(l, r)`` pairs from ``left`` x ``right`` that follow each other."""
+    edges = set(
+        session.exec(
+            select(UserFollow.follower_id, UserFollow.followee_id)
+            .where(UserFollow.status == "approved")
+            .where(
+                (
+                    col(UserFollow.follower_id).in_(list(left))
+                    & col(UserFollow.followee_id).in_(list(right))
+                )
+                | (
+                    col(UserFollow.follower_id).in_(list(right))
+                    & col(UserFollow.followee_id).in_(list(left))
+                )
+            )
+        ).all()
+    )
+    return {(a, b) for a, b in edges if a in left and (b, a) in edges}
+
+
+def withdraw_memory_notifications_between(
+    session: Session, user_a: UUID, user_b: UUID
+) -> int:
+    """Drop friend memory notifications once two users stop being friends."""
+    rows = session.exec(
+        select(Notification)
+        .where(Notification.kind == SUBSCRIPTION_MEMORIES)
+        .where(
+            (
+                (Notification.recipient_user_id == user_a)
+                & (Notification.actor_user_id == user_b)
+            )
+            | (
+                (Notification.recipient_user_id == user_b)
+                & (Notification.actor_user_id == user_a)
+            )
+        )
     ).all()
     for row in rows:
         session.delete(row)

@@ -8,7 +8,7 @@ import {
     uploadEventAsset,
 } from '../api';
 import { usePatchEventAssetSummary } from '../context/EventAssetSummaryContext';
-import type { EventAssets, EventUserAsset } from '../types';
+import type { EventAssets, EventAssetVisibility, EventUserAsset } from '../types';
 import { assetFileError, prepareAssetUpload } from '../utils/eventAssets';
 
 export type UploadKind = 'ticket' | 'memory';
@@ -44,6 +44,7 @@ export default function useEventAssets(eventId: string, enabled: boolean) {
                 .filter((a) => a.is_owner && a.kind === 'memory')
                 .slice(0, SUMMARY_THUMBS)
                 .map((a) => ({ id: a.id, thumb_url: a.thumb_url, visibility: a.visibility })),
+            shared_memory_count: data.assets.filter((a) => !a.is_owner && a.kind === 'memory').length,
         });
     }, [data, patchSummary]);
 
@@ -59,7 +60,7 @@ export default function useEventAssets(eventId: string, enabled: boolean) {
         }
     }, []);
 
-    const upload = useCallback(async (picked: File[], kind: UploadKind) => {
+    const upload = useCallback(async (picked: File[], kind: UploadKind, visibility?: EventAssetVisibility) => {
         if (!data) return;
         const remaining = kind === 'ticket'
             ? data.max_tickets - data.ticket_count
@@ -81,7 +82,7 @@ export default function useEventAssets(eventId: string, enabled: boolean) {
                     setError(`File is larger than ${maxMb}MB`);
                     return;
                 }
-                setData(await uploadEventAsset(eventId, kind, blob, name));
+                setData(await uploadEventAsset(eventId, kind, blob, name, kind === 'memory' ? visibility : undefined));
             }
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Upload failed');

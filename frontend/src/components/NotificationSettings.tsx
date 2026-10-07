@@ -96,8 +96,8 @@ const FEATURES: {
         },
         {
             key: 'friend_reviews',
-            label: 'Friend reviews',
-            description: 'When someone you follow reviews an event.',
+            label: 'Friend reviews & memories',
+            description: 'When someone you follow reviews an event, or a friend shares memories from one.',
             anchor: 'notify-friend-reviews',
         },
         {

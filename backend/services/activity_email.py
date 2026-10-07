@@ -72,6 +72,7 @@ ACTIVITY_KINDS = (
     "subscription_going",
     "subscription_suggested",
     "subscription_review",
+    "subscription_memories",
     "subscription_milestone",
     "new_follower",
     "new_friend",
@@ -91,6 +92,7 @@ FAST_PUSH_KINDS = frozenset(
         "subscription_going",
         "subscription_suggested",
         "subscription_review",
+        "subscription_memories",
         "subscription_milestone",
         "new_follower",
         "new_friend",
@@ -109,6 +111,8 @@ FEATURE_BY_KIND: dict[str, str] = {
     "subscription_going": "friends_going",
     "subscription_suggested": "suggested_events",
     "subscription_review": "friend_reviews",
+    # Shares the post-event "friend reviews" toggles.
+    "subscription_memories": "friend_reviews",
     "subscription_milestone": "friend_milestones",
     "new_follower": "social_activity",
     "new_friend": "social_activity",
@@ -165,7 +169,7 @@ _ACTOR_GROUPED_FEATURES = frozenset(
 # digest past-event guard, mirroring ``skip_past_guard`` in notifications.py.
 # Event-less kinds (milestones, follows) are exempt automatically since they
 # resolve to no event.
-_PAST_GUARD_EXEMPT_KINDS = frozenset({"subscription_review"})
+_PAST_GUARD_EXEMPT_KINDS = frozenset({"subscription_review", "subscription_memories"})
 _REACH_LABELS = {
     "any": "Any reach",
     "regional_plus": "Regional+",
@@ -380,6 +384,8 @@ def _render_line(
                 f"edition of {title}"
             )
         return f"<strong>{who}</strong> shared their experience of {title}"
+    if kind == "subscription_memories":
+        return f"<strong>{who}</strong> shared memories from {title}"
     if kind == "subscription_milestone":
         total_milestones = milestone_count or len(milestone_names or [])
         if total_milestones > 1:
@@ -470,6 +476,8 @@ def _render_plain(
         if context == "past_edition":
             return f"{who} shared their experience of an earlier edition of {title}"
         return f"{who} shared their experience of {title}"
+    if kind == "subscription_memories":
+        return f"{who} shared memories from {title}"
     if kind == "subscription_milestone":
         if milestone_names and len(milestone_names) > 1:
             return (

@@ -14,6 +14,7 @@ import type {
     EventRevisionSource,
     EventChangeCreate,
     EventVisibilityState,
+    FriendMemorySummary,
     MockSourceEvent,
     MockSourceSyncResult,
     OrganizedEvent,
@@ -1735,9 +1736,11 @@ export async function uploadEventAsset(
     kind: 'ticket' | 'memory',
     file: Blob,
     fileName: string,
+    visibility?: EventAssetVisibility,
 ): Promise<EventAssets> {
     const form = new FormData();
     form.append('kind', kind);
+    if (visibility) form.append('visibility', visibility);
     form.append('file', file, fileName);
     const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/assets`, {
         method: 'POST',
@@ -1796,6 +1799,20 @@ export async function fetchEventAssetSummaries(
         body: JSON.stringify({ event_ids: eventIds }),
     });
     return parseJsonResponse<Record<string, EventAssetSummary>>(res, 'Failed to load your files');
+}
+
+/** A friend's shared memories for their passport journey; ``{}`` unless allowed. */
+export async function fetchFriendMemorySummaries(
+    handle: string,
+    eventIds: string[],
+): Promise<Record<string, FriendMemorySummary>> {
+    const res = await fetch(`${BASE}/social/users/${encodeURIComponent(handle)}/event-assets/summary`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    return parseJsonResponse<Record<string, FriendMemorySummary>>(res, 'Failed to load memories');
 }
 
 export interface HandleAvailability {
@@ -2467,6 +2484,8 @@ export type NotificationKind =
     | 'subscription_saved'
     | 'subscription_suggested'
     | 'subscription_review'
+    | 'subscription_memories'
+    | 'event_memories_shared'
     | 'subscription_milestone'
     | 'new_follower'
     | 'new_friend'

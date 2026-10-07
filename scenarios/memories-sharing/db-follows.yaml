@@ -1,0 +1,8 @@
+follows:
+  - { follower: sara, followee: fred }
+  - { follower: fred, followee: sara }
+  - { follower: sara, followee: fiona }
+  - { follower: fiona, followee: sara }
+  - { follower: pat, followee: sara }
+  - { follower: gina, followee: fred }
+  - { follower: fred, followee: gina }

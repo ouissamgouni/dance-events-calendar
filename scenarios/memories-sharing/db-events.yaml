@@ -1,0 +1,46 @@
+# Events for "memories-sharing". Both are past and inside the memory window.
+base_week: 0
+events:
+  - id: evt-memshare-gala
+    calendar_id: memshare-cal-001
+    title: Paris Salsa Gala (shared memories)
+    description: Sara shared one photo per visibility level.
+    location: Studio Harmonic, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-1 Fri 21:00
+    end: w-1 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
+
+  - id: evt-memshare-open
+    calendar_id: memshare-cal-001
+    title: Lyon Bachata Night (upload here)
+    description: No memories yet — upload a batch to test notifications.
+    location: Salle Rameau, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-1 Sat 20:00
+    end: w-1 Sun 00:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
