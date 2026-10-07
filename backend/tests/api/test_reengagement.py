@@ -464,6 +464,33 @@ def test_review_prompt_skips_already_rated(session, monkeypatch):
     assert sent == []
 
 
+def test_review_prompt_still_sent_after_earlier_edition_review(session, monkeypatch):
+    """A review written about an earlier edition doesn't count as reviewing
+    the edition the user just attended."""
+    monkeypatch.setattr(
+        review_prompt_service, "send_event_review_prompt_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(
+        session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6)
+    )
+    _going(session, alice, "ev-past")
+    session.add(
+        EventRating(
+            event_id="ev-past",
+            user_id=alice.id,
+            stars=5,
+            status="approved",
+            scope="past_edition",
+        )
+    )
+    session.commit()
+
+    assert review_prompt_service.run_once()["prompts"] == 1
+
+
 def test_review_prompt_email_optout_keeps_inapp(session, monkeypatch):
     sent: list = []
     monkeypatch.setattr(
@@ -2303,12 +2330,22 @@ def test_send_push_prunes_stale_endpoints(session, monkeypatch):
             self.response = response
 
     class _Resp:
-        def __init__(self, status):
+        def __init__(self, status, text=""):
             self.status_code = status
+            self.text = text
 
     def fake_webpush(*, subscription_info, **kwargs):
         if "gone" in subscription_info["endpoint"]:
             raise FakeWebPushException("gone", response=_Resp(410))
+        if "rekeyed" in subscription_info["endpoint"]:
+            raise FakeWebPushException(
+                "forbidden",
+                response=_Resp(
+                    403,
+                    "the VAPID credentials in the authorization header do not "
+                    "correspond to the credentials used to create the subscriptions.",
+                ),
+            )
         return None  # delivered
 
     fake = types.ModuleType("pywebpush")
@@ -2331,6 +2368,11 @@ def test_send_push_prunes_stale_endpoints(session, monkeypatch):
     session.add(
         PushSubscription(
             user_id=alice.id, endpoint="https://push/gone", p256dh="a", auth="b"
+        )
+    )
+    session.add(
+        PushSubscription(
+            user_id=alice.id, endpoint="https://push/rekeyed", p256dh="a", auth="b"
         )
     )
     session.commit()

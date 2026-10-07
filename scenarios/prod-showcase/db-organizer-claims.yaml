@@ -18,6 +18,13 @@ organizer_claims:
     grant_badge: true
     status: rejected
     admin_notes: Organizer badges are reserved for event teams; ambassadors keep contributor access.
+  - submitter_email: penny.valdez@joinmovida.com
+    kind: events
+    status: approved
+    admin_notes: Penny co-organizes the Amalfi weekender with the local team.
+    events:
+      - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+        decision: approved
   - submitter_email: rave.republic@joinmovida.com
     kind: badge
     grant_badge: true

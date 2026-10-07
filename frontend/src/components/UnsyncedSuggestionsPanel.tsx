@@ -44,9 +44,9 @@ export default function UnsyncedSuggestionsPanel({ isOpen, onClose, suggestions,
             )}
 
             <div
-                className={`fixed top-0 right-0 h-full w-[420px] bg-surface shadow-lg border-l border-line z-50 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-full sm:w-[420px] bg-surface shadow-lg sm:border-l border-line z-50 flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas">
+                <div className="flex shrink-0 items-center justify-between px-4 py-2.5 border-b border-line bg-canvas" style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}>
                     <div className="flex items-center gap-2">
                         {onRefresh && (
                             <button
@@ -70,7 +70,7 @@ export default function UnsyncedSuggestionsPanel({ isOpen, onClose, suggestions,
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-muted hover:text-ink-soft text-sm leading-none p-1"
+                        className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 text-muted hover:text-ink-soft text-sm leading-none p-1"
                         aria-label="Close"
                     >
                         ✕
@@ -78,10 +78,10 @@ export default function UnsyncedSuggestionsPanel({ isOpen, onClose, suggestions,
                 </div>
 
                 {error && (
-                    <div className="px-4 py-2 bg-red-50 border-b border-red-100 text-[11px] text-danger">{error}</div>
+                    <div className="shrink-0 px-4 py-2 bg-red-50 border-b border-red-100 text-[11px] text-danger">{error}</div>
                 )}
 
-                <div className="overflow-y-auto" style={{ height: 'calc(100% - 48px)' }}>
+                <div className="min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
                     {unsynced.length === 0 ? (
                         <div className="text-center mt-12 px-4">
                             <p className="text-[11px] text-muted">All approved suggestions are synced</p>

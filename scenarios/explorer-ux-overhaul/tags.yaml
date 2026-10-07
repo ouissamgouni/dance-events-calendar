@@ -10,13 +10,53 @@ tag_groups:
         label: Salsa
         is_hero_filter: true
         hero_ordinal: 1
-        synonyms: ["salsa on1", "salsa on2", "linea", "línea", "la"]
-      - slug: cuban
-        label: Cuban (Casino)
-        synonyms: ["cubana", "salsa cubana", "casino", "rueda de casino"]
+      - slug: salsa-on1
+        label: Salsa On1 (LA)
+        synonyms: ["salsa on1", "on1", "la style", "linea", "línea"]
       - slug: mambo
-        label: Mambo (On2)
-        synonyms: ["ny style", "new york style", "on2"]
+        label: Salsa On2 (Mambo)
+        synonyms:
+          [
+            "salsa on2",
+            "on2",
+            "mambo",
+            "salsa mambo",
+            "ny style",
+            "new york style",
+          ]
+      - slug: cuban
+        label: Cuban Salsa (Casino)
+        synonyms:
+          [
+            "cubana",
+            "salsa cubana",
+            "cuban salsa",
+            "casino",
+            "rueda de casino",
+            "timba",
+          ]
+      - slug: son
+        label: Son
+        synonyms: ["son cubano"]
+      - slug: rueda
+        label: Rueda
+        synonyms: ["rueda de casino"]
+      - slug: afro-cuban
+        label: Afro-Cuban
+        synonyms:
+          [
+            "afro cubano",
+            "afro-cubano",
+            "rumba",
+            "rumba cubana",
+            "guaguancó",
+            "guaguanco",
+            "orishas",
+            "orisha",
+          ]
+      - slug: cha-cha
+        label: Cha-Cha
+        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
       - slug: bachata
         label: Bachata
         is_hero_filter: true
@@ -38,16 +78,16 @@ tag_groups:
         synonyms: ["kompa", "compas"]
       - slug: zouk
         label: Zouk
-        synonyms: ["brazilian zouk", "lambazouk"]
-      - slug: rueda
-        label: Rueda
-        synonyms: ["rueda de casino"]
-      - slug: cha-cha
-        label: Cha-Cha
-        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
-      - slug: son
-        label: Son
-        synonyms: ["son cubano"]
+        synonyms: ["brazilian zouk", "lambazouk", "lambada"]
+      - slug: argentine-tango
+        label: Argentine Tango
+        synonyms: ["tango", "tango argentino", "milonga"]
+      - slug: west-coast-swing
+        label: West Coast Swing
+        synonyms: ["wcs"]
+      - slug: lindy-hop
+        label: Lindy Hop
+        synonyms: ["lindy", "lindyhop"]
 
   - slug: format
     label: Format
@@ -92,8 +132,12 @@ tag_groups:
       - slug: festival
         label: Festival
         # NOTE: a dance "marathon" is its own format — keep it out of festival.
-        # Congress merged into festival (2026-05): treat congress/congreso as synonyms.
-        synonyms: ["congress", "congreso", "encuentro"]
+        synonyms: ["encuentro"]
+      # NOTE: default keeps `congress` as its own format tag (dev scenarios
+      # reference format:congress); prod merges it into festival synonyms.
+      - slug: congress
+        label: Congress
+        synonyms: ["congreso"]
       - slug: marathon
         label: Marathon
         ordinal: 6
@@ -110,22 +154,11 @@ tag_groups:
         label: Practice
         ordinal: 9
         synonyms: ["practica", "práctica", "training", "drill", "drills"]
-      - slug: trip
-        label: Trip
-        ordinal: 10
-        synonyms: ["getaway", "retreat", "tour", "excursion"]
-      - slug: live-band
-        label: Live band
-        ordinal: 11
-        synonyms: ["live music", "orchestra"]
+      # Scenario-only: db-events.yaml references format:pool-party.
       - slug: pool-party
         label: Pool party
         ordinal: 12
         synonyms: ["pool"]
-      - slug: beach-side
-        label: Beach Side
-        ordinal: 13
-        synonyms: ["beach"]
 
   - slug: reach
     label: Event reach
@@ -253,6 +286,25 @@ tag_groups:
   #     the venue group above.
   # Keeping subjective qualities out of the event taxonomy prevents
   # organisers from self-claiming them (Google/Yelp/Airbnb pattern).
+  # Default still keeps `vibe` as a dev-only group for scenarios that reference vibe:* tags.
+  - slug: vibe
+    label: Vibe
+    ordinal: 70
+    allow_multiple: true
+    color: "#e879f9"
+    tags:
+      - slug: good-music
+        label: Good Music
+      - slug: crowded
+        label: Crowded
+      - slug: spacious
+        label: Spacious
+      - slug: high-level-dancers
+        label: High-Level Dancers
+      - slug: social-atmosphere
+        label: Social Atmosphere
+      - slug: live-band
+        label: Live Band
 
   # ─────────────────────────────────────────────────────────────────────
   # Review aspects (scope: aspect). Each group is one aspect surfaced in the

@@ -29,6 +29,14 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
     return out;
 }
 
+/** Unknown keys count as matching so browsers that don't expose them never churn. */
+function sameKey(current: ArrayBuffer | null | undefined, key: string): boolean {
+    if (!current) return true;
+    const expected = urlBase64ToUint8Array(key);
+    const actual = new Uint8Array(current);
+    return actual.length === expected.length && actual.every((b, i) => b === expected[i]);
+}
+
 const isSupported = (): boolean =>
     typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
@@ -46,6 +54,14 @@ async function subscribeAndRegister(
 
     let sub = await reg.pushManager.getSubscription();
     console.log("Existing subscription:", sub);
+
+    // A subscription made with an older VAPID key is silently rejected by the push service.
+    if (sub && !sameKey(sub.options?.applicationServerKey, key)) {
+        console.log("VAPID key changed, re-subscribing...");
+        await unsubscribePush(sub.endpoint).catch(() => undefined);
+        await sub.unsubscribe();
+        sub = null;
+    }
 
     if (!sub) {
         console.log("Creating new subscription...");

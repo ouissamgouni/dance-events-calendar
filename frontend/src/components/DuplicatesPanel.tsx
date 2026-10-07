@@ -112,19 +112,19 @@ export default function DuplicatesPanel({ isOpen, onClose, onOpenEvent }: Props)
                 aria-hidden="true"
             />
             <div className="w-full max-w-2xl bg-surface shadow-xl flex flex-col">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-line">
-                    <h2 className="text-sm font-semibold text-ink">Duplicate events</h2>
+                <div className="flex items-center justify-between px-4 py-3 border-b border-line" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+                    <h2 className="text-base sm:text-sm font-semibold text-ink">Duplicate events</h2>
                     <div className="flex items-center gap-2">
                         <button
                             disabled={scanning}
                             onClick={scanNow}
-                            className="text-[11px] bg-action text-white px-2.5 py-1 hover:bg-action disabled:opacity-50"
+                            className="min-h-9 sm:min-h-0 text-sm sm:text-[11px] bg-action text-white px-2.5 py-1 hover:bg-action disabled:opacity-50"
                         >
                             {scanning ? 'Scanning…' : 'Scan now'}
                         </button>
                         <button
                             onClick={onClose}
-                            className="text-muted hover:text-ink text-sm px-2"
+                            className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 text-muted hover:text-ink text-sm px-2"
                         >
                             ✕
                         </button>
@@ -136,7 +136,7 @@ export default function DuplicatesPanel({ isOpen, onClose, onOpenEvent }: Props)
                         <button
                             key={t}
                             onClick={() => setActiveTab(t)}
-                            className={`px-3 py-2 text-xs font-medium capitalize ${activeTab === t
+                            className={`min-h-11 sm:min-h-0 px-3 py-2 text-sm sm:text-xs font-medium capitalize ${activeTab === t
                                 ? 'text-action border-b-2 border-action'
                                 : 'text-ink-soft hover:text-ink'
                                 }`}

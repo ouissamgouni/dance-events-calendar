@@ -19,6 +19,7 @@ import { DEFAULT_AREA_BBOX } from '../constants/area';
 import { BASEMAP_CONFIG } from '../constants/basemap';
 import { buildJourneyLegs } from '../utils/myEvents';
 import { allDayLastDay, eventDisplayZone, isSameEventDay } from '../utils/eventDates';
+import { isPlainClick } from '../utils/plainClick';
 
 export interface MapBounds {
     north: number;
@@ -200,6 +201,8 @@ interface Props {
     onEventHover?: (eventId: string | null) => void;
     /** Source value appended as ?src= on popup "Details" links */
     detailLinkSource?: string;
+    /** When set, a plain click on the popup "Details" link calls this instead of navigating. */
+    onOpenDetails?: (event: CalendarEvent) => void;
     /** Optional bounding box to render as a translucent rectangle, used by
      * the explorer to visualise the active preferred-area filter so users
      * understand why events outside it are hidden. Pass ``null`` to omit. */
@@ -293,12 +296,13 @@ interface PopupPortal {
     showFollowingOverlay: boolean;
 }
 
-function EventPopupContent({ event, followingCount, showFollowingOverlay, showRatings, detailLinkSource, formatDate, onEventClick, onMarkSeen, active, minimalPopup }: {
+function EventPopupContent({ event, followingCount, showFollowingOverlay, showRatings, detailLinkSource, onOpenDetails, formatDate, onEventClick, onMarkSeen, active, minimalPopup }: {
     event: CalendarEvent;
     followingCount: number;
     showFollowingOverlay: boolean;
     showRatings: boolean;
     detailLinkSource?: string;
+    onOpenDetails?: (event: CalendarEvent) => void;
     formatDate: (event: CalendarEvent) => string;
     onEventClick?: (event: CalendarEvent) => void;
     onMarkSeen?: (eventId: string) => void;
@@ -356,6 +360,11 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                 )}
                 <Link
                     to={`/event/${event.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
+                    onClick={onOpenDetails ? (e) => {
+                        if (!isPlainClick(e)) return;
+                        e.preventDefault();
+                        onOpenDetails(event);
+                    } : undefined}
                     className="text-[10px] font-medium text-action hover:text-action"
                 >
                     Details →
@@ -992,6 +1001,7 @@ function MarkerClusterLayer({
     markerRefs,
     clusterGroupRef,
     detailLinkSource,
+    onOpenDetails,
     formatDate,
     onEventClick,
     onEventHover,
@@ -1019,6 +1029,7 @@ function MarkerClusterLayer({
     markerRefs: MutableRefObject<Map<string, L.Marker>>;
     clusterGroupRef: MutableRefObject<L.MarkerClusterGroup | null>;
     detailLinkSource?: string;
+    onOpenDetails?: (event: CalendarEvent) => void;
     formatDate: (event: CalendarEvent) => string;
     onEventClick?: (event: CalendarEvent) => void;
     onEventHover?: (eventId: string | null) => void;
@@ -1210,6 +1221,7 @@ function MarkerClusterLayer({
                     showFollowingOverlay={portal.showFollowingOverlay}
                     showRatings={showRatings}
                     detailLinkSource={detailLinkSource}
+                    onOpenDetails={onOpenDetails}
                     formatDate={formatDate}
                     onEventClick={onEventClick}
                     onMarkSeen={onMarkSeen}
@@ -1223,7 +1235,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null, selectedEventId = null, fitAllToken, obscuredInsets, clustering = true }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, onOpenDetails, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null, selectedEventId = null, fitAllToken, obscuredInsets, clustering = true }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -1393,6 +1405,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 markerRefs={markerRefs}
                 clusterGroupRef={clusterGroupRef}
                 detailLinkSource={detailLinkSource}
+                onOpenDetails={onOpenDetails}
                 formatDate={formatDate}
                 onEventClick={onEventClick}
                 onEventHover={onEventHover}

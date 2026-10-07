@@ -39,13 +39,51 @@ import AdminUserMultiPicker from '../components/AdminUserMultiPicker';
 import AdminAssetPromptSendNow from '../components/AdminAssetPromptSendNow';
 import CalendarCurationRulesPanel from '../components/CalendarCurationRulesPanel';
 import { ConfirmDialog } from '../components/AppDialog';
+import BottomSheet from '../components/BottomSheet';
+import AdminBottomNav, { type AdminTab } from '../components/AdminBottomNav';
+import useMediaQuery from '../hooks/useMediaQuery';
+import { ArrowLeft, BadgeCheck, CalendarDays, ChevronRight, CloudOff, Copy, ListChecks, MapPinOff, MessageSquare, MoreHorizontal, RefreshCw, Repeat, Tags, Ticket, type LucideIcon } from 'lucide-react';
 import { useAdminCounters, notifyAdminDataChanged } from '../hooks/useAdminCounters';
+import { CHANGE_KINDS, CHANGE_KIND_META } from '../utils/eventRevisions';
 import { DATE_RANGE_PRESET_CHOICES, DEFAULT_EXPLORER_PERIOD } from '../utils/dateRangePresets';
 import type { DateRangePresetKey } from '../utils/dateRangePresets';
 
-type AdminTab = 'data' | 'configuration' | 'analytics' | 'users' | 'notifications';
 type ConfigurationTab = 'events-settings' | 'feature-flags' | 'tag-categories' | 'notifications';
+
+const ADMIN_TAB_LABELS: Record<AdminTab, string> = {
+    data: 'Data',
+    configuration: 'Configuration',
+    analytics: 'Analytics',
+    users: 'Users',
+    notifications: 'Notifications',
+};
 type SyncMode = 'incremental' | 'reseed';
+
+function AdminSyncShell({ mobile, message, onClose, children }: { mobile: boolean; message: string; onClose: () => void; children: ReactNode }) {
+    useBackToClose(onClose, mobile);
+    if (!mobile) return <>{children}</>;
+    return (
+        <div className="fixed inset-0 z-50 flex flex-col bg-canvas pt-[env(safe-area-inset-top)]">
+            <div className="flex shrink-0 items-center gap-1 border-b border-line bg-surface px-1">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Back"
+                    className="inline-flex h-11 w-11 items-center justify-center text-ink-soft hover:text-ink"
+                >
+                    <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+                </button>
+                <h2 className="text-base font-semibold text-ink">Calendar sync</h2>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                {message && (
+                    <p className="mb-4 bg-blue-50 border border-blue-100 px-3 py-1.5 text-[11px] text-action">{message}</p>
+                )}
+                {children}
+            </div>
+        </div>
+    );
+}
 
 function AdminInfoTooltip({ label }: { label: string }) {
     return (
@@ -58,7 +96,7 @@ function AdminInfoTooltip({ label }: { label: string }) {
             >
                 ?
             </button>
-            <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 hidden w-72 -translate-y-1/2 border border-line bg-surface px-2 py-1.5 text-[10px] font-normal leading-snug text-ink-soft shadow-lg group-hover:block group-focus-within:block">
+            <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 hidden w-[min(18rem,60vw)] -translate-y-1/2 border border-line bg-surface px-2 py-1.5 text-[10px] font-normal leading-snug text-ink-soft shadow-lg group-hover:block group-focus-within:block">
                 {label}
             </span>
         </span>
@@ -397,7 +435,8 @@ export default function Admin() {
     const [expandedDefaultTagsCalId, setExpandedDefaultTagsCalId] = useState<string | null>(null);
     const [expandedRulesCalId, setExpandedRulesCalId] = useState<string | null>(null);
     const [openMenuCalId, setOpenMenuCalId] = useState<string | null>(null);
-    useBackToClose(() => setOpenMenuCalId(null), openMenuCalId !== null);
+    const isMobile = useMediaQuery('(max-width: 639px)');
+    useBackToClose(() => setOpenMenuCalId(null), openMenuCalId !== null && !isMobile);
     const [confirmReseedOpen, setConfirmReseedOpen] = useState(false);
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [calendarDefaultTagIds, setCalendarDefaultTagIds] = useState<Record<string, number[]>>({});
@@ -410,6 +449,8 @@ export default function Admin() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const updateFlagFn = useUpdateFeatureFlag();
+    const [accountSheetOpen, setAccountSheetOpen] = useState(false);
+    const [syncPanelOpen, setSyncPanelOpen] = useState(false);
 
     // Sync activeTab with URL param (and redirect /admin -> /admin/data)
     useEffect(() => {
@@ -1630,6 +1671,47 @@ export default function Admin() {
     };
 
     const enabledCount = calendars.filter((c) => c.enabled).length;
+    const unsyncedCount = suggestions.filter((s) => s.status === 'approved' && !s.synced_to_google).length;
+    const openEventsPanel = (preset: EventsPanelPreset) => {
+        setEventsPanelPreset(preset);
+        if (preset === 'all') setEventsPanelCalendarId('');
+        setEventsPanelOpen(true);
+    };
+
+    type HubRow = { key: string; label: string; icon: LucideIcon; badges: { count: number; cls: string; title?: string; icon?: LucideIcon }[]; onOpen: () => void; detail?: string };
+    const reviewBadges = CHANGE_KINDS.map((kind) => ({
+        count: adminCounters.reviewByKind[kind] ?? 0,
+        cls: CHANGE_KIND_META[kind].badge,
+        title: CHANGE_KIND_META[kind].label,
+        icon: CHANGE_KIND_META[kind].icon,
+    }));
+    const queueRows: HubRow[] = [
+        {
+            key: 'review', label: 'Review', icon: ListChecks, onOpen: () => setReviewPanelOpen(true), badges: reviewBadges,
+        },
+        { key: 'tags', label: 'Tag suggestions', icon: Tags, onOpen: () => setTagSuggestionsPanelOpen(true), badges: [{ count: tagSuggestionCount, cls: 'bg-violet-500' }] },
+        { key: 'duplicates', label: 'Duplicates', icon: Copy, onOpen: () => setDuplicatesPanelOpen(true), badges: [{ count: duplicatesPendingCount, cls: 'bg-amber-500' }] },
+        { key: 'series', label: 'Series', icon: Repeat, onOpen: () => setSeriesPanelOpen(true), badges: [{ count: seriesPendingCount, cls: 'bg-amber-500' }] },
+        { key: 'feedback', label: 'Feedback', icon: MessageSquare, onOpen: () => setFeedbackPanelOpen(true), badges: [{ count: feedbackPendingCount, cls: 'bg-amber-500' }] },
+        { key: 'promo', label: 'Promo codes', icon: Ticket, onOpen: () => setPromoCodesPanelOpen(true), badges: [{ count: promoCodesPendingCount, cls: 'bg-amber-500' }] },
+        ...(organizerClaimsEnabled ? [{ key: 'claims', label: 'Organizer claims', icon: BadgeCheck, onOpen: () => setOrganizerClaimsPanelOpen(true), badges: [{ count: organizerClaimsPendingCount, cls: 'bg-amber-500' }] }] : []),
+        { key: 'unsynced', label: 'Unsynced', icon: CloudOff, onOpen: () => setUnsyncedPanelOpen(true), badges: [{ count: unsyncedCount, cls: 'bg-orange-500' }] },
+        { key: 'ungeolocated', label: 'Ungeolocated', icon: MapPinOff, onOpen: () => openEventsPanel('ungeolocated'), badges: [{ count: ungeolocatedCount, cls: 'bg-orange-500' }] },
+    ];
+    const dataHubGroups: { label: string; rows: HubRow[] }[] = [
+        { label: 'Queues', rows: queueRows },
+        {
+            label: 'Sync', rows: [{
+                key: 'sync', label: 'Calendar sync', icon: RefreshCw, onOpen: () => setSyncPanelOpen(true), badges: [],
+                detail: busy === 'sync' ? 'Syncing…' : `${enabledCount}/${calendars.length} on · Auto ${autoSyncEnabled ? 'on' : 'off'}`,
+            }],
+        },
+        { label: 'Browse', rows: [{ key: 'events', label: 'All events', icon: CalendarDays, onOpen: () => openEventsPanel('all'), badges: [] }] },
+    ];
+    const dataBadgeTotal = adminCounters.reviewNew + adminCounters.reviewEdits + tagSuggestionCount
+        + duplicatesPendingCount + seriesPendingCount + feedbackPendingCount + promoCodesPendingCount
+        + (organizerClaimsEnabled ? organizerClaimsPendingCount : 0);
+    const openMenuCal = isMobile ? calendars.find((c) => c.calendar_id === openMenuCalId) ?? null : null;
 
     const tabBtnClass = (tab: AdminTab) =>
         `text-[11px] font-medium px-2 py-1 sm:px-2.5 transition border ${activeTab === tab
@@ -1638,9 +1720,20 @@ export default function Admin() {
         }`;
 
     return (
-        <div className="mx-auto max-w-7xl px-5 py-6">
+        <div className="mx-auto flex min-h-full max-w-7xl flex-col px-4 pt-4 sm:block sm:px-5 sm:py-6">
             {/* ── Header ── */}
-            <div className="mb-5 space-y-2">
+            <div className="mb-4 flex items-center justify-between gap-2 sm:hidden">
+                <h1 className="text-2xl font-bold text-ink">{ADMIN_TAB_LABELS[activeTab]}</h1>
+                <button
+                    type="button"
+                    onClick={() => setAccountSheetOpen(true)}
+                    aria-label="Admin account"
+                    className="-mr-2 inline-flex h-11 w-11 items-center justify-center text-ink-soft hover:text-ink"
+                >
+                    <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+                </button>
+            </div>
+            <div className="mb-5 hidden space-y-2 sm:block">
                 <h1 className="-mt-2 text-sm font-semibold text-ink uppercase tracking-wide">Admin</h1>
                 <div className="flex flex-wrap items-start gap-2 sm:items-start sm:justify-between">
                     <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1664,8 +1757,45 @@ export default function Admin() {
                 </div>
             </div>
 
+            {/* ── Mobile queue list (Data tab) ── */}
+            {activeTab === 'data' && isMobile && (
+                <div className="-mx-4 mb-4 bg-surface">
+                    {dataHubGroups.map((group) => (
+                        <section key={group.label}>
+                            <h2 className="px-4 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">{group.label}</h2>
+                            <ul className="divide-y divide-line border-y border-line">
+                                {group.rows.map(({ key, label, icon: Icon, badges, onOpen, detail }) => (
+                                    <li key={key}>
+                                        <button
+                                            type="button"
+                                            onClick={onOpen}
+                                            className="flex min-h-14 w-full items-center gap-3 px-4 text-left hover:bg-canvas"
+                                        >
+                                            <Icon className="h-5 w-5 shrink-0 text-ink-soft" aria-hidden="true" />
+                                            <span className="flex-1 truncate text-[15px] font-medium text-ink">{label}</span>
+                                            {detail && <span className="shrink-0 text-xs text-ink-soft">{detail}</span>}
+                                            {badges.filter((b) => b.count > 0).map((b) => (
+                                                <span
+                                                    key={b.title ?? b.cls}
+                                                    title={b.title}
+                                                    className={`inline-flex h-5 min-w-5 items-center justify-center gap-0.5 px-1.5 text-[11px] font-semibold text-white ${b.cls}`}
+                                                >
+                                                    {b.icon && <b.icon className="h-3 w-3" aria-hidden="true" />}
+                                                    {b.count}
+                                                </span>
+                                            ))}
+                                            <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    ))}
+                </div>
+            )}
+
             {/* ── Action Bar (Data tab only) ── */}
-            {activeTab === 'data' && (
+            {activeTab === 'data' && !isMobile && (
                 <div className="mb-4 flex items-center gap-2 flex-wrap">
                     <button
                         onClick={() => { setEventsPanelPreset('all'); setEventsPanelCalendarId(''); setEventsPanelOpen(true); }}
@@ -1678,22 +1808,16 @@ export default function Admin() {
                         className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Review
-                        {adminCounters.reviewNew > 0 && (
+                        {reviewBadges.filter((b) => b.count > 0).map((b) => (
                             <span
-                                className="inline-flex items-center justify-center bg-action text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]"
-                                title={`${adminCounters.reviewNew} new event(s) or go-public request(s)`}
+                                key={b.title}
+                                className={`inline-flex items-center justify-center gap-0.5 ${b.cls} text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]`}
+                                title={`${b.count} ${b.title}`}
                             >
-                                {adminCounters.reviewNew}
+                                <b.icon className="h-3 w-3" aria-hidden="true" />
+                                {b.count}
                             </span>
-                        )}
-                        {adminCounters.reviewEdits > 0 && (
-                            <span
-                                className="inline-flex items-center justify-center bg-orange-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]"
-                                title={`${adminCounters.reviewEdits} edit(s), cancellation(s) or removal(s)`}
-                            >
-                                {adminCounters.reviewEdits}
-                            </span>
-                        )}
+                        ))}
                     </button>
                     <button
                         onClick={() => { setUnsyncedPanelOpen(true); }}
@@ -1793,344 +1917,330 @@ export default function Admin() {
             )}
 
             {/* ── Data Tab ── */}
-            {activeTab === 'data' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-                    {/* Left col (1/3): Calendar Sources */}
-                    <div className="border border-line bg-surface flex flex-col">
-                        <div className="px-4 py-2.5 border-b border-card-line bg-canvas">
-                            <h2 className="text-[11px] font-semibold text-ink uppercase tracking-wide">Calendar Sources</h2>
-                        </div>
-                        <div className="p-4 flex flex-col flex-1 gap-3">
-                            {/* Discover + Add Calendar Input row */}
-                            <div className="flex gap-1.5">
-                                <button
-                                    onClick={handleDiscover}
-                                    disabled={!!busy}
-                                    className="bg-gray-800 text-white text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition shrink-0"
-                                >
-                                    {busy === 'discover' ? '…' : 'Discover'}
-                                </button>
-                                <input
-                                    type="text"
-                                    value={newCalId}
-                                    onChange={(e) => setNewCalId(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddCalendar()}
-                                    placeholder="Calendar ID (e.g. user@gmail.com)"
-                                    className="flex-1 min-w-0 border border-line px-2.5 py-1.5 text-[11px] text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
-                                />
-                                <button
-                                    onClick={handleAddCalendar}
-                                    disabled={!!busy || !newCalId.trim()}
-                                    className="bg-gray-800 text-white text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition shrink-0"
-                                >
-                                    {busy === 'add' ? '…' : 'Add'}
-                                </button>
+            {activeTab === 'data' && (!isMobile || syncPanelOpen) && (
+                <AdminSyncShell mobile={isMobile} message={message} onClose={() => setSyncPanelOpen(false)}>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+                        {/* Left col (1/3): Calendar Sources */}
+                        <div className="border border-line bg-surface flex flex-col">
+                            <div className="px-4 py-2.5 border-b border-card-line bg-canvas">
+                                <h2 className="text-[11px] font-semibold text-ink uppercase tracking-wide">Calendar Sources</h2>
                             </div>
-
-                            {/* Calendar List */}
-                            <div className="flex-1 min-h-0 max-h-80 overflow-y-auto sm:max-h-none sm:overflow-visible">
-                                {loading ? (
-                                    <p className="text-[11px] text-muted">Loading…</p>
-                                ) : calendars.length === 0 ? (
-                                    <p className="text-[11px] text-muted">No calendars. Use "Discover" to find them.</p>
-                                ) : (
-                                    <ul className="divide-y divide-gray-100">
-                                        {calendars.map((cal) => (
-                                            <li key={cal.calendar_id} className="py-2 first:pt-0 last:pb-0">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        <input
-                                                            type="color"
-                                                            value={cal.color || '#3b82f6'}
-                                                            onChange={(e) => handleColorChange(cal, e.target.value)}
-                                                            className="h-4 w-4 cursor-pointer border-0 p-0 shrink-0"
-                                                            title="Change color"
-                                                        />
-                                                        <div className="min-w-0">
-                                                            {editingCalId === cal.calendar_id ? (
-                                                                <input
-                                                                    type="text"
-                                                                    value={editingName}
-                                                                    onChange={(e) => setEditingName(e.target.value)}
-                                                                    onBlur={() => handleNameSave(cal)}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') handleNameSave(cal);
-                                                                        if (e.key === 'Escape') setEditingCalId(null);
-                                                                    }}
-                                                                    autoFocus
-                                                                    className="text-[11px] font-medium text-ink border border-blue-400 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-action w-full"
-                                                                />
-                                                            ) : (
-                                                                <span
-                                                                    className="text-[11px] font-medium text-ink cursor-pointer hover:text-action transition block truncate"
-                                                                    onClick={() => handleNameEdit(cal)}
-                                                                    title={cal.calendar_id}
-                                                                >
-                                                                    {cal.name}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 shrink-0">
-                                                        <button
-                                                            onClick={() => handleToggle(cal)}
-                                                            className={`text-[10px] font-medium px-2 py-0.5 transition ${cal.enabled
-                                                                ? 'bg-emerald-50 text-success hover:bg-emerald-100'
-                                                                : 'bg-gray-100 text-muted hover:bg-canvas'
-                                                                }`}
-                                                            title="Whether the background job syncs new events from this calendar"
-                                                        >
-                                                            {cal.enabled ? 'Sync On' : 'Sync Off'}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleToggleShowEvents(cal)}
-                                                            className={`text-[10px] font-medium px-2 py-0.5 transition ${cal.show_events
-                                                                ? 'bg-blue-50 text-action hover:bg-blue-100'
-                                                                : 'bg-gray-100 text-muted hover:bg-canvas'
-                                                                }`}
-                                                            title="Whether this calendar's already-synced events are shown publicly"
-                                                        >
-                                                            {cal.show_events ? 'Shown' : 'Hidden'}
-                                                        </button>
-                                                        <div className="relative">
-                                                            <button
-                                                                onClick={() => setOpenMenuCalId((prev) => (prev === cal.calendar_id ? null : cal.calendar_id))}
-                                                                className={`flex h-5 w-5 items-center justify-center border transition ${openMenuCalId === cal.calendar_id
-                                                                    ? 'bg-gray-100 border-line text-ink'
-                                                                    : 'bg-surface border-line text-ink-soft hover:bg-canvas'
-                                                                    }`}
-                                                                title="More actions"
-                                                                aria-label="More actions"
-                                                                aria-haspopup="true"
-                                                                aria-expanded={openMenuCalId === cal.calendar_id}
-                                                            >
-                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                                                    <circle cx="12" cy="5" r="2" />
-                                                                    <circle cx="12" cy="12" r="2" />
-                                                                    <circle cx="12" cy="19" r="2" />
-                                                                </svg>
-                                                            </button>
-                                                            {openMenuCalId === cal.calendar_id && (
-                                                                <>
-                                                                    <div className="fixed inset-0 z-10" onClick={() => setOpenMenuCalId(null)} />
-                                                                    <div className="absolute right-0 top-full z-20 mt-1 w-40 border border-line bg-surface shadow-lg">
-                                                                        <button
-                                                                            onClick={() => { setOpenMenuCalId(null); handleShowCalendarEvents(cal.calendar_id); }}
-                                                                            className="block w-full px-3 py-1.5 text-left text-[11px] text-ink hover:bg-canvas"
-                                                                            title="Show all events from this calendar"
-                                                                        >
-                                                                            Events
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => { setOpenMenuCalId(null); handleToggleDefaultTags(cal.calendar_id); }}
-                                                                            className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] hover:bg-canvas ${expandedDefaultTagsCalId === cal.calendar_id ? 'text-violet-700' : 'text-ink'
-                                                                                }`}
-                                                                            title="Configure default tags for new events from this calendar"
-                                                                        >
-                                                                            <span>Tags</span>
-                                                                            {(calendarDefaultTagIds[cal.calendar_id]?.length ?? 0) > 0 && (
-                                                                                <span className="ml-2 inline-flex items-center justify-center bg-violet-500 text-white text-[9px] font-semibold px-1 min-w-[14px]">
-                                                                                    {calendarDefaultTagIds[cal.calendar_id].length}
-                                                                                </span>
-                                                                            )}
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => { setOpenMenuCalId(null); setExpandedRulesCalId((prev) => (prev === cal.calendar_id ? null : cal.calendar_id)); }}
-                                                                            className={`block w-full px-3 py-1.5 text-left text-[11px] hover:bg-canvas ${expandedRulesCalId === cal.calendar_id ? 'text-indigo-700' : 'text-ink'
-                                                                                }`}
-                                                                            title="Manage per-calendar curation (auto-add events to managed users' lists)"
-                                                                        >
-                                                                            Curation
-                                                                        </button>
-                                                                    </div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {expandedDefaultTagsCalId === cal.calendar_id && (
-                                                    <div className="mt-2 pl-6">
-                                                        <p className="text-[10px] text-muted mb-1.5">
-                                                            Default tags — applied to new events synced from this calendar:
-                                                        </p>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {tagGroups.filter((g) => g.enabled && (g.scope ?? 'event') === 'event').map((group) =>
-                                                                group.tags.filter((t) => t.enabled).map((tag) => {
-                                                                    const active = (calendarDefaultTagIds[cal.calendar_id] ?? []).includes(tag.id);
-                                                                    return (
-                                                                        <button
-                                                                            key={tag.id}
-                                                                            onClick={() => handleToggleDefaultTag(cal.calendar_id, tag.id)}
-                                                                            className={`text-[10px] px-2 py-0.5 border transition ${active
-                                                                                ? 'text-white border-transparent'
-                                                                                : 'bg-surface border-line text-ink-soft hover:bg-canvas'
-                                                                                }`}
-                                                                            style={active ? { backgroundColor: tag.color || '#7c3aed', borderColor: tag.color || '#7c3aed' } : {}}
-                                                                        >
-                                                                            {tag.label}
-                                                                        </button>
-                                                                    );
-                                                                })
-                                                            )}
-                                                            {tagGroups.length === 0 && (
-                                                                <span className="text-[10px] text-muted">No tags configured yet.</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {expandedRulesCalId === cal.calendar_id && (
-                                                    <CalendarCurationRulesPanel calendarId={cal.calendar_id} />
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </div>
-
-                            {/* Sync controls — under calendar list */}
-                            <div className="border-t border-card-line pt-3 space-y-2">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                    <label
-                                        className="inline-flex items-center gap-1 text-[11px] text-ink-soft"
-                                        title="Lower bound for fetching events from upstream calendars. Used on Reseed and on the first-ever sync of each calendar (or after a sync token expires). Incremental syncs always return only changes since the last successful fetch."
-                                    >
-                                        <span className="text-ink-soft">From</span>
-                                        <input
-                                            type="date"
-                                            value={syncSinceDate}
-                                            onChange={(e) => handleSyncSinceDateChange(e.target.value)}
-                                            className="border border-line px-1.5 py-1 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
-                                        />
-                                    </label>
+                            <div className="p-4 flex flex-col flex-1 gap-3">
+                                {/* Discover + Add Calendar Input row */}
+                                <div className="flex gap-1.5">
                                     <button
-                                        onClick={() => handleSync('incremental')}
-                                        disabled={!!busy || enabledCount === 0}
-                                        className="bg-action text-white text-[11px] font-medium px-3 py-1.5 hover:bg-action-strong disabled:opacity-50 transition"
+                                        onClick={handleDiscover}
+                                        disabled={!!busy}
+                                        className="bg-gray-800 text-white text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition shrink-0"
                                     >
-                                        {busy === 'sync' ? 'Syncing…' : `Sync Now (${enabledCount})`}
+                                        {busy === 'discover' ? '…' : 'Discover'}
                                     </button>
+                                    <input
+                                        type="text"
+                                        value={newCalId}
+                                        onChange={(e) => setNewCalId(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAddCalendar()}
+                                        placeholder="Calendar ID (e.g. user@gmail.com)"
+                                        className="flex-1 min-w-0 border border-line px-2.5 py-1.5 text-[11px] text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
+                                    />
                                     <button
-                                        onClick={() => handleSync('reseed')}
-                                        disabled={!!busy || enabledCount === 0}
-                                        className="bg-surface border border-line text-ink text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas disabled:opacity-50 transition"
-                                        title="Clear all sync tokens and re-fetch every event from the configured From date forward."
+                                        onClick={handleAddCalendar}
+                                        disabled={!!busy || !newCalId.trim()}
+                                        className="bg-gray-800 text-white text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition shrink-0"
                                     >
-                                        Reseed
+                                        {busy === 'add' ? '…' : 'Add'}
                                     </button>
                                 </div>
 
-                                <div className="border border-card-line bg-canvas px-2.5 py-2 space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] font-medium text-ink">Auto sync</span>
-                                        <button
-                                            onClick={handleToggleAutoSync}
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${autoSyncEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                {/* Calendar List */}
+                                <div className="flex-1 min-h-0">
+                                    {loading ? (
+                                        <p className="text-[11px] text-muted">Loading…</p>
+                                    ) : calendars.length === 0 ? (
+                                        <p className="text-[11px] text-muted">No calendars. Use "Discover" to find them.</p>
+                                    ) : (
+                                        <ul className="divide-y divide-gray-100">
+                                            {calendars.map((cal) => (
+                                                <li key={cal.calendar_id} className="py-2 first:pt-0 last:pb-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <input
+                                                                type="color"
+                                                                value={cal.color || '#3b82f6'}
+                                                                onChange={(e) => handleColorChange(cal, e.target.value)}
+                                                                className="h-6 w-6 sm:h-4 sm:w-4 cursor-pointer border-0 p-0 shrink-0"
+                                                                title="Change color"
+                                                            />
+                                                            <div className="min-w-0">
+                                                                {editingCalId === cal.calendar_id ? (
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editingName}
+                                                                        onChange={(e) => setEditingName(e.target.value)}
+                                                                        onBlur={() => handleNameSave(cal)}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') handleNameSave(cal);
+                                                                            if (e.key === 'Escape') setEditingCalId(null);
+                                                                        }}
+                                                                        autoFocus
+                                                                        className="text-[11px] font-medium text-ink border border-blue-400 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-action w-full"
+                                                                    />
+                                                                ) : (
+                                                                    <span
+                                                                        className="text-sm sm:text-[11px] font-medium text-ink cursor-pointer hover:text-action transition block truncate"
+                                                                        onClick={() => handleNameEdit(cal)}
+                                                                        title={cal.calendar_id}
+                                                                    >
+                                                                        {cal.name}
+                                                                    </span>
+                                                                )}
+                                                                <span className="block text-xs text-ink-soft sm:hidden">
+                                                                    {cal.enabled ? 'Sync on' : 'Sync off'} · {cal.show_events ? 'Shown' : 'Hidden'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            <button
+                                                                onClick={() => handleToggle(cal)}
+                                                                className={`hidden sm:inline-block text-[10px] font-medium px-2 py-0.5 transition ${cal.enabled
+                                                                    ? 'bg-emerald-50 text-success hover:bg-emerald-100'
+                                                                    : 'bg-gray-100 text-muted hover:bg-canvas'
+                                                                    }`}
+                                                                title="Whether the background job syncs new events from this calendar"
+                                                            >
+                                                                {cal.enabled ? 'Sync On' : 'Sync Off'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleToggleShowEvents(cal)}
+                                                                className={`hidden sm:inline-block text-[10px] font-medium px-2 py-0.5 transition ${cal.show_events
+                                                                    ? 'bg-blue-50 text-action hover:bg-blue-100'
+                                                                    : 'bg-gray-100 text-muted hover:bg-canvas'
+                                                                    }`}
+                                                                title="Whether this calendar's already-synced events are shown publicly"
+                                                            >
+                                                                {cal.show_events ? 'Shown' : 'Hidden'}
+                                                            </button>
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={() => setOpenMenuCalId((prev) => (prev === cal.calendar_id ? null : cal.calendar_id))}
+                                                                    className={`flex h-11 w-11 sm:h-5 sm:w-5 items-center justify-center border transition ${openMenuCalId === cal.calendar_id
+                                                                        ? 'bg-gray-100 border-line text-ink'
+                                                                        : 'bg-surface border-line text-ink-soft hover:bg-canvas'
+                                                                        }`}
+                                                                    title="More actions"
+                                                                    aria-label="More actions"
+                                                                    aria-haspopup="true"
+                                                                    aria-expanded={openMenuCalId === cal.calendar_id}
+                                                                >
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                        <circle cx="12" cy="5" r="2" />
+                                                                        <circle cx="12" cy="12" r="2" />
+                                                                        <circle cx="12" cy="19" r="2" />
+                                                                    </svg>
+                                                                </button>
+                                                                {openMenuCalId === cal.calendar_id && !isMobile && (
+                                                                    <>
+                                                                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuCalId(null)} />
+                                                                        <div className="absolute right-0 top-full z-20 mt-1 w-40 border border-line bg-surface shadow-lg">
+                                                                            <button
+                                                                                onClick={() => { setOpenMenuCalId(null); handleShowCalendarEvents(cal.calendar_id); }}
+                                                                                className="block w-full px-3 py-1.5 text-left text-[11px] text-ink hover:bg-canvas"
+                                                                                title="Show all events from this calendar"
+                                                                            >
+                                                                                Events
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => { setOpenMenuCalId(null); handleToggleDefaultTags(cal.calendar_id); }}
+                                                                                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] hover:bg-canvas ${expandedDefaultTagsCalId === cal.calendar_id ? 'text-violet-700' : 'text-ink'
+                                                                                    }`}
+                                                                                title="Configure default tags for new events from this calendar"
+                                                                            >
+                                                                                <span>Tags</span>
+                                                                                {(calendarDefaultTagIds[cal.calendar_id]?.length ?? 0) > 0 && (
+                                                                                    <span className="ml-2 inline-flex items-center justify-center bg-violet-500 text-white text-[9px] font-semibold px-1 min-w-[14px]">
+                                                                                        {calendarDefaultTagIds[cal.calendar_id].length}
+                                                                                    </span>
+                                                                                )}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => { setOpenMenuCalId(null); setExpandedRulesCalId((prev) => (prev === cal.calendar_id ? null : cal.calendar_id)); }}
+                                                                                className={`block w-full px-3 py-1.5 text-left text-[11px] hover:bg-canvas ${expandedRulesCalId === cal.calendar_id ? 'text-indigo-700' : 'text-ink'
+                                                                                    }`}
+                                                                                title="Manage per-calendar curation (auto-add events to managed users' lists)"
+                                                                            >
+                                                                                Curation
+                                                                            </button>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {expandedDefaultTagsCalId === cal.calendar_id && (
+                                                        <div className="mt-2 pl-6">
+                                                            <p className="text-[10px] text-muted mb-1.5">
+                                                                Default tags — applied to new events synced from this calendar:
+                                                            </p>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {tagGroups.filter((g) => g.enabled && (g.scope ?? 'event') === 'event').map((group) =>
+                                                                    group.tags.filter((t) => t.enabled).map((tag) => {
+                                                                        const active = (calendarDefaultTagIds[cal.calendar_id] ?? []).includes(tag.id);
+                                                                        return (
+                                                                            <button
+                                                                                key={tag.id}
+                                                                                onClick={() => handleToggleDefaultTag(cal.calendar_id, tag.id)}
+                                                                                className={`text-[10px] px-2 py-0.5 border transition ${active
+                                                                                    ? 'text-white border-transparent'
+                                                                                    : 'bg-surface border-line text-ink-soft hover:bg-canvas'
+                                                                                    }`}
+                                                                                style={active ? { backgroundColor: tag.color || '#7c3aed', borderColor: tag.color || '#7c3aed' } : {}}
+                                                                            >
+                                                                                {tag.label}
+                                                                            </button>
+                                                                        );
+                                                                    })
+                                                                )}
+                                                                {tagGroups.length === 0 && (
+                                                                    <span className="text-[10px] text-muted">No tags configured yet.</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {expandedRulesCalId === cal.calendar_id && (
+                                                        <CalendarCurationRulesPanel calendarId={cal.calendar_id} />
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+
+                                {/* Sync controls — under calendar list */}
+                                <div className="border-t border-card-line pt-3 space-y-2">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <label
+                                            className="inline-flex items-center gap-1 text-[11px] text-ink-soft"
+                                            title="Lower bound for fetching events from upstream calendars. Used on Reseed and on the first-ever sync of each calendar (or after a sync token expires). Incremental syncs always return only changes since the last successful fetch."
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${autoSyncEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            <span className="text-ink-soft">From</span>
+                                            <input
+                                                type="date"
+                                                value={syncSinceDate}
+                                                onChange={(e) => handleSyncSinceDateChange(e.target.value)}
+                                                className="border border-line px-1.5 py-1 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
+                                            />
+                                        </label>
+                                        <button
+                                            onClick={() => handleSync('incremental')}
+                                            disabled={!!busy || enabledCount === 0}
+                                            className="min-h-11 sm:min-h-0 bg-action text-white text-[11px] font-medium px-3 py-1.5 hover:bg-action-strong disabled:opacity-50 transition"
+                                        >
+                                            {busy === 'sync' ? 'Syncing…' : `Sync Now (${enabledCount})`}
+                                        </button>
+                                        <button
+                                            onClick={() => handleSync('reseed')}
+                                            disabled={!!busy || enabledCount === 0}
+                                            className="min-h-11 sm:min-h-0 bg-surface border border-line text-ink text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas disabled:opacity-50 transition"
+                                            title="Clear all sync tokens and re-fetch every event from the configured From date forward."
+                                        >
+                                            Reseed
                                         </button>
                                     </div>
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] text-ink-soft">Mode</span>
-                                        <select
-                                            value={autoSyncMode}
-                                            onChange={(e) => handleAutoSyncModeChange(e.target.value as SyncMode)}
-                                            disabled={!autoSyncEnabled}
-                                            className="border border-line px-1.5 py-0.5 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action disabled:bg-gray-100 disabled:text-muted"
-                                        >
-                                            <option value="incremental">Incremental</option>
-                                            <option value="reseed">Reseed</option>
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] text-ink-soft">Interval</span>
-                                        <div className="flex items-center gap-1">
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                max={1440}
-                                                value={syncInterval}
-                                                onChange={(e) => setSyncInterval(Number(e.target.value))}
-                                                disabled={!autoSyncEnabled}
-                                                className="w-14 border border-line px-1.5 py-0.5 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action disabled:bg-gray-100 disabled:text-muted"
-                                            />
-                                            <span className="text-[11px] text-muted">min</span>
+
+                                    <div className="border border-card-line bg-canvas px-2.5 py-2 space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[11px] font-medium text-ink">Auto sync</span>
                                             <button
-                                                onClick={handleSyncIntervalSave}
-                                                disabled={!autoSyncEnabled || !!busy || syncInterval < 1 || syncInterval > 1440}
-                                                className="bg-gray-800 text-white text-[11px] font-medium px-2 py-0.5 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                                onClick={handleToggleAutoSync}
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${autoSyncEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                             >
-                                                {busy === 'interval' ? '…' : 'Save'}
+                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${autoSyncEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                             </button>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[11px] text-ink-soft">Mode</span>
+                                            <select
+                                                value={autoSyncMode}
+                                                onChange={(e) => handleAutoSyncModeChange(e.target.value as SyncMode)}
+                                                disabled={!autoSyncEnabled}
+                                                className="border border-line px-1.5 py-0.5 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action disabled:bg-gray-100 disabled:text-muted"
+                                            >
+                                                <option value="incremental">Incremental</option>
+                                                <option value="reseed">Reseed</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[11px] text-ink-soft">Interval</span>
+                                            <div className="flex items-center gap-1">
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={1440}
+                                                    value={syncInterval}
+                                                    onChange={(e) => setSyncInterval(Number(e.target.value))}
+                                                    disabled={!autoSyncEnabled}
+                                                    className="w-14 border border-line px-1.5 py-0.5 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action disabled:bg-gray-100 disabled:text-muted"
+                                                />
+                                                <span className="text-[11px] text-muted">min</span>
+                                                <button
+                                                    onClick={handleSyncIntervalSave}
+                                                    disabled={!autoSyncEnabled || !!busy || syncInterval < 1 || syncInterval > 1440}
+                                                    className="bg-gray-800 text-white text-[11px] font-medium px-2 py-0.5 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                                >
+                                                    {busy === 'interval' ? '…' : 'Save'}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Right col (2/3): Progress card (when running) + Sync History */}
-                    <div className="lg:col-span-2 flex flex-col gap-4 min-w-0">
-                        {showSyncProgress && (
-                            <SyncProgressCard
-                                visible={showSyncProgress}
-                                jobId={syncJobId ?? undefined}
-                                onDismiss={() => { setShowSyncProgress(false); setSyncJobId(null); }}
-                                onJobComplete={() => {
-                                    // Refresh admin badges (pending review,
-                                    // ungeolocated, tag suggestions, …) so
-                                    // they reflect the freshly-synced state.
-                                    notifyAdminDataChanged();
-                                }}
-                            />
-                        )}
-                        <div className="flex-1 min-h-0">
-                            <SyncJobsHistoryTable />
+                        {/* Right col (2/3): Progress card (when running) + Sync History */}
+                        <div className="lg:col-span-2 flex flex-col gap-4 min-w-0">
+                            {showSyncProgress && (
+                                <SyncProgressCard
+                                    visible={showSyncProgress}
+                                    jobId={syncJobId ?? undefined}
+                                    onDismiss={() => { setShowSyncProgress(false); setSyncJobId(null); }}
+                                    onJobComplete={() => {
+                                        // Refresh admin badges (pending review,
+                                        // ungeolocated, tag suggestions, …) so
+                                        // they reflect the freshly-synced state.
+                                        notifyAdminDataChanged();
+                                    }}
+                                />
+                            )}
+                            <div className="flex-1 min-h-0">
+                                <SyncJobsHistoryTable />
+                            </div>
                         </div>
                     </div>
-                </div>
+                </AdminSyncShell>
             )}
 
             {/* ── Configuration Tab ── */}
             {activeTab === 'configuration' && (
                 <div className="space-y-4">
                     {/* Configuration Sub-tabs */}
-                    <div className="flex flex-wrap items-center gap-1">
-                        <button
-                            onClick={() => setActiveConfigTab('events-settings')}
-                            className={`text-[11px] font-medium px-2.5 py-1 transition border ${activeConfigTab === 'events-settings'
-                                ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
-                                : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
-                                }`}
-                        >
-                            Events settings
-                        </button>
-                        <button
-                            onClick={() => setActiveConfigTab('feature-flags')}
-                            className={`text-[11px] font-medium px-2.5 py-1 transition border ${activeConfigTab === 'feature-flags'
-                                ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
-                                : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
-                                }`}
-                        >
-                            Feature flags
-                        </button>
-                        <button
-                            onClick={() => setActiveConfigTab('tag-categories')}
-                            className={`text-[11px] font-medium px-2.5 py-1 transition border ${activeConfigTab === 'tag-categories'
-                                ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
-                                : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
-                                }`}
-                        >
-                            Tag categories
-                        </button>
-                        <button
-                            onClick={() => setActiveConfigTab('notifications')}
-                            className={`text-[11px] font-medium px-2.5 py-1 transition border ${activeConfigTab === 'notifications'
-                                ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
-                                : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
-                                }`}
-                        >
-                            Notifications
-                        </button>
+                    <div className="sticky top-0 z-20 -mx-4 flex items-center gap-1 overflow-x-auto bg-canvas px-4 py-2 sm:static sm:z-auto sm:mx-0 sm:flex-wrap sm:overflow-visible sm:bg-transparent sm:p-0">
+                        {([
+                            ['events-settings', 'Events settings'],
+                            ['feature-flags', 'Feature flags'],
+                            ['tag-categories', 'Tag categories'],
+                            ['notifications', 'Notifications'],
+                        ] as const).map(([tab, label]) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveConfigTab(tab)}
+                                className={`shrink-0 whitespace-nowrap min-h-10 sm:min-h-0 text-sm sm:text-[11px] font-medium px-3 sm:px-2.5 py-1 transition border ${activeConfigTab === tab
+                                    ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
+                                    : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
+                                    }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
                     </div>
 
                     {/* Events Settings Tab */}
@@ -3625,6 +3735,69 @@ export default function Admin() {
                     void handleSync('reseed', true);
                 }}
             />
+            {openMenuCal && (
+                <BottomSheet title={openMenuCal.name} subtitle={openMenuCal.calendar_id} onClose={() => setOpenMenuCalId(null)}>
+                    <ul className="-mx-4 divide-y divide-line">
+                        {([
+                            ['Sync new events', openMenuCal.enabled, () => handleToggle(openMenuCal)],
+                            ['Show events publicly', openMenuCal.show_events, () => handleToggleShowEvents(openMenuCal)],
+                        ] as const).map(([label, on, toggle]) => (
+                            <li key={label}>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={on}
+                                    onClick={toggle}
+                                    className="flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left text-sm text-ink hover:bg-canvas"
+                                >
+                                    {label}
+                                    {/* eslint-disable-next-line no-restricted-syntax -- toggle switch is a pill by design */}
+                                    <span className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition ${on ? 'bg-success' : 'bg-gray-300'}`}>
+                                        {/* eslint-disable-next-line no-restricted-syntax -- toggle knob is circular */}
+                                        <span className={`inline-block h-5 w-5 rounded-full bg-surface transition ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                                    </span>
+                                </button>
+                            </li>
+                        ))}
+                        {([
+                            ['Rename', () => handleNameEdit(openMenuCal)],
+                            ['Events', () => handleShowCalendarEvents(openMenuCal.calendar_id)],
+                            ['Default tags', () => handleToggleDefaultTags(openMenuCal.calendar_id)],
+                            ['Curation', () => setExpandedRulesCalId((prev) => (prev === openMenuCal.calendar_id ? null : openMenuCal.calendar_id))],
+                        ] as const).map(([label, action]) => (
+                            <li key={label}>
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenMenuCalId(null); action(); }}
+                                    className="flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left text-sm text-ink hover:bg-canvas"
+                                >
+                                    {label}
+                                    <ChevronRight className="h-4 w-4 text-muted" aria-hidden="true" />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </BottomSheet>
+            )}
+            {accountSheetOpen && (
+                <BottomSheet title="Admin" subtitle={user?.email} onClose={() => setAccountSheetOpen(false)}>
+                    <button
+                        type="button"
+                        onClick={() => { setAccountSheetOpen(false); handleLogout(); }}
+                        className="min-h-11 w-full border border-line bg-surface text-sm font-medium text-danger hover:bg-canvas"
+                    >
+                        Logout
+                    </button>
+                </BottomSheet>
+            )}
+            {isMobile && (
+                <>
+                    <div className="h-4 shrink-0" aria-hidden="true" />
+                    <div className="sticky bottom-0 z-30 -mx-4 mt-auto">
+                        <AdminBottomNav active={activeTab} onChange={changeTab} dataBadge={dataBadgeTotal} />
+                    </div>
+                </>
+            )}
         </div>
     );
 }

@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Repeat } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArrowLeft, Check, RefreshCw, Repeat, SlidersHorizontal, X } from 'lucide-react';
 import useBackToClose from '../hooks/useBackToClose';
-import type { AdminEventStatus, CalendarEvent, EventInterestReach, EventVisibilityState, SeriesGroup, DuplicateGroup } from '../types';
+import useMediaQuery from '../hooks/useMediaQuery';
+import useLongPress from '../hooks/useLongPress';
+import BottomSheet from './BottomSheet';
+import AdminLoadMore from './AdminLoadMore';
+import type { CalendarEvent, SeriesGroup, DuplicateGroup } from '../types';
 import type {
-    AdminEventFlag,
-    AdminEventGeoStatus,
+    AdminEventSort,
     EventFilterParams,
     EventFilterOptionsResponse,
-    FilterOption,
 } from '../api';
 import {
     fetchAdminEvents,
@@ -38,18 +40,39 @@ import TagsPicker from './TagsPicker';
 import SeriesGroupCard from './SeriesGroupCard';
 import DuplicateGroupCard from './DuplicateGroupCard';
 import MergeEventsDialog from './MergeEventsDialog';
-import { FlagIcon, WantsPublicChip } from './VisibilityChip';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import {
     ADMIN_EVENT_STATUS_CHIP_CLASSES,
     ADMIN_EVENT_STATUS_LABELS,
     getAdminEventRowClass,
     getAdminEventStatus,
-    getAdminEventStatusIcon,
     getRemovalReasonLabel,
+    hasOpenChanges,
     reviewLockReason,
 } from '../utils/adminEventStatus';
 import { formatCompactDateRange } from '../utils/eventDates';
+import { EventFlagIcons } from './admin-events/AdminEventCells';
+import AdminEventsToolbar from './admin-events/AdminEventsToolbar';
+import AdminEventsTable from './admin-events/AdminEventsTable';
+import AdminEventsColumnsMenu from './admin-events/AdminEventsColumnsMenu';
+import FilterEditor from './admin-events/FilterEditor';
+import useAdminEventsTablePrefs from './admin-events/useAdminEventsTablePrefs';
+import type { AdminColumnContext } from './admin-events/adminEventColumns';
+import {
+    DEFAULT_FILTERS,
+    FILTER_DIMENSIONS,
+    FILTER_GROUPS,
+    SORT_OPTIONS,
+    activeDimensions,
+    clearDimension,
+    defaultSortOrder,
+    dimensionSummary,
+    toFilterParams,
+    type AdminEventFilterState,
+    type SortOrder,
+} from './admin-events/adminEventFilters';
+
+export { MatchesCell } from './admin-events/AdminEventCells';
 
 export type EventsPanelPreset = 'all' | 'ungeolocated';
 
@@ -72,86 +95,10 @@ const PRESET_TITLES: Record<EventsPanelPreset, string> = {
     ungeolocated: 'Ungeolocated Events',
 };
 
-function toggled<T>(list: T[], value: T): T[] {
-    return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
-}
-
-function PillGroup<T extends string>({ label, options, selected, onToggle, icons = false }: {
-    label: string;
-    options: FilterOption[];
-    selected: T[];
-    onToggle: (value: T) => void;
-    icons?: boolean;
-}) {
-    return (
-        <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1">
-            <span className="text-[10px] uppercase tracking-wide text-muted">{label}</span>
-            {options.map((option) => {
-                const active = selected.includes(option.value as T);
-                return (
-                    <button
-                        key={option.value}
-                        type="button"
-                        aria-pressed={active}
-                        aria-label={icons ? `${option.label} (${option.count})` : undefined}
-                        title={icons ? option.label : undefined}
-                        onClick={() => onToggle(option.value as T)}
-                        className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 border transition ${active
-                            ? 'bg-blue-50 border-blue-300 text-action'
-                            : 'bg-surface border-line text-ink-soft hover:bg-canvas'
-                            }`}
-                    >
-                        {icons ? <><FlagIcon flag={option.value} size={12} /> {option.count}</> : `${option.label} (${option.count})`}
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
-
-const ENGAGEMENT_TOOLTIP = 'Visitors who accepted analytics cookies only; admins excluded.';
-
-function hasOpenChanges(event: CalendarEvent): boolean {
-    return Boolean(event.has_pending_changes) && getAdminEventStatus(event) !== 'removed';
-}
-
-function EventFlagIcons({ event }: { event: CalendarEvent }) {
-    return (
-        <span className="inline-flex items-center gap-1.5">
-            {event.visibility_state && <FlagIcon flag={event.visibility_state} />}
-            {event.wants_public && <WantsPublicChip />}
-            {event.is_submission && <FlagIcon flag="submitted" />}
-            {hasOpenChanges(event) && <FlagIcon flag="changes" />}
-        </span>
-    );
-}
-
-export function MatchesCell({ reach }: { reach?: EventInterestReach | null }) {
-    if (!reach) return <span className="text-muted">—</span>;
-    if (!reach.eligible) {
-        return (
-            <span
-                className="text-muted"
-                title={`No saved-search alerts: ${reach.ineligible_reason ?? 'unknown'} · ${reach.already_notified_users} notified earlier`}
-            >
-                —
-            </span>
-        );
-    }
-    if (reach.matched_users === 0) {
-        return <span className="text-muted" title="No saved search matches this event">0</span>;
-    }
-    const notYet = reach.would_alert_app;
-    const notified = reach.matched_users - notYet;
-    const summary =
-        `${notified} of ${reach.matched_users} matching users notified (${reach.matched_profiles} saved searches)` +
-        (notYet > 0 ? ` · ${notYet} not notified yet, alerted on next event update` : '');
-    return (
-        <span className={notYet > 0 ? 'font-medium text-amber-700' : 'text-ink'} title={summary}>
-            {notified}/{reach.matched_users}
-        </span>
-    );
-}
+const PRESET_HIDDEN_DIMENSIONS: Record<EventsPanelPreset, string[]> = {
+    all: [],
+    ungeolocated: ['geo'],
+};
 
 export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId }: Props) {
     useBackToClose(onClose, isOpen);
@@ -162,12 +109,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [filterOptions, setFilterOptions] = useState<EventFilterOptionsResponse | null>(null);
-    const [selectedCalendar, setSelectedCalendar] = useState<string>('');
-    const [selectedAudience, setSelectedAudience] = useState<EventVisibilityState[]>([]);
-    const [selectedStatus, setSelectedStatus] = useState<AdminEventStatus[]>([]);
-    const [selectedFlags, setSelectedFlags] = useState<AdminEventFlag[]>([]);
-    const [selectedGeoStatus, setSelectedGeoStatus] = useState<AdminEventGeoStatus | ''>('');
-    const [selectedTagIds, setSelectedTagIds] = useState<string>('');
+    const [filters, setFiltersState] = useState<AdminEventFilterState>(DEFAULT_FILTERS);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [allMatchingSelected, setAllMatchingSelected] = useState(false);
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
@@ -196,51 +138,75 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [selectedCurateHandles, setSelectedCurateHandles] = useState<Set<string>>(new Set());
     const [curateKind, setCurateKind] = useState<AdminBulkEngagementKind>('save');
     const [curateAudience, setCurateAudience] = useState<AdminBulkEngagementAudience | ''>('');
-    // Hide past events by default; toggle to include them.
-    const [hidePast, setHidePast] = useState(true);
     const [groupBySeries, setGroupBySeries] = useState(false);
-    const [sortBy, setSortBy] = useState<'start' | 'submitted'>('start');
+    const [sortBy, setSortBy] = useState<AdminEventSort>('start');
+    const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+    const tablePrefsState = useAdminEventsTablePrefs();
+    const { prefs: tablePrefs, setPrefs: setTablePrefs } = tablePrefsState;
     const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const seriesSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const isMobile = useMediaQuery('(max-width: 639px)');
+    const bindLongPress = useLongPress();
+    // Mobile appends pages; reloads after actions refetch everything already loaded.
+    const loadedCountRef = useRef(0);
+    const [selectMode, setSelectMode] = useState(false);
+    const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
+    const [actionsSheetOpen, setActionsSheetOpen] = useState(false);
+    const [prevSelectedCount, setPrevSelectedCount] = useState(0);
+    if (prevSelectedCount !== selectedIds.size) {
+        setPrevSelectedCount(selectedIds.size);
+        if (selectedIds.size === 0 && prevSelectedCount > 0) setSelectMode(false);
+    }
+    const selecting = isMobile && (selectMode || selectedIds.size > 0);
+
+    const setFilters = (next: AdminEventFilterState) => {
+        setFiltersState(next);
+        setPage(0);
+    };
+    const handleSort = (nextSort: AdminEventSort, nextOrder: SortOrder) => {
+        setSortBy(nextSort);
+        setSortOrder(nextOrder);
+        setPage(0);
+    };
 
     // Build filter params from current state
     const buildParams = useCallback(
         (pageOverride?: number): EventFilterParams => {
             const presetFilters = PRESET_FILTERS[preset];
             return {
+                ...toFilterParams(filters),
                 limit: PAGE_SIZE,
                 offset: (pageOverride ?? page) * PAGE_SIZE,
                 search: debouncedSearch || undefined,
-                audience: selectedAudience,
-                status: selectedStatus,
-                flags: selectedFlags,
-                calendar_id: selectedCalendar || undefined,
-                tag_ids: selectedTagIds || undefined,
-                geo_status: selectedGeoStatus || undefined,
                 ungeolocated: presetFilters.ungeolocated || undefined,
-                include_past: !hidePast || undefined,
                 group: groupBySeries ? 'series' : undefined,
                 sort: sortBy,
+                order: sortOrder === defaultSortOrder(sortBy) ? undefined : sortOrder,
             };
         },
-        [preset, page, debouncedSearch, selectedAudience, selectedStatus, selectedFlags, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast, groupBySeries, sortBy],
+        [preset, page, debouncedSearch, filters, groupBySeries, sortBy, sortOrder],
     );
 
     // Load events
     const loadEvents = useCallback(
-        async (pageOverride?: number) => {
+        async (pageOverride?: number, fresh = false) => {
             setLoading(true);
             try {
                 const params = buildParams(pageOverride);
+                if (isMobile) {
+                    params.offset = 0;
+                    params.limit = fresh ? PAGE_SIZE : Math.min(Math.max(loadedCountRef.current, PAGE_SIZE), 100);
+                }
                 // Fetch filter options without calendar_id so the calendar dropdown
                 // always shows all calendars regardless of the current selection.
                 const { calendar_id: _calId, ...rest } = params;
-                const optionParams = { ...rest, group: undefined, sort: undefined };
+                const optionParams = { ...rest, group: undefined, sort: undefined, order: undefined };
                 const [eventsRes, optionsRes] = await Promise.all([
                     fetchAdminEvents(params),
                     fetchEventFilterOptions(optionParams),
                 ]);
                 setEvents(eventsRes.items);
+                loadedCountRef.current = eventsRes.items.length;
                 setTotal(eventsRes.total);
                 setFilterOptions(optionsRes);
             } catch {
@@ -249,8 +215,24 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 setLoading(false);
             }
         },
-        [buildParams],
+        [buildParams, isMobile],
     );
+
+    const loadMore = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchAdminEvents({ ...buildParams(0), offset: loadedCountRef.current, limit: PAGE_SIZE });
+            const seen = new Set(events.map((e) => e.event_id));
+            const next = [...events, ...res.items.filter((e) => !seen.has(e.event_id))];
+            setEvents(next);
+            loadedCountRef.current = next.length;
+            setTotal(res.total);
+        } catch {
+            setMessage('Failed to load more events.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Reset state when panel opens or preset changes
     useEffect(() => {
@@ -258,12 +240,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setPage(0);
             setSearch('');
             setDebouncedSearch('');
-            setSelectedCalendar(initialCalendarId ?? '');
-            setSelectedAudience(PRESET_FILTERS[preset].audience ?? []);
-            setSelectedStatus(PRESET_FILTERS[preset].status ?? []);
-            setSelectedFlags([]);
-            setSelectedGeoStatus('');
-            setSelectedTagIds('');
+            setFiltersState({ ...DEFAULT_FILTERS, calendar: initialCalendarId ?? '' });
             setSelectedIds(new Set());
             setAllMatchingSelected(false);
             setMessage('');
@@ -271,9 +248,12 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setBulkTagPickerOpen(false);
             setBulkTagIds([]);
             setSelectedCurateHandles(new Set());
-            setHidePast(true);
             setGroupBySeries(false);
             setSortBy('start');
+            setSortOrder('asc');
+            setSelectMode(false);
+            setFiltersSheetOpen(false);
+            setActionsSheetOpen(false);
         }
     }, [isOpen, preset, initialCalendarId]);
 
@@ -294,7 +274,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     // Fetch when filters/page change
     useEffect(() => {
         if (isOpen) {
-            loadEvents();
+            loadEvents(undefined, true);
         }
     }, [isOpen, loadEvents]);
 
@@ -628,6 +608,179 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         }
     };
 
+    const hiddenDimensions = PRESET_HIDDEN_DIMENSIONS[preset];
+    const activeFilterChips: { key: string; label: string; onRemove: () => void }[] = [
+        ...activeDimensions(filters)
+            .filter((dim) => !hiddenDimensions.includes(dim.id))
+            .map((dim) => ({ key: dim.id, label: dimensionSummary(dim, filters, filterOptions), onRemove: () => setFiltersState(clearDimension(dim, filters)) })),
+        ...(groupBySeries ? [{ key: 'series', label: 'Grouped by series', onRemove: () => setGroupBySeries(false) }] : []),
+        ...(sortBy !== 'start' || sortOrder !== 'asc'
+            ? [{ key: 'sort', label: `Sort: ${SORT_OPTIONS.find((o) => o.value === sortBy)?.label} ${sortOrder === 'asc' ? '↑' : '↓'}`, onRemove: () => handleSort('start', 'asc') }]
+            : []),
+    ];
+    const resetFilters = () => {
+        setFilters(DEFAULT_FILTERS);
+        setGroupBySeries(false);
+        handleSort('start', 'asc');
+    };
+    const columnContext = useMemo<AdminColumnContext>(() => ({
+        selectedIds,
+        allPageSelected: events.length > 0 && selectedIds.size === events.length,
+        onSelectAll: () => {
+            setSelectedIds(selectedIds.size === events.length ? new Set() : new Set(events.map((e) => e.event_id)));
+            setAllMatchingSelected(false);
+        },
+        onToggleSelect: (eventId) => {
+            setSelectedIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(eventId)) next.delete(eventId);
+                else next.add(eventId);
+                return next;
+            });
+            setAllMatchingSelected(false);
+        },
+        onReview: (eventId) => {
+            reviewEvent(eventId).then(() => loadEvents()).catch(() => setMessage('Failed to review event.'));
+        },
+        calendarLabel: (calendarId) => filterOptions?.calendars.find((c) => c.value === calendarId)?.label ?? calendarId,
+    }), [selectedIds, events, filterOptions, loadEvents]);
+
+    const n = selectedIds.size;
+    type BulkActionKey = 'tags' | 'curate' | 'review' | 'geo' | 'suggest' | 'dups' | 'merge' | 'series' | 'add-series';
+    const bulkActions: { key: BulkActionKey; label: string; hint?: string; disabledReason?: string }[] = [
+        { key: 'tags', label: 'Assign tags' },
+        { key: 'curate', label: 'Curate to lists', hint: 'Saved/Going on admin-managed accounts' },
+        { key: 'review', label: 'Mark reviewed' },
+        { key: 'geo', label: 'Retry geocoding' },
+        { key: 'suggest', label: 'Auto-suggest tags', hint: 'Suggestions land in Tag suggestions' },
+        { key: 'dups', label: 'Flag as duplicates', disabledReason: n < 2 ? 'Select 2 or more events' : undefined },
+        { key: 'merge', label: 'Merge…', disabledReason: n < 2 || n > 6 ? 'Select 2–6 events' : undefined },
+        { key: 'series', label: 'Group as series', disabledReason: n < 2 || n > 20 ? 'Select 2–20 events' : undefined },
+        { key: 'add-series', label: 'Add to series', disabledReason: n > 20 ? 'Select up to 20 events' : undefined },
+    ];
+    const runBulkAction = (key: BulkActionKey) => {
+        setActionsSheetOpen(false);
+        if (key === 'tags') { setBulkTagIds([]); setBulkTagPickerOpen(true); }
+        else if (key === 'curate') setCuratePickerOpen(true);
+        else if (key === 'review') handleBulkReview();
+        else if (key === 'geo') handleBulkRetryGeo();
+        else if (key === 'suggest') handleBulkSuggestTags();
+        else if (key === 'dups') handleBulkFlagDuplicates();
+        else if (key === 'merge') setMergeIds([...selectedIds]);
+        else if (key === 'series') handleGroupAsSeries();
+        else { setSeriesSearch(''); setSeriesSearchResults([]); setAddSeriesPickerOpen(true); }
+    };
+
+    const enterSelection = (eventId: string) => {
+        setSelectMode(true);
+        if (!selectedIds.has(eventId)) handleToggleSelect(eventId);
+    };
+    const exitSelection = () => {
+        setSelectMode(false);
+        setSelectedIds(new Set());
+        setAllMatchingSelected(false);
+    };
+
+    const mobileList = (
+        <>
+            <ul className="divide-y divide-line">
+                {events.map((event) => {
+                    const status = getAdminEventStatus(event);
+                    const checked = selectedIds.has(event.event_id);
+                    const thumb = event.image_thumb_url ?? event.image_url;
+                    return (
+                        <li
+                            key={event.event_id}
+                            className={`flex select-none items-start gap-1 pr-1 [-webkit-touch-callout:none] ${checked ? 'bg-blue-100' : getAdminEventRowClass(event)} ${hasOpenChanges(event) ? 'border-l-4 border-orange-400' : ''}`}
+                            {...bindLongPress(() => enterSelection(event.event_id))}
+                        >
+                            <button
+                                type="button"
+                                aria-pressed={selecting ? checked : undefined}
+                                onClick={() => (selecting ? handleToggleSelect(event.event_id) : setAdminDetailEventId(event.event_id))}
+                                className="flex min-w-0 flex-1 items-start gap-3 py-3 pl-4 text-left"
+                            >
+                                {selecting && (
+                                    <span aria-hidden="true" className={`mt-3.5 flex h-5 w-5 shrink-0 items-center justify-center border ${checked ? 'border-action bg-action text-white' : 'border-line bg-surface'}`}>
+                                        {checked && <Check className="h-3.5 w-3.5" />}
+                                    </span>
+                                )}
+                                {thumb ? (
+                                    <img src={thumb} alt="" loading="lazy" className="h-12 w-12 shrink-0 object-cover" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+                                ) : (
+                                    <span aria-hidden="true" className="h-12 w-12 shrink-0 bg-canvas" style={event.color ? { backgroundColor: event.color, opacity: 0.25 } : undefined} />
+                                )}
+                                <span className="min-w-0 flex-1">
+                                    <span className={`flex items-start gap-1 text-sm font-medium leading-snug ${status === 'cancelled' ? 'text-ink-soft line-through' : 'text-ink'}`}>
+                                        {(event.in_series || (event.occurrence_count ?? 1) > 1) && (
+                                            <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-soft" aria-label="Series" role="img" />
+                                        )}
+                                        <span className="line-clamp-2">{event.title}</span>
+                                    </span>
+                                    <span className="mt-0.5 block truncate text-xs text-ink-soft">
+                                        {formatCompactDateRange(event)}
+                                        {(event.occurrence_count ?? 1) > 1 && ` ×${event.occurrence_count}`}
+                                        {event.location && ` · ${event.location}`}
+                                    </span>
+                                    <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                                        <span className={`inline-block px-1.5 py-0.5 text-[11px] font-medium ${ADMIN_EVENT_STATUS_CHIP_CLASSES[status]}`}>
+                                            {ADMIN_EVENT_STATUS_LABELS[status]}
+                                        </span>
+                                        {getRemovalReasonLabel(event) && (
+                                            <span className="inline-block bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-ink-soft">
+                                                {getRemovalReasonLabel(event)}
+                                            </span>
+                                        )}
+                                        <EventFlagIcons event={event} />
+                                        <LocationBadge location={event.location} latitude={event.latitude} longitude={event.longitude} size="sm" />
+                                    </span>
+                                </span>
+                            </button>
+                            {!selecting && status === 'new' && reviewLockReason(event) === null && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSingleReview(event.event_id)}
+                                    className="mt-1.5 inline-flex h-11 w-11 shrink-0 items-center justify-center text-action hover:bg-blue-50"
+                                    aria-label="Mark reviewed"
+                                >
+                                    <Check className="h-5 w-5" aria-hidden="true" />
+                                </button>
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+            <AdminLoadMore shown={events.length} total={total} loading={loading} onLoadMore={loadMore} />
+        </>
+    );
+
+    const sheetPillClass = (active: boolean) =>
+        `inline-flex min-h-10 items-center gap-1.5 border px-3 text-sm transition ${active ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:border-action hover:text-action'}`;
+    const sheetSection = (label: string, children: ReactNode) => (
+        <section className="space-y-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">{label}</h3>
+            {children}
+        </section>
+    );
+    const sheetSwitch = (label: string, on: boolean, toggle: () => void) => (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={on}
+            onClick={() => { toggle(); setPage(0); }}
+            className="flex min-h-12 w-full items-center justify-between gap-3 text-left text-sm text-ink"
+        >
+            {label}
+            {/* eslint-disable-next-line no-restricted-syntax -- toggle switch is a pill by design */}
+            <span className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition ${on ? 'bg-action' : 'bg-gray-300'}`}>
+                {/* eslint-disable-next-line no-restricted-syntax -- toggle knob is circular */}
+                <span className={`inline-block h-5 w-5 rounded-full bg-surface transition ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+            </span>
+        </button>
+    );
+    const sheetSelectClass = 'min-h-11 w-full border border-line bg-surface px-3 text-base text-ink focus:outline-none focus:ring-1 focus:ring-action';
+    const sheetPrimaryClass = 'min-h-11 w-full bg-action text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
+
     return (
         <>
             {isOpen && (
@@ -635,164 +788,153 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             )}
 
             <div
-                className={`fixed top-0 right-0 h-full w-[1100px] max-w-[95vw] bg-surface shadow-lg border-l border-line z-50 transform transition-transform duration-200 ease-in-out flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-full sm:w-[1100px] sm:max-w-[95vw] bg-surface shadow-lg sm:border-l border-line z-50 transform transition-transform duration-200 ease-in-out flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas shrink-0">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => loadEvents()}
-                            className={`text-muted hover:text-ink-soft p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
-                            title="Refresh"
-                            aria-label="Refresh"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="23 4 23 10 17 10" />
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                            </svg>
-                        </button>
-                        <h2 className="text-xs font-semibold text-ink uppercase tracking-wide">
-                            {PRESET_TITLES[preset]}
-                            {!loading && (
-                                <span className="ml-2 text-[10px] font-normal text-muted normal-case">
-                                    {total} event{total !== 1 ? 's' : ''}
-                                </span>
-                            )}
-                        </h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="text-muted hover:text-ink-soft text-sm leading-none p-1"
-                        aria-label="Close"
-                    >
-                        ✕
-                    </button>
-                </div>
-
-                {/* Filter Bar */}
-                <div className="px-4 py-2 border-b border-card-line space-y-2 shrink-0">
-                    {/* Search */}
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search title, description, location…"
-                        className="w-full border border-line px-2.5 py-1.5 text-[11px] text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
-                    />
-
-                    {/* Filter Chips */}
-                    {filterOptions && (
-                        <div className="flex flex-wrap gap-1.5">
-                            {/* Calendar filter */}
-                            {filterOptions.calendars.length > 0 && (
-                                <select
-                                    value={selectedCalendar}
-                                    onChange={(e) => { setSelectedCalendar(e.target.value); setPage(0); }}
-                                    className="border border-line text-[10px] text-ink-soft px-1.5 py-1 bg-surface focus:outline-none focus:ring-1 focus:ring-action"
-                                >
-                                    <option value="">All calendars</option>
-                                    {filterOptions.calendars.map((c) => (
-                                        <option key={c.value} value={c.value}>
-                                            {c.label} ({c.count})
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
-
-                            {/* Status pills: OR within a group, AND across groups */}
-                            <PillGroup<EventVisibilityState>
-                                label="Audience"
-                                options={filterOptions.audiences}
-                                selected={selectedAudience}
-                                icons
-                                onToggle={(v) => { setSelectedAudience((prev) => toggled(prev, v)); setPage(0); }}
-                            />
-                            <PillGroup<AdminEventStatus>
-                                label="Status"
-                                options={filterOptions.statuses}
-                                selected={selectedStatus}
-                                onToggle={(v) => { setSelectedStatus((prev) => toggled(prev, v)); setPage(0); }}
-                            />
-                            <PillGroup<AdminEventFlag>
-                                label="Flags"
-                                options={filterOptions.flags}
-                                selected={selectedFlags}
-                                icons
-                                onToggle={(v) => { setSelectedFlags((prev) => toggled(prev, v)); setPage(0); }}
-                            />
-
-                            {/* Geo status chips */}
-                            {preset === 'all' && filterOptions.geo_statuses.map((gs) => (
-                                <button
-                                    key={gs.value}
-                                    onClick={() => {
-                                        setSelectedGeoStatus((prev) => (
-                                            prev === gs.value ? '' : gs.value as AdminEventGeoStatus
-                                        ));
-                                        setPage(0);
-                                    }}
-                                    className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedGeoStatus === gs.value
-                                        ? 'bg-blue-50 border-blue-300 text-action'
-                                        : 'bg-surface border-line text-ink-soft hover:bg-canvas'
-                                        }`}
-                                >
-                                    {gs.label} ({gs.count})
-                                </button>
-                            ))}
-
-                            {/* Tag chips */}
-                            {filterOptions.tags.length > 0 && (
-                                <select
-                                    value={selectedTagIds}
-                                    onChange={(e) => { setSelectedTagIds(e.target.value); setPage(0); }}
-                                    className="border border-line text-[10px] text-ink-soft px-1.5 py-1 bg-surface focus:outline-none focus:ring-1 focus:ring-action"
-                                >
-                                    <option value="">All tags</option>
-                                    {filterOptions.tags.map((t) => (
-                                        <option key={t.value} value={t.value}>
-                                            {t.label} ({t.count})
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
-
-                            {/* Hide past events toggle */}
-                            <button
-                                onClick={() => { setHidePast((v) => !v); setPage(0); }}
-                                className={`text-[10px] font-medium px-2 py-0.5 border transition ${!hidePast
-                                    ? 'bg-blue-50 border-blue-300 text-action'
-                                    : 'bg-surface border-line text-ink-soft hover:bg-canvas'
-                                    }`}
-                                title={hidePast ? 'Past events hidden. Click to show them.' : 'Including past events. Click to hide them.'}
-                            >
-                                {hidePast ? 'Show past' : 'Hide past'}
+                {isMobile && (selecting ? (
+                    <div className="shrink-0 border-b border-line bg-blue-50 pt-[env(safe-area-inset-top)]">
+                        <div className="flex min-h-14 items-center gap-1 px-1">
+                            <button type="button" onClick={exitSelection} aria-label="Exit selection" className="inline-flex h-11 w-11 items-center justify-center text-ink">
+                                <X className="h-5 w-5" aria-hidden="true" />
                             </button>
-
+                            <span className="flex-1 text-base font-semibold text-ink">{selectedIds.size} selected</span>
+                            <button type="button" onClick={handleSelectAll} className="min-h-11 px-3 text-sm font-medium text-action">
+                                {events.length > 0 && selectedIds.size === events.length ? 'Deselect all' : 'Select all'}
+                            </button>
+                        </div>
+                        {allMatchingSelected ? (
+                            <p className="px-4 pb-2 text-xs text-ink-soft">All {selectedIds.size} matching events selected.</p>
+                        ) : events.length > 0 && selectedIds.size === events.length && total > events.length && (
                             <button
                                 type="button"
-                                aria-pressed={groupBySeries}
-                                onClick={() => { setGroupBySeries((v) => !v); setPage(0); }}
-                                className={`text-[10px] font-medium px-2 py-0.5 border transition ${groupBySeries
-                                    ? 'bg-blue-50 border-blue-300 text-action'
-                                    : 'bg-surface border-line text-ink-soft hover:bg-canvas'
-                                    }`}
-                                title="One row per series"
+                                onClick={handleSelectAllMatching}
+                                disabled={busy === 'select-all'}
+                                className="px-4 pb-2 text-left text-xs font-semibold text-action disabled:opacity-50"
                             >
-                                Group by series
+                                {busy === 'select-all' ? 'Selecting…' : `Select all ${total} matching events`}
                             </button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="flex min-h-14 shrink-0 items-center gap-1 border-b border-line bg-surface px-1 pt-[env(safe-area-inset-top)]">
+                        <button type="button" onClick={onClose} aria-label="Close" className="inline-flex h-11 w-11 items-center justify-center text-ink">
+                            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+                        </button>
+                        <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">
+                            {PRESET_TITLES[preset]}
+                            <span className="ml-2 text-sm font-normal text-ink-soft">{total}</span>
+                        </h2>
+                        <button type="button" onClick={() => loadEvents()} aria-label="Refresh" className="inline-flex h-11 w-11 items-center justify-center text-ink-soft">
+                            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+                        </button>
+                        <button type="button" onClick={() => setSelectMode(true)} disabled={events.length === 0} className="min-h-11 px-3 text-sm font-medium text-action disabled:opacity-50">
+                            Select
+                        </button>
+                    </div>
+                ))}
 
-                            <select
-                                value={sortBy}
-                                onChange={(e) => { setSortBy(e.target.value as 'start' | 'submitted'); setPage(0); }}
-                                aria-label="Sort"
-                                className="border border-line text-[10px] text-ink-soft px-1.5 py-1 bg-surface focus:outline-none focus:ring-1 focus:ring-action"
+                {isMobile && (
+                    <div className="shrink-0 space-y-2 border-b border-card-line px-4 py-2">
+                        <div className="flex gap-2">
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search events…"
+                                aria-label="Search events"
+                                className="min-h-11 min-w-0 flex-1 border border-line px-3 text-base text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setFiltersSheetOpen(true)}
+                                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 border border-line bg-surface px-3 text-sm font-medium text-ink"
                             >
-                                <option value="start">By date</option>
-                                <option value="submitted">Newest submitted</option>
-                            </select>
+                                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                                Filters
+                                {activeFilterChips.length > 0 && (
+                                    <span className="inline-flex h-5 min-w-5 items-center justify-center bg-action px-1 text-[11px] font-semibold text-white">{activeFilterChips.length}</span>
+                                )}
+                            </button>
                         </div>
-                    )}
-                </div>
+                        {activeFilterChips.length > 0 && (
+                            <div className="-mx-4 flex gap-2 overflow-x-auto px-4">
+                                {activeFilterChips.map((chip) => (
+                                    <button
+                                        key={chip.key}
+                                        type="button"
+                                        onClick={() => { chip.onRemove(); setPage(0); }}
+                                        aria-label={`Remove filter ${chip.label}`}
+                                        className="inline-flex min-h-8 shrink-0 items-center gap-1 border border-action bg-blue-50 px-2.5 text-xs font-medium text-action"
+                                    >
+                                        {chip.label}
+                                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Header */}
+                {!isMobile && (
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas shrink-0">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => loadEvents()}
+                                className={`text-muted hover:text-ink-soft p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
+                                title="Refresh"
+                                aria-label="Refresh"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="23 4 23 10 17 10" />
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                                </svg>
+                            </button>
+                            <h2 className="text-xs font-semibold text-ink uppercase tracking-wide">
+                                {PRESET_TITLES[preset]}
+                                {!loading && (
+                                    <span className="ml-2 text-[10px] font-normal text-muted normal-case">
+                                        {total} event{total !== 1 ? 's' : ''}
+                                    </span>
+                                )}
+                            </h2>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="text-muted hover:text-ink-soft text-sm leading-none p-1"
+                            aria-label="Close"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
+
+                {/* Filter Bar */}
+                {!isMobile && (
+                    <AdminEventsToolbar
+                        search={search}
+                        onSearchChange={setSearch}
+                        filters={filters}
+                        onFiltersChange={setFilters}
+                        options={filterOptions}
+                        sort={sortBy}
+                        order={sortOrder}
+                        onSort={handleSort}
+                        groupBySeries={groupBySeries}
+                        onToggleGroupBySeries={() => { setGroupBySeries((v) => !v); setPage(0); }}
+                        hiddenDimensions={hiddenDimensions}
+                        columnsMenu={(
+                            <AdminEventsColumnsMenu
+                                prefs={tablePrefs}
+                                onChange={setTablePrefs}
+                                onReset={tablePrefsState.reset}
+                                onSaveAsDefault={tablePrefsState.saveAsDefault}
+                                onFactoryReset={tablePrefsState.factoryReset}
+                                hasUserDefault={tablePrefsState.hasUserDefault}
+                                isDefault={tablePrefsState.isDefault}
+                            />
+                        )}
+                    />
+                )}
 
                 {/* Message */}
                 {message && (
@@ -809,176 +951,30 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             <p className="text-xs">Loading…</p>
                         </div>
                     ) : events.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-muted">
+                        <div className="flex h-full flex-col items-center justify-center gap-2 text-muted">
                             <p className="text-xs">No events match your filters.</p>
+                            {activeFilterChips.length > 0 && (
+                                <button type="button" onClick={resetFilters} className="border border-line bg-surface px-3 py-1 text-xs font-medium text-ink hover:bg-canvas">
+                                    Clear filters
+                                </button>
+                            )}
                         </div>
-                    ) : (
-                        <table className="w-full text-[11px]">
-                            <thead className="sticky top-0 bg-canvas border-b border-line z-10">
-                                <tr>
-                                    <th className="w-8 px-2 py-2 text-left">
-                                        <input
-                                            type="checkbox"
-                                            checked={events.length > 0 && selectedIds.size === events.length}
-                                            onChange={handleSelectAll}
-                                            className="h-3 w-3"
-                                        />
-                                    </th>
-                                    <th className="w-full px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide">Title</th>
-                                    <th className="hidden sm:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide whitespace-nowrap">Date</th>
-                                    <th className="hidden md:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Submitter</th>
-                                    <th className="hidden md:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-16">Image</th>
-                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-20">Status</th>
-                                    <th className="hidden sm:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-20">Flags</th>
-                                    <th className="hidden md:table-cell px-2 py-2 text-center font-semibold text-ink-soft uppercase tracking-wide w-10">Geo</th>
-                                    <th className="hidden md:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Tags</th>
-                                    <th className="hidden md:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24" title="Users whose saved searches match: notified / matching">Matches</th>
-                                    <th className="hidden md:table-cell px-2 py-2 text-right font-semibold text-ink-soft uppercase tracking-wide w-12" title={ENGAGEMENT_TOOLTIP}>Views</th>
-                                    <th className="hidden md:table-cell px-2 py-2 text-right font-semibold text-ink-soft uppercase tracking-wide w-12" title={ENGAGEMENT_TOOLTIP}>Clicks</th>
-                                    <th className="px-2 py-2 w-16"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {events.map((event) => (
-                                    <tr
-                                        key={event.event_id}
-                                        className={`transition cursor-pointer ${getAdminEventRowClass(event)}`}
-                                        onClick={() => setAdminDetailEventId(event.event_id)}
-                                    >
-                                        <td className={`px-2 py-1.5 ${hasOpenChanges(event) ? 'border-l-4 border-orange-400' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.has(event.event_id)}
-                                                onChange={() => handleToggleSelect(event.event_id)}
-                                                className="h-3 w-3"
-                                            />
-                                        </td>
-                                        <td className="max-w-0 px-2 py-1.5">
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                {event.color && (
-                                                    <span
-                                                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                                                        style={{ backgroundColor: event.color }}
-                                                    />
-                                                )}
-                                                {(event.in_series || (event.occurrence_count ?? 1) > 1) && (
-                                                    <Repeat className="h-3 w-3 shrink-0 text-ink-soft" aria-label="Series" role="img" />
-                                                )}
-                                                <span className={`truncate font-medium ${getAdminEventStatus(event) === 'cancelled' ? 'text-ink-soft line-through' : 'text-ink'}`}>
-                                                    {event.title}
-                                                </span>
-                                            </div>
-                                            {event.location && (
-                                                <p className="text-[10px] text-muted truncate mt-0.5">
-                                                    {event.location}
-                                                </p>
-                                            )}
-                                            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-ink-soft sm:hidden">
-                                                <span className="whitespace-nowrap">{formatCompactDateRange(event)}</span>
-                                                <EventFlagIcons event={event} />
-                                            </div>
-                                        </td>
-                                        <td className="hidden sm:table-cell px-2 py-1.5 text-ink-soft whitespace-nowrap">
-                                            {formatCompactDateRange(event)}
-                                            {(event.occurrence_count ?? 1) > 1 && (
-                                                <span className="ml-1 text-muted" title={`${event.occurrence_count} dates in this series`}>×{event.occurrence_count}</span>
-                                            )}
-                                        </td>
-                                        <td className="hidden md:table-cell max-w-[120px] truncate px-2 py-1.5 text-ink-soft" title={event.submitter_name ?? undefined}>
-                                            {event.submitter_name ?? <span className="text-muted">—</span>}
-                                        </td>
-                                        <td className="hidden md:table-cell w-16 px-2 py-1.5">
-                                            {(event.image_thumb_url ?? event.image_url) && (
-                                                <img
-                                                    src={event.image_thumb_url ?? event.image_url ?? undefined}
-                                                    alt=""
-                                                    loading="lazy"
-                                                    className="aspect-video w-12 object-cover"
-                                                    onError={(error) => { error.currentTarget.hidden = true; }}
-                                                />
-                                            )}
-                                        </td>
-                                        <td className="px-2 py-1.5">
-                                            <div className="flex flex-wrap items-center gap-1">
-                                                {getAdminEventStatusIcon(event) && (
-                                                    <img
-                                                        src={getAdminEventStatusIcon(event) ?? undefined}
-                                                        alt=""
-                                                        aria-hidden="true"
-                                                        className="h-4 w-4 shrink-0 object-contain"
-                                                    />
-                                                )}
-                                                <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${ADMIN_EVENT_STATUS_CHIP_CLASSES[getAdminEventStatus(event)]}`}>
-                                                    {ADMIN_EVENT_STATUS_LABELS[getAdminEventStatus(event)]}
-                                                </span>
-                                                {getRemovalReasonLabel(event) && (
-                                                    <span
-                                                        className="inline-block bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-soft"
-                                                        title={event.block_reason_detail ?? undefined}
-                                                    >
-                                                        {getRemovalReasonLabel(event)}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="hidden sm:table-cell px-2 py-1.5">
-                                            <EventFlagIcons event={event} />
-                                        </td>
-                                        <td className="hidden md:table-cell px-2 py-1.5 text-center">
-                                            <LocationBadge
-                                                location={event.location}
-                                                latitude={event.latitude}
-                                                longitude={event.longitude}
-                                                size="sm"
-                                            />
-                                        </td>
-                                        <td className="hidden md:table-cell px-2 py-1.5">
-                                            <div className="flex flex-wrap gap-0.5">
-                                                {event.tags.slice(0, 2).map((t) => (
-                                                    <span
-                                                        key={t.id}
-                                                        className="text-[9px] px-1 py-0 bg-gray-100 text-ink-soft truncate max-w-[60px]"
-                                                    >
-                                                        {t.label}
-                                                    </span>
-                                                ))}
-                                                {event.tags.length > 2 && (
-                                                    <span className="text-[9px] text-muted">+{event.tags.length - 2}</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="hidden md:table-cell px-2 py-1.5">
-                                            <MatchesCell reach={event.interest_reach} />
-                                        </td>
-                                        <td
-                                            className="hidden md:table-cell px-2 py-1.5 text-right text-ink-soft"
-                                            title={`${event.unique_viewers ?? 0} unique viewers`}
-                                        >
-                                            {event.view_count ?? 0}
-                                        </td>
-                                        <td className="hidden md:table-cell px-2 py-1.5 text-right text-ink-soft">
-                                            {event.link_clicks ?? 0}
-                                        </td>
-                                        <td className="px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
-                                            {getAdminEventStatus(event) === 'new' && reviewLockReason(event) === null && (
-                                                <button
-                                                    onClick={() => handleSingleReview(event.event_id)}
-                                                    className="text-[10px] text-action hover:text-blue-800 font-medium"
-                                                    title="Mark reviewed"
-                                                >
-                                                    ✓
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    ) : isMobile ? mobileList : (
+                        <AdminEventsTable
+                            events={events}
+                            context={columnContext}
+                            prefs={tablePrefs}
+                            setPrefs={setTablePrefs}
+                            sort={sortBy}
+                            order={sortOrder}
+                            onSort={handleSort}
+                            onRowClick={setAdminDetailEventId}
+                        />
                     )}
                 </div>
 
                 {/* Pagination */}
-                {totalPages > 1 && (
+                {!isMobile && totalPages > 1 && (
                     <div className="flex items-center justify-between px-4 py-2 border-t border-line bg-canvas shrink-0">
                         <span className="text-[10px] text-muted">
                             {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
@@ -1003,7 +999,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 )}
 
                 {/* Select-all-matching banner */}
-                {selectedIds.size === events.length && events.length === PAGE_SIZE && total > PAGE_SIZE && !allMatchingSelected && (
+                {!isMobile && selectedIds.size === events.length && events.length === PAGE_SIZE && total > PAGE_SIZE && !allMatchingSelected && (
                     <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-t border-amber-200 text-[10px] text-amber-800 shrink-0">
                         <span>All {events.length} on this page selected.</span>
                         <button
@@ -1015,7 +1011,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                         </button>
                     </div>
                 )}
-                {allMatchingSelected && (
+                {!isMobile && allMatchingSelected && (
                     <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-t border-amber-200 text-[10px] text-amber-800 shrink-0">
                         <span>All {selectedIds.size} matching events selected.</span>
                         <button
@@ -1028,7 +1024,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 )}
 
                 {/* Bulk Tag Picker */}
-                {bulkTagPickerOpen && (
+                {!isMobile && bulkTagPickerOpen && (
                     <div className="px-4 py-2.5 border-t border-blue-200 bg-surface shrink-0">
                         <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide mb-2">Assign tags to {selectedIds.size} event(s)</p>
                         <div className="mb-2 max-h-64 overflow-y-auto">
@@ -1059,7 +1055,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 )}
 
                 {/* Group-as-series title entry */}
-                {seriesTitlePickerOpen && (
+                {!isMobile && seriesTitlePickerOpen && (
                     <div className="px-4 py-2.5 border-t border-teal-200 bg-surface shrink-0 space-y-2">
                         <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">
                             Group {selectedIds.size} event(s) into a series
@@ -1091,7 +1087,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 )}
 
                 {/* Add-to-series picker */}
-                {addSeriesPickerOpen && (
+                {!isMobile && addSeriesPickerOpen && (
                     <div className="px-4 py-2.5 border-t border-purple-200 bg-surface shrink-0 space-y-2">
                         <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">
                             Add {selectedIds.size} event(s) to an existing series
@@ -1132,7 +1128,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 )}
 
                 {/* Inline series-group result card */}
-                {seriesGroupResult && (
+                {!isMobile && seriesGroupResult && (
                     <div className="px-4 py-2.5 border-t border-emerald-200 bg-emerald-50/40 shrink-0">
                         <div className="flex items-center justify-between mb-2">
                             <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">Series created</p>
@@ -1155,7 +1151,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 )}
 
                 {/* Inline duplicate-group result card */}
-                {duplicateGroupResult && (
+                {!isMobile && duplicateGroupResult && (
                     <div className="px-4 py-2.5 border-t border-orange-200 bg-orange-50/40 shrink-0">
                         <div className="flex items-center justify-between mb-2">
                             <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">Flagged as duplicates</p>
@@ -1177,7 +1173,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 )}
 
                 {/* Curate-to-Lists Picker */}
-                {curatePickerOpen && (
+                {!isMobile && curatePickerOpen && (
                     <div className="px-4 py-2.5 border-t border-indigo-200 bg-surface shrink-0 space-y-2">
                         <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-wide">
                             Curate {selectedIds.size} event(s) to admin-managed lists
@@ -1252,7 +1248,19 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 )}
 
                 {/* Bulk Action Bar */}
-                {selectedIds.size > 0 && (
+                {selecting && (
+                    <div className="shrink-0 border-t border-line bg-surface px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+                        <button
+                            type="button"
+                            onClick={() => setActionsSheetOpen(true)}
+                            disabled={selectedIds.size === 0 || !!busy}
+                            className={sheetPrimaryClass}
+                        >
+                            {busy ? 'Working…' : selectedIds.size === 0 ? 'Tap events to select' : `Actions (${selectedIds.size})`}
+                        </button>
+                    </div>
+                )}
+                {!isMobile && selectedIds.size > 0 && (
                     <div className="flex items-center gap-2 px-4 py-2 border-t border-blue-200 bg-blue-50 shrink-0">
                         <span className="text-[10px] font-medium text-action">
                             {selectedIds.size} selected
@@ -1336,6 +1344,237 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                     </div>
                 )}
             </div>
+
+            {isMobile && isOpen && filtersSheetOpen && (
+                <BottomSheet
+                    title="Filters"
+                    onClose={() => setFiltersSheetOpen(false)}
+                    headerAction={activeFilterChips.length > 0 ? (
+                        <button type="button" onClick={resetFilters} className="min-h-11 px-2 text-sm font-medium text-action">Reset</button>
+                    ) : undefined}
+                    footer={
+                        <button type="button" onClick={() => setFiltersSheetOpen(false)} className={sheetPrimaryClass}>
+                            {loading ? 'Loading…' : total === 0 ? 'No matches — close' : `Show ${total} event${total === 1 ? '' : 's'}`}
+                        </button>
+                    }
+                >
+                    {filterOptions ? (
+                        <div className="space-y-5 pb-2">
+                            {sheetSection('Sort', (
+                                <div className="flex flex-wrap gap-2">
+                                    {SORT_OPTIONS.map(({ value, label }) => (
+                                        <button key={value} type="button" aria-pressed={sortBy === value} onClick={() => handleSort(value, defaultSortOrder(value))} className={sheetPillClass(sortBy === value)}>
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            ))}
+                            {FILTER_GROUPS.map((group) => {
+                                const dims = FILTER_DIMENSIONS.filter((dim) => dim.group === group && !hiddenDimensions.includes(dim.id)
+                                    && !('optionsKey' in dim && (filterOptions[dim.optionsKey] ?? []).length === 0));
+                                if (dims.length === 0) return null;
+                                return (
+                                    <div key={group} className="space-y-4">
+                                        <h3 className="border-b border-line pb-1 text-xs font-semibold text-ink">{group}</h3>
+                                        {dims.map((dim) => (
+                                            <div key={dim.id}>
+                                                {sheetSection(dim.label, <FilterEditor dim={dim} state={filters} options={filterOptions} onChange={setFilters} size="sheet" />)}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                            <div className="divide-y divide-line border-y border-line">
+                                {sheetSwitch('Group by series', groupBySeries, () => setGroupBySeries((v) => !v))}
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="py-6 text-center text-sm text-muted">Loading…</p>
+                    )}
+                </BottomSheet>
+            )}
+
+            {isMobile && isOpen && actionsSheetOpen && (
+                <BottomSheet title="Bulk actions" subtitle={`${selectedIds.size} event${selectedIds.size === 1 ? '' : 's'} selected`} onClose={() => setActionsSheetOpen(false)}>
+                    <ul className="-mx-4 divide-y divide-line">
+                        {bulkActions.map((action) => (
+                            <li key={action.key}>
+                                <button
+                                    type="button"
+                                    disabled={!!action.disabledReason || !!busy}
+                                    onClick={() => runBulkAction(action.key)}
+                                    className="flex min-h-12 w-full flex-col justify-center px-4 py-2 text-left hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <span className="text-sm font-medium text-ink">{action.label}</span>
+                                    {(action.disabledReason ?? action.hint) && (
+                                        <span className="text-xs text-ink-soft">{action.disabledReason ?? action.hint}</span>
+                                    )}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </BottomSheet>
+            )}
+
+            {isMobile && isOpen && bulkTagPickerOpen && (
+                <BottomSheet
+                    title="Assign tags"
+                    subtitle={`${selectedIds.size} event(s)`}
+                    onClose={() => { setBulkTagPickerOpen(false); setBulkTagIds([]); }}
+                    footer={
+                        <button type="button" onClick={handleBulkAssignTags} disabled={bulkTagIds.length === 0 || !!busy} className={sheetPrimaryClass}>
+                            {busy === 'bulk-tags' ? 'Applying…' : `Apply${bulkTagIds.length > 0 ? ` (${bulkTagIds.length})` : ''}`}
+                        </button>
+                    }
+                >
+                    <TagsPicker
+                        tagGroups={tagGroups}
+                        value={{ selectedTagIds: bulkTagIds, freeTexts: {} }}
+                        onChange={(next) => setBulkTagIds(next.selectedTagIds)}
+                        searchable
+                        allowFreeText={false}
+                    />
+                </BottomSheet>
+            )}
+
+            {isMobile && isOpen && seriesTitlePickerOpen && (
+                <BottomSheet
+                    title="Group as series"
+                    subtitle={`${selectedIds.size} event(s)`}
+                    onClose={() => { setSeriesTitlePickerOpen(false); setSeriesTitleDraft(''); }}
+                    footer={
+                        <button type="button" onClick={handleConfirmGroupAsSeries} disabled={!!busy} className={sheetPrimaryClass}>
+                            {busy === 'bulk-series' ? 'Grouping…' : 'Create series'}
+                        </button>
+                    }
+                >
+                    <input
+                        type="text"
+                        value={seriesTitleDraft}
+                        onChange={(e) => setSeriesTitleDraft(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmGroupAsSeries(); }}
+                        placeholder="Series title"
+                        aria-label="Series title"
+                        className={sheetSelectClass}
+                    />
+                </BottomSheet>
+            )}
+
+            {isMobile && isOpen && addSeriesPickerOpen && (
+                <BottomSheet
+                    title="Add to series"
+                    subtitle={`${selectedIds.size} event(s)`}
+                    onClose={() => { setAddSeriesPickerOpen(false); setSeriesSearch(''); setSeriesSearchResults([]); }}
+                >
+                    <input
+                        type="search"
+                        value={seriesSearch}
+                        onChange={(e) => setSeriesSearch(e.target.value)}
+                        placeholder="Search series by title…"
+                        aria-label="Search series"
+                        className={sheetSelectClass}
+                    />
+                    {seriesSearch.trim().length >= 3 && (
+                        <div className="-mx-4 mt-2 divide-y divide-line">
+                            {seriesSearchLoading ? (
+                                <p className="px-4 py-3 text-sm text-ink-soft">Searching…</p>
+                            ) : seriesSearchResults.length === 0 ? (
+                                <p className="px-4 py-3 text-sm text-ink-soft">No series found.</p>
+                            ) : seriesSearchResults.map((s) => (
+                                <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => handleAddToSeries(s.id)}
+                                    disabled={!!busy}
+                                    className="flex min-h-12 w-full flex-col justify-center px-4 py-2 text-left hover:bg-canvas disabled:opacity-50"
+                                >
+                                    <span className="truncate text-sm text-ink">{s.canonical_title}</span>
+                                    <span className="text-xs text-ink-soft">{s.events.length} event(s) · {s.status}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </BottomSheet>
+            )}
+
+            {isMobile && isOpen && curatePickerOpen && (
+                <BottomSheet
+                    title="Curate to lists"
+                    subtitle={`${selectedIds.size} event(s) · no notifications are sent`}
+                    onClose={() => { setCuratePickerOpen(false); setSelectedCurateHandles(new Set()); }}
+                    footer={
+                        <button type="button" onClick={handleBulkCurate} disabled={!!busy || selectedCurateHandles.size === 0} className={sheetPrimaryClass}>
+                            {busy === 'bulk-curate' ? 'Curating…' : `Apply${selectedCurateHandles.size > 0 ? ` (${selectedCurateHandles.size})` : ''}`}
+                        </button>
+                    }
+                >
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-2">
+                            <label className="space-y-1 text-xs text-ink-soft">
+                                List
+                                <select value={curateKind} onChange={(e) => setCurateKind(e.target.value as AdminBulkEngagementKind)} className={sheetSelectClass}>
+                                    <option value="save">Saved</option>
+                                    <option value="going">Going</option>
+                                </select>
+                            </label>
+                            <label className="space-y-1 text-xs text-ink-soft">
+                                Audience
+                                <select value={curateAudience} onChange={(e) => setCurateAudience(e.target.value as AdminBulkEngagementAudience | '')} className={sheetSelectClass}>
+                                    <option value="">Target default</option>
+                                    <option value="public">Public</option>
+                                    <option value="friends">Friends</option>
+                                    <option value="private">Private</option>
+                                </select>
+                            </label>
+                        </div>
+                        {sheetSection('Admin-managed accounts', managedUsers.length === 0 ? (
+                            <p className="text-sm text-ink-soft">No admin-managed users yet.</p>
+                        ) : (
+                            <div className="-mx-4 divide-y divide-line border-y border-line">
+                                {managedUsers.map((u) => {
+                                    const handle = u.handle ?? '';
+                                    return (
+                                        <label key={u.user_id} className="flex min-h-12 cursor-pointer items-center gap-3 px-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedCurateHandles.has(handle)}
+                                                onChange={() => handleToggleCurateHandle(handle)}
+                                                className="h-5 w-5"
+                                            />
+                                            <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                                                @{handle}{u.managed_label ? ` - ${u.managed_label}` : ''}
+                                            </span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                </BottomSheet>
+            )}
+
+            {isMobile && isOpen && seriesGroupResult && (
+                <BottomSheet title="Series created" onClose={() => setSeriesGroupResult(null)}>
+                    <SeriesGroupCard
+                        group={seriesGroupResult}
+                        acting={inlineActing}
+                        onApprove={handleApproveInlineSeries}
+                        onDismiss={handleDismissInlineSeries}
+                        onRemove={handleSplitInlineSeries}
+                    />
+                </BottomSheet>
+            )}
+
+            {isMobile && isOpen && duplicateGroupResult && (
+                <BottomSheet title="Flagged as duplicates" onClose={() => setDuplicateGroupResult(null)}>
+                    <DuplicateGroupCard
+                        group={duplicateGroupResult}
+                        acting={inlineActing}
+                        onKeep={handleKeepDuplicate}
+                        onDismiss={handleDismissDuplicate}
+                    />
+                </BottomSheet>
+            )}
 
             {/* Admin event detail side panel */}
             <AdminEventDetailPanel

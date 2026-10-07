@@ -52,6 +52,12 @@ describe('admin event status presentation', () => {
         expect(getRemovalReasonLabel(hidden)).toBeNull();
     });
 
+    it('tints private events, below removed/unpublished/cancelled', () => {
+        expect(getAdminEventRowClass(event({ status: 'new', visibility_state: 'private' }))).toContain('bg-violet-50');
+        expect(getAdminEventPanelClass(event({ status: 'published', visibility_state: 'private' }))).toBe('bg-violet-50');
+        expect(getAdminEventPanelClass(event({ status: 'unpublished', visibility_state: 'private' }))).toBe('bg-admin-hidden');
+    });
+
     it('derives the status from legacy fields when missing', () => {
         expect(getAdminEventStatus(event({ is_blocked: true }))).toBe('removed');
         expect(getAdminEventStatus(event({ review_status: 'pending' }))).toBe('new');

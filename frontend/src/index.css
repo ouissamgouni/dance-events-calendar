@@ -41,6 +41,16 @@
   }
 }
 
+@keyframes slide-out-right {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -61,6 +71,10 @@
 
 @utility animate-slide-left {
   animation: slide-in-left 0.25s ease-out;
+}
+
+@utility animate-slide-out-right {
+  animation: slide-out-right 0.2s ease-in forwards;
 }
 
 @utility animate-fade-in {

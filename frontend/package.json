@@ -27,6 +27,7 @@
     "@fullcalendar/timegrid": "^6.1.20",
     "@maplibre/maplibre-gl-leaflet": "^0.1.4",
     "@tailwindcss/vite": "^4.2.2",
+    "@tanstack/react-table": "^9.2.6",
     "html-to-image": "^1.11.13",
     "leaflet": "^1.9.4",
     "leaflet-gesture-handling": "^1.2.2",

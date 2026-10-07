@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import type { EventRating, ReviewSentiment, Tag, TagGroup } from '../types';
+import type { EventRating, ReviewScope, ReviewSentiment, SeriesEditionSummary, Tag, TagGroup } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useEventAssetSummary } from '../context/EventAssetSummaryContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useMyRatingLookup } from '../context/MyRatingsContext';
 import {
     deleteMyRating,
     fetchAspectTagGroups,
     fetchAudienceTagGroups,
     fetchEvent,
+    fetchEventSeriesRollup,
     submitFeedback,
 } from '../api';
 import { trackRatingDeleted, trackRatingSubmitFailed, trackRatingSubmitted } from '../utils/tracking';
@@ -23,6 +25,8 @@ interface Props {
     onClose: () => void;
     onSubmitted: (rating: EventRating) => void;
     onDeleted?: () => void;
+    /** 'past_edition' when reviewing an earlier edition from an upcoming one. */
+    scope?: ReviewScope;
 }
 
 type Identity = 'name' | 'anonymous';
@@ -162,10 +166,14 @@ type WizardStep =
     | { kind: 'comment' }
     | { kind: 'identity' };
 
-export default function RateEventModal({ eventId, initialRating, onClose, onSubmitted, onDeleted }: Props) {
+export default function RateEventModal({ eventId, initialRating, onClose, onSubmitted, onDeleted, scope = 'this_edition' }: Props) {
     const { user } = useAuth();
     const { eventReviewSizeStepEnabled, eventMemoriesEnabled } = useFeatureFlags();
     const assetSummary = useEventAssetSummary(eventMemoriesEnabled ? eventId : null);
+    const lookupMyRating = useMyRatingLookup();
+    // Picking a listed past edition re-targets the review to that edition.
+    const [target, setTarget] = useState<{ eventId: string; scope: ReviewScope; start?: string }>({ eventId, scope });
+    const [pastEditions, setPastEditions] = useState<SeriesEditionSummary[] | null>(null);
 
     const [sentiment, setSentiment] = useState<ReviewSentiment | null>(
         initialRating?.overall_sentiment ?? null,
@@ -198,7 +206,9 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
     // Existing reviews open in a read-only summary first (consistent with the
     // other CTAs — a quick glance, not a multi-step form); an explicit "Edit"
     // action is required to enter the wizard. New reviews skip straight to it.
-    const [mode, setMode] = useState<'view' | 'edit'>(initialRating ? 'view' : 'edit');
+    const [mode, setMode] = useState<'view' | 'edit' | 'pick'>(
+        initialRating ? 'view' : scope === 'past_edition' ? 'pick' : 'edit',
+    );
 
     const [website, setWebsite] = useState(''); // honeypot
     const [submitting, setSubmitting] = useState(false);
@@ -207,6 +217,27 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
     useBackToClose(onClose, !submitting);
+
+    useEffect(() => {
+        if (scope !== 'past_edition' || initialRating) return;
+        let cancelled = false;
+        fetchEventSeriesRollup(eventId)
+            .then((rollup) => {
+                if (cancelled) return;
+                const now = Date.now();
+                const list = (rollup?.editions ?? []).filter(
+                    (e) => e.event_id !== eventId && new Date(e.start).getTime() < now,
+                );
+                setPastEditions(list);
+                if (list.length === 0) setMode('edit');
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setPastEditions([]);
+                setMode('edit');
+            });
+        return () => { cancelled = true; };
+    }, [eventId, scope, initialRating]);
 
     useEffect(() => {
         fetchAspectTagGroups().then(setAspectGroups).catch(() => setAspectGroups([]));
@@ -370,13 +401,14 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
             for (const slug of selectedAspects) {
                 if (aspectScores[slug]) scores[slug] = aspectScores[slug];
             }
-            const res = await submitFeedback(eventId, {
+            const res = await submitFeedback(target.eventId, {
                 overall_sentiment: sentiment,
                 aspect_scores: scores,
                 aspect_tag_ids: Array.from(aspectTagIds),
                 audience_tag_ids: Array.from(audienceTagIds),
                 comment: trimmedComment || undefined,
                 is_anonymous: identity === 'anonymous',
+                scope: target.scope,
                 tag_suggestions: [],
                 website: website || undefined,
             });
@@ -409,7 +441,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
         setConfirmDeleteOpen(false);
         setSubmitting(true);
         try {
-            await deleteMyRating(eventId);
+            await deleteMyRating(eventId, scope);
             trackRatingDeleted();
             onDeleted?.();
             onClose();
@@ -473,7 +505,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                     onClick={onClose}
                                     className="block text-sm font-semibold text-action hover:underline"
                                 >
-                                    📸 Add memories from the night
+                                    📸 Add memories from the event
                                 </Link>
                             )}
                             <button
@@ -482,6 +514,59 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                             >
                                 Close
                             </button>
+                        </div>
+                    ) : mode === 'pick' ? (
+                        <div className="p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-base font-semibold text-ink">Which edition did you go to?</h2>
+                                <button
+                                    onClick={onClose}
+                                    aria-label="Close"
+                                    className="shrink-0 text-muted hover:text-ink-soft text-xl leading-none"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                            {pastEditions == null ? (
+                                <p className="text-xs text-ink-soft">Loading…</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {pastEditions.map((ed) => {
+                                        const date = new Date(ed.start).toLocaleDateString();
+                                        return lookupMyRating(ed.event_id) ? (
+                                            <Link
+                                                key={ed.event_id}
+                                                to={`/event/${encodeURIComponent(ed.event_id)}/review`}
+                                                onClick={onClose}
+                                                className="flex w-full items-center justify-between gap-2 rounded-field border border-line bg-surface px-3 py-2 text-left text-sm text-ink hover:bg-canvas"
+                                            >
+                                                <span>{date}</span>
+                                                <span className="text-xs text-success">✓ You reviewed it — view</span>
+                                            </Link>
+                                        ) : (
+                                            <button
+                                                key={ed.event_id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setTarget({ eventId: ed.event_id, scope: 'this_edition', start: ed.start });
+                                                    setMode('edit');
+                                                }}
+                                                className="flex w-full items-center justify-between gap-2 rounded-field border border-line bg-surface px-3 py-2 text-left text-sm text-ink hover:bg-canvas"
+                                            >
+                                                <span>{date}</span>
+                                                <span className="text-xs text-ink-soft">{ed.title}</span>
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        type="button"
+                                        onClick={() => setMode('edit')}
+                                        className="w-full rounded-field border border-line bg-surface px-3 py-2 text-left text-sm text-ink hover:bg-canvas"
+                                    >
+                                        An earlier one / not listed
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ) : mode === 'view' && initialRating ? (
                         <div className="p-4 space-y-3">
@@ -568,7 +653,11 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
 
                             {current.kind === 'intro' && eventTitle && (
                                 <p className="-mt-2 text-xs text-ink-soft">
-                                    Rate your experience at {eventTitle}
+                                    {target.start
+                                        ? `Rate the ${new Date(target.start).toLocaleDateString()} edition of ${eventTitle}`
+                                        : target.scope === 'past_edition'
+                                            ? `Rate an earlier edition of ${eventTitle}`
+                                            : `Rate your experience at ${eventTitle}`}
                                 </p>
                             )}
 

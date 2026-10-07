@@ -11,12 +11,22 @@ test_plan:
     cross-edition Typical Experience roll-up, the upcoming-edition and
     empty-past-edition states can all be exercised.
 
-    Reviews only exist for editions that have already taken place. An UPCOMING
-    event can never be reviewed: its Rate button is shown disabled. When the
-    edition belongs to a series with past feedback, its review section shows the
-    full cross-edition experience (pooled breakdown + reviews from every edition,
-    each linking back to its own edition); otherwise it shows the series' Typical
-    Experience card.
+    Reviews of an edition open once it has STARTED (multi-day events can be
+    reviewed while ongoing). An UPCOMING edition can't be reviewed for itself,
+    but anyone who attended an EARLIER edition can review that one from it:
+    the "Review past edition" action lives behind the ••• menu of the action
+    bars and at the top of the Reviews tab. When the event belongs to a
+    resolved series with past editions in the app, the user first picks which
+    edition they went to (the review lands on that edition); otherwise ("An
+    earlier one / not listed", or no series at all) it's stored on the
+    upcoming event as an earlier-edition review (scope=past_edition), shown
+    with an "Attended an earlier edition" badge. Once that event starts,
+    earlier-edition reviews leave its own count and move to a collapsed
+    "From earlier editions" block; they always stay in the series roll-up.
+    When the edition belongs to a series with past feedback, its review
+    section shows the full cross-edition experience (pooled breakdown +
+    reviews from every edition, each linking back to its own edition);
+    otherwise it shows the series' Typical Experience card.
 
     No star average is shown publicly — only a "Reviews" badge with a count and
     a "Community Experience" section. That section leads with an overall mood
@@ -266,19 +276,21 @@ test_plan:
         review count), each linking back to that edition's event page.
 
     - id: 20
-      title: "Upcoming edition — full cross-edition experience, review button hidden"
+      title: "Upcoming edition — full cross-edition experience, review behind •••"
       description: |
         Open evt-rating-series-3 (Tuesday Salsa Night — Upcoming), which has
-        not yet taken place. Look at the Rate button and the review section.
+        not yet taken place. Look at the action bar and the review section.
       expected: |
-        The Rate button is hidden entirely (not shown, not just disabled) since
-        an upcoming event can't be reviewed yet. Because the series has past
+        No Review button is shown inline in the action bar; "Review past
+        edition" is available behind the ••• (More actions) menu on mobile
+        (and in the desktop side panel). Because the series has past
         feedback, the review section shows the FULL cross-edition experience
-        (not just a summary): a note that this edition hasn't taken place yet,
-        the series' "Typical experience" box used as the overall-mood headline
-        ("Usually <mood>" + "See other editions →"), the pooled
-        series breakdown (People appreciated / Good to know / Best suited for,
-        Ratings by area) and the individual reviews pooled across every edition
+        (not just a summary): the series' "Typical experience" box used as
+        the overall-mood headline ("Usually <mood>" + "See other editions →"),
+        the pooled series breakdown (People appreciated / Good to know / Best
+        suited for, Ratings by area) and the individual reviews pooled across
+        every edition. Chloé's review carries an "Attended an earlier edition"
+        badge.
 
     - id: 21
       title: "Empty past edition — no reviews + Typical Experience"
@@ -307,3 +319,60 @@ test_plan:
         "😊 Usually well received (5)", N = review count) with the "Details →"
         link in the bottom-right corner. Both link through to the full
         Community Experience section on the event page.
+
+    - id: 23
+      title: "Reviews tab — review CTA at the top"
+      description: |
+        Sign in as "Sam Rater". Open evt-rating-003 (past), then
+        evt-rating-series-3 (upcoming), and switch to the Reviews tab on each.
+      expected: |
+        The Reviews tab starts with a review CTA above the Community
+        Experience: "Write a review" on the past event, "Been to an earlier
+        edition? Review it" on the upcoming one. Once you've reviewed, the CTA
+        turns into a "Your review" preview (with "· earlier edition" for an
+        earlier-edition review) that reopens it.
+
+    - id: 24
+      title: "Upcoming edition in a series — pick the edition you attended"
+      description: |
+        Still as Sam Rater on evt-rating-series-3, open "Review past edition"
+        (••• menu or Reviews tab CTA). Pick the Week 1 date, pick "Great",
+        continue and submit.
+      expected: |
+        The modal first asks "Which edition did you go to?", listing the past
+        editions by date (Early Edition, Week 1, Week 2) plus "An earlier one /
+        not listed". The intro then reads "Rate the <date> edition of …". The
+        review is saved on Week 1 (evt-rating-series-1): its own count goes
+        from 3 to 4 and the series roll-up includes it. Reopening the picker
+        shows Week 1 as "✓ You reviewed it — view".
+
+    - id: 25
+      title: "Upcoming event with no previous edition in the app"
+      description: |
+        Open evt-rating-upcoming-solo (Zouk Summer Congress — Next Edition).
+        Check the Reviews tab, then review via the top CTA as Sam Rater.
+      expected: |
+        Bruno's seeded review shows with an "Attended an earlier edition"
+        badge. There is no edition picker (no series): the wizard opens
+        directly with "Rate an earlier edition of …". After submitting, the
+        count shows 2 and your review appears with the same badge. Bruno's
+        followers get "Bruno shared their experience of an earlier edition of
+        …" style activity.
+
+    - id: 26
+      title: "Earlier-edition reviews after the edition has started"
+      description: |
+        Open evt-rating-002 (Bachata Workshop, past) and look at its Reviews.
+      expected: |
+        Its own count and breakdown only include reviews of this edition
+        (Chloé's earlier-edition review is NOT counted). A collapsed "From
+        earlier editions (1)" block below the list reveals Chloé's review.
+
+    - id: 27
+      title: "Ongoing multi-day event can be reviewed"
+      description: |
+        Open evt-rating-ongoing (Kizomba Weekend — Happening Now), which
+        started yesterday and ends tomorrow. Review it as Sam Rater.
+      expected: |
+        The Review action is offered for this edition (not "Review past
+        edition") and submits successfully; no edition picker is shown.

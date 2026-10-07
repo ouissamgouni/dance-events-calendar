@@ -82,10 +82,10 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
             {isOpen && <div className="fixed inset-0 bg-slate-900/20 z-40" onClick={onClose} />}
 
             <div
-                className={`fixed top-0 right-0 h-full w-[420px] bg-surface shadow-lg border-l border-line z-50 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-full sm:w-[420px] bg-surface shadow-lg sm:border-l border-line z-50 flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-3 py-2 border-b border-line bg-canvas">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-line bg-canvas" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={load}
@@ -107,7 +107,7 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-muted hover:text-ink text-sm leading-none p-1"
+                        className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 text-muted hover:text-ink text-sm leading-none p-1"
                         aria-label="Close"
                     >
                         ✕
@@ -120,7 +120,7 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`flex-1 py-1.5 text-[11px] font-medium capitalize transition border-b-2 ${activeTab === tab
+                            className={`flex-1 min-h-11 sm:min-h-0 py-1.5 text-sm sm:text-[11px] font-medium capitalize transition border-b-2 ${activeTab === tab
                                 ? 'border-sky-600 text-sky-700'
                                 : 'border-transparent text-muted hover:text-ink'
                                 }`}
@@ -148,7 +148,7 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                 </div>
 
                 {/* List */}
-                <div className="overflow-y-auto" style={{ height: 'calc(100% - 130px)' }}>
+                <div className="min-h-0 flex-1 overflow-y-auto">
                     {loading ? (
                         <p className="text-center text-[11px] text-muted mt-8">Loading…</p>
                     ) : items.length === 0 ? (
@@ -218,11 +218,11 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                 </div>
 
                 {/* Pagination footer */}
-                <div className="flex items-center justify-between px-3 py-1.5 border-t border-line bg-canvas text-[11px]">
+                <div className="flex items-center justify-between px-3 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] border-t border-line bg-canvas text-[11px]">
                     <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page <= 1 || loading}
-                        className="px-2 py-0.5 border border-line disabled:opacity-50 hover:bg-surface"
+                        className="min-h-11 sm:min-h-0 px-2 py-0.5 border border-line disabled:opacity-50 hover:bg-surface"
                     >
                         ← Prev
                     </button>
@@ -232,7 +232,7 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                     <button
                         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                         disabled={page >= totalPages || loading}
-                        className="px-2 py-0.5 border border-line disabled:opacity-50 hover:bg-surface"
+                        className="min-h-11 sm:min-h-0 px-2 py-0.5 border border-line disabled:opacity-50 hover:bg-surface"
                     >
                         Next →
                     </button>

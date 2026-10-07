@@ -498,6 +498,7 @@ export default function NotificationRow({
                     <span className="font-medium text-ink">
                         {item.event_title || 'an event'}
                     </span>
+                    {item.context && <span className="text-ink-soft"> — add yours</span>}
                 </p>
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
             </>
@@ -509,7 +510,7 @@ export default function NotificationRow({
                     <span className="text-ink-soft">
                         {item.kind === 'event_ticket_prompt'
                             ? 'Got your ticket? Keep it handy here for'
-                            : 'Relive the night — add memories from'}
+                            : 'Relive the moment — add memories from'}
                     </span>{' '}
                     <span className="font-medium text-ink">
                         {item.event_title || 'an event'}

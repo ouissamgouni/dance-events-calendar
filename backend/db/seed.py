@@ -2811,7 +2811,8 @@ class DatabaseSeeder:
           - status: approved | rejected (default approved)
           - is_anonymous: bool
           - admin_notes: str (optional)
-        Idempotent: skips if a row already exists for the same (event_id, user_id).
+          - scope: this_edition | past_edition (default this_edition)
+        Idempotent: skips if a row already exists for the same (event_id, user_id, scope).
         """
         if not path.exists():
             return
@@ -2853,12 +2854,14 @@ class DatabaseSeeder:
                     continue
                 user_id = user.id
 
-            # Idempotency: same (event_id, user_id) → skip.
+            scope = entry.get("scope") or "this_edition"
+            # Idempotency: same (event_id, user_id, scope) → skip.
             if user_id is not None:
                 existing = self.session.exec(
                     select(EventRating).where(
                         EventRating.event_id == event_id,
                         EventRating.user_id == user_id,
+                        EventRating.scope == scope,
                     )
                 ).first()
                 if existing:
@@ -2898,6 +2901,7 @@ class DatabaseSeeder:
                 comment_status=comment_status,
                 audience_tag_ids=audience_tag_ids or None,
                 is_anonymous=bool(entry.get("is_anonymous", False)),
+                scope=scope,
                 status=status,
                 admin_notes=entry.get("admin_notes"),
                 reviewed_at=now if comment_status in ("approved", "rejected") else None,
@@ -2934,6 +2938,7 @@ class DatabaseSeeder:
                             actor,
                             event_id,
                             anonymous=bool(entry.get("is_anonymous", False)),
+                            past_edition=scope == "past_edition",
                         )
                     except Exception:  # best-effort, mirror HTTP route
                         logger.warning(

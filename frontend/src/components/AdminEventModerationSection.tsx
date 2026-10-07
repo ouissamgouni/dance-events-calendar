@@ -14,7 +14,6 @@ import {
 import type { AdminEventModeration, CalendarEvent, CalendarSetting, ChangeScope, EventRevision, RevisionChange } from '../types';
 import { describeRevisionValue, hasTimeChange, revisionFieldLabel, statusRequest } from '../utils/eventRevisions';
 import { getAdminEventStatus } from '../utils/adminEventStatus';
-import VisibilityChip, { VISIBILITY_META, WantsPublicChip } from './VisibilityChip';
 import SubmissionDetails from './SubmissionDetails';
 
 interface Props {
@@ -163,14 +162,13 @@ export default function AdminEventModerationSection({ event, moderation, onChang
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
     const [approveCalendar, setApproveCalendar] = useState('');
     const [rejecting, setRejecting] = useState(false);
-    const [rejectReason, setRejectReason] = useState('');
+    const [rejectReason, setRejectReason] = useState(moderation.submission?.admin_notes ?? '');
     const [historyOpen, setHistoryOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [revertingId, setRevertingId] = useState<number | null>(null);
     const [revertNotify, setRevertNotify] = useState(false);
 
     const submission = moderation.submission;
-    const [ownerNote, setOwnerNote] = useState(submission?.admin_notes ?? '');
     const awaitingApproval = submission?.status === 'pending';
     const lockable = Boolean(submission && !['blocked', 'withdrawn'].includes(submission.status));
     const markable = Boolean(
@@ -209,21 +207,9 @@ export default function AdminEventModerationSection({ event, moderation, onChang
         scopeFor(revision) === 'series' ? revision.series_affected_attendees : revision.affected_attendees;
     const notifyFor = (revision: EventRevision) =>
         countFor(revision) > 0 && (notify[revision.id] ?? notifyByDefault(revision));
-    const submitterName = submission?.submitter?.display_name ?? submission?.submitter_name ?? null;
-    const visibilityText =
-        moderation.visibility === 'private' && submitterName
-            ? `Only ${submitterName} — not in discovery, feeds or notifications`
-            : VISIBILITY_META[moderation.visibility].description;
 
     return (
         <section className="space-y-3" aria-label="Moderation">
-            <p className="flex flex-wrap items-center gap-2 text-xs text-ink">
-                <span className={labelCls}>Visible to</span>
-                <VisibilityChip state={moderation.visibility} />
-                {moderation.wants_public && <WantsPublicChip />}
-                <span data-testid="event-audience">{visibilityText}</span>
-            </p>
-
             {submission && (
                 <div className={cardCls} data-testid="submission-card">
                     <div className="flex flex-wrap items-center gap-2">
@@ -291,30 +277,6 @@ export default function AdminEventModerationSection({ event, moderation, onChang
                             />
                             Lock owner edits
                         </label>
-                    )}
-                    {lockable && (
-                        <div className="space-y-1">
-                            <label htmlFor="submission-owner-note" className={labelCls}>
-                                Note to the owner (shown if declined or removed)
-                            </label>
-                            <div className="flex items-start gap-2">
-                                <textarea
-                                    id="submission-owner-note"
-                                    value={ownerNote}
-                                    onChange={(e) => setOwnerNote(e.target.value)}
-                                    rows={2}
-                                    className="min-w-0 flex-1 border border-line px-2 py-1 text-xs"
-                                />
-                                <button
-                                    type="button"
-                                    disabled={busy !== null || ownerNote.trim() === (submission.admin_notes ?? '')}
-                                    onClick={() => run('note', () => updateSuggestion(submission.suggestion_id, { admin_notes: ownerNote.trim() || null }))}
-                                    className={secondaryBtn}
-                                >
-                                    {busy === 'note' ? 'Saving…' : 'Save note'}
-                                </button>
-                            </div>
-                        </div>
                     )}
                     {rejecting ? (
                         <div className="flex flex-wrap items-center gap-2">

@@ -9,16 +9,27 @@ Both behaviors were added together to fix the staging admin UX bugs:
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from backend.api.deps import require_admin
 from backend.api.main import app
 from backend.db.database import get_session
-from backend.db.models import BlockedEvent, CachedEvent, CalendarSetting
+from backend.db.models import (
+    BlockedEvent,
+    CachedEvent,
+    CalendarSetting,
+    EventPromoCode,
+    EventSchedule,
+    EventTag,
+    SchedulePublication,
+    UserEventAttendance,
+    UserSavedEvent,
+)
 
 
 def _fake_admin():
@@ -224,6 +235,208 @@ class TestIncludePastFilter:
         ]
         assert ids_resp.status_code == 200
         assert ids_resp.json()["ids"] == [expected_id]
+
+
+def _event(event_id, days=1, **kwargs):
+    now = datetime.now(timezone.utc)
+    return CachedEvent(
+        event_id=event_id,
+        calendar_id="cal-1",
+        title=event_id,
+        start=now + timedelta(days=days),
+        end=now + timedelta(days=days, hours=2),
+        **kwargs,
+    )
+
+
+@pytest.mark.unit
+class TestRichFilters:
+    def _ids(self, client, **params):
+        resp = client.get("/api/admin/events", params={"limit": 100, **params})
+        assert resp.status_code == 200, resp.text
+        ids = [item["event_id"] for item in resp.json()["items"]]
+        ids_resp = client.get("/api/admin/events/ids", params=params)
+        assert sorted(ids_resp.json()["ids"]) == sorted(ids)
+        return ids
+
+    def test_price_and_discount_filters_and_facets(self, client, engine):
+        _seed_calendar(engine)
+        now = datetime.now(timezone.utc)
+        with Session(engine) as s:
+            s.add_all(
+                [
+                    _event("free", price_is_free=True),
+                    _event("paid", price_min=10.0, price_currency="EUR"),
+                    _event("unknown"),
+                    EventPromoCode(
+                        event_id="paid",
+                        code="A",
+                        submitter_user_id=uuid4(),
+                        status="approved",
+                    ),
+                    EventPromoCode(
+                        event_id="free",
+                        code="B",
+                        submitter_user_id=uuid4(),
+                        status="approved",
+                        expires_at=now - timedelta(days=1),
+                    ),
+                    EventPromoCode(
+                        event_id="unknown",
+                        code="C",
+                        submitter_user_id=uuid4(),
+                        status="pending",
+                    ),
+                ]
+            )
+            s.commit()
+
+        assert self._ids(client, price="paid") == ["paid"]
+        assert set(self._ids(client, price="free,unknown")) == {"free", "unknown"}
+        assert self._ids(client, discount="active") == ["paid"]
+        assert set(self._ids(client, discount="active,expired")) == {"paid", "free"}
+
+        opts = client.get(
+            "/api/admin/events/filter-options", params={"price": "paid"}
+        ).json()
+        assert {o["value"]: o["count"] for o in opts["prices"]} == {
+            "paid": 1,
+            "free": 1,
+            "unknown": 1,
+        }
+        assert {o["value"]: o["count"] for o in opts["discounts"]} == {
+            "active": 1,
+            "expired": 0,
+        }
+        assert opts["total_count"] == 1
+
+    def test_program_engagement_and_has_filters(self, client, engine):
+        _seed_calendar(engine)
+        with Session(engine) as s:
+            s.add_all(
+                [
+                    _event(
+                        "published",
+                        image_url="https://img.test/a.jpg",
+                        links=[{"url": "https://tickets.test"}],
+                    ),
+                    _event("draft"),
+                    _event("bare", links=[]),
+                    EventSchedule(event_id="published", timezone="UTC"),
+                    EventSchedule(event_id="draft", timezone="UTC"),
+                    UserEventAttendance(device_id="d1", event_id="published"),
+                    UserSavedEvent(device_id="d1", event_id="published"),
+                    UserSavedEvent(device_id="d2", event_id="published"),
+                    UserEventAttendance(device_id="d3", event_id="draft"),
+                    EventTag(event_id="draft", tag_id=1),
+                ]
+            )
+            s.commit()
+            schedule = s.exec(
+                select(EventSchedule).where(EventSchedule.event_id == "published")
+            ).one()
+            s.add(SchedulePublication(schedule_id=schedule.id, version=1, snapshot={}))
+            s.commit()
+
+        assert self._ids(client, program="published") == ["published"]
+        assert self._ids(client, program="draft") == ["draft"]
+        assert self._ids(client, program="none") == ["bare"]
+        assert self._ids(client, going_min=1, saved_min=2) == ["published"]
+        # d1 is both going and saved: counted once.
+        assert self._ids(client, engaged_min=2) == ["published"]
+        assert self._ids(client, engaged_min=3) == []
+        assert self._ids(client, has_image="true") == ["published"]
+        assert self._ids(client, has_links="true") == ["published"]
+        assert set(self._ids(client, has_links="false")) == {"draft", "bare"}
+        assert set(self._ids(client, has_tags="false")) == {"published", "bare"}
+        assert self._ids(client, sort="engaged") == ["published", "draft", "bare"]
+        assert self._ids(client, sort="engaged", order="asc")[0] == "bare"
+
+        rows = {
+            i["event_id"]: i for i in client.get("/api/admin/events").json()["items"]
+        }
+        assert rows["published"]["program_status"] == "published"
+        assert rows["published"]["going_count"] == 1
+        assert rows["published"]["saved_count"] == 2
+        assert rows["published"]["engaged_count"] == 2
+        assert rows["draft"]["program_status"] == "draft"
+        assert rows["bare"]["program_status"] is None
+
+    def test_in_series_and_date_range(self, client, engine):
+        _seed_calendar(engine)
+        shared = uuid4()
+        with Session(engine) as s:
+            s.add_all(
+                [
+                    _event("occ-1", suggestion_id=shared),
+                    _event("occ-2", days=8, suggestion_id=shared),
+                    _event("single"),
+                    _event("last-month", days=-30),
+                ]
+            )
+            s.commit()
+
+        assert set(self._ids(client, in_series="true")) == {"occ-1", "occ-2"}
+        assert self._ids(client, in_series="false") == ["single"]
+        # An explicit range reaches past events without include_past.
+        start = (datetime.now(timezone.utc) - timedelta(days=31)).date()
+        end = (datetime.now(timezone.utc) - timedelta(days=29)).date()
+        assert self._ids(
+            client, start_from=start.isoformat(), start_to=end.isoformat()
+        ) == ["last-month"]
+
+    def test_rejects_unknown_facet_values(self, client, engine):
+        assert client.get("/api/admin/events?price=cheap").status_code == 422
+        assert client.get("/api/admin/events?sort=bogus").status_code == 422
+
+    def test_sort_by_added(self, client, engine):
+        _seed_calendar(engine)
+        now = datetime.now(timezone.utc)
+        with Session(engine) as s:
+            old = _event("old")
+            old.created_at = now - timedelta(days=3)
+            new = _event("new", days=9)
+            new.created_at = now
+            s.add_all([old, new])
+            s.commit()
+
+        assert self._ids(client, sort="added") == ["new", "old"]
+        assert self._ids(client, sort="added", order="asc") == ["old", "new"]
+        item = client.get("/api/admin/events").json()["items"][0]
+        assert item["created_at"] is not None
+
+    def test_filter_options_scope_counts(self, client, engine):
+        _seed_calendar(engine)
+        with Session(engine) as s:
+            s.add_all(
+                [
+                    _event(
+                        "imaged", image_url="https://img.test/a.jpg", price_is_free=True
+                    ),
+                    _event("tagged", price_is_free=True),
+                    _event("plain", location="Somewhere"),
+                    _event("past", days=-10),
+                    EventTag(event_id="tagged", tag_id=1),
+                    UserEventAttendance(device_id="d1", event_id="plain"),
+                ]
+            )
+            s.commit()
+
+        opts = client.get(
+            "/api/admin/events/filter-options",
+            params={"price": "free", "has_image": "true", "include_past": "true"},
+        ).json()
+        assert opts["total_count"] == 1
+        # Presets reset dates and other filters.
+        assert opts["quick_views"]["all"] == 3
+        assert opts["quick_views"]["untagged"] == 2
+        assert opts["quick_views"]["geo"] == 1
+        # has_image ignores its own selection; price still applies.
+        assert opts["has_counts"]["has_image"] == {"yes": 1, "no": 1}
+        assert opts["has_counts"]["has_tags"] == {"yes": 0, "no": 1}
+        assert opts["min_counts"]["going_min"] == 0
+        # Each active filter alone, with search + dates.
+        assert opts["dimension_counts"] == {"dates": 4, "price": 2, "has_image": 1}
 
 
 # ---------------------------------------------------------------------------

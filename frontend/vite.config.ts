@@ -10,11 +10,26 @@ import { join } from 'node:path'
 // and the iOS apple-mobile-web-app-title meta tag.
 function pwaEnvName(appName: string, appNameShort: string): Plugin {
   let outDir = 'dist'
+  let publicDir = 'public'
   return {
     name: 'pwa-env-name',
-    apply: 'build',
     configResolved(config) {
       outDir = config.build.outDir
+      publicDir = config.publicDir
+    },
+    // Dev server (scenarios): serve the patched manifest instead of the raw public/ copy.
+    configureServer(server) {
+      server.middlewares.use('/manifest.json', async (_req, res, next) => {
+        try {
+          const manifest = JSON.parse(await readFile(join(publicDir, 'manifest.json'), 'utf8'))
+          manifest.name = appName
+          manifest.short_name = appNameShort
+          res.setHeader('Content-Type', 'application/manifest+json')
+          res.end(JSON.stringify(manifest, null, 4))
+        } catch {
+          next()
+        }
+      })
     },
     transformIndexHtml(html) {
       return html.replace(

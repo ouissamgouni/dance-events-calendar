@@ -1,4 +1,6 @@
 import logging
+from dataclasses import replace
+from datetime import date
 from typing import Optional
 from uuid import UUID
 
@@ -37,6 +39,7 @@ from backend.api.schemas import (
     DigestSendNowRequest,
     DigestSendNowResponse,
     EventFilterOptionsResponse,
+    YesNoCount,
     EventIdsResponse,
     EventImageFromUrlRequest,
     EventDraftUpdate,
@@ -94,6 +97,7 @@ from backend.db.models import (
     EventRating,
     EventRevision,
     EventSave,
+    EventSchedule,
     EventSeries,
     EventSeriesMember,
     EventSuggestion,
@@ -109,6 +113,26 @@ from backend.db.models import (
     UserEventAttendance,
 )
 from backend.services import event_assets, event_revisions
+from backend.services.admin_event_filters import (
+    DIMENSION_FIELDS,
+    DISCOUNT_LABELS,
+    HAS_FILTERS,
+    MIN_FILTERS,
+    PRICE_LABELS,
+    PROGRAM_LABELS,
+    QUICK_VIEWS,
+    REACH_LABELS,
+    SORT_KEYS,
+    AdminEventFilters,
+    apply_extra_filters,
+    count_query,
+    csv_pattern,
+    discount_clause,
+    price_clause,
+    program_clause,
+    reach_clause,
+)
+from backend.services.schedules import published_schedule_event_ids
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.notifications import (
     EVENT_CHANGE_APPLIED,
@@ -243,6 +267,7 @@ def _admin_event_response(
         block_reason=blocked.reason if blocked else None,
         block_reason_detail=blocked.reason_detail if blocked else None,
         merged_into_event_id=event.merged_into_event_id,
+        created_at=event.created_at,
         is_submission=event.suggestion_id is not None,
         has_pending_changes=has_pending_changes,
         visibility_state=event_audience(event),
@@ -452,6 +477,95 @@ def _apply_upcoming_filter(
     if include_past:
         return stmt
     return stmt.where(CachedEvent.end > _dt.utcnow())
+
+
+def _admin_event_filters(
+    search: Optional[str] = Query(default=None, max_length=200),
+    audience: Optional[str] = Query(default=None, pattern=AUDIENCE_PATTERN),
+    status: Optional[str] = Query(default=None, pattern=STATUS_PATTERN),
+    flags: Optional[str] = Query(default=None, pattern=FLAGS_PATTERN),
+    calendar_id: Optional[str] = Query(default=None),
+    tag_ids: Optional[str] = Query(default=None),
+    geo_status: Optional[str] = Query(
+        default=None, pattern="^(geolocated|ungeolocated|no-location)$"
+    ),
+    ungeolocated: Optional[bool] = Query(default=None),
+    future_only: Optional[bool] = Query(default=None),
+    include_past: bool = Query(default=False),
+    price: Optional[str] = Query(default=None, pattern=csv_pattern(PRICE_LABELS)),
+    discount: Optional[str] = Query(default=None, pattern=csv_pattern(DISCOUNT_LABELS)),
+    program: Optional[str] = Query(default=None, pattern=csv_pattern(PROGRAM_LABELS)),
+    reach: Optional[str] = Query(default=None, pattern=csv_pattern(REACH_LABELS)),
+    going_min: Optional[int] = Query(default=None, ge=1),
+    saved_min: Optional[int] = Query(default=None, ge=1),
+    engaged_min: Optional[int] = Query(default=None, ge=1),
+    has_ratings: Optional[bool] = Query(default=None),
+    has_messages: Optional[bool] = Query(default=None),
+    has_memories: Optional[bool] = Query(default=None),
+    has_organizer: Optional[bool] = Query(default=None),
+    has_image: Optional[bool] = Query(default=None),
+    has_links: Optional[bool] = Query(default=None),
+    has_tags: Optional[bool] = Query(default=None),
+    in_series: Optional[bool] = Query(default=None),
+    start_from: Optional[date] = Query(default=None),
+    start_to: Optional[date] = Query(default=None),
+) -> AdminEventFilters:
+    return AdminEventFilters(**locals())
+
+
+def _apply_admin_event_filters(stmt, f: AdminEventFilters):
+    from sqlalchemy import String, cast
+
+    if f.calendar_id:
+        stmt = stmt.where(CachedEvent.calendar_id == f.calendar_id)
+    stmt = _apply_admin_geo_filter(stmt, f.geo_status, f.ungeolocated)
+    # An explicit date range replaces the upcoming-only default.
+    stmt = _apply_upcoming_filter(
+        stmt,
+        include_past=f.include_past or bool(f.start_from or f.start_to),
+        future_only=f.future_only,
+    )
+    if f.search:
+        pattern = f"%{f.search}%"
+        stmt = stmt.where(
+            (CachedEvent.title.ilike(pattern))
+            | (CachedEvent.description.ilike(pattern))
+            | (CachedEvent.location.ilike(pattern))
+            | (cast(CachedEvent.links, String).ilike(pattern))
+        )
+    if f.tag_ids:
+        tid_list = [int(t) for t in f.tag_ids.split(",") if t.strip().isdigit()]
+        if tid_list:
+            stmt = stmt.where(
+                CachedEvent.event_id.in_(
+                    select(EventTag.event_id).where(EventTag.tag_id.in_(tid_list))
+                )
+            )
+    stmt = _apply_admin_status_filter(stmt, f.audience, f.status, f.flags)
+    return apply_extra_filters(stmt, f)
+
+
+def _order_admin_events(stmt, sort: str, order: Optional[str]):
+    descending = order == "desc" if order else sort not in ("start", "title")
+    if sort == "submitted":
+        stmt = stmt.outerjoin(
+            EventSuggestion, EventSuggestion.id == CachedEvent.suggestion_id
+        )
+        key = col(EventSuggestion.created_at)
+    elif sort == "title":
+        key = func.lower(CachedEvent.title)
+    elif sort == "added":
+        key = col(CachedEvent.created_at)
+    elif sort == "price":
+        key = col(CachedEvent.price_min)
+    elif sort == "start":
+        key = col(CachedEvent.start)
+    else:
+        counts = count_query(sort)[0].subquery()
+        stmt = stmt.outerjoin(counts, counts.c.event_id == CachedEvent.event_id)
+        key = func.coalesce(counts.c.n, 0)
+    key = key.desc() if descending else key.asc()
+    return stmt.order_by(key.nulls_last(), CachedEvent.start, CachedEvent.event_id)
 
 
 # Visually distinct palette — cycled when more calendars are added
@@ -1602,6 +1716,7 @@ def review_prompt_candidates(
         session.exec(
             select(EventRating.user_id)
             .where(EventRating.event_id == event_id)
+            .where(EventRating.scope == "this_edition")
             .where(EventRating.user_id.in_(attendee_ids))  # type: ignore[union-attr]
         ).all()
     )
@@ -1672,6 +1787,7 @@ def review_prompt_send_now(
     rated = set(
         session.exec(
             select(EventRating.user_id)
+            .where(EventRating.scope == "this_edition")
             .where(EventRating.event_id == body.event_id)
             .where(EventRating.user_id.in_(body.user_ids))  # type: ignore[union-attr]
         ).all()
@@ -2147,20 +2263,10 @@ def list_sync_logs(
 def list_admin_events(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    search: Optional[str] = Query(default=None, max_length=200),
-    audience: Optional[str] = Query(default=None, pattern=AUDIENCE_PATTERN),
-    status: Optional[str] = Query(default=None, pattern=STATUS_PATTERN),
-    flags: Optional[str] = Query(default=None, pattern=FLAGS_PATTERN),
-    calendar_id: Optional[str] = Query(default=None),
-    tag_ids: Optional[str] = Query(default=None),
-    geo_status: Optional[str] = Query(
-        default=None, pattern="^(geolocated|ungeolocated|no-location)$"
-    ),
-    ungeolocated: Optional[bool] = Query(default=None),
-    future_only: Optional[bool] = Query(default=None),
-    include_past: bool = Query(default=False),
+    filters: AdminEventFilters = Depends(_admin_event_filters),
     group: Optional[str] = Query(default=None, pattern="^series$"),
-    sort: str = Query(default="start", pattern="^(start|submitted)$"),
+    sort: str = Query(default="start", pattern=f"^({'|'.join(SORT_KEYS)})$"),
+    order: Optional[str] = Query(default=None, pattern="^(asc|desc)$"),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -2175,34 +2281,7 @@ def list_admin_events(
     calendars = session.exec(select(CalendarSetting)).all()
     color_map = {c.calendar_id: c.color for c in calendars}
 
-    # Build base query
-    base = select(CachedEvent)
-
-    if calendar_id:
-        base = base.where(CachedEvent.calendar_id == calendar_id)
-    base = _apply_admin_geo_filter(base, geo_status, ungeolocated)
-    base = _apply_upcoming_filter(
-        base, include_past=include_past, future_only=future_only
-    )
-    if search:
-        pattern = f"%{search}%"
-        base = base.where(
-            (CachedEvent.title.ilike(pattern))
-            | (CachedEvent.description.ilike(pattern))
-            | (CachedEvent.location.ilike(pattern))
-            | (cast(CachedEvent.links, String).ilike(pattern))
-        )
-    if tag_ids:
-        tid_list = [int(t) for t in tag_ids.split(",") if t.strip().isdigit()]
-        if tid_list:
-            matching_event_ids = session.exec(
-                select(EventTag.event_id)
-                .where(EventTag.tag_id.in_(tid_list))
-                .distinct()
-            ).all()
-            base = base.where(CachedEvent.event_id.in_(matching_event_ids))
-
-    base = _apply_admin_status_filter(base, audience, status, flags)
+    base = _apply_admin_event_filters(select(CachedEvent), filters)
 
     group_sizes: dict[str, int] = {}
     if group == "series":
@@ -2240,13 +2319,8 @@ def list_admin_events(
     total = session.exec(count_stmt).one()
 
     # Fetch page
-    ordered = base
-    if sort == "submitted":
-        ordered = ordered.outerjoin(
-            EventSuggestion, EventSuggestion.id == CachedEvent.suggestion_id
-        ).order_by(col(EventSuggestion.created_at).desc().nulls_last())
     events = session.exec(
-        ordered.order_by(CachedEvent.start).offset(offset).limit(limit)
+        _order_admin_events(base, sort, order).offset(offset).limit(limit)
     ).all()
 
     event_ids = [e.event_id for e in events]
@@ -2313,6 +2387,31 @@ def list_admin_events(
             .group_by(EventLinkClick.event_id)
         ).all()
     )
+    counts: dict[str, dict[str, int]] = {}
+    for kind in ("going", "saved", "engaged", "ratings", "messages", "memories"):
+        stmt, event_col = count_query(kind)
+        counts[kind] = dict(session.exec(stmt.where(event_col.in_(event_ids))).all())
+    published_ids = published_schedule_event_ids(session, event_ids)
+    scheduled_ids = set(
+        session.exec(
+            select(EventSchedule.event_id).where(EventSchedule.event_id.in_(event_ids))
+        ).all()
+    )
+    promo_ids = set(
+        session.exec(
+            select(CachedEvent.event_id).where(
+                CachedEvent.event_id.in_(event_ids), discount_clause("active")
+            )
+        ).all()
+    )
+    submitted_map = dict(
+        session.exec(
+            select(CachedEvent.event_id, EventSuggestion.created_at)
+            .join(EventSuggestion, EventSuggestion.id == CachedEvent.suggestion_id)
+            .where(CachedEvent.event_id.in_(event_ids))
+        ).all()
+    )
+    reach_by_id = {e.event_id: e.reach for e in events}
     for item in items:
         item.submitter_name = submitters.get(item.event_id)
         item.occurrence_count = group_sizes.get(item.event_id)
@@ -2321,6 +2420,23 @@ def list_admin_events(
         item.interest_reach = EventInterestReach(**reach) if reach else None
         item.view_count, item.unique_viewers = view_map.get(item.event_id, (0, 0))
         item.link_clicks = int(click_map.get(item.event_id, 0))
+        item.going_count = counts["going"].get(item.event_id, 0)
+        item.saved_count = counts["saved"].get(item.event_id, 0)
+        item.engaged_count = counts["engaged"].get(item.event_id, 0)
+        item.rating_count = counts["ratings"].get(item.event_id, 0)
+        item.message_count = counts["messages"].get(item.event_id, 0)
+        item.memory_count = counts["memories"].get(item.event_id, 0)
+        item.schedule_published = item.event_id in published_ids
+        item.program_status = (
+            "published"
+            if item.schedule_published
+            else "draft"
+            if item.event_id in scheduled_ids
+            else None
+        )
+        item.has_active_promo_codes = item.event_id in promo_ids
+        item.submitted_at = submitted_map.get(item.event_id)
+        item.reach = reach_by_id.get(item.event_id)
 
     return PaginatedEventsResponse(items=items, total=total)
 
@@ -2575,18 +2691,7 @@ def geocode_search(
 
 @router.get("/events/filter-options", response_model=EventFilterOptionsResponse)
 def event_filter_options(
-    search: Optional[str] = Query(default=None, max_length=200),
-    audience: Optional[str] = Query(default=None, pattern=AUDIENCE_PATTERN),
-    status: Optional[str] = Query(default=None, pattern=STATUS_PATTERN),
-    flags: Optional[str] = Query(default=None, pattern=FLAGS_PATTERN),
-    calendar_id: Optional[str] = Query(default=None),
-    tag_ids: Optional[str] = Query(default=None),
-    geo_status: Optional[str] = Query(
-        default=None, pattern="^(geolocated|ungeolocated|no-location)$"
-    ),
-    ungeolocated: Optional[bool] = Query(default=None),
-    future_only: Optional[bool] = Query(default=None),
-    include_past: bool = Query(default=False),
+    filters: AdminEventFilters = Depends(_admin_event_filters),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -2595,48 +2700,32 @@ def event_filter_options(
     Defaults to upcoming-only (``end > now``); pass ``include_past=true`` to
     aggregate over the full archive.
     """
-    from sqlalchemy import cast, String, case, and_, literal_column
-
-    # Build filtered base (same logic as list_admin_events)
-    base = select(CachedEvent)
-    if calendar_id:
-        base = base.where(CachedEvent.calendar_id == calendar_id)
-    base = _apply_admin_geo_filter(base, geo_status, ungeolocated)
-    base = _apply_upcoming_filter(
-        base, include_past=include_past, future_only=future_only
-    )
-    if search:
-        pattern = f"%{search}%"
-        base = base.where(
-            (CachedEvent.title.ilike(pattern))
-            | (CachedEvent.description.ilike(pattern))
-            | (CachedEvent.location.ilike(pattern))
-            | (cast(CachedEvent.links, String).ilike(pattern))
-        )
-    if tag_ids:
-        tid_list = [int(t) for t in tag_ids.split(",") if t.strip().isdigit()]
-        if tid_list:
-            matching = session.exec(
-                select(EventTag.event_id)
-                .where(EventTag.tag_id.in_(tid_list))
-                .distinct()
-            ).all()
-            base = base.where(CachedEvent.event_id.in_(matching))
+    from sqlalchemy import case, and_, literal_column, true
 
     blocked_ids = select(BlockedEvent.event_id)
 
-    def facet(options, *, audience=audience, status=status, flags=flags):
-        stmt = _apply_admin_status_filter(base, audience, status, flags)
+    def facet(options, **overrides):
+        """Counts per option with this group's own selection replaced."""
+        filtered = _apply_admin_event_filters(
+            select(CachedEvent), replace(filters, **overrides)
+        )
+        stmt = select(
+            func.count(),
+            *(
+                func.coalesce(func.sum(case((clause, 1), else_=0)), 0)
+                for _, _, clause in options
+            ),
+        ).select_from(CachedEvent)
+        if filtered.whereclause is not None:
+            stmt = stmt.where(filtered.whereclause)
+        row = session.exec(stmt).one()
         return [
-            FilterOption(
-                value=value,
-                label=label,
-                count=session.exec(
-                    select(func.count()).select_from(stmt.where(clause).subquery())
-                ).one(),
-            )
-            for value, label, clause in options
+            FilterOption(value=value, label=label, count=int(count))
+            for (value, label, _), count in zip(options, row[1:])
         ]
+
+    def labelled(labels, clause):
+        return [(value, label, clause(value)) for value, label in labels.items()]
 
     audience_options = facet(
         [
@@ -2659,7 +2748,50 @@ def event_filter_options(
         [(flag, FLAG_LABELS[flag], _flag_clause(flag)) for flag in ADMIN_FLAGS],
         flags=None,
     )
-    base = _apply_admin_status_filter(base, audience, status, flags)
+    price_options = facet(labelled(PRICE_LABELS, price_clause), price=None)
+    discount_options = facet(labelled(DISCOUNT_LABELS, discount_clause), discount=None)
+    program_options = facet(labelled(PROGRAM_LABELS, program_clause), program=None)
+    reach_options = facet(labelled(REACH_LABELS, reach_clause), reach=None)
+
+    dates_scope = AdminEventFilters(
+        search=filters.search,
+        include_past=filters.include_past,
+        future_only=filters.future_only,
+        start_from=filters.start_from,
+        start_to=filters.start_to,
+    )
+    scopes: dict[tuple[str, str], AdminEventFilters] = {
+        ("dates", "dates"): dates_scope,
+    }
+    for view, overrides in QUICK_VIEWS.items():
+        scopes[("view", view)] = AdminEventFilters(search=filters.search, **overrides)
+    for name in DIMENSION_FIELDS:
+        value = getattr(filters, name)
+        if value is not None and value != "":
+            scopes[("dim", name)] = replace(dates_scope, **{name: value})
+    for name in MIN_FILTERS:
+        scopes[("min", name)] = replace(filters, **{name: 1})
+    for name in HAS_FILTERS:
+        scopes[("yes", name)] = replace(filters, **{name: True})
+        scopes[("no", name)] = replace(filters, **{name: False})
+    sums = []
+    for scope in scopes.values():
+        where = _apply_admin_event_filters(select(CachedEvent), scope).whereclause
+        sums.append(
+            func.coalesce(
+                func.sum(case((where if where is not None else true(), 1), else_=0)),
+                0,
+            )
+        )
+    # Leading count() keeps the result a row even with one sum.
+    scope_row = session.exec(select(func.count(), *sums).select_from(CachedEvent)).one()
+    scope_counts = {key: int(n) for key, n in zip(scopes, scope_row[1:])}
+
+    def counts_of(kind: str) -> dict[str, int]:
+        return {name: n for (k, name), n in scope_counts.items() if k == kind}
+
+    yes_counts, no_counts = counts_of("yes"), counts_of("no")
+    base = _apply_admin_event_filters(select(CachedEvent), filters)
 
     filtered_cte = base.subquery()
     fe = filtered_cte.c
@@ -2722,7 +2854,18 @@ def event_filter_options(
         flags=flag_options,
         geo_statuses=geo_options,
         tags=tag_options,
+        prices=price_options,
+        discounts=discount_options,
+        programs=program_options,
+        reaches=reach_options,
         total_count=total_count,
+        quick_views=counts_of("view"),
+        has_counts={
+            name: YesNoCount(yes=yes_counts[name], no=no_counts[name])
+            for name in HAS_FILTERS
+        },
+        min_counts=counts_of("min"),
+        dimension_counts={**counts_of("dim"), **counts_of("dates")},
     )
 
 
@@ -3022,18 +3165,7 @@ def suggest_tags_bulk(
 
 @router.get("/events/ids", response_model=EventIdsResponse)
 def list_admin_event_ids(
-    search: Optional[str] = Query(default=None, max_length=200),
-    audience: Optional[str] = Query(default=None, pattern=AUDIENCE_PATTERN),
-    status: Optional[str] = Query(default=None, pattern=STATUS_PATTERN),
-    flags: Optional[str] = Query(default=None, pattern=FLAGS_PATTERN),
-    calendar_id: Optional[str] = Query(default=None),
-    tag_ids: Optional[str] = Query(default=None),
-    geo_status: Optional[str] = Query(
-        default=None, pattern="^(geolocated|ungeolocated|no-location)$"
-    ),
-    ungeolocated: Optional[bool] = Query(default=None),
-    future_only: Optional[bool] = Query(default=None),
-    include_past: bool = Query(default=False),
+    filters: AdminEventFilters = Depends(_admin_event_filters),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -3041,35 +3173,7 @@ def list_admin_event_ids(
 
     Defaults to upcoming-only; pass ``include_past=true`` to widen the scope.
     """
-    from sqlalchemy import cast, String
-
-    base = select(CachedEvent.event_id)
-
-    if calendar_id:
-        base = base.where(CachedEvent.calendar_id == calendar_id)
-    base = _apply_admin_geo_filter(base, geo_status, ungeolocated)
-    base = _apply_upcoming_filter(
-        base, include_past=include_past, future_only=future_only
-    )
-    if search:
-        pattern = f"%{search}%"
-        base = base.where(
-            (CachedEvent.title.ilike(pattern))
-            | (CachedEvent.description.ilike(pattern))
-            | (CachedEvent.location.ilike(pattern))
-            | (cast(CachedEvent.links, String).ilike(pattern))
-        )
-    if tag_ids:
-        tid_list = [int(t) for t in tag_ids.split(",") if t.strip().isdigit()]
-        if tid_list:
-            matching_event_ids = session.exec(
-                select(EventTag.event_id)
-                .where(EventTag.tag_id.in_(tid_list))
-                .distinct()
-            ).all()
-            base = base.where(CachedEvent.event_id.in_(matching_event_ids))
-
-    base = _apply_admin_status_filter(base, audience, status, flags)
+    base = _apply_admin_event_filters(select(CachedEvent.event_id), filters)
 
     ids = session.exec(base).all()
     return EventIdsResponse(ids=list(ids))
@@ -3755,11 +3859,20 @@ def get_event_moderation(
     draft = next(
         (r for r in revisions if r.status == event_revisions.STATUS_DRAFT), None
     )
+    series_ids = _upcoming_series_ids(session, event)
+    here = set(event_revisions.engaged_user_ids(session, [event.event_id]))
+    everywhere = (
+        set(event_revisions.engaged_user_ids(session, series_ids))
+        if len(series_ids) > 1
+        else here
+    )
     return AdminEventModerationResponse(
         visibility=event_audience(event),
         wants_public=event_wants_public(session, event),
         submission=submission,
-        series_dates=len(_upcoming_series_ids(session, event)),
+        series_dates=len(series_ids),
+        affected_attendees=len(here),
+        series_affected_attendees=len(everywhere),
         draft=_revision_response(session, draft, counts(draft)) if draft else None,
         open_revisions=[
             _revision_response(session, r, counts(r))

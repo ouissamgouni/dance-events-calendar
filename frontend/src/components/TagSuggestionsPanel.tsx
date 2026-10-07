@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { ArrowLeft, Check, MoreHorizontal, X } from 'lucide-react';
 import useBackToClose from '../hooks/useBackToClose';
+import useMediaQuery from '../hooks/useMediaQuery';
+import useLongPress from '../hooks/useLongPress';
+import BottomSheet from './BottomSheet';
 import type { TagSuggestionResponse, TagGroup } from '../types';
 import {
     approveTagSuggestion,
@@ -39,6 +43,11 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
     const [bulkBusy, setBulkBusy] = useState(false);
     const [runUpcomingBusy, setRunUpcomingBusy] = useState(false);
     const [banner, setBanner] = useState<string | null>(null);
+    const isMobile = useMediaQuery('(max-width: 639px)');
+    const bindLongPress = useLongPress();
+    const [selectMode, setSelectMode] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const selecting = isMobile && (selectMode || selectedIds.size > 0);
 
     const applyStatusUpdate = useCallback((id: number, status: 'approved' | 'rejected') => {
         setSuggestions((prev) => {
@@ -120,6 +129,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
     // Reset selection when filters change.
     useEffect(() => {
         setSelectedIds(new Set());
+        setSelectMode(false);
     }, [activeTab, sourceFilter, isOpen]);
 
     const toggleSelect = (id: number) => {
@@ -153,6 +163,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
             // update all selected and let a refresh correct any discrepancy.
             ids.forEach((id) => applyStatusUpdate(id, status));
             setSelectedIds(new Set());
+            setSelectMode(false);
             setBanner(
                 skipped > 0
                     ? `${action === 'approve' ? 'Approved' : 'Rejected'} ${ok} suggestion${ok === 1 ? '' : 's'} (${skipped} skipped — need manual review).`
@@ -222,47 +233,73 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
             )}
 
             <div
-                className={`fixed top-0 right-0 h-full w-[680px] max-w-[95vw] bg-surface shadow-lg border-l border-line z-50 flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-full sm:w-[680px] sm:max-w-[95vw] bg-surface shadow-lg sm:border-l border-line z-50 flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={load}
-                            className={`text-muted hover:text-ink-soft p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
-                            title="Refresh"
-                            aria-label="Refresh"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="23 4 23 10 17 10" />
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                            </svg>
+                {isMobile && (selecting ? (
+                    <div className="flex min-h-14 shrink-0 items-center gap-1 border-b border-line bg-blue-50 px-1 pt-[env(safe-area-inset-top)]">
+                        <button type="button" onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }} aria-label="Exit selection" className="inline-flex h-11 w-11 items-center justify-center text-ink">
+                            <X className="h-5 w-5" aria-hidden="true" />
                         </button>
-                        <h2 className="text-xs font-semibold text-ink uppercase tracking-wide">Tag Suggestions</h2>
-                        {counts.pending > 0 && (
-                            <span className="inline-flex items-center justify-center bg-violet-500 text-white text-[10px] font-semibold px-1.5 py-0.5 min-w-[18px] rounded">
-                                {counts.pending}
-                            </span>
+                        <span className="flex-1 text-base font-semibold text-ink">{selectedIds.size} selected</span>
+                        <button type="button" onClick={toggleSelectAll} className="min-h-11 px-3 text-sm font-medium text-action">
+                            {allBulkableSelected ? 'Deselect all' : 'Select all'}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex min-h-14 shrink-0 items-center gap-1 border-b border-line bg-surface px-1 pt-[env(safe-area-inset-top)]">
+                        <button type="button" onClick={onClose} aria-label="Close" className="inline-flex h-11 w-11 items-center justify-center text-ink">
+                            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+                        </button>
+                        <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">Tag suggestions</h2>
+                        {bulkable.length > 0 && (
+                            <button type="button" onClick={() => setSelectMode(true)} className="min-h-11 px-3 text-sm font-medium text-action">Select</button>
                         )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={handleRunOnUpcoming}
-                            disabled={runUpcomingBusy}
-                            className="text-[10px] font-semibold uppercase tracking-wide bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40 px-2 py-1"
-                            title="Run heuristic auto-suggester on all upcoming events"
-                        >
-                            {runUpcomingBusy ? 'Running…' : 'Run on upcoming'}
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="text-muted hover:text-ink-soft text-sm leading-none p-1"
-                            aria-label="Close"
-                        >
-                            ✕
+                        <button type="button" onClick={() => setMenuOpen(true)} aria-label="More actions" className="inline-flex h-11 w-11 items-center justify-center text-ink-soft">
+                            <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
                         </button>
                     </div>
-                </div>
+                ))}
+                {/* Header */}
+                {!isMobile && (
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={load}
+                                className={`text-muted hover:text-ink-soft p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
+                                title="Refresh"
+                                aria-label="Refresh"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="23 4 23 10 17 10" />
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                                </svg>
+                            </button>
+                            <h2 className="text-xs font-semibold text-ink uppercase tracking-wide">Tag Suggestions</h2>
+                            {counts.pending > 0 && (
+                                <span className="inline-flex items-center justify-center bg-violet-500 text-white text-[10px] font-semibold px-1.5 py-0.5 min-w-[18px] rounded">
+                                    {counts.pending}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={handleRunOnUpcoming}
+                                disabled={runUpcomingBusy}
+                                className="text-[10px] font-semibold uppercase tracking-wide bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40 px-2 py-1"
+                                title="Run heuristic auto-suggester on all upcoming events"
+                            >
+                                {runUpcomingBusy ? 'Running…' : 'Run on upcoming'}
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="text-muted hover:text-ink-soft text-sm leading-none p-1"
+                                aria-label="Close"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Tabs */}
                 <div className="flex border-b border-line">
@@ -270,7 +307,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`flex-1 py-2 text-[11px] font-medium capitalize transition border-b-2 ${activeTab === tab
+                            className={`flex-1 min-h-11 sm:min-h-0 py-2 text-sm sm:text-[11px] font-medium capitalize transition border-b-2 ${activeTab === tab
                                 ? 'border-violet-500 text-violet-600'
                                 : 'border-transparent text-muted hover:text-ink-soft'
                                 }`}
@@ -288,7 +325,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                         <button
                             key={sf}
                             onClick={() => setSourceFilter(sf)}
-                            className={`text-[10px] uppercase font-medium px-2 py-0.5 transition ${sourceFilter === sf
+                            className={`text-[10px] uppercase font-medium px-2 py-0.5 min-h-9 sm:min-h-0 transition ${sourceFilter === sf
                                 ? 'bg-violet-100 text-violet-700'
                                 : 'text-muted hover:text-ink-soft'
                                 }`}
@@ -299,7 +336,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                 </div>
 
                 {/* Bulk-action bar — only when there are pending rows visible. */}
-                {bulkable.length > 0 && (
+                {!isMobile && bulkable.length > 0 && (
                     <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-card-line bg-surface">
                         <label className="flex items-center gap-1.5 text-[10px] text-ink-soft cursor-pointer">
                             <input
@@ -341,6 +378,80 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                         <p className="text-center text-[11px] text-muted mt-8">Loading…</p>
                     ) : filtered.length === 0 ? (
                         <p className="text-center text-[11px] text-muted mt-8">No suggestions</p>
+                    ) : isMobile ? (
+                        <ul className="divide-y divide-line">
+                            {filtered.map((s) => {
+                                const pending = s.status === 'pending';
+                                const checked = selectedIds.has(s.id);
+                                return (
+                                    <li
+                                        key={s.id}
+                                        className={`flex select-none items-start gap-1 pr-1 [-webkit-touch-callout:none] ${checked ? 'bg-blue-50' : ''}`}
+                                        {...(pending ? bindLongPress(() => { setSelectMode(true); if (!checked) toggleSelect(s.id); }) : {})}
+                                    >
+                                        <button
+                                            type="button"
+                                            aria-pressed={selecting && pending ? checked : undefined}
+                                            onClick={() => (selecting ? pending && toggleSelect(s.id) : setReviewing(s))}
+                                            className={`flex min-w-0 flex-1 items-start gap-3 py-3 pl-4 text-left ${selecting && !pending ? 'opacity-50' : ''}`}
+                                        >
+                                            {selecting && (
+                                                <span aria-hidden="true" className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border ${checked ? 'border-action bg-action text-white' : 'border-line bg-surface'} ${pending ? '' : 'invisible'}`}>
+                                                    {checked && <Check className="h-3.5 w-3.5" />}
+                                                </span>
+                                            )}
+                                            <span className="min-w-0 flex-1 space-y-1">
+                                                <span className="line-clamp-2 text-sm font-medium text-ink">{s.event_title || s.event_id}</span>
+                                                <span className="flex flex-wrap items-center gap-1.5">
+                                                    {s.tag ? (
+                                                        <span
+                                                            className="inline-block max-w-full truncate px-2 py-0.5 text-xs"
+                                                            style={{
+                                                                backgroundColor: `${s.tag.group_color ?? s.tag.color ?? '#6b7280'}20`,
+                                                                color: s.tag.group_color ?? s.tag.color ?? '#6b7280',
+                                                            }}
+                                                        >
+                                                            {s.tag.group_label}: {s.tag.label}
+                                                        </span>
+                                                    ) : s.free_text ? (
+                                                        <span className="truncate text-xs italic text-muted">&ldquo;{s.free_text}&rdquo;</span>
+                                                    ) : null}
+                                                    {statusBadge(s.status)}
+                                                </span>
+                                                <span className="block text-xs text-muted">
+                                                    {new Date(s.created_at).toLocaleDateString()}
+                                                    {s.source === 'heuristic' && ` · Auto${typeof s.confidence === 'number' ? ` ${Math.round(s.confidence * 100)}%` : ''}`}
+                                                </span>
+                                            </span>
+                                        </button>
+                                        {!selecting && pending && (
+                                            <span className="mt-1.5 flex shrink-0">
+                                                {s.tag && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleQuickApprove(s)}
+                                                        disabled={actionInFlight === s.id}
+                                                        aria-label="Approve suggestion"
+                                                        className="inline-flex h-11 w-11 items-center justify-center text-action disabled:opacity-50"
+                                                    >
+                                                        <Check className="h-5 w-5" aria-hidden="true" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickReject(s)}
+                                                    disabled={actionInFlight === s.id}
+                                                    aria-label="Reject suggestion"
+                                                    className="inline-flex h-11 w-11 items-center justify-center text-ink-soft disabled:opacity-50"
+                                                >
+                                                    <X className="h-5 w-5" aria-hidden="true" />
+                                                </button>
+                                            </span>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ul>
                     ) : (
                         <table className="w-full text-[12px] table-fixed">
                             <colgroup>
@@ -460,7 +571,50 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                         </table>
                     )}
                 </div>
+                {selecting && (
+                    <div className="flex shrink-0 gap-2 border-t border-line bg-surface px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+                        <button
+                            type="button"
+                            onClick={() => handleBulk('approve')}
+                            disabled={selectedIds.size === 0 || bulkBusy}
+                            className="min-h-11 flex-1 bg-action text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {bulkBusy ? 'Working…' : `Approve${selectedIds.size ? ` (${selectedIds.size})` : ''}`}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleBulk('reject')}
+                            disabled={selectedIds.size === 0 || bulkBusy}
+                            className="min-h-11 flex-1 border border-line bg-surface text-sm font-semibold text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Reject
+                        </button>
+                    </div>
+                )}
             </div>
+
+            {isMobile && isOpen && menuOpen && (
+                <BottomSheet title="Tag suggestions" onClose={() => setMenuOpen(false)}>
+                    <ul className="-mx-4 divide-y divide-line">
+                        <li>
+                            <button
+                                type="button"
+                                disabled={runUpcomingBusy}
+                                onClick={() => { setMenuOpen(false); handleRunOnUpcoming(); }}
+                                className="flex min-h-12 w-full flex-col justify-center px-4 py-2 text-left hover:bg-canvas disabled:opacity-50"
+                            >
+                                <span className="text-sm font-medium text-ink">{runUpcomingBusy ? 'Running…' : 'Run on upcoming events'}</span>
+                                <span className="text-xs text-ink-soft">Heuristic auto-suggester for all upcoming events</span>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" onClick={() => { setMenuOpen(false); load(); }} className="flex min-h-12 w-full items-center px-4 text-left text-sm font-medium text-ink hover:bg-canvas">
+                                Refresh
+                            </button>
+                        </li>
+                    </ul>
+                </BottomSheet>
+            )}
 
             {reviewing && (
                 <TagSuggestionReviewModal

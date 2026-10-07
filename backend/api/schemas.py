@@ -2525,6 +2525,9 @@ class AdminEventModerationResponse(BaseModel):
     submission: Optional[SubmissionInfo] = None
     # Dates still to come in the event's series, the event included.
     series_dates: int = 1
+    # Signed-in people who saved or are going, i.e. who a status change would notify.
+    affected_attendees: int = 0
+    series_affected_attendees: int = 0
     draft: Optional[EventRevisionResponse] = None
     open_revisions: list[EventRevisionResponse] = []
     history: list[EventRevisionResponse] = []
@@ -2736,6 +2739,14 @@ class AdminEventResponse(EventResponse):
     occurrence_count: Optional[int] = None
     # List-only: a date of a recurring submission or a confirmed series.
     in_series: bool = False
+    engaged_count: Optional[int] = None
+    rating_count: Optional[int] = None
+    message_count: Optional[int] = None
+    memory_count: Optional[int] = None
+    program_status: Optional[Literal["published", "draft"]] = None
+    submitted_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    reach: Optional[str] = None
 
 
 class PaginatedEventsResponse(BaseModel):
@@ -2958,6 +2969,11 @@ class FilterOption(BaseModel):
 AdminChangesResponse.model_rebuild()
 
 
+class YesNoCount(BaseModel):
+    yes: int = 0
+    no: int = 0
+
+
 class EventFilterOptionsResponse(BaseModel):
     calendars: list[FilterOption] = []
     # Each group's counts apply the other groups' selections.
@@ -2966,7 +2982,19 @@ class EventFilterOptionsResponse(BaseModel):
     flags: list[FilterOption] = []
     geo_statuses: list[FilterOption] = []
     tags: list[FilterOption] = []
+    prices: list[FilterOption] = []
+    discounts: list[FilterOption] = []
+    programs: list[FilterOption] = []
+    reaches: list[FilterOption] = []
     total_count: int = 0
+    # Search + upcoming + the preset's filters (presets reset everything else).
+    quick_views: dict[str, int] = {}
+    # Per has-X switch, with its own selection replaced.
+    has_counts: dict[str, YesNoCount] = {}
+    # Events with at least one going/saved/engaged, own minimum replaced.
+    min_counts: dict[str, int] = {}
+    # Each active filter alone, with search + dates; "dates" = search + dates only.
+    dimension_counts: dict[str, int] = {}
 
 
 class BulkEventIdsRequest(BaseModel):
@@ -3052,6 +3080,8 @@ class FeedbackSubmissionCreate(BaseModel):
     audience_tag_ids: list[int] = Field(default_factory=list, max_length=20)
     comment: Optional[str] = Field(default=None, max_length=300)
     is_anonymous: bool = False
+    # past_edition: written from an upcoming edition about an earlier one.
+    scope: Literal["this_edition", "past_edition"] = "this_edition"
     tag_suggestions: list[TagSuggestionInline] = Field(
         default_factory=list, max_length=10
     )
@@ -3068,6 +3098,7 @@ class EventRatingResponse(BaseModel):
     comment: Optional[str] = None
     comment_status: str = "none"
     is_anonymous: bool = False
+    scope: str = "this_edition"
     status: str
     created_at: datetime
     updated_at: datetime
@@ -3174,6 +3205,7 @@ class EventReviewPublic(BaseModel):
     event_start: datetime
     overall_sentiment: Optional[str] = None
     comment: Optional[str] = None
+    scope: str = "this_edition"
     aspect_tags: list[TagResponse] = []
     audience_tags: list[TagResponse] = []
     reviewer_label: str  # display name, "Anonymous", or initials
@@ -3304,6 +3336,7 @@ class MyRatingResponse(BaseModel):
     comment: Optional[str] = None
     comment_status: str = "none"
     is_anonymous: bool = False
+    scope: str = "this_edition"
     status: str
     created_at: datetime
     updated_at: datetime

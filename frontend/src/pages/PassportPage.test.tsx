@@ -40,6 +40,15 @@ vi.mock('../components/EventMap', () => ({
     ),
 }))
 
+vi.mock('../components/EventModal', () => ({
+    default: ({ onClose }: { onClose: () => void }) => <button type="button" onClick={onClose}>Close modal</button>,
+    EventIdModal: ({ eventId, onClose }: { eventId: string; onClose: () => void }) => (
+        <div data-testid="event-id-modal" data-event-id={eventId}>
+            <button type="button" onClick={onClose}>Close modal</button>
+        </div>
+    ),
+}))
+
 // Rasterising the share card needs a real canvas; stub the capture/share util
 // so the test asserts the dialog wiring (token mint + events fetch + scope)
 // rather than image encoding.
@@ -178,6 +187,26 @@ describe('PassportPage', () => {
         expect(screen.getByRole('button', { name: 'Show in map' })).toBeInTheDocument()
         // No "Styles danced" stat card.
         expect(screen.queryByText('Styles danced')).not.toBeInTheDocument()
+    })
+
+    it('opens a timeline event in the event modal instead of navigating', async () => {
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/passport', () => HttpResponse.json(PASSPORT)),
+            http.get('*/api/passport/timeline', () => HttpResponse.json(TIMELINE)),
+        )
+
+        renderPassport()
+        fireEvent.click(await screen.findByRole('tab', { name: 'Journey' }))
+        const link = (await screen.findByText('Paris Salsa Night')).closest('a')!
+        expect(link).toHaveAttribute('href', '/event/evt-1')
+        fireEvent.click(link)
+
+        expect(await screen.findByTestId('event-id-modal')).toHaveAttribute('data-event-id', 'evt-1')
+        expect(screen.queryByText('event page')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Close modal' }))
+        expect(screen.queryByTestId('event-id-modal')).not.toBeInTheDocument()
+        expect(screen.getByText('Paris Salsa Night')).toBeInTheDocument()
     })
 
     it.each([

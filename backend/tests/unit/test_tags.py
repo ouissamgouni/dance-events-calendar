@@ -8,7 +8,14 @@ from sqlmodel import Session
 from backend.api.main import app
 from backend.api.routes.tags import _group_to_response, get_event_tags
 from backend.db.database import get_session
-from backend.db.models import Tag, TagGroup, EventTag, TagSuggestion, CachedEvent
+from backend.db.models import (
+    Tag,
+    TagGroup,
+    EventTag,
+    TagSuggestion,
+    CachedEvent,
+    CalendarDefaultTag,
+)
 
 
 def _mock_session():
@@ -316,6 +323,44 @@ class TestAdminEventTags:
         assert resp.status_code == 200
         assert suggestion.status == "rejected"
         assert suggestion.admin_notes == "Not applicable"
+
+
+def _exec_results(*results):
+    """Queue session.exec() results: ints for .one(), lists for .all()."""
+    mocks = []
+    for r in results:
+        m = MagicMock()
+        m.one.return_value = r
+        m.all.return_value = r
+        mocks.append(m)
+    return mocks
+
+
+@pytest.mark.unit
+class TestAdminDeleteTag:
+    def test_delete_removes_calendar_default_tags(self, admin_client):
+        client, session = admin_client
+        tag = _make_tag(id=7)
+        default_tag = CalendarDefaultTag(id=1, calendar_id="cal-001", tag_id=7)
+        event_tag = EventTag(event_id="evt-001", tag_id=7)
+        session.get.return_value = tag
+        session.exec.side_effect = _exec_results(0, [default_tag], [event_tag], [], [])
+
+        resp = client.delete("/api/admin/tags/7")
+
+        assert resp.status_code == 204
+        assert session._deleted == [default_tag, event_tag, tag]
+
+    def test_delete_refuses_tag_used_by_ratings(self, admin_client):
+        client, session = admin_client
+        session.get.return_value = _make_tag(id=7)
+        session.exec.side_effect = _exec_results(2)
+
+        resp = client.delete("/api/admin/tags/7")
+
+        assert resp.status_code == 409
+        assert "2 event rating" in resp.json()["detail"]
+        assert session._deleted == []
 
 
 @pytest.mark.unit

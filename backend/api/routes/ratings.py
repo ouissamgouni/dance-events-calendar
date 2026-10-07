@@ -100,6 +100,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["ratings"])
 limiter = Limiter(key_func=client_ip)
 
+_SCOPE_PATTERN = "^(this_edition|past_edition)$"
+
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
@@ -256,7 +258,7 @@ def _reviewer_label(user: User | None, is_anonymous: bool) -> str:
 
 
 def _aggregate_core(
-    session: Session, event_ids: list[str]
+    session: Session, event_ids: list[str], scope: str | None = None
 ) -> tuple[
     int,
     dict[str, int],
@@ -281,6 +283,7 @@ def _aggregate_core(
         ).where(
             col(EventRating.event_id).in_(event_ids),
             EventRating.status != "rejected",
+            *([EventRating.scope == scope] if scope else []),
         )
     ).all()
 
@@ -395,7 +398,19 @@ def _aggregate_core(
     )
 
 
-def _aggregate_for_event(session: Session, event_id: str) -> EventRatingAggregate:
+def _has_started(event: CachedEvent) -> bool:
+    return event.start <= datetime.now(timezone.utc)
+
+
+def _own_scope(event: CachedEvent) -> str | None:
+    """Scope counted as an edition's *own* reviews: once it has started, earlier-
+    edition reviews written while it was upcoming no longer describe it."""
+    return "this_edition" if _has_started(event) else None
+
+
+def _aggregate_for_event(
+    session: Session, event_id: str, scope: str | None = None
+) -> EventRatingAggregate:
     """Live structured aggregate + overall-mood headline for a single event."""
     (
         total,
@@ -405,7 +420,7 @@ def _aggregate_for_event(session: Session, event_id: str) -> EventRatingAggregat
         top_neutral_tags,
         top_negative_tags,
         top_audience_tags,
-    ) = _aggregate_core(session, [event_id])
+    ) = _aggregate_core(session, [event_id], scope)
 
     min_reviews = get_review_mood_headline_min_reviews(session)
     mood = compute_mood_metrics(sentiment_distribution, min_reviews)
@@ -469,7 +484,7 @@ def _series_rollup(session: Session, series: EventSeries) -> SeriesRatingRollup:
     edition_averages: list[float] = []
     positive_percentages: list[float] = []
     for eid in event_ids:
-        total, dist, *_ = _aggregate_core(session, [eid])
+        total, dist, *_ = _aggregate_core(session, [eid], "this_edition")
         m = compute_mood_metrics(dist, min_reviews)
         ev = events.get(eid)
         if ev is None:
@@ -490,6 +505,13 @@ def _series_rollup(session: Session, series: EventSeries) -> SeriesRatingRollup:
         if m.review_count > 0:
             edition_averages.append(m.average_mood)
             positive_percentages.append(m.positive_percentage)
+
+    # Earlier editions not in the app count as one extra edition in the headline.
+    _, earlier_dist, *_ = _aggregate_core(session, event_ids, "past_edition")
+    earlier = compute_mood_metrics(earlier_dist, min_reviews)
+    if earlier.review_count > 0:
+        edition_averages.append(earlier.average_mood)
+        positive_percentages.append(earlier.positive_percentage)
 
     # Newest edition first.
     editions.sort(key=lambda e: e.start, reverse=True)
@@ -543,6 +565,7 @@ def _to_rating_response(
         comment=rating.comment,
         comment_status=rating.comment_status,
         is_anonymous=rating.is_anonymous,
+        scope=rating.scope,
         status=rating.status,
         created_at=rating.created_at,
         updated_at=rating.updated_at,
@@ -628,9 +651,14 @@ def submit_feedback(
             tag_suggestion_ids=[],
         )
 
-    # Upcoming editions can't be reviewed — reviews open only after the event ends.
-    if event.end and event.end > datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="This event hasn't taken place yet")
+    # This edition opens once it starts; earlier-edition reviews only while upcoming.
+    if body.scope == "this_edition" and not _has_started(event):
+        raise HTTPException(status_code=400, detail="This event hasn't started yet")
+    if body.scope == "past_edition" and _has_started(event):
+        raise HTTPException(
+            status_code=400,
+            detail="Earlier-edition reviews are only accepted on upcoming events",
+        )
 
     _enforce_user_rate_limit(session, user.id)
 
@@ -648,10 +676,12 @@ def submit_feedback(
     auto_flag = has_comment and contains_profanity(body.comment)
     admin_notes = "auto-flagged: profanity" if auto_flag else None
 
-    # Upsert rating per (user_id, event_id).
+    # Upsert rating per (user_id, event_id, scope).
     existing = session.exec(
         select(EventRating).where(
-            EventRating.user_id == user.id, EventRating.event_id == event_id
+            EventRating.user_id == user.id,
+            EventRating.event_id == event_id,
+            EventRating.scope == body.scope,
         )
     ).first()
     now = datetime.now(timezone.utc)
@@ -681,6 +711,7 @@ def submit_feedback(
             comment_status=comment_status,
             audience_tag_ids=valid_audience_tag_ids or None,
             is_anonymous=body.is_anonymous,
+            scope=body.scope,
             feedback_submission_id=feedback_submission_id,
             status="approved",
             admin_notes=admin_notes,
@@ -725,7 +756,9 @@ def submit_feedback(
     # re-submitting doesn't re-notify. Best-effort: never break submission.
     if existing is None and not body.is_anonymous:
         try:
-            fan_out_review(session, user, event_id)
+            fan_out_review(
+                session, user, event_id, past_edition=body.scope == "past_edition"
+            )
             session.commit()
         except Exception:  # noqa: BLE001 — notification is best-effort
             session.rollback()
@@ -747,13 +780,16 @@ def submit_feedback(
 )
 def get_my_rating(
     event_id: str,
+    scope: str = Query(default="this_edition", pattern=_SCOPE_PATTERN),
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
     _require_user_facing_event(session, event_id)
     rating = session.exec(
         select(EventRating).where(
-            EventRating.user_id == user.id, EventRating.event_id == event_id
+            EventRating.user_id == user.id,
+            EventRating.event_id == event_id,
+            EventRating.scope == scope,
         )
     ).first()
     if not rating:
@@ -768,12 +804,15 @@ def get_my_rating(
 @router.delete("/api/events/{event_id}/rating", status_code=204)
 def delete_my_rating(
     event_id: str,
+    scope: str = Query(default="this_edition", pattern=_SCOPE_PATTERN),
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
     rating = session.exec(
         select(EventRating).where(
-            EventRating.user_id == user.id, EventRating.event_id == event_id
+            EventRating.user_id == user.id,
+            EventRating.event_id == event_id,
+            EventRating.scope == scope,
         )
     ).first()
     if rating:
@@ -799,8 +838,8 @@ def get_rating_aggregate(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    _require_user_facing_event(session, event_id)
-    return _aggregate_for_event(session, event_id)
+    event = _require_user_facing_event(session, event_id)
+    return _aggregate_for_event(session, event_id, _own_scope(event))
 
 
 @router.get(
@@ -857,14 +896,14 @@ def get_rating_aggregates_batch(
 
     # Identify upcoming events in resolved series for special handling
     now = datetime.now(timezone.utc)
+    timings = session.exec(
+        select(CachedEvent.event_id, CachedEvent.start, CachedEvent.end).where(
+            col(CachedEvent.event_id).in_(requested_event_ids)
+        )
+    ).all()
+    started_ids = {ev_id for ev_id, start, _end in timings if start <= now}
     upcoming_ids = [
-        ev_id
-        for ev_id, end in session.exec(
-            select(CachedEvent.event_id, CachedEvent.end).where(
-                col(CachedEvent.event_id).in_(requested_event_ids)
-            )
-        ).all()
-        if end is not None and end > now
+        ev_id for ev_id, _start, end in timings if end is not None and end > now
     ]
 
     series_by_event: dict[str, int] = {}
@@ -907,7 +946,7 @@ def get_rating_aggregates_batch(
         edition_moods: dict[str, MoodMetrics] = {}
         if member_event_ids:
             for eid in member_event_ids:
-                total, dist, *_ = _aggregate_core(session, [eid])
+                total, dist, *_ = _aggregate_core(session, [eid], "this_edition")
                 mood = compute_mood_metrics(dist, min_reviews)
                 # Unreviewed editions would drag the mean toward 0.
                 if mood.review_count > 0:
@@ -916,21 +955,14 @@ def get_rating_aggregates_batch(
         # Build series roll-ups
         for series_id in resolved_series_ids:
             edition_ids = [ev_id for sid, ev_id in all_members if sid == series_id]
-            edition_averages = [
-                edition_moods[eid].average_mood
-                for eid in edition_ids
-                if eid in edition_moods
-            ]
-            edition_positives = [
-                edition_moods[eid].positive_percentage
-                for eid in edition_ids
-                if eid in edition_moods
-            ]
-            total_reviews = sum(
-                edition_moods[eid].review_count
-                for eid in edition_ids
-                if eid in edition_moods
-            )
+            moods = [edition_moods[eid] for eid in edition_ids if eid in edition_moods]
+            _, earlier_dist, *_ = _aggregate_core(session, edition_ids, "past_edition")
+            earlier = compute_mood_metrics(earlier_dist, min_reviews)
+            if earlier.review_count > 0:
+                moods.append(earlier)
+            edition_averages = [m.average_mood for m in moods]
+            edition_positives = [m.positive_percentage for m in moods]
+            total_reviews = sum(m.review_count for m in moods)
 
             rollup = mood_metrics_from_averages(
                 edition_averages, total_reviews, edition_positives, min_reviews
@@ -951,7 +983,9 @@ def get_rating_aggregates_batch(
     remaining = [eid for eid in requested_event_ids if eid not in processed]
 
     for event_id in remaining:
-        total, sentiment_dist, *_ = _aggregate_core(session, [event_id])
+        total, sentiment_dist, *_ = _aggregate_core(
+            session, [event_id], "this_edition" if event_id in started_ids else None
+        )
         mood = compute_mood_metrics(sentiment_dist, min_reviews)
         results[event_id] = EventRatingAggregate(
             event_id=event_id,
@@ -1014,6 +1048,7 @@ def _reviews_to_public(
                     session, list(r.audience_tag_ids or [])
                 ),
                 reviewer_label=_reviewer_label(u, r.is_anonymous),
+                scope=r.scope,
                 created_at=r.created_at,
             )
         )
@@ -1026,12 +1061,16 @@ def list_reviews(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     sort: str = Query(default="recent", pattern="^(recent|positive|critical)$"),
+    scope: str | None = Query(default=None, pattern=_SCOPE_PATTERN),
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
     event = _require_user_facing_event(session, event_id)
+    scope = scope or _own_scope(event)
     base = select(EventRating).where(
-        EventRating.event_id == event_id, EventRating.status != "rejected"
+        EventRating.event_id == event_id,
+        EventRating.status != "rejected",
+        *([EventRating.scope == scope] if scope else []),
     )
 
     total = session.exec(select(func.count()).select_from(base.subquery())).one()
@@ -1192,6 +1231,7 @@ def list_my_ratings(
                 comment=r.comment,
                 comment_status=r.comment_status,
                 is_anonymous=r.is_anonymous,
+                scope=r.scope,
                 status=r.status,
                 created_at=r.created_at,
                 updated_at=r.updated_at,
@@ -1219,6 +1259,7 @@ def list_my_pending_reviews(
         session.exec(
             select(EventRating.event_id)
             .where(EventRating.user_id == user.id)
+            .where(EventRating.scope == "this_edition")
             .where(col(EventRating.event_id).in_(event_ids))
         ).all()
     )

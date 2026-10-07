@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { Route, Routes } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
@@ -78,6 +78,32 @@ describe('SeriesPage', () => {
         const hrefs = links.map((l) => l.getAttribute('href'))
         expect(hrefs).toContain('/event/evt-series-2')
         expect(hrefs).toContain('/event/evt-series-1')
+    })
+
+    it('opens an edition in the event modal instead of navigating', async () => {
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/series/5', () => HttpResponse.json(rollup)),
+            http.get('*/api/tags', () => HttpResponse.json([])),
+            http.get('*/api/events/evt-series-1', () => new Promise(() => { })),
+        )
+
+        renderWithProviders(
+            <HelmetProvider>
+                <Routes>
+                    <Route path="/series/:seriesId" element={<SeriesPage />} />
+                    <Route path="/event/:eventId" element={<p>event page</p>} />
+                </Routes>
+            </HelmetProvider>,
+            { routerEntries: ['/series/5'] },
+        )
+
+        await screen.findByRole('heading', { name: 'Weekly Milonga' })
+        const link = screen.getAllByRole('link').find((l) => l.getAttribute('href') === '/event/evt-series-1')!
+        fireEvent.click(link)
+
+        expect(await screen.findByRole('status')).toHaveTextContent('Loading event')
+        expect(screen.queryByText('event page')).not.toBeInTheDocument()
     })
 
     it('shows a not-found message when the series is missing', async () => {

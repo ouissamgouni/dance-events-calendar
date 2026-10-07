@@ -76,14 +76,32 @@ function renderSheet(data: EventAssets, start = '2099-01-01T20:00:00Z', onClose 
 }
 
 describe('TicketSheet', () => {
-    it('lists tickets with the counter and inline add options', async () => {
-        renderSheet(assets({ assets: [asset({})], ticket_count: 1 }));
+    it('folds the add options behind a + tile once a ticket exists', async () => {
+        const { user } = renderSheet(assets({ assets: [asset({})], ticket_count: 1 }));
 
         const dialog = await screen.findByRole('dialog', { name: /My ticket/ });
         expect(await within(dialog).findByText('1 / 2')).toBeInTheDocument();
         expect(within(dialog).getByRole('link', { name: /PDF ticket/ })).toHaveAttribute('href', 'https://signed.test/ticket.pdf');
+        expect(within(dialog).queryByRole('button', { name: /Paste ticket link/ })).not.toBeInTheDocument();
+
+        const add = within(dialog).getByRole('button', { name: 'Add another ticket' });
+        expect(add).toHaveAttribute('aria-expanded', 'false');
+        await user.click(add);
+        expect(add).toHaveAttribute('aria-expanded', 'true');
+        expect(within(dialog).getByRole('button', { name: /Choose file/ })).toBeInTheDocument();
         expect(within(dialog).getByRole('button', { name: /Paste ticket link/ })).toBeInTheDocument();
         expect(within(dialog).getByRole('button', { name: /Take a photo/ })).toBeInTheDocument();
+
+        await user.click(add);
+        expect(within(dialog).queryByRole('button', { name: /Paste ticket link/ })).not.toBeInTheDocument();
+    });
+
+    it('shows the add options directly with no + tile when there is no ticket', async () => {
+        renderSheet(assets({}));
+
+        const dialog = await screen.findByRole('dialog', { name: /My ticket/ });
+        expect(await within(dialog).findByRole('button', { name: /Paste ticket link/ })).toBeInTheDocument();
+        expect(within(dialog).queryByRole('button', { name: 'Add another ticket' })).not.toBeInTheDocument();
     });
 
     it('deletes a ticket from the thumbnail badge after confirming', async () => {
@@ -112,16 +130,17 @@ describe('TicketSheet', () => {
 
         expect(await screen.findByText('Limit reached (2).')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /Paste ticket link/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Add another ticket' })).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: /tix\.example/ })).toHaveAttribute('href', 'https://tix.example/1');
     });
 
-    it('lists Take a photo last and has no close button', async () => {
+    it('lists Take a photo last and has a close button', async () => {
         renderSheet(assets({ ticket_likely: true }));
 
         const dialog = await screen.findByRole('dialog', { name: /My ticket/ });
         const options = await within(dialog).findAllByRole('button', { name: /Choose file|Paste ticket link|Take a photo/ });
         expect(options.map((o) => o.textContent)).toEqual(['📄 Choose file (PDF, image)', '🔗 Paste ticket link', '📷 Take a photo']);
-        expect(within(dialog).queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+        expect(within(dialog).getByRole('button', { name: 'Close' })).toBeInTheDocument();
         expect(within(dialog).queryByRole('button', { name: 'No ticket needed' })).not.toBeInTheDocument();
     });
 

@@ -31,6 +31,8 @@ from backend.api.schemas import (
 from backend.db.database import get_session
 from backend.db.models import (
     CachedEvent,
+    CalendarDefaultTag,
+    EventRatingAspectTag,
     EventTag,
     Tag,
     TagGroup,
@@ -546,7 +548,22 @@ def delete_tag(
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
 
-    # Cascade: delete event_tags, tag_suggestions, and tag_synonyms referencing this tag
+    rating_refs = session.exec(
+        select(func.count())
+        .select_from(EventRatingAspectTag)
+        .where(EventRatingAspectTag.tag_id == tag_id)
+    ).one()
+    if rating_refs:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Tag is used in {rating_refs} event rating(s); disable it instead.",
+        )
+
+    # Cascade: delete event_tags, tag_suggestions, tag_synonyms and calendar default tags
+    for cdt in session.exec(
+        select(CalendarDefaultTag).where(CalendarDefaultTag.tag_id == tag_id)
+    ).all():
+        session.delete(cdt)
     for et in session.exec(select(EventTag).where(EventTag.tag_id == tag_id)).all():
         session.delete(et)
     for ts in session.exec(

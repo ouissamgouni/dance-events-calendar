@@ -55,7 +55,7 @@ test_plan:
         Sign in as Alice (dev login), open the bell / Notifications page.
       expected: >
         Alice's row reads "Carol, Dan +2 others shared their experience at
-        Rooftop Salsa Social — Rate Me!". Signed in as Bob or Gina the row
+        Rooftop Salsa Social — Rate Me! — add yours". Signed in as Bob or Gina the row
         reads the generic "How was it? Share your experience at …" (neither
         follows a reviewer). Clicking any row navigates to
         `/event/ev-past/review`, scrolls to Community Experience,

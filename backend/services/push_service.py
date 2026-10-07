@@ -11,8 +11,8 @@ Resilience:
   * No-ops (returns 0) when web-push is disabled or VAPID keys are unset, so
     callers can invoke it unconditionally.
   * Per-endpoint failures are logged, never raised.
-  * Endpoints the push service reports as gone (HTTP 404/410) are pruned so we
-    stop retrying dead browsers.
+  * Endpoints the push service reports as gone (HTTP 404/410), or as created
+    with a different VAPID key (403), are pruned so we stop retrying them.
 """
 
 from __future__ import annotations
@@ -46,6 +46,11 @@ def _topic_header(topic: str) -> str:
         return topic
     digest = hashlib.sha256(topic.encode()).digest()
     return base64.urlsafe_b64encode(digest).decode().rstrip("=")[:32]
+
+
+def _vapid_mismatch(body: str) -> bool:
+    """403 because the subscription was made with another VAPID key (FCM / Apple)."""
+    return "do not correspond" in body or "VapidPkHashMismatch" in body
 
 
 def webpush_configured() -> bool:
@@ -107,8 +112,11 @@ def send_push(
                 )
                 delivered += 1
             except WebPushException as exc:
-                status = getattr(getattr(exc, "response", None), "status_code", None)
-                if status in (404, 410):
+                response = getattr(exc, "response", None)
+                status = getattr(response, "status_code", None)
+                if status in (404, 410) or (
+                    status == 403 and _vapid_mismatch(getattr(response, "text", ""))
+                ):
                     stale.append(sub.id)  # endpoint gone — prune below
                 else:
                     if status is None or status == 429 or status >= 500:

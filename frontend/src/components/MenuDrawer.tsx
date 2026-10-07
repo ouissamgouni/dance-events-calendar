@@ -102,6 +102,10 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                                 <img src="/search.png" alt="" aria-hidden="true" className={iconClass} />
                                 Saved searches
                             </Link>
+                            <Link to="/account" onClick={onClose} className={rowClass}>
+                                <img src="/setting.png" alt="" aria-hidden="true" className={iconClass} />
+                                Settings
+                            </Link>
                             <Link to="/tribe/network" onClick={onClose} className={rowClass}>
                                 <img src="/tribe.png" alt="" aria-hidden="true" className={iconClass} />
                                 People
@@ -145,10 +149,6 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                                 Install App
                             </Link>
                             {divider}
-                            <Link to="/account" onClick={onClose} className={rowClass}>
-                                <img src="/setting.png" alt="" aria-hidden="true" className={iconClass} />
-                                Settings
-                            </Link>
                             <a href="mailto:support@joinmovida.com?subject=Movida%20support" onClick={onClose} className={rowClass}>
                                 <img src="/question.png" alt="" aria-hidden="true" className={iconClass} />
                                 Help &amp; support

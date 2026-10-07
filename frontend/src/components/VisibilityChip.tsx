@@ -27,21 +27,24 @@ export function FlagIcon({ flag, size = 14 }: { flag: string; size?: number }) {
     );
 }
 
-export function WantsPublicChip() {
+const LABELLED_CHIP = 'inline-flex shrink-0 items-center gap-1 bg-canvas px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide';
+
+export function WantsPublicChip({ withLabel = false }: { withLabel?: boolean }) {
     return (
         <span
             data-testid="wants-public-chip"
             title={PUBLIC_REQUEST_HINT}
             aria-label={PUBLIC_REQUEST_HINT}
             role="img"
-            className="inline-flex shrink-0 items-center text-amber-600"
+            className={withLabel ? `${LABELLED_CHIP} text-amber-700` : 'inline-flex shrink-0 items-center text-amber-600'}
         >
-            <LockOpen size={14} aria-hidden="true" />
+            <LockOpen size={withLabel ? 12 : 14} aria-hidden="true" />
+            {withLabel && 'Wants public'}
         </span>
     );
 }
 
-export default function VisibilityChip({ state, title }: { state: EventVisibilityState; title?: string }) {
+export default function VisibilityChip({ state, title, withLabel = false }: { state: EventVisibilityState; title?: string; withLabel?: boolean }) {
     const { label, description, Icon, cls } = VISIBILITY_META[state];
     return (
         <span
@@ -49,9 +52,10 @@ export default function VisibilityChip({ state, title }: { state: EventVisibilit
             title={title ?? `${label}: ${description}`}
             aria-label={label}
             role="img"
-            className={`inline-flex shrink-0 items-center ${cls}`}
+            className={withLabel ? `${LABELLED_CHIP} ${cls}` : `inline-flex shrink-0 items-center ${cls}`}
         >
-            <Icon size={14} aria-hidden="true" />
+            <Icon size={withLabel ? 12 : 14} aria-hidden="true" />
+            {withLabel && label}
         </span>
     );
 }

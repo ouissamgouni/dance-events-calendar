@@ -18,11 +18,14 @@ import {
     X,
 } from 'lucide-react';
 import EventMap from './EventMap';
+import EventModal, { EventIdModal } from './EventModal';
 import MemoriesStrip from './MemoriesStrip';
+import { isPlainClick } from '../utils/plainClick';
 import { useEventAssetSummary } from '../context/EventAssetSummaryContext';
 import PassportActivityHeatmap from './PassportActivityHeatmap';
 import PassportSummaryCard from './PassportSummaryCard';
 import type {
+    CalendarEvent,
     PassportConsistency,
     PassportMapEvent,
     PassportMilestone,
@@ -414,6 +417,21 @@ function MilestoneCategorySheet({ category, onClose }: { category: MilestoneCate
     );
 }
 
+export function MilestoneCategorySheetFor({
+    data,
+    categoryKey,
+    onClose,
+}: {
+    data: PassportResponse;
+    categoryKey: string;
+    onClose: () => void;
+}) {
+    const categories = useMemo(() => buildMilestoneCategories(data), [data]);
+    const category = categories.find((c) => c.key === categoryKey) ?? null;
+    if (!category) return null;
+    return <MilestoneCategorySheet category={category} onClose={onClose} />;
+}
+
 const TIMELINE_MILESTONE: Record<string, { icon: string; label: string }> = {
     first_event: { icon: '💃', label: 'First dance event' },
     events_5: { icon: '🔥', label: 'Danced at 5 events' },
@@ -495,13 +513,21 @@ function TimelineEventMemories({ eventId, children }: { eventId: string; childre
     );
 }
 
-function JourneyEntryRow({ entry, anchorMonth, highlighted, showMemories }: { entry: JourneyEntry; anchorMonth?: string | null; highlighted?: boolean; showMemories?: boolean }) {
+function JourneyEntryRow({ entry, anchorMonth, highlighted, showMemories, onOpenEvent }: { entry: JourneyEntry; anchorMonth?: string | null; highlighted?: boolean; showMemories?: boolean; onOpenEvent: (eventId: string) => void }) {
     const date = railDate(entry.date);
     const place = entry.event
         ? [entry.event.city, entry.event.country].filter(Boolean).join(', ') || entry.event.location
         : null;
     const eventLink = entry.event && (
-        <Link to={`/event/${entry.event.event_id}`} className="group block px-1 pb-2 pt-0.5">
+        <Link
+            to={`/event/${entry.event.event_id}`}
+            onClick={(e) => {
+                if (!isPlainClick(e) || !entry.event) return;
+                e.preventDefault();
+                onOpenEvent(entry.event.event_id);
+            }}
+            className="group block px-1 pb-2 pt-0.5"
+        >
             <div className="text-sm font-semibold leading-5 text-ink group-hover:text-action">{entry.event.title}</div>
             {place && (
                 <div className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
@@ -542,11 +568,13 @@ function FilterableEventMap({
     entries,
     eventKeyOf,
     emptyLabel,
+    onOpenEvent,
 }: {
     events: PassportMapEvent[];
     entries: FilterEntry[];
     eventKeyOf: (event: PassportMapEvent) => string | null;
     emptyLabel: string;
+    onOpenEvent: (event: CalendarEvent) => void;
 }) {
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [activeFilterKey, setActiveFilterKey] = useState<string | null>(null);
@@ -587,6 +615,8 @@ function FilterableEventMap({
                     events={filtered}
                     minimalPopup
                     detailLinkSource="passport"
+                    onEventClick={onOpenEvent}
+                    onOpenDetails={onOpenEvent}
                     autoFitToken={autoFitToken}
                     onMarkerSelect={(event) => selectMarker(event as PassportMapEvent)}
                     showFollowingBadgeOverlay={false}
@@ -635,11 +665,13 @@ function PlacesPanel({
     events,
     showCities,
     showCountries,
+    onOpenEvent,
 }: {
     data: PassportResponse;
     events: PassportMapEvent[];
     showCities: boolean;
     showCountries: boolean;
+    onOpenEvent: (event: CalendarEvent) => void;
 }) {
     const [mode, setMode] = useState<'cities' | 'countries'>(showCities ? 'cities' : 'countries');
     const baseCityEntries: FilterEntry[] = data.collections.cities.map((city) => ({
@@ -684,6 +716,7 @@ function PlacesPanel({
                     entries={cityEntries}
                     eventKeyOf={(event) => event.city ? cityKey(event.city, event.country, showCountries) : null}
                     emptyLabel="No cities yet."
+                    onOpenEvent={onOpenEvent}
                 />
             ) : (
                 <FilterableEventMap
@@ -692,6 +725,7 @@ function PlacesPanel({
                     entries={countryEntries}
                     eventKeyOf={(event) => event.country ?? null}
                     emptyLabel="No countries yet."
+                    onOpenEvent={onOpenEvent}
                 />
             )}
         </section>
@@ -752,6 +786,8 @@ export default function PassportView({
 }: PassportViewProps) {
     const [tab, setTab] = useState<PassportTab>(initialTab);
     const [selectedCategory, setSelectedCategory] = useState<MilestoneCategoryKey | null>(null);
+    const [openEvent, setOpenEvent] = useState<{ id: string; event?: CalendarEvent } | null>(null);
+    const closeEvent = useCallback(() => setOpenEvent(null), []);
     const hasMilestones = sections.includes('milestones');
     const hasJourney = sections.includes('timeline');
     const hasCities = sections.includes('cities');
@@ -930,6 +966,7 @@ export default function PassportView({
                                                                 anchorMonth={entry.event ? monthAnchorIds.get(entry.event.event_id) ?? null : null}
                                                                 highlighted={entry.event != null && highlightMonth != null && entry.event.start.slice(0, 7) === highlightMonth}
                                                                 showMemories={showTimelineMemories}
+                                                                onOpenEvent={(id) => setOpenEvent({ id })}
                                                             />
                                                         ))}
                                                     </ul>
@@ -951,13 +988,16 @@ export default function PassportView({
                             ) : mapEvents === null ? (
                                 <UnavailableState message="Loading map..." />
                             ) : (
-                                <PlacesPanel data={data} events={mapEvents} showCities={hasCities} showCountries={hasCountries} />
+                                <PlacesPanel data={data} events={mapEvents} showCities={hasCities} showCountries={hasCountries} onOpenEvent={(event) => setOpenEvent({ id: event.event_id, event })} />
                             )
                         )}
                     </div>
                 </section>
             </div>
             {activeCategory && <MilestoneCategorySheet category={activeCategory} onClose={() => setSelectedCategory(null)} />}
+            {openEvent && (openEvent.event
+                ? <EventModal event={openEvent.event} onClose={closeEvent} source="passport" />
+                : <EventIdModal eventId={openEvent.id} onClose={closeEvent} source="passport" />)}
         </>
     );
 }

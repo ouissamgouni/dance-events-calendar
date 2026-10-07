@@ -214,11 +214,9 @@ def test_submit_feedback_requires_auth(client, event):
     assert resp.status_code == 401
 
 
-@pytest.mark.unit
-def test_submit_feedback_rejected_for_upcoming_event(client, session):
-    """Upcoming editions can't be reviewed — reviews open only after the event."""
+def _upcoming_event(session, event_id="evt-upcoming"):
     ev = CachedEvent(
-        event_id="evt-upcoming",
+        event_id=event_id,
         calendar_id="cal-1",
         title="Future Social",
         start=datetime(2099, 1, 1, 20, 0, 0, tzinfo=timezone.utc),
@@ -227,6 +225,13 @@ def test_submit_feedback_rejected_for_upcoming_event(client, session):
     )
     session.add(ev)
     session.commit()
+    return ev
+
+
+@pytest.mark.unit
+def test_submit_feedback_this_edition_rejected_for_upcoming_event(client, session):
+    """An upcoming edition can't be reviewed for itself before it starts."""
+    ev = _upcoming_event(session)
     assert _login(client, email="user@example.com").status_code == 200
     resp = client.post(
         f"/api/events/{ev.event_id}/feedback",
@@ -234,6 +239,86 @@ def test_submit_feedback_rejected_for_upcoming_event(client, session):
     )
     assert resp.status_code == 400
     assert session.exec(select(EventRating)).first() is None
+
+
+@pytest.mark.unit
+def test_submit_feedback_this_edition_open_once_started(client, session):
+    """A multi-day event can be reviewed once it has started, before it ends."""
+    now = datetime.now(timezone.utc)
+    ev = CachedEvent(
+        event_id="evt-ongoing",
+        calendar_id="cal-1",
+        title="Festival",
+        start=now - timedelta(days=1),
+        end=now + timedelta(days=2),
+        review_status="reviewed",
+    )
+    session.add(ev)
+    session.commit()
+    assert _login(client, email="user@example.com").status_code == 200
+    resp = client.post(
+        f"/api/events/{ev.event_id}/feedback",
+        json={"overall_sentiment": "great", "tag_suggestions": []},
+    )
+    assert resp.status_code == 201
+    # ...but no longer as an earlier-edition review.
+    resp = client.post(
+        f"/api/events/{ev.event_id}/feedback",
+        json={
+            "overall_sentiment": "great",
+            "scope": "past_edition",
+            "tag_suggestions": [],
+        },
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.unit
+def test_past_edition_review_on_upcoming_event(client, session):
+    """An earlier-edition review is accepted on an upcoming event, counts in its
+    aggregate while upcoming, and doesn't block a later this-edition review."""
+    ev = _upcoming_event(session)
+    assert _login(client, email="user@example.com").status_code == 200
+    resp = client.post(
+        f"/api/events/{ev.event_id}/feedback",
+        json={
+            "overall_sentiment": "amazing",
+            "scope": "past_edition",
+            "tag_suggestions": [],
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["rating"]["scope"] == "past_edition"
+
+    assert client.get(f"/api/events/{ev.event_id}/rating").json()["count"] == 1
+    mine = client.get(f"/api/events/{ev.event_id}/rating/me?scope=past_edition")
+    assert mine.json()["scope"] == "past_edition"
+    assert client.get(f"/api/events/{ev.event_id}/rating/me").json() is None
+    reviews = client.get(f"/api/events/{ev.event_id}/reviews").json()
+    assert reviews["items"][0]["scope"] == "past_edition"
+
+    # Once the edition starts, its own aggregate excludes earlier-edition reviews.
+    ev = session.get(CachedEvent, ev.event_id)
+    ev.start = datetime(2020, 1, 1, 20, 0, 0, tzinfo=timezone.utc)
+    ev.end = datetime(2020, 1, 2, 1, 0, 0, tzinfo=timezone.utc)
+    session.add(ev)
+    session.commit()
+    assert client.get(f"/api/events/{ev.event_id}/rating").json()["count"] == 0
+    assert client.get(f"/api/events/{ev.event_id}/reviews").json()["total"] == 0
+    earlier = client.get(f"/api/events/{ev.event_id}/reviews?scope=past_edition")
+    assert earlier.json()["total"] == 1
+    batch = client.post(
+        "/api/events/ratings/aggregate", json={"event_ids": [ev.event_id]}
+    ).json()
+    assert batch[0]["count"] == 0
+
+    resp = client.post(
+        f"/api/events/{ev.event_id}/feedback",
+        json={"overall_sentiment": "okay", "tag_suggestions": []},
+    )
+    assert resp.status_code == 201
+    assert len(session.exec(select(EventRating)).all()) == 2
+    assert client.get(f"/api/events/{ev.event_id}/rating").json()["count"] == 1
 
 
 @pytest.mark.unit
@@ -1007,6 +1092,34 @@ def test_batch_aggregate_pools_series_count_for_upcoming_edition(client, session
     # The unreviewed upcoming edition must not drag the series mood down.
     moods = {a["event_id"]: a["average_mood"] for a in resp.json()}
     assert moods[upcoming.event_id] == pytest.approx(5.0)
+
+    # An earlier-edition review on the upcoming edition joins the series pool
+    # as its own "earlier editions" bucket, not as the upcoming edition's.
+    assert _login(client, email="c@example.com").status_code == 200
+    resp = client.post(
+        f"/api/events/{upcoming.event_id}/feedback",
+        json={
+            "overall_sentiment": "bad",
+            "scope": "past_edition",
+            "tag_suggestions": [],
+        },
+    )
+    assert resp.status_code == 201
+    rollup = client.get(f"/api/events/{upcoming.event_id}/series").json()
+    assert rollup["total_review_count"] == 3
+    assert rollup["reviewed_edition_count"] == 2
+    editions = {e["event_id"]: e["review_count"] for e in rollup["editions"]}
+    assert editions == {past.event_id: 2, upcoming.event_id: 0}
+    series_reviews = client.get(f"/api/series/{series.id}/reviews").json()
+    assert series_reviews["total"] == 3
+    batch = client.post(
+        "/api/events/ratings/aggregate",
+        json={"event_ids": [past.event_id, upcoming.event_id]},
+    ).json()
+    by_id = {a["event_id"]: a for a in batch}
+    assert by_id[past.event_id]["count"] == 2
+    assert by_id[upcoming.event_id]["count"] == 3
+    assert by_id[upcoming.event_id]["average_mood"] < 5.0
 
 
 @pytest.mark.unit

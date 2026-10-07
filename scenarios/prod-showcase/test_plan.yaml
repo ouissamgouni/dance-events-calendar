@@ -195,14 +195,21 @@ test_plan:
         Sign in as Alex Navarro (@alex-navarro) and open the notifications
         sheet, then repeat as Penny Valdez (@penny-valdez).
       expected: |
-        Alex's inbox mixes a follow request with Approve/Decline, Follow back,
-        new friend, approved request, grouped friends going, friend saved,
-        plan activity, planned-session change, reminder, review prompt,
-        interest match, promo code added, discussion post and reply, friend
-        review, suggested event, and milestones. Penny's inbox shows promo
-        code approved and rejected, organizer claim decision, program
-        available and updated, a reminder with Ask a question, and a review
-        prompt naming a friend.
+        Both inboxes are ordered by importance: urgent plan changes first,
+        then actions and decisions, direct activity, friends' activity,
+        post-event prompts, discovery, and read history. Both open on a red
+        "Event cancelled" row for Lisbon Rooftop Salsa Social and an "Event
+        updated" venue change for Lisboa Beach Bachata Social 2027.
+        Alex's inbox then mixes a planned-session change, reminder, follow
+        request with Approve/Decline, ticket prompt, discussion reply,
+        approved request, Follow back, grouped friends going, plan activity,
+        review and memories prompts, promo code added, interest match, and
+        older read history (new friend, friend saved, friend review,
+        discussion posts, suggested event, milestones). Penny's inbox shows
+        program updated and available, a reminder with Ask a question,
+        "You're the organizer" for Salsa Sunset Amalfi Coast 2027, organizer
+        claim decision, promo code rejected and approved, a discussion post,
+        and review and memories prompts for the Athens weekender.
       verification: "Each row deep-links to its subject and neither inbox is dominated by interest matches."
 
     - id: 19
@@ -220,12 +227,13 @@ test_plan:
     - id: 20
       title: "Open tickets and memories"
       description: |
-        As Elena, open My Events, then Back 2 Mambo 2026, Amsterdam World Dance
-        Congress, Transilvania Salsa Fest, and London Salsa Sessions. Then open
-        the previous Milan, Brussels, and Athens weekender editions. Finally
+        As Elena, open My Events, then Seville Salsa Weekender, Back 2 Mambo
+        2026, Brussels Latin Weekender, Athens Bachata Weekender, and London
+        Salsa Sessions. Then open the previous Milan, Brussels, and Athens
+        weekender editions. Finally
         sign in as one of Elena's friends and open the same past weekenders.
       expected: |
-        The four upcoming events show a Ticket chip and Elena's saved passes
+        The five upcoming events show a Ticket chip and Elena's saved passes
         (two for Back 2 Mambo). Each past weekender shows five of Elena's
         photos in Memories. Her friends see the photos; strangers do not.
       verification: "Ticket PDFs and images open in the viewer and memories respect friends visibility."

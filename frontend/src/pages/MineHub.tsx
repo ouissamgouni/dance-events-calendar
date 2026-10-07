@@ -23,6 +23,7 @@ import type {
 import MilestoneCarousel from '../components/MilestoneCarousel';
 import PassportSummaryCard from '../components/PassportSummaryCard';
 import YourNextEventsRail from '../components/YourNextEventsRail';
+import { MilestoneCategorySheetFor } from '../components/PassportView';
 import { useAuth } from '../context/AuthContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { firstNameOf } from '../utils/displayName';
@@ -89,6 +90,7 @@ export default function MineHub() {
     const [pendingReviewCount, setPendingReviewCount] = useState(0);
     const [savedSearchCount, setSavedSearchCount] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [milestoneCategory, setMilestoneCategory] = useState<string | null>(null);
 
     useEffect(() => {
         if (!user) {
@@ -187,7 +189,10 @@ export default function MineHub() {
                     loading={attendingLoading || loading}
                 />
 
-                <MilestoneCarousel milestones={inProgressMilestones(passport?.milestones ?? [])} />
+                <MilestoneCarousel
+                    milestones={inProgressMilestones(passport?.milestones ?? [])}
+                    onSelectCategory={setMilestoneCategory}
+                />
 
                 <section aria-labelledby="my-dance-title">
                     <h2 id="my-dance-title" className="mb-2 text-lg font-bold text-ink">My Dance</h2>
@@ -219,6 +224,13 @@ export default function MineHub() {
                     </div>
                 </section>
             </div>
+            {passport && milestoneCategory && (
+                <MilestoneCategorySheetFor
+                    data={passport}
+                    categoryKey={milestoneCategory}
+                    onClose={() => setMilestoneCategory(null)}
+                />
+            )}
         </div>
     );
 }

@@ -264,33 +264,36 @@ def _icon_link_row(icon: str, label: str, href: str) -> str:
     )
 
 
-def _engagement_ctas_html(notifications_href: str) -> str:
-    """Shared row of engagement links appended to every user email.
+def _engagement_ctas_html(*, open_as_button: bool = False) -> str:
+    """Shared row of secondary engagement links appended to every user email.
 
-    All four CTAs ("Open Movida" plus the three icon links) render side
-    by side in a single row via a table layout — the reliable way to
-    get a horizontal row across email clients, since flexbox/inline-
-    block support is inconsistent (e.g. Outlook). "Open Movida" is the
-    primary button (opens the homepage); the rest are plain links (not
-    buttons) with a leading icon, per product spec. ``notifications_href``
-    varies by email (points at the relevant Settings section for that
-    email's category).
+    Rendered as a single table row (the reliable horizontal layout across
+    email clients, e.g. Outlook). "Open Movida" is a plain icon link so it
+    doesn't compete with the email's own primary CTA; emails without one
+    (digests) pass ``open_as_button=True``. Settings lives in the footer.
     """
     app = get_public_app_url()
-    return f"""
-    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 12px">
-      <tr>
-        <td style="padding-right:16px">
+    if open_as_button:
+        open_cell = f"""
           <a href="{app}/"
                      style="background:#3b82f6;color:#fff;text-decoration:none;
                                     padding:10px 18px;display:inline-block;white-space:nowrap">
             <img src="{app}/open.png" alt="" width="16" height="16"
                  style="vertical-align:middle;margin-right:8px">Open Movida
-          </a>
-        </td>
+          </a>"""
+        divider = ""
+    else:
+        open_cell = _icon_link_row("open.png", "Open Movida", f"{app}/")
+        divider = (
+            '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 0">'
+        )
+    return f"""
+    {divider}
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0 12px">
+      <tr>
+        <td style="padding-right:16px">{open_cell}</td>
         <td style="padding-right:16px">{_icon_link_row("share.png", "Invite a friend", f"{app}/invite")}</td>
-        <td style="padding-right:16px">{_icon_link_row("save-pink.png", "Install Movida", f"{app}/install")}</td>
-        <td>{_icon_link_row("setting.png", "Settings", notifications_href)}</td>
+        <td>{_icon_link_row("save-pink.png", "Install Movida", f"{app}/install")}</td>
       </tr>
     </table>
     """
@@ -427,7 +430,7 @@ def send_event_reminder_email(
     </p>
     {ask_cta}
     {ticket_cta}
-    {_engagement_ctas_html(f"{app}/account#notifications")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "reminder", "event reminders")
     html = _email_shell("See you on the dance floor 💃", body, footer)
@@ -460,12 +463,12 @@ def send_event_review_prompt_email(
         subject = f"{friend_proof} shared their experience at {event.title or 'your event'} — share yours"
         heading = "Your friends shared their experience 💃"
         lede = f"<p><strong>{who}</strong> shared their experience of:</p>"
-        tagline = "Add yours to help others discover great nights out."
+        tagline = "Add your rating in a few taps and help fellow dancers find their next favorite event."
     else:
         subject = f"How was {event.title or 'your event'}?"
-        heading = "How was your night? 💃"
+        heading = "How was it? 💃"
         lede = "<p>You went to:</p>"
-        tagline = "Share a quick rating to help others discover great nights out."
+        tagline = "Rate it in a few taps and help fellow dancers find their next favorite event."
     body = f"""
     {lede}
     <p style="font-size:18px;font-weight:600;margin:8px 0">{title_link}</p>
@@ -477,7 +480,7 @@ def send_event_review_prompt_email(
         Share your experience
       </a>
     </p>
-    {_engagement_ctas_html(f"{app}/account#notifications")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "review_prompt", "review prompts")
     html = _email_shell(heading, body, footer)
@@ -519,7 +522,7 @@ def _event_nudge_email(
         {button}
       </a>
     </p>
-    {_engagement_ctas_html(f"{app}/account#notifications")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, category, label)
     html = _email_shell(heading, body, footer)
@@ -553,10 +556,10 @@ def send_event_memories_prompt_email(
         event,
         path="memories",
         notification_id=notification_id,
-        subject=f"Relive {event.title or 'your night'} 📸",
-        heading="Relive the night 📸",
+        subject=f"Add your photos from {event.title or 'the event'} 📸",
+        heading="Relive the moment 📸",
         lede="You went to:",
-        tagline="Add a few photos to remember the night.",
+        tagline="Share your best shots and keep the memories alive.",
         button="Add memories",
         category="memories_prompt",
         label="event memories prompts",
@@ -585,7 +588,7 @@ def send_schedule_program_available_email(user, event, session_count: int) -> bo
         View program
       </a>
     </p>
-    {_engagement_ctas_html(f"{app}/account#notifications")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "schedule_updates", "program updates")
     html = _email_shell("Program now available", body, footer)
@@ -613,7 +616,7 @@ def send_schedule_plan_changed_email(user, event, description: str) -> bool:
         Review My Plan
       </a>
     </p>
-    {_engagement_ctas_html(f"{app}/account#notifications")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "schedule_updates", "program updates")
     html = _email_shell("Your plan changed", body, footer)
@@ -641,7 +644,7 @@ def send_event_changed_email(user, event, description: str) -> bool:
         View event
       </a>
     </p>
-    {_engagement_ctas_html(f"{app}/account#notifications")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "schedule_updates", "event updates")
     html = _email_shell("An event you follow changed", body, footer)
@@ -783,7 +786,7 @@ def send_schedule_program_updated_email(user, event) -> bool:
         Review program
       </a>
     </p>
-    {_engagement_ctas_html(f"{app}/account#notifications")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "schedule_updates", "program updates")
     html = _email_shell("Program updated", body, footer)
@@ -838,7 +841,7 @@ def send_milestone_instant_email(user, milestones) -> bool:
         View your passport
       </a>
     </p>
-    {_engagement_ctas_html(f"{app}/account#notify-milestone-unlocked")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "milestone", "achievement updates")
     html = _email_shell(heading, body, footer)
@@ -883,7 +886,7 @@ def send_promo_code_added_email(user, event, promo) -> bool:
         View event
       </a>
     </p>
-    {_engagement_ctas_html(f"{app}/account#notify-promo-codes")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "promo_codes", "promo code alerts")
     html = _email_shell("A promo code just dropped", body, footer)
@@ -968,7 +971,7 @@ def send_event_message_instant_email(
         View the conversation
       </a>
     </p>
-    {_engagement_ctas_html(f"{app}/account#notifications")}
+    {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "event_messages", "event message updates")
     html = _email_shell(f"{heading} on {APP_NAME}", body, footer)
@@ -989,11 +992,8 @@ def send_activity_digest_email(
     notification) produced by the activity-email worker.
 
     ``feature`` is ``"social_activity"`` (default) or ``"interest_matches"``
-    and controls the subject line, footer copy, the per-feature
-    unsubscribe token category, and the Notifications Settings link target
-    (social-activity digests point at the "Notifications & email" section;
-    interest-match digests point at the "Search Profiles" section, since
-    that's where alert profiles are managed).
+    and controls the subject line, footer copy and the per-feature
+    unsubscribe token category.
 
     ``discover_more_count`` (interest-match digests only): number of
     additional matched events beyond ``lines`` that were collapsed behind
@@ -1018,7 +1018,6 @@ def send_activity_digest_email(
         heading = "New matches on Movida"
         footer_label = "interest match updates"
         footer_category = feature
-        notifications_href = f"{app}/account#preferences"
     elif feature == "milestone_unlocked":
         subject = (
             "You unlocked a new milestone on Movida"
@@ -1028,7 +1027,6 @@ def send_activity_digest_email(
         heading = "New milestone unlocked \U0001f389"
         footer_label = "achievement updates"
         footer_category = "milestone"
-        notifications_href = f"{app}/account#notify-milestone-unlocked"
     else:
         subject = (
             "You have 1 new notification on Movida"
@@ -1038,7 +1036,6 @@ def send_activity_digest_email(
         heading = "New activity on Movida"
         footer_label = "activity updates"
         footer_category = feature
-        notifications_href = f"{app}/account#notifications"
     items = "".join(
         f'<li style="margin:6px 0;color:#374151">{line}</li>' for line in lines
     )
@@ -1057,7 +1054,7 @@ def send_activity_digest_email(
     <ul style="padding-left:18px;margin:12px 0">{items}</ul>
     {discover_more_html}
     {_people_suggestions_html(suggestions or [])}
-    {_engagement_ctas_html(notifications_href)}
+    {_engagement_ctas_html(open_as_button=True)}
     """
     footer = _unsubscribe_footer(user.id, footer_category, footer_label)
     html = _email_shell(heading, body, footer)
@@ -1342,7 +1339,7 @@ def send_activity_digest_v2_email(
     <p>Here's what happened in your scene:</p>
     {"".join(blocks)}
     {_people_suggestions_html(suggestions or [])}
-    {_engagement_ctas_html(f"{app}/account#notifications")}
+    {_engagement_ctas_html(open_as_button=True)}
     """
     footer = _unsubscribe_footer(user.id, "digest", "the activity digest")
     html = _email_shell("New activity on Movida", body, footer)

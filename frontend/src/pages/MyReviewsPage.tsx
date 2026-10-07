@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { fetchAspectTagGroups, fetchAudienceTagGroups, fetchEventsByIds, fetchMyPendingReviews, fetchMyRatings } from '../api';
 import type { CalendarEvent, EventRating, MyRating, PendingReview, TagGroup } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { useUpsertMyRating } from '../context/MyRatingsContext';
 import { useInvalidateRatingAggregate } from '../context/RatingAggregatesContext';
 import RateEventModal from '../components/RateEventModal';
 import EventReviewCard from '../components/EventReviewCard';
+import EventModal from '../components/EventModal';
 import { SENTIMENT_META } from '../utils/reviewSentiment';
 
 type ReviewsTab = 'pending' | 'reviewed';
@@ -66,7 +67,8 @@ export default function MyReviewsPage() {
     const [reviewing, setReviewing] = useState<PendingReview | null>(null);
     const upsertMyRating = useUpsertMyRating();
     const invalidateAggregate = useInvalidateRatingAggregate();
-    const navigate = useNavigate();
+    const [modalEvent, setModalEvent] = useState<CalendarEvent | null>(null);
+    const closeModal = useCallback(() => setModalEvent(null), []);
 
     const load = useCallback(() => {
         if (!user) {
@@ -142,7 +144,7 @@ export default function MyReviewsPage() {
                             <EventReviewCard
                                 event={event}
                                 variant="pending"
-                                onOpen={(selectedEvent) => navigate(`/event/${selectedEvent.event_id}`)}
+                                onOpen={setModalEvent}
                                 friendProof={review.friend_proof}
                                 onRatingChanged={(rating) => handlePendingRatingChanged(review, rating)}
                                 testId="pending-review-card"
@@ -157,7 +159,7 @@ export default function MyReviewsPage() {
                         <EventReviewCard
                             event={event}
                             variant="reviewed"
-                            onOpen={(selectedEvent) => navigate(`/event/${selectedEvent.event_id}`)}
+                            onOpen={setModalEvent}
                             initialRating={review}
                             reviewTagLabels={reviewTagLabels}
                             onRatingChanged={(rating) => handleReviewedRatingChanged(review, rating)}
@@ -167,6 +169,7 @@ export default function MyReviewsPage() {
                 ) : <MyReviewCard key={review.id} review={review} name={user.name ?? 'You'} />;
             })}</ul>}
             {reviewing && <RateEventModal eventId={reviewing.event_id} initialRating={null} onClose={() => setReviewing(null)} onSubmitted={handleSubmitted} />}
+            {modalEvent && <EventModal event={modalEvent} onClose={closeModal} source="my-reviews" />}
         </div>
     );
 }

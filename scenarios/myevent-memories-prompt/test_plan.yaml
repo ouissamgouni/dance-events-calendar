@@ -3,7 +3,7 @@ test_plan:
   description: >
     The morning after an event (user-local memories_prompt_local_hour; 0 in
     this scenario so it is always due), Going users who haven't added a
-    memory yet get a "Relive the night — add memories" nudge.
+    memory yet get a "Relive the moment — add memories" nudge.
 
   preconditions:
     - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
@@ -24,7 +24,7 @@ test_plan:
       title: "Who is nudged"
       description: "Check Mailpit and each user's Notifications → Reviews."
       expected: >
-        Mia has one row "Relive the night — add memories from Bachata Night
+        Mia has one row "Relive the moment — add memories from Bachata Night
         at the Docks" (none for Rooftop). Leo has one for Rooftop Salsa
         Social. Emails link to `/event/<id>/memories`.
 
@@ -40,7 +40,7 @@ test_plan:
       title: "Review thank-you CTA"
       description: "As Leo, rate Rooftop Salsa Social and submit."
       expected: >
-        The thank-you screen shows "📸 Add memories from the night", which
+        The thank-you screen shows "📸 Add memories from the event", which
         closes the modal and scrolls to Memories.
 
     - id: 5

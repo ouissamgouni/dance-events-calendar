@@ -446,6 +446,11 @@ class CachedEvent(SQLModel, table=True):
     # proposes what the source changed, not local edits it never had.
     source_values: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        index=True,
+        sa_column_kwargs={"server_default": text("CURRENT_TIMESTAMP")},
+    )
     deleted_at: Optional[datetime] = Field(default=None, index=True)
     is_hidden: bool = Field(default=False, index=True)
     # Per-event overrides for the ``show_prices`` / ``promo_codes_enabled``
@@ -1528,6 +1533,9 @@ class EventRating(SQLModel, table=True):
     stars: int = Field(ge=1, le=5)
     comment: Optional[str] = Field(default=None, sa_column=Column(Text))
     is_anonymous: bool = Field(default=False)
+    # this_edition | past_edition (written from an upcoming edition about an
+    # earlier one). Unique per (user_id, event_id, scope) via partial index.
+    scope: str = Field(default="this_edition", max_length=20)
 
     # Headline sentiment (amazing|great|okay|disappointing|bad). Required by the
     # API; nullable at the column level only for defensive backfill.

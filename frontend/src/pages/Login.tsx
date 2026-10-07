@@ -65,7 +65,7 @@ export default function Login() {
 
     useEffect(() => {
         if (!loading && user) {
-            const dest = safeNext ?? (user.is_admin ? '/admin' : '/');
+            const dest = user.is_admin ? '/admin' : (safeNext ?? '/');
             navigate(dest, { replace: true });
         }
     }, [user, loading, navigate, safeNext]);

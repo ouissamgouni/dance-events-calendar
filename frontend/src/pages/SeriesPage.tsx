@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { fetchAspectTagGroups, fetchSeriesRollup } from '../api';
 import { useAuth } from '../context/AuthContext';
 import type { EventRatingAggregate, SeriesRatingRollup, TagGroup } from '../types';
 import ExperienceBreakdown, { aspectMood } from '../components/ExperienceBreakdown';
+import { EventIdModal } from '../components/EventModal';
+import { isPlainClick } from '../utils/plainClick';
 
 /**
  * /series/:seriesId — cross-edition rating roll-up for a recurring event.
@@ -23,6 +25,8 @@ export default function SeriesPage() {
     const [aspectGroups, setAspectGroups] = useState<TagGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [openEventId, setOpenEventId] = useState<string | null>(null);
+    const closeEvent = useCallback(() => setOpenEventId(null), []);
 
     // Reading reviews requires sign-in — bounce to login and back rather than
     // rendering an empty/"not found" page for anonymous visitors.
@@ -116,6 +120,11 @@ export default function SeriesPage() {
                         <li key={e.event_id}>
                             <Link
                                 to={`/event/${e.event_id}`}
+                                onClick={(click) => {
+                                    if (!isPlainClick(click)) return;
+                                    click.preventDefault();
+                                    setOpenEventId(e.event_id);
+                                }}
                                 className="flex items-center justify-between gap-2 border border-line bg-canvas px-2.5 py-1.5 hover:bg-canvas"
                             >
                                 <div className="min-w-0">
@@ -145,6 +154,7 @@ export default function SeriesPage() {
                     ))}
                 </ul>
             </section>
+            {openEventId && <EventIdModal eventId={openEventId} onClose={closeEvent} source="series" />}
         </div>
     );
 }

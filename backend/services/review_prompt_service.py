@@ -206,6 +206,7 @@ def _due_pairs(session: Session, now: datetime, delay_hours: int, lookback_hours
             select(EventRating.user_id, EventRating.event_id)
             .where(EventRating.user_id.in_(user_ids))  # type: ignore[union-attr]
             .where(EventRating.event_id.in_(event_ids))  # type: ignore[union-attr]
+            .where(EventRating.scope == "this_edition")
         ).all()
     )
 

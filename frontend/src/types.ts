@@ -167,6 +167,16 @@ export interface CalendarEvent {
     occurrence_count?: number | null;
     /** Admin only: a date of a recurring submission or a confirmed series. */
     in_series?: boolean;
+    /** Admin list only: distinct devices going or saved. */
+    engaged_count?: number | null;
+    rating_count?: number | null;
+    message_count?: number | null;
+    memory_count?: number | null;
+    program_status?: 'published' | 'draft' | null;
+    submitted_at?: string | null;
+    /** Admin only: when the event first entered the database. */
+    created_at?: string | null;
+    reach?: 'local' | 'regional' | 'international' | null;
     links: LinkItem[] | null;
     tags: Tag[];
     /** Server-computed: at least one approved, non-expired promo code exists.
@@ -1031,6 +1041,9 @@ export interface AdminEventModeration {
     submission: SubmissionInfo | null;
     /** Dates still to come in the event's series, the event included. */
     series_dates: number;
+    /** Signed-in people who saved or are going (this date / all upcoming dates). */
+    affected_attendees: number;
+    series_affected_attendees: number;
     draft: EventRevision | null;
     open_revisions: EventRevision[];
     history: EventRevision[];
@@ -1085,9 +1098,13 @@ export interface FeedbackSubmissionCreate {
     audience_tag_ids: number[];
     comment?: string;
     is_anonymous: boolean;
+    scope?: ReviewScope;
     tag_suggestions: RatingTagSuggestionInline[];
     website?: string; // honeypot
 }
+
+/** 'past_edition' = written from an upcoming edition about an earlier one. */
+export type ReviewScope = 'this_edition' | 'past_edition';
 
 export interface EventRating {
     id: string;
@@ -1100,6 +1117,7 @@ export interface EventRating {
     /** Moderation state of the free-text comment only. */
     comment_status: 'none' | 'pending' | 'approved' | 'rejected';
     is_anonymous: boolean;
+    scope?: ReviewScope;
     status: 'approved' | 'rejected';
     created_at: string;
     updated_at: string;
@@ -1183,6 +1201,7 @@ export interface EventReviewPublic {
     event_id: string;
     event_title: string;
     event_start: string;
+    scope?: ReviewScope;
     overall_sentiment: ReviewSentiment | null;
     comment: string | null;
     aspect_tags: Tag[];
@@ -1232,6 +1251,7 @@ export interface MyRating {
     event_title: string | null;
     event_start: string | null;
     overall_sentiment: ReviewSentiment | null;
+    scope?: ReviewScope;
     aspect_scores: Record<string, number>;
     aspect_tag_ids: number[];
     audience_tag_ids: number[];

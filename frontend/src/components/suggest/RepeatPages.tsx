@@ -113,22 +113,15 @@ function EndField({ value, onChange }: { value: RecurrenceEnd; onChange: (e: Rec
                         }
                     />
                     After
-                    <input
-                        type="number"
-                        aria-label="Number of occurrences"
-                        min={1}
-                        max={MAX_OCCURRENCES}
-                        disabled={value.kind !== 'after'}
-                        value={value.kind === 'after' ? value.count : ''}
-                        onChange={(e) =>
-                            onChange({
-                                kind: 'after',
-                                count: Math.max(1, Math.min(MAX_OCCURRENCES, Number(e.target.value) || 1)),
-                            })
-                        }
-                        className="ml-auto w-16 bg-transparent text-right text-sm text-ink focus:outline-none disabled:opacity-40"
-                    />
-                    <span className="shrink-0 text-ink-soft">times</span>
+                    <span className={`ml-auto flex items-center gap-2 ${value.kind === 'after' ? '' : 'opacity-40'}`}>
+                        <Stepper
+                            label="Number of occurrences"
+                            value={value.kind === 'after' ? value.count : 10}
+                            max={MAX_OCCURRENCES}
+                            onChange={(count) => onChange({ kind: 'after', count })}
+                        />
+                        <span className="shrink-0 text-ink-soft">times</span>
+                    </span>
                 </label>
             </div>
         </fieldset>

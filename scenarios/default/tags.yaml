@@ -10,13 +10,53 @@ tag_groups:
         label: Salsa
         is_hero_filter: true
         hero_ordinal: 1
-        synonyms: ["salsa on1", "salsa on2", "linea", "línea", "la"]
-      - slug: cuban
-        label: Cuban (Casino)
-        synonyms: ["cubana", "salsa cubana", "casino", "rueda de casino"]
+      - slug: salsa-on1
+        label: Salsa On1 (LA)
+        synonyms: ["salsa on1", "on1", "la style", "linea", "línea"]
       - slug: mambo
-        label: Mambo (On2)
-        synonyms: ["ny style", "new york style", "on2"]
+        label: Salsa On2 (Mambo)
+        synonyms:
+          [
+            "salsa on2",
+            "on2",
+            "mambo",
+            "salsa mambo",
+            "ny style",
+            "new york style",
+          ]
+      - slug: cuban
+        label: Cuban Salsa (Casino)
+        synonyms:
+          [
+            "cubana",
+            "salsa cubana",
+            "cuban salsa",
+            "casino",
+            "rueda de casino",
+            "timba",
+          ]
+      - slug: son
+        label: Son
+        synonyms: ["son cubano"]
+      - slug: rueda
+        label: Rueda
+        synonyms: ["rueda de casino"]
+      - slug: afro-cuban
+        label: Afro-Cuban
+        synonyms:
+          [
+            "afro cubano",
+            "afro-cubano",
+            "rumba",
+            "rumba cubana",
+            "guaguancó",
+            "guaguanco",
+            "orishas",
+            "orisha",
+          ]
+      - slug: cha-cha
+        label: Cha-Cha
+        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
       - slug: bachata
         label: Bachata
         is_hero_filter: true
@@ -38,16 +78,16 @@ tag_groups:
         synonyms: ["kompa", "compas"]
       - slug: zouk
         label: Zouk
-        synonyms: ["brazilian zouk", "lambazouk"]
-      - slug: rueda
-        label: Rueda
-        synonyms: ["rueda de casino"]
-      - slug: cha-cha
-        label: Cha-Cha
-        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
-      - slug: son
-        label: Son
-        synonyms: ["son cubano"]
+        synonyms: ["brazilian zouk", "lambazouk", "lambada"]
+      - slug: argentine-tango
+        label: Argentine Tango
+        synonyms: ["tango", "tango argentino", "milonga"]
+      - slug: west-coast-swing
+        label: West Coast Swing
+        synonyms: ["wcs"]
+      - slug: lindy-hop
+        label: Lindy Hop
+        synonyms: ["lindy", "lindyhop"]
 
   - slug: format
     label: Format
@@ -91,6 +131,7 @@ tag_groups:
         synonyms: ["workshops", "stage", "masterclass", "master class"]
       - slug: festival
         label: Festival
+        # NOTE: a dance "marathon" is its own format — keep it out of festival.
         synonyms: ["encuentro"]
       # NOTE: default keeps `congress` as its own format tag (dev scenarios
       # reference format:congress); prod merges it into festival synonyms.
@@ -230,9 +271,17 @@ tag_groups:
         label: All Levels
         synonyms: ["all level", "open level", "tous niveaux"]
 
-  # NOTE: `vibe` is a dev-only group kept for scenarios that reference
-  # vibe:* tags; prod dropped it (subjective qualities moved to review
-  # aspect groups below).
+  # NOTE: the previous "Vibe" group (good-music / crowded / spacious /
+  # high-level-dancers / social-atmosphere / live-band) was a mix of
+  # subjective experience tags and one factual property. Following the
+  # event-vs-review scope split:
+  #   - the subjective ones moved to the review aspect groups below
+  #     (scope: aspect — music / atmosphere / venue-quality / …);
+  #   - live-band (a factual property organisers can declare) moved to
+  #     the venue group above.
+  # Keeping subjective qualities out of the event taxonomy prevents
+  # organisers from self-claiming them (Google/Yelp/Airbnb pattern).
+  # Default still keeps `vibe` as a dev-only group for scenarios that reference vibe:* tags.
   - slug: vibe
     label: Vibe
     ordinal: 70
@@ -253,17 +302,12 @@ tag_groups:
         label: Live Band
 
   # ─────────────────────────────────────────────────────────────────────
-  # Review aspects (scope: aspect) — mirrors scenarios/prod/tags.yaml so the
-  # adaptive review flow is testable in every scenario that inherits these
-  # default tags. Each group is one aspect surfaced in the review flow: the
-  # user picks a headline sentiment, chooses the aspects that drove it, then
-  # rates (1-5 stars) and tags each. Tags carry a `polarity`
-  # (positive|negative|neutral) so appreciation stays separate from factual
-  # or cautionary mentions in the public community summary.
-  #
-  # NOTE: the aspect "Venue" group uses slug `venue-quality` (not `venue`)
-  # because the event-scope `venue` group above already owns that slug and
-  # the seeder matches tag groups by slug only.
+  # Review aspects (scope: aspect). Each group is one aspect surfaced in the
+  # adaptive review flow: the user picks a headline sentiment, chooses the
+  # aspects that drove it, then rates (1-5 stars) and tags each. Tags carry a
+  # `polarity` (positive|negative|neutral) so appreciation stays separate from
+  # factual or cautionary mentions. Kept generic (not scene-specific)
+  # so the vocabulary reads cleanly across salsa/bachata/kizomba/etc.
   # ─────────────────────────────────────────────────────────────────────
   - slug: music
     label: 🎵 Music

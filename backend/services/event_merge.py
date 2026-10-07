@@ -206,6 +206,7 @@ def _move_ratings(
                 select(EventRating).where(
                     EventRating.event_id == target_id,
                     EventRating.user_id == rating.user_id,
+                    EventRating.scope == rating.scope,
                 )
             ).first()
             if rating.user_id is not None

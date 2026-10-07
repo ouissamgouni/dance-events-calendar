@@ -1,17 +1,19 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { fetchMyRatings } from '../api';
-import type { EventRating, MyRating } from '../types';
+import type { EventRating, MyRating, ReviewScope } from '../types';
 import { useAuth } from './AuthContext';
 
 interface Ctx {
-    get: (eventId: string) => MyRating | null;
+    get: (eventId: string, scope?: ReviewScope) => MyRating | null;
     /** Called by RateEventModal after submit/edit/delete to keep the store in sync. */
-    upsert: (eventId: string, rating: EventRating | null) => void;
+    upsert: (eventId: string, rating: EventRating | null, scope?: ReviewScope) => void;
     loaded: boolean;
 }
 
 const MyRatingsCtx = createContext<Ctx | null>(null);
+
+const keyOf = (eventId: string, scope: ReviewScope = 'this_edition') => `${eventId}|${scope}`;
 
 function toMyRating(eventId: string, r: EventRating): MyRating {
     return {
@@ -26,6 +28,7 @@ function toMyRating(eventId: string, r: EventRating): MyRating {
         comment: r.comment,
         comment_status: r.comment_status,
         is_anonymous: r.is_anonymous,
+        scope: r.scope,
         status: r.status,
         created_at: r.created_at,
         updated_at: r.updated_at,
@@ -47,20 +50,24 @@ export function MyRatingsProvider({ children }: { children: ReactNode }) {
         fetchMyRatings()
             .then((items) => {
                 const m = new Map<string, MyRating>();
-                for (const r of items) m.set(r.event_id, r);
+                for (const r of items) m.set(keyOf(r.event_id, r.scope), r);
                 setByEventId(m);
             })
             .catch(() => setByEventId(new Map()))
             .finally(() => setLoaded(true));
     }, [user?.user_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const get = useCallback((eventId: string) => byEventId.get(eventId) ?? null, [byEventId]);
+    const get = useCallback(
+        (eventId: string, scope?: ReviewScope) => byEventId.get(keyOf(eventId, scope)) ?? null,
+        [byEventId],
+    );
 
-    const upsert = useCallback((eventId: string, rating: EventRating | null) => {
+    const upsert = useCallback((eventId: string, rating: EventRating | null, scope?: ReviewScope) => {
         setByEventId((prev) => {
             const next = new Map(prev);
-            if (rating == null) next.delete(eventId);
-            else next.set(eventId, toMyRating(eventId, rating));
+            const key = keyOf(eventId, rating?.scope ?? scope);
+            if (rating == null) next.delete(key);
+            else next.set(key, toMyRating(eventId, rating));
             return next;
         });
     }, []);
@@ -69,10 +76,10 @@ export function MyRatingsProvider({ children }: { children: ReactNode }) {
     return <MyRatingsCtx.Provider value={value}>{children}</MyRatingsCtx.Provider>;
 }
 
-export function useMyRating(eventId: string | null | undefined): MyRating | null {
+export function useMyRating(eventId: string | null | undefined, scope?: ReviewScope): MyRating | null {
     const ctx = useContext(MyRatingsCtx);
     if (!ctx || !eventId) return null;
-    return ctx.get(eventId);
+    return ctx.get(eventId, scope);
 }
 
 export function useMyRatingsLoaded(): boolean {
@@ -80,7 +87,12 @@ export function useMyRatingsLoaded(): boolean {
     return ctx?.loaded ?? true;
 }
 
-export function useUpsertMyRating(): (eventId: string, rating: EventRating | null) => void {
+export function useMyRatingLookup(): (eventId: string, scope?: ReviewScope) => MyRating | null {
+    const ctx = useContext(MyRatingsCtx);
+    return ctx?.get ?? (() => null);
+}
+
+export function useUpsertMyRating(): (eventId: string, rating: EventRating | null, scope?: ReviewScope) => void {
     const ctx = useContext(MyRatingsCtx);
     return ctx?.upsert ?? (() => { /* no-op */ });
 }

@@ -17,6 +17,8 @@ import {
     type PublicProfile,
 } from '../api';
 import PassportView from '../components/PassportView';
+import EventModal from '../components/EventModal';
+import { isPlainClick } from '../utils/plainClick';
 import type { CalendarEvent, SharedPassportResponse } from '../types';
 import { reportMailto } from '../utils/report';
 
@@ -755,6 +757,8 @@ function CalendarTabContent({ handle }: { handle: string }) {
 }
 
 function ProfileCalendarRow({ item }: { item: ProfileCalendarItem }) {
+    const [open, setOpen] = useState(false);
+    const close = useCallback(() => setOpen(false), []);
     const badge =
         item.intent === 'both'
             ? { label: 'Going · Saved', cls: 'bg-blue-50 text-action' }
@@ -774,6 +778,11 @@ function ProfileCalendarRow({ item }: { item: ProfileCalendarItem }) {
             <div className="flex items-start justify-between gap-2">
                 <Link
                     to={`/event/${item.event.event_id}`}
+                    onClick={(e) => {
+                        if (!isPlainClick(e)) return;
+                        e.preventDefault();
+                        setOpen(true);
+                    }}
                     className="block text-sm font-medium text-ink hover:text-action truncate"
                 >
                     {item.event.title}
@@ -796,6 +805,7 @@ function ProfileCalendarRow({ item }: { item: ProfileCalendarItem }) {
                 {dateLabel}
                 {item.event.location ? ` · ${item.event.location}` : ''}
             </p>
+            {open && <EventModal event={item.event} onClose={close} source="profile" />}
         </li>
     );
 }
@@ -811,6 +821,8 @@ function EmptyCalendarState({ chip }: { chip: CalendarChip }) {
 }
 
 function ProfileEventRow({ event }: { event: CalendarEvent }) {
+    const [open, setOpen] = useState(false);
+    const close = useCallback(() => setOpen(false), []);
     const start = useMemo(() => new Date(event.start), [event.start]);
     const dateLabel = start.toLocaleString(undefined, {
         weekday: 'short',
@@ -823,6 +835,11 @@ function ProfileEventRow({ event }: { event: CalendarEvent }) {
         <li className="px-2 py-2">
             <Link
                 to={`/event/${event.event_id}`}
+                onClick={(e) => {
+                    if (!isPlainClick(e)) return;
+                    e.preventDefault();
+                    setOpen(true);
+                }}
                 className="block text-sm font-medium text-ink hover:text-action truncate"
             >
                 {event.title}
@@ -831,6 +848,7 @@ function ProfileEventRow({ event }: { event: CalendarEvent }) {
                 {dateLabel}
                 {event.location ? ` · ${event.location}` : ''}
             </p>
+            {open && <EventModal event={event} onClose={close} source="profile" />}
         </li>
     );
 }

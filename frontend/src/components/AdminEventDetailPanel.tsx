@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Share2 } from 'lucide-react';
+import { ArrowLeft, Ban, FilePenLine, GitMerge, Globe, Lock, MoreHorizontal, PencilLine, Share2, UserPen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { dismissDuplicateGroup, fetchAdminEvent, fetchAdminEventModeration, fetchAdminEvents, flagEventsAsDuplicates, scanEventDuplicates, updateAdminEventDraft, fetchEventDuplicateCandidates, keepDuplicateEvent, rejectSuggestion, setAdminEventStatus, updateEvent, fetchEventSeriesCandidates, splitSeriesMember, addEventsToSeries, fetchSeriesGroups, fetchOptionalAdminEventSchedule } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import useBackToClose from '../hooks/useBackToClose';
+import useMediaQuery from '../hooks/useMediaQuery';
+import BottomSheet from './BottomSheet';
 import {
     ADMIN_EVENT_STATUS_CHIP_CLASSES,
     ADMIN_EVENT_STATUS_LABELS,
@@ -30,7 +32,7 @@ import AdminEventOverviewModal from './AdminEventOverviewModal';
 import type { AdminEventModeration, CalendarEvent, DuplicateGroup, SeriesGroup } from '../types';
 
 // Taller on touch screens, compact on desktop.
-const FOOTER_BTN = 'px-2.5 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 sm:py-1';
+const FOOTER_BTN = 'shrink-0 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 sm:py-1';
 
 const CONFIRM_TEXT = {
     remove: 'Remove for everyone? It will not come back on the next sync.',
@@ -54,6 +56,8 @@ interface Props {
 
 export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated }: Props) {
     const toast = useToast();
+    const isMobile = useMediaQuery('(max-width: 639px)');
+    const [moreOpen, setMoreOpen] = useState(false);
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [moderation, setModeration] = useState<AdminEventModeration | null>(null);
     const [loading, setLoading] = useState(false);
@@ -108,8 +112,21 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
     const submissionDates = removableSubmission?.dates_total ?? 0;
     const submissionRemoval = confirmAction === 'remove' && Boolean(removableSubmission);
     const scopeDates = submissionRemoval ? submissionDates : moderation?.series_dates ?? 1;
+    const notifyCount = moderation
+        ? (removeScope === 'all' ? moderation.series_affected_attendees : moderation.affected_attendees)
+        : null;
+    const notifyLabel = notifyCount === null
+        ? 'Notify attendees'
+        : notifyCount === 0
+            ? 'Nobody to notify (no one saved or is going)'
+            : `Notify ${notifyCount} attendee${notifyCount === 1 ? '' : 's'}`;
 
     useEffect(() => {
+        setConfirmAction(null);
+        setCancelNote('');
+        setOwnerReason('');
+        setRemoveScope('date');
+        setMoreOpen(false);
         if (!eventId) {
             setEvent(null);
             setError(false);
@@ -246,7 +263,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
     useBackToClose(onClose, isOpen);
 
     // Keyboard close; a modal on top handles its own Escape.
-    const childModalOpen = Boolean(mergeIds || previewId || flagCandidateId);
+    const childModalOpen = Boolean(mergeIds || previewId || flagCandidateId || moreOpen || (isMobile && confirmAction));
     useEffect(() => {
         if (!isOpen || childModalOpen) return;
         const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -325,7 +342,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
     const openConfirm = (action: 'remove' | 'cancel' | 'uncancel') => {
         setConfirmNotify(true);
         setCancelNote('');
-        setOwnerReason('');
+        setOwnerReason(removableSubmission?.admin_notes ?? '');
         setRemoveScope(action === 'remove' && removableSubmission && submissionDates <= 1 ? 'all' : 'date');
         setConfirmAction(action);
     };
@@ -351,7 +368,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                 await setAdminEventStatus(event.event_id, {
                     status: confirmAction === 'remove' ? 'removed' : confirmAction === 'cancel' ? 'cancelled' : 'published',
                     note: confirmAction === 'cancel' ? cancelNote.trim() || undefined : undefined,
-                    notify: confirmAction === 'restore' ? false : confirmNotify,
+                    notify: confirmAction === 'restore' ? false : confirmNotify && notifyCount !== 0,
                     scope: confirmAction !== 'restore' && removeScope === 'all' ? 'series' : 'date',
                 });
             }
@@ -463,8 +480,38 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
         }
     };
 
+    const mobileStatus = event ? getAdminEventStatus(event) : null;
+    const mobilePrimary: { label: string; onClick: () => void; primary: boolean } | null =
+        mobileStatus === 'removed' ? { label: 'Restore', onClick: () => setConfirmAction('restore'), primary: false }
+            : mobileStatus === 'new' ? { label: 'Publish', onClick: handlePublish, primary: true }
+                : mobileStatus === 'cancelled' ? { label: 'Undo cancellation…', onClick: () => openConfirm('uncancel'), primary: false }
+                    : mobileStatus === 'unpublished' ? { label: 'Republish', onClick: handleUnhide, primary: true }
+                        : mobileStatus ? { label: 'Unpublish', onClick: handleHide, primary: false }
+                            : null;
+    const mobileMoreActions: { label: string; onClick: () => void; danger?: boolean }[] = event ? [
+        ...(mobileStatus === 'new' ? [{ label: 'Unpublish', onClick: handleHide }] : []),
+        ...(mobileStatus === 'published' ? [{ label: 'Cancel event…', onClick: () => openConfirm('cancel') }] : []),
+        ...(new Date(event.end).getTime() < Date.now() ? [{ label: 'Share review link', onClick: handleShareReviewLink }] : []),
+        ...(mobileStatus !== 'removed' ? [{ label: 'Remove…', onClick: () => openConfirm('remove'), danger: true }] : []),
+    ] : [];
+
     const shownEvent = event ? withDraft(event, moderation?.draft?.changes) : null;
     const visibility = moderation?.visibility ?? event?.visibility_state;
+    const ownerName = moderation?.submission?.submitter?.display_name ?? moderation?.submission?.submitter_name ?? null;
+    const visibilityTitle = visibility === 'private' && ownerName
+        ? `Private: only ${ownerName} — not in discovery, feeds or notifications`
+        : undefined;
+    const headerChip = 'inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide';
+    const AudienceIcon = visibility === 'private' ? Lock : Globe;
+    const audienceSummary = visibility === 'private'
+        ? `Private · only ${ownerName ?? 'the owner'}`
+        : `Public · ${moderation?.affected_attendees ?? 0} saved or going`;
+    const audienceLine = moderation && (
+        <span className="inline-flex min-w-0 items-center gap-1 text-[11px] text-ink-soft" data-testid="footer-audience" title="Who the actions below affect">
+            <AudienceIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="truncate">{audienceSummary}</span>
+        </span>
+    );
 
     return (
         <>
@@ -475,11 +522,16 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
 
             {/* Panel */}
             <div
-                className={`fixed top-0 right-0 h-full w-[820px] max-w-[95vw] shadow-xl border-l border-line z-[60] flex flex-col transform transition-transform duration-200 ease-in-out ${getAdminEventPanelClass(event)} ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-full sm:w-[820px] sm:max-w-[95vw] shadow-xl sm:border-l border-line z-[60] flex flex-col transform transition-transform duration-200 ease-in-out ${getAdminEventPanelClass(event)} ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 {/* Header */}
-                <div className="flex items-start justify-between px-5 py-3 border-b border-line bg-transparent shrink-0">
-                    <div className="flex-1 min-w-0 mr-3">
+                <div className="flex items-start justify-between px-2 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-3 sm:px-5 sm:py-3 border-b border-line bg-transparent shrink-0">
+                    {isMobile && (
+                        <button type="button" onClick={onClose} aria-label="Back" className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-ink">
+                            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+                        </button>
+                    )}
+                    <div className="flex-1 min-w-0 mr-3 pt-2 sm:pt-0">
                         {editingTitle ? (
                             <input
                                 autoFocus
@@ -493,7 +545,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                             />
                         ) : (
                             <p
-                                className={`text-sm font-semibold leading-snug truncate cursor-text hover:bg-canvas -mx-1 px-1 rounded transition ${event && getAdminEventStatus(event) === 'cancelled' ? 'text-ink-soft line-through' : 'text-ink'}`}
+                                className={`text-base sm:text-sm font-semibold leading-snug line-clamp-2 sm:line-clamp-none sm:truncate cursor-text hover:bg-canvas -mx-1 px-1 rounded transition ${event && getAdminEventStatus(event) === 'cancelled' ? 'text-ink-soft line-through' : 'text-ink'}`}
                                 onClick={() => event && setEditingTitle(true)}
                                 title="Click to edit title"
                             >
@@ -519,22 +571,32 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 <span className={`px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${ADMIN_EVENT_STATUS_CHIP_CLASSES[getAdminEventStatus(event)]}`}>
                                     {ADMIN_EVENT_STATUS_LABELS[getAdminEventStatus(event)]}
                                 </span>
-                                {visibility && <VisibilityChip state={visibility} />}
-                                {(moderation?.wants_public ?? event.wants_public) && <WantsPublicChip />}
+                                {visibility && <VisibilityChip state={visibility} title={visibilityTitle} withLabel />}
+                                {(moderation?.wants_public ?? event.wants_public) && <WantsPublicChip withLabel />}
                                 {event.is_submission && (
-                                    <span className="bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-action">Submitted</span>
+                                    <span className={`${headerChip} bg-blue-50 text-action`}>
+                                        <UserPen className="h-3 w-3" aria-hidden="true" />
+                                        Submitted
+                                    </span>
                                 )}
                                 {(moderation?.open_revisions.length ?? 0) > 0 && (
-                                    <span className="bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-800">Changes pending</span>
+                                    <span className={`${headerChip} bg-orange-100 text-orange-800`}>
+                                        <PencilLine className="h-3 w-3" aria-hidden="true" />
+                                        Changes pending
+                                    </span>
                                 )}
                                 {moderation?.draft && (
-                                    <span className="bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-action">Unpublished draft</span>
+                                    <span className={`${headerChip} bg-blue-50 text-action`}>
+                                        <FilePenLine className="h-3 w-3" aria-hidden="true" />
+                                        Unpublished draft
+                                    </span>
                                 )}
                                 {getRemovalReasonLabel(event) && (
                                     <span
-                                        className="bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-soft"
+                                        className={`${headerChip} bg-slate-100 text-ink-soft`}
                                         title={event.block_reason_detail ?? undefined}
                                     >
+                                        <Ban className="h-3 w-3" aria-hidden="true" />
                                         {getRemovalReasonLabel(event)}
                                     </span>
                                 )}
@@ -542,8 +604,9 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                     <button
                                         type="button"
                                         onClick={() => setOverlapOpenId(event.merged_into_event_id ?? null)}
-                                        className="px-1.5 py-0.5 text-[10px] font-medium text-action hover:underline"
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-action hover:underline"
                                     >
+                                        <GitMerge className="h-3 w-3" aria-hidden="true" />
                                         Merged into {event.merged_into_event_id}
                                     </button>
                                 )}
@@ -560,7 +623,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                         <button
                             onClick={handleManualRefresh}
                             disabled={loading || !event}
-                            className="text-muted hover:text-ink-soft disabled:opacity-40 p-1"
+                            className="text-muted hover:text-ink-soft disabled:opacity-40 p-3.5 sm:p-1"
                             title="Refresh event"
                             aria-label="Refresh event"
                         >
@@ -579,18 +642,20 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                             </svg>
                         </button>
-                        <button
-                            onClick={onClose}
-                            className="text-muted hover:text-ink-soft text-sm leading-none p-1"
-                            aria-label="Close"
-                        >
-                            ✕
-                        </button>
+                        {!isMobile && (
+                            <button
+                                onClick={onClose}
+                                className="text-muted hover:text-ink-soft text-sm leading-none p-1"
+                                aria-label="Close"
+                            >
+                                ✕
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto px-5 py-4">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4">
                     {loading && (
                         <p className="text-xs text-muted text-center mt-8">Loading event…</p>
                     )}
@@ -804,8 +869,8 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                             )}
                             <div className="mt-4 border border-line overflow-hidden">
                                 {event.latitude != null && event.longitude != null ? (
-                                    <div className="h-[300px]">
-                                        <EventMap events={[event]} />
+                                    <div className="h-[200px] sm:h-[300px]">
+                                        <EventMap events={[event]} cooperativeGestures />
                                     </div>
                                 ) : (
                                     <div className="px-3 py-4 bg-canvas">
@@ -876,7 +941,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                 {/* Footer: one row of event-level actions; confirmations replace it in place. */}
                 {event && (
                     <div className="shrink-0 border-t border-line bg-canvas px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-5">
-                        {confirmAction ? (
+                        {confirmAction && !isMobile ? (
                             <div className="flex flex-wrap items-center justify-end gap-2">
                                 <span className="mr-auto text-xs text-ink">
                                     {confirmAction === 'remove' && removableSubmission && removeScope === 'all'
@@ -918,14 +983,15 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                     />
                                 )}
                                 {confirmAction !== 'restore' && !(confirmAction === 'remove' && removableSubmission && removeScope === 'all') && (
-                                    <label className="flex items-center gap-1.5 text-xs text-ink">
+                                    <label className={`flex items-center gap-1.5 text-xs ${notifyCount === 0 ? 'text-muted' : 'text-ink'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={confirmNotify}
+                                            checked={notifyCount !== 0 && confirmNotify}
+                                            disabled={notifyCount === 0}
                                             onChange={(e) => setConfirmNotify(e.target.checked)}
-                                            className="h-3.5 w-3.5"
+                                            className="h-3.5 w-3.5 disabled:cursor-not-allowed"
                                         />
-                                        Notify attendees
+                                        {notifyLabel}
                                     </label>
                                 )}
                                 <button
@@ -946,6 +1012,30 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                     {CONFIRM_BUTTON[confirmAction]}
                                 </button>
                             </div>
+                        ) : isMobile ? (
+                            <>
+                                {audienceLine && <div className="mb-1.5 flex">{audienceLine}</div>}
+                                <div className="flex items-center gap-2">
+                                    {mobilePrimary && (
+                                        <button
+                                            type="button"
+                                            onClick={mobilePrimary.onClick}
+                                            disabled={actionLoading}
+                                            className={`min-h-11 flex-1 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${mobilePrimary.primary ? 'bg-action text-white hover:opacity-90' : 'border border-line bg-surface text-ink hover:bg-canvas'}`}
+                                        >
+                                            {mobilePrimary.label}
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setMoreOpen(true)}
+                                        aria-label="More actions"
+                                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas"
+                                    >
+                                        <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+                                    </button>
+                                </div>
+                            </>
                         ) : (
                             <div className="flex flex-wrap items-center gap-2">
                                 <Link
@@ -975,7 +1065,8 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                         Share review link
                                     </button>
                                 )}
-                                <div className="ml-auto flex items-center gap-2">
+                                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                                    {audienceLine}
                                     {getAdminEventStatus(event) === 'removed' ? (
                                         <button
                                             type="button"
@@ -1038,6 +1129,118 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                     </div>
                 )}
             </div>
+
+            {isMobile && isOpen && event && moreOpen && (
+                <BottomSheet title="Event actions" subtitle={event.title} onClose={() => setMoreOpen(false)}>
+                    <ul className="-mx-4 divide-y divide-line">
+                        <li>
+                            <Link
+                                to={`/event/${event.event_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => setMoreOpen(false)}
+                                className="flex min-h-12 items-center px-4 text-sm text-action"
+                            >
+                                See full details ↗
+                            </Link>
+                        </li>
+                        {hasSchedule !== null && (
+                            <li>
+                                <Link
+                                    to={`/admin/events/${encodeURIComponent(event.event_id)}/schedule`}
+                                    onClick={() => { setMoreOpen(false); onClose(); }}
+                                    className="flex min-h-12 items-center px-4 text-sm text-ink"
+                                >
+                                    {hasSchedule ? 'Manage schedule' : 'Add schedule'}
+                                </Link>
+                            </li>
+                        )}
+                        {mobileMoreActions.map((action) => (
+                            <li key={action.label}>
+                                <button
+                                    type="button"
+                                    disabled={actionLoading}
+                                    onClick={() => { setMoreOpen(false); action.onClick(); }}
+                                    className={`flex min-h-12 w-full items-center px-4 text-left text-sm disabled:opacity-50 ${action.danger ? 'text-danger' : 'text-ink'}`}
+                                >
+                                    {action.label}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </BottomSheet>
+            )}
+
+            {isMobile && isOpen && event && confirmAction && (
+                <BottomSheet
+                    title={CONFIRM_BUTTON[confirmAction]}
+                    onClose={() => setConfirmAction(null)}
+                    footer={
+                        <button
+                            type="button"
+                            onClick={handleConfirmStatus}
+                            disabled={actionLoading}
+                            className={`min-h-11 w-full text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${confirmAction === 'remove' ? 'bg-danger hover:bg-danger/90' : 'bg-action hover:opacity-90'}`}
+                        >
+                            {CONFIRM_BUTTON[confirmAction]}
+                        </button>
+                    }
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm text-ink">
+                            {confirmAction === 'remove' && removableSubmission && removeScope === 'all'
+                                ? `Remove ${submissionDates > 1 ? `all ${submissionDates} dates` : 'it'} for everyone, its owner included?`
+                                : CONFIRM_TEXT[confirmAction]}
+                        </p>
+                        {scopeDates > 1 && confirmAction !== 'restore' && (
+                            <div role="radiogroup" aria-label="Apply to" className="-mx-4 divide-y divide-line border-y border-line">
+                                <label className="flex min-h-12 items-center gap-3 px-4 text-sm text-ink">
+                                    <input type="radio" name="remove-scope-mobile" checked={removeScope === 'date'} onChange={() => setRemoveScope('date')} className="h-5 w-5" />
+                                    This date
+                                </label>
+                                <label className="flex min-h-12 items-center gap-3 px-4 text-sm text-ink">
+                                    <input type="radio" name="remove-scope-mobile" checked={removeScope === 'all'} onChange={() => setRemoveScope('all')} className="h-5 w-5" />
+                                    {submissionRemoval ? `All ${scopeDates} dates` : `All ${scopeDates} upcoming dates`}
+                                </label>
+                            </div>
+                        )}
+                        {confirmAction === 'remove' && removableSubmission && removeScope === 'all' && (
+                            <input
+                                type="text"
+                                value={ownerReason}
+                                onChange={(e) => setOwnerReason(e.target.value)}
+                                placeholder="Reason shown to the owner"
+                                aria-label="Reason shown to the owner"
+                                maxLength={500}
+                                className="min-h-11 w-full border border-line px-3 text-base"
+                            />
+                        )}
+                        {confirmAction === 'cancel' && (
+                            <input
+                                type="text"
+                                value={cancelNote}
+                                onChange={(e) => setCancelNote(e.target.value)}
+                                placeholder="Note for attendees (optional)"
+                                aria-label="Cancellation note"
+                                maxLength={500}
+                                className="min-h-11 w-full border border-line px-3 text-base"
+                            />
+                        )}
+                        {confirmAction !== 'restore' && !(confirmAction === 'remove' && removableSubmission && removeScope === 'all') && (
+                            <label className={`flex min-h-11 items-center gap-3 text-sm ${notifyCount === 0 ? 'text-muted' : 'text-ink'}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={notifyCount !== 0 && confirmNotify}
+                                    disabled={notifyCount === 0}
+                                    onChange={(e) => setConfirmNotify(e.target.checked)}
+                                    className="h-5 w-5 disabled:cursor-not-allowed"
+                                />
+                                {notifyLabel}
+                            </label>
+                        )}
+                    </div>
+                </BottomSheet>
+            )}
 
             {overlapOpenId && (
                 <AdminEventDetailPanel

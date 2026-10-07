@@ -1,4 +1,16 @@
-import type { CalendarEvent, RevisionChange } from '../types';
+import { CalendarX, FilePlus, Globe, PencilLine, Trash2, type LucideIcon } from 'lucide-react';
+import type { CalendarEvent, EventRevisionKind, RevisionChange } from '../types';
+
+/** Per change kind: pill, row tint (one shade lighter), solid count badge and icon. */
+export const CHANGE_KIND_META: Record<EventRevisionKind, { label: string; pill: string; row: string; badge: string; icon: LucideIcon }> = {
+    create: { label: 'New event', pill: 'bg-blue-100 text-action', row: 'bg-blue-50', badge: 'bg-action', icon: FilePlus },
+    go_public: { label: 'Go public', pill: 'bg-amber-100 text-amber-800', row: 'bg-amber-50', badge: 'bg-amber-500', icon: Globe },
+    edit: { label: 'Edit', pill: 'bg-orange-100 text-orange-800', row: 'bg-orange-50', badge: 'bg-orange-500', icon: PencilLine },
+    cancel: { label: 'Cancellation', pill: 'bg-red-100 text-danger', row: 'bg-red-50', badge: 'bg-danger', icon: CalendarX },
+    remove: { label: 'Removal', pill: 'bg-slate-200 text-ink', row: 'bg-slate-100', badge: 'bg-slate-500', icon: Trash2 },
+};
+
+export const CHANGE_KINDS: EventRevisionKind[] = ['create', 'go_public', 'edit', 'cancel', 'remove'];
 
 /** Fields an admin edit of a published event stages in a draft (mirrors backend DRAFT_FIELDS). */
 export const DRAFT_FIELDS = [

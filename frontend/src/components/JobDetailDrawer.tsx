@@ -124,7 +124,7 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
         <>
             <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
             <div
-                className="fixed top-0 right-0 h-full w-full sm:w-[1100px] max-w-[95vw] bg-surface shadow-xl border-l border-line z-50 flex flex-col"
+                className="fixed top-0 right-0 h-full w-full sm:w-[1100px] sm:max-w-[95vw] bg-surface shadow-xl sm:border-l border-line z-50 flex flex-col pt-[env(safe-area-inset-top)] sm:pt-0"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
