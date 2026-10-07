@@ -175,6 +175,14 @@ export default function TicketSheet({ event, onClose }: Props) {
                         {data?.is_going && (
                             <span className="text-xs text-ink-soft tabular-nums">{data.ticket_count} / {data.max_tickets}</span>
                         )}
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close"
+                            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-soft transition hover:bg-canvas hover:text-ink sm:flex"
+                        >
+                            <X className="h-5 w-5" aria-hidden="true" />
+                        </button>
                     </header>
                     <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4">
                         {body}

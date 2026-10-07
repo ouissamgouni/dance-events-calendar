@@ -134,13 +134,13 @@ describe('TicketSheet', () => {
         expect(screen.getByRole('link', { name: /tix\.example/ })).toHaveAttribute('href', 'https://tix.example/1');
     });
 
-    it('lists Take a photo last and has no close button', async () => {
+    it('lists Take a photo last and has a close button', async () => {
         renderSheet(assets({ ticket_likely: true }));
 
         const dialog = await screen.findByRole('dialog', { name: /My ticket/ });
         const options = await within(dialog).findAllByRole('button', { name: /Choose file|Paste ticket link|Take a photo/ });
         expect(options.map((o) => o.textContent)).toEqual(['📄 Choose file (PDF, image)', '🔗 Paste ticket link', '📷 Take a photo']);
-        expect(within(dialog).queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+        expect(within(dialog).getByRole('button', { name: 'Close' })).toBeInTheDocument();
         expect(within(dialog).queryByRole('button', { name: 'No ticket needed' })).not.toBeInTheDocument();
     });
 

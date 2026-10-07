@@ -182,6 +182,14 @@ export default function EventDetailPage() {
         setActiveTab('discussion');
     }, [location.hash, event]);
 
+    // `#ticket` opens the sheet once; keeping the hash would reopen it when the overlay pops back.
+    const [ticketSheetOpen, setTicketSheetOpen] = useState(false);
+    useEffect(() => {
+        if (location.hash !== '#ticket' || authLoading || !user || !eventTicketsEnabled) return;
+        setTicketSheetOpen(true);
+        navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: location.state });
+    }, [location.hash, location.pathname, location.search, location.state, user, authLoading, eventTicketsEnabled, navigate]);
+
     // `/ticket` and `/memories` arrive from ticket/memories nudges; rewrite to the
     // matching hash (opens the ticket sheet / Memories tab below).
     const assetPathRef = useRef(/\/(ticket|memories)$/.exec(location.pathname)?.[1] ?? null);
@@ -308,11 +316,6 @@ export default function EventDetailPage() {
     const hasProgram = eventScheduleEnabled && Boolean(event.schedule_published);
     const requestedTab: EventDetailTab = location.hash === '#memories' ? 'memories' : activeTab;
     const tab: EventDetailTab = requestedTab === 'memories' && !showMemoriesTab ? 'overview' : requestedTab;
-    // `#ticket` (nudges, post-RSVP popover) opens the ticket sheet; closing drops the hash.
-    const showTicketSheet = Boolean(user) && eventTicketsEnabled && location.hash === '#ticket';
-    const closeTicketSheet = () => {
-        navigate({ pathname: location.pathname, search: location.search }, { replace: true });
-    };
     const memoryCount = assetSummary?.memory_count ?? 0;
 
     const pageTitle = `${event.title} — ${formatDate(start)}`;
@@ -538,7 +541,7 @@ export default function EventDetailPage() {
                         </>
                     )}
 
-                    {showTicketSheet && <TicketSheet event={event} onClose={closeTicketSheet} />}
+                    {ticketSheetOpen && <TicketSheet event={event} onClose={() => setTicketSheetOpen(false)} />}
 
                     <AdminEventDetailPanel
                         eventId={adminEditorEventId}
