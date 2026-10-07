@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import type { EventRating, ReviewSentiment, Tag, TagGroup } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useEventAssetSummary } from '../context/EventAssetSummaryContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import {
     deleteMyRating,
@@ -162,7 +164,8 @@ type WizardStep =
 
 export default function RateEventModal({ eventId, initialRating, onClose, onSubmitted, onDeleted }: Props) {
     const { user } = useAuth();
-    const { eventReviewSizeStepEnabled } = useFeatureFlags();
+    const { eventReviewSizeStepEnabled, eventMemoriesEnabled } = useFeatureFlags();
+    const assetSummary = useEventAssetSummary(eventMemoriesEnabled ? eventId : null);
 
     const [sentiment, setSentiment] = useState<ReviewSentiment | null>(
         initialRating?.overall_sentiment ?? null,
@@ -464,6 +467,15 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                             <p className="text-xs text-ink-soft">
                                 Your review is live. Any comment you added will appear once it's checked by our team.
                             </p>
+                            {assetSummary?.can_add_memory && (
+                                <Link
+                                    to={`/event/${encodeURIComponent(eventId)}#memories`}
+                                    onClick={onClose}
+                                    className="block text-sm font-semibold text-action hover:underline"
+                                >
+                                    📸 Add memories from the night
+                                </Link>
+                            )}
                             <button
                                 onClick={onClose}
                                 className="mt-2 bg-sky-600 text-white px-4 py-1.5 text-xs hover:bg-sky-700"

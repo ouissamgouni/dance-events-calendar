@@ -1,0 +1,31 @@
+# suggestion-editing cast.
+#   Olivia — organizer; submitted every non-anonymous suggestion.
+#   Sam    — signed in, owns nothing → never sees Edit, API returns 404.
+#   Gina   — Going on dates of Olivia's weekly series (RSVPs must survive edits).
+#   Sean   — saved one of Olivia's dates.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: olivia@example.com
+    name: Olivia Ortega
+    handle: olivia
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Olivia%20Ortega
+
+  - email: sam@example.com
+    name: Sam Lee
+    handle: sam
+    account_visibility: public
+
+  - email: gina@example.com
+    name: Gina Rossi
+    handle: gina
+    account_visibility: public
+
+  - email: sean@example.com
+    name: Sean Murphy
+    handle: sean
+    account_visibility: public

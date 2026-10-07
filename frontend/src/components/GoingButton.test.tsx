@@ -187,7 +187,7 @@ describe('GoingButton visibility', () => {
         expect(screen.getByText('Summer Salsa Social')).toHaveClass('truncate', 'text-sm')
         expect(screen.getByRole('radiogroup', { name: 'Who can see you in the attendee list?' })).toHaveClass('flex', 'w-full')
         expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-10', 'text-sm')
-        expect(within(confirmationSheet).getByRole('button', { name: 'Share event' })).toBeInTheDocument()
+        expect(within(confirmationSheet).getByRole('button', { name: 'Share' })).toBeInTheDocument()
 
         await user.click(within(confirmationSheet).getByRole('button', { name: 'Done' }))
         await user.click(screen.getByRole('button', { name: 'Not going' }))

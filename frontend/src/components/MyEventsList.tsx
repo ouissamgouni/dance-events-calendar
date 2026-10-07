@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
-import { fetchAspectTagGroups, fetchAudienceTagGroups } from '../api';
-import type { CalendarEvent, TagGroup } from '../types';
+import { fetchAspectTagGroups, fetchAudienceTagGroups, fetchEventAssetSummaries } from '../api';
+import type { CalendarEvent, EventAssetSummary, TagGroup } from '../types';
 import type { MyEventsTab } from '../utils/myEvents';
 import { groupMyEventsByMonth } from '../utils/myEvents';
+import { showMemoriesRow } from '../utils/eventAssets';
+import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useMyRating, useMyRatingsLoaded } from '../context/MyRatingsContext';
 import EventCard from './EventCard';
 import EventReviewCard from './EventReviewCard';
+import MemoriesStrip from './MemoriesStrip';
 import ProgramAction from './ProgramAction';
+import TicketAction from './TicketAction';
 
 interface Props {
     events: CalendarEvent[];
@@ -16,7 +20,7 @@ interface Props {
     showMonthHeadings?: boolean;
 }
 
-function MyEventRow({ event, tab, onEventClick, reviewTagLabels }: { event: CalendarEvent; tab: MyEventsTab; onEventClick: (event: CalendarEvent) => void; reviewTagLabels: Map<number, string> }) {
+function MyEventRow({ event, tab, onEventClick, reviewTagLabels, assetSummary }: { event: CalendarEvent; tab: MyEventsTab; onEventClick: (event: CalendarEvent) => void; reviewTagLabels: Map<number, string>; assetSummary?: EventAssetSummary }) {
     const { showRatings } = useFeatureFlags();
     const myRating = useMyRating(event.event_id);
     const ratingsLoaded = useMyRatingsLoaded();
@@ -33,6 +37,9 @@ function MyEventRow({ event, tab, onEventClick, reviewTagLabels }: { event: Cale
                 variant={ratingsLoaded && !myRating ? 'pending' : 'reviewed'}
                 onOpen={onEventClick}
                 reviewTagLabels={reviewTagLabels}
+                memoriesSlot={showMemoriesRow(assetSummary)
+                    ? <MemoriesStrip eventId={event.event_id} summary={assetSummary} />
+                    : undefined}
                 testId="my-events-row"
             />
         );
@@ -52,7 +59,12 @@ function MyEventRow({ event, tab, onEventClick, reviewTagLabels }: { event: Cale
             actions={isSaved ? ['going'] : undefined}
             hideAvatarsIfOnlyCurrentUser={isUpcoming}
             goingIconVariant="hand"
-            bottomSlot={isUpcoming ? <ProgramAction event={event} /> : undefined}
+            bottomSlot={isUpcoming ? (
+                <div className="flex flex-wrap items-center gap-2 empty:hidden">
+                    <TicketAction event={event} summary={assetSummary ?? null} existingOnly />
+                    <ProgramAction event={event} />
+                </div>
+            ) : undefined}
             testId="my-events-row"
         />
     );
@@ -64,6 +76,21 @@ function labelsByTagId(groups: TagGroup[]): Map<number, string> {
 
 export default function MyEventsList({ events, tab, onEventClick, showMonthHeadings = true }: Props) {
     const [reviewTagLabels, setReviewTagLabels] = useState<Map<number, string>>(new Map());
+    const [assetSummaries, setAssetSummaries] = useState<Record<string, EventAssetSummary>>({});
+    const { user } = useAuth();
+    const { eventTicketsEnabled, eventMemoriesEnabled } = useFeatureFlags();
+    const assetEventIds = tab === 'saved' ? '' : events.slice(0, 200).map((e) => e.event_id).join(',');
+    const featureOn = tab === 'past' ? eventMemoriesEnabled : eventTicketsEnabled;
+    const assetsActive = Boolean(user) && featureOn && Boolean(assetEventIds);
+
+    useEffect(() => {
+        if (!assetsActive) return;
+        let cancelled = false;
+        fetchEventAssetSummaries(assetEventIds.split(','))
+            .then((summaries) => { if (!cancelled) setAssetSummaries(summaries); })
+            .catch(() => { if (!cancelled) setAssetSummaries({}); });
+        return () => { cancelled = true; };
+    }, [assetsActive, assetEventIds]);
 
     useEffect(() => {
         if (tab !== 'past') return;
@@ -104,7 +131,7 @@ export default function MyEventsList({ events, tab, onEventClick, showMonthHeadi
                     )}
                     <div className="space-y-2">
                         {group.events.map((event) => (
-                            <MyEventRow key={event.event_id} event={event} tab={tab} onEventClick={onEventClick} reviewTagLabels={reviewTagLabels} />
+                            <MyEventRow key={event.event_id} event={event} tab={tab} onEventClick={onEventClick} reviewTagLabels={reviewTagLabels} assetSummary={assetsActive ? assetSummaries[event.event_id] : undefined} />
                         ))}
                     </div>
                 </section>

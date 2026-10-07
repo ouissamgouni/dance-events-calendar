@@ -43,6 +43,7 @@ export default defineConfig(({ mode }) => {
   const viteProxyTarget = env.VITE_PROXY_TARGET || process.env.VITE_PROXY_TARGET || viteApiUrl
   const objectStorageProxyTarget = env.VITE_OBJECT_STORAGE_PROXY_TARGET || process.env.VITE_OBJECT_STORAGE_PROXY_TARGET
   const objectStorageBucket = env.VITE_OBJECT_STORAGE_BUCKET || process.env.VITE_OBJECT_STORAGE_BUCKET
+  const objectStoragePrivateBucket = env.VITE_OBJECT_STORAGE_PRIVATE_BUCKET || process.env.VITE_OBJECT_STORAGE_PRIVATE_BUCKET
   const umamiProxyTarget = env.VITE_UMAMI_PROXY_TARGET || process.env.VITE_UMAMI_PROXY_TARGET
   const allowedHost = env.VITE_ALLOWED_HOST || process.env.VITE_ALLOWED_HOST
   const appName = env.VITE_APP_NAME || process.env.VITE_APP_NAME || 'Movida'
@@ -86,6 +87,8 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       allowedHosts: allowedHost ? [allowedHost] : [],
+      // Remote phone demo: the HMR socket drops while the PWA is backgrounded (camera) and Vite reloads on reconnect.
+      ...(allowedHost ? { ws: false as const } : {}),
       proxy: {
         '/api': viteProxyTarget || 'http://localhost:8001',
         ...(objectStorageProxyTarget && objectStorageBucket ? {
@@ -93,6 +96,14 @@ export default defineConfig(({ mode }) => {
             target: objectStorageProxyTarget,
             changeOrigin: true,
             rewrite: (path) => path.replace(/^\/objects/, `/${objectStorageBucket}`),
+          },
+        } : {}),
+        // Presigned URLs sign the endpoint host; changeOrigin keeps it intact.
+        ...(objectStorageProxyTarget && objectStoragePrivateBucket ? {
+          '/private-objects': {
+            target: objectStorageProxyTarget,
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/private-objects/, `/${objectStoragePrivateBucket}`),
           },
         } : {}),
         ...(umamiProxyTarget ? {

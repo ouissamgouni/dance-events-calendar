@@ -18,7 +18,7 @@ import {
  * that flips all six channel flags to false in a single PATCH.
  */
 
-type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'plan_activity' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked' | 'event_messages' | 'suggested_events' | 'schedule_updates';
+type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'plan_activity' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'ticket_prompt' | 'memories_prompt' | 'milestone_unlocked' | 'event_messages' | 'suggested_events' | 'schedule_updates';
 type Channel = 'email' | 'push';
 type FlagKey =
     | 'email_event_reminders_enabled'
@@ -31,6 +31,10 @@ type FlagKey =
     | 'push_promo_codes_enabled'
     | 'email_review_prompt_enabled'
     | 'push_review_prompt_enabled'
+    | 'email_ticket_prompt_enabled'
+    | 'push_ticket_prompt_enabled'
+    | 'email_memories_prompt_enabled'
+    | 'push_memories_prompt_enabled'
     | 'email_milestone_unlocked_enabled'
     | 'push_milestone_unlocked_enabled'
     | 'email_friends_going_enabled'
@@ -65,6 +69,12 @@ const FEATURES: {
             label: 'Program updates',
             description: "When a program is announced for an event I'm going to.",
             anchor: 'notify-schedule-updates',
+        },
+        {
+            key: 'ticket_prompt',
+            label: 'Ticket reminders',
+            description: 'Save tickets for events that usually need one bought in advance.',
+            anchor: 'notify-ticket-prompt',
         },
         {
             key: 'social_activity',
@@ -113,6 +123,12 @@ const FEATURES: {
             label: 'Rate your experience',
             description: "After events I've RSVP'd to, ask how it went.",
             anchor: 'notify-review-prompt',
+        },
+        {
+            key: 'memories_prompt',
+            label: 'Event memories',
+            description: 'The day after events I attended, invite me to add photos.',
+            anchor: 'notify-memories-prompt',
         },
         {
             key: 'milestone_unlocked',

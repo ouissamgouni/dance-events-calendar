@@ -1,0 +1,14 @@
+# Seeded through the real submit helpers: a private event only Jamie sees.
+base_week: 0
+suggestions:
+  - id: 5e0d0000-0000-4000-8000-0000000000c1
+    submitter_email: jamie@example.com
+    status: private
+    title: Jamie's Private Lesson
+    description: One-to-one salsa lesson.
+    location: Studio A, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Wed 19:00
+    end: w1 Wed 20:00
+    tags: ["dance-style:salsa", "reach:local"]

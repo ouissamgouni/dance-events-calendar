@@ -169,12 +169,34 @@ class TestAuthRoutes:
         finally:
             app.dependency_overrides.clear()
 
+    @patch("backend.api.routes.auth._is_dev_auth", return_value=False)
+    @patch(
+        "backend.api.routes.auth.get_google_client_id", return_value="test-client-id"
+    )
+    @patch("google.oauth2.id_token.verify_oauth2_token")
+    def test_login_rejects_unverified_google_email(self, mock_verify, _cid, _dev):
+        mock_verify.return_value = {
+            "email": "victim@example.com",
+            "email_verified": False,
+            "sub": "google-sub-3",
+        }
+        override, _ = _sqlite_session_override()
+        app.dependency_overrides[get_session] = override
+        try:
+            client = TestClient(app)
+            resp = client.post("/api/auth/google", json={"credential": "valid-token"})
+            assert resp.status_code == 401
+            assert "session_token" not in resp.cookies
+        finally:
+            app.dependency_overrides.clear()
+
     def test_logout_clears_cookie(self):
         token = create_session_token("admin@example.com", "Admin")
         client = TestClient(app, cookies={"session_token": token})
         resp = client.post("/api/auth/logout")
         assert resp.status_code == 200
         assert resp.json()["status"] == "logged out"
+
 
 @pytest.mark.unit
 class TestAdminProtection:

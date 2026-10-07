@@ -21,8 +21,11 @@ primary_region = "cdg"
   # In-app background dispatch loops. Fly has no native cron, so these flags
   # are the only thing that drives notification delivery and auto-sync.
   NOTIFICATION_SCHEDULER_ENABLED = "true"
-  NOTIFICATION_INTERVAL_MINUTES = "1"
+  # Hourly keeps Neon able to scale to zero; request-triggered pushes use the job queue.
+  SCHEDULER_TICK_MINUTES = "60"
+  NOTIFICATION_DEBOUNCE_SECONDS = "60"
   AUTO_SYNC_SCHEDULER_ENABLED = "true"
+  SYNC_INTERVAL_MINUTES = "60"
   WEB_PUSH_ENABLED="true"
   ACTIVITY_DIGEST_EMAIL_ENABLED="true"
   INTEREST_MATCH_NOTIFICATIONS_ENABLED="true"

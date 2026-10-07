@@ -24,9 +24,7 @@ const DEFAULT_USER_AGENT = navigator.userAgent
 const DEFAULT_PLATFORM = navigator.platform
 const DEFAULT_MAX_TOUCH_POINTS = navigator.maxTouchPoints
 
-// The install banner is only offered to signed-in users (anonymous visitors
-// are prompted to sign in elsewhere first), so every test needs `/auth/me`
-// to resolve to a user before the banner can appear.
+// Most tests render as a signed-in user so the post-install push opt-in is reachable.
 function renderPrompt(userOverrides: Parameters<typeof makeUser>[0] = {}) {
   server.use(http.get('*/api/auth/me', () => HttpResponse.json(makeUser(userOverrides))))
   return render(
@@ -271,6 +269,39 @@ describe('InstallPrompt', () => {
 
     expect(screen.getByRole('dialog', { name: 'Install Movida' })).toBeInTheDocument()
     expect(screen.getByText('2. Add to Home Screen')).toBeInTheDocument()
+    expect(screen.queryByText(/another app’s browser/i)).not.toBeInTheDocument()
+  })
+
+  it('tells Instagram in-app browser users to open a real browser on iPhone', async () => {
+    Object.defineProperty(navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 350.0.0',
+    })
+    Object.defineProperty(navigator, 'platform', { configurable: true, value: 'iPhone' })
+    renderPrompt()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'How to install' }))
+
+    expect(screen.getByText(/another app’s browser/i)).toBeInTheDocument()
+  })
+
+  it('offers install to anonymous visitors', async () => {
+    server.use(http.get('*/api/auth/me', () => new HttpResponse(null, { status: 401 })))
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <PwaInstallProvider>
+            <InstallPrompt />
+          </PwaInstallProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    await act(async () => {
+      window.dispatchEvent(new FakeBeforeInstallPromptEvent('accepted'))
+    })
+
+    expect(await screen.findByRole('button', { name: /install app/i })).toBeInTheDocument()
   })
 
   describe('push opt-in force override', () => {

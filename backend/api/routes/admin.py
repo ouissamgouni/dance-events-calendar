@@ -3,18 +3,25 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import object_session
 from sqlmodel import Session, col, func, select
 
 logger = logging.getLogger(__name__)
 
 from backend.api.deps import require_admin
 from backend.api.schemas import (
+    AdminEventModerationResponse,
     AdminEventResponse,
     AdminEventNotificationStatsResponse,
     AdminBulkEngagementItem,
     AdminBulkEngagementRequest,
     AdminBulkEngagementResponse,
+    AssetPromptCandidate,
+    AssetPromptCandidatesResponse,
+    AssetPromptNotificationState,
+    AssetPromptSendNowRequest,
+    AssetPromptSendNowResponse,
     BulkEventIdsRequest,
     BulkTagAssignRequest,
     BulkTagSuggestionRunRequest,
@@ -32,10 +39,16 @@ from backend.api.schemas import (
     EventFilterOptionsResponse,
     EventIdsResponse,
     EventImageFromUrlRequest,
+    EventDraftUpdate,
     EventInterestReach,
+    EventOrganizerMini,
+    EventRevisionResponse,
     EventUpdateRequest,
     FilterOption,
     ForceInterestMatchSendRequest,
+    MockSourceEvent,
+    MockSourceEventUpdate,
+    MockSourceSyncResponse,
     ForceInterestMatchSendResponse,
     ForceInterestMatchPreviewResponse,
     ForceInterestMatchPreviewUser,
@@ -49,6 +62,17 @@ from backend.api.schemas import (
     ReviewPromptCandidate,
     ReviewPromptSendNowRequest,
     ReviewPromptSendNowResponse,
+    RevisionActor,
+    RevisionDecisionRequest,
+    AdminEventStatusRequest,
+    AdminChangeResponse,
+    AdminChangesResponse,
+    ChangeDecisionRequest,
+    ChangeEventSummary,
+    SuggestionApproveRequest,
+    SuggestionRejectRequest,
+    SubmissionInfo,
+    SubmissionSubmitter,
     SyncJobListResponse,
     SyncJobStartRequest,
     SyncLogResponse,
@@ -63,11 +87,16 @@ from backend.db.models import (
     CachedEvent,
     CalendarCurationRule,
     CalendarSetting,
+    CalendarSubscription,
     EventAttendance,
     EventLinkClick,
     EventExport,
     EventRating,
+    EventRevision,
     EventSave,
+    EventSeries,
+    EventSeriesMember,
+    EventSuggestion,
     EventTag,
     EventView,
     Notification,
@@ -79,7 +108,14 @@ from backend.db.models import (
     User,
     UserEventAttendance,
 )
+from backend.services import event_assets, event_revisions
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
+from backend.services.notifications import (
+    EVENT_CHANGE_APPLIED,
+    EVENT_CHANGE_DECLINED,
+    EVENT_CHANGE_REVERTED,
+    notify_submitter,
+)
 from backend.services.event_images import (
     ImageValidationError,
     delete_event_image,
@@ -87,7 +123,30 @@ from backend.services.event_images import (
     replace_event_image_from_url,
     store_event_image,
 )
-from backend.services.event_visibility import event_is_user_facing
+from backend.services.event_visibility import (
+    EVENT_STATUSES,
+    REASON_ADMIN,
+    REASON_GOOGLE_CALENDAR,
+    REASON_REJECTED,
+    STATUS_CANCELLED,
+    STATUS_NEW,
+    STATUS_PUBLISHED,
+    STATUS_REMOVED,
+    STATUS_UNPUBLISHED,
+    VISIBILITY_PRIVATE,
+    VISIBILITY_PUBLIC,
+    audience as event_audience,
+    audience_clause,
+    event_is_user_facing,
+    event_status,
+    event_wants_public,
+    is_private,
+    pending_request_ids,
+    set_event_status,
+    wants_public_clause,
+)
+from backend.services.recurrence import expand_occurrences, normalize_all_day
+from backend.services.timezones import valid_timezone
 from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.geocoding import (
     geocode_location,
@@ -97,8 +156,31 @@ from backend.services.geocoding import (
 from backend.services.reach import assign_event_tag, sync_event_reach
 from backend.services.sync_job_service import SyncJobStatus, get_sync_job_service
 from backend.services.sync_service import SyncService
+from backend.services.user_avatars import resolve_user_avatar
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+FLAG_WANTS_PUBLIC = "wants_public"
+FLAG_CHANGES = "changes"
+FLAG_SUBMITTED = "submitted"
+ADMIN_FLAGS = (FLAG_SUBMITTED, FLAG_WANTS_PUBLIC, FLAG_CHANGES)
+FLAG_LABELS = {
+    FLAG_SUBMITTED: "Submitted",
+    FLAG_WANTS_PUBLIC: "Public request",
+    FLAG_CHANGES: "Pending changes",
+}
+AUDIENCE_PATTERN = r"^(public|private)(,(public|private))*$"
+_STATUS_ALT = "|".join(EVENT_STATUSES)
+STATUS_PATTERN = rf"^({_STATUS_ALT})(,({_STATUS_ALT}))*$"
+_FLAG_ALT = "|".join(ADMIN_FLAGS)
+FLAGS_PATTERN = rf"^({_FLAG_ALT})(,({_FLAG_ALT}))*$"
+STATUS_LABELS = {
+    "new": "New",
+    "published": "Published",
+    "unpublished": "Unpublished",
+    "cancelled": "Cancelled",
+    "removed": "Removed",
+}
 
 
 def _get_blocked_event(session: Session, event_id: str) -> Optional[BlockedEvent]:
@@ -117,7 +199,19 @@ def _admin_event_response(
     color: Optional[str],
     tags: list,
     blocked: Optional[BlockedEvent],
+    has_pending_changes: bool = False,
+    review_requested: Optional[bool] = None,
 ) -> AdminEventResponse:
+    if review_requested is None:
+        review_requested = bool(
+            event.suggestion_id
+            and pending_request_ids(object_session(event), [event.suggestion_id])
+        )
+    organizer = (
+        object_session(event).get(User, event.organizer_user_id)
+        if event.organizer_user_id
+        else None
+    )
     return AdminEventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
@@ -129,6 +223,7 @@ def _admin_event_response(
         start=event.start,
         end=event.end,
         all_day=event.all_day,
+        timezone=event.timezone,
         latitude=event.latitude,
         longitude=event.longitude,
         color=color,
@@ -137,27 +232,174 @@ def _admin_event_response(
         price_currency=event.price_currency,
         price_is_free=event.price_is_free,
         review_status=event.review_status,
-        status="blocked" if blocked else event.review_status,
+        status=event_status(event),
+        status_reason=event.status_reason,
         links=event.links,
         tags=tags,
         is_hidden=event.is_hidden,
+        is_cancelled=event.is_cancelled,
+        cancellation_note=event.cancellation_note,
         is_blocked=blocked is not None,
         block_reason=blocked.reason if blocked else None,
         block_reason_detail=blocked.reason_detail if blocked else None,
+        merged_into_event_id=event.merged_into_event_id,
+        is_submission=event.suggestion_id is not None,
+        has_pending_changes=has_pending_changes,
+        visibility_state=event_audience(event),
+        wants_public=review_requested,
         show_price_override=event.show_price_override,
         show_promo_override=event.show_promo_override,
+        organizer=(
+            EventOrganizerMini(
+                user_id=organizer.id,
+                handle=organizer.handle,
+                display_name=organizer.display_name,
+                avatar_url=resolve_user_avatar(organizer),
+                is_verified_organizer=organizer.is_verified_organizer,
+            )
+            if organizer is not None
+            else None
+        ),
+        **event_assets.ticket_fields(
+            event, event_assets.ticket_min_hours(object_session(event))
+        ),
     )
 
 
-def _apply_admin_status_filter(stmt, status: Optional[str]):
-    blocked_ids = select(BlockedEvent.event_id)
-    if status == "blocked":
-        return stmt.where(CachedEvent.event_id.in_(blocked_ids))
-    if status in ("pending", "reviewed"):
-        return stmt.where(
-            CachedEvent.review_status == status,
-            ~CachedEvent.event_id.in_(blocked_ids),
+def _guard_submission_review_status(
+    session: Session, event: CachedEvent, status: str
+) -> None:
+    """Keep a submission's events in step with its EventSuggestion.
+
+    Going public or staying private is decided on the suggestion (calendar,
+    picture, full series, notifications); only a private event with no open
+    request may be marked published or pending directly.
+    """
+    current = event_status(event)
+    if (
+        event.suggestion_id is None
+        or status == current
+        or {status, current} - {STATUS_NEW, STATUS_PUBLISHED}
+    ):
+        return
+    if not is_private(event):
+        raise HTTPException(
+            status_code=409,
+            detail="Public submissions keep their review status",
         )
+    if pending_request_ids(session, [event.suggestion_id]):
+        raise HTTPException(
+            status_code=409,
+            detail="The owner asked to go public: make it public or keep it private",
+        )
+
+
+def _set_submission_review_status(
+    session: Session, event: CachedEvent, status: str
+) -> None:
+    """A submission is reviewed as a whole series."""
+    if event.suggestion_id is None:
+        return
+    for row in session.exec(
+        select(CachedEvent).where(
+            CachedEvent.suggestion_id == event.suggestion_id,
+            CachedEvent.event_id != event.event_id,
+            col(CachedEvent.status).in_((STATUS_NEW, STATUS_PUBLISHED)),
+        )
+    ).all():
+        set_event_status(row, status)
+        session.add(row)
+
+
+def _csv(value: Optional[str]) -> list[str]:
+    return [v for v in (value or "").split(",") if v]
+
+
+def _submitter_names(session: Session, suggestion_ids: list) -> dict[str, str]:
+    """``{event_id: submitter}`` keyed by the events' suggestion ids."""
+    ids = {sid for sid in suggestion_ids if sid is not None}
+    if not ids:
+        return {}
+    rows = session.exec(
+        select(
+            CachedEvent.event_id,
+            EventSuggestion.submitter_name,
+            User.handle,
+            User.display_name,
+        )
+        .join(EventSuggestion, EventSuggestion.id == CachedEvent.suggestion_id)
+        .outerjoin(User, User.id == EventSuggestion.submitter_user_id)
+        .where(col(CachedEvent.suggestion_id).in_(ids))
+    ).all()
+    return {
+        event_id: f"@{handle}" if handle else display_name or name or "Anonymous"
+        for event_id, name, handle, display_name in rows
+    }
+
+
+def _in_series_ids(session: Session, events: list) -> set[str]:
+    """Events that are one date of a recurring submission or of a confirmed series."""
+    event_ids = [e.event_id for e in events]
+    if not event_ids:
+        return set()
+    suggestion_ids = {e.suggestion_id for e in events if e.suggestion_id is not None}
+    recurring = (
+        set(
+            session.exec(
+                select(CachedEvent.suggestion_id)
+                .where(col(CachedEvent.suggestion_id).in_(suggestion_ids))
+                .group_by(CachedEvent.suggestion_id)
+                .having(func.count() > 1)
+            ).all()
+        )
+        if suggestion_ids
+        else set()
+    )
+    grouped = set(
+        session.exec(
+            select(EventSeriesMember.event_id)
+            .join(EventSeries, EventSeries.id == EventSeriesMember.series_id)
+            .where(
+                EventSeries.status == "resolved",
+                col(EventSeriesMember.event_id).in_(event_ids),
+            )
+        ).all()
+    )
+    return grouped | {e.event_id for e in events if e.suggestion_id in recurring}
+
+
+def _flag_clause(flag: str):
+    if flag == FLAG_WANTS_PUBLIC:
+        return wants_public_clause()
+    if flag == FLAG_SUBMITTED:
+        return col(CachedEvent.suggestion_id).is_not(None)
+    return and_(
+        event_revisions.pending_changes_clause(),
+        CachedEvent.status != STATUS_REMOVED,
+    )
+
+
+def _apply_admin_status_filter(
+    stmt,
+    audience: Optional[str] = None,
+    status: Optional[str] = None,
+    flags: Optional[str] = None,
+):
+    """OR within a group (audience, status, flags), AND across groups.
+
+    Removed events (the trash) only show when asked for.
+    """
+    audiences = _csv(audience)
+    if audiences:
+        stmt = stmt.where(or_(*(audience_clause(a) for a in audiences)))
+    statuses = _csv(status)
+    if statuses:
+        stmt = stmt.where(col(CachedEvent.status).in_(statuses))
+    else:
+        stmt = stmt.where(CachedEvent.status != STATUS_REMOVED)
+    flag_list = _csv(flags)
+    if flag_list:
+        stmt = stmt.where(or_(*(_flag_clause(f) for f in flag_list)))
     return stmt
 
 
@@ -752,8 +994,12 @@ def notifications_effective_config(
             "effective": loader.get_notification_scheduler_enabled(),
             "source": "env_only",
         },
-        "notification_interval_minutes": {
-            "effective": loader.get_notification_interval_minutes(),
+        "scheduler_tick_minutes": {
+            "effective": loader.get_scheduler_tick_minutes(),
+            "source": "env_only",
+        },
+        "notification_debounce_seconds": {
+            "effective": loader.get_notification_debounce_seconds(),
             "source": "env_only",
         },
         "vapid_configured": bool(
@@ -834,6 +1080,14 @@ def notification_toggle_counts(
             email=_count(User.email_milestone_unlocked_enabled == True),  # noqa: E712
             push=_count(User.push_milestone_unlocked_enabled == True),  # noqa: E712
         ),
+        ticket_prompt=NotificationToggleCountEntry(
+            email=_count(User.email_ticket_prompt_enabled == True),  # noqa: E712
+            push=_count(User.push_ticket_prompt_enabled == True),  # noqa: E712
+        ),
+        memories_prompt=NotificationToggleCountEntry(
+            email=_count(User.email_memories_prompt_enabled == True),  # noqa: E712
+            push=_count(User.push_memories_prompt_enabled == True),  # noqa: E712
+        ),
     )
 
 
@@ -860,10 +1114,24 @@ def _notification_kinds_by_type() -> dict[str, list[str]]:
     return kinds_by_type
 
 
+def _delivery_latency_seconds(created_at, delivered_at) -> Optional[float]:
+    from datetime import timezone
+
+    if created_at is None or delivered_at is None:
+        return None
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    if delivered_at.tzinfo is None:
+        delivered_at = delivered_at.replace(tzinfo=timezone.utc)
+    return max(0.0, (delivered_at - created_at).total_seconds())
+
+
 @router.get("/notifications/log", response_model=NotificationLogResponse)
 def admin_notifications_log(
     type: Optional[str] = Query(default=None),
     channel: Optional[str] = Query(default=None),
+    mode: Optional[str] = Query(default=None),
+    source: Optional[str] = Query(default=None),
     q: Optional[str] = Query(default=None, max_length=120),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -880,7 +1148,9 @@ def admin_notifications_log(
 
     ``type`` filters to one of "interest_match" / "activity_digest" /
     "event_reminder" (matching the 3 feature gates in Configuration).
-    ``channel`` filters to "app", "email", or "push". ``q`` matches the
+    ``channel`` filters to "app", "email", or "push". ``mode`` filters email
+    rows to "instant" / "digest"; ``source`` to "request" / "job" / "tick" /
+    "admin". ``q`` matches the
     recipient's handle, display name, or email (case-insensitive
     substring).
     """
@@ -889,6 +1159,10 @@ def admin_notifications_log(
         raise HTTPException(status_code=400, detail=f"Unknown type: {type}")
     if channel is not None and channel not in ("app", "email", "push"):
         raise HTTPException(status_code=400, detail=f"Unknown channel: {channel}")
+    if mode is not None and mode not in ("instant", "digest"):
+        raise HTTPException(status_code=400, detail=f"Unknown mode: {mode}")
+    if source is not None and source not in ("request", "job", "tick", "admin"):
+        raise HTTPException(status_code=400, detail=f"Unknown source: {source}")
 
     from sqlalchemy.orm import aliased
 
@@ -906,6 +1180,10 @@ def admin_notifications_log(
         stmt = stmt.where(col(Notification.kind).in_(kinds_by_type[type]))
     if channel is not None:
         stmt = stmt.where(NotificationDelivery.channel == channel)
+    if mode is not None:
+        stmt = stmt.where(NotificationDelivery.mode == mode)
+    if source is not None:
+        stmt = stmt.where(NotificationDelivery.source == source)
     if q:
         needle = f"%{q.strip().lower()}%"
         stmt = stmt.where(
@@ -932,6 +1210,9 @@ def admin_notifications_log(
             kind=n.kind,
             type=kind_to_type.get(n.kind, n.kind),
             channel=d.channel,
+            mode=d.mode,
+            source=d.source,
+            latency_seconds=_delivery_latency_seconds(n.created_at, d.delivered_at),
             recipient_user_id=u.id,
             recipient_email=u.email,
             recipient_handle=u.handle,
@@ -1164,6 +1445,123 @@ def digest_send_now(
         pushes_sent=stats.get("pushed", 0),
         stamped=stats.get("stamped", 0),
         results=results,
+    )
+
+
+def _asset_prompt_event(session: Session, event_id: str, kind: str) -> CachedEvent:
+    if kind == "ticket" and not event_assets.tickets_enabled(session):
+        raise HTTPException(status_code=409, detail="Event tickets is off")
+    if kind == "memories" and not event_assets.memories_enabled(session):
+        raise HTTPException(status_code=409, detail="Event memories is off")
+    event = session.get(CachedEvent, event_id)
+    if (
+        event is None
+        or event.deleted_at is not None
+        or not event_is_user_facing(session, event)
+    ):
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event
+
+
+@router.get(
+    "/events/{event_id}/asset-prompt-candidates",
+    response_model=AssetPromptCandidatesResponse,
+)
+def asset_prompt_candidates(
+    event_id: str,
+    kind: str = Query(..., pattern="^(ticket|memories)$"),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Going users of an event with per-channel ticket/memories prompt status."""
+    from datetime import datetime, timezone
+    from backend.services import event_asset_prompts
+
+    event = _asset_prompt_event(session, event_id, kind)
+    now = datetime.now(timezone.utc)
+    likely, reason = event_assets.ticket_likely(
+        event, event_assets.ticket_min_hours(session)
+    )
+    candidates = []
+    for c in event_asset_prompts.force_candidates(session, kind, event):
+        user, notif = c["user"], c["notification"]
+        candidates.append(
+            AssetPromptCandidate(
+                user_id=user.id,
+                email=user.email,
+                name=user.display_name,
+                handle=user.handle,
+                blocker=c["blocker"],
+                email_enabled=c["email_enabled"],
+                push_enabled=c["push_enabled"],
+                has_push_subscription=c["has_push_subscription"],
+                curator_marked=c["curator_marked"],
+                notification=(
+                    AssetPromptNotificationState(
+                        created_at=notif.created_at,
+                        read_at=notif.read_at,
+                        emailed_at=notif.emailed_at,
+                        pushed_at=notif.pushed_at,
+                    )
+                    if notif
+                    else None
+                ),
+            )
+        )
+    candidates.sort(key=lambda c: (c.blocker is not None, c.email.casefold()))
+    return AssetPromptCandidatesResponse(
+        event_id=event.event_id,
+        title=event.title,
+        start=event.start,
+        end=event.end,
+        ticket_likely=likely,
+        ticket_likely_reason=reason,
+        ineligible_reason=event_asset_prompts.force_ineligible_reason(
+            session, kind, event, now
+        ),
+        candidates=candidates,
+    )
+
+
+@router.post(
+    "/notifications/asset-prompt/send-now",
+    response_model=AssetPromptSendNowResponse,
+)
+def asset_prompt_send_now(
+    body: AssetPromptSendNowRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin override: send the ticket or memories prompt for one event now.
+
+    Bypasses timing, the site toggles and the ticket-likely rule; opt-outs
+    and per-user blockers still apply. Without ``resend`` only channels not
+    yet delivered are sent.
+    """
+    from datetime import datetime, timezone
+    from backend.services import event_asset_prompts
+
+    event = _asset_prompt_event(session, body.event_id, body.kind)
+    now = datetime.now(timezone.utc)
+    reason = event_asset_prompts.force_ineligible_reason(session, body.kind, event, now)
+    if reason:
+        raise HTTPException(status_code=409, detail=reason)
+    out = event_asset_prompts.force_send(
+        session,
+        body.kind,
+        event,
+        body.user_ids,
+        set(body.channels),
+        body.resend,
+        now,
+    )
+    session.commit()
+    return AssetPromptSendNowResponse(
+        in_app_created=out["in_app_created"],
+        in_app_resurfaced=out["in_app_resurfaced"],
+        emailed=out["emailed"],
+        pushed=out["pushed"],
+        results=[ForceSendUserResult(**r) for r in out["results"]],
     )
 
 
@@ -1539,26 +1937,6 @@ def analytics_source_breakdown(
     return [{"source": r[0], "view_count": r[1]} for r in results]
 
 
-@router.get("/analytics/top-countries")
-def analytics_top_countries(
-    limit: int = 10,
-    session: Session = Depends(get_session),
-    _admin: dict = Depends(require_admin),
-):
-    """Aggregate EventView by visitor country."""
-    results = session.exec(
-        select(
-            EventView.country,
-            func.count(EventView.id).label("view_count"),
-        )
-        .where(EventView.country.is_not(None))
-        .group_by(EventView.country)
-        .order_by(func.count(EventView.id).desc())
-        .limit(limit)
-    ).all()
-    return [{"country": r[0], "view_count": r[1]} for r in results]
-
-
 @router.get("/analytics/top-links")
 def analytics_top_links(
     limit: int = 20,
@@ -1770,7 +2148,9 @@ def list_admin_events(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     search: Optional[str] = Query(default=None, max_length=200),
-    status: Optional[str] = Query(default=None, pattern="^(pending|reviewed|blocked)$"),
+    audience: Optional[str] = Query(default=None, pattern=AUDIENCE_PATTERN),
+    status: Optional[str] = Query(default=None, pattern=STATUS_PATTERN),
+    flags: Optional[str] = Query(default=None, pattern=FLAGS_PATTERN),
     calendar_id: Optional[str] = Query(default=None),
     tag_ids: Optional[str] = Query(default=None),
     geo_status: Optional[str] = Query(
@@ -1779,22 +2159,24 @@ def list_admin_events(
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
     include_past: bool = Query(default=False),
-    hidden: bool = Query(default=False),
+    group: Optional[str] = Query(default=None, pattern="^series$"),
+    sort: str = Query(default="start", pattern="^(start|submitted)$"),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """List non-deleted events with pagination and filters.
+    """List events with pagination and filters.
 
     By default returns only events whose ``end > now`` (upcoming + in progress).
-    Pass ``include_past=true`` to include finished events.
+    Pass ``include_past=true`` to include finished events. ``group=series``
+    keeps one row per submission or confirmed series (its first matching date).
     """
-    from sqlalchemy import cast, String
+    from sqlalchemy import cast, String, literal
 
     calendars = session.exec(select(CalendarSetting)).all()
     color_map = {c.calendar_id: c.color for c in calendars}
 
     # Build base query
-    base = select(CachedEvent).where(CachedEvent.deleted_at == None)
+    base = select(CachedEvent)
 
     if calendar_id:
         base = base.where(CachedEvent.calendar_id == calendar_id)
@@ -1820,20 +2202,59 @@ def list_admin_events(
             ).all()
             base = base.where(CachedEvent.event_id.in_(matching_event_ids))
 
-    if hidden:
-        base = base.where(CachedEvent.is_hidden == True)
-    base = _apply_admin_status_filter(base, status)
+    base = _apply_admin_status_filter(base, audience, status, flags)
+
+    group_sizes: dict[str, int] = {}
+    if group == "series":
+        series_key = literal("series:") + cast(EventSeries.id, String)
+        key = func.coalesce(
+            cast(CachedEvent.suggestion_id, String), series_key, CachedEvent.event_id
+        )
+        ranked = (
+            base.outerjoin(
+                EventSeriesMember, EventSeriesMember.event_id == CachedEvent.event_id
+            )
+            .outerjoin(
+                EventSeries,
+                and_(
+                    EventSeries.id == EventSeriesMember.series_id,
+                    EventSeries.status == "resolved",
+                ),
+            )
+            .with_only_columns(
+                CachedEvent.event_id,
+                func.row_number()
+                .over(partition_by=key, order_by=CachedEvent.start)
+                .label("rank"),
+                func.count().over(partition_by=key).label("size"),
+            )
+            .subquery()
+        )
+        firsts = select(ranked.c.event_id, ranked.c.size).where(ranked.c.rank == 1)
+        base = base.where(
+            CachedEvent.event_id.in_(firsts.with_only_columns(ranked.c.event_id))
+        )
 
     # Count total matching
     count_stmt = select(func.count()).select_from(base.subquery())
     total = session.exec(count_stmt).one()
 
     # Fetch page
+    ordered = base
+    if sort == "submitted":
+        ordered = ordered.outerjoin(
+            EventSuggestion, EventSuggestion.id == CachedEvent.suggestion_id
+        ).order_by(col(EventSuggestion.created_at).desc().nulls_last())
     events = session.exec(
-        base.order_by(CachedEvent.start).offset(offset).limit(limit)
+        ordered.order_by(CachedEvent.start).offset(offset).limit(limit)
     ).all()
 
     event_ids = [e.event_id for e in events]
+    if group == "series" and event_ids:
+        group_sizes = dict(
+            session.exec(firsts.where(ranked.c.event_id.in_(event_ids))).all()
+        )
+    submitters = _submitter_names(session, [e.suggestion_id for e in events])
     tags_map = get_event_tags(session, event_ids)
     blocked_map = {
         blocked.event_id: blocked
@@ -1842,12 +2263,28 @@ def list_admin_events(
         ).all()
     }
 
+    changed_ids = (
+        set(
+            session.exec(
+                select(CachedEvent.event_id).where(
+                    CachedEvent.event_id.in_(event_ids),
+                    event_revisions.pending_changes_clause(),
+                )
+            ).all()
+        )
+        if event_ids
+        else set()
+    )
+    requested_ids = pending_request_ids(session, [e.suggestion_id for e in events])
+    series_ids = _in_series_ids(session, events)
     items = [
         _admin_event_response(
             e,
             color=color_map.get(e.calendar_id),
             tags=tags_map.get(e.event_id, []),
             blocked=blocked_map.get(e.event_id),
+            has_pending_changes=e.event_id in changed_ids,
+            review_requested=e.suggestion_id in requested_ids,
         )
         for e in events
     ]
@@ -1877,6 +2314,9 @@ def list_admin_events(
         ).all()
     )
     for item in items:
+        item.submitter_name = submitters.get(item.event_id)
+        item.occurrence_count = group_sizes.get(item.event_id)
+        item.in_series = item.event_id in series_ids
         reach = reach_map.get(item.event_id)
         item.interest_reach = EventInterestReach(**reach) if reach else None
         item.view_count, item.unique_viewers = view_map.get(item.event_id, (0, 0))
@@ -1898,9 +2338,33 @@ def update_event(
         raise HTTPException(status_code=404, detail="Event not found")
 
     update_data = body.model_dump(exclude_unset=True)
+    new_status = update_data.pop("status", None)
+    legacy_review = update_data.pop("review_status", None)
+    legacy_hidden = update_data.pop("is_hidden", None)
+    if new_status is None and legacy_hidden is not None:
+        new_status = (
+            STATUS_UNPUBLISHED
+            if legacy_hidden
+            else STATUS_NEW
+            if event.review_status == "pending"
+            else STATUS_PUBLISHED
+        )
+    if new_status is None and legacy_review is not None:
+        new_status = STATUS_NEW if legacy_review == "pending" else STATUS_PUBLISHED
+    if new_status is not None and new_status != event_status(event):
+        if event_status(event) in (STATUS_REMOVED, STATUS_CANCELLED):
+            raise HTTPException(
+                status_code=409,
+                detail=f"A {event_status(event)} event is restored, not edited",
+            )
+        _guard_submission_review_status(session, event, new_status)
+        if new_status != STATUS_UNPUBLISHED:
+            _set_submission_review_status(session, event, new_status)
+        set_event_status(event, new_status)
 
     # Handle tag_ids separately
     tag_ids = update_data.pop("tag_ids", None)
+    _normalize_time_changes(event, update_data)
 
     # Validate calendar_id (if changing) refers to an existing calendar
     if "calendar_id" in update_data and update_data["calendar_id"] != event.calendar_id:
@@ -2063,10 +2527,25 @@ def remove_event_image(
 
     from datetime import datetime as dt, timezone
 
-    delete_event_image(event.image_key)
+    removed_key = event.image_key
+    delete_event_image(removed_key)
     event.image_key = None
     event.updated_at = dt.utcnow()
     session.add(event)
+    if removed_key and event.suggestion_id is not None:
+        # A submission's picture is shared by every date; the owner's next edit would restore it.
+        suggestion = session.get(EventSuggestion, event.suggestion_id)
+        if suggestion is not None and suggestion.image_key == removed_key:
+            suggestion.image_key = None
+            session.add(suggestion)
+        for sibling in session.exec(
+            select(CachedEvent).where(
+                CachedEvent.suggestion_id == event.suggestion_id,
+                CachedEvent.image_key == removed_key,
+            )
+        ).all():
+            sibling.image_key = None
+            session.add(sibling)
     session.commit()
     session.refresh(event)
     return _event_image_response(session, event)
@@ -2097,7 +2576,9 @@ def geocode_search(
 @router.get("/events/filter-options", response_model=EventFilterOptionsResponse)
 def event_filter_options(
     search: Optional[str] = Query(default=None, max_length=200),
-    status: Optional[str] = Query(default=None, pattern="^(pending|reviewed|blocked)$"),
+    audience: Optional[str] = Query(default=None, pattern=AUDIENCE_PATTERN),
+    status: Optional[str] = Query(default=None, pattern=STATUS_PATTERN),
+    flags: Optional[str] = Query(default=None, pattern=FLAGS_PATTERN),
     calendar_id: Optional[str] = Query(default=None),
     tag_ids: Optional[str] = Query(default=None),
     geo_status: Optional[str] = Query(
@@ -2106,7 +2587,6 @@ def event_filter_options(
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
     include_past: bool = Query(default=False),
-    hidden: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -2118,7 +2598,7 @@ def event_filter_options(
     from sqlalchemy import cast, String, case, and_, literal_column
 
     # Build filtered base (same logic as list_admin_events)
-    base = select(CachedEvent).where(CachedEvent.deleted_at == None)
+    base = select(CachedEvent)
     if calendar_id:
         base = base.where(CachedEvent.calendar_id == calendar_id)
     base = _apply_admin_geo_filter(base, geo_status, ungeolocated)
@@ -2143,35 +2623,43 @@ def event_filter_options(
             ).all()
             base = base.where(CachedEvent.event_id.in_(matching))
 
-    if hidden:
-        base = base.where(CachedEvent.is_hidden == True)
-
     blocked_ids = select(BlockedEvent.event_id)
-    status_options = [
-        FilterOption(
-            value=value,
-            label=value.capitalize(),
-            count=session.exec(select(func.count()).select_from(stmt.subquery())).one(),
-        )
-        for value, stmt in (
-            (
-                "pending",
-                base.where(
-                    CachedEvent.review_status == "pending",
-                    ~CachedEvent.event_id.in_(blocked_ids),
-                ),
-            ),
-            (
-                "reviewed",
-                base.where(
-                    CachedEvent.review_status == "reviewed",
-                    ~CachedEvent.event_id.in_(blocked_ids),
-                ),
-            ),
-            ("blocked", base.where(CachedEvent.event_id.in_(blocked_ids))),
-        )
-    ]
-    base = _apply_admin_status_filter(base, status)
+
+    def facet(options, *, audience=audience, status=status, flags=flags):
+        stmt = _apply_admin_status_filter(base, audience, status, flags)
+        return [
+            FilterOption(
+                value=value,
+                label=label,
+                count=session.exec(
+                    select(func.count()).select_from(stmt.where(clause).subquery())
+                ).one(),
+            )
+            for value, label, clause in options
+        ]
+
+    audience_options = facet(
+        [
+            (value, label, audience_clause(value))
+            for value, label in (
+                (VISIBILITY_PUBLIC, "Public"),
+                (VISIBILITY_PRIVATE, "Private"),
+            )
+        ],
+        audience=None,
+    )
+    status_options = facet(
+        [
+            (value, STATUS_LABELS[value], CachedEvent.status == value)
+            for value in EVENT_STATUSES
+        ],
+        status=",".join(EVENT_STATUSES),
+    )
+    flag_options = facet(
+        [(flag, FLAG_LABELS[flag], _flag_clause(flag)) for flag in ADMIN_FLAGS],
+        flags=None,
+    )
+    base = _apply_admin_status_filter(base, audience, status, flags)
 
     filtered_cte = base.subquery()
     fe = filtered_cte.c
@@ -2229,7 +2717,9 @@ def event_filter_options(
 
     return EventFilterOptionsResponse(
         calendars=cal_options,
+        audiences=audience_options,
         statuses=status_options,
+        flags=flag_options,
         geo_statuses=geo_options,
         tags=tag_options,
         total_count=total_count,
@@ -2243,15 +2733,14 @@ def review_event(
     _admin: dict = Depends(require_admin),
 ):
     """Mark a single event as reviewed."""
-    from datetime import datetime as _dt, timezone
-
     event = session.get(CachedEvent, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    _guard_submission_review_status(session, event, STATUS_PUBLISHED)
+    _set_submission_review_status(session, event, STATUS_PUBLISHED)
 
-    event.review_status = "reviewed"
     # Re-enters the interest-match scan window (pending events were skipped).
-    event.updated_at = _dt.now(timezone.utc)
+    set_event_status(event, STATUS_PUBLISHED)
     session.add(event)
     session.commit()
     session.refresh(event)
@@ -2273,22 +2762,28 @@ def bulk_review_events(
     _admin: dict = Depends(require_admin),
 ):
     """Mark multiple events as reviewed."""
-    from datetime import datetime as _dt, timezone
-
     events = session.exec(
         select(CachedEvent).where(
             CachedEvent.event_id.in_(body.event_ids),
-            CachedEvent.review_status == "pending",
-            CachedEvent.deleted_at == None,
+            CachedEvent.status == STATUS_NEW,
         )
     ).all()
-    now = _dt.now(timezone.utc)
+    marked = 0
+    skipped_submissions = 0
+    requested = pending_request_ids(session, [e.suggestion_id for e in events])
     for event in events:
-        event.review_status = "reviewed"
-        event.updated_at = now
+        # Public submissions and open requests are decided on the suggestion.
+        if event.suggestion_id is not None and (
+            not is_private(event) or event.suggestion_id in requested
+        ):
+            skipped_submissions += 1
+            continue
+        _set_submission_review_status(session, event, STATUS_PUBLISHED)
+        set_event_status(event, STATUS_PUBLISHED)
         session.add(event)
+        marked += 1
     session.commit()
-    return {"marked_reviewed": len(events)}
+    return {"marked_reviewed": marked, "skipped_submissions": skipped_submissions}
 
 
 @router.post("/events/bulk-retry-geocoding")
@@ -2528,7 +3023,9 @@ def suggest_tags_bulk(
 @router.get("/events/ids", response_model=EventIdsResponse)
 def list_admin_event_ids(
     search: Optional[str] = Query(default=None, max_length=200),
-    status: Optional[str] = Query(default=None, pattern="^(pending|reviewed|blocked)$"),
+    audience: Optional[str] = Query(default=None, pattern=AUDIENCE_PATTERN),
+    status: Optional[str] = Query(default=None, pattern=STATUS_PATTERN),
+    flags: Optional[str] = Query(default=None, pattern=FLAGS_PATTERN),
     calendar_id: Optional[str] = Query(default=None),
     tag_ids: Optional[str] = Query(default=None),
     geo_status: Optional[str] = Query(
@@ -2537,7 +3034,6 @@ def list_admin_event_ids(
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
     include_past: bool = Query(default=False),
-    hidden: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -2547,7 +3043,7 @@ def list_admin_event_ids(
     """
     from sqlalchemy import cast, String
 
-    base = select(CachedEvent.event_id).where(CachedEvent.deleted_at == None)
+    base = select(CachedEvent.event_id)
 
     if calendar_id:
         base = base.where(CachedEvent.calendar_id == calendar_id)
@@ -2573,9 +3069,7 @@ def list_admin_event_ids(
             ).all()
             base = base.where(CachedEvent.event_id.in_(matching_event_ids))
 
-    if hidden:
-        base = base.where(CachedEvent.is_hidden == True)
-    base = _apply_admin_status_filter(base, status)
+    base = _apply_admin_status_filter(base, audience, status, flags)
 
     ids = session.exec(base).all()
     return EventIdsResponse(ids=list(ids))
@@ -2754,18 +3248,19 @@ def block_event(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    event.is_hidden = True
-    from datetime import datetime as _dt, timezone
-
-    event.updated_at = _dt.utcnow()
+    set_event_status(event, STATUS_REMOVED, REASON_ADMIN)
     session.add(event)
 
     blocked = session.get(BlockedEvent, event_id)
     if not blocked:
         blocked = BlockedEvent(event_id=event_id, reason="deleted")
         session.add(blocked)
+    removed_key = event_revisions.notify_event_removed(
+        session, [event_id], title=event.title
+    )
 
     session.commit()
+    event_revisions.enqueue_removed_notices(removed_key)
     session.refresh(event)
 
     cal = session.get(CalendarSetting, event.calendar_id)
@@ -2798,10 +3293,8 @@ def unblock_event(
     if blocked:
         session.delete(blocked)
 
-    event.is_hidden = False
-    from datetime import datetime as _dt, timezone
-
-    event.updated_at = _dt.utcnow()
+    # Back from the trash, the event is reviewed again.
+    set_event_status(event, STATUS_NEW)
     session.add(event)
     session.commit()
     session.refresh(event)
@@ -3006,3 +3499,1101 @@ def delete_calendar_curation_rule(
         raise HTTPException(status_code=404, detail="rule_not_found")
     session.delete(rule)
     session.commit()
+
+
+# --- Event revisions & moderation ---
+
+
+def _revision_response(
+    session: Session, revision: EventRevision, counts: Optional[dict] = None
+) -> EventRevisionResponse:
+    proposer = None
+    if revision.proposed_by_user_id is not None:
+        user = session.get(User, revision.proposed_by_user_id)
+        if user is not None:
+            proposer = RevisionActor(
+                user_id=user.id,
+                handle=user.handle,
+                display_name=user.display_name,
+                avatar_url=resolve_user_avatar(user),
+            )
+    return EventRevisionResponse(
+        id=revision.id,
+        event_id=revision.event_id,
+        suggestion_id=revision.suggestion_id,
+        kind=revision.kind or event_revisions.KIND_EDIT,
+        source=revision.source,
+        status=revision.status,
+        changes=revision.changes,
+        material_fields=sorted(event_revisions.material_changes(revision.changes)),
+        proposed_by=proposer,
+        proposed_by_admin_email=revision.proposed_by_admin_email,
+        decided_by=revision.decided_by,
+        decided_at=revision.decided_at,
+        notified_count=revision.notified_count,
+        created_at=revision.created_at,
+        updated_at=revision.updated_at,
+        **(counts or {}),
+    )
+
+
+def _series_event_ids(session: Session, event: CachedEvent) -> list[str]:
+    if event.suggestion_id is None:
+        return [event.event_id]
+    return list(
+        session.exec(
+            select(CachedEvent.event_id).where(
+                CachedEvent.suggestion_id == event.suggestion_id,
+                CachedEvent.is_hidden == False,  # noqa: E712
+            )
+        ).all()
+    ) or [event.event_id]
+
+
+def _upcoming_series_ids(session: Session, event: CachedEvent) -> list[str]:
+    """The event, then the other dates of its submission or confirmed series
+    that are not over or removed."""
+    from datetime import datetime, timezone
+
+    if event.suggestion_id is not None:
+        members = CachedEvent.suggestion_id == event.suggestion_id
+    else:
+        series_id = session.exec(
+            select(EventSeriesMember.series_id)
+            .join(EventSeries, EventSeries.id == EventSeriesMember.series_id)
+            .where(
+                EventSeriesMember.event_id == event.event_id,
+                EventSeries.status == "resolved",
+            )
+        ).first()
+        if series_id is None:
+            return [event.event_id]
+        members = col(CachedEvent.event_id).in_(
+            select(EventSeriesMember.event_id).where(
+                EventSeriesMember.series_id == series_id
+            )
+        )
+    others = session.exec(
+        select(CachedEvent.event_id)
+        .where(
+            members,
+            CachedEvent.event_id != event.event_id,
+            CachedEvent.end >= datetime.now(timezone.utc),
+            CachedEvent.status != STATUS_REMOVED,
+        )
+        .order_by(CachedEvent.start)
+    ).all()
+    return [event.event_id, *others]
+
+
+def _revision_counts(
+    session: Session, event: CachedEvent, revision: EventRevision
+) -> dict:
+    """Who applying would notify, for this date and for every upcoming date."""
+    series_ids = _upcoming_series_ids(session, event)
+    if revision.source == event_revisions.SOURCE_SUBMITTER:
+        engaged = set(
+            event_revisions.engaged_user_ids(session, _series_event_ids(session, event))
+        )
+        # The submitter is not told about their own edit.
+        suggestion = (
+            session.get(EventSuggestion, event.suggestion_id)
+            if event.suggestion_id is not None
+            else None
+        )
+        if suggestion is not None:
+            engaged.discard(suggestion.submitter_user_id)
+        return {
+            "affected_attendees": len(engaged),
+            "series_dates": len(series_ids),
+            "series_affected_attendees": len(engaged),
+        }
+    proposer = {revision.proposed_by_user_id}
+    here = set(event_revisions.engaged_user_ids(session, [event.event_id])) - proposer
+    everywhere = (
+        set(event_revisions.engaged_user_ids(session, series_ids)) - proposer
+        if len(series_ids) > 1
+        else here
+    )
+    return {
+        "affected_attendees": len(here),
+        "series_dates": len(series_ids),
+        "series_affected_attendees": len(everywhere),
+        "group_size": len(_sync_group(session, revision, event, series_ids)),
+    }
+
+
+def _sync_group(
+    session: Session,
+    revision: EventRevision,
+    event: CachedEvent,
+    series_ids: Optional[list[str]] = None,
+) -> list[tuple[EventRevision, CachedEvent]]:
+    """The revision and the same pending Google change on the series' other upcoming dates."""
+    group = [(revision, event)]
+    if revision.source != event_revisions.SOURCE_SYNC or not revision.group_hash:
+        return group
+    series_ids = series_ids or _upcoming_series_ids(session, event)
+    if len(series_ids) < 2:
+        return group
+    for other in session.exec(
+        select(EventRevision)
+        .where(
+            EventRevision.group_hash == revision.group_hash,
+            EventRevision.source == event_revisions.SOURCE_SYNC,
+            EventRevision.status == event_revisions.STATUS_PENDING,
+            EventRevision.id != revision.id,
+            col(EventRevision.event_id).in_(series_ids[1:]),
+        )
+        .order_by(EventRevision.id)
+    ).all():
+        other_event = session.get(CachedEvent, other.event_id)
+        if other_event is not None:
+            group.append((other, other_event))
+    return group
+
+
+def _submission_info(session: Session, event: CachedEvent) -> Optional[SubmissionInfo]:
+    if event.suggestion_id is None:
+        return None
+    suggestion = session.get(EventSuggestion, event.suggestion_id)
+    if suggestion is None:
+        return None
+    submitter = None
+    approved_count = rejected_count = followers = 0
+    if suggestion.submitter_user_id is not None:
+        user = session.get(User, suggestion.submitter_user_id)
+        if user is not None:
+            submitter = SubmissionSubmitter(
+                user_id=user.id,
+                handle=user.handle,
+                display_name=user.display_name,
+                avatar_url=resolve_user_avatar(user),
+            )
+        counts = dict(
+            session.exec(
+                select(EventSuggestion.status, func.count())
+                .where(
+                    EventSuggestion.submitter_user_id == suggestion.submitter_user_id,
+                    EventSuggestion.id != suggestion.id,
+                )
+                .group_by(EventSuggestion.status)
+            ).all()
+        )
+        approved_count = counts.get("approved", 0)
+        rejected_count = counts.get("declined", 0) + counts.get("blocked", 0)
+        followers = session.exec(
+            select(func.count()).where(
+                CalendarSubscription.target_user_id == suggestion.submitter_user_id,
+                CalendarSubscription.notify_new_events == True,  # noqa: E712
+            )
+        ).one()
+    dates_total = len(
+        expand_occurrences(
+            suggestion.start,
+            suggestion.end,
+            suggestion.recurrence_rule,
+            suggestion.recurrence_dates,
+            timezone_name=None if suggestion.all_day else suggestion.timezone,
+        )
+    )
+    dates_materialised = session.exec(
+        select(func.count()).where(
+            CachedEvent.suggestion_id == suggestion.id,
+            CachedEvent.is_hidden == False,  # noqa: E712
+        )
+    ).one()
+    return SubmissionInfo(
+        suggestion_id=suggestion.id,
+        status=suggestion.status,
+        edit_locked=suggestion.edit_locked,
+        submitter=submitter,
+        submitter_name=suggestion.submitter_name,
+        submitter_email=suggestion.submitter_email,
+        submitted_at=suggestion.created_at,
+        reviewed_by=suggestion.reviewed_by,
+        reviewed_at=suggestion.reviewed_at,
+        admin_notes=suggestion.admin_notes,
+        approved_count=approved_count,
+        rejected_count=rejected_count,
+        followers_to_notify=followers,
+        dates_total=dates_total,
+        dates_materialised=dates_materialised,
+    )
+
+
+def _get_event_or_404(session: Session, event_id: str) -> CachedEvent:
+    event = session.get(CachedEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event
+
+
+@router.get(
+    "/events/{event_id}/moderation", response_model=AdminEventModerationResponse
+)
+def get_event_moderation(
+    event_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Who can see the event, its submission, and its revision history."""
+    event = _get_event_or_404(session, event_id)
+    clause = EventRevision.event_id == event.event_id
+    if event.suggestion_id is not None:
+        clause = or_(clause, EventRevision.suggestion_id == event.suggestion_id)
+    revisions = session.exec(
+        select(EventRevision)
+        .where(clause)
+        .order_by(col(EventRevision.created_at).desc())
+    ).all()
+    submission = _submission_info(session, event)
+
+    def counts(revision: EventRevision) -> dict:
+        return _revision_counts(session, event, revision)
+
+    draft = next(
+        (r for r in revisions if r.status == event_revisions.STATUS_DRAFT), None
+    )
+    return AdminEventModerationResponse(
+        visibility=event_audience(event),
+        wants_public=event_wants_public(session, event),
+        submission=submission,
+        series_dates=len(_upcoming_series_ids(session, event)),
+        draft=_revision_response(session, draft, counts(draft)) if draft else None,
+        open_revisions=[
+            _revision_response(session, r, counts(r))
+            for r in revisions
+            if r.status == event_revisions.STATUS_PENDING
+            and r.kind in event_revisions.EDIT_KINDS
+        ],
+        history=[
+            _revision_response(session, r)
+            for r in revisions
+            if r.status not in event_revisions.OPEN_STATUSES
+        ],
+    )
+
+
+def _normalize_time_changes(event: CachedEvent, changes: dict) -> None:
+    if changes.get("timezone") and not valid_timezone(changes["timezone"]):
+        raise HTTPException(status_code=422, detail="Unknown time zone")
+    if (
+        changes.get("all_day", event.all_day)
+        and {"start", "end", "all_day"} & changes.keys()
+    ):
+        changes["start"], changes["end"] = normalize_all_day(
+            changes.get("start", event.start), changes.get("end", event.end)
+        )
+
+
+def _normalize_draft_changes(event: CachedEvent, changes: dict) -> dict:
+    from datetime import datetime as _dt
+
+    normalized = dict(changes)
+    for field in ("start", "end"):
+        if isinstance(normalized.get(field), str):
+            normalized[field] = _dt.fromisoformat(normalized[field])
+    _normalize_time_changes(event, normalized)
+    return normalized
+
+
+@router.put("/events/{event_id}/draft", response_model=Optional[EventRevisionResponse])
+def update_event_draft(
+    event_id: str,
+    body: EventDraftUpdate,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Stage side-panel edits of a published event until they are published."""
+    event = _get_event_or_404(session, event_id)
+    if event.review_status != "reviewed":
+        raise HTTPException(
+            status_code=409, detail="Unpublished events are edited directly"
+        )
+    draft = event_revisions.update_draft(
+        session,
+        event,
+        _normalize_draft_changes(event, body.changes),
+        admin.get("email"),
+    )
+    if draft is not None:
+        start = draft.changes.get("start", {}).get("new") or event_revisions.to_json(
+            event.start
+        )
+        end = draft.changes.get("end", {}).get("new") or event_revisions.to_json(
+            event.end
+        )
+        if end <= start:
+            session.rollback()
+            raise HTTPException(status_code=422, detail="End must be after start")
+    session.commit()
+    if draft is None:
+        return None
+    session.refresh(draft)
+    return _revision_response(session, draft, _revision_counts(session, event, draft))
+
+
+@router.delete("/events/{event_id}/draft", status_code=204)
+def discard_event_draft(
+    event_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    draft = event_revisions.get_draft(session, event_id)
+    if draft is not None:
+        session.delete(draft)
+        session.commit()
+
+
+def _refresh_event_geo(event: CachedEvent, old_coords: tuple) -> None:
+    if event.location:
+        coords = geocode_location(event.location)
+        if coords:
+            event.latitude, event.longitude = coords
+    if (event.latitude, event.longitude) != old_coords:
+        place = (
+            reverse_geocode(event.latitude, event.longitude)
+            if event.latitude is not None and event.longitude is not None
+            else None
+        )
+        if place:
+            event.city, event.country, event.country_code = place
+        else:
+            event.city = event.country = event.country_code = None
+
+
+def _notify_change_proposer(
+    session: Session,
+    revision: EventRevision,
+    event: CachedEvent,
+    kind: str,
+    admin_email: Optional[str],
+) -> None:
+    if (
+        revision.source
+        not in (event_revisions.SOURCE_USER, event_revisions.SOURCE_ORGANIZER)
+        or revision.proposed_by_user_id is None
+    ):
+        return
+    proposer = session.get(User, revision.proposed_by_user_id)
+    if proposer is None or proposer.deleted_at is not None:
+        return
+    notify_submitter(
+        session,
+        proposer,
+        kind,
+        subject_key=f"revision:{revision.id}",
+        actor=event_revisions.admin_actor(session, admin_email),
+        event_id=event.event_id,
+        context=event.title,
+        description=event_revisions.describe_changes(
+            revision.changes, proposer.timezone
+        ),
+    )
+
+
+def _apply_changes(
+    session: Session,
+    event: CachedEvent,
+    revision: EventRevision,
+    admin_email: Optional[str],
+) -> None:
+    old_coords = (event.latitude, event.longitude)
+    event_revisions.apply_to_event(event, revision.changes)
+    if (
+        event_revisions.is_removal(revision.changes)
+        and event.status_reason != REASON_GOOGLE_CALENDAR
+    ):
+        # Admin removals stay gone on the next sync.
+        if session.get(BlockedEvent, event.event_id) is None:
+            session.add(BlockedEvent(event_id=event.event_id, reason="deleted"))
+    if event_revisions.TAG_FIELD in revision.changes:
+        event_revisions.replace_event_tags(
+            session, event, revision.changes[event_revisions.TAG_FIELD]["new"]
+        )
+    if "location" in revision.changes and "latitude" not in revision.changes:
+        _refresh_event_geo(event, old_coords)
+    session.add(event)
+    event_revisions.mark_decided(revision, event_revisions.STATUS_ACCEPTED, admin_email)
+    session.add(revision)
+    session.flush()
+    event_revisions.supersede_overlapping(session, event.event_id, revision)
+
+
+_TEMPLATE_FIELDS = (
+    "title",
+    "description",
+    "location",
+    "latitude",
+    "longitude",
+    "timezone",
+    "links",
+    "price_min",
+    "price_max",
+    "price_currency",
+    "price_is_free",
+)
+
+
+def _series_copies(
+    session: Session, event: CachedEvent, revision: EventRevision
+) -> list[tuple[EventRevision, CachedEvent]]:
+    """One pending copy of ``revision`` per other upcoming date it changes."""
+    copies = []
+    for other_id in _upcoming_series_ids(session, event)[1:]:
+        other = session.get(CachedEvent, other_id)
+        changes = event_revisions.rebase_changes(session, other, revision.changes)
+        if not changes:
+            continue
+        copy = EventRevision(
+            event_id=other_id,
+            kind=revision.kind,
+            source=revision.source,
+            status=event_revisions.STATUS_PENDING,
+            changes=changes,
+            proposed_by_user_id=revision.proposed_by_user_id,
+            proposed_by_admin_email=revision.proposed_by_admin_email,
+        )
+        session.add(copy)
+        copies.append((copy, other))
+    if event.suggestion_id is not None:
+        # The owner's next series edit would otherwise bring the old values back.
+        suggestion = session.get(EventSuggestion, event.suggestion_id)
+        if suggestion is not None:
+            for field, change in revision.changes.items():
+                if field in _TEMPLATE_FIELDS:
+                    setattr(suggestion, field, change["new"])
+                elif field == event_revisions.TAG_FIELD:
+                    suggestion.suggested_tag_ids = sorted(change["new"] or [])
+            session.add(suggestion)
+    session.flush()
+    return copies
+
+
+def _apply_event_revision(
+    session: Session,
+    event: CachedEvent,
+    revision: EventRevision,
+    admin_email: Optional[str],
+    notify: Optional[bool],
+    *,
+    actor: Optional[User] = None,
+    scope: str = "date",
+) -> EventRevision:
+    """Apply a change to its date; ``scope="series"`` also to the series'
+    other upcoming dates, or to every date with the same Google change."""
+    batch = [(revision, event)]
+    if scope == "series":
+        batch = _sync_group(session, revision, event)
+        if len(batch) == 1:
+            if event_revisions.has_time_change(revision.changes):
+                raise HTTPException(
+                    status_code=422, detail="A time change applies to this date only"
+                )
+            batch += _series_copies(session, event, revision)
+    for applied, applied_event in batch:
+        _apply_changes(session, applied_event, applied, admin_email)
+    _notify_change_proposer(session, revision, event, EVENT_CHANGE_APPLIED, admin_email)
+    notifications = []
+    removed_key = None
+    if event_revisions.resolve_notify(notify, revision.changes):
+        if event_revisions.is_removal(revision.changes):
+            removed_key = event_revisions.notify_event_removed(
+                session, [e.event_id for _, e in batch], title=event.title
+            )
+        else:
+            actor = actor or event_revisions.admin_actor(session, admin_email)
+            # Each person hears once, about the first of their dates.
+            told = {revision.proposed_by_user_id} - {None}
+            for applied, applied_event in batch:
+                created = event_revisions.notify_event_changed(
+                    session,
+                    applied,
+                    [applied_event.event_id],
+                    actor,
+                    title=applied_event.title,
+                    exclude_user_ids=frozenset(told),
+                )
+                told |= {n.recipient_user_id for n in created}
+                if created:
+                    notifications.append(applied)
+    session.commit()
+    for applied in notifications:
+        event_revisions.enqueue_change_emails(applied)
+    event_revisions.enqueue_removed_notices(removed_key)
+    session.refresh(revision)
+    return revision
+
+
+@router.post("/events/{event_id}/status", response_model=EventRevisionResponse)
+def set_admin_event_status(
+    event_id: str,
+    body: AdminEventStatusRequest,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Cancel, remove or restore an event; recorded as an applied admin change."""
+    event = _get_event_or_404(session, event_id)
+    current = event_status(event)
+    if body.status == STATUS_CANCELLED:
+        if current not in (STATUS_PUBLISHED, STATUS_CANCELLED):
+            raise HTTPException(
+                status_code=409, detail="Only published events can be cancelled"
+            )
+        changes = {
+            "is_cancelled": {"old": event.is_cancelled, "new": True},
+            "cancellation_note": {"old": event.cancellation_note, "new": body.note},
+        }
+    elif body.status == STATUS_REMOVED:
+        changes = {
+            event_revisions.STATUS_FIELD: {"old": current, "new": STATUS_REMOVED},
+            event_revisions.STATUS_REASON_FIELD: {"old": None, "new": REASON_ADMIN},
+        }
+    elif current == STATUS_CANCELLED:
+        changes = {"is_cancelled": {"old": True, "new": False}}
+    elif current == STATUS_REMOVED:
+        # Back from the trash, the event is reviewed again.
+        blocked = session.get(BlockedEvent, event_id)
+        if blocked is not None:
+            session.delete(blocked)
+        changes = {event_revisions.STATUS_FIELD: {"old": current, "new": STATUS_NEW}}
+    else:
+        raise HTTPException(status_code=409, detail=f"The event is already {current}")
+    revision = EventRevision(
+        event_id=event.event_id,
+        source=event_revisions.SOURCE_ADMIN,
+        status=event_revisions.STATUS_PENDING,
+        changes=changes,
+        proposed_by_admin_email=admin.get("email"),
+    )
+    session.add(revision)
+    session.flush()
+    revision = _apply_event_revision(
+        session, event, revision, admin.get("email"), body.notify, scope=body.scope
+    )
+    return _revision_response(session, revision)
+
+
+@router.post("/events/{event_id}/draft/publish", response_model=EventRevisionResponse)
+def publish_event_draft(
+    event_id: str,
+    body: RevisionDecisionRequest,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Apply the draft to the live event; optionally notify attendees."""
+    event = _get_event_or_404(session, event_id)
+    draft = event_revisions.get_draft(session, event_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="No unpublished changes")
+    revision = _apply_event_revision(
+        session, event, draft, admin.get("email"), body.notify, scope=body.scope
+    )
+    return _revision_response(session, revision)
+
+
+def _get_open_revision(session: Session, revision_id: int) -> EventRevision:
+    revision = session.get(EventRevision, revision_id)
+    if revision is None:
+        raise HTTPException(status_code=404, detail="Revision not found")
+    if revision.status != event_revisions.STATUS_PENDING:
+        raise HTTPException(
+            status_code=409, detail=f"Revision is already {revision.status}"
+        )
+    return revision
+
+
+def _require_edit_kind(revision: EventRevision) -> None:
+    if revision.kind not in event_revisions.EDIT_KINDS:
+        raise HTTPException(
+            status_code=409, detail="Decide this change from the review queue"
+        )
+
+
+@router.post("/revisions/{revision_id}/apply", response_model=EventRevisionResponse)
+def apply_revision(
+    revision_id: int,
+    body: RevisionDecisionRequest,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Publish a source or submitter change to the live event."""
+    revision = _get_open_revision(session, revision_id)
+    _require_edit_kind(revision)
+    if body.as_status:
+        if not (
+            event_revisions.is_removal(revision.changes)
+            or event_revisions.is_cancellation(revision.changes)
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Only a removal or cancellation can be retargeted",
+            )
+        targets = [revision]
+        if body.scope == "series" and revision.event_id is not None:
+            event = _get_event_or_404(session, revision.event_id)
+            targets = [r for r, _ in _sync_group(session, revision, event)]
+        for target in targets:
+            event_revisions.retarget_status(target, body.as_status)
+    if revision.source == event_revisions.SOURCE_SUBMITTER:
+        from backend.api.routes.suggestions import apply_submitter_revision
+
+        apply_submitter_revision(session, revision, admin.get("email"), body.notify)
+        session.refresh(revision)
+        return _revision_response(session, revision)
+    event = _get_event_or_404(session, revision.event_id)
+    revision = _apply_event_revision(
+        session, event, revision, admin.get("email"), body.notify, scope=body.scope
+    )
+    return _revision_response(session, revision)
+
+
+@router.post("/revisions/{revision_id}/discard", response_model=EventRevisionResponse)
+def discard_revision(
+    revision_id: int,
+    body: Optional[RevisionDecisionRequest] = None,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Keep the live event; a discarded source change is not proposed again."""
+    revision = _get_open_revision(session, revision_id)
+    _require_edit_kind(revision)
+    if revision.source == event_revisions.SOURCE_SUBMITTER:
+        from backend.api.routes.suggestions import discard_submitter_revision
+
+        discard_submitter_revision(session, revision, admin.get("email"))
+    else:
+        event = session.get(CachedEvent, revision.event_id)
+        group = [(revision, event)]
+        if body is not None and body.scope == "series" and event is not None:
+            group = _sync_group(session, revision, event)
+        for rejected, _ in group:
+            event_revisions.mark_decided(
+                rejected, event_revisions.STATUS_REJECTED, admin.get("email")
+            )
+            session.add(rejected)
+        if event is not None:
+            _notify_change_proposer(
+                session, revision, event, EVENT_CHANGE_DECLINED, admin.get("email")
+            )
+        session.commit()
+    session.refresh(revision)
+    return _revision_response(session, revision)
+
+
+@router.post("/revisions/{revision_id}/revert", response_model=EventRevisionResponse)
+def revert_revision(
+    revision_id: int,
+    body: Optional[RevisionDecisionRequest] = None,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Undo an applied organizer or user change, leaving fields edited since alone."""
+    from datetime import datetime, timezone
+
+    original = session.get(EventRevision, revision_id)
+    if original is None or original.event_id is None:
+        raise HTTPException(status_code=404, detail="Revision not found")
+    if original.status != event_revisions.STATUS_ACCEPTED or original.source not in (
+        event_revisions.SOURCE_ORGANIZER,
+        event_revisions.SOURCE_USER,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Only applied organizer or user changes can be reverted",
+        )
+    event = _get_event_or_404(session, original.event_id)
+    changes = event_revisions.revert_changes(session, event, original.changes)
+    if not changes:
+        raise HTTPException(
+            status_code=409,
+            detail="Every field of this change was edited since; nothing to revert",
+        )
+    revision = EventRevision(
+        event_id=event.event_id,
+        source=event_revisions.SOURCE_ADMIN,
+        status=event_revisions.STATUS_PENDING,
+        changes=changes,
+        proposed_by_admin_email=admin.get("email"),
+    )
+    session.add(revision)
+    original.status = event_revisions.STATUS_REVERTED
+    original.updated_at = datetime.now(timezone.utc)
+    session.add(original)
+    session.flush()
+    _notify_change_proposer(
+        session, original, event, EVENT_CHANGE_REVERTED, admin.get("email")
+    )
+    notify = (
+        body.notify if body and body.notify is not None else original.notified_count > 0
+    )
+    revision = _apply_event_revision(
+        session, event, revision, admin.get("email"), notify
+    )
+    return _revision_response(session, revision)
+
+
+# --- Review queue: changes across events ---
+
+CHANGE_KIND_LABELS = {
+    event_revisions.KIND_CREATE: "New event",
+    event_revisions.KIND_GO_PUBLIC: "Go public",
+    event_revisions.KIND_EDIT: "Edit",
+    event_revisions.KIND_CANCEL: "Cancellation",
+    event_revisions.KIND_REMOVE: "Removal",
+}
+CHANGE_SOURCE_LABELS = {
+    event_revisions.SOURCE_SYNC: "Google Calendar",
+    event_revisions.SOURCE_SUBMITTER: "Submitter",
+    event_revisions.SOURCE_USER: "User",
+    event_revisions.SOURCE_ORGANIZER: "Organizer",
+    event_revisions.SOURCE_ADMIN: "Admin",
+}
+_KIND_ALT = "|".join(CHANGE_KIND_LABELS)
+_SOURCE_ALT = "|".join(CHANGE_SOURCE_LABELS)
+
+
+def _revision_event(
+    session: Session, revision: EventRevision
+) -> tuple[Optional[CachedEvent], Optional[EventSuggestion]]:
+    suggestion = (
+        session.get(EventSuggestion, revision.suggestion_id)
+        if revision.suggestion_id
+        else None
+    )
+    event_id = revision.event_id or (
+        suggestion.created_event_id if suggestion else None
+    )
+    event = session.get(CachedEvent, event_id) if event_id else None
+    if event is None and suggestion is not None:
+        event = session.exec(
+            select(CachedEvent)
+            .where(CachedEvent.suggestion_id == suggestion.id)
+            .order_by(CachedEvent.start)
+        ).first()
+    return event, suggestion
+
+
+def _change_event(
+    session: Session,
+    event: Optional[CachedEvent],
+    suggestion: Optional[EventSuggestion],
+) -> tuple[Optional[ChangeEventSummary], Optional[str]]:
+    if event is None:
+        return None, suggestion.submitter_name if suggestion else None
+    occurrences = 1
+    if event.suggestion_id is not None:
+        occurrences = session.exec(
+            select(func.count()).where(
+                CachedEvent.suggestion_id == event.suggestion_id,
+                CachedEvent.status != STATUS_REMOVED,
+            )
+        ).one()
+    return (
+        ChangeEventSummary(
+            event_id=event.event_id,
+            title=event.title,
+            start=event.start,
+            end=event.end,
+            all_day=event.all_day,
+            timezone=event.timezone,
+            location=event.location,
+            status=event_status(event),
+            visibility_state=event_audience(event),
+            occurrences=max(occurrences, 1),
+            is_submission=event.suggestion_id is not None,
+        ),
+        suggestion.submitter_name if suggestion else None,
+    )
+
+
+def _change_response(session: Session, revision: EventRevision) -> AdminChangeResponse:
+    cached, suggestion = _revision_event(session, revision)
+    counts = (
+        _revision_counts(session, cached, revision)
+        if cached is not None
+        and revision.status == event_revisions.STATUS_PENDING
+        and (revision.kind or event_revisions.KIND_EDIT) in event_revisions.EDIT_KINDS
+        else None
+    )
+    event, submitter_name = _change_event(session, cached, suggestion)
+    return AdminChangeResponse(
+        **_revision_response(session, revision, counts).model_dump(),
+        event=event,
+        submitter_name=submitter_name,
+    )
+
+
+@router.get("/changes", response_model=AdminChangesResponse)
+def list_admin_changes(
+    kind: Optional[str] = Query(
+        default=None, pattern=rf"^({_KIND_ALT})(,({_KIND_ALT}))*$"
+    ),
+    source: Optional[str] = Query(
+        default=None, pattern=rf"^({_SOURCE_ALT})(,({_SOURCE_ALT}))*$"
+    ),
+    state: str = Query(default="open", pattern="^(open|decided)$"),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Changes waiting for a decision (or decided ones), across events."""
+    if state == "open":
+        base = select(EventRevision).where(
+            EventRevision.status == event_revisions.STATUS_PENDING
+        )
+        order = col(EventRevision.created_at).asc()
+    else:
+        base = select(EventRevision).where(
+            col(EventRevision.status).not_in(event_revisions.OPEN_STATUSES)
+        )
+        order = col(EventRevision.decided_at).desc()
+    if state == "open":
+        from sqlalchemy import String, case, cast, literal
+
+        # The same Google change on several dates of a series is one row.
+        key = case(
+            (
+                and_(
+                    EventRevision.source == event_revisions.SOURCE_SYNC,
+                    col(EventRevision.group_hash).is_not(None),
+                    col(EventSeries.id).is_not(None),
+                ),
+                literal("g:")
+                + cast(EventSeries.id, String)
+                + literal(":")
+                + EventRevision.group_hash,
+            ),
+            else_=literal("r:") + cast(EventRevision.id, String),
+        )
+        ranked = (
+            base.outerjoin(
+                EventSeriesMember, EventSeriesMember.event_id == EventRevision.event_id
+            )
+            .outerjoin(
+                EventSeries,
+                and_(
+                    EventSeries.id == EventSeriesMember.series_id,
+                    EventSeries.status == "resolved",
+                ),
+            )
+            .with_only_columns(
+                EventRevision.id,
+                func.row_number()
+                .over(partition_by=key, order_by=EventRevision.id)
+                .label("rank"),
+            )
+            .subquery()
+        )
+        base = base.where(
+            col(EventRevision.id).in_(select(ranked.c.id).where(ranked.c.rank == 1))
+        )
+
+    def filtered(kinds: list[str], sources: list[str]):
+        stmt = base
+        if kinds:
+            stmt = stmt.where(col(EventRevision.kind).in_(kinds))
+        if sources:
+            stmt = stmt.where(col(EventRevision.source).in_(sources))
+        return stmt
+
+    kinds, sources = _csv(kind), _csv(source)
+    sub_kinds = filtered([], sources).subquery()
+    sub_sources = filtered(kinds, []).subquery()
+    kind_counts = dict(
+        session.exec(
+            select(sub_kinds.c.kind, func.count()).group_by(sub_kinds.c.kind)
+        ).all()
+    )
+    source_counts = dict(
+        session.exec(
+            select(sub_sources.c.source, func.count()).group_by(sub_sources.c.source)
+        ).all()
+    )
+    statement = filtered(kinds, sources)
+    total = session.exec(select(func.count()).select_from(statement.subquery())).one()
+    rows = session.exec(statement.order_by(order).offset(offset).limit(limit)).all()
+    return AdminChangesResponse(
+        items=[_change_response(session, r) for r in rows],
+        total=total,
+        kinds=[
+            FilterOption(value=v, label=label, count=kind_counts.get(v, 0))
+            for v, label in CHANGE_KIND_LABELS.items()
+        ],
+        sources=[
+            FilterOption(value=v, label=label, count=source_counts.get(v, 0))
+            for v, label in CHANGE_SOURCE_LABELS.items()
+        ],
+    )
+
+
+@router.post("/changes/{revision_id}/decide", response_model=AdminChangeResponse)
+def decide_change(
+    revision_id: int,
+    body: ChangeDecisionRequest,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Accept or reject any change; one path for every kind."""
+    revision = _get_open_revision(session, revision_id)
+    accept = body.decision == "accept"
+    if revision.kind == event_revisions.KIND_CREATE:
+        event = _get_event_or_404(session, revision.event_id)
+        event_revisions.mark_decided(
+            revision,
+            event_revisions.STATUS_ACCEPTED
+            if accept
+            else event_revisions.STATUS_REJECTED,
+            admin.get("email"),
+        )
+        session.add(revision)
+        if accept:
+            set_event_status(event, STATUS_PUBLISHED)
+        else:
+            set_event_status(event, STATUS_REMOVED, REASON_REJECTED)
+            # A rejected source event must not come back on the next sync.
+            if (
+                event.suggestion_id is None
+                and session.get(BlockedEvent, event.event_id) is None
+            ):
+                session.add(
+                    BlockedEvent(
+                        event_id=event.event_id,
+                        reason="rejected",
+                        reason_detail=body.note,
+                    )
+                )
+        session.add(event)
+        session.commit()
+    elif revision.kind == event_revisions.KIND_GO_PUBLIC:
+        from backend.api.routes.suggestions import (
+            approve_suggestion,
+            decline_suggestion,
+        )
+
+        if accept:
+            if not body.calendar_id:
+                raise HTTPException(
+                    status_code=422, detail="Pick the calendar to publish it in"
+                )
+            approve_suggestion(
+                revision.suggestion_id,
+                SuggestionApproveRequest(calendar_id=body.calendar_id),
+                session,
+                admin,
+            )
+        else:
+            decline_suggestion(
+                revision.suggestion_id,
+                SuggestionRejectRequest(admin_notes=body.note),
+                session,
+                admin,
+            )
+    elif accept:
+        apply_revision(
+            revision_id,
+            RevisionDecisionRequest(
+                notify=body.notify, as_status=body.as_status, scope=body.scope
+            ),
+            session,
+            admin,
+        )
+    else:
+        discard_revision(
+            revision_id, RevisionDecisionRequest(scope=body.scope), session, admin
+        )
+    session.refresh(revision)
+    return _change_response(session, revision)
+
+
+# --- Dev only: emulate edits at a mock calendar source ---
+
+
+def _mock_calendar_service():
+    from backend.config.loader import get_calendar_service_type
+    from backend.services.calendar.mock_calendar import MockCalendarService
+
+    if get_calendar_service_type() != "mock":
+        raise HTTPException(status_code=404, detail="Mock calendar is not enabled")
+    try:
+        return MockCalendarService()
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def _sync_mock_calendar(session: Session, service, calendar_id: str) -> dict:
+    cal = session.get(CalendarSetting, calendar_id)
+    if cal is None:
+        return {}
+    result = SyncService(service).sync_calendar(session, cal)
+    session.commit()
+    return result
+
+
+@router.get("/mock-source/events/{event_id}", response_model=MockSourceEvent)
+def get_mock_source_event(event_id: str, _admin: dict = Depends(require_admin)):
+    source = _mock_calendar_service().source_event(event_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Not a mock source event")
+    return source
+
+
+@router.patch("/mock-source/events/{event_id}", response_model=MockSourceSyncResponse)
+def edit_mock_source_event(
+    event_id: str,
+    body: MockSourceEventUpdate,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Emulate the organiser editing this event in Google, then sync."""
+    service = _mock_calendar_service()
+    changes = body.model_dump(exclude_unset=True, exclude={"sync"})
+    try:
+        source = service.edit_source_event(event_id, changes)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Not a mock source event") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = (
+        _sync_mock_calendar(session, service, source["calendar_id"])
+        if body.sync
+        else {}
+    )
+    return MockSourceSyncResponse(
+        source=source,
+        synced=bool(result),
+        upserted=result.get("upserted", 0),
+        deleted=result.get("deleted", 0),
+    )
+
+
+@router.delete("/mock-source/events/{event_id}", response_model=MockSourceSyncResponse)
+def delete_mock_source_event(
+    event_id: str,
+    sync: bool = Query(default=True),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Emulate the organiser deleting this event in Google, then sync."""
+    service = _mock_calendar_service()
+    source = service.source_event(event_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Not a mock source event")
+    service.delete_source_event(event_id)
+    result = (
+        _sync_mock_calendar(session, service, source["calendar_id"]) if sync else {}
+    )
+    return MockSourceSyncResponse(
+        source=service.source_event(event_id),
+        synced=bool(result),
+        upserted=result.get("upserted", 0),
+        deleted=result.get("deleted", 0),
+    )
+
+
+@router.post("/mock-source/reset", status_code=204)
+def reset_mock_source(_admin: dict = Depends(require_admin)):
+    """Drop every emulated source edit; the next full sync uses the YAML again."""
+    _mock_calendar_service().reset_source()

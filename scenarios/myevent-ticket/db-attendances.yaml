@@ -1,0 +1,7 @@
+attendances:
+  - { event_id: evt-ticket-u1, email: tina@example.com, share_audience: public }
+  - { event_id: evt-ticket-u2, email: tina@example.com, share_audience: public }
+  - { event_id: evt-ticket-u3, email: tina@example.com, share_audience: public }
+  - { event_id: evt-ticket-u4, email: tina@example.com, share_audience: public }
+  - { event_id: evt-ticket-p1, email: tina@example.com, share_audience: public }
+  - { event_id: evt-ticket-p2, email: tina@example.com, share_audience: public }

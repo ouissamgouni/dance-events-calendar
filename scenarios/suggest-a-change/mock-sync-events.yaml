@@ -1,0 +1,23 @@
+# The emulated Google source. Same ids as db-events.yaml, so the first sync
+# matches the published copies unchanged.
+base_week: 0
+events:
+  - id: ev-friday
+    calendar_id: salsa-src
+    title: Friday Salsa at Studio A
+    description: Weekly Friday social with a beginner class at 19:30.
+    location: Studio A, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Fri 20:00
+    end: w1 Fri 23:30
+
+  - id: ev-sunday
+    calendar_id: salsa-src
+    title: Sunday Bachata Practica
+    description: Open practica, all levels.
+    location: Studio Mitte, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Sun 18:00
+    end: w1 Sun 21:00

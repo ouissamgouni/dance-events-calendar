@@ -5,7 +5,6 @@ import {
     adminDeleteUser,
     adminBlockUser,
     adminRevokeUserBlock,
-    adminSetVerifiedOrganizer,
     adminSetAdminManaged,
     adminSetForceInstallPrompt,
     adminSetForceEnablePush,
@@ -15,6 +14,7 @@ import {
 } from '../api';
 import type { AdminUserMergeResponse, AdminUserRow } from '../api';
 import { ConfirmDialog, PromptDialog } from './AppDialog';
+import AdminOrganizerSheet from './AdminOrganizerSheet';
 import { FeatureStatusCell, PushSubscriptionCell } from './NotificationStatusBadges';
 import { parseUserAgent } from '../utils/userAgent';
 
@@ -59,6 +59,7 @@ export default function AdminUsersTab() {
     const [blockPrompt, setBlockPrompt] = useState<AdminUserRow | null>(null);
     const [unblockTarget, setUnblockTarget] = useState<AdminUserRow | null>(null);
     const [mergeTarget, setMergeTarget] = useState<AdminUserRow | null>(null);
+    const [organizerTarget, setOrganizerTarget] = useState<AdminUserRow | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
 
     const load = useCallback(async () => {
@@ -95,18 +96,6 @@ export default function AdminUsersTab() {
         } else {
             setSortBy(field);
             setSortDir('desc');
-        }
-    };
-
-    const onToggleVerified = async (row: AdminUserRow) => {
-        setBusyUserId(row.user_id);
-        try {
-            await adminSetVerifiedOrganizer(row.user_id, !row.is_verified_organizer);
-            await load();
-        } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to update');
-        } finally {
-            setBusyUserId(null);
         }
     };
 
@@ -577,11 +566,11 @@ export default function AdminUsersTab() {
                                             <button
                                                 type="button"
                                                 disabled={isDeleted || busyUserId === row.user_id}
-                                                onClick={() => onToggleVerified(row)}
+                                                onClick={() => setOrganizerTarget(row)}
                                                 className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={row.is_verified_organizer ? 'Remove verified badge' : 'Mark as verified organizer'}
+                                                title="Verified badge and organized events"
                                             >
-                                                {row.is_verified_organizer ? 'Unverify' : 'Verify'}
+                                                {row.is_verified_organizer ? 'Organizer ✓' : 'Organizer'}
                                             </button>
                                             <button
                                                 type="button"
@@ -719,6 +708,15 @@ export default function AdminUsersTab() {
                 onCancel={() => setUnblockTarget(null)}
                 onConfirm={() => void confirmUnblock()}
             />
+            {organizerTarget && (
+                <AdminOrganizerSheet
+                    userId={organizerTarget.user_id}
+                    label={userLabel(organizerTarget)}
+                    verified={organizerTarget.is_verified_organizer}
+                    onClose={() => setOrganizerTarget(null)}
+                    onChanged={() => void load()}
+                />
+            )}
             <MergeUsersDialog
                 open={mergeTarget !== null}
                 source={mergeTarget}

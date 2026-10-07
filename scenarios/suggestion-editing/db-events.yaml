@@ -1,0 +1,7 @@
+# Past-date rating on S3 — must stay on its row through every later edit.
+ratings:
+  - event_id: suggestion-5e0d0000-0000-4000-8000-000000000003-1
+    email: gina@example.com
+    overall_sentiment: great
+    comment: Great DJ and a friendly crowd.
+    status: approved

@@ -12,7 +12,7 @@ import { IosInstallInstructions } from './InstallPrompt';
  * device capability, not an account feature.
  */
 export default function InstallAppSection() {
-    const { canInstall, isStandalone, isIos, isIosSafari, promptInstall } = usePwaInstall();
+    const { canInstall, isStandalone, isIos, isInAppBrowser, promptInstall } = usePwaInstall();
     const [installing, setInstalling] = useState(false);
     const [showIosHelp, setShowIosHelp] = useState(false);
 
@@ -40,7 +40,7 @@ export default function InstallAppSection() {
         <section className="border border-line bg-surface p-4 mb-3">
             <h2 className="text-sm font-semibold text-ink mb-1">Install app</h2>
             <p className="text-xs text-ink-soft mb-2">
-                {isIos ? 'Add Movida from Safari to keep it on your Home Screen.' : 'Add Movida to your home screen for faster access.'}
+                {isIos ? 'Add Movida to your Home Screen from the Share menu.' : 'Add Movida to your home screen for faster access.'}
             </p>
             <button
                 type="button"
@@ -56,7 +56,7 @@ export default function InstallAppSection() {
                         Done
                     </button>
                 )}>
-                    <IosInstallInstructions isSafari={isIosSafari} />
+                    <IosInstallInstructions inAppBrowser={isInAppBrowser} />
                 </BottomSheet>
             ) : null}
         </section>

@@ -1,10 +1,9 @@
 /**
  * Frontend recurrence model for the Suggest Event wizard.
  *
- * The wizard keeps recurrence as structured state and only ever converts *out*
- * of it (to an RRULE string or an explicit date list) at submit time. We never
- * parse an RRULE back into this state, which keeps the UI free of a full RFC
- * 5545 parser.
+ * The wizard keeps recurrence as structured state and converts *out* of it (to
+ * an RRULE string or an explicit date list) at submit time. `fromRRule` only
+ * reads back the subset `toRRule` writes, so editing an event can prefill it.
  */
 
 export type RecurrenceFrequency = 'weekly' | 'monthly' | 'yearly';
@@ -162,6 +161,51 @@ export function toRRule(state: RecurrenceState, start: Date): string | null {
 export function toOccurrenceDates(state: RecurrenceState): ManualDate[] | null {
     if (state.mode !== 'dates' || state.dates.length === 0) return null;
     return state.dates;
+}
+
+function parseEnd(parts: Record<string, string>): RecurrenceEnd {
+    if (parts.COUNT) return { kind: 'after', count: Number(parts.COUNT) };
+    const until = /^(\d{4})(\d{2})(\d{2})/.exec(parts.UNTIL ?? '');
+    if (until) return { kind: 'on', date: `${until[1]}-${until[2]}-${until[3]}` };
+    return { kind: 'never' };
+}
+
+/** Inverse of `toRRule`; falls back to the mode's defaults for anything else. */
+export function fromRRule(rule: string | null, start: Date): RecurrenceState {
+    if (!rule) return NO_RECURRENCE;
+    const parts: Record<string, string> = {};
+    for (const chunk of rule.replace(/^RRULE:/i, '').split(';')) {
+        const [name, value] = chunk.split('=');
+        if (name && value !== undefined) parts[name.trim().toUpperCase()] = value.trim();
+    }
+    const interval = Math.max(1, Number(parts.INTERVAL ?? 1) || 1);
+    const end = parseEnd(parts);
+    switch ((parts.FREQ ?? '').toUpperCase()) {
+        case 'WEEKLY': {
+            const weekdays = (parts.BYDAY ?? '')
+                .split(',')
+                .filter((d): d is WeekdayCode => (WEEKDAY_CODES as readonly string[]).includes(d));
+            return { mode: 'weekly', interval, weekdays: weekdays.length ? weekdays : [weekdayOf(start)], end };
+        }
+        case 'MONTHLY':
+            return {
+                mode: 'monthly',
+                interval,
+                by: parts.BYDAY ? 'day-of-week' : 'day-of-month',
+                monthDay: Number(parts.BYMONTHDAY) || start.getDate(),
+                end,
+            };
+        case 'YEARLY':
+            return {
+                mode: 'yearly',
+                interval,
+                month: Number(parts.BYMONTH) || start.getMonth() + 1,
+                day: Number(parts.BYMONTHDAY) || start.getDate(),
+                end,
+            };
+        default:
+            return NO_RECURRENCE;
+    }
 }
 
 function endSummary(end: RecurrenceEnd): string {

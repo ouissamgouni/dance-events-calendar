@@ -55,6 +55,29 @@ describe('resolveNotificationDestination — reminder ask deep-link', () => {
             '/event/evt-1/program',
         );
     });
+
+    it('routes submitter notifications without yielding /event/null', () => {
+        expect(resolveNotificationDestination(item({ kind: 'event_changed' }))).toBe('/event/evt-1');
+        expect(resolveNotificationDestination(item({ kind: 'suggestion_approved' }))).toBe('/event/evt-1');
+        expect(resolveNotificationDestination(item({ kind: 'suggestion_change_applied' }))).toBe('/event/evt-1');
+        expect(resolveNotificationDestination(item({ kind: 'suggestion_rejected', event_id: null }))).toBe('/me/submissions');
+        // A declined event is still the owner's, so it opens the event itself.
+        expect(resolveNotificationDestination(item({ kind: 'suggestion_declined', event_id: 'suggestion-1' }))).toBe('/event/suggestion-1');
+        expect(resolveNotificationDestination(item({ kind: 'suggestion_change_discarded', event_id: null }))).toBe('/me/submissions');
+        expect(resolveNotificationDestination(item({ kind: 'suggestion_change_discarded' }))).toBe('/me/submissions');
+    });
+
+    it('routes removed events to the kept duplicate, else to browsing', () => {
+        expect(resolveNotificationDestination(item({ kind: 'event_removed', event_id: 'evt-kept' }))).toBe('/event/evt-kept');
+        expect(resolveNotificationDestination(item({ kind: 'event_removed', event_id: null }))).toBe('/browse');
+        expect(resolveNotificationDestination(item({ kind: 'event_change_applied' }))).toBe('/event/evt-1');
+    });
+
+    it('routes organizer assignments to the event, or to Hosting for several', () => {
+        expect(resolveNotificationDestination(item({ kind: 'organizer_assigned' }))).toBe('/event/evt-1');
+        expect(resolveNotificationDestination(item({ kind: 'organizer_assigned', event_id: null }))).toBe('/hosting');
+        expect(resolveNotificationDestination(item({ kind: 'event_cancelled' }))).toBe('/event/evt-1');
+    });
 });
 
 describe('subscription_saved', () => {
@@ -74,6 +97,7 @@ describe('notificationCategory', () => {
         expect(notificationCategory('event_reminder')).toBe('plans');
         expect(notificationCategory('schedule_program_available')).toBe('plans');
         expect(notificationCategory('planned_session_changed')).toBe('plans');
+        expect(notificationCategory('event_changed')).toBe('plans');
         expect(notificationCategory('event_message')).toBe('plans');
         expect(notificationCategory('event_message_reply')).toBe('plans');
         expect(notificationCategory('event_message_reported')).toBe('others');
@@ -95,6 +119,13 @@ describe('notificationCategory', () => {
     it('maps review kinds to "reviews"', () => {
         expect(notificationCategory('subscription_review')).toBe('reviews');
         expect(notificationCategory('event_review_prompt')).toBe('reviews');
+        expect(notificationCategory('event_memories_prompt')).toBe('reviews');
+    });
+
+    it('routes ticket and memories nudges to their deep links', () => {
+        expect(notificationCategory('event_ticket_prompt')).toBe('plans');
+        expect(resolveNotificationDestination(item({ kind: 'event_ticket_prompt' }))).toBe('/event/evt-1/ticket');
+        expect(resolveNotificationDestination(item({ kind: 'event_memories_prompt' }))).toBe('/event/evt-1/memories');
     });
 
     it('maps milestone kinds to "milestones"', () => {
@@ -105,5 +136,9 @@ describe('notificationCategory', () => {
     it('maps promo/claim kinds to "others"', () => {
         expect(notificationCategory('promo_code_added')).toBe('others');
         expect(notificationCategory('organizer_claim_decided')).toBe('others');
+        expect(notificationCategory('suggestion_approved')).toBe('others');
+        expect(notificationCategory('suggestion_rejected')).toBe('others');
+        expect(notificationCategory('suggestion_change_applied')).toBe('others');
+        expect(notificationCategory('suggestion_change_discarded')).toBe('others');
     });
 });

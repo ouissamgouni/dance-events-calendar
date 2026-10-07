@@ -93,6 +93,50 @@ events:
     tags:
       - reach:regional
 
+  # ── Pair D: same title listed a day later (wrong date / time-zone slip).
+  # 48h apart is outside the 36h window but inside the extended +1 day
+  # one, which only accepts near-identical titles (ratio >= 0.9). ─────────
+  - id: dup-d-primary
+    calendar_id: salsa-primary
+    title: Rueda de Casino Night at El Sol
+    description: Cuban rueda night, callers from 20:30.
+    location: El Sol, 12 Rue Oberkampf, 75011 Paris, France
+    latitude: 48.8649
+    longitude: 2.3735
+    start: w1 Thu 20:00
+    end: w1 Thu 23:30
+    price_is_free: true
+    tags:
+      - reach:local
+
+  - id: dup-d-aggregator
+    calendar_id: community-listings
+    title: Rueda de Casino Night at El Sol
+    description: Rueda de casino social.
+    location: El Sol, 12 Rue Oberkampf, 75011 Paris, France
+    latitude: 48.8649
+    longitude: 2.3735
+    start: w1 Sat 20:00
+    end: w1 Sat 23:30
+    price_is_free: true
+    tags:
+      - reach:regional
+
+  # Similar but not near-identical title, two days before pair D: must NOT be
+  # grouped, since a day-off match needs a near-identical title.
+  - id: dup-d-lookalike
+    calendar_id: community-listings
+    title: Rueda Casino Night El Sol
+    description: Rueda practice evening.
+    location: El Sol, 12 Rue Oberkampf, 75011 Paris, France
+    latitude: 48.8649
+    longitude: 2.3735
+    start: w1 Tue 20:00
+    end: w1 Tue 23:00
+    price_is_free: true
+    tags:
+      - reach:local
+
   # ── Unique event — must never appear in any duplicate group ────────────
   - id: unique-tango
     calendar_id: salsa-primary

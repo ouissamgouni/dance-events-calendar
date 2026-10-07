@@ -1,0 +1,13 @@
+saves:
+  - event_id: ev-live-friday
+    email: sam@example.com
+    audience: public
+  - event_id: ev-edit-user
+    email: sam@example.com
+    audience: public
+  - event_id: ev-cancel-request
+    email: sam@example.com
+    audience: public
+  - event_id: ev-remove-request
+    email: sam@example.com
+    audience: public

@@ -1,6 +1,5 @@
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     HTTPException,
     Request,
@@ -38,11 +37,9 @@ from backend.db.models import (
     UserSavedEvent,
     ShareToken,
 )
-from backend.services.event_visibility import event_is_user_facing
-from backend.services.ip_geolocation import geolocate_ip
-from backend.services import milestone_notification_service
+from backend.services.event_visibility import STATUS_CANCELLED, viewer_can_see_event
+from backend.services import push_jobs
 from backend.services import passport as passport_service
-from backend.services import activity_instant
 from backend.services.notifications import (
     fan_out_going,
     fan_out_saved,
@@ -57,9 +54,13 @@ limiter = Limiter(key_func=client_ip)
 logger = logging.getLogger(__name__)
 
 
-def _require_user_facing_event(session: Session, event_id: str) -> None:
+def _require_user_facing_event(
+    session: Session, event_id: str, owner: User | None = None
+) -> None:
     event = session.get(CachedEvent, event_id)
-    if event is None or not event_is_user_facing(session, event):
+    if event is None or not viewer_can_see_event(
+        session, event, owner.id if owner else None
+    ):
         raise HTTPException(status_code=404, detail="Event not found")
 
 
@@ -74,46 +75,11 @@ def _is_admin(user: User | None) -> bool:
     return bool(admin_email) and user.email == admin_email
 
 
-async def _update_view_geo(view_id: int, ip: str) -> None:
-    """Resolve IP geo and update the EventView row. Fire-and-forget — failures are silent."""
-    geo = await geolocate_ip(ip)
-    if not geo:
-        return
-    from backend.db.database import get_engine
-    from sqlmodel import Session as _Session
-
-    with _Session(get_engine()) as session:
-        view = session.get(EventView, view_id)
-        if view:
-            view.country = geo.get("country")
-            view.city = geo.get("city")
-            session.add(view)
-            session.commit()
-
-
-async def _update_click_geo(click_id: int, ip: str) -> None:
-    """Resolve IP geo and update the EventLinkClick row. Fire-and-forget — failures are silent."""
-    geo = await geolocate_ip(ip)
-    if not geo:
-        return
-    from backend.db.database import get_engine
-    from sqlmodel import Session as _Session
-
-    with _Session(get_engine()) as session:
-        click = session.get(EventLinkClick, click_id)
-        if click:
-            click.country = geo.get("country")
-            click.city = geo.get("city")
-            session.add(click)
-            session.commit()
-
-
 @router.post("/track/event-view", status_code=201)
 @limiter.limit("30/minute")
-async def track_event_view(
+def track_event_view(
     request: Request,
     payload: EventViewRequest,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
@@ -129,9 +95,6 @@ async def track_event_view(
     )
     session.add(view)
     session.commit()
-    session.refresh(view)
-    if request.client:
-        background_tasks.add_task(_update_view_geo, view.id, request.client.host)
     return {"status": "tracked"}
 
 
@@ -145,7 +108,7 @@ def track_event_save(
     current_user: User | None = Depends(get_current_user_optional),
 ):
     if payload.action == "save":
-        _require_user_facing_event(session, payload.event_id)
+        _require_user_facing_event(session, payload.event_id, current_user)
     if (
         payload.record_analytics
         and not _is_admin(current_user)
@@ -305,7 +268,10 @@ def track_event_attendance(
     current_user: User | None = Depends(get_current_user_optional),
 ):
     if payload.action == "going":
-        _require_user_facing_event(session, payload.event_id)
+        _require_user_facing_event(session, payload.event_id, current_user)
+        target = session.get(CachedEvent, payload.event_id)
+        if target is not None and target.status == STATUS_CANCELLED:
+            raise HTTPException(status_code=409, detail="This event is cancelled")
     if (
         payload.record_analytics
         and not _is_admin(current_user)
@@ -481,31 +447,11 @@ def track_event_attendance(
             _clear_creator_going_intent(session, current_user, payload.event_id)
 
     session.commit()
-    # A newly-logged attendance may unlock a Dance Passport milestone; fire its
-    # in-app notification/email/push straight away (the scheduler is only a
-    # safety net). Runs on the request session and never breaks tracking.
-    if (
+    newly_going = (
         payload.action == "going"
         and newly_going_user_id is not None
         and current_user is not None
-    ):
-        try:
-            milestone_notification_service.notify_milestones_for_user(
-                session, current_user
-            )
-        except Exception:  # noqa: BLE001 — notification is best-effort
-            logger.warning("Immediate milestone notify failed", exc_info=True)
-        # If the "friends going" email is in instant mode, deliver the just
-        # fanned-out subscription_going emails now instead of on the tick.
-        try:
-            activity_instant.dispatch_activity_instant(
-                session,
-                kind="subscription_going",
-                actor=current_user,
-                event_id=payload.event_id,
-            )
-        except Exception:  # noqa: BLE001 — best-effort, never breaks tracking
-            logger.warning("Instant friends-going email failed", exc_info=True)
+    )
     # Reconcile recurring consistency achievements on any attendance change by an
     # authenticated user: a new Going may unlock a level, while cancelling one
     # (going off) prunes achievements whose period no longer exists.
@@ -514,15 +460,17 @@ def track_event_attendance(
             passport_service.evaluate_and_persist_consistency(session, current_user)
         except Exception:  # noqa: BLE001 — best-effort, never breaks tracking
             logger.warning("Consistency reconcile failed", exc_info=True)
+    # Enqueued after the reconcile above so the job doesn't race its inserts.
+    if newly_going:
+        push_jobs.enqueue_milestone_check(current_user.id)
     return {"status": "tracked"}
 
 
 @router.post("/track/link-click", status_code=201)
 @limiter.limit("30/minute")
-async def track_link_click(
+def track_link_click(
     request: Request,
     payload: EventLinkClickRequest,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
@@ -538,9 +486,6 @@ async def track_link_click(
     )
     session.add(click)
     session.commit()
-    session.refresh(click)
-    if request.client:
-        background_tasks.add_task(_update_click_geo, click.id, request.client.host)
     return {"status": "tracked"}
 
 

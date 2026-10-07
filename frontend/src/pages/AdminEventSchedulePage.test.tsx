@@ -67,7 +67,7 @@ describe('AdminEventSchedulePage', () => {
         vi.mocked(publishEventSchedule).mockResolvedValue({
             ...schedule,
             version: 2,
-            notification_summary: { impacted_planners: 1, going_attendees_notified: 2, in_app_created: 3, emailed: 1, pushed: 0, going_attendees: 3 },
+            notification_summary: { impacted_planners: 1, going_attendees_notified: 2, in_app_created: 3, going_attendees: 3 },
         });
     });
 
@@ -307,7 +307,7 @@ describe('AdminEventSchedulePage', () => {
         await waitFor(() => expect(publishEventSchedule).toHaveBeenCalledWith(event.event_id, true));
         expect(await screen.findByText('1 impacted planner notified')).toBeInTheDocument();
         expect(screen.getByText('2 additional Going attendees notified')).toBeInTheDocument();
-        expect(screen.getByText('3 in-app · 1 email · 0 push')).toBeInTheDocument();
+        expect(screen.getByText('3 in-app · email and push are sent in the background')).toBeInTheDocument();
     });
 
     it('announces the first publication without offering a broad-update option', async () => {

@@ -37,15 +37,6 @@ export interface TagGroup {
     tags: Tag[];
 }
 
-export interface TagSuggestionCreate {
-    event_id: string;
-    tag_id?: number;
-    free_text?: string;
-    group_slug?: string;
-    device_id: string;
-    website?: string; // honeypot
-}
-
 export interface TagSuggestionResponse {
     id: number;
     event_id: string;
@@ -58,6 +49,7 @@ export interface TagSuggestionResponse {
     group_slug: string | null;
     status: string;
     submitter_device_id: string | null;
+    submitter_name?: string | null;
     admin_notes: string | null;
     reviewed_at: string | null;
     created_at: string;
@@ -88,8 +80,9 @@ export interface LinkItem {
     label: string | null;
 }
 
-export type AdminEventStatus = 'pending' | 'reviewed' | 'blocked';
-export type AdminEventBlockReason = 'deleted' | 'duplicate' | 'rejected';
+export type AdminEventStatus = 'new' | 'published' | 'unpublished' | 'cancelled' | 'removed';
+export type AdminEventRemovalReason = 'admin' | 'duplicate' | 'owner' | 'google_calendar' | 'series_edit' | 'rejected' | 'merged';
+export type AdminEventBlockReason = 'deleted' | 'duplicate' | 'rejected' | 'merged';
 
 export interface CalendarEvent {
     event_id: string;
@@ -109,6 +102,8 @@ export interface CalendarEvent {
     start: string;
     end: string;
     all_day: boolean;
+    /** IANA zone the event happens in; null = unknown (shown in the viewer's zone). */
+    timezone?: string | null;
     color: string | null;
     view_count: number;
     going_count?: number;
@@ -145,14 +140,33 @@ export interface CalendarEvent {
     price_is_free: boolean | null;
     review_status?: string;
     status?: AdminEventStatus;
+    status_reason?: AdminEventRemovalReason | null;
     is_hidden?: boolean;
     is_blocked?: boolean;
     block_reason?: AdminEventBlockReason | null;
     block_reason_detail?: string | null;
+    /** Admin only: the event this one was merged into. */
+    merged_into_event_id?: string | null;
+    /** True when only the viewer (its owner) can see this private event. */
+    owner_preview?: boolean;
+    /** The viewer added this event (edited from Events I added). */
+    is_owner?: boolean;
+    /** Admin list chips: created from a user submission / a change awaits review. */
+    is_submission?: boolean;
+    has_pending_changes?: boolean;
+    /** Admin only: who can see the event. */
+    visibility_state?: EventVisibilityState;
+    wants_public?: boolean;
     /** Admin list only: interest-alert reach + consented engagement counts. */
     interest_reach?: EventInterestReach | null;
     unique_viewers?: number | null;
     link_clicks?: number | null;
+    /** Admin list only: who submitted it. */
+    submitter_name?: string | null;
+    /** Admin list grouped by series: matching dates this row stands for. */
+    occurrence_count?: number | null;
+    /** Admin only: a date of a recurring submission or a confirmed series. */
+    in_series?: boolean;
     links: LinkItem[] | null;
     tags: Tag[];
     /** Server-computed: at least one approved, non-expired promo code exists.
@@ -166,8 +180,15 @@ export interface CalendarEvent {
      */
     show_price_override?: boolean | null;
     show_promo_override?: boolean | null;
+    /** Admin pin for "ticket bought in advance"; null = derived. */
+    advance_ticket_override?: boolean | null;
+    ticket_likely?: boolean;
+    ticket_likely_reason?: 'admin' | 'international' | 'multi_day' | null;
     /** Approved organizer claim for this event (or null). */
     organizer?: EventOrganizerMini | null;
+    /** Set once an admin approves the organizer's cancellation request. */
+    is_cancelled?: boolean;
+    cancellation_note?: string | null;
 }
 
 export interface ScheduleVenue {
@@ -455,6 +476,8 @@ export interface OrganizerClaimEvent {
     event_title: string | null;
     event_start: string | null;
     decision: 'pending' | 'approved' | 'rejected';
+    current_organizer_handle?: string | null;
+    competing_pending_claims?: number;
 }
 
 export interface OrganizerClaim {
@@ -477,6 +500,16 @@ export interface OrganizerClaimAdmin extends OrganizerClaim {
     user_bio: string | null;
     user_instagram_url: string | null;
     user_facebook_url: string | null;
+    user_created_at: string | null;
+    user_is_verified_organizer: boolean;
+    user_organized_count: number;
+}
+
+export interface OrganizedEvent {
+    event_id: string;
+    title: string;
+    start: string | null;
+    city: string | null;
 }
 
 export interface OrganizerClaimCreate {
@@ -653,6 +686,59 @@ export interface AttendanceSummary {
     preview_attendees: Attendee[];
 }
 
+export type EventAssetKind = 'ticket' | 'ticket_link' | 'memory';
+export type EventAssetVisibility = 'private' | 'friends' | 'attendees';
+
+export interface EventUserAsset {
+    id: string;
+    event_id: string;
+    kind: EventAssetKind;
+    content_type: string | null;
+    /** Ticket link target. */
+    url: string | null;
+    /** Short-lived signed URLs; refetch the list when they expire. */
+    thumb_url: string | null;
+    full_url: string | null;
+    file_url: string | null;
+    width: number | null;
+    height: number | null;
+    visibility: EventAssetVisibility;
+    caption: string | null;
+    created_at: string;
+    is_owner: boolean;
+    owner_display_name: string | null;
+    owner_avatar_url: string | null;
+}
+
+export interface EventAssets {
+    event_id: string;
+    is_going: boolean;
+    assets: EventUserAsset[];
+    ticket_count: number;
+    memory_count: number;
+    max_tickets: number;
+    max_memories: number;
+    max_ticket_mb: number;
+    max_memory_mb: number;
+    can_add_ticket: boolean;
+    can_add_memory: boolean;
+    memory_window_opens_at: string;
+    memory_window_closes_at: string;
+    ticket_expires_at: string;
+    ticket_likely?: boolean;
+    ticket_not_needed?: boolean;
+}
+
+export interface EventAssetSummary {
+    ticket_count: number;
+    memory_count: number;
+    memory_thumbs: { id: string; thumb_url: string | null; visibility: EventAssetVisibility }[];
+    can_add_memory: boolean;
+    memory_window_closes_at: string | null;
+    ticket_likely?: boolean;
+    ticket_not_needed?: boolean;
+}
+
 export interface AttendingEventEntry {
     event_id: string;
     share_publicly: boolean;
@@ -716,6 +802,8 @@ export interface EventSuggestionCreate {
     suggested_new_tags?: { free_text: string; group_slug?: string | null }[];
     going?: boolean;
     going_audience?: 'public' | 'friends' | 'private' | null;
+    /** Verified organizers only: attribute the event to the submitter once public. */
+    is_organizer?: boolean;
     promo_code?: string | null;
     promo_description?: string | null;
     promo_source_url?: string | null;
@@ -732,6 +820,10 @@ export interface EventSuggestionCreate {
     website?: string; // honeypot
     screen_size?: string;
     timezone?: string;
+    /** Zone the event happens in, as confirmed in the form. */
+    event_timezone?: string;
+    /** False keeps the event to its owner; true asks curators to make it public. */
+    share_publicly?: boolean;
 }
 
 export interface EventSuggestion {
@@ -747,17 +839,11 @@ export interface EventSuggestion {
     all_day: boolean;
     submitter_name: string | null;
     submitter_email: string | null;
-    submitter_ip: string | null;
-    submitter_user_agent: string | null;
-    submitter_language: string | null;
-    submitter_referrer: string | null;
-    submitter_screen_size: string | null;
     submitter_timezone: string | null;
-    submitter_city: string | null;
-    submitter_country: string | null;
-    submitter_lat: number | null;
-    submitter_lng: number | null;
     status: string;
+    edit_locked?: boolean;
+    /** A date of it still awaits a curator's look. */
+    needs_review?: boolean;
     admin_notes: string | null;
     assigned_calendar_id: string | null;
     created_event_id: string | null;
@@ -777,6 +863,208 @@ export interface EventSuggestion {
     created_at: string;
     reviewed_at: string | null;
     reviewed_by: string | null;
+}
+
+/** private: owner only · pending: asked to go public · declined: kept private · blocked: removed for everyone. */
+export type SuggestionStatus = 'private' | 'pending' | 'approved' | 'declined' | 'blocked' | 'withdrawn';
+
+/** The signed-in submitter's view of their own suggestion. */
+export interface OwnSuggestion {
+    id: string;
+    status: SuggestionStatus;
+    edit_locked: boolean;
+    can_edit: boolean;
+    title: string;
+    description: string | null;
+    location: string | null;
+    links: LinkItem[] | null;
+    latitude: number | null;
+    longitude: number | null;
+    start: string;
+    end: string;
+    all_day: boolean;
+    timezone?: string | null;
+    recurrence_rule: string | null;
+    recurrence_dates: { start: string; end: string }[] | null;
+    suggested_tag_ids: number[] | null;
+    price_min: number | null;
+    price_max: number | null;
+    price_currency: string | null;
+    price_is_free: boolean | null;
+    image_key: string | null;
+    image_thumb_url: string | null;
+    created_event_id: string | null;
+    created_at: string;
+    /** Shown to the owner once the event is kept private or removed. */
+    rejection_reason?: string | null;
+    /** An approved suggestion's edit awaiting review. */
+    pending_changes?: Record<string, RevisionChange> | null;
+}
+
+export interface RevisionChange {
+    old: unknown;
+    new: unknown;
+}
+
+export interface RevisionActor {
+    user_id: string;
+    handle: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+}
+
+export type EventRevisionSource = 'sync' | 'admin' | 'submitter' | 'user' | 'organizer';
+
+/** A change the signed-in user suggested (or, as organizer, made) to an event. */
+export interface OwnEventChange {
+    id: number;
+    event_id: string;
+    event_title: string | null;
+    source: 'user' | 'organizer';
+    status: 'pending' | 'accepted' | 'rejected' | 'superseded' | 'reverted' | 'withdrawn' | 'closed';
+    changes: Record<string, RevisionChange>;
+    created_at: string;
+    decided_at: string | null;
+}
+
+export interface EventChangeCreate {
+    title?: string;
+    description?: string | null;
+    location?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    links?: { url: string; label: string | null }[];
+    start?: string;
+    end?: string;
+    all_day?: boolean;
+    price_min?: number | null;
+    price_max?: number | null;
+    price_currency?: string | null;
+    price_is_free?: boolean | null;
+    tag_ids?: number[];
+    /** Tags that don't exist yet; each becomes a tag suggestion. */
+    suggested_new_tags?: NewTagRequest[];
+    /** Organizer-only: request cancellation (reviewed by an admin). */
+    is_cancelled?: boolean;
+    cancellation_note?: string | null;
+}
+
+export interface NewTagRequest {
+    free_text: string;
+    group_slug?: string | null;
+}
+export type EventRevisionStatus = 'draft' | 'pending' | 'accepted' | 'rejected' | 'superseded' | 'reverted' | 'withdrawn' | 'closed';
+export type EventRevisionKind = 'create' | 'edit' | 'cancel' | 'remove' | 'go_public';
+
+export interface EventRevision {
+    id: number;
+    event_id: string | null;
+    suggestion_id: string | null;
+    kind: EventRevisionKind;
+    source: EventRevisionSource;
+    status: EventRevisionStatus;
+    changes: Record<string, RevisionChange>;
+    /** Fields attendees are told about when the revision is applied. */
+    material_fields: string[];
+    proposed_by: RevisionActor | null;
+    proposed_by_admin_email: string | null;
+    decided_by: string | null;
+    decided_at: string | null;
+    notified_count: number;
+    affected_attendees: number;
+    /** Dates still to come in the event's series, the event included. */
+    series_dates: number;
+    series_affected_attendees: number;
+    /** The same Google change pending on this many upcoming dates. */
+    group_size: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export type ChangeScope = 'date' | 'series';
+
+export interface SubmissionInfo {
+    suggestion_id: string;
+    status: string;
+    edit_locked: boolean;
+    submitter: RevisionActor | null;
+    submitter_name: string | null;
+    submitter_email: string | null;
+    submitted_at: string;
+    reviewed_by: string | null;
+    reviewed_at: string | null;
+    admin_notes: string | null;
+    approved_count: number;
+    rejected_count: number;
+    followers_to_notify: number;
+    dates_total: number;
+    dates_materialised: number;
+}
+
+/** An event as the emulated (mock) Google source has it. Times are naive UTC. */
+export interface MockSourceEvent {
+    event_id: string;
+    calendar_id: string;
+    title: string;
+    description: string | null;
+    location: string | null;
+    start: string;
+    end: string;
+    all_day: boolean;
+    edited: boolean;
+    deleted: boolean;
+}
+
+export interface MockSourceSyncResult {
+    source: MockSourceEvent | null;
+    synced: boolean;
+    upserted: number;
+    deleted: number;
+}
+
+export type EventVisibilityState = 'public' | 'private';
+
+export interface AdminEventModeration {
+    visibility: EventVisibilityState;
+    /** The owner asked curators to make it public. */
+    wants_public: boolean;
+    submission: SubmissionInfo | null;
+    /** Dates still to come in the event's series, the event included. */
+    series_dates: number;
+    draft: EventRevision | null;
+    open_revisions: EventRevision[];
+    history: EventRevision[];
+}
+
+export interface OwnSuggestionUpdate {
+    title?: string;
+    description?: string | null;
+    location?: string | null;
+    links?: LinkItem[];
+    latitude?: number | null;
+    longitude?: number | null;
+    start?: string;
+    end?: string;
+    all_day?: boolean;
+    event_timezone?: string;
+    recurrence_rule?: string | null;
+    recurrence_dates?: { start: string; end: string }[] | null;
+    suggested_tag_ids?: number[];
+    suggested_new_tags?: NewTagRequest[];
+    price_min?: number | null;
+    price_max?: number | null;
+    price_currency?: string | null;
+    price_is_free?: boolean;
+    image_key?: string | null;
+}
+
+export interface SuggestionAuditEntry {
+    id: number;
+    action: string;
+    actor_user_id: string | null;
+    actor_admin_email: string | null;
+    changes: Record<string, [unknown, unknown]> | null;
+    created_at: string;
 }
 
 // --- Ratings / Feedback ---
@@ -925,9 +1213,6 @@ export interface AdminRating {
     linked_tag_suggestion_ids: number[];
     status: 'pending' | 'approved' | 'rejected';
     admin_notes: string | null;
-    submitter_ip: string | null;
-    submitter_user_agent: string | null;
-    submitter_country: string | null;
     auto_flagged: boolean;
     reviewed_at: string | null;
     reviewed_by: string | null;

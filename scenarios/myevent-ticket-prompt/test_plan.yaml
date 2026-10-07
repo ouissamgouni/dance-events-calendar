@@ -1,0 +1,88 @@
+test_plan:
+  name: "Ticket nudges (ticket-likely events only)"
+  description: >
+    Going users get a "Got your ticket? Keep it handy here" nudge ~24h after
+    marking Going, only on events that usually need a ticket bought in
+    advance: international, lasting 20h+, or pinned Yes by an admin. Local
+    socials stay quiet. "No ticket needed" stops nudges for one event.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - "`SCENARIO=myevent-ticket-prompt RESET=1 task start:scenario`"
+
+  cast:
+    - "Tina — Going (25h ago) to 6 events ~6 days away, no tickets saved."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: "`SCENARIO=myevent-ticket-prompt task notify:trigger:scenario`"
+      expected: >
+        Stats include `ticket_prompt: {"prompts": 3, "emailed": 3, "pushed": 0}`.
+
+    - id: 2
+      title: "Only ticket-likely events are nudged"
+      description: "Sign in as tina@example.com, open Notifications → My plans."
+      expected: >
+        Three "Got your ticket? Keep it handy here for …" rows: Paris
+        International Salsa Congress Gala, Lyon Bachata Weekender (3 days)
+        and Lille Salsa Gala (admin Yes). No row for Marseille (local),
+        Brussels (admin No) or Berlin (No ticket needed). Mailpit has the
+        same three emails, each linking to `/event/<id>/ticket`.
+
+    - id: 3
+      title: "Deep link lands on the ticket section"
+      description: "Click the Paris row (or the email button)."
+      expected: >
+        The event page opens on Overview with the URL settled to
+        `/event/evt-tp-intl#ticket`, scrolled to "My ticket", which shows the
+        add tile and a "No ticket needed" link.
+
+    - id: 4
+      title: "Add ticket CTA placement"
+      description: >
+        Open My Events → Upcoming, then the Paris event modal and page.
+      expected: >
+        "Add ticket" appears next to the program action on Paris, Lyon and
+        Lille cards, the event modal footer and under the event page header.
+        Marseille, Brussels and Berlin show no ticket CTA.
+
+    - id: 5
+      title: "No ticket needed"
+      description: 'On the Lyon event page tap "No ticket needed".'
+      expected: >
+        The section collapses to "No ticket needed · Undo" and the "Add
+        ticket" CTA disappears from the page and My Events. Undo restores it.
+
+    - id: 6
+      title: "Saved ticket switches the CTA"
+      description: "On the Paris event, add a ticket link (https://example.com/t)."
+      expected: 'The CTA reads "Ticket" everywhere and opens the ticket section.'
+
+    - id: 7
+      title: "Local events stay quiet"
+      description: "Open the Marseille event page."
+      expected: >
+        The ticket area is a single quiet "🎟 Add ticket" link (no counter,
+        no "No ticket needed").
+
+    - id: 8
+      title: "Admin Advance ticket switch"
+      description: >
+        Sign in as admin@example.com, open Marseille in the admin editor.
+      expected: >
+        "Advance ticket: No · auto". Flip it on → "Yes · set by admin" with
+        "Reset to auto". Paris shows "Yes · auto: international", Lyon
+        "Yes · auto: multi-day event".
+
+    - id: 9
+      title: "Idempotent re-trigger"
+      description: "Run `SCENARIO=myevent-ticket-prompt task notify:trigger:scenario` again."
+      expected: '`ticket_prompt: {"prompts": 0}` — no new rows or emails.'
+
+    - id: 10
+      title: "Notification settings"
+      description: "Account → Notifications."
+      expected: >
+        A "Ticket reminders" row with Email/Push switches. Turning email off
+        and re-seeding then triggering sends in-app rows only.

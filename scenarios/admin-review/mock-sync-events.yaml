@@ -1,0 +1,45 @@
+# The emulated Google source, synced at startup.
+# - ev-new-* exist only here: they arrive as New, each with an open
+#   "New event" change.
+# - ev-live-friday starts at 21:00 here but 20:00 in db-events.yaml, so the
+#   first sync proposes a pending Google change.
+# - ev-live-sunday is identical in both files: no change.
+base_week: 0
+events:
+  - id: ev-new-zouk
+    calendar_id: salsa-src
+    title: Zouk Night (new)
+    location: Club Havana, Oranienstraße 25, 10999 Berlin
+    latitude: 52.5016
+    longitude: 13.4189
+    start: w2 Sat 22:00
+    end: w2 Sat 23:59
+
+  - id: ev-new-kizomba
+    calendar_id: salsa-src
+    title: Kizomba Sunset Open Air (new)
+    location: Monbijoupark, 10178 Berlin
+    latitude: 52.5236
+    longitude: 13.3968
+    start: w2 Sun 17:00
+    end: w2 Sun 21:00
+
+  - id: ev-live-friday
+    calendar_id: salsa-src
+    title: Friday Salsa at Studio A
+    description: Weekly Friday social with a beginner class at 19:30.
+    location: Studio A, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Fri 21:00
+    end: w1 Fri 23:30
+
+  - id: ev-live-sunday
+    calendar_id: salsa-src
+    title: Sunday Bachata Practica
+    description: Open practica, all levels.
+    location: Studio Mitte, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Sun 18:00
+    end: w1 Sun 21:00

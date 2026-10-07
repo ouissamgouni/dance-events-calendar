@@ -65,6 +65,7 @@ from backend.db.models import (
     UserInterestProfileTag,
 )
 from backend.services.event_visibility import (
+    STATUS_CANCELLED,
     apply_event_visibility,
     show_pending_events_enabled,
 )
@@ -420,7 +421,12 @@ def _ineligible_reason(
         return "deleted"
     if event.is_hidden:
         return "hidden"
-    if event.review_status == "pending" and not show_pending:
+    if event.status == STATUS_CANCELLED:
+        return "cancelled"
+    # The toggle only releases synced events; submissions wait for approval.
+    if event.review_status == "pending" and (
+        event.suggestion_id is not None or not show_pending
+    ):
         return "pending review"
     start = event.start
     if start is not None and start.tzinfo is None:

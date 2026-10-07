@@ -24,9 +24,9 @@ function detectIos(): boolean {
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-function detectIosSafari(): boolean {
-    return detectIos() && /Safari/i.test(navigator.userAgent) &&
-        !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(navigator.userAgent);
+// Social apps' embedded webviews can't install PWAs on any platform.
+function detectInAppBrowser(userAgent: string = navigator.userAgent): boolean {
+    return /Instagram|FBAN|FBAV|FB_IAB|BytedanceWebview|musical_ly|TikTok|LinkedInApp|Snapchat|Line\//i.test(userAgent);
 }
 
 export interface InstallInvitation {
@@ -42,7 +42,8 @@ interface PwaInstallContextValue {
     isStandalone: boolean;
     /** iPhone/iPad browsers need manual Add to Home Screen guidance. */
     isIos: boolean;
-    isIosSafari: boolean;
+    /** Instagram/Facebook/TikTok-style webviews: user must open a real browser first. */
+    isInAppBrowser: boolean;
     /** Optional high-intent context for the otherwise global install prompt. */
     invitation: InstallInvitation | null;
     requestInstallInvitation: (invitation: InstallInvitation) => void;
@@ -55,7 +56,7 @@ const PwaInstallContext = createContext<PwaInstallContextValue>({
     canInstall: false,
     isStandalone: false,
     isIos: false,
-    isIosSafari: false,
+    isInAppBrowser: false,
     invitation: null,
     requestInstallInvitation: () => { },
     clearInstallInvitation: () => { },
@@ -66,7 +67,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
     const [invitation, setInvitation] = useState<InstallInvitation | null>(null);
     const [isIos] = useState(detectIos);
-    const [isIosSafari] = useState(detectIosSafari);
+    const [isInAppBrowser] = useState(() => detectInAppBrowser());
     // Lazy-initialized (not set in an effect) so the very first render
     // already reflects reality — an effect-based initial value is briefly
     // wrong (defaults to `false`) which previously let the install banner
@@ -116,7 +117,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
             canInstall: !!deferred,
             isStandalone,
             isIos,
-            isIosSafari,
+            isInAppBrowser,
             invitation,
             requestInstallInvitation,
             clearInstallInvitation,

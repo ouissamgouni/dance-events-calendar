@@ -13,6 +13,8 @@ config/secrets.env
 config/secrets.*.env
 !config/secrets.*.env.example
 scenarios/*/secrets.env
+# Source edits emulated through the mock calendar (Admin → Edit at source)
+scenarios/*/.mock-source-overrides.json
 scenarios/staging/calendars.yaml
 scenarios/prod/calendars.yaml
 

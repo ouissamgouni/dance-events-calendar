@@ -1,0 +1,26 @@
+# The published copies of the two synced events (same ids as in
+# mock-sync-events.yaml). Pre-seeded as reviewed so the first sync matches them
+# unchanged; later edits to mock-sync-events.yaml become revisions.
+base_week: 0
+events:
+  - id: ev-sync-live
+    calendar_id: salsa-src
+    title: Friday Salsa at Studio A
+    description: Weekly Friday social with a beginner class at 19:30.
+    location: Studio A, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Fri 20:00
+    end: w1 Fri 23:30
+    tags: ["dance-style:salsa", "reach:local"]
+
+  - id: ev-sync-desc
+    calendar_id: salsa-src
+    title: Sunday Bachata Practica
+    description: Open practica, all levels.
+    location: Studio Mitte, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Sun 18:00
+    end: w1 Sun 21:00
+    tags: ["dance-style:bachata", "reach:local"]

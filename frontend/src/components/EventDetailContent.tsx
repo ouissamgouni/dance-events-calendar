@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import type { CalendarEvent, TagGroup } from '../types';
+import { Link, useLocation } from 'react-router-dom';
+import type { CalendarEvent } from '../types';
 import type { GeocodeSuggestion } from '../api';
 import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
@@ -8,8 +8,7 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useAuth } from '../context/AuthContext';
 import { useRatingAggregate } from '../context/RatingAggregatesContext';
 import { trackLink } from '../utils/tracking';
-import { getDeviceId } from '../utils/deviceId';
-import { fetchTagGroups, retryGeocodingSingle, fetchEventMessages } from '../api';
+import { retryGeocodingSingle, fetchEventMessages } from '../api';
 import AddressAutocomplete from './AddressAutocomplete';
 import EventTagEditor from './EventTagEditor';
 import LocationBadge from './LocationBadge';
@@ -21,12 +20,12 @@ import CommunityExperienceSummary from './CommunityExperienceSummary';
 import EventMessagesTeaser from './EventMessagesTeaser';
 import EventSeriesLink from './EventSeriesLink';
 import TagBadges from './TagBadges';
-import SuggestTagsButton from './SuggestTagsButton';
 import ExpandableDescription from './ExpandableDescription';
 import ShareButton from './ShareButton';
 import { EventPromoCodes } from './EventPromoCodes';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
 import { formatEventPrice } from '../utils/eventPrice';
+import { formatEventWhen, fromEditFields, switchEditMode, timeZoneLabel, toEditFields, viewerTimeHint, type EventEditFields } from '../utils/eventDates';
 import { useCommunityExperience } from '../hooks/useCommunityExperience';
 
 interface Props {
@@ -64,8 +63,7 @@ export default function EventDetailContent({
     const anonAggregate = useRatingAggregate(event.event_id);
     const isPast = new Date(event.end).getTime() < Date.now();
     const { aggregate } = useCommunityExperience(event.event_id, isPast);
-    const [showSuggestTags, setShowSuggestTags] = useState(false);
-    const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
+    const location = useLocation();
     const [messageCount, setMessageCount] = useState(0);
 
     // ── Inline editing state ──────────────────────────────────────────────────
@@ -76,9 +74,7 @@ export default function EventDetailContent({
     const cancelledRef = useRef(false);
 
     // Datetime edit state
-    const [editStart, setEditStart] = useState('');
-    const [editEnd, setEditEnd] = useState('');
-    const [editAllDay, setEditAllDay] = useState(false);
+    const [editTimes, setEditTimes] = useState<EventEditFields>({ start: '', end: '', allDay: false, timeZone: null });
 
     // Price edit state
     const [editIsFree, setEditIsFree] = useState(false);
@@ -130,9 +126,7 @@ export default function EventDetailContent({
     const startDatetimeEdit = () => {
         setSaveError(null);
         cancelledRef.current = false;
-        setEditStart(event.start.slice(0, 16));
-        setEditEnd(event.end.slice(0, 16));
-        setEditAllDay(event.all_day);
+        setEditTimes(toEditFields(event));
         setEditingField('datetime');
     };
 
@@ -193,26 +187,8 @@ export default function EventDetailContent({
     const hasVisibleBadge =
         (priceVisible && (event.price_is_free || (event.price_min != null && event.price_currency))) ||
         (showPopularity && event.view_count > 0);
-    const start = new Date(event.start);
-    const end = new Date(event.end);
-
-    const formatDate = (d: Date) =>
-        d.toLocaleDateString(undefined, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-        });
-
-    const formatTime = (d: Date) =>
-        d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-
-    // Multi-day events must surface the end date, not just an end time.
-    const sameDay = start.toDateString() === end.toDateString();
-    const whenText = event.all_day
-        ? (sameDay ? formatDate(start) : `${formatDate(start)} – ${formatDate(new Date(end.getTime() - 1))}`)
-        : (sameDay
-            ? `${formatDate(start)} · ${formatTime(start)} – ${formatTime(end)}`
-            : `${formatDate(start)} · ${formatTime(start)} – ${formatDate(end)}, ${formatTime(end)}`);
+    const whenText = formatEventWhen(event);
+    const viewerHint = viewerTimeHint(event);
 
     return (
         <div className={showActions ? 'space-y-3' : 'space-y-4'}>
@@ -228,8 +204,8 @@ export default function EventDetailContent({
                             <label className="flex items-center gap-2 text-xs text-ink-soft">
                                 <input
                                     type="checkbox"
-                                    checked={editAllDay}
-                                    onChange={(e) => setEditAllDay(e.target.checked)}
+                                    checked={editTimes.allDay}
+                                    onChange={(e) => setEditTimes((t) => switchEditMode(t, e.target.checked))}
                                     className="h-3.5 w-3.5"
                                 />
                                 All day
@@ -237,16 +213,16 @@ export default function EventDetailContent({
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] text-muted uppercase tracking-wide">Start</label>
                                 <input
-                                    type={editAllDay ? 'date' : 'datetime-local'}
-                                    value={editAllDay ? editStart.slice(0, 10) : editStart}
-                                    onChange={(e) => setEditStart(e.target.value)}
+                                    type={editTimes.allDay ? 'date' : 'datetime-local'}
+                                    value={editTimes.start}
+                                    onChange={(e) => setEditTimes((t) => ({ ...t, start: e.target.value }))}
                                     className="border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                 />
-                                <label className="text-[10px] text-muted uppercase tracking-wide">End</label>
+                                <label className="text-[10px] text-muted uppercase tracking-wide">{editTimes.allDay ? 'Last day' : 'End'}</label>
                                 <input
-                                    type={editAllDay ? 'date' : 'datetime-local'}
-                                    value={editAllDay ? editEnd.slice(0, 10) : editEnd}
-                                    onChange={(e) => setEditEnd(e.target.value)}
+                                    type={editTimes.allDay ? 'date' : 'datetime-local'}
+                                    value={editTimes.end}
+                                    onChange={(e) => setEditTimes((t) => ({ ...t, end: e.target.value }))}
                                     className="border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                 />
                             </div>
@@ -255,9 +231,12 @@ export default function EventDetailContent({
                                 <button
                                     disabled={saving}
                                     onClick={() => {
-                                        const s = editAllDay ? editStart.slice(0, 10) : new Date(editStart).toISOString();
-                                        const e2 = editAllDay ? editEnd.slice(0, 10) : new Date(editEnd).toISOString();
-                                        saveField({ start: s, end: e2, all_day: editAllDay });
+                                        const result = fromEditFields(editTimes);
+                                        if (!result.ok) {
+                                            setSaveError(result.error);
+                                            return;
+                                        }
+                                        saveField(result.changes);
                                     }}
                                     className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
                                 >
@@ -276,7 +255,21 @@ export default function EventDetailContent({
                             <p className={`text-ink-soft ${compact ? 'text-xs' : 'text-sm'}`}>
                                 🗓 {whenText}
                             </p>
+                            {viewerHint && event.timezone ? (
+                                <p className="text-xs text-muted">
+                                    {timeZoneLabel(event.timezone, new Date(event.start))} · {viewerHint}
+                                </p>
+                            ) : null}
                             {editable && <EditHint />}
+                        </div>
+                    )}
+
+                    {event.is_cancelled && (
+                        <div role="status" className="mt-2 rounded-field border border-danger/20 bg-danger/10 px-3 py-2">
+                            <p className="text-sm font-semibold text-danger">This event is cancelled</p>
+                            {event.cancellation_note && (
+                                <p className="mt-0.5 text-sm text-ink">{event.cancellation_note}</p>
+                            )}
                         </div>
                     )}
 
@@ -677,17 +670,6 @@ export default function EventDetailContent({
                     >+ Add links</div>
                 ) : null}
 
-                {/* Suggest tags modal */}
-                {showSuggestTags && (
-                    <SuggestTagsButton
-                        eventId={event.event_id}
-                        tagGroups={tagGroups}
-                        existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
-                        deviceId={getDeviceId()}
-                        onClose={() => setShowSuggestTags(false)}
-                    />
-                )}
-
                 {/* Interest — merged "who's going" + "who you know going" (same
                 section as the event detail page; deduped across friends /
                 FoF / public so attendees never appear twice). */}
@@ -716,19 +698,14 @@ export default function EventDetailContent({
                                 Ask
                             </Link>
                         )}
-                        {!editable && (
-                            <button
-                                onClick={() => {
-                                    if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
-                                    setShowSuggestTags(!showSuggestTags);
-                                }}
+                        {!editable && !event.owner_preview && !event.is_owner && (
+                            <Link
+                                to={`/event/${event.event_id}/suggest-change`}
+                                state={{ backgroundLocation: location }}
                                 className="text-xs text-ink-soft hover:text-ink bg-slate-100 hover:bg-canvas px-3 py-1 transition"
                             >
-                                Suggest{' '}
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="inline h-3.5 w-3.5 align-[-1px]">
-                                    <path fillRule="evenodd" d="M2 4.75A2.75 2.75 0 0 1 4.75 2h4.379a2.75 2.75 0 0 1 1.944.805l5.122 5.122a2.75 2.75 0 0 1 0 3.889l-4.38 4.379a2.75 2.75 0 0 1-3.888 0L2.805 11.073A2.75 2.75 0 0 1 2 9.129V4.75Zm4.5 1.75a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
-                                </svg>
-                            </button>
+                                {user && event.organizer?.user_id === user.user_id ? 'Edit event' : 'Suggest an edit'}
+                            </Link>
                         )}
                         {/* Edit button only shown in non-editable mode (inline editing replaces it when editable=true) */}
                         {!editable && onEdit && (

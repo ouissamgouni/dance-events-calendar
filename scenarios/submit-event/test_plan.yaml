@@ -3,20 +3,23 @@
 # Validates the full event suggestion workflow: the full-screen 3-step
 # "Suggest an Event" wizard (Event → Details → Publish), native date/time
 # selection, the recurrence editors (weekly/monthly/yearly/chosen dates),
-# signed-in vs. anonymous visibility, recurring-occurrence visibility
-# before and after approval, admin review with the occurrence list,
-# approve/reject, and notification fan-out to friends.
+# signed-in only adding, private-by-default events with an
+# opt-in public request, recurring-occurrence visibility before and after
+# approval, admin review with the occurrence list, make public / keep
+# private / remove, and notification fan-out to friends.
 
 test_plan:
   name: "Event Suggestions — Full Workflow QA"
   description: >
     End-to-end test of the event suggestion feature: the three-step
-    "Suggest an Event" wizard, recurrence entry, immediate visibility for
-    signed-in submitters (pending review) vs. anonymous submitters
-    (invisible until approved), the occurrence preview shown before
-    approval, admin review/approve/reject, rejection hard-block, and
-    social_activity notification fan-out to friends when a signed-in
-    submitter's event goes live with them marked "going".
+    "Suggest an Event" wizard, recurrence entry, events kept private to a
+    signed-in owner by default ("Share publicly" asks curators to publish
+    them), signed-out visitors asked to sign in first, the
+    occurrence preview shown before approval, the admin side-panel
+    Submission card and visibility chips, make public / keep private /
+    remove (owner notified), Events I added, and social_activity
+    notification fan-out to friends once a signed-in submitter's event is
+    made public with them marked "going".
 
   steps:
     # ---------------------------------------------------------------- shell
@@ -33,7 +36,8 @@ test_plan:
     - id: 2
       title: "Wizard opens full-screen at /suggest with a 3-step header"
       description: >
-        Click "Suggest an Event" while signed out on a 390px-wide viewport.
+        Sign in as Dev User, then click "Suggest an Event" on a 390px-wide
+        viewport.
       expected: >
         The URL becomes /suggest and a full-screen page covers the app (not a
         centered modal). The header shows a Close button on the left (a Back
@@ -331,6 +335,18 @@ test_plan:
         preview reopens the same More tags page for adding/removing.
       verification: "Exactly one tags row; preview reopens the editor"
 
+    - id: 60
+      title: "A tag that doesn't exist yet can be suggested"
+      description: >
+        Reopen More tags, search "Rooftop" and tap "+ Venue" under
+        "Suggest “Rooftop” as a new tag in", then Done.
+      expected: >
+        More tags lists "Rooftop · Venue ✕" under "New tags you suggested";
+        Step 2's preview shows "Rooftop (new)". After submitting, Admin →
+        Tag Suggestions lists "Rooftop" (Venue) with "By: Dev User" right
+        away, even while the event is private.
+      verification: "suggested_new_tags sent; a pending TagSuggestion with the submitter exists after submit"
+
     # --------------------------------------------------------------- step 3
     - id: 27
       title: "Step 3 structure"
@@ -340,7 +356,8 @@ test_plan:
         Step 3 of 3 renders: a "Pricing / No pricing" row, a "Promo code /
         Add a promo code" row, an "I'm going" toggle, "Your name", "Your
         email", then Back / Submit Event. Pricing and Promo code are two
-        independent rows, never merged into one surface.
+        independent rows, never merged into one surface. The Promo code row
+        is only shown while Admin → Configuration → promo codes is on.
       verification: "Order matches; pricing and promo are separate rows"
 
     - id: 28
@@ -424,18 +441,63 @@ test_plan:
 
     # ------------------------------------------------------- submit/success
     - id: 35
-      title: "Signed-in submission succeeds and shows the success screen"
+      title: "Signed-in submission asking to go public shows the success screen"
       description: >
-        As Dev User, submit "Salsa Night" (weekly on Fridays, no end date,
-        Going = on, audience Friends).
+        As Dev User, fill in "Salsa Night" (weekly on Fridays, no end date,
+        Going = on, audience Friends). On Step 3 "Share publicly" is already
+        ON with the hint "You see it right away; others will once a curator
+        reviews it."; submit.
       expected: >
         The wizard is replaced by a centered success state: a green circular
-        check badge, the heading "Event submitted", the body "Your event is
-        live and under review. All of its dates are already on your calendar."
-        and a single "Done" action that closes the flow and returns to the
-        page behind it. There is no "View event" and no "Create another
-        event" action.
-      verification: "Check badge + 'Event submitted' + single Done; flow closes on Done"
+        check badge, the heading "Event submitted", the body "It's in your
+        events now. Others will see it once a curator makes it public." and
+        a single "Done" action that closes the flow and returns to the page
+        behind it. There is no "View event" and no "Create another event"
+        action.
+      verification: "Share publicly defaults ON; check badge + 'Event submitted' + single Done"
+
+    - id: 55
+      title: "An event kept for yourself is added, not submitted"
+      description: >
+        As Dev User, add "Private Lesson" (one date next week) and switch
+        "Share publicly" OFF. Then add "Last Week's Social" with a date in
+        the past, leaving Share publicly ON.
+      expected: >
+        "Private Lesson": heading "Event added", body "Only you can see it.
+        You can ask to make it public anytime from Events I added." It is not
+        in Admin → Review (a private event needs no review) and no admin
+        email is sent. For "Last Week's Social" the Share publicly switch is
+        greyed out with "Past events stay private — only you will see it.";
+        it is added as private: past one-off events can only be kept for
+        yourself.
+      verification: "Private when switched off; past one-off dates always private"
+
+    - id: 56
+      title: "Look-alike public events are offered before adding a duplicate"
+      description: >
+        As Dev User, start a new event titled like a seeded public event
+        (same name, a day later than it, any location) and tap Next on
+        Step 1. Then tap "None of these, continue", go Back and tap Next
+        again.
+      expected: >
+        Instead of Step 2, "Is it one of these?" lists the seeded event (date
+        and venue). Tapping it opens the event in a modal on top of the
+        wizard; closing the modal returns to the list with everything typed
+        kept. Events a day apart only show up for near-identical names;
+        private events of other users never do. "None of these, continue"
+        moves to Step 2, and the check does not repeat for the same name and
+        date.
+      verification: "GET /api/suggestions/similar called once; a match opens the event modal, not the page"
+
+    - id: 57
+      title: "Discard really closes the wizard"
+      description: >
+        Open the wizard from Explore, type a name, tap Close, then Discard.
+      expected: >
+        Both the confirmation and the wizard close and Explore is back where
+        it was. Pressing the browser Back button afterwards does not reopen
+        the wizard's confirmation.
+      verification: "Discard returns to the page behind the wizard"
 
     - id: 36
       title: "Submitter sees several preview occurrences before approval"
@@ -446,34 +508,50 @@ test_plan:
         just the first one — so the submitter can confirm their recurrence was
         understood. Submission materialises a bounded preview only (at most 10
         occurrences, within a 90-day horizon), each pending review and each
-        carrying the submitted tags, all grouped under one event series. The
-        success copy already tells the submitter their dates are on their
-        calendar.
-      verification: "More than one occurrence visible pre-approval, capped at the 10/90-day preview"
+        carrying the submitted tags, all grouped under one event series.
+        Opening one shows the banner "Only you can see this event — it isn't
+        shared in discovery, feeds or notifications." with Edit event / Keep
+        it private / Delete below the title.
+      verification: "More than one occurrence visible pre-approval, capped at the 10/90-day preview; owner banner shown"
+
+    - id: 50
+      title: "A pending submission is invisible to everyone else — toggle OFF and ON"
+      description: >
+        Copy the URL of a "Salsa Night" date. As Jamie, then signed out,
+        search Explore/Home for "Salsa Night", open the copied URL, and check
+        the share/ICS feeds. Repeat after Admin turns ON Settings → "Show
+        unreviewed calendar events", then turn it OFF again.
+      expected: >
+        In both toggle states "Salsa Night" is never listed and its URL shows
+        "not found" for Jamie and signed-out visitors. With the toggle ON the
+        seeded synced event "Unreviewed Salsa Brunch – Berlin" does appear
+        publicly (and disappears again when OFF) — the toggle only affects
+        synced calendar events, never user submissions.
+      verification: "Submission private in both toggle states; toggle only releases the synced pending event"
 
     - id: 37
-      title: "Friend fan-out notification on signed-in Going submission"
+      title: "No follower notification while the event awaits review"
       description: >
         Jamie (who follows Dev User) checks their in-app notifications after
-        the step-35 submission goes live with Going = friends.
+        the step-35 submission (Going = friends).
       expected: >
-        Jamie receives a social_activity in-app notification referencing Dev
-        User going to "Salsa Night", via the same fan-out mechanism used for
-        regular attendance toggles.
-      verification: "Notification row created for follower Jamie via the notification scheduler"
+        Jamie has NO "Dev User is going to Salsa Night" notification yet —
+        the event is private until approved. It arrives at step 44.
+      verification: "No notification row for Jamie before approval"
 
     - id: 38
-      title: "Anonymous submission is NOT visible until approved"
+      title: "Signed-out visitors are asked to sign in; Jamie asks to publish"
       description: >
-        Sign out. Submit a second suggestion ("Bachata Night") anonymously
-        (no recurrence). The I'm going toggle is replaced by a "Sign in to
-        mark yourself as going…" note for anonymous submitters.
+        Sign out and open Menu → "Add Event". Then sign in as Jamie and add
+        "Bachata Night" (no recurrence) with Share publicly ON.
       expected: >
-        The success screen reads "Your suggestion is under review. We will
-        publish it once a curator approves it." (different copy from the
-        signed-in case) with the same single Done action. Navigating Home does
-        NOT show "Bachata Night" anywhere.
-      verification: "Anonymous success copy differs; no event entry pre-approval"
+        Signed out, a dialog "Sign in to add an event" replaces the wizard
+        with "Not now" (closes it) and "Sign in" (goes to
+        /login?next=/suggest); POST /api/suggestions without a session
+        answers 401. As Jamie the success screen reads "It's in your events
+        now. Others will see it once a curator makes it public." Signed out
+        again, Home does NOT show "Bachata Night" anywhere.
+      verification: "Sign-in gate for adding events; Jamie's request invisible to others before approval"
 
     # ---------------------------------------------------------------- admin
     - id: 39
@@ -486,54 +564,119 @@ test_plan:
       verification: "Admin page renders with action bar"
 
     - id: 40
-      title: "Suggestions panel shows pending items"
+      title: "Review panel lists the go-public requests"
       description: >
-        Click the "Suggestions" button in the admin action bar.
+        Click the "Review" button in the admin action bar.
       expected: >
-        Slide-out panel opens. Both pending suggestions ("Salsa Night" and
-        "Bachata Night") are listed with amber pending badges.
-      verification: "Panel shows 2 suggestions with amber pending badges"
+        The Review panel opens on "Open". "Salsa Night" and "Bachata
+        Night" are listed as "Go public" changes from the Submitter, with
+        the submitter's name, their date range ("×N" for a series) and their
+        age. "Private Lesson" and "Last Week's Social" are not listed: a
+        private event needs no review. The Kind pills show "Go public (2)".
+      verification: "GET /api/admin/changes lists one go_public change per request"
 
     - id: 41
-      title: "Review modal shows details, tags, price/promo, and metadata"
+      title: "A submission opens in the event side panel"
       description: >
-        Click "Salsa Night" in the panel.
+        Click "Salsa Night" in the Review panel, then "Open event", then
+        "Show more" on the Submission card.
       expected: >
-        Review modal shows all event fields, the selected tags, price/promo
-        details, and submitter metadata (IP, timezone, screen size, etc.).
-      verification: "All fields, tags, price/promo, and metadata section visible"
+        The admin event side panel opens (no separate review modal) with
+        the event fields, tags and price/promo. "Show more" reveals the
+        submitter's email, IP, location and time zone, and the edit
+        history.
+      verification: "Side panel replaces the review modal; Show more loads submitter details"
 
     - id: 42
-      title: "Review modal lists the recurrence occurrences"
+      title: "Show more lists the recurrence dates"
       description: >
-        In the "Salsa Night" review modal, inspect the section following the
-        All-day line.
+        On the "Salsa Night" Submission card, look at Show more.
       expected: >
-        An "Occurrences (N)" section lists every date approval would create —
-        the FULL expansion, not just the preview the submitter can see. Rows
-        already live are shown plainly; rows that do not exist yet are
-        annotated "created on approval". A long series scrolls inside the
-        section rather than stretching the modal. The data comes from
+        A "Dates (N)" list shows every date making it public would create —
+        the FULL expansion, not just the preview the submitter sees. Dates
+        that don't exist yet read "created when public". A long series
+        scrolls inside the list. The data comes from
         GET /api/admin/suggestions/{id}/occurrences.
       verification: "Occurrence list rendered for the recurring suggestion, with per-row materialised state"
 
     - id: 43
-      title: "Non-recurring suggestion shows no occurrence section"
+      title: "Non-recurring submission shows no dates list"
       description: >
-        Open the "Bachata Night" review modal.
+        Open "Bachata Night" and its Show more.
       expected: >
-        No occurrences section is rendered — it only appears when the
-        suggestion expands to more than one occurrence.
+        No dates list is rendered — it only appears when the submission
+        expands to more than one date.
       verification: "Section hidden when the expansion yields a single occurrence"
 
-    - id: 44
-      title: "Approve signed-in submission to Movida calendar"
+    - id: 51
+      title: "Admin event side panel shows who can see it and that it wants to go public"
       description: >
-        Select "Movida" from the calendar dropdown. Click "Approve".
+        In Admin → Events, select the lock (private) Audience pill and the
+        amber open-lock (public request) Flags pill together, and open a
+        "Salsa Night" date. Then clear the flag, select the Submitted flag
+        and turn on "Group by series".
       expected: >
-        Status badge changes to green "approved". The already-live occurrences
-        remain associated with the approved suggestion.
-      verification: "Status approved; existing occurrences remain visible on Home"
+        Pills combine: OR within a group, AND across groups, each count
+        reflecting the other groups' picks. The Status column reads
+        "Published"; the Flags column shows the lock, amber open-lock and
+        user-pen (submitted) icons. The Submitter column shows @dev-user. The
+        panel starts with "Visible to · Only Dev User …" and a Submission
+        card: Dev User (@dev-user), "0 made public · 0 refused before", the
+        "Public request" status, "On approval: 1 follower notified · N dates
+        created (10 previewed now)", "Lock owner edits", "Note to the owner"
+        and the actions calendar picker, Make public and Keep private…; the
+        footer offers Remove…. Grouped by series, each submission is one row
+        with "×N" next to its dates; "Private Lesson" is listed too.
+      verification: "Audience × Status × Flags pills combine; one row per series when grouped"
+
+    - id: 58
+      title: "A private submission is live for its owner without review"
+      description: >
+        Open "Private Lesson" in the side panel.
+      expected: >
+        Its status is "Published" and its audience "Private"; there is no
+        "Mark reviewed" action and Make public is not offered (only the
+        owner can ask). It never appears in the Review panel.
+      verification: "Status and audience are separate; private events need no review"
+
+    - id: 59
+      title: "The side panel lists events happening at the same time"
+      description: >
+        Open "Bachata Night" in the side panel and scroll to "Happening at
+        the same time". Click a listed event, then Close.
+      expected: >
+        Same-time events are listed with their time range, venue and
+        audience chip only (no duplicate tag, Flag or Merge). Clicking one
+        opens a read-only Event overview modal above the panel; Close returns
+        to Bachata Night with the panel still open.
+      verification: "GET /api/admin/events/{id}/overlapping; overview uses GET /api/admin/events/{id}"
+
+    - id: 52
+      title: "Bulk 'mark reviewed' cannot bypass approval"
+      description: >
+        Select a "Salsa Night" row together with a new synced event and
+        use the bulk "Mark reviewed" action.
+      expected: >
+        Only the synced event becomes "Published" (its "New event" change
+        leaves the Review panel); the Salsa Night dates stay private and its
+        "Go public" change stays open.
+      verification: "Bulk review only publishes new events; go-public requests are decided in Review"
+
+    - id: 44
+      title: "Make the signed-in submission public on the Movida calendar"
+      description: >
+        Select "Movida" from the calendar dropdown. Click "Make public".
+      expected: >
+        The Submission card status changes to green "Public". The already-live occurrences
+        remain associated with the approved suggestion and become public:
+        Jamie now finds "Salsa Night" on Home. Jamie receives the in-app
+        "Dev User is going to Salsa Night" notification (the follower fan-out
+        deferred from step 37) and the "suggested" activity. Dev User receives
+        "Your event is public · Salsa Night" in-app and a "Approved: Salsa
+        Night" email in Mailpit. The side panel now shows the globe (public)
+        icon and "Made public by …"; "Lock owner edits"
+        is still offered.
+      verification: "Status approved; public; Jamie notified once; Dev User notified in-app + email"
 
     - id: 45
       title: "Approval expands the full recurring series"
@@ -548,33 +691,74 @@ test_plan:
       verification: "All occurrences materialised after approval; more events on Home than the preview"
 
     - id: 46
-      title: "Approve anonymous submission — event becomes visible"
+      title: "Make Jamie's request public — everyone can see it"
       description: >
-        Click "Bachata Night" (the anonymous suggestion). Approve it to the
-        Bachata Events calendar.
+        Click "Bachata Night" (Jamie's request). Make it public on
+        the Bachata Events calendar.
       expected: >
-        Status changes to green "approved". Navigating Home now shows
+        The Submission card status changes to green "Public". Navigating Home now shows
         "Bachata Night" for the first time (it was invisible before approval).
-      verification: "Anonymous event appears on Home only after approval"
+      verification: "Jamie's event appears on Home for signed-out visitors only after approval"
 
     - id: 47
-      title: "Reject hard-blocks re-import"
+      title: "Remove keeps it from coming back"
       description: >
-        Submit a third anonymous suggestion duplicating an existing event
-        title. In Admin → Suggestions, reject it with notes "Duplicate event".
+        As Jamie, add a third event duplicating an existing event title
+        with Share publicly ON. In Admin → Review, open its "Go public"
+        change → Open event → Remove… → "All dates" → reason "Duplicate
+        event" → Yes, remove.
       expected: >
-        Status changes to red "rejected" with notes saved. The event stays
-        hidden and is blocked from being recreated by a later sync/import.
-      verification: "Status rejected; BlockedEvent-style suppression prevents reimport"
+        The status reads Removed and the Submission card "Removed" with the
+        reason. Jamie is told why; the event stays gone and a later
+        sync/import does not recreate it.
+      verification: "Status removed; BlockedEvent suppression prevents reimport"
+
+    - id: 53
+      title: "Keeping a request private tells the owner why and leaves the event theirs"
+      description: >
+        As Dev User, submit "Salsa Night Copy" with Share publicly ON. As
+        Admin, open it in the side panel → Keep private… with reason
+        "Duplicate event" → Keep private.
+      expected: >
+        The Submission card reads "Declined" and the event stays Published
+        with the private audience. Dev User gets "Your event stays private
+        · Salsa Night Copy" with "Duplicate event" (in-app; tapping it opens
+        the event, which still loads for them) and a "Kept private" email.
+        Events I added shows "Only you", "Not published publicly — it's
+        still in your events." and "Curator note: Duplicate event", with
+        View, Edit and "Ask to make public". Jamie still cannot open it.
+      verification: "Owner notified with reason; event stays private to them and leaves the review queue"
+
+    - id: 54
+      title: "Events I added: edit, cancel the request, delete"
+      description: >
+        As Dev User, submit "Kizomba Test" with Share publicly ON. Open Menu
+        → Events I added (separated from Invite friends by a divider). Edit
+        its time (Edit → change Start → Save changes), click "Keep it
+        private", then Delete → confirm.
+      expected: >
+        Events I added lists every event with who can see it (Public,
+        Waiting to go public, Only you, Removed, Deleted). The edit applies
+        straight away (its preview dates move; no one is notified). "Keep it
+        private" turns the chip to "Only you" and moves its "Go public"
+        change to Review → Closed as "Withdrawn". After Delete it shows
+        "Deleted" and its dates disappear.
+      verification: "Edit applied directly; request cancelled; delete hides the dates"
 
     - id: 48
-      title: "Status filter tabs work"
+      title: "Submissions are found from the Events and Review panels"
       description: >
-        Use the filter tabs at the top of the Suggestions panel.
+        In Admin → Events, select the "Submitted" flag and combine it with
+        the Audience and Status pills; sort by "Newest submitted". Then open
+        Review → Closed.
       expected: >
-        All: 3 suggestions. Pending: 0. Approved: 2. Rejected: 1. Counts in
-        tab labels match.
-      verification: "Filter tabs correctly filter and show counts"
+        Submitted + Private lists "Private Lesson", "Last Week's Social" and
+        "Salsa Night Copy"; Submitted + Public lists the two made public;
+        Submitted + Status "Removed" lists the removed and the deleted ones
+        with "Removed by admin" / "Deleted by owner". Review → Closed shows
+        the go-public requests as Accepted, Rejected ("Salsa Night Copy")
+        or Withdrawn.
+      verification: "Flags × Audience × Status replace the Submissions tabs"
 
     # ----------------------------------------------------------- responsive
     - id: 49

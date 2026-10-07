@@ -31,6 +31,9 @@ from backend.db.models import (  # noqa: E402
     CachedEvent,
     CalendarSubscription,
     EmailLoginCode,
+    Notification,
+    PassportShareToken,
+    PushSubscription,
     ShareToken,
     User,
     UserEventAttendance,
@@ -331,7 +334,26 @@ def test_delete_me_removes_user_and_personal_rows(client, session, monkeypatch):
         UserEventAttendance(device_id=device_id, event_id="evt-9", user_id=user_id)
     )
     session.add(ShareToken(token="tok-del", device_id=device_id, user_id=user_id))
+    session.add(PassportShareToken(token="pp-del", user_id=user_id))
+    session.add(
+        PushSubscription(
+            user_id=user_id, endpoint="https://push.test/1", p256dh="k", auth="a"
+        )
+    )
+    other = _login(client, email="bob@example.com").json()
+    session.add(
+        Notification(
+            recipient_user_id=UUID(other["user_id"]),
+            actor_user_id=user_id,
+            kind="new_follower",
+        )
+    )
+    db_user = session.get(User, user_id)
+    db_user.bio = "Salsa addict"
+    db_user.instagram_url = "https://instagram.com/alice"
+    session.add(db_user)
     session.commit()
+    _login(client, email="alice@example.com", device_id=device_id)
 
     resp = client.delete("/api/auth/me")
     assert resp.status_code == 200
@@ -341,12 +363,19 @@ def test_delete_me_removes_user_and_personal_rows(client, session, monkeypatch):
     assert session.exec(select(UserSavedEvent)).all() == []
     assert session.exec(select(UserEventAttendance)).all() == []
     assert session.exec(select(ShareToken)).all() == []
+    assert session.exec(select(PassportShareToken)).all() == []
+    assert session.exec(select(PushSubscription)).all() == []
+    assert session.exec(select(Notification)).all() == []
 
     # User row is soft-deleted + anonymized.
+    session.expire_all()
     db_user = session.get(User, user_id)
     assert db_user is not None
     assert db_user.deleted_at is not None
     assert db_user.email.startswith("deleted-")
+    assert db_user.bio is None
+    assert db_user.instagram_url is None
+    assert db_user.handle is None
     assert db_user.provider_subject == "mock|alice@example.com"
 
     # Cookie was cleared → /me now 401s.

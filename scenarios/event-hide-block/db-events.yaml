@@ -1,6 +1,6 @@
 base_week: 0
 events:
-  # Visible — used to test Hide action
+  # Published — used to test Unpublish
   - id: evt-hide-001
     calendar_id: salsa-cal-001
     title: Friday Salsa Social
@@ -18,15 +18,15 @@ events:
     end: w0 Sat 01:00
     price_is_free: true
 
-  # Visible — used to test Permanently Remove (block) action
+    # Published — used to test Remove…
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:beginner-friendly
-    - venue:indoor
-    - vibe:good-music
-    - vibe:social-atmosphere
-    - reach:regional
+      - format:social
+      - dance-style:salsa
+      - level:beginner-friendly
+      - venue:indoor
+      - vibe:good-music
+      - vibe:social-atmosphere
+      - reach:regional
   - id: evt-hide-002
     calendar_id: bachata-cal-002
     title: Bachata Sensual Night
@@ -45,17 +45,17 @@ events:
     price_min: 10
     price_currency: EUR
 
-  # Already hidden — used to test Unhide action
+    # Already unpublished — used to test Republish
     tags:
-    - format:class
-    - dance-style:bachata
-    - level:beginner-friendly
-    - venue:indoor
-    - vibe:social-atmosphere
-    - reach:local
+      - format:class
+      - dance-style:bachata
+      - level:beginner-friendly
+      - venue:indoor
+      - vibe:social-atmosphere
+      - reach:local
   - id: evt-hide-003
     calendar_id: salsa-cal-001
-    title: Salsa On2 Workshop (hidden)
+    title: Salsa On2 Workshop (unpublished)
     description: |
       Intermediate on2 technique workshop with Carlos & Maria.
       Each session is broken into clear, manageable steps with individual feedback.
@@ -69,18 +69,18 @@ events:
     price_is_free: false
     price_min: 20
     price_currency: EUR
-    is_hidden: true
+    status: unpublished
 
-  # Already blocked (permanently removed) — used to test Restore action
+    # Already removed by an admin — used to test Restore
     tags:
-    - format:workshop
-    - dance-style:salsa
-    - level:intermediate
-    - venue:indoor
-    - reach:regional
+      - format:workshop
+      - dance-style:salsa
+      - level:intermediate
+      - venue:indoor
+      - reach:regional
   - id: evt-hide-004
     calendar_id: bachata-cal-002
-    title: Kizomba Urban Night (blocked)
+    title: Kizomba Urban Night (removed)
     description: |
       Kizomba and urban kiz social with a live DJ set.
       The dance floor is open from the first beat to the last.
@@ -94,14 +94,15 @@ events:
     price_is_free: false
     price_min: 15
     price_currency: EUR
-    is_hidden: true
+    status: removed
+    status_reason: admin
     is_blocked: true
     tags:
-    - format:social
-    - dance-style:bachata
-    - dance-style:kizomba
-    - level:beginner-friendly
-    - venue:indoor
-    - vibe:good-music
-    - vibe:social-atmosphere
-    - reach:international
+      - format:social
+      - dance-style:bachata
+      - dance-style:kizomba
+      - level:beginner-friendly
+      - venue:indoor
+      - vibe:good-music
+      - vibe:social-atmosphere
+      - reach:international

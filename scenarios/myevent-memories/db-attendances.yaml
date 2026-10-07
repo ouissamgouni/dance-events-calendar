@@ -1,0 +1,8 @@
+attendances:
+  - { event_id: evt-mem-p1, email: mia@example.com, share_audience: public }
+  - { event_id: evt-mem-p2, email: mia@example.com, share_audience: public }
+  - { event_id: evt-mem-p3, email: mia@example.com, share_audience: public }
+  - { event_id: evt-mem-p4, email: mia@example.com, share_audience: public }
+  - { event_id: evt-mem-p5, email: mia@example.com, share_audience: public }
+  - { event_id: evt-mem-u1, email: mia@example.com, share_audience: public }
+  - { event_id: evt-mem-p1, email: ana@example.com, share_audience: public }

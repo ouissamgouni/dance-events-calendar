@@ -1,21 +1,15 @@
 # Pre-seeded organizer claims for the Organizer Claims scenario.
 #
-# Two-flow model:
-#   - kind: "badge"  → account-level verified-organizer request.
-#                       Admin approval flips ``is_verified_organizer``.
-#   - kind: "events" → per-event organizer attribution. Only available
-#                       to already-verified organizers. Admin approval
-#                       attributes the event AND auto-marks the
-#                       organizer as Going (public) on each event.
+#   - kind: "badge"  → organizer request; may carry events decided in the
+#                       same review. Approval flips ``is_verified_organizer``.
+#   - kind: "events" → later event claims from an already-verified organizer.
+#   Approved events are attributed to the organizer, who is auto-marked
+#   Going (public).
 #
 # Seeded:
-#   1. Olive — approved badge claim (grants verified-organizer status)
-#      plus an approved events claim covering evt-organizer-001. The
-#      event detail page should show "Organized by @olive ✓" from boot
-#      and Olive's profile shows that event as Going (public).
-#   2. Carl — pending badge claim awaiting admin review. After admins
-#      approve the badge, Carl can submit an events claim from /account
-#      using the event-search picker.
+#   1. Olive — approved badge claim plus an approved events claim covering
+#      evt-organizer-001 ("Organized by @olive ✓" from boot).
+#   2. Carl — pending organizer request with evt-organizer-002 attached.
 organizer_claims:
   # Olive — verified-organizer status (badge approved).
   - submitter_email: organizer@example.com
@@ -33,8 +27,12 @@ organizer_claims:
       - event_id: evt-organizer-001
         decision: approved
 
-  # Carl — pending badge claim. Admin approves this in the scenario.
+  # Carl — pending organizer request with one event attached. Admin
+  # decides the badge and the event in the same review.
   - submitter_email: claimant@example.com
     kind: badge
     grant_badge: true
     status: pending
+    events:
+      - event_id: evt-organizer-002
+        decision: pending

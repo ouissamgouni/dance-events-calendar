@@ -14,6 +14,7 @@ from backend.db.database import get_session
 from backend.db.models import CachedEvent, User, UserEventAttendance, UserSavedEvent
 from backend.services.event_visibility import apply_event_visibility
 from backend.services.ics import build_ics, ics_escape
+from backend.services.timezones import to_event_local
 
 router = APIRouter(prefix="/api/events/export", tags=["export"])
 
@@ -127,9 +128,13 @@ def export_xlsx(
             start_time = "All day"
             end_time = ""
         else:
-            date_str = e.start.strftime("%Y-%m-%d")
-            start_time = e.start.strftime("%H:%M")
-            end_time = e.end.strftime("%H:%M")
+            start, end = (
+                to_event_local(e.start, e.timezone),
+                to_event_local(e.end, e.timezone),
+            )
+            date_str = start.strftime("%Y-%m-%d")
+            start_time = start.strftime("%H:%M")
+            end_time = end.strftime("%H:%M")
 
         # Get status for this event
         status = status_map.get(e.event_id, "")

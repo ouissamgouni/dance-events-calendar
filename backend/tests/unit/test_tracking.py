@@ -36,6 +36,14 @@ def _mock_session():
     return session
 
 
+@pytest.fixture(autouse=True)
+def _visible_events(monkeypatch):
+    # Mocked sessions return MagicMock events, which carry no real status.
+    monkeypatch.setattr(
+        "backend.api.routes.tracking.viewer_can_see_event", lambda *a, **k: True
+    )
+
+
 @pytest.fixture
 def client():
     session = _mock_session()
@@ -48,8 +56,7 @@ def client():
 class TestTrackingEndpoints:
     def test_track_event_view_minimal(self, client):
         c, session = client
-        with patch("backend.api.routes.tracking._update_view_geo", new=AsyncMock()):
-            resp = c.post("/api/track/event-view", json={"event_id": "ev1"})
+        resp = c.post("/api/track/event-view", json={"event_id": "ev1"})
         assert resp.status_code == 201
         assert len(session._added) == 1
         view = session._added[0]
@@ -60,15 +67,14 @@ class TestTrackingEndpoints:
 
     def test_track_event_view_with_source_and_device(self, client):
         c, session = client
-        with patch("backend.api.routes.tracking._update_view_geo", new=AsyncMock()):
-            resp = c.post(
-                "/api/track/event-view",
-                json={
-                    "event_id": "ev2",
-                    "device_id": "dev-123",
-                    "source": "calendar",
-                },
-            )
+        resp = c.post(
+            "/api/track/event-view",
+            json={
+                "event_id": "ev2",
+                "device_id": "dev-123",
+                "source": "calendar",
+            },
+        )
         assert resp.status_code == 201
         view = session._added[0]
         assert view.device_id == "dev-123"
@@ -90,23 +96,21 @@ class TestTrackingEndpoints:
     )
     def test_track_event_view_accepts_attribution_sources(self, client, source):
         c, session = client
-        with patch("backend.api.routes.tracking._update_view_geo", new=AsyncMock()):
-            resp = c.post(
-                "/api/track/event-view", json={"event_id": "ev1", "source": source}
-            )
+        resp = c.post(
+            "/api/track/event-view", json={"event_id": "ev1", "source": source}
+        )
         assert resp.status_code == 201
         assert session._added[0].source == source
 
     def test_track_link_click(self, client):
         c, session = client
-        with patch("backend.api.routes.tracking._update_click_geo", new=AsyncMock()):
-            resp = c.post(
-                "/api/track/link-click",
-                json={
-                    "event_id": "ev1",
-                    "url": "https://example.com/event",
-                },
-            )
+        resp = c.post(
+            "/api/track/link-click",
+            json={
+                "event_id": "ev1",
+                "url": "https://example.com/event",
+            },
+        )
         assert resp.status_code == 201
         click = session._added[0]
         assert isinstance(click, EventLinkClick)

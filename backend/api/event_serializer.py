@@ -24,6 +24,7 @@ from backend.db.models import (
     User,
     UserEventAttendance,
 )
+from backend.services import event_assets
 from backend.services.event_images import event_image_fields
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
 from backend.services.schedules import published_schedule_event_ids
@@ -170,6 +171,7 @@ def serialize_events(
                         is_verified_organizer=u.is_verified_organizer,
                     )
 
+    ticket_hours = event_assets.ticket_min_hours(session)
     return [
         EventResponse(
             event_id=e.event_id,
@@ -183,6 +185,7 @@ def serialize_events(
             start=e.start,
             end=e.end,
             all_day=e.all_day,
+            timezone=e.timezone,
             latitude=e.latitude,
             longitude=e.longitude,
             color=color_map.get(e.calendar_id),
@@ -198,8 +201,11 @@ def serialize_events(
             tags=tags_map.get(e.event_id, []),
             has_active_promo_codes=e.event_id in events_with_promos,
             organizer=organizer_by_event.get(e.event_id),
+            is_cancelled=e.is_cancelled,
+            cancellation_note=e.cancellation_note,
             show_price_override=e.show_price_override,
             show_promo_override=e.show_promo_override,
+            **event_assets.ticket_fields(e, ticket_hours),
             schedule_published=e.event_id in published_schedule_ids,
         )
         for e in events_list

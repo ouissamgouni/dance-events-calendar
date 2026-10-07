@@ -1,0 +1,188 @@
+test_plan:
+  name: "Submitters edit their suggested events — phase 1 (awaiting review)"
+  description: >
+    A signed-in user's own event stays theirs: they can edit it, ask to make
+    it public, cancel that request or delete it while it is not public.
+    Dates are re-expanded on save, but each occurrence keeps its id, so RSVPs
+    and saves stay attached. Admins can lock an event, and every change is
+    recorded in the suggestion's edit history. Edits to public events wait
+    for admin review (see scenarios/event-revisions); a curator who refuses a
+    public request keeps the event private for its owner, and only Remove…
+    with "All dates" removes it for everyone. Removed, locked and anonymous
+    events stay read-only.
+
+  preconditions:
+    - "Run the scenario with: `SCENARIO=suggestion-editing task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Seed (db-suggestions.yaml): S1 pending one-off 'Salsa Socail at Club Havana'; S2 pending weekly 'Tuesday Bachata Practica' (6 dates, Gina Going on dates 3 and 4, Sean saved date 2); S3 approved weekly 'Thursday Salsa Social'; S6 pending but locked; S7 approved anonymous; S8 blocked; S9 private 'Private Lesson with Marco'; S10 declined 'Salsa Rueda Practice Group'."
+
+  cast:
+    - "Olivia — added S1, S2, S3, S6, S8, S9 and S10."
+    - "Sam — signed in, owns nothing."
+    - "Gina — Going on two S2 dates and on S3."
+    - "Sean — saved an S2 date."
+    - "Admin — reviews suggestions, can lock them."
+
+  steps:
+    - id: 1
+      title: "UC1 · Fix a typo in a pending event"
+      description: |
+        As Olivia, open 'Salsa Socail at Club Havana' (S1) from My events.
+        Under the title, click "Edit event". The wizard opens as "Edit event"
+        with every field prefilled. Change the name to "Salsa Social at Club
+        Havana", click Next twice, then "Save changes".
+      expected: |
+        "Changes saved" appears. Closing it shows the page with the new
+        title. The Promo code and "I'm going" controls are not shown in edit
+        mode. As Admin, open S1 in Admin → Events → Submission card → Show
+        more: the history lists `owner_edit` with `title`.
+
+    - id: 2
+      title: "UC2 · Move a pending weekly series to another day"
+      description: |
+        As Olivia, open any 'Tuesday Bachata Practica' date (S2) → Edit
+        event. Change Start to the following Wednesday (same time) and set
+        Repeat to weekly on Wednesday. Save changes.
+      expected: |
+        All six dates now fall on Wednesdays, and their event URLs did not
+        change. As Gina, My events still lists her two Going dates, now on
+        Wednesday. As Sean, his saved date is still in his calendar.
+
+    - id: 3
+      title: "UC3 · Shorten the series"
+      description: |
+        As Olivia, edit S2 again and change Repeat to end after 3 times.
+        Save changes.
+      expected: |
+        Only three practica dates remain visible in Explore. The other dates
+        are hidden, not deleted: the admin's Dates list (Show more) for S2
+        shows three, and restoring "6 times" brings back the same date-4 URL
+        with Gina still Going.
+
+    - id: 4
+      title: "UC5 · Someone else's event has no Edit button"
+      description: |
+        As Sam, open S1. Then call
+        `PATCH /api/me/suggestions/5e0d0000-0000-4000-8000-000000000001`
+        with `{"title": "Mine"}` from the browser devtools.
+      expected: |
+        No Edit event / Delete buttons. The API answers 404, and S1's
+        title is unchanged.
+
+    - id: 5
+      title: "UC6 · Anonymous submissions are read-only"
+      description: |
+        As Olivia and then as Admin (normal view), open 'Open Air Salsa at
+        Mauerpark' (S7).
+      expected: |
+        Neither sees Edit event / Delete. Admin still edits through the
+        admin tools.
+
+    - id: 6
+      title: "UC7 · A locked event cannot be edited"
+      description: |
+        As Olivia, open 'Kizomba Night at Tresor Garden' (S6). Then go to
+        /suggest/5e0d0000-0000-4000-8000-000000000006/edit directly.
+      expected: |
+        The page shows "An admin has locked this event." instead of the
+        buttons. The direct URL shows "An admin has locked this event, so it
+        can no longer be edited." As Admin, open S6 in Admin → Events (the
+        event side panel) and untick "Lock owner edits" on the Submission
+        card; Olivia now sees Edit event after a reload.
+
+    - id: 7
+      title: "UC8 · Public events are edited through review; removed ones are gone"
+      description: |
+        As Olivia, open a 'Thursday Salsa Social' date (S3). Then go to
+        /suggest/5e0d0000-0000-4000-8000-000000000008/edit (S8, removed).
+      expected: |
+        S3 shows "Edit event" but no Delete and no "Suggest an edit"; saving
+        an edit there says
+        "Changes sent for review" and leaves the live dates unchanged (the
+        review itself is covered by the event-revisions scenario). The S8 URL
+        shows "This event was removed, so it can no longer be edited.", and
+        Events I added shows S8 as "Removed" with the curator note.
+
+    - id: 8
+      title: "UC4 · Cancel a public request, then delete the event"
+      description: |
+        As Olivia, open S1 → "Keep it private". Then → Delete → confirm
+        "Delete".
+      expected: |
+        After "Keep it private" the page still opens and the actions become
+        "Ask to make public" / Delete; Events I added shows "Only you". After
+        Delete the row reads "You deleted this event." S1 disappears from
+        Explore and My events. As Admin, S1 shows "Deleted by owner", its
+        edit history lists `withdraw` then `delete`, and Make public is no
+        longer offered.
+
+    - id: 9
+      title: "UC9 · An event kept for yourself never reaches anyone else"
+      description: |
+        As Olivia, open Events I added and then 'Private Lesson with Marco'
+        (S9). As Sam, open the same event URL and search Explore for it.
+        As Admin, open Events → the lock (private) Audience pill.
+      expected: |
+        Olivia sees "Only you" in Events I added and the banner "Only you can
+        see this event — it isn't shared in discovery, feeds or
+        notifications." Sam gets "Event not found" and it is not in Explore.
+        Admin's private pill lists S9 (and S10) with a lock icon in Flags;
+        the side panel says "Visible to · Only Olivia — not in discovery,
+        feeds or notifications" and offers Mark reviewed and Remove…, never
+        Make public.
+
+    - id: 10
+      title: "UC10 · A declined event stays yours and can be sent again"
+      description: |
+        As Olivia, open Events I added and find 'Salsa Rueda Practice Group'
+        (S10). Click "Ask to make public".
+      expected: |
+        Before: "Only you", "Not published publicly — it's still in your
+        events." and "Curator note: Looks like a private class, not a public
+        event." View and Edit work. As Admin, S10's Submission card reads
+        "Declined". After the click the owner chip becomes "Waiting to go
+        public"; in Admin the S10 row shows the amber open-lock flag, its
+        Submission card reads "Public request" and Review → Open lists a
+        "Go public" change for it.
+
+    - id: 11
+      title: "UC11 · Admin keeps a request private vs removes it"
+      description: |
+        As Admin, open S2 in the events side panel → "Keep private…" →
+        reason "Weekly practice, not public" → "Keep private". Then open S10
+        (it wants public again) → Remove… → "All dates" → reason "Not a
+        public event" → Yes, remove.
+      expected: |
+        S2's card reads "Declined" and its Go public change moves to Review →
+        Closed; Olivia gets "Your event stays private"
+        (tap opens the event, which still works for her) and a "Kept
+        private" email. S10 reads Removed; Olivia gets "Your event was
+        removed" and the event URL now answers "Event not found" for her too.
+
+    - id: 12
+      title: "UC12 · Lock owner edits stays available after an event is public"
+      description: |
+        As Admin, open a 'Thursday Salsa Social' date (S3, public) in the
+        side panel and tick "Lock owner edits". As Olivia, reload the event.
+      expected: |
+        The checkbox is on the Submission card even though S3 is already
+        public; the card reads "· locked for editing". Olivia sees "An admin
+        has locked this event." instead of Edit event.
+
+    - id: 13
+      title: "UC13 · Note to the owner"
+      description: |
+        As Admin, open S9 in the side panel, type "Please add the studio
+        address" in "Note to the owner (shown if declined or removed)" and
+        click Save note. Reload the panel.
+      expected: |
+        The note is still there after the reload. Save note is disabled until
+        the text changes again.
+
+    - id: 14
+      title: "UC14 · Owners don't see Suggest an edit on their public events"
+      description: |
+        As Olivia, open a 'Thursday Salsa Social' date (S3) page and its •••
+        menu. As Sam, open the same page.
+      expected: |
+        Olivia only has her owner actions (Edit event); "Suggest an edit" is
+        not offered. Sam sees "Suggest an edit".

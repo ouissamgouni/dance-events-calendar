@@ -1,0 +1,5 @@
+settings:
+  my_events_route_enabled: true
+  event_memories_enabled: true
+  memories_prompt_enabled: true
+  memories_prompt_local_hour: 0

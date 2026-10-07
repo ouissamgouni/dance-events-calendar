@@ -22,7 +22,7 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const SKIP_PREFIXES = ['/onboarding', '/login', '/r/', '/admin', '/privacy'];
+const SKIP_PREFIXES = ['/onboarding', '/login', '/r/', '/admin', '/privacy', '/terms', '/legal'];
 
 export default function OnboardingGate() {
     const { user, loading } = useAuth();

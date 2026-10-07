@@ -41,6 +41,19 @@ export default function MoreTagsPage({ groups, value, onChange, onClose }: Props
             tags: needle ? g.tags.filter((t) => t.label.toLowerCase().includes(needle)) : g.tags,
         }))
         .filter((g) => g.tags.length > 0);
+    const exactMatch = groups.some((g) => g.tags.some((t) => t.label.toLowerCase() === needle));
+    const requested = Object.entries(value.freeTexts).filter(([, text]) => text.trim());
+    const groupLabel = (slug: string) => groups.find((g) => g.slug === slug)?.label ?? slug;
+
+    const requestTag = (slug: string) => {
+        onChange({ ...value, freeTexts: { ...value.freeTexts, [slug]: query.trim() } });
+        setQuery('');
+    };
+    const dropRequest = (slug: string) => {
+        const next = { ...value.freeTexts };
+        delete next[slug];
+        onChange({ ...value, freeTexts: next });
+    };
 
     return (
         <SubPage
@@ -69,6 +82,39 @@ export default function MoreTagsPage({ groups, value, onChange, onClose }: Props
             </div>
 
             {visible.length === 0 ? <p className={helpCls}>No tags match “{query.trim()}”.</p> : null}
+
+            {needle && !exactMatch && groups.length > 0 ? (
+                <div className="mt-3" data-testid="request-new-tag">
+                    <span className={sectionLabelCls}>Suggest “{query.trim()}” as a new tag in</span>
+                    <div className="flex flex-wrap gap-2">
+                        {groups.map((g) => (
+                            <button key={g.id} type="button" onClick={() => requestTag(g.slug)} className={chipCls(false)}>
+                                + {g.label}
+                            </button>
+                        ))}
+                    </div>
+                    <p className={helpCls}>A curator reviews new tags before they appear.</p>
+                </div>
+            ) : null}
+
+            {requested.length > 0 ? (
+                <div className="mt-3">
+                    <span className={sectionLabelCls}>New tags you suggested</span>
+                    <div className="flex flex-wrap gap-2">
+                        {requested.map(([slug, text]) => (
+                            <button
+                                key={slug}
+                                type="button"
+                                onClick={() => dropRequest(slug)}
+                                aria-label={`Remove new tag ${text}`}
+                                className={chipCls(true)}
+                            >
+                                {text} · {groupLabel(slug)} ✕
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
 
             <div className="mt-4 space-y-5">
                 {visible.map(({ group, tags }) => (

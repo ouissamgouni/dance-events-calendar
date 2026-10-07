@@ -1,6 +1,8 @@
 import asyncio
 import functools
 import logging
+import time
+from datetime import datetime, timedelta, timezone
 
 from backend.config.loader import get_auto_sync_enabled, get_sync_interval_minutes
 from backend.db.database import get_engine
@@ -13,10 +15,95 @@ from sqlmodel import Session
 logger = logging.getLogger(__name__)
 
 # Dedicated Postgres advisory-lock key for the notification dispatch tick, so
-# multi-instance deployments (e.g. staging's min_machines_running = 2) don't
+# multi-instance deployments don't
 # double-send pushes in the select→send→stamp race. Distinct from the sync
 # job's key (0x6D6F7669736E6373 / "movisncs").
 _NOTIFY_DISPATCH_ADVISORY_LOCK_KEY = 0x6D6F76696E746679  # "movintfy"
+
+_DAILY_SECONDS = 24 * 60 * 60
+# Minimum seconds between runs of a dispatch sub-job when the loop respects
+# cadence; unlisted jobs run every tick. One tick = one DB wake-up on Neon.
+_DISPATCH_JOB_MIN_INTERVAL_SECONDS = {
+    "milestone": _DAILY_SECONDS,
+    "recurrence": _DAILY_SECONDS,
+    "suggestion_images": _DAILY_SECONDS,
+    "event_tickets": _DAILY_SECONDS,
+    "data_retention": _DAILY_SECONDS,
+    "ticket_prompt": 30 * 60,
+    "memories_prompt": 30 * 60,
+}
+_dispatch_last_run: dict[str, float] = {}
+
+
+def _dispatch_job_due(name: str) -> bool:
+    last = _dispatch_last_run.get(name)
+    interval = _DISPATCH_JOB_MIN_INTERVAL_SECONDS.get(name, 0)
+    return last is None or time.monotonic() - last >= interval
+
+
+# Older undelivered fan-out rows are stale news or channel-disabled; leave them.
+_FANOUT_SWEEP_MAX_AGE = timedelta(hours=24)
+
+
+def sweep_fanout_jobs() -> dict:
+    """Re-run fan-out delivery jobs whose rows are still undelivered (a job
+    lost to a restart or exhausted retries). Handlers skip stamped rows."""
+    from sqlmodel import or_, select
+
+    from backend.api.routes import promo_codes, schedules, suggestions
+    from backend.db.models import EventPromoCode, Notification
+    from backend.services import event_revisions, job_queue
+
+    decision_kinds = tuple(suggestions._DECISION_STATUS)
+    change_kinds = (event_revisions.EVENT_CHANGED, event_revisions.EVENT_CANCELLED)
+    email_only_kinds = (*change_kinds, *decision_kinds)
+    both_kinds = (*schedules._PUBLICATION_KINDS, promo_codes.PROMO_CODE_ADDED)
+    cutoff = datetime.now(timezone.utc) - _FANOUT_SWEEP_MAX_AGE
+    jobs: set[tuple[str, str]] = set()
+    promo_refs: set[tuple[str, str | None]] = set()
+    with Session(get_engine()) as session:
+        rows = session.exec(
+            select(Notification).where(
+                Notification.created_at >= cutoff,
+                or_(
+                    Notification.kind.in_(email_only_kinds)  # type: ignore[union-attr]
+                    & Notification.emailed_at.is_(None),  # type: ignore[union-attr]
+                    Notification.kind.in_(both_kinds)  # type: ignore[union-attr]
+                    & (
+                        Notification.emailed_at.is_(None)  # type: ignore[union-attr]
+                        | Notification.pushed_at.is_(None)  # type: ignore[union-attr]
+                    ),
+                ),
+            )
+        ).all()
+        for row in rows:
+            prefix, _, ref = (row.subject_key or "").partition(":")
+            if row.kind in schedules._PUBLICATION_KINDS and prefix == "publication":
+                jobs.add((schedules.PUBLICATION_DELIVERY_JOB, f"{row.event_id}:{ref}"))
+            elif row.kind in change_kinds and prefix == "revision":
+                jobs.add((event_revisions.CHANGE_EMAILS_JOB, ref))
+            elif row.kind in decision_kinds and prefix == "suggestion":
+                jobs.add((suggestions.SUGGESTION_DECISION_JOB, f"{ref}:{row.kind}"))
+            elif row.kind == promo_codes.PROMO_CODE_ADDED and row.event_id:
+                promo_refs.add((row.event_id, row.context))
+        for event_id, code in promo_refs:
+            promo_id = session.exec(
+                select(EventPromoCode.id).where(
+                    EventPromoCode.event_id == event_id,
+                    EventPromoCode.code == code,
+                    EventPromoCode.status == "approved",
+                )
+            ).first()
+            if promo_id is not None:
+                jobs.add((promo_codes.PROMO_CODE_ADDED_JOB, str(promo_id)))
+    failed = 0
+    for name, key in sorted(jobs):
+        try:
+            job_queue.run_job(name, key)
+        except Exception:
+            failed += 1
+            logger.exception("Fan-out sweep job %s:%s failed", name, key)
+    return {"jobs": len(jobs), "failed": failed}
 
 
 def _get_effective_interval(session: Session) -> int:
@@ -199,25 +286,30 @@ def _log_effective_gates() -> None:
             get_activity_digest_schedule,
             get_reminder_lead_hours,
         )
-        from backend.config.loader import get_notification_interval_minutes
+        from backend.config.loader import get_scheduler_tick_minutes
 
         logger.debug(
             "Effective notification gates: reminders=%s (lead_hours=%s) "
             "activity_email=%s (schedule=%r) interest=%s web_push=%s "
-            "interval_minutes=%s",
+            "tick_minutes=%s",
             get_event_reminders_enabled(),
             get_reminder_lead_hours(),
             get_activity_digest_email_enabled(),
             get_activity_digest_schedule(),
             get_interest_match_notifications_enabled(),
             get_web_push_enabled(),
-            get_notification_interval_minutes(),
+            get_scheduler_tick_minutes(),
         )
     except Exception:
         logger.debug("Effective notification gates: failed to resolve", exc_info=True)
 
 
-def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
+def run_notification_dispatch_once(
+    force_activity_digest: bool = False,
+    *,
+    respect_cadence: bool = False,
+    source: str = "admin",
+) -> dict:
     """Run one pass of user-facing notification delivery.
 
     Generates due event reminders and sends batched activity digest emails.
@@ -232,11 +324,18 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
     ``force_activity_digest`` bypasses the per-user schedule window in the
     activity digest step; used by admin manual triggers so operators can
     flush queued digests on demand.
+
+    ``respect_cadence`` (the in-app loop) skips sub-jobs that ran more
+    recently than their ``_DISPATCH_JOB_MIN_INTERVAL_SECONDS``; manual
+    triggers run everything. ``source`` is recorded on delivery-log rows.
     """
     # Imported lazily to keep scheduler import-light and avoid any import
     # cycle with the email/notification services.
     from backend.services import (
         activity_email,
+        data_retention,
+        event_asset_prompts,
+        event_assets,
         event_images,
         interest_notification_service,
         milestone_notification_service,
@@ -254,44 +353,74 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
         return {"skipped": "locked"}
 
     try:
+        # Interest runs before activity so new interest_event rows ship this tick.
+        jobs = (
+            ("reminders", reminder_service.run_once, "Reminder generation failed"),
+            ("fanout", sweep_fanout_jobs, "Fan-out delivery sweep failed"),
+            (
+                "review_prompt",
+                review_prompt_service.run_once,
+                "Review prompt generation failed",
+            ),
+            (
+                "ticket_prompt",
+                event_asset_prompts.run_ticket_prompts,
+                "Ticket prompt generation failed",
+            ),
+            (
+                "memories_prompt",
+                event_asset_prompts.run_memories_prompts,
+                "Memories prompt generation failed",
+            ),
+            (
+                "milestone",
+                milestone_notification_service.run_once,
+                "Milestone notification generation failed",
+            ),
+            (
+                "interest",
+                interest_notification_service.run_once,
+                "Interest notification generation failed",
+            ),
+            (
+                "activity",
+                functools.partial(
+                    activity_email.run_once, force=force_activity_digest, source=source
+                ),
+                "Activity digest failed",
+            ),
+            (
+                "recurrence",
+                recurrence_extension.run_once,
+                "Recurring series extension failed",
+            ),
+            (
+                "suggestion_images",
+                event_images.run_sweep_once,
+                "Suggestion image sweep failed",
+            ),
+            (
+                "event_tickets",
+                event_assets.run_sweep_once,
+                "Event ticket sweep failed",
+            ),
+            (
+                "data_retention",
+                data_retention.run_once,
+                "Data retention sweep failed",
+            ),
+        )
         stats: dict = {}
-        try:
-            stats["reminders"] = reminder_service.run_once()
-        except Exception:
-            logger.exception("Reminder generation failed")
-            stats["reminders"] = {"error": True}
-        try:
-            stats["review_prompt"] = review_prompt_service.run_once()
-        except Exception:
-            logger.exception("Review prompt generation failed")
-            stats["review_prompt"] = {"error": True}
-        try:
-            stats["milestone"] = milestone_notification_service.run_once()
-        except Exception:
-            logger.exception("Milestone notification generation failed")
-            stats["milestone"] = {"error": True}
-        try:
-            # Runs before the activity digest so newly created interest_event
-            # rows are picked up by the same tick's digest below.
-            stats["interest"] = interest_notification_service.run_once()
-        except Exception:
-            logger.exception("Interest notification generation failed")
-            stats["interest"] = {"error": True}
-        try:
-            stats["activity"] = activity_email.run_once(force=force_activity_digest)
-        except Exception:
-            logger.exception("Activity digest failed")
-            stats["activity"] = {"error": True}
-        try:
-            stats["recurrence"] = recurrence_extension.run_once()
-        except Exception:
-            logger.exception("Recurring series extension failed")
-            stats["recurrence"] = {"error": True}
-        try:
-            stats["suggestion_images"] = event_images.run_sweep_once()
-        except Exception:
-            logger.exception("Suggestion image sweep failed")
-            stats["suggestion_images"] = {"error": True}
+        for name, run, error_message in jobs:
+            if respect_cadence and not _dispatch_job_due(name):
+                stats[name] = {"skipped": "not_due"}
+                continue
+            _dispatch_last_run[name] = time.monotonic()
+            try:
+                stats[name] = run()
+            except Exception:
+                logger.exception(error_message)
+                stats[name] = {"error": True}
         return stats
     finally:
         _release_dispatch_lock(lock_conn)
@@ -299,14 +428,38 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
 
 async def run_notification_dispatch_loop() -> None:
     """Background loop that delivers reminders + activity digests."""
-    from backend.config.loader import get_notification_interval_minutes
+    from backend.config.loader import (
+        get_notification_debounce_seconds,
+        get_scheduler_tick_minutes,
+    )
+    from backend.services import job_queue
 
+    queue = job_queue.get_job_queue()
+    logger.info(
+        "Notification scheduler: tick=%d min, delivery debounce=%.0fs, job queue "
+        "concurrency=%d max_attempts=%d retry_base=%.0fs, job min intervals=%s",
+        get_scheduler_tick_minutes(),
+        get_notification_debounce_seconds(),
+        queue.concurrency,
+        queue.max_attempts,
+        queue.retry_base_seconds,
+        _DISPATCH_JOB_MIN_INTERVAL_SECONDS,
+    )
     loop = asyncio.get_running_loop()
+    dispatch = functools.partial(
+        run_notification_dispatch_once, respect_cadence=True, source="tick"
+    )
     while True:
-        interval = get_notification_interval_minutes() * 60
+        tick_minutes = get_scheduler_tick_minutes()
+        started = time.monotonic()
         try:
-            stats = await loop.run_in_executor(None, run_notification_dispatch_once)
-            logger.info("Notification dispatch tick: %s", stats)
+            stats = await loop.run_in_executor(None, dispatch)
+            logger.info(
+                "Notification dispatch tick took %.1fs, next in %d min: %s",
+                time.monotonic() - started,
+                tick_minutes,
+                stats,
+            )
         except Exception:
             logger.exception("Notification dispatch loop iteration failed")
-        await asyncio.sleep(interval)
+        await asyncio.sleep(tick_minutes * 60)

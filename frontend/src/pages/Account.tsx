@@ -400,8 +400,8 @@ export default function Account() {
             <section className="rounded-lg border border-red-200 bg-red-50 p-4">
                 <h2 className="text-sm font-semibold text-red-900 mb-2">Delete your account</h2>
                 <p className="text-xs text-red-800 mb-3">
-                    Permanently removes your account and all personal data we hold for you
-                    (saved events, attending events, share link). This cannot be undone.
+                    Permanently removes your account and personal data (profile, saved and going events, follows,
+                    share links, notifications, tickets and memories). Reviews stay, anonymised. This cannot be undone.
                     See our{' '}
                     <Link to="/privacy" className="underline">privacy policy</Link>.
                 </p>

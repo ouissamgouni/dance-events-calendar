@@ -1,0 +1,39 @@
+# The emulated Google source. Leave this file as-is: to emulate the organiser
+# editing or deleting an event in Google, open it in the admin event panel →
+# "Edit at source" (dev · mock source) → Save & sync. Edits are stored in the
+# untracked .mock-source-overrides.json next to this file and are cleared when
+# the scenario is (re)started.
+base_week: 0
+events:
+  # Published; Sam and Lee saved it. Its edits must wait for review.
+  - id: ev-sync-live
+    calendar_id: salsa-src
+    title: Friday Salsa at Studio A
+    description: Weekly Friday social with a beginner class at 19:30.
+    location: Studio A, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Fri 21:00
+    end: w1 Fri 23:30
+
+  # Published; used for a description-only edit (applied without notifying).
+  - id: ev-sync-desc
+    calendar_id: salsa-src
+    title: Sunday Bachata Practica
+    description: Open practica, all levels.
+    location: Studio Mitte, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Sun 18:00
+    end: w1 Sun 21:00
+
+  # Never reviewed (only arrives through the sync): edits overwrite it
+  # directly, no revision.
+  - id: ev-sync-new
+    calendar_id: salsa-src
+    title: Zouk Night (new)
+    location: Club Havana, Oranienstraße 25, 10999 Berlin
+    latitude: 52.5016
+    longitude: 13.4189
+    start: w2 Sat 22:00
+    end: w2 Sat 23:59

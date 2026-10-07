@@ -13,6 +13,14 @@ from backend.db.models import CachedEvent, CalendarSetting
 from backend.services.ics import build_ics
 
 
+@pytest.fixture(autouse=True)
+def _visible_events(monkeypatch):
+    # Mocked sessions return MagicMock events, which carry no real status.
+    monkeypatch.setattr(
+        "backend.api.routes.tracking.viewer_can_see_event", lambda *a, **k: True
+    )
+
+
 def _make_mock_session(events=None, calendars=None):
     """Create a mock session returning given events/calendars."""
     session = MagicMock(spec=Session)
@@ -295,7 +303,8 @@ class TestIcsBuild:
         event = _sample_event(all_day=True)
         ics = _build_ics([event])
         assert "DTSTART;VALUE=DATE:20260510" in ics
-        assert "DTEND;VALUE=DATE:20260510" in ics
+        # All-day DTEND is exclusive, so it must fall after DTSTART.
+        assert "DTEND;VALUE=DATE:20260511" in ics
 
     def test_build_ics_timed(self):
         from backend.api.routes.export import _build_ics

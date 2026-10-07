@@ -1,0 +1,4 @@
+attendances:
+  - { event_id: evt-mp-rooftop, email: mia@example.com, share_audience: public }
+  - { event_id: evt-mp-bachata, email: mia@example.com, share_audience: public }
+  - { event_id: evt-mp-rooftop, email: leo@example.com, share_audience: public }

@@ -26,6 +26,7 @@ import {
     timePart,
 } from './datetime';
 import type { FieldError } from './validation';
+import { supportedTimeZones, timeZoneLabel } from '../../utils/eventDates';
 
 interface Props {
     state: SuggestFormState;
@@ -33,14 +34,17 @@ interface Props {
     error: FieldError | null;
     /** Lets the shell hide its header and footer while a sub-page is open. */
     onSubPageChange: (open: boolean) => void;
+    /** A change to one existing date can't make it a series. */
+    allowRepeat?: boolean;
 }
 
 /** Default gap between start and end until the user sets an end themselves. */
 const DEFAULT_DURATION_MIN = 120;
 
-export default function Step1Event({ state, patch, error, onSubPageChange }: Props) {
+export default function Step1Event({ state, patch, error, onSubPageChange, allowRepeat = true }: Props) {
     const [page, setPage] = useState<'none' | 'location' | 'repeat'>('none');
     const [repeatRederived, setRepeatRederived] = useState(false);
+    const [tzOpen, setTzOpen] = useState(false);
 
     const startDate = parseLocal(state.start);
 
@@ -112,7 +116,9 @@ export default function Step1Event({ state, patch, error, onSubPageChange }: Pro
         return (
             <LocationPage
                 value={state.location}
-                onSelect={(location, latitude, longitude) => patch({ location, latitude, longitude })}
+                onSelect={(location, latitude, longitude, timezone) =>
+                    patch({ location, latitude, longitude, ...(timezone ? { timezone } : {}) })
+                }
                 onClose={close}
             />
         );
@@ -223,28 +229,51 @@ export default function Step1Event({ state, patch, error, onSubPageChange }: Pro
                         {errorFor('end')}
                     </p>
                 ) : null}
+                {!state.allDay ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-2 px-1 text-xs text-ink-soft">
+                        <span>Times in {timeZoneLabel(state.timezone)}</span>
+                        {tzOpen ? (
+                            <select
+                                aria-label="Time zone"
+                                value={state.timezone}
+                                onChange={(e) => patch({ timezone: e.target.value })}
+                                className="rounded-field border border-line bg-surface px-2 py-1 text-xs text-ink"
+                            >
+                                {[...new Set([state.timezone, ...supportedTimeZones()])].map((tz) => (
+                                    <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <button type="button" onClick={() => setTzOpen(true)} className="font-medium text-action">
+                                Change
+                            </button>
+                        )}
+                    </div>
+                ) : null}
             </div>
 
-            <div>
-                <Row
-                    id="suggest-repeat"
-                    icon={Repeat}
-                    label="Repeat"
-                    value={state.recurrence.mode === 'none' ? undefined : rowSummary(state.recurrence)}
-                    placeholder="Does not repeat"
-                    invalid={Boolean(errorFor('recurrence'))}
-                    describedBy={errorFor('recurrence') ? 'suggest-repeat-error' : undefined}
-                    onClick={() => open('repeat')}
-                />
-                {errorFor('recurrence') ? (
-                    <p id="suggest-repeat-error" className={fieldErrorCls}>
-                        {errorFor('recurrence')}
-                    </p>
-                ) : null}
-                {repeatRederived && state.recurrence.mode !== 'none' ? (
-                    <p className={helpCls}>Repeat now follows the new start date. Tap to review.</p>
-                ) : null}
-            </div>
+            {allowRepeat ? (
+                <div>
+                    <Row
+                        id="suggest-repeat"
+                        icon={Repeat}
+                        label="Repeat"
+                        value={state.recurrence.mode === 'none' ? undefined : rowSummary(state.recurrence)}
+                        placeholder="Does not repeat"
+                        invalid={Boolean(errorFor('recurrence'))}
+                        describedBy={errorFor('recurrence') ? 'suggest-repeat-error' : undefined}
+                        onClick={() => open('repeat')}
+                    />
+                    {errorFor('recurrence') ? (
+                        <p id="suggest-repeat-error" className={fieldErrorCls}>
+                            {errorFor('recurrence')}
+                        </p>
+                    ) : null}
+                    {repeatRederived && state.recurrence.mode !== 'none' ? (
+                        <p className={helpCls}>Repeat now follows the new start date. Tap to review.</p>
+                    ) : null}
+                </div>
+            ) : null}
         </div>
     );
 }

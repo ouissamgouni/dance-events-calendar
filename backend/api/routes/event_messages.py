@@ -51,9 +51,6 @@ from backend.db.models import (
     UserEventMute,
     UserSavedEvent,
 )
-from backend.services.event_message_instant import (
-    dispatch_event_message_instant,
-)
 from backend.services.event_visibility import eligible_event_ids, event_is_user_facing
 from backend.services.notifications import (
     fan_out_event_message,
@@ -391,10 +388,9 @@ def create_message(
         logger.warning("Auto-engage on post failed", exc_info=True)
 
     # Best-effort fan-out: never break posting on a notification error.
-    notifs = []
     try:
         if parent is None:
-            notifs = fan_out_event_message(
+            fan_out_event_message(
                 session,
                 user,
                 event_id,
@@ -403,7 +399,7 @@ def create_message(
                 snippet=_snippet(text),
             )
         else:
-            notifs = notify_thread_reply(
+            notify_thread_reply(
                 session,
                 user,
                 event_id,
@@ -415,18 +411,7 @@ def create_message(
         session.commit()
     except Exception:  # noqa: BLE001 — notification is best-effort
         session.rollback()
-        notifs = []
         logger.warning("Event message fan-out failed", exc_info=True)
-
-    # When the admin has enabled instant email for event messages, deliver the
-    # email + push right now instead of waiting for the digest scheduler. This
-    # stamps the notifications so the scheduler skips them (idempotent).
-    if notifs:
-        try:
-            dispatch_event_message_instant(session, notifs, actor=user, event=event)
-        except Exception:  # noqa: BLE001 — instant delivery is best-effort
-            session.rollback()
-            logger.warning("Event message instant delivery failed", exc_info=True)
 
     return _to_response(msg, user, viewer=user, viewer_is_admin=is_admin_user(user))
 

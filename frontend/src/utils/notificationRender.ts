@@ -68,6 +68,30 @@ export function getNotificationVerb(item: NotificationItem): string {
             return 'reported a message on';
         case 'planned_session_changed':
             return 'updated your planned session for';
+        case 'event_changed':
+            return 'updated';
+        case 'suggestion_approved':
+            return 'approved your submitted event';
+        case 'suggestion_declined':
+            return 'kept your event private';
+        case 'suggestion_rejected':
+            return 'removed your event';
+        case 'suggestion_change_applied':
+            return 'applied your edit to';
+        case 'suggestion_change_discarded':
+            return 'did not accept your edit to';
+        case 'event_change_applied':
+            return 'applied your suggested change to';
+        case 'event_change_declined':
+            return 'did not apply your suggested change to';
+        case 'event_change_reverted':
+            return 'reverted your change to';
+        case 'event_removed':
+            return 'removed';
+        case 'event_cancelled':
+            return 'cancelled';
+        case 'organizer_assigned':
+            return 'made you the organizer of';
         default:
             return 'updated';
     }
@@ -87,9 +111,13 @@ export function resolveNotificationDestination(item: NotificationItem): string {
         case 'follow_request_approved':
             return `/u/${item.actor.handle}`;
         case 'organizer_claim_decided':
-            return '/account';
+            return '/account#organizer';
         case 'event_review_prompt':
             return `/event/${item.event_id}/review`;
+        case 'event_ticket_prompt':
+            return `/event/${item.event_id}/ticket`;
+        case 'event_memories_prompt':
+            return `/event/${item.event_id}/memories`;
         case 'event_reminder':
             return item.context === 'ask'
                 ? `/event/${item.event_id}/ask`
@@ -100,6 +128,24 @@ export function resolveNotificationDestination(item: NotificationItem): string {
             return `/event/${item.event_id}#messages`;
         case 'planned_session_changed':
             return `/event/${item.event_id}/program/plan${item.schedule_session_id ? `?session=${item.schedule_session_id}` : ''}`;
+        case 'event_changed':
+        case 'suggestion_approved':
+        case 'suggestion_declined':
+        case 'suggestion_change_applied':
+            return item.event_id ? `/event/${item.event_id}` : '/me/submissions';
+        case 'suggestion_rejected':
+        case 'suggestion_change_discarded':
+            return '/me/submissions';
+        case 'event_change_applied':
+        case 'event_change_declined':
+        case 'event_change_reverted':
+            return item.event_id ? `/event/${item.event_id}` : '/me/submissions';
+        case 'event_removed':
+            return item.event_id ? `/event/${item.event_id}` : '/browse';
+        case 'event_cancelled':
+            return `/event/${item.event_id}`;
+        case 'organizer_assigned':
+            return item.event_id ? `/event/${item.event_id}` : '/hosting';
         case 'plan_session_added':
             return `/event/${item.event_id}/program${item.schedule_session_id ? `?session=${item.schedule_session_id}` : ''}`;
         case 'schedule_program_available':
@@ -148,6 +194,8 @@ const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> =
     follow_request_approved: 'people',
     subscription_review: 'reviews',
     event_review_prompt: 'reviews',
+    event_ticket_prompt: 'plans',
+    event_memories_prompt: 'reviews',
     subscription_milestone: 'milestones',
     milestone_unlocked: 'milestones',
     promo_code_approved: 'others',
@@ -158,6 +206,18 @@ const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> =
     event_message_reply: 'plans',
     event_message_reported: 'others',
     planned_session_changed: 'plans',
+    event_changed: 'plans',
+    suggestion_approved: 'others',
+    suggestion_declined: 'others',
+    suggestion_rejected: 'others',
+    suggestion_change_applied: 'others',
+    suggestion_change_discarded: 'others',
+    event_change_applied: 'others',
+    event_change_declined: 'others',
+    event_change_reverted: 'others',
+    event_removed: 'plans',
+    event_cancelled: 'plans',
+    organizer_assigned: 'others',
     plan_session_added: 'people',
     schedule_program_available: 'plans',
     schedule_program_updated: 'plans',

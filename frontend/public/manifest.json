@@ -1,7 +1,13 @@
 {
     "name": "Movida",
     "short_name": "Movida",
-    "description": "Explore . Dance . Connect - discover social dance events and connect with dancers.",
+    "description": "What's your next dance event? Find salsa, bachata, kizomba & zouk socials and festivals, see who's going, and collect your dance passport.",
+    "categories": [
+        "lifestyle",
+        "social",
+        "entertainment",
+        "travel"
+    ],
     "id": "/",
     "start_url": "/",
     "scope": "/",

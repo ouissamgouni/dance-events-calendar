@@ -45,10 +45,6 @@ from backend.db.models import (  # noqa: E402
 # stub it out — engine creation needs POSTGRES_PASSWORD or DATABASE_URL,
 # neither of which the unit-test runner provides.
 promo_codes_module._notify_admin_promo = lambda _id: None
-# Same reasoning for the saved-event fan-out email/push background task —
-# the in-app fan-out (``_fan_out_saved_event_promo_code``) runs
-# synchronously in the request and is covered directly below.
-promo_codes_module._send_promo_code_added_notifications = lambda *_a, **_kw: None
 
 
 @pytest.fixture
@@ -482,3 +478,57 @@ def test_second_approved_code_does_not_renotify_same_saver(
     ).all()
     assert len(added) == 1
     assert added[0].recipient_user_id == saver_id
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("deliver_via", ["job", "sweep"])
+def test_approve_queues_saver_email_and_push_instead_of_sending_inline(
+    client, session, engine, event, flag_on, monkeypatch, deliver_via
+):
+    from backend.db import database
+    from backend.services import job_queue, push_service
+    from backend.services.scheduler import sweep_fanout_jobs
+
+    queued: list = []
+    monkeypatch.setattr(
+        job_queue, "enqueue", lambda name, key, delay=0: queued.append((name, key))
+    )
+    monkeypatch.setattr(database, "_engine", engine)
+    emails: list = []
+    pushes: list = []
+    monkeypatch.setattr(
+        promo_codes_module,
+        "send_promo_code_added_email",
+        lambda user, event, promo: emails.append(user.id) or True,
+    )
+    monkeypatch.setattr(
+        push_service, "send_push", lambda user_id, **k: pushes.append(user_id) or 1
+    )
+
+    assert _login(client, email="submitter4@example.com").status_code == 200
+    promo_id = client.post(
+        f"/api/events/{event.event_id}/promo-codes", json={"code": "QUEUE10"}
+    ).json()["id"]
+    assert _login(client, email="queued-saver@example.com").status_code == 200
+    saver_id = _user_id(session, "queued-saver@example.com")
+    _save_event(
+        session, user_id=saver_id, event_id=event.event_id, device_id="dev-queued"
+    )
+
+    assert _login(client, email="admin@example.com").status_code == 200
+    assert client.post(f"/api/admin/promo-codes/{promo_id}/approve").status_code == 200
+    assert emails == [] and pushes == []
+    assert queued == [(promo_codes_module.PROMO_CODE_ADDED_JOB, promo_id)]
+
+    for _ in range(2):  # a re-run must not re-send stamped channels
+        if deliver_via == "job":
+            job_queue.run_job(*queued[0])
+        else:
+            sweep_fanout_jobs()
+    assert emails == [saver_id] and pushes == [saver_id]
+    assert sweep_fanout_jobs() == {"jobs": 0, "failed": 0}
+    session.expire_all()
+    channels = sorted(
+        d.channel for d in session.exec(select(NotificationDelivery)).all()
+    )
+    assert channels.count("email") == 1 and channels.count("push") == 1

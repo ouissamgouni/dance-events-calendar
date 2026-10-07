@@ -14,3 +14,9 @@ settings:
   trending_floor_going: 5
   trending_top_n: 4
   trending_top_percent: 100
+  my_events_route_enabled: true
+  event_tickets_enabled: true
+  event_memories_enabled: true
+  event_assets_max_tickets: 2
+  event_assets_ticket_retention_days: 30
+  event_assets_max_ticket_mb: 5

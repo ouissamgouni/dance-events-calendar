@@ -24,6 +24,11 @@ from backend.api.schemas import (
     DuplicateScanLogEntry,
     DuplicateScanLogListResponse,
     ManualDuplicateGroupRequest,
+    MergeEventsRequest,
+    MergeEventsResponse,
+    MergePreviewResponse,
+    OverlappingEventListResponse,
+    OverlappingEventResponse,
 )
 from backend.db.database import get_session
 from backend.db.models import (
@@ -32,13 +37,17 @@ from backend.db.models import (
     EventDuplicateMember,
     EventDuplicateScanLog,
 )
+from backend.services import event_merge
 from backend.services.duplicate_detection import (
     create_manual_group,
+    detect_duplicates_for_event,
     dismiss_group,
+    find_overlapping_events,
     get_groups_for_event,
     keep_event,
     run_full_scan,
 )
+from backend.services.event_visibility import audience, event_status
 
 router = APIRouter(prefix="/api/admin", tags=["admin-duplicates"])
 
@@ -183,6 +192,41 @@ def dismiss_duplicate_group(
     return _group_to_response(session, group)
 
 
+@router.get("/event-merge/preview", response_model=MergePreviewResponse)
+def preview_event_merge(
+    ids: list[str] = Query(...),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    try:
+        return event_merge.preview(session, ids)
+    except event_merge.MergeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/event-merge", response_model=MergeEventsResponse)
+def merge_events(
+    body: MergeEventsRequest,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Merge ``event_ids`` into ``target_event_id``; cannot be undone."""
+    try:
+        return event_merge.merge(
+            session,
+            target_id=body.target_event_id,
+            event_ids=[i for i in body.event_ids if i != body.target_event_id],
+            fields=body.fields,
+            combine_tags=body.combine_tags,
+            combine_links=body.combine_links,
+            note=body.note,
+            notify=body.notify,
+            admin_email=admin.get("email"),
+        )
+    except event_merge.MergeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/events/{event_id}/duplicates", response_model=DuplicateGroupListResponse)
 def list_event_duplicate_candidates(
     event_id: str,
@@ -192,3 +236,69 @@ def list_event_duplicate_candidates(
     groups = get_groups_for_event(session, event_id)
     items = [_group_to_response(session, group) for group in groups]
     return DuplicateGroupListResponse(items=items, total=len(items))
+
+
+@router.post(
+    "/events/{event_id}/duplicates/scan", response_model=DuplicateGroupListResponse
+)
+def scan_event_duplicates(
+    event_id: str,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Runs the automatic detection for this event only, ignoring the feature flag."""
+    if session.get(CachedEvent, event_id) is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    detect_duplicates_for_event(
+        session, event_id, triggered_by_admin=admin.get("email")
+    )
+    groups = get_groups_for_event(session, event_id)
+    items = [_group_to_response(session, group) for group in groups]
+    return DuplicateGroupListResponse(items=items, total=len(items))
+
+
+@router.get(
+    "/events/{event_id}/overlapping", response_model=OverlappingEventListResponse
+)
+def list_overlapping_events(
+    event_id: str,
+    limit: int = Query(default=10, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Events happening at the same time, likely duplicates first."""
+    event = session.get(CachedEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    scored = find_overlapping_events(session, event)
+    grouped = {
+        member.event_id
+        for group in get_groups_for_event(session, event_id)
+        for member in session.exec(
+            select(EventDuplicateMember).where(
+                EventDuplicateMember.group_id == group.id
+            )
+        ).all()
+    }
+    return OverlappingEventListResponse(
+        items=[
+            OverlappingEventResponse(
+                event_id=row.event_id,
+                title=row.title,
+                start=row.start,
+                end=row.end,
+                all_day=row.all_day,
+                location=row.location,
+                calendar_id=row.calendar_id,
+                visibility=audience(row),
+                status=event_status(row),
+                title_similarity=round(similarity, 2),
+                same_venue=same_venue,
+                likely_duplicate=likely,
+                in_duplicate_group=row.event_id in grouped,
+            )
+            for row, similarity, same_venue, likely in scored[offset : offset + limit]
+        ],
+        total=len(scored),
+    )

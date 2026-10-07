@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import {
     fetchProfilePassport,
     fetchPublicProfile,
     fetchUserCalendar,
+    fetchUserHosting,
     fetchUserSuggested,
     followUser,
     setFollowNotify,
@@ -16,6 +18,7 @@ import {
 } from '../api';
 import PassportView from '../components/PassportView';
 import type { CalendarEvent, SharedPassportResponse } from '../types';
+import { reportMailto } from '../utils/report';
 
 /**
  * Public profile page at /u/{handle}.
@@ -186,6 +189,14 @@ export default function ProfilePage() {
             />
             <SocialLinks profile={profile} />
             <ProfileTabs profile={profile} />
+            {!profile.is_self && (
+                <a
+                    href={reportMailto('profile', `${window.location.origin}/u/${profile.handle}`, `@${profile.handle}`)}
+                    className="block text-center text-xs text-ink-soft hover:text-ink"
+                >
+                    Report this profile
+                </a>
+            )}
         </div>
     );
 }
@@ -474,8 +485,9 @@ function SocialLinks({ profile }: { profile: PublicProfile }) {
     );
 }
 
-type TabKey = 'calendar' | 'suggested' | 'passport';
+type TabKey = 'hosting' | 'calendar' | 'suggested' | 'passport';
 const TAB_LABELS: Record<TabKey, string> = {
+    hosting: 'Hosting',
     calendar: 'Calendar',
     suggested: 'Suggested',
     passport: 'Dance Passport',
@@ -489,11 +501,16 @@ const CALENDAR_CHIP_LABELS: Record<CalendarChip, string> = {
 };
 
 function ProfileTabs({ profile }: { profile: PublicProfile }) {
-    const [active, setActive] = useState<TabKey>('passport');
+    const { organizerClaimsEnabled } = useOptionalFeatureFlags();
+    const showHosting = organizerClaimsEnabled && profile.is_verified_organizer;
+    const [active, setActive] = useState<TabKey>(showHosting ? 'hosting' : 'passport');
     // "Dance Passport" leads and is always present; its own visibility is
     // governed by ``passport_visibility`` (surfaced as ``can_view_passport``),
     // independent of the account-level gate on Calendar. Suggested is public.
-    const tabs: TabKey[] = ['passport', 'calendar', 'suggested'];
+    // Organizers lead with the events they host.
+    const tabs: TabKey[] = showHosting
+        ? ['hosting', 'passport', 'calendar', 'suggested']
+        : ['passport', 'calendar', 'suggested'];
 
     // Account-level gate ("public" | "friends") controls the owner-activity
     // tabs. Suggested is always public. The passport tab has its own gate
@@ -544,9 +561,54 @@ function ProfileTabs({ profile }: { profile: PublicProfile }) {
 }
 
 function ProfileTabContent({ handle, tab }: { handle: string; tab: TabKey }) {
+    if (tab === 'hosting') return <HostingTabContent handle={handle} />;
     if (tab === 'calendar') return <CalendarTabContent handle={handle} />;
     if (tab === 'passport') return <PassportTabContent handle={handle} />;
     return <SuggestedTabContent handle={handle} />;
+}
+
+function HostingTabContent({ handle }: { handle: string }) {
+    const [includePast, setIncludePast] = useState(false);
+    const [data, setData] = useState<ProfileEventListResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- per-tab fetch lifecycle
+        setLoading(true);
+        setError(null);
+        fetchUserHosting(handle, { limit: 50, includePast })
+            .then((res) => { if (!cancelled) setData(res); })
+            .catch((err: unknown) => {
+                if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load');
+            })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [handle, includePast]);
+
+    const items = data?.items ?? [];
+    return (
+        <div>
+            <label className="mb-2 flex items-center gap-2 text-sm text-ink-soft">
+                <input type="checkbox" checked={includePast} onChange={(e) => setIncludePast(e.target.checked)} />
+                Include past events
+            </label>
+            {loading && !data ? (
+                <div className="text-sm text-ink-soft p-2">Loading…</div>
+            ) : error ? (
+                <div className="text-sm text-ink-soft p-2">{error}</div>
+            ) : items.length === 0 ? (
+                <EmptyTabState tab="hosting" />
+            ) : (
+                <ul className="divide-y divide-slate-100">
+                    {items.map((ev) => (
+                        <ProfileEventRow key={ev.event_id} event={ev} />
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
 }
 
 function PassportTabContent({ handle }: { handle: string }) {
@@ -775,9 +837,11 @@ function ProfileEventRow({ event }: { event: CalendarEvent }) {
 
 function EmptyTabState({ tab }: { tab: TabKey }) {
     const message =
-        tab === 'calendar'
-            ? 'No events on this calendar yet.'
-            : 'No approved suggestions yet.';
+        tab === 'hosting'
+            ? 'No upcoming events hosted yet.'
+            : tab === 'calendar'
+                ? 'No events on this calendar yet.'
+                : 'No approved suggestions yet.';
     return <p className="text-sm text-ink-soft p-2">{message}</p>;
 }
 

@@ -43,6 +43,7 @@ class EventSearchResponse(BaseModel):
     country: Optional[str] = None
     matched_fields: list[Literal["title", "city", "country", "tag"]] = []
     matched_tags: list[str] = []
+    has_organizer: bool = False
 
 
 class EventResponse(BaseModel):
@@ -60,6 +61,7 @@ class EventResponse(BaseModel):
     start: datetime
     end: datetime
     all_day: bool = False
+    timezone: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     color: Optional[str] = None
@@ -108,11 +110,22 @@ class EventResponse(BaseModel):
     # ``True``/``False`` force the section on/off for this event only.
     show_price_override: Optional[bool] = None
     show_promo_override: Optional[bool] = None
+    advance_ticket_override: Optional[bool] = None
+    ticket_likely: bool = False
+    # admin | international | multi_day | None
+    ticket_likely_reason: Optional[str] = None
     # Verified organizer mini-profile when an admin-approved
     # OrganizerClaimEvent maps this event to a user. Gated by the
     # ``organizer_claims_enabled`` site setting (always None when off).
     organizer: Optional["EventOrganizerMini"] = None
+    is_cancelled: bool = False
+    cancellation_note: Optional[str] = None
     schedule_published: bool = False
+    # True when the viewer only sees this event because they submitted it and
+    # it is still awaiting review.
+    owner_preview: bool = False
+    # The viewer added this event; they edit it from Events I added.
+    is_owner: bool = False
 
 
 class ScheduleVenueResponse(BaseModel):
@@ -301,8 +314,6 @@ class SchedulePublishNotificationSummary(BaseModel):
     impacted_planners: int = 0
     going_attendees_notified: int = 0
     in_app_created: int = 0
-    emailed: int = 0
-    pushed: int = 0
     going_attendees: int = 0
 
 
@@ -763,6 +774,76 @@ class AttendanceSummaryBatchRequest(BaseModel):
     event_ids: list[str] = Field(..., min_length=1, max_length=200)
 
 
+class EventUserAssetResponse(BaseModel):
+    id: UUID
+    event_id: str
+    kind: str
+    content_type: Optional[str] = None
+    # Signed, short-lived URLs (images: thumb/full, PDFs: file); ``url`` is a ticket link.
+    url: Optional[str] = None
+    thumb_url: Optional[str] = None
+    full_url: Optional[str] = None
+    file_url: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    visibility: str = "private"
+    caption: Optional[str] = None
+    created_at: datetime
+    is_owner: bool = True
+    owner_display_name: Optional[str] = None
+    owner_avatar_url: Optional[str] = None
+
+
+class EventAssetsResponse(BaseModel):
+    event_id: str
+    is_going: bool
+    assets: list[EventUserAssetResponse] = []
+    ticket_count: int = 0
+    memory_count: int = 0
+    max_tickets: int
+    max_memories: int
+    max_ticket_mb: int
+    max_memory_mb: int
+    can_add_ticket: bool = False
+    can_add_memory: bool = False
+    memory_window_opens_at: datetime
+    memory_window_closes_at: datetime
+    ticket_expires_at: datetime
+    ticket_likely: bool = False
+    ticket_not_needed: bool = False
+
+
+class EventAssetLinkRequest(BaseModel):
+    url: HttpUrl
+
+
+class EventAssetUpdateRequest(BaseModel):
+    visibility: Optional[str] = Field(
+        default=None, pattern="^(private|friends|attendees)$"
+    )
+    caption: Optional[str] = Field(default=None, max_length=200)
+
+
+class EventAssetThumb(BaseModel):
+    id: UUID
+    thumb_url: Optional[str] = None
+    visibility: str = "private"
+
+
+class EventAssetSummary(BaseModel):
+    ticket_count: int = 0
+    memory_count: int = 0
+    memory_thumbs: list[EventAssetThumb] = []
+    can_add_memory: bool = False
+    memory_window_closes_at: Optional[datetime] = None
+    ticket_likely: bool = False
+    ticket_not_needed: bool = False
+
+
+class EventAssetSummaryRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
 # ---------------------------------------------------------------------------
 # Phase: interest-filter-following — per-user upcoming counts used by the
 # explorer's interest filter picker.
@@ -1152,6 +1233,9 @@ class OrganizerClaimEventOut(BaseModel):
     event_title: Optional[str] = None
     event_start: Optional[datetime] = None
     decision: str
+    # Admin-only context; left empty on the claimant's own view.
+    current_organizer_handle: Optional[str] = None
+    competing_pending_claims: int = 0
 
 
 class OrganizerClaimOut(BaseModel):
@@ -1176,17 +1260,51 @@ class OrganizerClaimAdminOut(OrganizerClaimOut):
     user_bio: Optional[str] = None
     user_instagram_url: Optional[str] = None
     user_facebook_url: Optional[str] = None
+    user_created_at: Optional[datetime] = None
+    user_is_verified_organizer: bool = False
+    user_organized_count: int = 0
 
 
 class OrganizerClaimCreate(BaseModel):
-    # ``badge``: request the account-level verified-organizer badge.
-    # Must not include ``event_ids``. Allowed only when the user is
-    # not already verified and has no pending badge claim.
+    # ``badge``: request the verified-organizer badge, optionally with up
+    # to 20 events decided in the same review. Allowed only when the user
+    # is not already verified and has no pending badge claim.
     #
     # ``events``: claim organizership of specific events. Requires
     # 1..20 ``event_ids``. Allowed only for already-verified users.
     kind: str = Field(default="badge", max_length=16)
     event_ids: list[str] = Field(default_factory=list, max_length=20)
+
+
+class OrganizerClaimEventsAdd(BaseModel):
+    event_ids: list[str] = Field(min_length=1, max_length=20)
+
+
+class OrganizedEventOut(BaseModel):
+    event_id: str
+    title: str
+    start: Optional[datetime] = None
+    city: Optional[str] = None
+
+
+class AdminEventOrganizerUpdate(BaseModel):
+    user_id: Optional[UUID] = None
+
+
+class AdminEventOrganizerOut(BaseModel):
+    event_id: str
+    organizer: Optional[EventOrganizerMini] = None
+
+
+class AdminUserOrganizerUpdate(BaseModel):
+    is_verified_organizer: bool
+    add_event_ids: list[str] = Field(default_factory=list, max_length=50)
+    remove_event_ids: list[str] = Field(default_factory=list, max_length=50)
+
+
+class AdminUserOrganizerOut(BaseModel):
+    is_verified_organizer: bool
+    events: list[OrganizedEventOut]
 
 
 class OrganizerClaimDecideRequest(BaseModel):
@@ -1450,6 +1568,20 @@ class SiteSettingsResponse(BaseModel):
     event_images_enabled: bool = True
     # What fills a card's picture slot when the event has no picture.
     event_card_placeholder_style: str = "none"
+    event_tickets_enabled: bool = False
+    event_memories_enabled: bool = False
+    event_assets_max_tickets: int = 2
+    event_assets_max_memories: int = 5
+    event_assets_ticket_retention_days: int = 30
+    event_assets_memory_window_days: int = 30
+    event_assets_max_ticket_mb: int = 5
+    event_assets_max_memory_mb: int = 10
+    ticket_likely_min_hours: int = 20
+    ticket_prompt_delay_hours: int = 24
+    ticket_prompt_min_lead_hours: int = 48
+    memories_prompt_local_hour: int = 11
+    ticket_prompt_enabled: bool = True
+    memories_prompt_enabled: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -1510,6 +1642,12 @@ class NotificationLogEntry(BaseModel):
     # delivery event went out on. One row per channel-event, so a single
     # Notification with all 3 channels delivered produces 3 rows here.
     channel: str
+    # Email route ("instant" | "digest") and sender ("request" | "job" |
+    # "tick" | "admin"); null for rows recorded before they were tracked.
+    mode: Optional[str] = None
+    source: Optional[str] = None
+    # Seconds between notification creation and this delivery.
+    latency_seconds: Optional[float] = None
     recipient_user_id: UUID
     recipient_email: str
     recipient_handle: Optional[str] = None
@@ -1589,6 +1727,61 @@ class ReviewPromptCandidate(BaseModel):
     already_rated: bool = False
 
 
+AssetPromptKind = Literal["ticket", "memories"]
+AssetPromptChannel = Literal["app", "email", "push"]
+
+
+class AssetPromptNotificationState(BaseModel):
+    created_at: datetime
+    read_at: Optional[datetime] = None
+    emailed_at: Optional[datetime] = None
+    pushed_at: Optional[datetime] = None
+
+
+class AssetPromptCandidate(BaseModel):
+    user_id: UUID
+    email: str
+    name: Optional[str] = None
+    handle: Optional[str] = None
+    # has_ticket | ticket_not_needed | has_memory; blocked users can't be sent to.
+    blocker: Optional[str] = None
+    email_enabled: bool
+    push_enabled: bool
+    has_push_subscription: bool
+    curator_marked: bool = False
+    notification: Optional[AssetPromptNotificationState] = None
+
+
+class AssetPromptCandidatesResponse(BaseModel):
+    event_id: str
+    title: Optional[str] = None
+    start: datetime
+    end: datetime
+    ticket_likely: bool
+    ticket_likely_reason: Optional[str] = None
+    # not_upcoming | not_ended | window_closed
+    ineligible_reason: Optional[str] = None
+    candidates: list[AssetPromptCandidate]
+
+
+class AssetPromptSendNowRequest(BaseModel):
+    kind: AssetPromptKind
+    event_id: str
+    user_ids: list[UUID] = Field(..., min_length=1, max_length=50)
+    channels: list[AssetPromptChannel] = Field(
+        default_factory=lambda: ["app", "email", "push"], min_length=1
+    )
+    resend: bool = False
+
+
+class AssetPromptSendNowResponse(BaseModel):
+    in_app_created: int
+    in_app_resurfaced: int
+    emailed: int
+    pushed: int
+    results: list[ForceSendUserResult]
+
+
 class NotificationToggleCountEntry(BaseModel):
     email: int = 0
     push: int = 0
@@ -1601,6 +1794,8 @@ class NotificationToggleCountsResponse(BaseModel):
     activity_digest: NotificationToggleCountEntry
     review_prompt: NotificationToggleCountEntry
     milestones: NotificationToggleCountEntry
+    ticket_prompt: NotificationToggleCountEntry
+    memories_prompt: NotificationToggleCountEntry
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -1711,6 +1906,22 @@ class SiteSettingsUpdateRequest(BaseModel):
     event_card_placeholder_style: Optional[str] = Field(
         default=None, pattern="^(gradient|initial|none)$"
     )
+    event_tickets_enabled: Optional[bool] = None
+    event_memories_enabled: Optional[bool] = None
+    event_assets_max_tickets: Optional[int] = Field(default=None, ge=1, le=10)
+    event_assets_max_memories: Optional[int] = Field(default=None, ge=1, le=20)
+    event_assets_ticket_retention_days: Optional[int] = Field(
+        default=None, ge=1, le=365
+    )
+    event_assets_memory_window_days: Optional[int] = Field(default=None, ge=1, le=365)
+    event_assets_max_ticket_mb: Optional[int] = Field(default=None, ge=1, le=20)
+    event_assets_max_memory_mb: Optional[int] = Field(default=None, ge=1, le=25)
+    ticket_likely_min_hours: Optional[int] = Field(default=None, ge=1, le=168)
+    ticket_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=168)
+    ticket_prompt_min_lead_hours: Optional[int] = Field(default=None, ge=0, le=168)
+    memories_prompt_local_hour: Optional[int] = Field(default=None, ge=0, le=23)
+    ticket_prompt_enabled: Optional[bool] = None
+    memories_prompt_enabled: Optional[bool] = None
 
 
 class EventImageFromUrlRequest(BaseModel):
@@ -1731,6 +1942,7 @@ class EventUpdateRequest(BaseModel):
     start: Optional[datetime] = None
     end: Optional[datetime] = None
     all_day: Optional[bool] = None
+    timezone: Optional[str] = Field(default=None, max_length=64)
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
@@ -1739,9 +1951,11 @@ class EventUpdateRequest(BaseModel):
     tag_ids: Optional[list[int]] = None
     calendar_id: Optional[str] = None
     review_status: Optional[str] = Field(default=None, pattern="^(pending|reviewed)$")
+    status: Optional[str] = Field(default=None, pattern="^(new|published|unpublished)$")
     is_hidden: Optional[bool] = None
     show_price_override: Optional[bool] = None
     show_promo_override: Optional[bool] = None
+    advance_ticket_override: Optional[bool] = None
 
 
 class GeocodeBoundingBox(BaseModel):
@@ -1774,6 +1988,14 @@ class GeocodeSuggestion(BaseModel):
     ] = "unknown"
     type_label: str = "Place"
     bounding_box: Optional[GeocodeBoundingBox] = None
+    timezone: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _resolve_timezone(self) -> "GeocodeSuggestion":
+        from backend.services.timezones import tz_for_point
+
+        self.timezone = self.timezone or tz_for_point(self.latitude, self.longitude)
+        return self
 
 
 class AppInfoResponse(BaseModel):
@@ -1817,14 +2039,17 @@ class EventSuggestionCreate(BaseModel):
     submitter_name: Optional[str] = Field(default=None, max_length=100)
     submitter_email: Optional[str] = Field(default=None, max_length=200)
     website: str = ""  # honeypot
-    screen_size: Optional[str] = None
     timezone: Optional[str] = None
+    # Zone the event happens in, as confirmed in the form (``timezone`` is the browser's).
+    event_timezone: Optional[str] = Field(default=None, max_length=64)
     suggested_tag_ids: list[int] = Field(default_factory=list)
     suggested_new_tags: list[NewTagSuggestionItem] = Field(default_factory=list)
     going: bool = False
     going_audience: Optional[str] = Field(
         default=None, pattern="^(public|friends|private)$"
     )
+    # Honoured only for verified organizers.
+    is_organizer: bool = False
     promo_code: Optional[str] = Field(default=None, max_length=64)
     promo_description: Optional[str] = Field(default=None, max_length=200)
     promo_source_url: Optional[str] = Field(default=None, max_length=500)
@@ -1837,6 +2062,8 @@ class EventSuggestionCreate(BaseModel):
     # effect for anonymous submissions.
     auto_save: bool = True
     image_key: Optional[str] = Field(default=None, max_length=200)
+    # False keeps the event to its owner; True asks curators to make it public.
+    share_publicly: bool = True
 
     @model_validator(mode="after")
     def _check_recurrence(self) -> "EventSuggestionCreate":
@@ -1868,21 +2095,16 @@ class EventSuggestionResponse(BaseModel):
     start: datetime
     end: datetime
     all_day: bool = False
+    timezone: Optional[str] = None
     recurrence_rule: Optional[str] = None
     recurrence_dates: Optional[list[RecurrenceDateItem]] = None
     submitter_name: Optional[str] = None
     submitter_email: Optional[str] = None
-    submitter_ip: Optional[str] = None
-    submitter_user_agent: Optional[str] = None
-    submitter_language: Optional[str] = None
-    submitter_referrer: Optional[str] = None
-    submitter_screen_size: Optional[str] = None
     submitter_timezone: Optional[str] = None
-    submitter_city: Optional[str] = None
-    submitter_country: Optional[str] = None
-    submitter_lat: Optional[float] = None
-    submitter_lng: Optional[float] = None
     status: str = "pending"
+    # An occurrence still awaits an admin look (any audience).
+    needs_review: bool = False
+    edit_locked: bool = False
     admin_notes: Optional[str] = None
     assigned_calendar_id: Optional[str] = None
     created_event_id: Optional[str] = None
@@ -1922,6 +2144,15 @@ class EventSuggestionPublicResponse(BaseModel):
     message: str
 
 
+class SimilarEventResponse(BaseModel):
+    event_id: str
+    title: str
+    start: datetime
+    end: datetime
+    all_day: bool = False
+    location: Optional[str] = None
+
+
 class SuggestionOccurrence(BaseModel):
     """One expanded date of a suggestion's recurrence, for admin review."""
 
@@ -1958,6 +2189,345 @@ class SuggestionUpdateRequest(BaseModel):
     admin_notes: Optional[str] = None
     # Admins may only clear the submitter's picture, never point it elsewhere.
     image_key: None = None
+    edit_locked: Optional[bool] = None
+
+
+class OwnSuggestionUpdate(BaseModel):
+    """Submitter edit of their own suggestion; only sent fields change."""
+
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    location: Optional[str] = None
+    links: Optional[list[LinkItem]] = Field(default=None, max_length=3)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    start: Optional[datetime] = None
+    end: Optional[datetime] = None
+    all_day: Optional[bool] = None
+    event_timezone: Optional[str] = Field(default=None, max_length=64)
+    recurrence_rule: Optional[str] = Field(default=None, max_length=500)
+    recurrence_dates: Optional[list[RecurrenceDateItem]] = Field(
+        default=None, max_length=MAX_OCCURRENCES
+    )
+    suggested_tag_ids: Optional[list[int]] = None
+    # Tags that don't exist yet; each becomes a tag suggestion for curators.
+    suggested_new_tags: Optional[list[NewTagSuggestionItem]] = Field(
+        default=None, max_length=5
+    )
+    price_min: Optional[float] = Field(default=None, ge=0)
+    price_max: Optional[float] = Field(default=None, ge=0)
+    price_currency: Optional[str] = Field(default=None, max_length=8)
+    price_is_free: Optional[bool] = None
+    image_key: Optional[str] = Field(default=None, max_length=200)
+
+    @model_validator(mode="after")
+    def _check_recurrence(self) -> "OwnSuggestionUpdate":
+        if self.recurrence_rule and self.recurrence_dates:
+            raise ValueError(
+                "Provide either recurrence_rule or recurrence_dates, not both"
+            )
+        if self.recurrence_rule:
+            self.recurrence_rule = validate_rule(self.recurrence_rule)
+        if self.recurrence_dates:
+            seen: set[datetime] = set()
+            for item in self.recurrence_dates:
+                if item.end <= item.start:
+                    raise ValueError("Each recurrence date must end after it starts")
+                if item.start in seen:
+                    raise ValueError("Recurrence dates must be unique")
+                seen.add(item.start)
+        return self
+
+
+class OwnSuggestionResponse(BaseModel):
+    id: UUID
+    status: str
+    edit_locked: bool = False
+    can_edit: bool = False
+    title: str
+    description: Optional[str] = None
+    location: Optional[str] = None
+    links: Optional[list[LinkItem]] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    start: datetime
+    end: datetime
+    all_day: bool = False
+    timezone: Optional[str] = None
+    recurrence_rule: Optional[str] = None
+    recurrence_dates: Optional[list[RecurrenceDateItem]] = None
+    suggested_tag_ids: Optional[list[int]] = None
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    price_currency: Optional[str] = None
+    price_is_free: Optional[bool] = None
+    image_key: Optional[str] = None
+    image_thumb_url: Optional[str] = None
+    created_event_id: Optional[str] = None
+    created_at: datetime
+    # Shown to the submitter once their suggestion is rejected.
+    rejection_reason: Optional[str] = None
+    # An approved suggestion's edit awaiting admin review:
+    # ``{field: {"old": ..., "new": ...}}``.
+    pending_changes: Optional[dict] = None
+
+    @model_validator(mode="after")
+    def _resolve_image_url(self) -> "OwnSuggestionResponse":
+        from backend.services.event_images import image_urls
+        from backend.services.object_storage import ObjectStorageError
+
+        if self.image_key:
+            try:
+                self.image_thumb_url, _ = image_urls(self.image_key)
+            except ObjectStorageError:
+                pass
+        return self
+
+
+class SuggestionAuditEntry(BaseModel):
+    id: int
+    action: str
+    actor_user_id: Optional[UUID] = None
+    actor_admin_email: Optional[str] = None
+    changes: Optional[dict] = None
+    created_at: datetime
+
+
+class EventChangeCreate(BaseModel):
+    """A change to a public event; only sent fields are compared."""
+
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=5000)
+    location: Optional[str] = Field(default=None, max_length=300)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    links: Optional[list[LinkItem]] = Field(default=None, max_length=3)
+    start: Optional[datetime] = None
+    end: Optional[datetime] = None
+    all_day: Optional[bool] = None
+    price_min: Optional[float] = Field(default=None, ge=0)
+    price_max: Optional[float] = Field(default=None, ge=0)
+    price_currency: Optional[str] = Field(default=None, max_length=8)
+    price_is_free: Optional[bool] = None
+    tag_ids: Optional[list[int]] = Field(default=None, max_length=30)
+    suggested_new_tags: Optional[list[NewTagSuggestionItem]] = Field(
+        default=None, max_length=5
+    )
+    # Organizer or owner: request cancellation (or undo it) with a note for attendees.
+    is_cancelled: Optional[bool] = None
+    cancellation_note: Optional[str] = Field(default=None, max_length=500)
+
+
+class OwnEventChangeResponse(BaseModel):
+    id: int
+    event_id: str
+    event_title: Optional[str] = None
+    source: Literal["user", "organizer"]
+    status: Literal[
+        "pending",
+        "accepted",
+        "rejected",
+        "superseded",
+        "reverted",
+        "withdrawn",
+        "closed",
+    ]
+    changes: dict
+    created_at: datetime
+    decided_at: Optional[datetime] = None
+
+
+class RevisionActor(BaseModel):
+    user_id: UUID
+    handle: Optional[str] = None
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class EventRevisionResponse(BaseModel):
+    id: int
+    event_id: Optional[str] = None
+    suggestion_id: Optional[UUID] = None
+    kind: Literal["create", "edit", "cancel", "remove", "go_public"] = "edit"
+    source: Literal["sync", "admin", "submitter", "user", "organizer"]
+    status: Literal[
+        "draft",
+        "pending",
+        "accepted",
+        "rejected",
+        "superseded",
+        "reverted",
+        "withdrawn",
+        "closed",
+    ]
+    # ``{field: {"old": ..., "new": ...}}``
+    changes: dict
+    material_fields: list[str] = []
+    proposed_by: Optional[RevisionActor] = None
+    proposed_by_admin_email: Optional[str] = None
+    decided_by: Optional[str] = None
+    decided_at: Optional[datetime] = None
+    notified_count: int = 0
+    # Signed-in users who saved or are going; who applying would notify.
+    affected_attendees: int = 0
+    # Dates still to come in the event's series, the event included.
+    series_dates: int = 1
+    series_affected_attendees: int = 0
+    # The same Google change pending on this many upcoming dates.
+    group_size: int = 1
+    created_at: datetime
+    updated_at: datetime
+
+
+class EventDraftUpdate(BaseModel):
+    """Side-panel edits merged into the event's unpublished draft."""
+
+    changes: dict[str, Any]
+
+    @model_validator(mode="after")
+    def _check_fields(self) -> "EventDraftUpdate":
+        from backend.services.event_revisions import DRAFT_FIELDS
+
+        unknown = set(self.changes) - set(DRAFT_FIELDS)
+        if unknown:
+            raise ValueError(f"Not editable through a draft: {sorted(unknown)}")
+        if "title" in self.changes and not (self.changes["title"] or "").strip():
+            raise ValueError("title is required")
+        for field in ("start", "end"):
+            value = self.changes.get(field)
+            if field in self.changes and value is None:
+                raise ValueError(f"{field} is required")
+            if isinstance(value, str):
+                try:
+                    datetime.fromisoformat(value)
+                except ValueError as exc:
+                    raise ValueError(f"{field} must be an ISO datetime") from exc
+        return self
+
+
+class RevisionDecisionRequest(BaseModel):
+    # None: notify only when the time, venue or title changed.
+    notify: Optional[bool] = None
+    # Apply a removal or cancellation proposal as the other one.
+    as_status: Optional[Literal["cancelled", "removed"]] = None
+    # ``series``: also every other upcoming date of the series.
+    scope: Literal["date", "series"] = "date"
+
+
+class AdminEventStatusRequest(BaseModel):
+    status: Literal["published", "cancelled", "removed"]
+    note: Optional[str] = Field(default=None, max_length=500)
+    notify: Optional[bool] = None
+    scope: Literal["date", "series"] = "date"
+
+
+class ChangeDecisionRequest(BaseModel):
+    decision: Literal["accept", "reject"]
+    note: Optional[str] = Field(default=None, max_length=2000)
+    # None: notify only when the time, venue or title changed.
+    notify: Optional[bool] = None
+    # Accept a removal or cancellation as the other one.
+    as_status: Optional[Literal["cancelled", "removed"]] = None
+    # Where an accepted go-public request is published.
+    calendar_id: Optional[str] = None
+    scope: Literal["date", "series"] = "date"
+
+
+class ChangeEventSummary(BaseModel):
+    event_id: str
+    title: str
+    start: datetime
+    end: datetime
+    all_day: bool = False
+    timezone: Optional[str] = None
+    location: Optional[str] = None
+    status: str
+    visibility_state: Literal["public", "private"] = "public"
+    occurrences: int = 1
+    is_submission: bool = False
+
+
+class AdminChangeResponse(EventRevisionResponse):
+    event: Optional[ChangeEventSummary] = None
+    submitter_name: Optional[str] = None
+
+
+class AdminChangesResponse(BaseModel):
+    items: list[AdminChangeResponse]
+    total: int
+    kinds: list["FilterOption"] = []
+    sources: list["FilterOption"] = []
+
+
+class SubmissionSubmitter(BaseModel):
+    user_id: UUID
+    handle: Optional[str] = None
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class SubmissionInfo(BaseModel):
+    suggestion_id: UUID
+    status: str
+    edit_locked: bool = False
+    submitter: Optional[SubmissionSubmitter] = None
+    submitter_name: Optional[str] = None
+    submitter_email: Optional[str] = None
+    submitted_at: datetime
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    admin_notes: Optional[str] = None
+    # The submitter's other decided suggestions.
+    approved_count: int = 0
+    rejected_count: int = 0
+    # What approving would trigger.
+    followers_to_notify: int = 0
+    dates_total: int = 0
+    dates_materialised: int = 0
+
+
+class MockSourceEvent(BaseModel):
+    """An event as the emulated (mock) Google source currently has it."""
+
+    event_id: str
+    calendar_id: str
+    title: str
+    description: Optional[str] = None
+    location: Optional[str] = None
+    start: datetime
+    end: datetime
+    all_day: bool = False
+    edited: bool = False
+    deleted: bool = False
+
+
+class MockSourceEventUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    location: Optional[str] = None
+    start: Optional[datetime] = None
+    end: Optional[datetime] = None
+    all_day: Optional[bool] = None
+    # Run an incremental sync of the event's calendar right away.
+    sync: bool = True
+
+
+class MockSourceSyncResponse(BaseModel):
+    source: Optional[MockSourceEvent] = None
+    synced: bool = False
+    upserted: int = 0
+    deleted: int = 0
+
+
+class AdminEventModerationResponse(BaseModel):
+    visibility: Literal["public", "private"]
+    wants_public: bool = False
+    submission: Optional[SubmissionInfo] = None
+    # Dates still to come in the event's series, the event included.
+    series_dates: int = 1
+    draft: Optional[EventRevisionResponse] = None
+    open_revisions: list[EventRevisionResponse] = []
+    history: list[EventRevisionResponse] = []
 
 
 # --- Tags / Categorization ---
@@ -2033,15 +2603,6 @@ class EventTagAssignment(BaseModel):
     tag_ids: list[int]
 
 
-class TagSuggestionCreate(BaseModel):
-    event_id: str
-    tag_id: Optional[int] = None
-    free_text: Optional[str] = Field(default=None, max_length=100)
-    group_slug: Optional[str] = Field(default=None, max_length=64)
-    device_id: Optional[str] = Field(default=None, max_length=64)
-    website: str = ""  # honeypot
-
-
 class TagSuggestionResponse(BaseModel):
     id: int
     event_id: str
@@ -2054,6 +2615,7 @@ class TagSuggestionResponse(BaseModel):
     group_slug: Optional[str] = None
     status: str = "pending"
     submitter_device_id: Optional[str] = None
+    submitter_name: Optional[str] = None
     admin_notes: Optional[str] = None
     reviewed_at: Optional[datetime] = None
     created_at: datetime
@@ -2141,13 +2703,39 @@ class EventInterestReach(BaseModel):
 
 class AdminEventResponse(EventResponse):
     source_description: Optional[str] = None
-    status: Literal["pending", "reviewed", "blocked"] = "reviewed"
-    block_reason: Optional[Literal["deleted", "duplicate", "rejected"]] = None
+    status: Literal["new", "published", "unpublished", "cancelled", "removed"] = (
+        "published"
+    )
+    status_reason: Optional[
+        Literal[
+            "admin",
+            "duplicate",
+            "owner",
+            "google_calendar",
+            "series_edit",
+            "rejected",
+            "merged",
+        ]
+    ] = None
+    block_reason: Optional[Literal["deleted", "duplicate", "rejected", "merged"]] = None
     block_reason_detail: Optional[str] = None
+    merged_into_event_id: Optional[str] = None
+    # Row chips: created from a user suggestion / has a source or submitter
+    # change awaiting review.
+    is_submission: bool = False
+    has_pending_changes: bool = False
+    # Audience only; whether it is shown at all is ``status``.
+    visibility_state: Literal["public", "private"] = "public"
+    wants_public: bool = False
     # List-only metrics (None on single-event endpoints).
     interest_reach: Optional[EventInterestReach] = None
     unique_viewers: Optional[int] = None
     link_clicks: Optional[int] = None
+    submitter_name: Optional[str] = None
+    # Rows grouped by series: how many matching dates the row stands for.
+    occurrence_count: Optional[int] = None
+    # List-only: a date of a recurring submission or a confirmed series.
+    in_series: bool = False
 
 
 class PaginatedEventsResponse(BaseModel):
@@ -2206,6 +2794,27 @@ class DuplicateGroupListResponse(BaseModel):
     total: int
 
 
+class OverlappingEventResponse(BaseModel):
+    event_id: str
+    title: str
+    start: datetime
+    end: datetime
+    all_day: bool = False
+    location: Optional[str] = None
+    calendar_id: str
+    visibility: Literal["public", "private"]
+    status: str
+    title_similarity: float
+    same_venue: bool
+    likely_duplicate: bool
+    in_duplicate_group: bool
+
+
+class OverlappingEventListResponse(BaseModel):
+    items: list[OverlappingEventResponse]
+    total: int
+
+
 class DuplicateScanLogEntry(BaseModel):
     id: int
     scan_type: str  # incremental | full | manual_pair
@@ -2228,6 +2837,47 @@ class DuplicateKeepRequest(BaseModel):
 
 class ManualDuplicateGroupRequest(BaseModel):
     event_ids: list[str] = Field(..., min_length=2, max_length=20)
+
+
+class MergeField(BaseModel):
+    key: str
+    label: str
+    identical: bool
+
+
+class MergeEventPreview(BaseModel):
+    event_id: str
+    calendar_id: str
+    status: Optional[str] = None
+    is_submission: bool = False
+    # ``{field key: value}``; ``time`` and ``price`` are objects.
+    values: dict
+    tag_ids: list[int] = []
+    counts: dict[str, int]
+
+
+class MergePreviewResponse(BaseModel):
+    events: list[MergeEventPreview]
+    fields: list[MergeField]
+    affected_users: int
+
+
+class MergeEventsRequest(BaseModel):
+    target_event_id: str
+    event_ids: list[str] = Field(..., min_length=1, max_length=5)
+    # ``{field key: event_id whose value the kept event takes}``
+    fields: dict[str, str] = {}
+    combine_tags: bool = True
+    combine_links: bool = True
+    note: Optional[str] = Field(default=None, max_length=500)
+    notify: bool = True
+
+
+class MergeEventsResponse(BaseModel):
+    target_event_id: str
+    merged_event_ids: list[str]
+    moved: dict[str, int]
+    notified: int
 
 
 # --- Admin: event series grouping & fuzzy detection ---
@@ -2305,9 +2955,15 @@ class FilterOption(BaseModel):
     count: int = 0
 
 
+AdminChangesResponse.model_rebuild()
+
+
 class EventFilterOptionsResponse(BaseModel):
     calendars: list[FilterOption] = []
+    # Each group's counts apply the other groups' selections.
+    audiences: list[FilterOption] = []
     statuses: list[FilterOption] = []
+    flags: list[FilterOption] = []
     geo_statuses: list[FilterOption] = []
     tags: list[FilterOption] = []
     total_count: int = 0
@@ -2615,9 +3271,6 @@ class AdminRatingResponse(BaseModel):
     linked_tag_suggestion_ids: list[int] = []
     status: str
     admin_notes: Optional[str] = None
-    submitter_ip: Optional[str] = None
-    submitter_user_agent: Optional[str] = None
-    submitter_country: Optional[str] = None
     auto_flagged: bool = False
     reviewed_at: Optional[datetime] = None
     reviewed_by: Optional[str] = None
@@ -3284,6 +3937,14 @@ class ProfileEventListResponse(BaseModel):
     limit: int
     offset: int
     curated_event_ids: list[str] = []
+
+
+class HostingResponse(BaseModel):
+    """The signed-in organizer's own events (upcoming and past)."""
+
+    items: list[EventResponse]
+    # Events with an organizer change still waiting for admin review.
+    pending_change_event_ids: list[str] = []
 
 
 class ProfileCalendarItem(BaseModel):

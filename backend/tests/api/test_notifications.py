@@ -317,7 +317,7 @@ def test_signed_in_suggestion_submit_does_not_fan_out_pending_event(client, sess
     event = session.get(CachedEvent, event_id)
     assert event is not None
     assert event.calendar_id == "user-submissions"
-    assert event.review_status == "pending"
+    assert (event.status, event.visibility) == ("published", "private")
 
     attendance = session.exec(
         select(UserEventAttendance).where(
@@ -332,6 +332,24 @@ def test_signed_in_suggestion_submit_does_not_fan_out_pending_event(client, sess
         select(Notification).where(Notification.recipient_user_id == bob.id)
     ).all()
     assert notifs == []
+
+    # Followers hear about the Going once the event is approved.
+    from backend.api.deps import require_admin
+
+    _make_calendar(session, "movida")
+    app.dependency_overrides[require_admin] = lambda: {"email": "admin@example.com"}
+    r = client.post(
+        f"/api/admin/suggestions/{suggestion_id}/approve",
+        json={"calendar_id": "movida"},
+    )
+    assert r.status_code == 200, r.text
+    session.expire_all()
+    kinds = {
+        (n.recipient_user_id, n.kind, n.event_id)
+        for n in session.exec(select(Notification)).all()
+    }
+    assert (bob.id, "subscription_going", event_id) in kinds
+    assert (alice.id, "suggestion_approved", event_id) in kinds
 
 
 def test_going_repeat_is_idempotent(client, session):
@@ -455,35 +473,6 @@ def test_suggested_fan_out_on_admin_approval(client, session):
     assert notifs[0].kind == "subscription_suggested"
     assert notifs[0].event_id == created_event_id
     assert notifs[0].actor_user_id == alice.id
-
-
-def test_anonymous_suggestion_no_fan_out(client, session):
-    _make_calendar(session)
-    alice = _make_user(session, "alice@example.com", "alice")
-    bob = _make_user(session, "bob@example.com", "bob")
-    _subscribe(session, bob, alice)
-
-    # No login -> anonymous submission.
-    submit = client.post(
-        "/api/suggestions",
-        json={
-            "title": "Anon Salsa",
-            "start": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
-            "end": (
-                datetime.now(timezone.utc) + timedelta(days=2, hours=2)
-            ).isoformat(),
-            "all_day": False,
-        },
-    )
-    assert submit.status_code == 201
-    sug_id = submit.json()["id"]
-
-    _login(client, "admin@example.com")
-    client.post(
-        f"/api/admin/suggestions/{sug_id}/approve",
-        json={"calendar_id": "cal-test"},
-    )
-    assert _count_notifs(session, bob) == 0
 
 
 # --- /api/notifications endpoints -------------------------------------------

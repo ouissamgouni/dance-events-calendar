@@ -210,22 +210,6 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                             <span className="text-muted">Submitted:</span>{' '}
                             {new Date(rating.created_at).toLocaleString()}
                         </div>
-                        {rating.submitter_country && (
-                            <div>
-                                <span className="text-muted">Country:</span> {rating.submitter_country}
-                            </div>
-                        )}
-                        {rating.submitter_ip && (
-                            <div>
-                                <span className="text-muted">IP:</span> <span className="font-mono">{rating.submitter_ip}</span>
-                            </div>
-                        )}
-                        {rating.submitter_user_agent && (
-                            <div className="col-span-2 truncate">
-                                <span className="text-muted">UA:</span>{' '}
-                                <span className="font-mono text-[10px]">{rating.submitter_user_agent}</span>
-                            </div>
-                        )}
                     </div>
 
                     {/* Admin notes */}

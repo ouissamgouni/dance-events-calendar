@@ -30,3 +30,4 @@ settings:
   explorer_view_control_labels_enabled: true
   event_images_enabled: true
   tag_as_badge_enabled: true
+  browse_nav_enabled: true

@@ -8,6 +8,7 @@ import { AttendanceSummariesProvider } from '../context/AttendanceSummariesConte
 import { SavedEventsProvider } from '../context/SavedEventsContext'
 import { AttendingEventsProvider } from '../context/AttendingEventsContext'
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext'
+import { EventAssetSummaryProvider } from '../context/EventAssetSummaryContext'
 import { ToastProvider } from '../components/Toast'
 import { server } from '../test/server'
 import { makeUser } from '../test/handlers'
@@ -50,7 +51,7 @@ vi.mock('../utils/passportShareImage', () => ({
     downloadImage: vi.fn(),
 }))
 
-function renderPassport() {
+function renderPassport(flags: Partial<typeof defaultFlags> = {}) {
     return render(
         <MemoryRouter initialEntries={['/mine/passport']}>
             <ToastProvider>
@@ -58,12 +59,14 @@ function renderPassport() {
                     <AttendanceSummariesProvider>
                         <SavedEventsProvider>
                             <AttendingEventsProvider>
-                                <FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}>
-                                    <Routes>
-                                        <Route path="/mine/passport" element={<PassportPage />} />
-                                        <Route path="/login" element={<p>login page</p>} />
-                                        <Route path="/event/:eventId" element={<p>event page</p>} />
-                                    </Routes>
+                                <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, ...flags }, updateFlag: vi.fn() }}>
+                                    <EventAssetSummaryProvider>
+                                        <Routes>
+                                            <Route path="/mine/passport" element={<PassportPage />} />
+                                            <Route path="/login" element={<p>login page</p>} />
+                                            <Route path="/event/:eventId" element={<p>event page</p>} />
+                                        </Routes>
+                                    </EventAssetSummaryProvider>
                                 </FeatureFlagsContext.Provider>
                             </AttendingEventsProvider>
                         </SavedEventsProvider>
@@ -175,6 +178,29 @@ describe('PassportPage', () => {
         expect(screen.getByRole('button', { name: 'Show in map' })).toBeInTheDocument()
         // No "Styles danced" stat card.
         expect(screen.queryByText('Styles danced')).not.toBeInTheDocument()
+    })
+
+    it.each([
+        ['icon on the row when there are no memories yet', [], 'Paris Salsa Night'],
+        ['a + tile after the thumbnails', [{ id: 'a', thumb_url: 'https://signed.test/a', visibility: 'private' }], '1 memories'],
+    ])('shows a compact add-memories action: %s', async (_label, thumbs, neighbour) => {
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/passport', () => HttpResponse.json(PASSPORT)),
+            http.get('*/api/passport/timeline', () => HttpResponse.json(TIMELINE)),
+            http.post('*/api/me/event-assets/summary', () => HttpResponse.json({
+                'evt-1': { ticket_count: 0, memory_count: thumbs.length, memory_thumbs: thumbs, can_add_memory: true, memory_window_closes_at: '2026-10-05T20:00:00Z' },
+            })),
+        )
+
+        renderPassport({ eventMemoriesEnabled: true })
+        fireEvent.click(await screen.findByRole('tab', { name: 'Journey' }))
+
+        const add = await screen.findByRole('link', { name: 'Add memories' })
+        expect(add).toHaveAttribute('href', '/event/evt-1#memories')
+        expect(screen.getAllByRole('link', { name: 'Add memories' })).toHaveLength(1)
+        expect(screen.getByRole('link', { name: new RegExp(neighbour) })).toBeInTheDocument()
+        expect(screen.queryByText(/Add memories · until/)).not.toBeInTheDocument()
     })
 
     it('renders an independent milestone as its own chronological entry', async () => {

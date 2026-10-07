@@ -5,6 +5,7 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useEventCardImage } from '../hooks/useEventCardImage';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
 import { shortLocation } from '../utils/locationShort';
+import { allDayLastDay, dayOfMonth, eventDisplayZone, isSameEventDay, isSameMonth } from '../utils/eventDates';
 import EventDateRail from './EventDateRail';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
 import TagBadges from './TagBadges';
@@ -74,14 +75,14 @@ export interface EventCardProps {
     actionsTestId?: string;
 }
 
-const fmtTime = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-const fmtDate = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const fmtTime = (d: Date, timeZone?: string) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
+const fmtDate = (d: Date, timeZone?: string) => d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone });
 // End date drops the month when it lands in the same month/year as the start.
-const fmtEndDate = (start: Date, end: Date) => end.toLocaleDateString(
+const fmtEndDate = (start: Date, end: Date, timeZone?: string) => end.toLocaleDateString(
     undefined,
-    start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
-        ? { weekday: 'short', day: 'numeric' }
-        : { weekday: 'short', month: 'short', day: 'numeric' },
+    isSameMonth(start, end, timeZone)
+        ? { weekday: 'short', day: 'numeric', timeZone }
+        : { weekday: 'short', month: 'short', day: 'numeric', timeZone },
 );
 
 /**
@@ -139,13 +140,14 @@ export default function EventCard({
 
     const start = new Date(event.start);
     const end = new Date(event.end);
-    const sameDay = start.toDateString() === end.toDateString();
+    const tz = eventDisplayZone(event);
+    const sameDay = isSameEventDay(event);
     const timeText = event.all_day
-        ? (sameDay ? 'All day' : `Until ${fmtEndDate(start, new Date(end.getTime() - 1))}`)
+        ? (sameDay ? 'All day' : `Until ${fmtEndDate(start, allDayLastDay(event), tz)}`)
         : (sameDay
-            ? `${fmtTime(start)} – ${fmtTime(end)}`
-            : `${fmtTime(start)} – ${fmtEndDate(start, end)}, ${fmtTime(end)}`);
-    const dateText = event.all_day ? fmtDate(start) : `${fmtDate(start)} · ${fmtTime(start)}`;
+            ? `${fmtTime(start, tz)} – ${fmtTime(end, tz)}`
+            : `${fmtTime(start, tz)} – ${fmtEndDate(start, end, tz)}, ${fmtTime(end, tz)}`);
+    const dateText = event.all_day ? fmtDate(start, tz) : `${fmtDate(start, tz)} · ${fmtTime(start, tz)}`;
 
     // "I'm going" sits bottom-right by the tags when the flag is on;
     // otherwise it joins Save in the top-right cluster.
@@ -246,6 +248,7 @@ export default function EventCard({
                     onKeyDown={(e) => e.stopPropagation()}
                 >
                     <CardActionCluster
+                        cancelled={event.is_cancelled}
                         eventId={event.event_id}
                         eventTitle={event.title}
                         isPast={isPast}
@@ -275,6 +278,12 @@ export default function EventCard({
             data-testid={newDotTestId}
         />
     ) : null;
+    const cancelledChip = event.is_cancelled ? (
+        <span className="mr-1.5 bg-danger/10 px-1.5 py-0.5 align-middle text-xs font-semibold text-danger">Cancelled</span>
+    ) : null;
+    const cancelledTitle = event.is_cancelled
+        ? <span className="text-ink-soft line-through">{event.title}</span>
+        : event.title;
 
     return (
         <div
@@ -305,19 +314,20 @@ export default function EventCard({
                         <div className="flex items-start gap-2.5">
                             <span className="flex shrink-0 flex-col items-center text-center leading-tight" aria-hidden="true">
                                 <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-weekday'}>
-                                    {start.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()}
+                                    {start.toLocaleDateString(undefined, { weekday: 'short', timeZone: tz }).toUpperCase()}
                                 </span>
                                 <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-month'}>
-                                    {start.toLocaleDateString(undefined, { month: 'short' }).toUpperCase()}
+                                    {start.toLocaleDateString(undefined, { month: 'short', timeZone: tz }).toUpperCase()}
                                 </span>
-                                <span className={isPast ? 'text-sm font-semibold text-ink-soft' : 'event-card-rail-day'}>{start.getDate()}</span>
+                                <span className={isPast ? 'text-sm font-semibold text-ink-soft' : 'event-card-rail-day'}>{dayOfMonth(start, tz)}</span>
                             </span>
                             <h3
                                 className="min-w-0 flex-1 line-clamp-2 text-sm font-semibold leading-snug text-ink group-hover:text-action"
                                 title={event.title}
                             >
                                 {newDot}
-                                {event.title}
+                                {cancelledChip}
+                                {cancelledTitle}
                                 {showPastLabel && isPast && <span className="ml-2 text-xs font-semibold text-ink-soft">Past</span>}
                             </h3>
                             {topActions.length > 0 && (
@@ -328,6 +338,7 @@ export default function EventCard({
                                     onKeyDown={(e) => e.stopPropagation()}
                                 >
                                     <CardActionCluster
+                                        cancelled={event.is_cancelled}
                                         eventId={event.event_id}
                                         eventTitle={event.title}
                                         isSavedFlag={isSavedFlag}
@@ -365,6 +376,7 @@ export default function EventCard({
                         <div className="flex shrink-0 self-stretch">
                             <EventDateRail
                                 start={start}
+                                timeZone={tz}
                                 sequence={dateSequence}
                                 tone={isPast ? 'neutral' : 'default'}
                             />
@@ -381,12 +393,12 @@ export default function EventCard({
                                         </span>
                                     )}
                                     <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-weekday'}>
-                                        {start.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()}
+                                        {start.toLocaleDateString(undefined, { weekday: 'short', timeZone: tz }).toUpperCase()}
                                     </span>
                                     <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-month'}>
-                                        {start.toLocaleDateString(undefined, { month: 'short' }).toUpperCase()}
+                                        {start.toLocaleDateString(undefined, { month: 'short', timeZone: tz }).toUpperCase()}
                                     </span>
-                                    <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-day'}>{start.getDate()}</span>
+                                    <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-day'}>{dayOfMonth(start, tz)}</span>
                                 </span>
                                 {inlineActions && (
                                     <div
@@ -396,6 +408,7 @@ export default function EventCard({
                                         onKeyDown={(e) => e.stopPropagation()}
                                     >
                                         <CardActionCluster
+                                            cancelled={event.is_cancelled}
                                             eventId={event.event_id}
                                             eventTitle={event.title}
                                             isSavedFlag={isSavedFlag}
@@ -417,6 +430,7 @@ export default function EventCard({
                                 onKeyDown={(e) => e.stopPropagation()}
                             >
                                 <CardActionCluster
+                                    cancelled={event.is_cancelled}
                                     eventId={event.event_id}
                                     eventTitle={event.title}
                                     isSavedFlag={isSavedFlag}
@@ -438,7 +452,8 @@ export default function EventCard({
                                         title={event.title}
                                     >
                                         {newDot}
-                                        {event.title}
+                                        {cancelledChip}
+                                        {cancelledTitle}
                                         {showPastLabel && isPast && <span className="ml-2 text-xs font-semibold text-ink-soft">Past</span>}
                                     </h3>
                                     {popularityBadges}

@@ -1,0 +1,4 @@
+calendars:
+  - id: "ticket-prompt-cal"
+    name: "Salsa"
+    color: "#e11d48"

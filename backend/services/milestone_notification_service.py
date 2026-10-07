@@ -29,11 +29,12 @@ re-creating the in-app row or re-sending a channel that already fired.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from sqlmodel import Session, select
 
+from backend.config.loader import get_milestone_sweep_lookback_days
 from backend.services import passport
 from backend.services.app_settings import (
     get_feature_email_instant,
@@ -56,15 +57,17 @@ logger = logging.getLogger(__name__)
 MILESTONE_UNLOCKED = "milestone_unlocked"
 
 
-def _candidate_user_ids(session: Session) -> list:
-    """Users who have attended at least one event (only they can unlock)."""
-    return list(
-        session.exec(
-            select(UserEventAttendance.user_id)
-            .where(UserEventAttendance.user_id.is_not(None))  # type: ignore[union-attr]
-            .distinct()
-        ).all()
+def _candidate_user_ids(session: Session, recent_only: bool = True) -> list:
+    """Users with an attendance (only attendance can unlock milestones)."""
+    stmt = select(UserEventAttendance.user_id).where(
+        UserEventAttendance.user_id.is_not(None)  # type: ignore[union-attr]
     )
+    if recent_only:
+        since = datetime.now(timezone.utc) - timedelta(
+            days=get_milestone_sweep_lookback_days()
+        )
+        stmt = stmt.where(UserEventAttendance.attending_since >= since)
+    return list(session.exec(stmt.distinct()).all())
 
 
 def run_once() -> dict:
@@ -87,7 +90,7 @@ def run_once() -> dict:
             )
         session.commit()
 
-    emailed, pushed = _dispatch_channels(to_email, to_push, notif_ids)
+    emailed, pushed = _dispatch_channels(to_email, to_push, notif_ids, source="tick")
 
     logger.info(
         "Milestone notification run: %d created, %d emailed, %d pushed",
@@ -98,7 +101,7 @@ def run_once() -> dict:
     return {"milestones": created, "emailed": emailed, "pushed": pushed}
 
 
-def notify_milestones_for_user(session, user) -> dict:
+def notify_milestones_for_user(session, user, source: str = "request") -> dict:
     """Immediate, in-request variant of :func:`run_once` for a single user.
 
     Runs on the caller's ``session`` (so it participates in the request's
@@ -119,7 +122,9 @@ def notify_milestones_for_user(session, user) -> dict:
     )
     session.commit()
 
-    emailed, pushed = _dispatch_channels(to_email, to_push, notif_ids, session=session)
+    emailed, pushed = _dispatch_channels(
+        to_email, to_push, notif_ids, session=session, source=source
+    )
     return {"milestones": created, "emailed": emailed, "pushed": pushed}
 
 
@@ -304,7 +309,9 @@ def _create_consistency_notifications(
     return created
 
 
-def _dispatch_channels(to_email, to_push, notif_ids, session=None) -> tuple[int, int]:
+def _dispatch_channels(
+    to_email, to_push, notif_ids, session=None, source: str | None = None
+) -> tuple[int, int]:
     """Send queued milestone emails/pushes and stamp their delivery, mirroring
     the in-app dedupe: each channel is tracked independently on the shared row.
 
@@ -361,17 +368,17 @@ def _dispatch_channels(to_email, to_push, notif_ids, session=None) -> tuple[int,
 
     if emailed_ids or pushed_ids:
         if session is not None:
-            _stamp_deliveries(session, emailed_ids, pushed_ids)
+            _stamp_deliveries(session, emailed_ids, pushed_ids, source)
             session.commit()
         else:
             with Session(get_engine()) as fresh:
-                _stamp_deliveries(fresh, emailed_ids, pushed_ids)
+                _stamp_deliveries(fresh, emailed_ids, pushed_ids, source)
                 fresh.commit()
 
     return emailed, pushed
 
 
-def _stamp_deliveries(session, emailed_ids, pushed_ids) -> None:
+def _stamp_deliveries(session, emailed_ids, pushed_ids, source=None) -> None:
     """Stamp ``emailed_at``/``pushed_at`` and log per-channel delivery rows."""
     from sqlmodel import col, update
 
@@ -383,7 +390,9 @@ def _stamp_deliveries(session, emailed_ids, pushed_ids) -> None:
             .values(emailed_at=stamp_now)
         )
         for nid in emailed_ids:
-            record_delivery(session, nid, "email", stamp_now)
+            record_delivery(
+                session, nid, "email", stamp_now, mode="instant", source=source
+            )
     if pushed_ids:
         session.exec(
             update(Notification)
@@ -391,4 +400,4 @@ def _stamp_deliveries(session, emailed_ids, pushed_ids) -> None:
             .values(pushed_at=stamp_now)
         )
         for nid in pushed_ids:
-            record_delivery(session, nid, "push", stamp_now)
+            record_delivery(session, nid, "push", stamp_now, source=source)

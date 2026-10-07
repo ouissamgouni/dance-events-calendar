@@ -102,6 +102,7 @@ class TestAuthGate:
             ("post", "/api/admin/duplicates/1/keep"),
             ("post", "/api/admin/duplicates/1/dismiss"),
             ("get", "/api/admin/events/evt-aaa/duplicates"),
+            ("post", "/api/admin/events/evt-aaa/duplicates/scan"),
         ],
     )
     def test_requires_admin(self, client, session, method, path):
@@ -234,3 +235,89 @@ class TestEventCandidates:
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["total"] == 1
+
+    def test_scan_for_one_event_returns_its_groups(self, client, session):
+        _seed_pair(session)
+        _login(client, "admin@example.com")
+
+        r = client.post("/api/admin/events/evt-aaa/duplicates/scan")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["total"] == 1
+        assert {e["event_id"] for e in body["items"][0]["events"]} == {
+            "evt-aaa",
+            "evt-bbb",
+        }
+
+        assert (
+            client.post("/api/admin/events/missing/duplicates/scan").status_code == 404
+        )
+
+
+@pytest.mark.unit
+class TestOverlappingEvents:
+    def _seed(self, session: Session) -> None:
+        start = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=3)
+
+        def add(event_id, title, offset_h, hours, **kw):
+            session.add(
+                CachedEvent(
+                    event_id=event_id,
+                    calendar_id="cal-1",
+                    title=title,
+                    start=start + timedelta(hours=offset_h),
+                    end=start + timedelta(hours=offset_h + hours),
+                    **kw,
+                )
+            )
+
+        add("festival", "Salsa Festival Weekend", 0, 48, location="Club Havana")
+        add("social", "Bachata Social", 30, 3)
+        add("same-place", "Kizomba Night", 10, 4, location="club havana")
+        add("lookalike", "Salsa Festival Weekend!", 2, 40)
+        add("before", "Earlier Party", -5, 5)
+        add("after", "Later Party", 48, 3)
+        session.commit()
+
+    def test_lists_time_overlaps_with_likely_duplicates_first(self, client, session):
+        self._seed(session)
+        _login(client, "admin@example.com")
+
+        r = client.get("/api/admin/events/festival/overlapping")
+
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["total"] == 3
+        assert [item["event_id"] for item in body["items"]] == [
+            "lookalike",
+            "same-place",
+            "social",
+        ]
+        lookalike, same_place, social = body["items"]
+        assert lookalike["likely_duplicate"] is True
+        assert lookalike["title_similarity"] > 0.9
+        assert same_place["same_venue"] is True
+        assert same_place["likely_duplicate"] is True
+        assert social["likely_duplicate"] is False
+
+    def test_pages_and_marks_grouped_events(self, client, session):
+        self._seed(session)
+        _login(client, "admin@example.com")
+        client.post(
+            "/api/admin/duplicates/manual", json={"event_ids": ["festival", "social"]}
+        )
+
+        r = client.get(
+            "/api/admin/events/festival/overlapping", params={"limit": 1, "offset": 2}
+        )
+
+        body = r.json()
+        assert body["total"] == 3
+        assert [(i["event_id"], i["in_duplicate_group"]) for i in body["items"]] == [
+            ("social", True)
+        ]
+
+    def test_requires_admin(self, client, session):
+        self._seed(session)
+        _login(client, "civilian@example.com")
+        assert client.get("/api/admin/events/festival/overlapping").status_code == 403

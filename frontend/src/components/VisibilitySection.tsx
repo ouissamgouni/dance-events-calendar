@@ -11,6 +11,7 @@ import {
 import MySubscribersBadge from './MySubscribersBadge';
 import AudiencePicker from './AudiencePicker';
 import { useAuth } from '../context/AuthContext';
+import useProfileChanged from '../hooks/useProfileChanged';
 
 const ACCOUNT_VISIBILITY_OPTIONS: { value: AccountVisibility; label: string; help: string }[] = [
     {
@@ -338,6 +339,7 @@ export function ProfileLinksEditor({ handle }: { handle: string | null }) {
     }, [handle]);
 
     useEffect(() => { load(); }, [load, user?.user_id]);
+    useProfileChanged(setProfile);
 
     return (
         <div className="mt-3 border-t border-card-line pt-3">

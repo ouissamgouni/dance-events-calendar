@@ -1,6 +1,10 @@
 import type { SuggestionImage } from '../../api';
+import type { CalendarEvent, OwnSuggestion } from '../../types';
 import type { TagsPickerValue } from '../TagsPicker';
-import { NO_RECURRENCE, type RecurrenceState } from './recurrence';
+import { browserTimeZone, toEditFields } from '../../utils/eventDates';
+import { toZonedInput } from '../../utils/schedule';
+import { parseLocal } from './datetime';
+import { fromRRule, NO_RECURRENCE, type RecurrenceState } from './recurrence';
 
 export interface LinkRow {
     url: string;
@@ -27,6 +31,8 @@ export interface SuggestFormState {
     start: string;
     end: string;
     allDay: boolean;
+    /** IANA zone the typed times are in: the venue's, else the browser's. */
+    timezone: string;
     /** Set once the user edits the end themselves; stops it tracking the start. */
     endTouched: boolean;
     /** Times parked while All day is on, so turning it off can restore them. */
@@ -42,6 +48,10 @@ export interface SuggestFormState {
     promoSourceUrl: string;
     going: boolean;
     goingAudience: GoingAudience;
+    /** Ask curators to publish it; off keeps the event to its owner. */
+    sharePublicly: boolean;
+    /** Verified organizers: show them as its organizer once public. */
+    isOrganizer: boolean;
     submitterName: string;
     submitterEmail: string;
     image: SuggestionImage | null;
@@ -67,6 +77,7 @@ export function initialFormState(
         start: '',
         end: '',
         allDay: false,
+        timezone: browserTimeZone(),
         endTouched: false,
         hiddenTimes: null,
         recurrence: NO_RECURRENCE,
@@ -80,11 +91,87 @@ export function initialFormState(
         promoSourceUrl: '',
         going: signedIn,
         goingAudience: audience ?? 'public',
+        sharePublicly: true,
+        isOrganizer: false,
         submitterName: name ?? '',
         submitterEmail: email ?? '',
         image: null,
         website: '',
     };
+}
+
+type PrefillSource = Pick<
+    OwnSuggestion,
+    | 'title' | 'description' | 'location' | 'latitude' | 'longitude' | 'links' | 'start' | 'end' | 'all_day'
+    | 'timezone' | 'recurrence_rule' | 'recurrence_dates' | 'suggested_tag_ids' | 'price_min' | 'price_max'
+    | 'price_currency' | 'price_is_free' | 'image_key' | 'image_thumb_url'
+>;
+
+/** Prefill the wizard from a saved suggestion so its owner can edit it. */
+export function formStateFromSuggestion(s: PrefillSource): SuggestFormState {
+    const timezone = s.timezone || browserTimeZone();
+    const allDayFields = s.all_day ? toEditFields(s) : null;
+    const toInput = (iso: string, field: 'start' | 'end') => allDayFields?.[field] ?? toZonedInput(iso, timezone);
+    const startDate = parseLocal(toZonedInput(s.start, timezone)) ?? new Date(s.start);
+    const recurrence: RecurrenceState = s.recurrence_dates?.length
+        ? {
+            mode: 'dates',
+            dates: s.recurrence_dates.map((d) => ({
+                start: toZonedInput(d.start, timezone),
+                end: toZonedInput(d.end, timezone),
+            })),
+        }
+        : fromRRule(s.recurrence_rule, startDate);
+    const paid = s.price_min != null || s.price_max != null;
+    return {
+        ...initialFormState(undefined, undefined, undefined, false),
+        title: s.title,
+        description: s.description ?? '',
+        location: s.location ?? '',
+        latitude: s.latitude,
+        longitude: s.longitude,
+        links: (s.links ?? []).map((l) => ({ url: l.url, label: l.label ?? '' })),
+        start: toInput(s.start, 'start'),
+        end: toInput(s.end, 'end'),
+        allDay: s.all_day,
+        timezone,
+        endTouched: true,
+        recurrence,
+        tagsValue: { selectedTagIds: s.suggested_tag_ids ?? [], freeTexts: {} },
+        priceMode: s.price_is_free ? 'free' : paid ? 'paid' : 'none',
+        priceMin: s.price_min != null ? String(s.price_min) : '',
+        priceMax: s.price_max != null ? String(s.price_max) : '',
+        priceCurrency: s.price_currency ?? 'EUR',
+        image:
+            s.image_key && s.image_thumb_url
+                ? { image_key: s.image_key, image_thumb_url: s.image_thumb_url }
+                : null,
+    };
+}
+
+/** Prefill the wizard from a live event for a suggested change. */
+export function formStateFromEvent(e: CalendarEvent): SuggestFormState {
+    return formStateFromSuggestion({
+        title: e.title,
+        description: e.description,
+        location: e.location,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        links: e.links,
+        start: e.start,
+        end: e.end,
+        all_day: e.all_day,
+        timezone: e.timezone ?? null,
+        recurrence_rule: null,
+        recurrence_dates: null,
+        suggested_tag_ids: e.tags.map((t) => t.id),
+        price_min: e.price_min,
+        price_max: e.price_max,
+        price_currency: e.price_currency,
+        price_is_free: e.price_is_free,
+        image_key: null,
+        image_thumb_url: null,
+    });
 }
 
 /** True once the user has typed anything worth warning about on close. */

@@ -5,7 +5,18 @@ import { fetchAdminCalendars, retryGeocodingSingle } from '../api';
 import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import { formatEventPrice } from '../utils/eventPrice';
-import { getAdminEventStatus } from '../utils/adminEventStatus';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
+import {
+    browserTimeZone,
+    formatEventWhen,
+    fromEditFields,
+    supportedTimeZones,
+    switchEditMode,
+    timeZoneLabel,
+    toEditFields,
+    viewerTimeHint,
+    type EventEditFields,
+} from '../utils/eventDates';
 import AddressAutocomplete from './AddressAutocomplete';
 import AdminAutoTagSuggestions from './AdminAutoTagSuggestions';
 import AdminEventPromoCodes from './AdminEventPromoCodes';
@@ -16,7 +27,7 @@ import ExpandableDescription from './ExpandableDescription';
 
 interface Props {
     event: CalendarEvent;
-    onFieldSave: (changes: Partial<CalendarEvent> & { review_status?: string; calendar_id?: string }) => Promise<void>;
+    onFieldSave: (changes: Partial<CalendarEvent> & { calendar_id?: string }) => Promise<void>;
     onTagsUpdated?: () => void;
     compact?: boolean;
 }
@@ -31,16 +42,23 @@ export function VisibilityOverrideControl({
     value,
     disabled,
     onChange,
+    onLabel = 'Show',
+    offLabel = 'Hide',
+    effective,
 }: {
     label?: string;
     value: boolean | null;
     disabled?: boolean;
     onChange: (value: boolean | null) => void;
+    onLabel?: string;
+    offLabel?: string;
+    /** Resolved value currently in effect, shown right of the pills. */
+    effective?: { on: boolean; text: string; note?: string };
 }) {
     const options: { label: string; val: boolean | null }[] = [
         { label: 'Auto', val: null },
-        { label: 'Show', val: true },
-        { label: 'Hide', val: false },
+        { label: onLabel, val: true },
+        { label: offLabel, val: false },
     ];
     return (
         <div className="flex items-center gap-1.5">
@@ -56,7 +74,7 @@ export function VisibilityOverrideControl({
                             type="button"
                             disabled={disabled}
                             onClick={() => onChange(opt.val)}
-                            className={`px-2 py-0.5 text-[11px] border disabled:opacity-50 ${active
+                            className={`w-11 py-0.5 text-center text-[11px] border disabled:opacity-50 ${active
                                 ? 'bg-action border-action text-white'
                                 : 'bg-surface border-line text-ink-soft hover:border-action hover:text-action'
                                 }`}
@@ -65,6 +83,63 @@ export function VisibilityOverrideControl({
                         </button>
                     );
                 })}
+            </div>
+            {effective && (
+                <span
+                    className="ml-1 w-16 shrink-0 text-right text-[11px] leading-tight"
+                    title="Current effective value"
+                >
+                    <span className={`font-semibold ${effective.on ? 'text-success' : 'text-muted'}`}>{effective.text}</span>
+                    {effective.note && <span className="block text-[10px] text-muted">{effective.note}</span>}
+                </span>
+            )}
+        </div>
+    );
+}
+
+// Date/time editor: one row on desktop; Start and End take full rows on mobile.
+const DT_LABEL = 'flex basis-full items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted sm:basis-auto';
+const DT_FIELD = 'min-w-0 flex-1 rounded-field border border-line bg-surface px-2 py-1 text-xs normal-case tracking-normal text-ink focus:outline-none focus:ring-1 focus:ring-action sm:flex-none';
+
+const TICKET_REASON_NOTES: Record<string, string> = {
+    admin: 'admin',
+    international: 'international',
+    multi_day: 'multi-day',
+};
+
+export function overrideEffective(override: boolean | null | undefined, globalOn: boolean) {
+    const on = override ?? globalOn;
+    return { on, text: on ? 'Shown' : 'Hidden', note: override == null ? 'global' : undefined };
+}
+
+function TicketEligibleControl({
+    event,
+    disabled,
+    onChange,
+}: {
+    event: CalendarEvent;
+    disabled: boolean;
+    onChange: (value: boolean | null) => void;
+}) {
+    const on = Boolean(event.ticket_likely);
+    const reason = event.ticket_likely_reason;
+    return (
+        <div className="border border-line rounded-lg bg-canvas overflow-hidden">
+            <div className="w-full flex items-center gap-2 px-3 py-1.5">
+                <span
+                    className="flex-1 min-w-0 text-[10px] font-semibold uppercase tracking-wide text-ink-soft"
+                    title="Shows ticket CTAs on cards and event page, and sends ticket nudges to Going users"
+                >
+                    Ticket eligible
+                </span>
+                <VisibilityOverrideControl
+                    value={event.advance_ticket_override ?? null}
+                    disabled={disabled}
+                    onChange={onChange}
+                    onLabel="Yes"
+                    offLabel="No"
+                    effective={{ on, text: on ? 'Yes' : 'No', note: reason ? TICKET_REASON_NOTES[reason] : undefined }}
+                />
             </div>
         </div>
     );
@@ -82,6 +157,7 @@ export default function AdminEventDetailContent({
     onTagsUpdated,
     compact = false,
 }: Props) {
+    const { showPrices, promoCodesEnabled } = useOptionalFeatureFlags();
     // Inline editing state
     const [editingField, setEditingField] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
@@ -90,9 +166,7 @@ export default function AdminEventDetailContent({
     const cancelledRef = useRef(false);
 
     // Field-specific state
-    const [editStart, setEditStart] = useState('');
-    const [editEnd, setEditEnd] = useState('');
-    const [editAllDay, setEditAllDay] = useState(false);
+    const [editTimes, setEditTimes] = useState<EventEditFields>({ start: '', end: '', allDay: false, timeZone: null });
 
     const [editIsFree, setEditIsFree] = useState(false);
     const [editPriceMin, setEditPriceMin] = useState('');
@@ -128,9 +202,7 @@ export default function AdminEventDetailContent({
 
     const startDatetimeEdit = () => {
         setSaveError(null);
-        setEditStart(event.start.slice(0, 16));
-        setEditEnd(event.end.slice(0, 16));
-        setEditAllDay(event.all_day);
+        setEditTimes(toEditFields(event));
         setEditingField('datetime');
     };
 
@@ -158,7 +230,7 @@ export default function AdminEventDetailContent({
         setSaveError(null);
     };
 
-    const saveField = async (changes: Partial<CalendarEvent> & { review_status?: string; calendar_id?: string }) => {
+    const saveField = async (changes: Partial<CalendarEvent> & { calendar_id?: string }) => {
         setSaving(true);
         setSaveError(null);
         try {
@@ -185,18 +257,23 @@ export default function AdminEventDetailContent({
     const fallbackLinks = parseLinks(event.description);
     const structuredLinks = event.links && event.links.length > 0 ? event.links : null;
     const start = new Date(event.start);
-    const end = new Date(event.end);
+    const tz = event.timezone || null;
+    const viewerHint = viewerTimeHint(event);
 
-    const formatDate = (d: Date) =>
-        d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    const formatTime = (d: Date) =>
-        d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    const saveDatetime = () => {
+        const result = fromEditFields(editTimes);
+        if (!result.ok) {
+            setSaveError(result.error);
+            return;
+        }
+        saveField(result.changes);
+    };
 
     const currentCalendar = calendars.find((c) => c.calendar_id === event.calendar_id);
 
     return (
         <div className="space-y-2">
-            {/* Calendar + review status (admin-only) */}
+            {/* Calendar (admin-only) */}
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
                 <label className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                     Calendar
@@ -223,94 +300,97 @@ export default function AdminEventDetailContent({
                         title={currentCalendar.color}
                     />
                 )}
-
-                <div className="ml-auto flex items-center gap-1.5">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">Status</span>
-                    <select
-                        value={getAdminEventStatus(event)}
-                        disabled={saving || getAdminEventStatus(event) === 'blocked'}
-                        onChange={(e) => saveField({ review_status: e.target.value })}
-                        className="rounded border border-line bg-surface px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
-                    >
-                        <option value="pending">pending</option>
-                        <option value="reviewed">reviewed</option>
-                        {getAdminEventStatus(event) === 'blocked' && (
-                            <option value="blocked">blocked</option>
-                        )}
-                    </select>
-                </div>
+                {event.view_count > 0 && (
+                    <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-ink-soft" title="Views">
+                        <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                            <path d="M2 10s2.5-5 8-5 8 5 8 5-2.5 5-8 5-8-5-8-5Z" strokeLinejoin="round" />
+                            <circle cx="10" cy="10" r="2.25" />
+                        </svg>
+                        {event.view_count}
+                    </span>
+                )}
             </div>
 
-            {/* Date */}
-            <div>
-                {editingField === 'datetime' ? (
-                    <div className="space-y-2 rounded-lg bg-canvas p-3 border border-line">
-                        <label className="flex items-center gap-2 text-xs text-ink-soft">
+            {/* Date & time */}
+            {editingField === 'datetime' ? (
+                <form
+                    onSubmit={(e) => { e.preventDefault(); saveDatetime(); }}
+                    onKeyDown={(e) => { if (e.key === 'Escape') cancelEdit(); }}
+                    className="rounded-field border border-line bg-canvas px-3 py-2"
+                >
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <label className={DT_LABEL}>
+                            Start
+                            <input
+                                type={editTimes.allDay ? 'date' : 'datetime-local'}
+                                value={editTimes.start}
+                                onChange={(e) => setEditTimes((t) => ({ ...t, start: e.target.value }))}
+                                className={DT_FIELD}
+                            />
+                        </label>
+                        <label className={DT_LABEL}>
+                            {editTimes.allDay ? 'Last day' : 'End'}
+                            <input
+                                type={editTimes.allDay ? 'date' : 'datetime-local'}
+                                value={editTimes.end}
+                                onChange={(e) => setEditTimes((t) => ({ ...t, end: e.target.value }))}
+                                className={DT_FIELD}
+                            />
+                        </label>
+                        <label className="flex min-w-0 flex-1 items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted sm:flex-none">
+                            Zone
+                            <select
+                                value={editTimes.timeZone ?? ''}
+                                onChange={(e) => setEditTimes((t) => ({ ...t, timeZone: e.target.value || null }))}
+                                className={`${DT_FIELD} sm:max-w-[11rem]`}
+                            >
+                                <option value="">Not set ({browserTimeZone().replace(/_/g, ' ')})</option>
+                                {[...new Set([...(editTimes.timeZone ? [editTimes.timeZone] : []), ...supportedTimeZones()])].map((zone) => (
+                                    <option key={zone} value={zone}>{zone.replace(/_/g, ' ')}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-ink-soft">
                             <input
                                 type="checkbox"
-                                checked={editAllDay}
-                                onChange={(e) => setEditAllDay(e.target.checked)}
+                                checked={editTimes.allDay}
+                                onChange={(e) => setEditTimes((t) => switchEditMode(t, e.target.checked))}
                                 className="h-3.5 w-3.5"
                             />
                             All day
                         </label>
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-muted uppercase tracking-wide">Start</label>
-                            <input
-                                type={editAllDay ? 'date' : 'datetime-local'}
-                                value={editAllDay ? editStart.slice(0, 10) : editStart}
-                                onChange={(e) => setEditStart(e.target.value)}
-                                className="border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
-                            />
-                            <label className="text-[10px] text-muted uppercase tracking-wide">End</label>
-                            <input
-                                type={editAllDay ? 'date' : 'datetime-local'}
-                                value={editAllDay ? editEnd.slice(0, 10) : editEnd}
-                                onChange={(e) => setEditEnd(e.target.value)}
-                                className="border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
-                            />
-                        </div>
-                        {saveError && <p className="text-[10px] text-danger">{saveError}</p>}
-                        <div className="flex gap-2 pt-1">
+                        <div className="ml-auto flex items-center gap-1">
                             <button
+                                type="submit"
                                 disabled={saving}
-                                onClick={() => {
-                                    const s = editAllDay ? editStart.slice(0, 10) : new Date(editStart).toISOString();
-                                    const e2 = editAllDay ? editEnd.slice(0, 10) : new Date(editEnd).toISOString();
-                                    saveField({ start: s, end: e2, all_day: editAllDay });
-                                }}
-                                className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
+                                className="rounded-field bg-action px-2.5 py-1 text-[11px] font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {saving ? 'Saving…' : 'Save'}
                             </button>
-                            <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">Cancel</button>
+                            <button type="button" onClick={cancelEdit} className="px-2 py-1 text-[11px] text-ink-soft hover:text-ink">Cancel</button>
                         </div>
                     </div>
-                ) : (
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <div
-                            className="group relative cursor-pointer hover:bg-canvas -mx-2 px-2 py-1 rounded transition"
-                            onClick={startDatetimeEdit}
-                        >
-                            <p className="text-ink-soft text-xs">
-                                🗓 {event.all_day
-                                    ? formatDate(start)
-                                    : `${formatDate(start)} · ${formatTime(start)} – ${formatTime(end)}`}
-                            </p>
-                            <EditHint />
-                        </div>
-                        {event.view_count > 0 && (
-                            <span className="ml-auto inline-flex items-center gap-1 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-ink-soft">
-                                <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                                    <path d="M2 10s2.5-5 8-5 8 5 8 5-2.5 5-8 5-8-5-8-5Z" strokeLinejoin="round" />
-                                    <circle cx="10" cy="10" r="2.25" />
-                                </svg>
-                                {event.view_count}
-                            </span>
-                        )}
-                    </div>
-                )}
-            </div>
+                    {saveError && <p className="mt-1 text-[10px] text-danger">{saveError}</p>}
+                </form>
+            ) : (
+                <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Edit date and time"
+                    onClick={startDatetimeEdit}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startDatetimeEdit(); } }}
+                    className="group relative flex cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-field bg-canvas px-3 py-2 pr-6 text-xs transition hover:bg-line/40"
+                >
+                    <span aria-hidden="true">🗓</span>
+                    <span className="text-ink">{formatEventWhen(event)}</span>
+                    <span className="text-[11px] text-muted">
+                        {event.all_day
+                            ? 'All day'
+                            : `${tz ? timeZoneLabel(tz, start) : 'Zone not set'}${viewerHint ? ` · ${viewerHint}` : ''}`}
+                    </span>
+                    <EditHint />
+                </div>
+            )}
 
             {/* Location */}
             {editingField === 'location' ? (
@@ -577,6 +657,7 @@ export default function AdminEventDetailContent({
                         value={event.show_price_override ?? null}
                         disabled={saving}
                         onChange={(v) => saveField({ show_price_override: v })}
+                        effective={overrideEffective(event.show_price_override, showPrices)}
                     />
                 </div>
                 {priceExpanded && (
@@ -668,12 +749,19 @@ export default function AdminEventDetailContent({
                 )}
             </div>
 
+            <TicketEligibleControl
+                event={event}
+                disabled={saving}
+                onChange={(v) => saveField({ advance_ticket_override: v })}
+            />
+
             {/* Promo codes (admin moderation + section visibility override) */}
             <AdminEventPromoCodes
                 eventId={event.event_id}
                 overrideValue={event.show_promo_override ?? null}
                 overrideDisabled={saving}
                 onOverrideChange={(v) => saveField({ show_promo_override: v })}
+                overrideEffective={overrideEffective(event.show_promo_override, promoCodesEnabled)}
             />
         </div>
     );

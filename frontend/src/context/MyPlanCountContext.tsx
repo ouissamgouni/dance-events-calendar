@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext';
 interface MyPlanCountContextValue {
     register: (eventId: string) => () => void;
     get: (eventId: string) => number | undefined;
+    set: (eventId: string, count: number) => void;
     version: number;
 }
 
@@ -75,7 +76,12 @@ export function MyPlanCountProvider({ children }: { children: ReactNode }) {
     }, [scheduleFlush, user?.user_id]);
 
     const get = useCallback((eventId: string) => cacheRef.current.get(eventId), []);
-    const value = useMemo(() => ({ register, get, version }), [get, register, version]);
+    const set = useCallback((eventId: string, count: number) => {
+        if (cacheRef.current.get(eventId) === count) return;
+        cacheRef.current.set(eventId, count);
+        setVersion((current) => current + 1);
+    }, []);
+    const value = useMemo(() => ({ register, get, set, version }), [get, register, set, version]);
     return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -90,3 +96,10 @@ export function useMyPlanCount(eventId: string | null | undefined): number | und
     void ctx.version;
     return ctx.get(eventId);
 }
+
+export function useSetMyPlanCount(): (eventId: string, count: number) => void {
+    const ctx = useContext(Ctx);
+    return ctx?.set ?? noop;
+}
+
+function noop() { }

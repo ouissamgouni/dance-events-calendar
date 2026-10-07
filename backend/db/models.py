@@ -213,6 +213,11 @@ class User(SQLModel, table=True):
     # see services/review_prompt_service.py).
     email_review_prompt_enabled: bool = Field(default=True, nullable=False)
     push_review_prompt_enabled: bool = Field(default=True, nullable=False)
+    # Ticket / memories nudges (services/ticket_prompt_service.py, memories_prompt_service.py).
+    email_ticket_prompt_enabled: bool = Field(default=True, nullable=False)
+    push_ticket_prompt_enabled: bool = Field(default=True, nullable=False)
+    email_memories_prompt_enabled: bool = Field(default=True, nullable=False)
+    push_memories_prompt_enabled: bool = Field(default=True, nullable=False)
     # Dance Passport milestone/achievement unlocks (see
     # services/milestone_notification_service.py). In-app is always on (like
     # every other category); these two gate email/push only.
@@ -415,6 +420,8 @@ class CachedEvent(SQLModel, table=True):
     start: datetime
     end: datetime
     all_day: bool = Field(default=False)
+    # IANA zone the event happens in (backend/services/timezones.py); NULL = unknown.
+    timezone: Optional[str] = Field(default=None, max_length=64)
     latitude: Optional[float] = Field(default=None)
     longitude: Optional[float] = Field(default=None)
     reach: Optional[str] = Field(default=None, max_length=16, index=True)
@@ -435,6 +442,9 @@ class CachedEvent(SQLModel, table=True):
     review_status: str = Field(default="pending")
     links: Optional[list] = Field(default=None, sa_column=Column(JSON))
     content_hash: Optional[str] = Field(default=None, index=True)
+    # Revisable fields as last received from the source, so a sync only
+    # proposes what the source changed, not local edits it never had.
+    source_values: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deleted_at: Optional[datetime] = Field(default=None, index=True)
     is_hidden: bool = Field(default=False, index=True)
@@ -444,12 +454,17 @@ class CachedEvent(SQLModel, table=True):
     # regardless of the global setting.
     show_price_override: Optional[bool] = Field(default=None)
     show_promo_override: Optional[bool] = Field(default=None)
+    # Admin pin for "needs a ticket bought in advance"; NULL derives it from reach/duration.
+    advance_ticket_override: Optional[bool] = Field(default=None)
     # Per-event organizer attribution. Set when an admin approves an
     # ``OrganizerClaimEvent`` row tying a user to this event. Independent
     # from ``User.is_verified_organizer`` (the account-level badge).
     organizer_user_id: Optional[UUID] = Field(
         default=None, foreign_key="users.id", index=True
     )
+    # Set only through an admin-approved organizer revision; the event stays listed.
+    is_cancelled: bool = Field(default=False, nullable=False)
+    cancellation_note: Optional[str] = Field(default=None, sa_column=Column(Text))
     # Human-readable reason set when this event is rejected as a duplicate
     # via the admin duplicate-review workflow, e.g.
     # "Duplicate of evt-123 — Salsa Night". Cleared on unblock. Independent
@@ -462,6 +477,30 @@ class CachedEvent(SQLModel, table=True):
     suggestion_id: Optional[UUID] = Field(
         default=None, foreign_key="event_suggestions.id", index=True
     )
+    # The start the recurrence expansion produced for this row; matched across
+    # re-expansions so an edit never re-points an id at a different date.
+    occurrence_key: Optional[datetime] = Field(default=None)
+    # ``private``: only ``owner_user_id`` (and admins) can see it, in any channel.
+    visibility: str = Field(default="public", max_length=16, index=True)
+    owner_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+    # new | published | unpublished | cancelled | removed (see event_visibility).
+    # None until flush, where it is derived from the legacy columns.
+    status: Optional[str] = Field(
+        default=None,
+        max_length=16,
+        index=True,
+        nullable=False,
+        sa_column_kwargs={"server_default": "new"},
+    )
+    # Why a removed event was removed: admin | duplicate | owner | google_calendar | series_edit | rejected
+    status_reason: Optional[str] = Field(default=None, max_length=32)
+    status_changed_at: Optional[datetime] = Field(default=None)
+    # Set on an event an admin merged into another; its URL redirects there.
+    merged_into_event_id: Optional[str] = Field(default=None, index=True)
+    # On the kept event: one entry per merge ({source_ids, moved, note, by, at}).
+    merge_summary: Optional[list] = Field(default=None, sa_column=Column(JSON))
 
 
 class EventSchedule(SQLModel, table=True):
@@ -888,8 +927,6 @@ class EventView(SQLModel, table=True):
     event_id: str = Field(index=True)
     device_id: Optional[str] = Field(default=None, index=True)
     source: Optional[str] = Field(default=None)  # calendar | list | map | direct
-    country: Optional[str] = Field(default=None)
-    city: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -1041,6 +1078,7 @@ class EventSuggestion(SQLModel, table=True):
     start: datetime
     end: datetime
     all_day: bool = Field(default=False)
+    timezone: Optional[str] = Field(default=None, max_length=64)
 
     # User-declared recurrence. Mutually exclusive:
     #   ``recurrence_rule``  -- an RFC 5545 RRULE line (weekly/monthly/yearly),
@@ -1063,21 +1101,11 @@ class EventSuggestion(SQLModel, table=True):
         default=None, foreign_key="users.id", index=True
     )
 
-    # Browser metadata
-    submitter_ip: Optional[str] = Field(default=None)
-    submitter_user_agent: Optional[str] = Field(default=None)
-    submitter_language: Optional[str] = Field(default=None)
-    submitter_referrer: Optional[str] = Field(default=None)
-    submitter_screen_size: Optional[str] = Field(default=None)
+    # Browser timezone, used to default the event's timezone.
     submitter_timezone: Optional[str] = Field(default=None)
 
-    # IP geolocation
-    submitter_city: Optional[str] = Field(default=None)
-    submitter_country: Optional[str] = Field(default=None)
-    submitter_lat: Optional[float] = Field(default=None)
-    submitter_lng: Optional[float] = Field(default=None)
-
-    # Workflow
+    # Workflow: private (owner only) | pending (asked to go public) | approved |
+    # declined (kept private) | blocked (removed for everyone) | withdrawn
     status: str = Field(default="pending", index=True)
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     assigned_calendar_id: Optional[str] = Field(default=None)
@@ -1096,6 +1124,8 @@ class EventSuggestion(SQLModel, table=True):
     # and every wave has to replay the RSVP onto the occurrences it creates.
     creator_going: bool = Field(default=False, nullable=False)
     creator_going_audience: Optional[str] = Field(default=None, max_length=16)
+    # A verified organizer said they organize it; approval attributes the event to them.
+    submitter_is_organizer: bool = Field(default=False, nullable=False)
     # User-entered new-tag suggestions submitted with the event. Each item:
     #   {"free_text": str, "group_slug": str | None}
     # On approval these become regular TagSuggestion rows tied to the new event.
@@ -1112,10 +1142,68 @@ class EventSuggestion(SQLModel, table=True):
     # Submitter's picture (``suggestions/{user_id}/{uuid}``); shared by every
     # occurrence once approved.
     image_key: Optional[str] = Field(default=None, max_length=200)
+    # Set by an admin to stop the submitter from editing.
+    edit_locked: bool = Field(default=False, nullable=False)
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None)
+
+
+class SuggestionAuditLog(SQLModel, table=True):
+    __tablename__ = "suggestion_audit_log"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    suggestion_id: UUID = Field(foreign_key="event_suggestions.id", index=True)
+    actor_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
+    actor_admin_email: Optional[str] = Field(default=None, max_length=255)
+    action: str = Field(max_length=32)
+    # ``{field: [old, new]}``
+    changes: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class EventRevision(SQLModel, table=True):
+    """A change waiting for, or past, a decision on an event.
+
+    ``kind``: ``create`` (a new event to publish), ``edit``, ``cancel``,
+    ``remove`` or ``go_public`` (a private submission asking to be shared).
+    ``source``: ``sync`` (edited at the Google source), ``admin`` (side-panel
+    draft), ``submitter`` (series-level, so ``suggestion_id`` is set instead
+    of ``event_id``), ``user`` or ``organizer``.
+    ``status``: ``draft`` | ``pending`` | ``accepted`` | ``rejected`` |
+    ``withdrawn`` | ``superseded`` | ``reverted`` | ``closed``.
+    """
+
+    __tablename__ = "event_revisions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: Optional[str] = Field(
+        default=None, foreign_key="cached_events.event_id", index=True
+    )
+    suggestion_id: Optional[UUID] = Field(
+        default=None, foreign_key="event_suggestions.id", index=True
+    )
+    kind: str = Field(
+        default="edit",
+        max_length=16,
+        index=True,
+        sa_column_kwargs={"server_default": "edit"},
+    )
+    source: str = Field(max_length=16)
+    status: str = Field(max_length=16, index=True)
+    # ``{field: {"old": ..., "new": ...}}``
+    changes: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    content_hash: Optional[str] = Field(default=None, max_length=64)
+    # Equal for the same Google change on several dates of a series.
+    group_hash: Optional[str] = Field(default=None, max_length=64, index=True)
+    proposed_by_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
+    proposed_by_admin_email: Optional[str] = Field(default=None, max_length=255)
+    decided_by: Optional[str] = Field(default=None, max_length=255)
+    decided_at: Optional[datetime] = Field(default=None)
+    notified_count: int = Field(default=0, nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventPromoCode(SQLModel, table=True):
@@ -1214,8 +1302,6 @@ class EventLinkClick(SQLModel, table=True):
     event_id: str = Field(index=True)
     device_id: Optional[str] = Field(default=None, index=True)
     url: str
-    country: Optional[str] = Field(default=None)
-    city: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -1397,7 +1483,9 @@ class TagSuggestion(SQLModel, table=True):
     group_slug: Optional[str] = Field(default=None)
     status: str = Field(default="pending", index=True)  # pending | approved | rejected
     submitter_device_id: Optional[str] = Field(default=None)
-    submitter_ip: Optional[str] = Field(default=None)
+    submitter_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -1462,11 +1550,6 @@ class EventRating(SQLModel, table=True):
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None)
-
-    # Audit
-    submitter_ip: Optional[str] = Field(default=None)
-    submitter_user_agent: Optional[str] = Field(default=None)
-    submitter_country: Optional[str] = Field(default=None)
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), index=True
@@ -1592,6 +1675,32 @@ class UserEventMute(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class EventUserAsset(SQLModel, table=True):
+    """A Going user's private ticket (file or link) or memory photo for an event.
+
+    ``kind``: ``ticket`` | ``ticket_link`` | ``memory``.
+    ``visibility`` (memories only): ``private`` | ``friends`` | ``attendees``.
+    Files live in the private bucket under ``object_key``.
+    """
+
+    __tablename__ = "event_user_assets"
+    __table_args__ = (Index("ix_event_user_assets_user_event", "user_id", "event_id"),)
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    kind: str = Field(max_length=16)
+    object_key: Optional[str] = Field(default=None, max_length=255)
+    url: Optional[str] = Field(default=None, max_length=1000)
+    content_type: Optional[str] = Field(default=None, max_length=64)
+    size_bytes: Optional[int] = Field(default=None)
+    width: Optional[int] = Field(default=None)
+    height: Optional[int] = Field(default=None)
+    visibility: str = Field(default="private", max_length=16)
+    caption: Optional[str] = Field(default=None, max_length=200)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class EventAttendance(SQLModel, table=True):
     """Append-only audit log of going/not_going actions (mirrors EventSave)."""
 
@@ -1658,6 +1767,7 @@ class UserEventAttendance(SQLModel, table=True):
     created_by_admin_user_id: Optional[UUID] = Field(
         default=None, foreign_key="users.id", index=True
     )
+    ticket_not_needed_at: Optional[datetime] = Field(default=None)
 
 
 class CalendarDefaultTag(SQLModel, table=True):
@@ -1910,6 +2020,12 @@ class NotificationDelivery(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     notification_id: int = Field(foreign_key="notifications.id", index=True)
     channel: str = Field(index=True)  # "app" | "email" | "push"
+    mode: Optional[str] = Field(
+        default=None, max_length=16
+    )  # email: "instant" | "digest"
+    source: Optional[str] = Field(
+        default=None, max_length=16
+    )  # "request" | "job" | "tick" | "admin"
     delivered_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), index=True
     )
@@ -2001,3 +2117,6 @@ for table in SQLModel.metadata.tables.values():
     for column in table.columns:
         if isinstance(column.type, DateTime):
             column.type = UTCDateTime()
+
+import backend.services.timezones  # noqa: E402,F401  registers the venue time zone flush hook
+import backend.services.event_visibility  # noqa: E402,F401  registers the event status flush hook

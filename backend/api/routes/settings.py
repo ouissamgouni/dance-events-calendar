@@ -8,7 +8,7 @@ from backend.api.schemas import SiteSettingsResponse, SiteSettingsUpdateRequest
 from backend.config.loader import get_auto_sync_enabled, get_sync_interval_minutes
 from backend.db.database import get_session
 from backend.db.models import SiteSetting
-from backend.services import app_settings
+from backend.services import app_settings, event_assets
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -365,6 +365,16 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         event_card_placeholder_style=_get_str_setting(
             session, "event_card_placeholder_style", "none"
         ),
+        event_tickets_enabled=event_assets.tickets_enabled(session),
+        event_memories_enabled=event_assets.memories_enabled(session),
+        **{
+            key: event_assets.int_setting(session, key)
+            for key in event_assets.INT_SETTINGS
+        },
+        **{
+            key: event_assets.bool_setting(session, key)
+            for key in event_assets.BOOL_SETTINGS
+        },
     )
 
 
@@ -639,6 +649,27 @@ def update_settings(
 
     if body.event_images_enabled is not None:
         _set_bool_setting(session, "event_images_enabled", body.event_images_enabled)
+
+    for key in (event_assets.TICKETS_FLAG, event_assets.MEMORIES_FLAG):
+        value = getattr(body, key)
+        if value is not None:
+            _set_bool_setting(session, key, value)
+
+    for key in event_assets.INT_SETTINGS:
+        value = getattr(body, key)
+        if value is None:
+            continue
+        row = session.get(SiteSetting, key)
+        if row:
+            row.value = str(value)
+        else:
+            row = SiteSetting(key=key, value=str(value))
+        session.add(row)
+
+    for key in event_assets.BOOL_SETTINGS:
+        value = getattr(body, key)
+        if value is not None:
+            _set_bool_setting(session, key, value)
 
     if body.onboarding_profile_step_enabled is not None:
         _set_bool_setting(

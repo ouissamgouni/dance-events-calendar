@@ -1,6 +1,6 @@
 """Shared iCalendar (RFC 5545) rendering for downloads and live feeds."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from backend.db.models import CachedEvent
 
@@ -77,8 +77,9 @@ def build_ics(
         lines.append(f"UID:{e.event_id}@movida")
         lines.append(f"DTSTAMP:{now}")
         if e.all_day:
+            end = max(e.end, e.start + timedelta(days=1))
             lines.append(f"DTSTART;VALUE=DATE:{e.start.strftime('%Y%m%d')}")
-            lines.append(f"DTEND;VALUE=DATE:{e.end.strftime('%Y%m%d')}")
+            lines.append(f"DTEND;VALUE=DATE:{end.strftime('%Y%m%d')}")
         else:
             lines.append(f"DTSTART:{e.start.strftime('%Y%m%dT%H%M%SZ')}")
             lines.append(f"DTEND:{e.end.strftime('%Y%m%dT%H%M%SZ')}")

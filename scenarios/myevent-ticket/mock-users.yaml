@@ -1,0 +1,14 @@
+# Mock users for "myevent-ticket".
+#   * tina  — POV. Going to every event; tickets seeded in db-event-assets.yaml.
+#   * sam   — never Going; must not see any "My ticket" section or tina's files.
+#   * admin — matches ADMIN_EMAIL; edits the ticket settings.
+users:
+  - email: tina@example.com
+    name: Tina (tickets)
+    handle: tina
+  - email: sam@example.com
+    name: Sam (not going)
+    handle: sam
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

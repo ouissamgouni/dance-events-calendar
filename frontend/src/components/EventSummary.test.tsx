@@ -221,4 +221,27 @@ describe('EventSummary shared implementation', () => {
         await view.user.click(seriesLink)
         expect(onSeriesNavigate).toHaveBeenCalledOnce()
     })
+
+    it('shows the verified organizer pill and the cancelled state on both surfaces', () => {
+        const event = makeEvent({
+            organizer: { user_id: 'u-olive', handle: 'olive', display_name: 'Olive', avatar_url: null, is_verified_organizer: true },
+            is_cancelled: true,
+            cancellation_note: 'Venue flooded',
+        })
+        for (const variant of ['page', 'modal'] as const) {
+            const { container, unmount } = renderSummary(variant, variant === 'modal', event)
+            const view = within(container)
+            const pill = view.getByTestId('event-organizer-pill')
+            expect(pill).toHaveTextContent('Organized by @olive')
+            expect(pill).toHaveAttribute('href', '/u/olive')
+            expect(within(pill).getByAltText('Verified organizer')).toBeInTheDocument()
+            expect(view.getByTestId('event-cancelled-banner')).toHaveTextContent('Venue flooded')
+            if (variant === 'modal') {
+                expect(view.getByRole('button', { name: 'Save event' })).toBeDisabled()
+                expect(view.getByRole('button', { name: "I'm going" })).toBeDisabled()
+                expect(view.getByRole('button', { name: /share|copy link/i })).toBeDisabled()
+            }
+            unmount()
+        }
+    })
 })

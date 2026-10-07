@@ -18,7 +18,7 @@ import {
     type WeekdayCode,
 } from './recurrence';
 import { btnPrimary, btnSecondary, chipCls, errorCls, helpCls, inputCls, sectionLabelCls } from './formState';
-import { formatDateTime, toLocalInput } from './datetime';
+import { formatDateTime, toDateInput, toLocalInput } from './datetime';
 
 type View = 'modes' | 'weekly' | 'monthly' | 'yearly' | 'dates';
 
@@ -89,7 +89,7 @@ function EndField({ value, onChange }: { value: RecurrenceEnd; onChange: (e: Rec
                         onChange={() =>
                             onChange({
                                 kind: 'on',
-                                date: value.kind === 'on' ? value.date : new Date().toISOString().slice(0, 10),
+                                date: value.kind === 'on' ? value.date : toDateInput(new Date()),
                             })
                         }
                     />

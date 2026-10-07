@@ -29,6 +29,7 @@ def run_once() -> dict:
     from backend.api.routes.suggestions import (
         _apply_creator_going,
         _apply_suggestion_tags,
+        _attribute_to_organizer_submitter,
         _link_occurrences_to_series,
         _upsert_occurrences_from_suggestion,
     )
@@ -69,6 +70,7 @@ def run_once() -> dict:
                     session,
                     suggestion,
                     review_status="reviewed",
+                    visibility="public",
                     calendar_id=calendar_id,
                     latitude=suggestion.latitude,
                     longitude=suggestion.longitude,
@@ -91,6 +93,7 @@ def run_once() -> dict:
                         session, event.event_id, suggestion.suggested_tag_ids
                     )
             _apply_creator_going(session, suggestion, events[before:], fan_out=False)
+            _attribute_to_organizer_submitter(session, suggestion, events[before:])
             _link_occurrences_to_series(
                 session, suggestion, events, suggestion.reviewed_by
             )

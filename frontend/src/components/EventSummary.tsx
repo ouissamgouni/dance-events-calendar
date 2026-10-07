@@ -18,7 +18,7 @@ import { cleanEventDescription } from '../utils/eventDescription';
 import { formatEventPrice } from '../utils/eventPrice';
 
 /** Detail tabs the summary can deep-link into. */
-export type EventDetailTab = 'overview' | 'program' | 'about' | 'location' | 'people' | 'reviews' | 'discussion';
+export type EventDetailTab = 'overview' | 'program' | 'about' | 'location' | 'people' | 'reviews' | 'discussion' | 'memories';
 
 interface Props {
     event: CalendarEvent;

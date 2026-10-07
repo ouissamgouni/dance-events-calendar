@@ -4,12 +4,10 @@ When an admin enables *instant* email for the ``event_messages`` feature, a
 new board post or reply should reach engaged users right away instead of
 waiting for the activity-digest scheduler (``services/activity_email.py``).
 
-This module is called from the message-create route immediately after the
-in-app notifications are fanned out. It sends a content-aware email + push per
-recipient and stamps the same idempotency fields the scheduler uses
-(``instant_emailed_at`` / ``pushed_at``) so the scheduler never re-delivers
-them. Everything here is best-effort — the caller wraps it so a delivery
-failure can never break posting.
+Run by the post-request ``deliver`` job (``push_jobs``) for one recipient,
+before the generic activity push. It sends a content-aware email + push per
+notification and stamps the same idempotency fields the scheduler uses
+(``instant_emailed_at`` / ``pushed_at``) so nothing is re-delivered.
 """
 
 from __future__ import annotations
@@ -17,9 +15,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 
 from backend.db.models import CachedEvent, Notification, User
+from backend.services.activity_email import _MAX_AGE
 from backend.services.app_settings import get_feature_email_instant
 from backend.services.email import (
     event_message_action_phrase,
@@ -27,11 +26,16 @@ from backend.services.email import (
 )
 from backend.services.event_visibility import event_is_user_facing
 from backend.services.notification_delivery import record_delivery, tracked_url
-from backend.services.push_service import send_push, webpush_configured
+from backend.services.push_service import (
+    PushTransientError,
+    send_push,
+    webpush_configured,
+)
 
 logger = logging.getLogger(__name__)
 
 FEATURE = "event_messages"
+KINDS = ("event_message", "event_message_reply")
 
 
 def _actor_name(actor: User | None) -> str:
@@ -44,43 +48,63 @@ def _actor_name(actor: User | None) -> str:
     )
 
 
-def dispatch_event_message_instant(
-    session: Session,
-    notifs: list[Notification],
-    *,
-    actor: User,
-    event: CachedEvent | None,
-) -> dict:
-    """Deliver ``notifs`` instantly when the admin instant toggle is on.
+def deliver_for_recipient(session: Session, recipient_id, source: str = "job") -> dict:
+    """Deliver ``recipient_id``'s pending event-message rows when instant is on.
 
-    Sends an email (when the recipient's per-user email flag allows) and a
-    push (when configured and the recipient's push flag allows), stamping
-    ``instant_emailed_at`` / ``pushed_at`` on success so the digest scheduler
-    skips them. Returns ``{"emails": int, "pushes": int}``. Commits.
+    Rows are claimed with ``FOR UPDATE SKIP LOCKED`` until commit. A transient
+    push failure leaves ``pushed_at`` unset and is counted in ``push_retry``.
+    Commits. Returns ``{"emails", "pushes", "push_retry"}``.
     """
-    if not notifs or event is None:
-        return {"emails": 0, "pushes": 0}
-    if not event_is_user_facing(session, event):
-        return {"emails": 0, "pushes": 0}
+    stats = {"emails": 0, "pushes": 0, "push_retry": 0}
     if not get_feature_email_instant(FEATURE, session):
-        return {"emails": 0, "pushes": 0}
+        return stats
+    recipient = session.get(User, recipient_id)
+    if recipient is None or recipient.deleted_at is not None:
+        return stats
 
     now = datetime.now(timezone.utc)
-    recipient_ids = {n.recipient_user_id for n in notifs if n.recipient_user_id}
-    recipients = {
+    notifs = session.exec(
+        select(Notification)
+        .where(Notification.recipient_user_id == recipient_id)
+        .where(Notification.kind.in_(KINDS))  # type: ignore[union-attr]
+        .where(Notification.created_at >= now - _MAX_AGE)
+        .where(
+            or_(
+                Notification.instant_emailed_at.is_(None),  # type: ignore[union-attr]
+                Notification.pushed_at.is_(None),  # type: ignore[union-attr]
+            )
+        )
+        .order_by(Notification.created_at)
+        .with_for_update(skip_locked=True, of=Notification)
+    ).all()
+    if not notifs:
+        session.commit()
+        return stats
+
+    users = {
         u.id: u
-        for u in session.exec(select(User).where(User.id.in_(recipient_ids))).all()
+        for u in session.exec(
+            select(User).where(User.id.in_({n.actor_user_id for n in notifs}))  # type: ignore[union-attr]
+        ).all()
+    }
+    events = {
+        e.event_id: e
+        for e in session.exec(
+            select(CachedEvent).where(
+                CachedEvent.event_id.in_({n.event_id for n in notifs if n.event_id})  # type: ignore[union-attr]
+            )
+        ).all()
+    }
+    user_facing = {
+        eid: event_is_user_facing(session, event) for eid, event in events.items()
     }
     push_ok = webpush_configured()
-    event_url = f"/event/{event.event_id}#messages"
-    event_title = event.title or "an event"
 
-    emails = 0
-    pushes = 0
     for n in notifs:
-        recipient = recipients.get(n.recipient_user_id)
-        if recipient is None or recipient.deleted_at is not None:
+        event = events.get(n.event_id) if n.event_id else None
+        if event is None or not user_facing.get(event.event_id):
             continue
+        actor = users.get(n.actor_user_id)
 
         if (
             recipient.email
@@ -98,8 +122,8 @@ def dispatch_event_message_instant(
         ):
             n.instant_emailed_at = now
             session.add(n)
-            record_delivery(session, n.id, "email", now)
-            emails += 1
+            record_delivery(session, n.id, "email", now, mode="instant", source=source)
+            stats["emails"] += 1
 
         if (
             push_ok
@@ -108,19 +132,28 @@ def dispatch_event_message_instant(
         ):
             title = (
                 f"{_actor_name(actor)} "
-                f"{event_message_action_phrase(n.kind, n.context)} {event_title}"
+                f"{event_message_action_phrase(n.kind, n.context)} "
+                f"{event.title or 'an event'}"
             )
-            if send_push(
-                recipient.id,
-                title=title,
-                body=n.description or "",
-                url=tracked_url(event_url, n.id, "push"),
-                tag=f"event-messages-{event.event_id}",
-            ):
+            tag = f"event-messages-{event.event_id}"
+            try:
+                delivered = send_push(
+                    recipient.id,
+                    title=title,
+                    body=n.description or "",
+                    url=tracked_url(f"/event/{event.event_id}#messages", n.id, "push"),
+                    tag=tag,
+                    topic=tag,
+                    raise_on_transient=True,
+                )
+            except PushTransientError:
+                stats["push_retry"] += 1
+                continue
+            if delivered:
                 n.pushed_at = now
                 session.add(n)
-                record_delivery(session, n.id, "push", now)
-                pushes += 1
+                record_delivery(session, n.id, "push", now, source=source)
+                stats["pushes"] += 1
 
     session.commit()
-    return {"emails": emails, "pushes": pushes}
+    return stats

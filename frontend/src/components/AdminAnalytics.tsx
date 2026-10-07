@@ -1,18 +1,17 @@
-import type { MostViewedEvent, MostSavedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat } from '../api';
+import type { MostViewedEvent, MostSavedEvent, MostAttendedEvent, SourceBreakdown, TopLink, ExportStat } from '../api';
 
 interface Props {
     mostViewed: MostViewedEvent[];
     mostSaved: MostSavedEvent[];
     mostAttended: MostAttendedEvent[];
     sourceBreakdown: SourceBreakdown[];
-    topCountries: CountryBreakdown[];
     topLinks: TopLink[];
     exportStats: ExportStat[];
 }
 
-export default function AdminAnalytics({ mostViewed, mostSaved, mostAttended, sourceBreakdown, topCountries, topLinks, exportStats }: Props) {
+export default function AdminAnalytics({ mostViewed, mostSaved, mostAttended, sourceBreakdown, topLinks, exportStats }: Props) {
     const hasAnyData = mostViewed.length > 0 || mostSaved.length > 0 || mostAttended.length > 0
-        || sourceBreakdown.length > 0 || topCountries.length > 0 || topLinks.length > 0 || exportStats.length > 0;
+        || sourceBreakdown.length > 0 || topLinks.length > 0 || exportStats.length > 0;
 
     if (!hasAnyData) {
         return (
@@ -100,51 +99,28 @@ export default function AdminAnalytics({ mostViewed, mostSaved, mostAttended, so
                 </div>
             )}
 
-            {/* Source Breakdown + Top Countries side-by-side */}
-            {(sourceBreakdown.length > 0 || topCountries.length > 0) && (
+            {/* Source Breakdown */}
+            {sourceBreakdown.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {sourceBreakdown.length > 0 && (
-                        <div className="bg-surface border border-line p-4">
-                            <h2 className="text-sm font-bold text-ink mb-3">📊 Views by Source</h2>
-                            <div className="space-y-2">
-                                {sourceBreakdown.map((row) => {
-                                    const maxCount = sourceBreakdown[0]?.view_count || 1;
-                                    return (
-                                        <div key={row.source} className="text-xs">
-                                            <div className="flex items-center justify-between mb-0.5">
-                                                <span className="text-ink capitalize">{row.source}</span>
-                                                <span className="text-ink-soft font-medium">{row.view_count}</span>
-                                            </div>
-                                            <div className="w-full bg-gray-100 h-1.5 rounded">
-                                                <div className="bg-indigo-400 h-1.5 rounded" style={{ width: `${Math.round((row.view_count / maxCount) * 100)}%` }} />
-                                            </div>
+                    <div className="bg-surface border border-line p-4">
+                        <h2 className="text-sm font-bold text-ink mb-3">📊 Views by Source</h2>
+                        <div className="space-y-2">
+                            {sourceBreakdown.map((row) => {
+                                const maxCount = sourceBreakdown[0]?.view_count || 1;
+                                return (
+                                    <div key={row.source} className="text-xs">
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <span className="text-ink capitalize">{row.source}</span>
+                                            <span className="text-ink-soft font-medium">{row.view_count}</span>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                    {topCountries.length > 0 && (
-                        <div className="bg-surface border border-line p-4">
-                            <h2 className="text-sm font-bold text-ink mb-3">🌍 Top Countries</h2>
-                            <div className="space-y-2">
-                                {topCountries.map((row) => {
-                                    const maxCount = topCountries[0]?.view_count || 1;
-                                    return (
-                                        <div key={row.country} className="text-xs">
-                                            <div className="flex items-center justify-between mb-0.5">
-                                                <span className="text-ink">{row.country}</span>
-                                                <span className="text-ink-soft font-medium">{row.view_count}</span>
-                                            </div>
-                                            <div className="w-full bg-gray-100 h-1.5 rounded">
-                                                <div className="bg-teal-400 h-1.5 rounded" style={{ width: `${Math.round((row.view_count / maxCount) * 100)}%` }} />
-                                            </div>
+                                        <div className="w-full bg-gray-100 h-1.5 rounded">
+                                            <div className="bg-indigo-400 h-1.5 rounded" style={{ width: `${Math.round((row.view_count / maxCount) * 100)}%` }} />
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    )}
+                    </div>
                 </div>
             )}
 

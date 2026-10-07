@@ -24,7 +24,6 @@ import {
     fetchPopularCities,
     fetchTagGroups,
     followUser,
-    geolocateFromIP,
     searchSuggestionAddress,
     searchUsers,
     unfollowUser,
@@ -154,19 +153,6 @@ export function LegacyOnboardingWizard() {
     const [areaLabelDraft, setAreaLabelDraft] = useState(prefs.area?.label ?? DEFAULT_AREA_BBOX.label);
     const [savingArea, setSavingArea] = useState(false);
     const areaNameRef = useRef<HTMLInputElement | null>(null);
-    const geoPrefilledRef = useRef(false);
-    // Best-effort geo-IP center so the area step is confirm-not-configure.
-    useEffect(() => {
-        if (prefs.area || geoPrefilledRef.current) return;
-        geoPrefilledRef.current = true;
-        geolocateFromIP()
-            .then((loc) => {
-                if (!loc) return;
-                const bbox = bboxFromPinRadius({ lat: loc.lat, lng: loc.lng }, 60, loc.label || 'Default');
-                void setPrefs({ area: bbox });
-            })
-            .catch(() => { /* fall back to default footprint */ });
-    }, [prefs.area, setPrefs]);
 
     const handleAreaChange = async (nextArea: PreferredAreaPayload | null) => {
         setSavingArea(true);

@@ -39,7 +39,6 @@ from backend.api.schemas import (
     AnonPreferencesPayload,
     HandleAvailabilityResponse,
     HomeLocationResponse,
-    IPGeolocationResponse,
     PreferredAreaResponse,
     RedeemReferralRequest,
     RedeemReferralResponse,
@@ -63,7 +62,13 @@ from backend.db.models import (
     BlockedUserIdentity,
     CalendarSubscription,
     EmailLoginCode,
+    EventMessage,
     EventRating,
+    EventSuggestion,
+    MyPlanShareToken,
+    Notification,
+    PassportShareToken,
+    PushSubscription,
     ShareToken,
     Tag,
     User,
@@ -73,6 +78,7 @@ from backend.db.models import (
     UserReferral,
     UserSavedEvent,
 )
+from backend.services import event_assets
 from backend.services.email import send_login_code_email, send_new_user_notification
 from backend.services.event_visibility import eligible_event_ids
 from backend.services.follows import ensure_approved_follow_with_subscription
@@ -89,22 +95,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 limiter = Limiter(key_func=client_ip)
-
-
-def _dispatch_social_instant_auth(session, *, kind: str, recipient_ids) -> None:
-    """Best-effort instant email for a social_activity kind from auth flows.
-
-    No-op unless the ``social_activity`` email mode is *instant*; otherwise the
-    activity-digest tick delivers these. Never raises into the caller.
-    """
-    from backend.services import activity_instant
-
-    try:
-        activity_instant.dispatch_activity_instant(
-            session, kind=kind, recipient_ids=recipient_ids
-        )
-    except Exception:  # noqa: BLE001 — best-effort, never breaks the flow
-        logger.warning("Instant social email failed (%s)", kind, exc_info=True)
 
 
 _COOKIE_NAME = "session_token"
@@ -502,6 +492,7 @@ def _build_auth_response(session: Session, user: User, is_new_user: bool) -> dic
         "avatar_url": resolve_user_avatar(user),
         "has_custom_avatar": bool(user.avatar_key),
         "is_admin": is_admin,
+        "is_verified_organizer": bool(user.is_verified_organizer),
         "is_new_user": is_new_user,
         "share_attendance_default": user.share_attendance_default,
         "share_attendance_default_audience": (
@@ -584,6 +575,11 @@ def login_with_google(
         if not email:
             return JSONResponse(
                 status_code=400, content={"detail": "Email missing from Google token"}
+            )
+        # Accounts are matched by email, so an unverified Google address could claim someone else's account.
+        if idinfo.get("email_verified") is False:
+            return JSONResponse(
+                status_code=401, content={"detail": "Google email is not verified"}
             )
         name = idinfo.get("name") or email
         picture = idinfo.get("picture")
@@ -889,6 +885,7 @@ def get_me(
         "avatar_url": resolve_user_avatar(user),
         "has_custom_avatar": bool(user.avatar_key),
         "is_admin": _is_admin_email(user.email),
+        "is_verified_organizer": bool(user.is_verified_organizer),
         "share_attendance_default": user.share_attendance_default,
         "share_attendance_default_audience": (
             user.share_attendance_default_audience
@@ -910,6 +907,10 @@ def get_me(
         # Re-engagement / notification preferences (see /auth/notification-preferences).
         "timezone": user.timezone,
         # Phase G: six per-feature × per-channel gates.
+        "email_ticket_prompt_enabled": user.email_ticket_prompt_enabled,
+        "push_ticket_prompt_enabled": user.push_ticket_prompt_enabled,
+        "email_memories_prompt_enabled": user.email_memories_prompt_enabled,
+        "push_memories_prompt_enabled": user.push_memories_prompt_enabled,
         "email_event_reminders_enabled": user.email_event_reminders_enabled,
         "email_social_activity_enabled": user.email_social_activity_enabled,
         "email_interest_matches_enabled": user.email_interest_matches_enabled,
@@ -1074,6 +1075,10 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     push_promo_codes_enabled: Optional[bool] = None
     email_review_prompt_enabled: Optional[bool] = None
     push_review_prompt_enabled: Optional[bool] = None
+    email_ticket_prompt_enabled: Optional[bool] = None
+    push_ticket_prompt_enabled: Optional[bool] = None
+    email_memories_prompt_enabled: Optional[bool] = None
+    push_memories_prompt_enabled: Optional[bool] = None
     email_milestone_unlocked_enabled: Optional[bool] = None
     push_milestone_unlocked_enabled: Optional[bool] = None
     email_friends_going_enabled: Optional[bool] = None
@@ -1140,6 +1145,10 @@ _NEW_FLAGS: tuple[str, ...] = (
     "push_promo_codes_enabled",
     "email_review_prompt_enabled",
     "push_review_prompt_enabled",
+    "email_ticket_prompt_enabled",
+    "push_ticket_prompt_enabled",
+    "email_memories_prompt_enabled",
+    "push_memories_prompt_enabled",
     "email_milestone_unlocked_enabled",
     "push_milestone_unlocked_enabled",
     "email_friends_going_enabled",
@@ -1195,6 +1204,10 @@ def update_notification_preferences(
     session.refresh(user)
     return {
         "timezone": user.timezone,
+        "email_ticket_prompt_enabled": user.email_ticket_prompt_enabled,
+        "push_ticket_prompt_enabled": user.push_ticket_prompt_enabled,
+        "email_memories_prompt_enabled": user.email_memories_prompt_enabled,
+        "push_memories_prompt_enabled": user.push_memories_prompt_enabled,
         "email_event_reminders_enabled": user.email_event_reminders_enabled,
         "email_social_activity_enabled": user.email_social_activity_enabled,
         "email_interest_matches_enabled": user.email_interest_matches_enabled,
@@ -1236,32 +1249,6 @@ def update_notification_preferences(
             user.email_interest_matches_enabled and user.push_interest_matches_enabled
         ),
     }
-
-
-@router.get("/geolocate-ip", response_model=Optional[IPGeolocationResponse])
-async def geolocate_ip_endpoint(
-    request: Request,
-    _user: User = Depends(require_user),
-):
-    """Best-effort IP -> city geo prefill for the home-pin picker.
-
-    Returns 204 when the IP is private or geolocation fails (silent-fail
-    so the caller falls back to browser geolocation or manual city
-    typeahead per PRD §8 Step 2).
-    """
-    from backend.services.ip_geolocation import geolocate_ip
-
-    ip = get_client_ip(request)
-    geo = await geolocate_ip(ip)
-    if not geo:
-        return JSONResponse(status_code=204, content=None)
-    lat = geo.get("lat")
-    lng = geo.get("lon")
-    if lat is None or lng is None:
-        return JSONResponse(status_code=204, content=None)
-    parts = [p for p in (geo.get("city"), geo.get("country")) if p]
-    label = ", ".join(parts) if parts else "My area"
-    return IPGeolocationResponse(lat=float(lat), lng=float(lng), label=label)
 
 
 @router.get("/unsubscribe")
@@ -1575,6 +1562,22 @@ def purge_user_account(session: Session, user_id) -> None:
         delete(UserEventAttendance).where(UserEventAttendance.user_id == user_id)
     )
     session.exec(delete(ShareToken).where(ShareToken.user_id == user_id))
+    session.exec(
+        delete(PassportShareToken).where(PassportShareToken.user_id == user_id)
+    )
+    session.exec(delete(MyPlanShareToken).where(MyPlanShareToken.user_id == user_id))
+    session.exec(delete(PushSubscription).where(PushSubscription.user_id == user_id))
+    for message in session.exec(
+        select(EventMessage).where(EventMessage.author_user_id == user_id)
+    ).all():
+        message.author_user_id = None
+        session.add(message)
+    for suggestion in session.exec(
+        select(EventSuggestion).where(EventSuggestion.submitter_user_id == user_id)
+    ).all():
+        suggestion.submitter_name = None
+        suggestion.submitter_email = None
+        session.add(suggestion)
     # Drop social edges in both directions so deleted users no longer
     # inflate other users' follower / friend counts and disappear from
     # subscription lists. (Hard-delete: these rows carry no standalone
@@ -1596,7 +1599,10 @@ def purge_user_account(session: Session, user_id) -> None:
     user_ratings = session.exec(
         select(EventRating).where(EventRating.user_id == user_id)
     ).all()
-    from backend.services.notifications import withdraw_review_notifications
+    from backend.services.notifications import (
+        SUBSCRIPTION_REVIEW,
+        withdraw_review_notifications,
+    )
 
     for rating in user_ratings:
         withdraw_review_notifications(session, user_id, rating.event_id)
@@ -1604,13 +1610,34 @@ def purge_user_account(session: Session, user_id) -> None:
         rating.is_anonymous = True
         session.add(rating)
 
+    # Review rows were just anonymised above and keep feeding others' feeds.
+    session.exec(
+        delete(Notification).where(
+            (Notification.recipient_user_id == user_id)
+            | (
+                (Notification.actor_user_id == user_id)
+                & (Notification.kind != SUBSCRIPTION_REVIEW)
+            )
+        )
+    )
+
     db_user = session.get(User, user_id)
     if db_user is not None:
+        event_assets.delete_user_assets(session, user_id)
         delete_user_avatar(db_user.avatar_key)
         db_user.email = f"deleted-{db_user.id}@example.invalid"
         db_user.display_name = None
         db_user.avatar_url = None
         db_user.avatar_key = None
+        db_user.handle = None
+        db_user.bio = None
+        db_user.instagram_url = None
+        db_user.facebook_url = None
+        db_user.dancing_since = None
+        db_user.home_lat = None
+        db_user.home_lng = None
+        db_user.home_label = None
+        db_user.last_visit_user_agent = None
         db_user.deleted_at = datetime.now(timezone.utc)
         session.add(db_user)
 
@@ -1655,7 +1682,9 @@ def get_my_saved_events(
                 UserSavedEvent.user_id == user.id
             )
         ).all()
-        visible_ids = eligible_event_ids(session, (row[0] for row in rows))
+        visible_ids = eligible_event_ids(
+            session, (row[0] for row in rows), viewer_id=user.id
+        )
         # Collapse cross-device rows to one entry per event_id; most-permissive
         # audience wins on collapse (public > friends > private).
         order = {"private": 0, "friends": 1, "public": 2}
@@ -1714,7 +1743,9 @@ def get_my_attending_events(
                 UserEventAttendance.share_audience,
             ).where(UserEventAttendance.user_id == user.id)
         ).all()
-        visible_ids = eligible_event_ids(session, (row[0] for row in rows))
+        visible_ids = eligible_event_ids(
+            session, (row[0] for row in rows), viewer_id=user.id
+        )
         # A user may have rows on multiple devices for the same event; collapse
         # to one entry per event_id, treating share_publicly=True on any device
         # as the canonical state (since one row gating visibility is enough).
@@ -1866,12 +1897,6 @@ def redeem_referral(
         _notify_new_follower(session, followee=inviter, follower=viewer)
         _notify_new_friend(session, viewer, inviter)
         session.commit()
-        _dispatch_social_instant_auth(
-            session, kind="new_follower", recipient_ids={inviter.id}
-        )
-        _dispatch_social_instant_auth(
-            session, kind="new_friend", recipient_ids={inviter.id, viewer.id}
-        )
 
     return RedeemReferralResponse(
         inviter_handle=inviter.handle,
@@ -1947,9 +1972,6 @@ def redeem_share_follow(
         # notification helper or its row is dropped on teardown.
         _notify_new_follower(session, followee=sharer, follower=viewer)
         session.commit()
-        _dispatch_social_instant_auth(
-            session, kind="new_follower", recipient_ids={sharer.id}
-        )
 
     return RedeemShareFollowResponse(
         sharer_handle=sharer.handle,

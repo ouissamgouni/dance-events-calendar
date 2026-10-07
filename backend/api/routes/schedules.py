@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from backend.api.rate_limit import client_ip
+from backend.services import job_queue
 from backend.api.deps import (
     get_current_user_optional,
     is_admin_user,
@@ -104,7 +105,6 @@ from backend.services.notifications import (
     notify_planned_session_changes,
     reconcile_plan_activity_notifications,
 )
-from backend.services import activity_instant
 from backend.services.program_exports import (
     build_program_projection,
     render_program_csv,
@@ -114,6 +114,13 @@ from backend.services.program_exports import (
 
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=client_ip)
+
+PUBLICATION_DELIVERY_JOB = "schedule_publication"
+_PUBLICATION_KINDS = (
+    "planned_session_changed",
+    "schedule_program_available",
+    "schedule_program_updated",
+)
 
 
 def _can_edit_schedule(session: Session, event_id: str, user: User | None) -> bool:
@@ -437,7 +444,6 @@ def update_my_plan_audience(
             UserPlanAudience.event_id == event_id,
         )
     ).first()
-    first_public_choice = row is None and payload.audience in {"followers", "friends"}
     if row is None:
         row = UserPlanAudience(
             user_id=user.id,
@@ -456,17 +462,6 @@ def update_my_plan_audience(
         alert=False,
     )
     session.commit()
-    if first_public_choice:
-        try:
-            activity_instant.dispatch_activity_instant(
-                session,
-                kind="plan_session_added",
-                actor=user,
-                event_id=event_id,
-            )
-        except Exception:  # noqa: BLE001 - audience choice is already saved
-            session.rollback()
-            logger.warning("Plan activity instant delivery failed", exc_info=True)
     return {"entries": entries, "audience": row.audience}
 
 
@@ -610,16 +605,6 @@ def add_to_my_plan(
         session.flush()
         reconcile_plan_activity_notifications(session, user, event_id, alert=True)
         session.commit()
-        try:
-            activity_instant.dispatch_activity_instant(
-                session,
-                kind="plan_session_added",
-                actor=user,
-                event_id=event_id,
-            )
-        except Exception:  # noqa: BLE001 - delivery must not undo the saved plan
-            session.rollback()
-            logger.warning("Plan activity instant delivery failed", exc_info=True)
     return {"session_id": session_id, "status": "active", "session": item}
 
 
@@ -968,9 +953,7 @@ def create_contributor(
     return _save_config_row(session, row)
 
 
-@admin_router.put(
-    "/contributors/{row_id}", response_model=ScheduleContributorResponse
-)
+@admin_router.put("/contributors/{row_id}", response_model=ScheduleContributorResponse)
 def update_contributor(
     event_id: str,
     row_id: int,
@@ -983,9 +966,7 @@ def update_contributor(
     return _save_config_row(session, row)
 
 
-@admin_router.delete(
-    "/contributors/{row_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@admin_router.delete("/contributors/{row_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_contributor(
     event_id: str, row_id: int, session: Session = Depends(get_session)
 ):
@@ -1570,63 +1551,6 @@ def publish_schedule(
         )
     session.commit()
 
-    event = session.get(CachedEvent, event_id)
-    impacted_user_ids = {
-        notification.recipient_user_id for notification in impacted_notifications
-    }
-    users = (
-        {
-            user.id: user
-            for user in session.exec(
-                select(User).where(User.id.in_(impacted_user_ids))
-            ).all()
-        }
-        if impacted_user_ids
-        else {}
-    )
-    from backend.services.email import send_schedule_plan_changed_email
-    from backend.services.push_service import send_push
-    from backend.services.notification_delivery import record_delivery
-
-    emailed = pushed = 0
-    delivered_at = datetime.now(timezone.utc)
-    if event is not None:
-        for notification in impacted_notifications:
-            user = users.get(notification.recipient_user_id)
-            if user is None or user.deleted_at is not None:
-                continue
-            if user.email_schedule_updates_enabled:
-                try:
-                    if send_schedule_plan_changed_email(
-                        user, event, notification.description or "The program changed."
-                    ):
-                        notification.emailed_at = delivered_at
-                        record_delivery(session, notification.id, "email", delivered_at)
-                        emailed += 1
-                except Exception:
-                    logger.exception(
-                        "Could not email schedule update to user %s", user.id
-                    )
-            if user.push_schedule_updates_enabled:
-                try:
-                    delivered = send_push(
-                        user.id,
-                        title="Your plan changed",
-                        body=f"The program for {event.title} changed. Review My Plan.",
-                        url=f"/event/{event_id}/program/plan",
-                        tag=f"schedule-plan:{event_id}:{version}",
-                    )
-                    if delivered:
-                        notification.pushed_at = delivered_at
-                        record_delivery(session, notification.id, "push", delivered_at)
-                        pushed += delivered
-                except Exception:
-                    logger.exception(
-                        "Could not push schedule update to user %s", user.id
-                    )
-            session.add(notification)
-        session.commit()
-
     going_ids = set(
         session.exec(
             select(UserEventAttendance.user_id).where(
@@ -1639,22 +1563,131 @@ def publish_schedule(
         emailed=0, pushed=0, in_app_created=0, results=[]
     )
     if version == 1 or body.notify_all_going:
-        broad_result = _notify_publication_going_attendees(event_id, version, session)
+        broad_result = _notify_publication_going_attendees(
+            event_id, version, session, deliver=False
+        )
+    if impacted_notifications or broad_result.results:
+        job_queue.enqueue(PUBLICATION_DELIVERY_JOB, f"{event_id}:{version}")
     snapshot["notification_summary"] = {
-        "impacted_planners": len(impacted_user_ids),
+        "impacted_planners": len(
+            {notification.recipient_user_id for notification in impacted_notifications}
+        ),
         "going_attendees_notified": len(broad_result.results),
         "in_app_created": len(impacted_notifications) + broad_result.in_app_created,
-        "emailed": emailed + broad_result.emailed,
-        "pushed": pushed + broad_result.pushed,
         "going_attendees": len(going_ids),
     }
     return snapshot
+
+
+def _deliver_publication(key: str) -> None:
+    """Job: email/push one publication's not-yet-delivered rows (My Plan
+    changes and Going announcements). Channels already stamped are skipped."""
+    from backend.db.database import get_engine
+    from backend.services.email import (
+        send_schedule_plan_changed_email,
+        send_schedule_program_available_email,
+        send_schedule_program_updated_email,
+    )
+    from backend.services.notification_delivery import record_delivery
+    from backend.services.push_service import send_push
+
+    event_id, _, version = key.rpartition(":")
+    with Session(get_engine()) as session:
+        event = session.get(CachedEvent, event_id)
+        if event is None or event.deleted_at is not None:
+            return
+        rows = session.exec(
+            select(Notification)
+            .where(
+                Notification.event_id == event_id,
+                Notification.subject_key == f"publication:{version}",
+                Notification.kind.in_(_PUBLICATION_KINDS),
+                Notification.emailed_at.is_(None) | Notification.pushed_at.is_(None),
+            )
+            .with_for_update(skip_locked=True, of=Notification)
+        ).all()
+        if not rows:
+            return
+        users = {
+            user.id: user
+            for user in session.exec(
+                select(User).where(
+                    User.id.in_({row.recipient_user_id for row in rows}),
+                    User.deleted_at.is_(None),
+                )
+            ).all()
+        }
+        for notification in rows:
+            user = users.get(notification.recipient_user_id)
+            if user is None:
+                continue
+            kind = notification.kind
+            if notification.emailed_at is None and user.email_schedule_updates_enabled:
+                try:
+                    if kind == "planned_session_changed":
+                        sent = send_schedule_plan_changed_email(
+                            user,
+                            event,
+                            notification.description or "The program changed.",
+                        )
+                    elif kind == "schedule_program_available":
+                        sent = send_schedule_program_available_email(
+                            user, event, int(notification.context or 0)
+                        )
+                    else:
+                        sent = send_schedule_program_updated_email(user, event)
+                except Exception:
+                    logger.exception(
+                        "Could not email publication %s to user %s", version, user.id
+                    )
+                    sent = False
+                if sent:
+                    now = datetime.now(timezone.utc)
+                    notification.emailed_at = now
+                    record_delivery(
+                        session, notification.id, "email", now, source="job"
+                    )
+            if notification.pushed_at is None and user.push_schedule_updates_enabled:
+                if kind == "planned_session_changed":
+                    title = "Your plan changed"
+                    body = f"The program for {event.title} changed. Review My Plan."
+                    url = f"/event/{event_id}/program/plan"
+                    tag = f"schedule-plan:{event_id}:{version}"
+                elif kind == "schedule_program_available":
+                    title = "Program now available"
+                    body = f"The program for {event.title} is live. Build your plan."
+                    url = f"/event/{event_id}/program"
+                    tag = f"schedule-program:{event_id}:{version}"
+                else:
+                    title = "Program updated"
+                    body = f"The program for {event.title} changed. Review the latest schedule."
+                    url = f"/event/{event_id}/program"
+                    tag = f"schedule-program:{event_id}:{version}"
+                try:
+                    delivered = send_push(
+                        user.id, title=title, body=body, url=url, tag=tag
+                    )
+                except Exception:
+                    logger.exception(
+                        "Could not push publication %s to user %s", version, user.id
+                    )
+                    delivered = 0
+                if delivered:
+                    now = datetime.now(timezone.utc)
+                    notification.pushed_at = now
+                    record_delivery(session, notification.id, "push", now, source="job")
+            session.add(notification)
+        session.commit()
+
+
+job_queue.register(PUBLICATION_DELIVERY_JOB, _deliver_publication)
 
 
 def _notify_publication_going_attendees(
     event_id: str,
     version: int,
     session: Session,
+    deliver: bool = True,
 ):
     from backend.services.email import (
         send_schedule_program_available_email,
@@ -1752,7 +1785,9 @@ def _notify_publication_going_attendees(
             record_delivery(session, notification.id, "app", delivered_at)
             in_app_created += 1
 
-        if not user.email_schedule_updates_enabled:
+        if not deliver:
+            email_status = "queued"
+        elif not user.email_schedule_updates_enabled:
             email_status = "disabled"
         elif notification.emailed_at is not None:
             email_status = "already_sent"
@@ -1776,7 +1811,9 @@ def _notify_publication_going_attendees(
             else:
                 email_status = "failed"
 
-        if not user.push_schedule_updates_enabled:
+        if not deliver:
+            push_status = "queued"
+        elif not user.push_schedule_updates_enabled:
             push_status = "disabled"
         elif notification.pushed_at is not None:
             push_status = "already_sent"

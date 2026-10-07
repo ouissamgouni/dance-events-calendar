@@ -49,6 +49,7 @@ tasks:
         export VITE_UMAMI_URL_OVERRIDE="/umami"
         export PUBLIC_APP_URL_OVERRIDE="https://$TAILSCALE_HOST"
         export OBJECT_STORAGE_PUBLIC_BASE_URL="/objects"
+        export OBJECT_STORAGE_PRIVATE_BASE_URL="/private-objects"
         export CORS_ORIGINS="https://$TAILSCALE_HOST,http://localhost:$SC_WEB_PORT"
 
         echo "Showcase: https://$TAILSCALE_HOST"

@@ -20,6 +20,7 @@ import {
     type PublicProfile,
 } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useToast } from '../components/Toast';
 import useBackToClose from '../hooks/useBackToClose';
@@ -28,6 +29,8 @@ import PassportView, { type PassportTab } from '../components/PassportView';
 import MilestoneCarousel from '../components/MilestoneCarousel';
 import PassportShareCard from '../components/PassportShareCard';
 import { scopePassport, type ShareScope } from '../utils/passportScope';
+import { formatLocalDate } from '../utils/calendarRange';
+import { eventDisplayZone, isSameEventDay } from '../utils/eventDates';
 import { CARD_HEIGHT, CARD_WIDTH, downloadImage, renderCardToBlob, shareImage } from '../utils/passportShareImage';
 import type {
     CalendarEvent,
@@ -789,7 +792,7 @@ function DancingSinceControl({
     const [value, setValue] = useState('');
     const [saving, setSaving] = useState(false);
     const effective = dancingSince ?? memberSince;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatLocalDate(new Date());
 
     const startEdit = () => {
         setValue((dancingSince ?? memberSince ?? '').slice(0, 10));
@@ -863,24 +866,26 @@ function DancingSinceControl({
 }
 
 function formatEventDates(event: CalendarEvent): string {
+    const timeZone = eventDisplayZone(event);
     const opts: Intl.DateTimeFormatOptions = {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZone,
     };
     try {
         const start = new Date(event.start);
         const end = event.end ? new Date(event.end) : null;
         const startStr = start.toLocaleString(undefined, event.all_day
-            ? { year: 'numeric', month: 'short', day: 'numeric' }
+            ? { year: 'numeric', month: 'short', day: 'numeric', timeZone }
             : opts);
         if (!end || event.all_day || end.getTime() === start.getTime()) return startStr;
-        const sameDay = start.toDateString() === end.toDateString();
+        const sameDay = isSameEventDay(event);
         const endStr = end.toLocaleString(
             undefined,
-            sameDay ? { hour: 'numeric', minute: '2-digit' } : opts,
+            sameDay ? { hour: 'numeric', minute: '2-digit', timeZone } : opts,
         );
         return `${startStr} – ${endStr}`;
     } catch {
@@ -1084,6 +1089,7 @@ function AddPastEventControl({ onAdded, onOpenSubmitEvent }: { onAdded: () => vo
 
 export default function PassportPage() {
     const { user, loading: authLoading } = useAuth();
+    const { eventMemoriesEnabled } = useOptionalFeatureFlags();
     const toast = useToast();
     const [data, setData] = useState<PassportResponse | null>(null);
     const [items, setItems] = useState<PassportTimelineItem[]>([]);
@@ -1338,6 +1344,7 @@ export default function PassportPage() {
                         mapEvents={mapEvents}
                         onNeedMapEvents={loadMapEvents}
                         onTimelineSearch={searchTimeline}
+                        showTimelineMemories={eventMemoriesEnabled}
                     />
                 </>
             )}

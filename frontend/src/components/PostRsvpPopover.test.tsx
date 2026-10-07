@@ -1,6 +1,7 @@
 import { act, fireEvent, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import PostRsvpPopover from './PostRsvpPopover'
+import { FeatureFlagsContext, defaultFlags } from '../context/FeatureFlagsContext'
 import { renderWithProviders } from '../test/render'
 
 function setMobileViewport(matches: boolean) {
@@ -19,7 +20,7 @@ function setMobileViewport(matches: boolean) {
 afterEach(() => vi.useRealTimers())
 
 describe('PostRsvpPopover', () => {
-    it('renders a mobile sheet without auto-dismiss, with Share event + Done', () => {
+    it('renders a mobile sheet without auto-dismiss, with Share + Done', () => {
         vi.useFakeTimers()
         setMobileViewport(true)
         const onClose = vi.fn()
@@ -46,7 +47,7 @@ describe('PostRsvpPopover', () => {
         act(() => vi.advanceTimersByTime(5000))
         expect(onClose).not.toHaveBeenCalled()
 
-        fireEvent.click(screen.getByRole('button', { name: 'Share event' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }))
         expect(onShare).toHaveBeenCalledOnce()
         fireEvent.click(screen.getByRole('button', { name: 'Done' }))
         expect(onClose).toHaveBeenCalledOnce()
@@ -80,5 +81,46 @@ describe('PostRsvpPopover', () => {
         expect(onClose).not.toHaveBeenCalled()
         fireEvent.pointerDown(document.body)
         expect(onClose).toHaveBeenCalledOnce()
+    })
+
+    it.each([
+        [false, true, 'Got your ticket? Keep it handy here', '/event/evt-1#ticket'],
+        [true, false, 'Add memories', '/event/evt-1#memories'],
+    ])('offers the asset shortcut (isPast=%s, ticketLikely=%s)', (isPast, ticketLikely, label, href) => {
+        setMobileViewport(true)
+        const flags = { ...defaultFlags, eventTicketsEnabled: true, eventMemoriesEnabled: true }
+        renderWithProviders(
+            <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
+                <PostRsvpPopover
+                    anchorRef={{ current: document.createElement('button') }}
+                    variant="signed-in"
+                    eventId="evt-1"
+                    isPast={isPast}
+                    ticketLikely={ticketLikely}
+                    onClose={vi.fn()}
+                    onShare={vi.fn()}
+                />
+            </FeatureFlagsContext.Provider>,
+        )
+
+        expect(screen.getByRole('link', { name: new RegExp(label.replace('?', '\\?')) })).toHaveAttribute('href', href)
+    })
+
+    it('skips the ticket shortcut for events that rarely need one', () => {
+        setMobileViewport(true)
+        const flags = { ...defaultFlags, eventTicketsEnabled: true, eventMemoriesEnabled: true }
+        renderWithProviders(
+            <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
+                <PostRsvpPopover
+                    anchorRef={{ current: document.createElement('button') }}
+                    variant="signed-in"
+                    eventId="evt-1"
+                    onClose={vi.fn()}
+                    onShare={vi.fn()}
+                />
+            </FeatureFlagsContext.Provider>,
+        )
+
+        expect(screen.queryByRole('link', { name: /ticket/i })).not.toBeInTheDocument()
     })
 })

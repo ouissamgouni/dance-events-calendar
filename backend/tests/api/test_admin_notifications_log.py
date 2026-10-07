@@ -211,6 +211,50 @@ class TestAdminNotificationsLog:
         # row recorded, so it must not appear under the push filter.
         assert all(i["kind"] != "new_follower" for i in body["items"])
 
+    def test_exposes_and_filters_by_mode_source_with_latency(self, client, engine):
+        _seed(engine)
+        now = datetime.now(timezone.utc)
+        with Session(engine) as s:
+            follow = s.exec(
+                select(Notification).where(Notification.kind == "new_follower")
+            ).one()
+            follow.created_at = now - timedelta(seconds=90)
+            s.add(follow)
+            s.add(
+                NotificationDelivery(
+                    notification_id=follow.id,
+                    channel="email",
+                    mode="instant",
+                    source="job",
+                    delivered_at=now,
+                )
+            )
+            s.commit()
+
+        resp = client.get(
+            "/api/admin/notifications/log", params={"mode": "instant", "source": "job"}
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        item = body["items"][0]
+        assert (item["mode"], item["source"]) == ("instant", "job")
+        assert item["latency_seconds"] == pytest.approx(90, abs=1)
+
+        legacy = client.get(
+            "/api/admin/notifications/log", params={"channel": "app"}
+        ).json()["items"]
+        assert all(i["mode"] is None and i["source"] is None for i in legacy)
+
+    @pytest.mark.parametrize(
+        "params", [{"mode": "weekly"}, {"source": "carrier_pigeon"}]
+    )
+    def test_unknown_mode_or_source_returns_400(self, client, engine, params):
+        _seed(engine)
+
+        resp = client.get("/api/admin/notifications/log", params=params)
+        assert resp.status_code == 400
+
 
 @pytest.mark.unit
 class TestAdminEventNotificationStats:

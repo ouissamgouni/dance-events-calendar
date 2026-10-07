@@ -233,20 +233,19 @@ test_plan:
       title: "Alice submits a suggestion → admin approves → Bob gets subscription_suggested"
       description: >
         On Browser A (Alice), open /suggest and submit a new event
-        (title "Alice's Suggested Salsa", any future date). On Browser
-        Admin, /login as admin@example.com, open /admin/suggestions,
-        find the new suggestion and click "Approve" (assigning it to
-        any enabled calendar).
+        (title "Alice's Suggested Salsa", any future date; Share publicly
+        stays ON). On Browser Admin, /login as admin@example.com, open
+        /admin → Submissions → "Wants public", click the new submission
+        and click "Make public" in the side panel (any enabled calendar).
       expected: >
-        Server: POST /api/admin/suggestions/{id}/approve → 200; a new
-        CachedEvent is created and one Notification row with
+        Server: POST /api/admin/suggestions/{id}/approve → 200; the
+        submission's event becomes public and one Notification row with
         kind=subscription_suggested, actor=alice, event_id=<new event>,
         recipient=bob is inserted. On Browser B (Bob), refresh
         /notifications: unread_count=1 again, and the new row renders
-        with attribution "Alice suggested this event". Critically, an
-        ANONYMOUS suggestion (one submitted while logged out) does NOT
-        generate any notification — fan-out only fires when
-        submitter_user_id is set on the EventSuggestion row.
+        with attribution "Alice suggested this event". Adding an event
+        requires signing in, so every submission has a submitter to fan
+        out from.
 
     # ── Visibility revoke (re-check at emit time AND at read time) ──
     - id: 14

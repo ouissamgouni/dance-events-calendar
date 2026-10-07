@@ -1,0 +1,130 @@
+# Admin review — QA Test Plan
+# ===========================
+# A seeded tour of every admin review state: events in each status and
+# audience, tags and series, new events arriving from a mock Google sync, and
+# changes of every kind, source and outcome.
+
+test_plan:
+  name: "Admin review — events and changes overview"
+  description: >
+    Check the Events grid (status colors, flag icons, series icon, group by
+    series, mobile layout), the event side panel (status actions in the
+    footer, Remove scope for submissions, organizer field, aligned
+    Auto/Yes/No controls) and the Review panel (Open / Closed, filters,
+    accept/reject per kind, mobile layout).
+
+  preconditions:
+    - "Run the scenario with: `SCENARIO=admin-review task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "The mock Google sync runs at startup: ev-new-zouk and ev-new-kizomba arrive as New, and ev-live-friday gets a pending Google change (20:00 → 21:00)."
+    - "Seed: one event per status (New, Published, Unpublished, Cancelled, Removed by admin, Removed as rejected), Olivia's submissions (private, public request, declined, public weekly), the confirmed 'Wednesday Rueda' series and the changes in db-revisions.yaml."
+
+  cast:
+    - "Admin — reviews everything."
+    - "Olivia — submitter and organizer."
+    - "Riley — suggests fixes."
+    - "Sam — saved several events."
+
+  steps:
+    - id: 1
+      title: "Events grid: one row per status"
+      description: "As Admin open Admin → Events, enable 'Show past' off/on as needed and clear all filters."
+      expected: |
+        New rows (ev-new-admin, ev-new-zouk, ev-new-kizomba) have a light blue
+        background; Unpublished, Cancelled (title struck through) and Removed
+        rows keep their own colors; published rows are white.
+
+    - id: 2
+      title: "Flags are icons"
+      description: "Look at the Flags column and the Audience / Flags filter pills."
+      expected: |
+        Globe = public, lock = private, amber open lock = public request
+        (Tuesday Bachata Practica), user-pen = submitted, orange pencil =
+        pending changes. No "Public", "Private" or "Wants public" words;
+        hovering an icon shows its meaning. Pills show icon + count.
+
+    - id: 3
+      title: "Pending changes: orange icon and left stripe"
+      description: "Find ev-edit-user, ev-edit-organizer, ev-cancel-request, ev-remove-request, ev-draft, ev-live-friday and Thursday Salsa Social."
+      expected: |
+        Each has an orange pencil flag and an orange stripe on its left edge;
+        the row background follows its status only.
+
+    - id: 4
+      title: "Series icon, grouped or not"
+      description: "Check Wednesday Rueda and Thursday Salsa Social rows, then click 'Group by series'."
+      expected: |
+        A repeat icon precedes both titles. Grouped, each shows one row with
+        ×3 / ×4 next to the date.
+
+    - id: 5
+      title: "Side panel: status actions in the footer"
+      description: "Open ev-new-admin, then a published event."
+      expected: |
+        No Status dropdown in the body. The header shows the status chip.
+        ev-new-admin's footer has Publish; clicking it turns the row white and
+        closes its 'New event' change. A published event shows Unpublish,
+        Cancel event… and Remove….
+
+    - id: 6
+      title: "Side panel: organizer field"
+      description: "Open Thursday Salsa Social (2nd date), click Refresh twice, then Set → search 'olivia' → pick her → Refresh."
+      expected: |
+        Exactly one Organizer block at all times; after Refresh it shows
+        @olivia instead of None.
+
+    - id: 7
+      title: "Side panel: Auto / Yes / No aligned"
+      description: "Scroll to Price, Ticket eligible and Promo codes."
+      expected: "The three Auto / Show|Yes / Hide|No controls line up in one column."
+
+    - id: 8
+      title: "Remove a submission: this date or all dates"
+      description: "Open Thursday Salsa Social → Remove…."
+      expected: |
+        The confirm offers 'This date' / 'All 4 dates'. 'All 4 dates' adds a
+        'Reason shown to the owner' field and removes every date; Olivia is
+        notified. The Submitted by card has no Block… button.
+
+    - id: 9
+      title: "Review panel: Open / Closed"
+      description: "Open Admin → Review."
+      expected: |
+        Tabs read Open and Closed. Open lists: 3 New event (ev-new-admin,
+        ev-new-zouk, ev-new-kizomba), 1 Go public (Tuesday Bachata Practica,
+        repeat icon), edits from User (Riley), Organizer (Olivia), Submitter
+        (Thursday Salsa Social), Google Calendar (ev-live-friday), a
+        Cancellation and a Removal. Closed lists accepted, rejected,
+        withdrawn, replaced, reverted and closed changes.
+
+    - id: 10
+      title: "Review panel: decide one of each kind"
+      description: "Publish a New event, Make public the Go public request, Apply the user edit, Keep the removal request."
+      expected: |
+        Each leaves Open and appears in Closed with its outcome; the Review
+        badge counts (blue = new / go public, orange = edits) drop.
+
+    - id: 11
+      title: "Mobile layout"
+      description: "Resize to 390px wide and open Events, then Review, then one change."
+      expected: |
+        Events shows checkbox, title (with date and flag icons below it) and
+        status; Review shows change and event with date · source · author ·
+        age below; the change detail covers the list and closes with ✕.
+
+    - id: 12
+      title: "Series scope: one Google change on every date"
+      description: "Review → Open → the Wednesday Rueda row ('Start, End · on 3 dates')."
+      expected: |
+        One row for the three dates. The detail offers 'This date only' /
+        'All 3 dates with this change'; the notify count follows the choice.
+        Apply with all dates moves each Wednesday to 19:30 and the row leaves Open.
+
+    - id: 13
+      title: "Series scope: owner edits and per-date edits"
+      description: "Open the Thursday Salsa Social change, then the Kizomba Lounge organizer change, then edit Wednesday Rueda's venue in the side panel."
+      expected: |
+        The owner edit says 'Applies to all 4 upcoming dates.' with no choice.
+        The organizer time change has no series, so no choice. The Rueda venue
+        draft offers 'All 3 upcoming dates'; picking it updates every date.
+        A time edit greys that option out ('Time changes apply to this date only.').
+        Cancel event… on a Rueda date also offers 'All 3 upcoming dates'.

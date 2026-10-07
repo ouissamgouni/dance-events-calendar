@@ -1,5 +1,6 @@
 interface Props {
     date: Date;
+    timeZone?: string;
 }
 
 /**
@@ -7,10 +8,10 @@ interface Props {
  * day number over the month. Red is used ONLY for the weekday, per the event
  * page design spec.
  */
-export default function DateBlock({ date }: Props) {
-    const weekday = date.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase();
-    const day = date.toLocaleDateString(undefined, { day: '2-digit' });
-    const month = date.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
+export default function DateBlock({ date, timeZone }: Props) {
+    const weekday = date.toLocaleDateString(undefined, { weekday: 'short', timeZone }).toUpperCase();
+    const day = date.toLocaleDateString(undefined, { day: '2-digit', timeZone });
+    const month = date.toLocaleDateString(undefined, { month: 'short', timeZone }).toUpperCase();
 
     return (
         <div className="flex w-[46px] shrink-0 flex-col items-center leading-none">

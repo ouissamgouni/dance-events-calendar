@@ -1,0 +1,7 @@
+saves:
+  - event_id: ev-sync-live
+    email: sam@example.com
+    audience: public
+  - event_id: ev-sync-live
+    email: lee@example.com
+    audience: public

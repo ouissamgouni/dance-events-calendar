@@ -1,6 +1,7 @@
 import type { CalendarEvent } from '../../types';
 import { useAttendanceSummary } from '../../context/AttendanceSummariesContext';
-import AttendeeAvatarStack from '../AttendeeAvatarStack';
+import { useAttendingEvents } from '../../context/AttendingEventsContext';
+import AttendeeAvatarStack, { goingSentence } from '../AttendeeAvatarStack';
 
 interface Props {
     event: CalendarEvent;
@@ -17,6 +18,8 @@ interface Props {
  */
 export default function PeopleProofRow({ event, postsCount, onOpenPeople, onOpenPosts }: Props) {
     const summary = useAttendanceSummary(event.event_id);
+    const { isAttending } = useAttendingEvents();
+    const viewerGoing = isAttending(event.event_id);
     const totalGoing = summary?.total_going ?? event.going_count ?? 0;
     const totalSaved = summary?.total_saved ?? event.saved_count ?? 0;
     const friendsGoing = event.friends_going_count ?? 0;
@@ -27,7 +30,7 @@ export default function PeopleProofRow({ event, postsCount, onOpenPeople, onOpen
     const goingText = friendsGoing > 0 && otherGoing > 0
         ? `${friendsGoing} friend${friendsGoing === 1 ? '' : 's'} + ${otherGoing} more are going`
         : totalGoing > 0
-            ? `${totalGoing} ${totalGoing === 1 ? 'is' : 'are'} going`
+            ? goingSentence(viewerGoing, totalGoing)
             : '';
 
     return (
@@ -38,7 +41,7 @@ export default function PeopleProofRow({ event, postsCount, onOpenPeople, onOpen
                     onClick={onOpenPeople}
                     className="min-w-0 flex-1 space-y-2 text-left hover:text-action"
                 >
-                    <span className="block text-sm font-semibold leading-5 text-ink-soft">People going</span>
+                    <span className="block text-sm font-semibold leading-5 text-ink">People going</span>
                     <span className="flex items-center gap-2 text-xs text-ink-soft">
                         <AttendeeAvatarStack
                             eventId={event.event_id}
@@ -46,7 +49,6 @@ export default function PeopleProofRow({ event, postsCount, onOpenPeople, onOpen
                             goingFriendsPreview={event.friends_going_preview}
                             size="lg"
                             layout="faces"
-                            hideIfOnlyCurrentUser
                         />
                         <span className="min-w-0 truncate">
                             {goingText}

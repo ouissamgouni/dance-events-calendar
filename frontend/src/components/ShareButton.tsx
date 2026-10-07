@@ -10,6 +10,7 @@ interface ShareButtonProps {
     className?: string;
     labelClassName?: string;
     onAction?: () => void;
+    disabled?: boolean;
 }
 
 /**
@@ -21,7 +22,7 @@ interface ShareButtonProps {
  * When the user is signed in we append `?ref=share&src={share_code}` so
  * recipient clicks can be attributed back to them in the share funnel.
  */
-export default function ShareButton({ eventId, title, url, className, labelClassName = '', onAction }: ShareButtonProps) {
+export default function ShareButton({ eventId, title, url, className, labelClassName = '', onAction, disabled = false }: ShareButtonProps) {
     const toast = useToast();
     const { user } = useAuth();
     const canNativeShare = useMemo(
@@ -65,11 +66,10 @@ export default function ShareButton({ eventId, title, url, className, labelClass
         <button
             type="button"
             onClick={handleClick}
+            disabled={disabled}
             aria-label={canNativeShare ? 'Share' : 'Copy link'}
-            className={
-                className ??
-                'text-xs text-ink-soft hover:text-ink bg-slate-100 hover:bg-canvas rounded px-2.5 py-1 transition shrink-0'
-            }
+            className={`${className ??
+                'text-xs text-ink-soft hover:text-ink bg-slate-100 hover:bg-canvas rounded px-2.5 py-1 transition shrink-0'} disabled:cursor-not-allowed disabled:opacity-50`}
         >
             {canNativeShare ? (
                 <>

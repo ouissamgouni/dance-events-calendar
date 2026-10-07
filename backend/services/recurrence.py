@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Optional, Sequence
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dateutil.rrule import rrulestr
 
@@ -108,6 +109,19 @@ def _coerce_datetime(value: Any) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def _nearest_utc_midnight(value: datetime) -> datetime:
+    # Local midnights in any zone within ±12h round to their own date.
+    day = (value + timedelta(hours=12)).date()
+    return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+
+
+def normalize_all_day(start: Any, end: Any) -> Occurrence:
+    """All-day bounds as UTC midnights with an exclusive end of at least one day."""
+    first = _nearest_utc_midnight(_coerce_datetime(start))
+    last = _nearest_utc_midnight(_coerce_datetime(end))
+    return first, max(last, first + timedelta(days=1))
+
+
 def normalize_dates(items: Iterable[Any]) -> list[Occurrence]:
     """Parse, validate, de-duplicate and sort explicit occurrences."""
     occurrences: list[Occurrence] = []
@@ -142,6 +156,7 @@ def expand_occurrences(
     *,
     limit: Optional[int] = None,
     horizon_end: Optional[datetime] = None,
+    timezone_name: Optional[str] = None,
 ) -> list[Occurrence]:
     """Materialise ``(start, end)`` pairs for one suggestion.
 
@@ -162,8 +177,12 @@ def expand_occurrences(
 
     try:
         normalized = validate_rule(recurrence_rule)
-        rule = rrulestr(normalized, dtstart=start)
-    except ValueError:
+        # Expanding on local wall-clock time keeps 20:00 at 20:00 across DST.
+        local_start = (
+            start.astimezone(ZoneInfo(timezone_name)) if timezone_name else start
+        )
+        rule = rrulestr(normalized, dtstart=local_start)
+    except (ValueError, ZoneInfoNotFoundError):
         logger.warning(
             "Unusable recurrence rule %r; falling back to a single occurrence",
             recurrence_rule,
@@ -174,6 +193,7 @@ def expand_occurrences(
     horizon = horizon_end or (start + timedelta(days=MAX_HORIZON_DAYS))
     occurrences: list[Occurrence] = []
     for occurrence_start in rule:
+        occurrence_start = occurrence_start.astimezone(timezone.utc)
         if occurrence_start > horizon:
             break
         occurrences.append((occurrence_start, occurrence_start + duration))

@@ -35,10 +35,10 @@ function event(id: string, imageUrl: string | null): CalendarEvent {
     };
 }
 
-function renderList(tab: 'upcoming' | 'saved' | 'past', events: CalendarEvent[], onEventClick = vi.fn(), scheduleEnabled = false) {
+function renderList(tab: 'upcoming' | 'saved' | 'past', events: CalendarEvent[], onEventClick = vi.fn(), scheduleEnabled = false, extraFlags: Partial<typeof defaultFlags> = {}) {
     // Pictures are behind a site setting; turn it on so the image assertions
     // below exercise the picture slot rather than the placeholder-free layout.
-    const flags = { ...defaultFlags, eventImagesEnabled: true, eventScheduleEnabled: scheduleEnabled };
+    const flags = { ...defaultFlags, eventImagesEnabled: true, eventScheduleEnabled: scheduleEnabled, ...extraFlags };
     return renderWithProviders(
         <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
             <MyRatingsProvider>
@@ -190,5 +190,59 @@ describe('MyEventsList', () => {
         expect(screen.queryByText('Friendly crowd')).not.toBeInTheDocument();
         expect(screen.queryByText(/^\+\d+$/)).not.toBeInTheDocument();
         expect(screen.queryByText('Write a review')).not.toBeInTheDocument();
+    });
+
+    it('shows a memories strip on Past cards only when there are photos or uploads are open', async () => {
+        const thumb = (id: string) => ({ id, thumb_url: `https://signed.test/${id}`, visibility: 'private' as const });
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/users/me/ratings', () => HttpResponse.json([])),
+            http.get('*/api/tags', () => HttpResponse.json([])),
+            http.post('*/api/me/event-assets/summary', () => HttpResponse.json({
+                full: { ticket_count: 0, memory_count: 4, memory_thumbs: [thumb('a'), thumb('b'), thumb('c')], can_add_memory: false, memory_window_closes_at: '2026-10-05T20:00:00Z' },
+                open: { ticket_count: 0, memory_count: 0, memory_thumbs: [], can_add_memory: true, memory_window_closes_at: '2026-10-05T20:00:00Z' },
+                closed: { ticket_count: 0, memory_count: 0, memory_thumbs: [], can_add_memory: false, memory_window_closes_at: '2026-10-05T20:00:00Z' },
+            })),
+        );
+
+        renderList('past', [event('full', null), event('open', null), event('closed', null)], vi.fn(), false, { eventMemoriesEnabled: true });
+
+        const strips = await screen.findAllByTestId('memories-strip');
+        expect(strips).toHaveLength(2);
+        expect(screen.getByRole('link', { name: '4 memories' })).toHaveAttribute('href', '/event/full#memories');
+        expect(screen.getByText('+1')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /Add memories · until/ })).toHaveAttribute('href', '/event/open#memories');
+    });
+
+    it('shows only My ticket (never Add ticket) on Upcoming cards from the batched summary', async () => {
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.post('*/api/me/event-assets/summary', () => HttpResponse.json({
+                one: { ticket_count: 1, memory_count: 0, memory_thumbs: [], can_add_memory: false, memory_window_closes_at: null },
+                two: { ticket_count: 0, memory_count: 0, memory_thumbs: [], can_add_memory: false, memory_window_closes_at: null },
+                intl: { ticket_count: 0, memory_count: 0, memory_thumbs: [], can_add_memory: false, memory_window_closes_at: null },
+            })),
+            http.get('*/api/events/one/assets', () => new HttpResponse(null, { status: 404 })),
+        );
+        const future = (id: string, likely = false): CalendarEvent => ({
+            ...event(id, null),
+            start: '2099-09-05T20:00:00Z',
+            end: '2099-09-05T22:00:00Z',
+            ticket_likely: likely,
+        });
+
+        const { user } = renderList('upcoming', [future('one'), future('two'), future('intl', true)], vi.fn(), false, { eventTicketsEnabled: true });
+
+        expect(await screen.findByRole('button', { name: 'My ticket' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Add ticket/ })).not.toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: /ticket/i })).toHaveLength(1);
+
+        await user.click(screen.getByRole('button', { name: 'My ticket' }));
+        expect(await screen.findByRole('dialog', { name: /My ticket/ })).toBeInTheDocument();
+    });
+
+    it('does not render stray text in the list', () => {
+        const { container } = renderList('upcoming', [event('one', null)]);
+        expect(container.textContent).not.toContain('assetSummaries');
     });
 });

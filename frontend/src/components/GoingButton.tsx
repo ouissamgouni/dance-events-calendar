@@ -35,6 +35,10 @@ interface Props {
     /** When true, the event has already ended — labels use past tense ("Attended"). */
     isPast?: boolean;
     iconVariant?: 'hand' | 'person';
+    /** Offers "Add ticket" in the post-RSVP sheet. */
+    ticketLikely?: boolean;
+    /** A cancelled event can no longer be joined or left. */
+    cancelled?: boolean;
 }
 
 function RaisedHandIcon({ solid, className }: { solid: boolean; className: string }) {
@@ -96,6 +100,8 @@ export default function GoingButton({
     labelClassName = '',
     isPast = false,
     iconVariant,
+    ticketLikely = false,
+    cancelled = false,
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user } = useAuth();
@@ -285,6 +291,8 @@ export default function GoingButton({
             onShare={shareEventNow}
             audience={user ? getAudience(eventId) : undefined}
             onAudienceChange={user ? handlePostRsvpAudienceChange : undefined}
+            eventId={eventId}
+            ticketLikely={ticketLikely}
         />
     ) : null;
 
@@ -327,6 +335,20 @@ export default function GoingButton({
     ) : null;
 
     if (appearance === 'pill') {
+        if (cancelled) {
+            return (
+                <button
+                    type="button"
+                    disabled
+                    title="This event was cancelled"
+                    aria-label={going ? goingLabel : markLabel}
+                    className={`inline-flex h-10 cursor-not-allowed items-center gap-2 rounded-xl bg-action-tile px-3 text-sm text-ink-soft opacity-50 ${className}`.trim()}
+                >
+                    <AttendanceIcon variant={resolvedIconVariant} solid={going} className="shrink-0" />
+                    <span className={labelClassName}>{going ? goingLabel : markLabel}</span>
+                </button>
+            );
+        }
         // When the user is going AND signed-in, render the pill as a unified
         // segmented control: left half = toggle going, right half = visibility
         // icon (replaces the redundant ✓). Anonymous "going" keeps the simple
@@ -390,9 +412,10 @@ export default function GoingButton({
             <button
                 ref={triggerRef}
                 onClick={handleClick}
+                disabled={cancelled}
                 aria-label={tooltip}
-                title={tooltip}
-                className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none ${className} ${going ? 'bg-action/10 text-action hover:bg-action/10' : 'bg-action-tile text-ink-soft hover:text-ink'}`.trim()}
+                title={cancelled ? 'This event was cancelled' : tooltip}
+                className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${className} ${going ? 'bg-action/10 text-action hover:bg-action/10' : 'bg-action-tile text-ink-soft hover:text-ink disabled:hover:text-ink-soft'}`.trim()}
             >
                 <AttendanceIcon variant={resolvedIconVariant} solid={going} className="shrink-0" />
             </button>

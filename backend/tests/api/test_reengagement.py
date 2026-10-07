@@ -2342,159 +2342,653 @@ def test_send_push_prunes_stale_endpoints(session, monkeypatch):
     assert remaining == ["https://push/live"]
 
 
-# --- Truly-instant activity email (request-path, non-scheduler) -------------
+# --- Immediate delivery (post-request deliver job) ---------------------------
 
 
-def test_activity_instant_sends_when_feature_is_instant(session, monkeypatch):
-    """dispatch_activity_instant emails immediately (no scheduler) when the
-    feature's email mode is instant, stamping ``instant_emailed_at`` and
-    leaving the digest ``emailed_at`` track untouched."""
-    from backend.services import activity_instant
+def _patch_digest_senders(monkeypatch) -> list:
+    from backend.api.routes import social as social_module
 
-    calls: list = []
+    emails: list = []
     monkeypatch.setattr(
-        activity_instant,
+        activity_email,
         "send_activity_digest_email",
-        lambda recipient, lines, **_: calls.append(recipient.id) or True,
+        lambda recipient, lines, **kw: (
+            emails.append((recipient.id, kw.get("feature"))) or True
+        ),
     )
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda recipient, *a, **k: emails.append((recipient.id, "digest_v2")) or True,
+    )
+    monkeypatch.setattr(
+        social_module, "get_people_suggestions_for_email", lambda *a, **k: []
+    )
+    return emails
+
+
+def _deliveries(session: Session, notification_id: int, channel: str) -> list:
+    from backend.db.models import NotificationDelivery
+
+    return session.exec(
+        select(NotificationDelivery)
+        .where(NotificationDelivery.notification_id == notification_id)
+        .where(NotificationDelivery.channel == channel)
+    ).all()
+
+
+def test_deliver_immediate_sends_instant_email_once(session, monkeypatch):
+    """Instant-mode features are emailed by the job, stamping
+    ``instant_emailed_at`` (never the digest ``emailed_at``) and auditing the
+    delivery as instant/job; a second run sends nothing."""
+    emails = _patch_digest_senders(monkeypatch)
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
     session.add(SiteSetting(key="friends_going_email_instant", value="true"))
     session.commit()
-
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
     _make_event(session, "ev-going")
     n = _notif(
-        session,
-        recipient=bob,
-        actor=a1,
-        kind="subscription_going",
-        event_id="ev-going",
+        session, recipient=bob, actor=a1, kind="subscription_going", event_id="ev-going"
     )
 
-    stats = activity_instant.dispatch_activity_instant(
-        session, kind="subscription_going", actor=a1, event_id="ev-going"
-    )
-    assert stats["emails"] == 1
-    assert calls == [bob.id]
+    stats = activity_email.deliver_immediate({bob.id})
+
+    assert stats["instant_emails"] == 1
+    assert emails == [(bob.id, "friends_going")]
     session.refresh(n)
     assert n.instant_emailed_at is not None
-    assert n.emailed_at is None  # digest track never touched
+    assert n.emailed_at is None
+    [delivery] = _deliveries(session, n.id, "email")
+    assert (delivery.mode, delivery.source) == ("instant", "job")
 
-    # Idempotent: re-dispatch finds it already stamped.
-    stats2 = activity_instant.dispatch_activity_instant(
-        session, kind="subscription_going", actor=a1, event_id="ev-going"
-    )
-    assert stats2["emails"] == 0
+    assert activity_email.deliver_immediate({bob.id}).get("instant_emails", 0) == 0
+    assert len(emails) == 1
 
 
-def test_activity_instant_noop_when_feature_is_digest(session, monkeypatch):
-    """With the default digest mode, dispatch_activity_instant sends nothing
-    and leaves the row pending for the scheduler tick."""
-    from backend.services import activity_instant
-
-    calls: list = []
+def test_deliver_immediate_never_sends_digest_email(session, monkeypatch):
+    """Default digest mode: the job pushes but leaves the email for the
+    digest slot, even when the recipient is due."""
+    emails = _patch_digest_senders(monkeypatch)
+    pushes: list = []
     monkeypatch.setattr(
-        activity_instant,
-        "send_activity_digest_email",
-        lambda recipient, lines, **_: calls.append(recipient.id) or True,
+        activity_email, "send_push", lambda rid, **k: pushes.append(rid) or 1
     )
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
-    _make_event(session, "ev-going")
-    n = _notif(
-        session,
-        recipient=bob,
-        actor=a1,
-        kind="subscription_going",
-        event_id="ev-going",
-    )
+    n = _notif(session, recipient=bob, actor=a1, kind="new_follower")
 
-    stats = activity_instant.dispatch_activity_instant(
-        session, kind="subscription_going", actor=a1, event_id="ev-going"
-    )
-    assert stats["emails"] == 0
-    assert calls == []
+    activity_email.deliver_immediate({bob.id})
+
+    assert emails == []
+    assert pushes == [bob.id]
     session.refresh(n)
-    assert n.instant_emailed_at is None
-    assert n.emailed_at is None
+    assert n.emailed_at is None and n.instant_emailed_at is None
+    assert n.pushed_at is not None
+    [delivery] = _deliveries(session, n.id, "push")
+    assert (delivery.mode, delivery.source) == (None, "job")
 
 
-def test_activity_instant_skips_withdrawn_review(session, monkeypatch):
-    from backend.services import activity_instant
-
-    calls: list = []
-    monkeypatch.setattr(
-        activity_instant,
-        "send_activity_digest_email",
-        lambda *args, **kwargs: calls.append((args, kwargs)) or True,
-    )
+def test_deliver_immediate_skips_withdrawn_anon_review(session, monkeypatch):
+    emails = _patch_digest_senders(monkeypatch)
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 1)
     session.add(SiteSetting(key="friend_reviews_email_instant", value="true"))
     session.commit()
     bob = _make_user(session, "bob@example.com", "bob")
     alice = _make_user(session, "alice@example.com", "alice")
     _make_event(session, "ev-withdrawn-review")
-    notification = _notif(
+    n = _notif(
         session,
         recipient=bob,
         actor=alice,
         kind="subscription_review",
         event_id="ev-withdrawn-review",
     )
-    notification.context = "anon"
-    session.add(notification)
+    n.context = "anon"
+    session.add(n)
     session.commit()
 
-    stats = activity_instant.dispatch_activity_instant(
-        session,
-        kind="subscription_review",
-        actor=alice,
-        event_id="ev-withdrawn-review",
-    )
-    assert stats == {"emails": 0}
-    assert calls == []
-    session.refresh(notification)
-    assert notification.instant_emailed_at is None
+    activity_email.deliver_immediate({bob.id})
+
+    assert emails == []
+    session.refresh(n)
+    assert n.instant_emailed_at is None
 
 
-def test_activity_instant_social_scoped_by_recipient(session, monkeypatch):
-    """Event-less social kinds are matched by recipient (so the bidirectional
-    new_friend pair is covered) and email instantly when instant is on."""
-    from backend.services import activity_instant
-    from backend.api.routes import social as social_module
-
-    calls: list = []
+def test_deliver_immediate_ignores_scan_only_kinds(session, monkeypatch):
+    """interest_event rows are scan-created and stay with the tick (and its
+    interest push schedule) even when interest matches are instant."""
+    emails = _patch_digest_senders(monkeypatch)
+    pushes: list = []
     monkeypatch.setattr(
-        activity_instant,
-        "send_activity_digest_email",
-        lambda recipient, lines, **_: calls.append(recipient.id) or True,
+        activity_email, "send_push", lambda rid, **k: pushes.append(rid) or 1
     )
-    monkeypatch.setattr(
-        social_module, "get_people_suggestions_for_email", lambda *a, **k: []
-    )
-    session.add(SiteSetting(key="social_activity_email_instant", value="true"))
+    session.add(SiteSetting(key="interest_matches_email_instant", value="true"))
     session.commit()
+    bob = _make_user(session, "bob@example.com", "bob")
+    _make_event(session, "ev-match")
+    n = _notif(
+        session, recipient=bob, actor=bob, kind="interest_event", event_id="ev-match"
+    )
 
+    stats = activity_email.deliver_immediate({bob.id})
+
+    assert stats == {"digests": 0, "pushed": 0}
+    assert emails == [] and pushes == []
+    session.refresh(n)
+    assert n.instant_emailed_at is None and n.pushed_at is None
+
+
+def test_deliver_immediate_retries_transient_push_failure(session, monkeypatch):
+    emails = _patch_digest_senders(monkeypatch)
+
+    def failing_push(*a, raise_on_transient=False, **k):
+        assert raise_on_transient
+        raise push_service.PushTransientError("503")
+
+    monkeypatch.setattr(activity_email, "send_push", failing_push)
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
     n = _notif(session, recipient=bob, actor=a1, kind="new_follower")
 
-    stats = activity_instant.dispatch_activity_instant(
-        session, kind="new_follower", recipient_ids={bob.id}
-    )
-    assert stats["emails"] == 1
-    assert calls == [bob.id]
+    stats = activity_email.deliver_immediate({bob.id})
+    assert stats["push_retry"] == 1
     session.refresh(n)
-    assert n.instant_emailed_at is not None
+    assert n.pushed_at is None  # left pending for the retry / sweep
+
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 1)
+    stats = activity_email.deliver_immediate({bob.id})
+    assert stats["pushed"] == 1 and stats["push_retry"] == 0
+    session.refresh(n)
+    assert n.pushed_at is not None
+    assert n.emailed_at is None and n.instant_emailed_at is None
+    assert emails == []
 
 
-def test_activity_instant_skips_scan_only_and_dedicated_kinds(session):
-    """interest_event (scan-only) and milestone_unlocked / event_message
-    (dedicated services) are not deliverable by this module."""
-    from backend.services import activity_instant
-
+def test_tick_after_job_sends_nothing_twice(session, monkeypatch):
+    emails = _patch_digest_senders(monkeypatch)
+    pushes: list = []
+    monkeypatch.setattr(
+        activity_email, "send_push", lambda rid, **k: pushes.append(rid) or 1
+    )
+    session.add(SiteSetting(key="social_activity_email_instant", value="true"))
+    session.commit()
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
-    for kind in ("interest_event", "milestone_unlocked", "event_message"):
-        assert activity_instant.dispatch_activity_instant(
-            session, kind=kind, recipient_ids={bob.id}
-        ) == {"emails": 0}
+    _notif(session, recipient=bob, actor=a1, kind="new_follower")
+
+    activity_email.deliver_immediate({bob.id})
+    activity_email.run_once()
+    activity_email.run_once(force=True)
+
+    assert pushes == [bob.id]
+    assert emails == [(bob.id, "social_activity")]
+
+
+def test_tick_sweeps_fresh_rows_the_job_missed(session, monkeypatch):
+    """No age cutoff: a fresh row the job never handled (e.g. lost on
+    restart) is delivered by the next tick and audited as tick."""
+    _patch_digest_senders(monkeypatch)
+    pushes: list = []
+    monkeypatch.setattr(
+        activity_email, "send_push", lambda rid, **k: pushes.append(rid) or 1
+    )
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    n = _notif(session, recipient=bob, actor=a1, kind="new_follower")
+
+    stats = activity_email.run_once()
+
+    assert pushes == [bob.id]
+    assert stats["fast_pushed"] == 1
+    [delivery] = _deliveries(session, n.id, "push")
+    assert delivery.source == "tick"
+
+
+def test_pending_rows_are_claimed_with_skip_locked(session, monkeypatch):
+    """Job and tick claim the rows they deliver, so concurrent runs on
+    Postgres skip each other's rows instead of double-sending."""
+    from sqlalchemy import event as sa_event
+    from sqlalchemy.dialects import postgresql
+    from sqlalchemy.orm import Session as OrmSession
+
+    from backend.services import event_message_instant
+
+    _patch_digest_senders(monkeypatch)
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 1)
+    session.add(SiteSetting(key="event_messages_email_instant", value="true"))
+    session.commit()
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    _notif(session, recipient=bob, actor=a1, kind="new_follower")
+
+    captured: list = []
+
+    def _on_execute(state):
+        if getattr(state.statement, "_for_update_arg", None) is not None:
+            captured.append(str(state.statement.compile(dialect=postgresql.dialect())))
+
+    sa_event.listen(OrmSession, "do_orm_execute", _on_execute)
+    try:
+        activity_email.deliver_immediate({bob.id})
+        event_message_instant.deliver_for_recipient(session, bob.id)
+    finally:
+        sa_event.remove(OrmSession, "do_orm_execute", _on_execute)
+
+    assert len(captured) == 2
+    assert all("FOR UPDATE OF notifications SKIP LOCKED" in sql for sql in captured)
+
+
+# --- Post-request push jobs ---------------------------------------------------
+
+
+def _fake_pywebpush(monkeypatch, status: int):
+    import sys
+    import types
+
+    class FakeWebPushException(Exception):
+        def __init__(self, msg, response=None):
+            super().__init__(msg)
+            self.response = response
+
+    class _Resp:
+        status_code = status
+
+    def fake_webpush(**kwargs):
+        raise FakeWebPushException("failed", response=_Resp())
+
+    fake = types.ModuleType("pywebpush")
+    fake.webpush = fake_webpush
+    fake.WebPushException = FakeWebPushException
+    monkeypatch.setitem(sys.modules, "pywebpush", fake)
+    monkeypatch.setattr(push_service, "get_web_push_enabled", lambda: True)
+    monkeypatch.setattr(
+        push_service,
+        "get_vapid_config",
+        lambda: {"public_key": "p", "private_key": "k", "subject": "mailto:a@b.c"},
+    )
+
+
+@pytest.mark.parametrize("status,transient", [(503, True), (429, True), (410, False)])
+def test_send_push_flags_only_transient_failures(
+    session, monkeypatch, status, transient
+):
+    _fake_pywebpush(monkeypatch, status)
+    alice = _make_user(session, "alice@example.com", "alice")
+    session.add(
+        PushSubscription(
+            user_id=alice.id, endpoint="https://push/x", p256dh="a", auth="b"
+        )
+    )
+    session.commit()
+
+    if transient:
+        with pytest.raises(push_service.PushTransientError):
+            push_service.send_push(alice.id, "T", "B", raise_on_transient=True)
+    else:
+        assert push_service.send_push(alice.id, "T", "B", raise_on_transient=True) == 0
+
+
+def _record_enqueues(monkeypatch) -> list:
+    from backend.services import job_queue, push_jobs
+
+    push_jobs.install()
+    calls: list = []
+    monkeypatch.setattr(job_queue, "enqueue", lambda *a: calls.append(a))
+    return calls
+
+
+def test_committed_request_notification_enqueues_debounced_deliver_job(
+    session, monkeypatch
+):
+    from backend.services import push_jobs
+
+    monkeypatch.setenv("NOTIFICATION_DEBOUNCE_SECONDS", "7")
+    calls = _record_enqueues(monkeypatch)
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+
+    _notif(session, recipient=bob, actor=a1, kind="interest_event")
+    assert calls == []  # not a request-created kind
+    _notif(session, recipient=bob, actor=a1, kind="new_follower")
+    assert calls == [(push_jobs.DELIVER_JOB, str(bob.id), 7.0)]
+
+
+def test_rolled_back_notification_enqueues_nothing(session, monkeypatch):
+    calls = _record_enqueues(monkeypatch)
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+
+    session.add(
+        Notification(recipient_user_id=bob.id, actor_user_id=a1.id, kind="new_friend")
+    )
+    session.flush()
+    session.rollback()
+    session.add(SiteSetting(key="unrelated", value="1"))
+    session.commit()
+
+    assert calls == []
+
+
+def test_realerted_notification_enqueues_but_read_does_not(session, monkeypatch):
+    """Updated rows re-enter delivery only when pushed_at is reset (e.g. a
+    plan re-alert), not on unrelated updates such as marking read."""
+    calls = _record_enqueues(monkeypatch)
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    n = _notif(session, recipient=bob, actor=a1, kind="plan_session_added")
+    n.pushed_at = datetime.now(timezone.utc)
+    session.add(n)
+    session.commit()
+    calls.clear()
+
+    n.read_at = datetime.now(timezone.utc)
+    session.add(n)
+    session.commit()
+    assert calls == []
+
+    n.pushed_at = None
+    session.add(n)
+    session.commit()
+    assert [c[1] for c in calls] == [str(bob.id)]
+
+
+_EM_EMPTY = {"emails": 0, "pushes": 0, "push_retry": 0}
+
+
+def test_follow_route_queues_delivery_instead_of_sending_inline(
+    client, session, monkeypatch
+):
+    """Request handlers never call email/push providers: following someone
+    with social_activity in instant mode only queues the recipient's job."""
+    from backend.services import push_jobs
+
+    calls = _record_enqueues(monkeypatch)
+    emails = _patch_digest_senders(monkeypatch)
+    pushes: list = []
+    monkeypatch.setattr(
+        activity_email, "send_push", lambda rid, **k: pushes.append(rid) or 1
+    )
+    session.add(SiteSetting(key="social_activity_email_instant", value="true"))
+    session.commit()
+    bob = _make_user(session, "bob@example.com", "bob")
+    _login(client, "alice@example.com")
+
+    r = client.post("/api/social/users/bob/follow")
+
+    assert r.status_code in (200, 201), r.text
+    assert emails == [] and pushes == []
+    assert (push_jobs.DELIVER_JOB, str(bob.id)) in [c[:2] for c in calls]
+
+    push_jobs.deliver_for_recipient(str(bob.id))
+    assert emails == [(bob.id, "social_activity")]
+    assert pushes == [bob.id]
+
+
+@pytest.mark.parametrize(
+    "em_retry,activity_retry,raises,expected_order",
+    [
+        (0, 0, False, ["event_messages", "activity"]),
+        (0, 1, True, ["event_messages", "activity"]),
+        (1, 0, True, ["event_messages"]),
+    ],
+)
+def test_deliver_job_order_and_retry(
+    engine, monkeypatch, em_retry, activity_retry, raises, expected_order
+):
+    import uuid
+
+    from backend.services import job_queue, push_jobs
+
+    order: list = []
+    monkeypatch.setattr(
+        push_jobs.event_message_instant,
+        "deliver_for_recipient",
+        lambda session, rid: (
+            order.append("event_messages") or {**_EM_EMPTY, "push_retry": em_retry}
+        ),
+    )
+    monkeypatch.setattr(
+        push_jobs.activity_email,
+        "deliver_immediate",
+        lambda user_ids, source: (
+            order.append("activity") or {"push_retry": activity_retry, "source": source}
+        ),
+    )
+
+    if raises:
+        with pytest.raises(job_queue.RetryLater):
+            push_jobs.deliver_for_recipient(str(uuid.uuid4()))
+    else:
+        push_jobs.deliver_for_recipient(str(uuid.uuid4()))
+    assert order == expected_order
+
+
+def _instant_event_message(session, monkeypatch):
+    from backend.services import event_message_instant as em_instant
+
+    session.add(SiteSetting(key="event_messages_email_instant", value="true"))
+    session.commit()
+    bob = _make_user(session, "bob@example.com", "bob")
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(session, "ev-board", title="Board Night")
+    n = _notif(
+        session, recipient=bob, actor=alice, kind="event_message", event_id="ev-board"
+    )
+    n.context = "question"
+    session.add(n)
+    session.commit()
+    rich_emails: list = []
+    monkeypatch.setattr(
+        em_instant,
+        "send_event_message_instant_email",
+        lambda user, actor, *a, **k: rich_emails.append(user.id) or True,
+    )
+    monkeypatch.setattr(em_instant, "webpush_configured", lambda: True)
+    return bob, n, rich_emails
+
+
+def test_deliver_job_rich_event_message_not_duplicated_by_generic_pass(
+    session, monkeypatch
+):
+    from backend.services import event_message_instant as em_instant
+    from backend.services import push_jobs
+
+    generic_emails = _patch_digest_senders(monkeypatch)
+    generic_pushes: list = []
+    monkeypatch.setattr(
+        activity_email, "send_push", lambda rid, **k: generic_pushes.append(rid) or 1
+    )
+    bob, n, rich_emails = _instant_event_message(session, monkeypatch)
+    rich_pushes: list = []
+    monkeypatch.setattr(
+        em_instant, "send_push", lambda rid, **k: rich_pushes.append(k) or 1
+    )
+
+    push_jobs.deliver_for_recipient(str(bob.id))
+
+    assert rich_emails == [bob.id]
+    assert len(rich_pushes) == 1
+    assert rich_pushes[0]["title"] == "Alice asked a question about Board Night"
+    assert rich_pushes[0]["url"] == f"/event/ev-board?via=push&nid={n.id}#messages"
+    assert rich_pushes[0]["topic"] == "event-messages-ev-board"
+    assert generic_emails == [] and generic_pushes == []
+    session.refresh(n)
+    assert n.instant_emailed_at is not None and n.pushed_at is not None
+
+
+def test_deliver_job_retries_transient_rich_push_without_generic_fallback(
+    session, monkeypatch
+):
+    from backend.services import event_message_instant as em_instant
+    from backend.services import job_queue, push_jobs
+
+    _patch_digest_senders(monkeypatch)
+    generic_pushes: list = []
+    monkeypatch.setattr(
+        activity_email, "send_push", lambda rid, **k: generic_pushes.append(rid) or 1
+    )
+    bob, n, rich_emails = _instant_event_message(session, monkeypatch)
+
+    def failing_push(*a, raise_on_transient=False, **k):
+        assert raise_on_transient
+        raise push_service.PushTransientError("503")
+
+    monkeypatch.setattr(em_instant, "send_push", failing_push)
+
+    with pytest.raises(job_queue.RetryLater):
+        push_jobs.deliver_for_recipient(str(bob.id))
+
+    assert rich_emails == [bob.id]  # email already delivered and stamped
+    assert generic_pushes == []
+    session.refresh(n)
+    assert n.instant_emailed_at is not None
+    assert n.pushed_at is None
+
+
+def test_event_message_instant_noop_when_toggle_off_or_event_not_user_facing(
+    session, monkeypatch
+):
+    import uuid
+
+    from backend.services import event_message_instant as em_instant
+
+    bob, n, rich_emails = _instant_event_message(session, monkeypatch)
+    monkeypatch.setattr(em_instant, "send_push", lambda *a, **k: 1)
+
+    event = session.get(CachedEvent, "ev-board")
+    event.review_status = "pending"
+    event.suggestion_id = uuid.uuid4()
+    session.add(event)
+    session.commit()
+    assert em_instant.deliver_for_recipient(session, bob.id) == _EM_EMPTY
+
+    event.review_status = "reviewed"
+    session.add(event)
+    session.get(SiteSetting, "event_messages_email_instant").value = "false"
+    session.commit()
+    assert em_instant.deliver_for_recipient(session, bob.id) == _EM_EMPTY
+    assert rich_emails == []
+    session.refresh(n)
+    assert n.instant_emailed_at is None and n.pushed_at is None
+
+
+@pytest.mark.asyncio
+async def test_in_process_job_queue_coalesces_and_retries():
+    import asyncio
+
+    from backend.services import job_queue
+
+    queue = job_queue.InProcessJobQueue()
+    queue.retry_base_seconds = 0
+    runs: list = []
+
+    def handler(key):
+        runs.append(key)
+        if len(runs) == 1:
+            raise job_queue.RetryLater()
+
+    job_queue.register("test-job", handler)
+    queue.start()
+    queue.enqueue("test-job", "k", 0.05)
+    queue.enqueue("test-job", "k", 0.05)  # coalesced with the first
+    await asyncio.sleep(0.5)
+    await queue.stop()
+
+    assert runs == ["k", "k"]  # one run + one retry
+
+
+@pytest.mark.asyncio
+async def test_in_process_job_queue_waits_for_debounce_delay():
+    import asyncio
+
+    from backend.services import job_queue
+
+    queue = job_queue.InProcessJobQueue()
+    runs: list = []
+    job_queue.register("test-delay", runs.append)
+    queue.start()
+    queue.enqueue("test-delay", "k", 0.3)
+    await asyncio.sleep(0.1)
+    assert runs == []
+    await asyncio.sleep(0.4)
+    assert runs == ["k"]
+    # Released before running: a new enqueue gets its own pass.
+    queue.enqueue("test-delay", "k", 0)
+    await asyncio.sleep(0.1)
+    await queue.stop()
+    assert runs == ["k", "k"]
+
+
+@pytest.mark.asyncio
+async def test_in_process_job_queue_gives_up_after_max_attempts(caplog):
+    import asyncio
+    import logging
+
+    from backend.services import job_queue
+
+    queue = job_queue.InProcessJobQueue()
+    queue.max_attempts = 3
+    queue.retry_base_seconds = 0
+    runs: list = []
+
+    def handler(key):
+        runs.append(key)
+        raise job_queue.RetryLater()
+
+    job_queue.register("test-giveup", handler)
+    queue.start()
+    with caplog.at_level(logging.INFO, logger="backend.services.job_queue"):
+        queue.enqueue("test-giveup", "k", 0)
+        await asyncio.sleep(0.3)
+    await queue.stop()
+
+    assert runs == ["k", "k", "k"]
+    assert sum("asked to retry" in r.message for r in caplog.records) == 2
+    assert any("gave up after 3 attempts" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_in_process_job_queue_does_not_retry_unexpected_errors(caplog):
+    import asyncio
+
+    from backend.services import job_queue
+
+    queue = job_queue.InProcessJobQueue()
+    queue.retry_base_seconds = 0
+    runs: list = []
+
+    def handler(key):
+        runs.append(key)
+        raise ValueError("boom")
+
+    job_queue.register("test-error", handler)
+    queue.start()
+    queue.enqueue("test-error", "k", 0)
+    await asyncio.sleep(0.2)
+    await queue.stop()
+
+    assert runs == ["k"]
+    assert any("Job test-error:k failed" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_in_process_job_queue_stop_cancels_pending_and_inactive_is_noop():
+    import asyncio
+
+    from backend.services import job_queue
+
+    queue = job_queue.InProcessJobQueue()
+    runs: list = []
+    job_queue.register("test-stop", runs.append)
+
+    queue.enqueue("test-stop", "before-start", 0)  # not started: dropped
+    queue.start()
+    queue.enqueue("test-stop", "k", 10)
+    await asyncio.sleep(0.05)
+    await queue.stop()
+    assert not queue.active
+    queue.enqueue("test-stop", "after-stop", 0)
+    await asyncio.sleep(0.05)
+
+    assert runs == []

@@ -87,37 +87,46 @@ test_plan:
       expected: >
         Only "Salsa on the Rooftop" appears (only event with live-band tag).
 
-    # ── Tag Suggestions (Public) ────────────────────────────────
+    # ── Suggesting tags (signed-in users, via Suggest an edit) ────
     - id: 11
-      title: "Suggest tag button visible"
+      title: "Suggest an edit replaces the old Suggest tags button"
       description: >
-        Open the modal for "Sunday Kizomba Class" (untagged event).
+        Signed out, open the modal for "Sunday Kizomba Class" (untagged
+        event) and click "Suggest an edit".
       expected: >
-        A "Suggest Tags" button is visible in the modal.
+        There is no "Suggest Tags" button any more. "Suggest an edit" opens a
+        dialog "Sign in to suggest a change" with Not now / Sign in.
 
     - id: 12
-      title: "Suggest predefined tag"
+      title: "Suggest tags as part of a change"
       description: >
-        Click "Suggest Tags". Select "Beginner-friendly" from the Level group.
-        Submit the suggestion.
+        Sign in as Dev User, open "Sunday Kizomba Class" → "Suggest an
+        edit". The form opens filled in with the event. Go to Step 2, pick
+        "Beginner-friendly" from the Level group, Next, "Send suggestion".
       expected: >
-        Success message: "Thank you! Your tag suggestion has been submitted."
+        "Suggestion sent — Thanks — a curator will review it." The event is
+        unchanged for now. Events I added lists it under "Changes I
+        suggested" as "Waiting for review · Changed: Tags". The dance-style
+        and reach groups are not forced, since the event already exists.
 
     - id: 13
-      title: "Suggest free-text tag"
+      title: "Admin applies the suggested tags"
       description: >
-        Open suggest tags for "Bachata Night". Type "cozy venue" in the
-        free-text field. Submit.
+        As Dev Admin, open Events → Flags "Changes" → "Sunday Kizomba Class"
+        and Apply the card tagged "Suggested: Dev User".
       expected: >
-        Success message shown. Free-text suggestion submitted.
+        "Beginner-friendly" now shows on the event. Dev User gets "Your
+        suggestion was applied · Sunday Kizomba Class".
 
     - id: 14
-      title: "Honeypot rejects bots"
+      title: "One open suggestion per event"
       description: >
-        (Developer test) Submit a tag suggestion with the honeypot 'website'
-        field filled in.
+        As Dev User, suggest a change to "Bachata Night", then try to suggest
+        another before the admin decides.
       expected: >
-        Request returns 200 (silent rejection). No suggestion created in DB.
+        The second attempt shows "You already suggested a change to this
+        event; withdraw it to send a new one". Withdrawing it from Events I
+        added allows a new one.
 
     # ── Admin Tag Management ────────────────────────────────────
     - id: 15
@@ -196,10 +205,10 @@ test_plan:
         "Congress" in red, "Large" in cyan, "International" in purple).
 
     - id: 24
-      title: "Suggest tags modal uses group color"
+      title: "Suggest an edit's tag step uses group color"
       description: >
-        Open suggest tags for any event. Check the tag pill colors in the
-        selection grid.
+        As Dev User, open "Suggest an edit" for any event and go to Step 2.
+        Check the tag pill colors.
       expected: >
         Tags are grouped and colored by group: Dance Style tags in amber,
         Level tags in blue, Vibe tags in magenta, etc.

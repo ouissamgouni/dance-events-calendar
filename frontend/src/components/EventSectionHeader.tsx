@@ -1,5 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import type { CalendarEvent } from '../types';
+import { eventDisplayZone } from '../utils/eventDates';
 import SaveEventButton from './SaveEventButton';
 import ShareButton from './ShareButton';
 
@@ -13,8 +14,9 @@ interface Props {
 /** Compact meta line: "Fri, Sep 4 · 9:00 PM · Prague". */
 function metaLine(event: CalendarEvent): string {
     const start = new Date(event.start);
-    const day = start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    const time = event.all_day ? null : start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    const timeZone = eventDisplayZone(event);
+    const day = start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone });
+    const time = event.all_day ? null : start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
     const place = event.city || event.location || null;
     return [day, time, place].filter(Boolean).join(' · ');
 }

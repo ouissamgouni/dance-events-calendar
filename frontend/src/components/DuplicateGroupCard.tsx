@@ -6,6 +6,7 @@ interface Props {
     onKeep: (eventId: string) => void;
     onDismiss: () => void;
     onOpenEvent?: (eventId: string) => void;
+    onMerge?: () => void;
 }
 
 function statusBadge(status: string) {
@@ -21,7 +22,7 @@ function statusBadge(status: string) {
     );
 }
 
-export default function DuplicateGroupCard({ group, acting, onKeep, onDismiss, onOpenEvent }: Props) {
+export default function DuplicateGroupCard({ group, acting, onKeep, onDismiss, onOpenEvent, onMerge }: Props) {
     return (
         <div>
             <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -83,7 +84,17 @@ export default function DuplicateGroupCard({ group, acting, onKeep, onDismiss, o
                 ))}
             </ul>
             {group.status === 'pending' && (
-                <div className="mt-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {onMerge && group.events.length >= 2 && (
+                        <button
+                            type="button"
+                            disabled={acting}
+                            onClick={onMerge}
+                            className="border border-line bg-surface px-2 py-1 text-[11px] font-semibold text-ink hover:bg-canvas disabled:opacity-50"
+                        >
+                            Merge…
+                        </button>
+                    )}
                     <button
                         disabled={acting}
                         onClick={onDismiss}

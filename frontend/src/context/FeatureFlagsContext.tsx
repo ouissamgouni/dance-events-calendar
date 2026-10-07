@@ -83,6 +83,11 @@ export interface FeatureFlags {
     eventImagesEnabled: boolean;
     /** What a card renders when an event has no picture. */
     eventCardPlaceholderStyle: 'gradient' | 'initial' | 'none';
+    /** Private tickets + memory photos on events the user is going to. */
+    eventTicketsEnabled: boolean;
+    eventMemoriesEnabled: boolean;
+    eventAssetsMaxTicketMb: number;
+    eventAssetsMaxMemoryMb: number;
 }
 
 const defaultFlags: FeatureFlags = {
@@ -128,6 +133,10 @@ const defaultFlags: FeatureFlags = {
     summaryTwoLineEnabled: false,
     eventImagesEnabled: true,
     eventCardPlaceholderStyle: 'none',
+    eventTicketsEnabled: false,
+    eventMemoriesEnabled: false,
+    eventAssetsMaxTicketMb: 5,
+    eventAssetsMaxMemoryMb: 10,
 };
 
 const FeatureFlagsContext = createContext<{
@@ -195,6 +204,10 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     summaryTwoLineEnabled: s.summary_two_line_enabled ?? false,
                     eventImagesEnabled: s.event_images_enabled ?? true,
                     eventCardPlaceholderStyle: s.event_card_placeholder_style ?? 'none',
+                    eventTicketsEnabled: s.event_tickets_enabled ?? false,
+                    eventMemoriesEnabled: s.event_memories_enabled ?? false,
+                    eventAssetsMaxTicketMb: s.event_assets_max_ticket_mb ?? 5,
+                    eventAssetsMaxMemoryMb: s.event_assets_max_memory_mb ?? 10,
                 });
             })
             .catch(() => {

@@ -5,7 +5,7 @@ import {
     getAdminEventRowClass,
     getAdminEventStatus,
     getAdminEventStatusIcon,
-    getBlockReasonLabel,
+    getRemovalReasonLabel,
 } from './adminEventStatus';
 
 function event(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
@@ -33,31 +33,28 @@ function event(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
 }
 
 describe('admin event status presentation', () => {
-    it('uses blocked status and surface ahead of hidden and pending', () => {
-        const blocked = event({
-            status: 'blocked',
-            review_status: 'pending',
-            is_hidden: true,
-            is_blocked: true,
-        });
+    it('shows removed events as the trash', () => {
+        const removed = event({ status: 'removed', status_reason: 'google_calendar', is_hidden: true });
 
-        expect(getAdminEventStatus(blocked)).toBe('blocked');
-        expect(getAdminEventRowClass(blocked)).toContain('bg-admin-blocked');
-        expect(getAdminEventPanelClass(blocked)).toBe('bg-admin-blocked');
-        expect(getAdminEventStatusIcon(blocked)).toBe('/blocked.png');
+        expect(getAdminEventStatus(removed)).toBe('removed');
+        expect(getAdminEventRowClass(removed)).toContain('bg-admin-blocked');
+        expect(getAdminEventPanelClass(removed)).toBe('bg-admin-blocked');
+        expect(getAdminEventStatusIcon(removed)).toBe('/blocked.png');
+        expect(getRemovalReasonLabel(removed)).toBe('Deleted in Google Calendar');
     });
 
-    it('uses hidden surface ahead of pending without changing status', () => {
-        const hiddenPending = event({ status: 'pending', is_hidden: true });
+    it('uses the hidden surface for unpublished events', () => {
+        const hidden = event({ status: 'unpublished', is_hidden: true });
 
-        expect(getAdminEventStatus(hiddenPending)).toBe('pending');
-        expect(getAdminEventRowClass(hiddenPending)).toContain('bg-admin-hidden');
-        expect(getAdminEventPanelClass(hiddenPending)).toBe('bg-admin-hidden');
-        expect(getAdminEventStatusIcon(hiddenPending)).toBe('/hide.png');
+        expect(getAdminEventRowClass(hidden)).toContain('bg-admin-hidden');
+        expect(getAdminEventPanelClass(hidden)).toBe('bg-admin-hidden');
+        expect(getAdminEventStatusIcon(hidden)).toBe('/hide.png');
+        expect(getRemovalReasonLabel(hidden)).toBeNull();
     });
 
-    it('labels typed block reasons', () => {
-        expect(getBlockReasonLabel('duplicate')).toBe('Duplicate');
-        expect(getBlockReasonLabel(null)).toBeNull();
+    it('derives the status from legacy fields when missing', () => {
+        expect(getAdminEventStatus(event({ is_blocked: true }))).toBe('removed');
+        expect(getAdminEventStatus(event({ review_status: 'pending' }))).toBe('new');
+        expect(getAdminEventStatus(event({ review_status: 'reviewed' }))).toBe('published');
     });
 });

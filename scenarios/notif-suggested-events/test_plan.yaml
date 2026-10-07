@@ -53,9 +53,10 @@ test_plan:
       title: "Approve Alice's suggestion → followers get the notification"
       description: |
         As Alice (Browser A), open /suggest and submit a new event
-        ("Alice's Suggested Salsa", any future date). As Admin, open
-        /admin/suggestions, find it and click Approve, assigning it to
-        Movida Salsa.
+        ("Alice's Suggested Salsa", any future date; Share publicly stays
+        ON). As Admin, open /admin → Submissions → "Wants public" tab,
+        click it to open the event side panel, pick Movida Salsa and click
+        "Make public".
       expected: |
         POST /api/admin/suggestions/{id}/approve → 200; a CachedEvent is
         created and a ``subscription_suggested`` notification (actor=alice)

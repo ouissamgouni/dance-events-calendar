@@ -1,23 +1,22 @@
 import { useState } from 'react';
 import useBackToClose from '../hooks/useBackToClose';
-import type { EventSuggestion, CalendarSetting } from '../types';
+import type { EventSuggestion } from '../types';
 import { syncSuggestionToGoogle } from '../api';
-import SuggestionReviewModal from './SuggestionReviewModal';
+import AdminEventDetailPanel from './AdminEventDetailPanel';
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
     suggestions: EventSuggestion[];
-    calendars: CalendarSetting[];
     onUpdated: (s: EventSuggestion) => void;
     onRefresh?: () => void;
 }
 
-export default function UnsyncedSuggestionsPanel({ isOpen, onClose, suggestions, calendars, onUpdated, onRefresh }: Props) {
+export default function UnsyncedSuggestionsPanel({ isOpen, onClose, suggestions, onUpdated, onRefresh }: Props) {
     useBackToClose(onClose, isOpen);
     const [syncingId, setSyncingId] = useState<string | null>(null);
     const [error, setError] = useState('');
-    const [reviewingSuggestion, setReviewingSuggestion] = useState<EventSuggestion | null>(null);
+    const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
 
     const unsynced = suggestions.filter((s) => s.status === 'approved' && !s.synced_to_google);
 
@@ -94,7 +93,7 @@ export default function UnsyncedSuggestionsPanel({ isOpen, onClose, suggestions,
                                     <div className="flex items-start justify-between gap-2">
                                         <div
                                             className="min-w-0 cursor-pointer flex-1"
-                                            onClick={() => setReviewingSuggestion(s)}
+                                            onClick={() => s.created_event_id && setAdminDetailEventId(s.created_event_id)}
                                         >
                                             <p className="text-[12px] font-medium text-ink truncate">{s.title}</p>
                                             <p className="text-[10px] text-muted mt-0.5">
@@ -117,17 +116,11 @@ export default function UnsyncedSuggestionsPanel({ isOpen, onClose, suggestions,
                 </div>
             </div>
 
-            {reviewingSuggestion && (
-                <SuggestionReviewModal
-                    suggestion={reviewingSuggestion}
-                    calendars={calendars}
-                    onClose={() => setReviewingSuggestion(null)}
-                    onUpdated={(updated) => {
-                        setReviewingSuggestion(updated);
-                        onUpdated(updated);
-                    }}
-                />
-            )}
+            <AdminEventDetailPanel
+                eventId={adminDetailEventId}
+                onClose={() => setAdminDetailEventId(null)}
+                onEventUpdated={() => onRefresh?.()}
+            />
         </>
     );
 }

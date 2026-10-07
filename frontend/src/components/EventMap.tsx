@@ -18,6 +18,7 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
 import { BASEMAP_CONFIG } from '../constants/basemap';
 import { buildJourneyLegs } from '../utils/myEvents';
+import { allDayLastDay, eventDisplayZone, isSameEventDay } from '../utils/eventDates';
 
 export interface MapBounds {
     north: number;
@@ -349,8 +350,8 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                     <span />
                 ) : (
                     <div className="flex items-center gap-1">
-                        <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation />
-                        <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation isPast={isPast} />
+                        <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation disabled={event.is_cancelled} />
+                        <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation isPast={isPast} cancelled={event.is_cancelled} />
                     </div>
                 )}
                 <Link
@@ -1267,19 +1268,22 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
     const formatDate = useCallback((e: CalendarEvent) => {
         const start = new Date(e.start);
         const end = new Date(e.end);
+        const timeZone = eventDisplayZone(e);
         const dateStr = (d: Date) => d.toLocaleDateString(undefined, {
             weekday: 'short',
             month: 'short',
             day: 'numeric',
+            timeZone,
         });
         const timeStr = (d: Date) => d.toLocaleTimeString(undefined, {
             hour: 'numeric',
             minute: '2-digit',
+            timeZone,
         });
         // Multi-day events show the end date so the span reads correctly.
-        const sameDay = start.toDateString() === end.toDateString();
+        const sameDay = isSameEventDay(e);
         if (e.all_day) {
-            return sameDay ? dateStr(start) : `${dateStr(start)} – ${dateStr(new Date(end.getTime() - 1))}`;
+            return sameDay ? dateStr(start) : `${dateStr(start)} – ${dateStr(allDayLastDay(e))}`;
         }
         const base = `${dateStr(start)} · ${timeStr(start)}`;
         return sameDay ? base : `${base} – ${dateStr(end)}, ${timeStr(end)}`;

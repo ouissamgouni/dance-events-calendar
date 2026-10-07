@@ -5,3 +5,9 @@ users:
     name: Dev Admin
     handle: admin
     account_visibility: public
+
+  # Saves a listing that gets resolved as a duplicate (step 12).
+  - email: sam@example.com
+    name: Sam Lee
+    handle: sam
+    account_visibility: public

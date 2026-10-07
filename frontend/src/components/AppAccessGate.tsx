@@ -2,7 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
 
-const PUBLIC_EXACT_PATHS = new Set(['/login', '/privacy', '/invite', '/install']);
+const PUBLIC_EXACT_PATHS = new Set(['/login', '/privacy', '/terms', '/legal', '/invite', '/install']);
 const PUBLIC_PATH_PREFIXES = ['/r/', '/event/', '/series/', '/u/', '/shared/'];
 
 function isPublicPath(pathname: string): boolean {

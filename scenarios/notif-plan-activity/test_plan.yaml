@@ -89,7 +89,8 @@ test_plan:
         with Bob's Plan activity email explicitly enabled by this scenario.
       expected: >
         Accounts without an override show Plan activity email OFF and push ON.
-        Bob receives the instant Plan activity email because his dedicated
+        Bob receives the instant Plan activity email a few seconds after the
+        add (deliver job, NOTIFICATION_DEBOUNCE_SECONDS) because his dedicated
         email preference is explicitly ON and settings.yaml enables instant
         mode. Carol receives no email. Push remains dependent on an active
         browser PushSubscription and granted permission.

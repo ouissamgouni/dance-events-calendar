@@ -194,7 +194,7 @@ describe('NotificationsPanel (event reminders)', () => {
     expect(screen.getByText(/wasn't approved/i)).toBeInTheDocument()
     expect(screen.getByText(/code: badcode/i)).toBeInTheDocument()
     expect(screen.getByText('Code is expired.')).toBeInTheDocument()
-    expect(screen.getByText(/your organizer claim was approved/i)).toBeInTheDocument()
+    expect(screen.getByText(/your organizer request was approved/i)).toBeInTheDocument()
     expect(screen.queryByText('Penny')).not.toBeInTheDocument()
   })
 

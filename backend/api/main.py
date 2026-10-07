@@ -19,6 +19,7 @@ from backend.api.routes.attendance import router as attendance_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.config import router as config_router
 from backend.api.routes.events import router as events_router
+from backend.api.routes.event_assets import router as event_assets_router
 from backend.api.routes.event_messages import router as event_messages_router
 from backend.api.routes.export import router as export_router
 from backend.api.routes.interest_profiles import router as interest_profiles_router
@@ -29,6 +30,7 @@ from backend.api.routes.settings import router as settings_router
 from backend.api.routes.sharing import router as sharing_router
 from backend.api.routes.social import router as social_router
 from backend.api.routes.suggestions import router as suggestions_router
+from backend.api.routes.event_changes import router as event_changes_router
 from backend.api.routes.promo_codes import router as promo_codes_router
 from backend.api.routes.organizer_claims import router as organizer_claims_router
 from backend.api.routes.passport import router as passport_router
@@ -46,7 +48,7 @@ from backend.config.loader import (
 )
 from backend.config.logging_config import configure_logging
 from backend.db.database import init_db
-from backend.services import object_storage
+from backend.services import job_queue, object_storage, push_jobs
 from backend.services.scheduler import run_notification_dispatch_loop, run_sync_loop
 
 configure_logging()
@@ -110,7 +112,8 @@ async def lifespan(app: FastAPI):
     # Same gating model as sync: in-app loop for dev/staging, external cron
     # (POST /admin/trigger-notifications) for prod single-source delivery.
     notif_task = None
-    if get_notification_scheduler_enabled():
+    scheduler_enabled = get_notification_scheduler_enabled()
+    if scheduler_enabled:
         notif_task = asyncio.create_task(run_notification_dispatch_loop())
         logger.info("Started in-app notification dispatch scheduler")
     else:
@@ -118,9 +121,15 @@ async def lifespan(app: FastAPI):
             "In-app notification scheduler disabled; using external scheduler "
             "(call POST /admin/trigger-notifications)"
         )
+    # Fan-out jobs (publish, promo codes, event changes) have no tick sweep, so
+    # the queue runs regardless; only activity delivery follows the scheduler.
+    push_jobs.install(commit_hook=scheduler_enabled)
+    job_queue.get_job_queue().start()
+    logger.info("Started in-process job queue")
 
     yield
 
+    await job_queue.get_job_queue().stop()
     for task in (sync_task, notif_task):
         if task:
             task.cancel()
@@ -171,6 +180,7 @@ if _os.getenv("RATE_LIMIT_ENABLED", "true").lower() in ("false", "0", "no"):
     for _mod_name in (
         "auth",
         "events",
+        "event_assets",
         "export",
         "ratings",
         "event_messages",
@@ -178,6 +188,7 @@ if _os.getenv("RATE_LIMIT_ENABLED", "true").lower() in ("false", "0", "no"):
         "social",
         "schedules",
         "suggestions",
+        "event_changes",
         "promo_codes",
         "tags",
         "tracking",
@@ -217,11 +228,13 @@ app.include_router(admin_series_router)
 app.include_router(settings_router)
 app.include_router(config_router)
 app.include_router(suggestions_router)
+app.include_router(event_changes_router)
 app.include_router(promo_codes_router)
 app.include_router(organizer_claims_router)
 app.include_router(tags_router)
 app.include_router(ratings_router)
 app.include_router(event_messages_router)
+app.include_router(event_assets_router)
 app.include_router(social_router)
 app.include_router(notifications_router)
 app.include_router(push_router)

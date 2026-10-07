@@ -1,0 +1,61 @@
+test_plan:
+  name: "Memories nudge the day after"
+  description: >
+    The morning after an event (user-local memories_prompt_local_hour; 0 in
+    this scenario so it is always due), Going users who haven't added a
+    memory yet get a "Relive the night — add memories" nudge.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - "`SCENARIO=myevent-memories-prompt RESET=1 task start:scenario`"
+
+  cast:
+    - "Mia — Going to Rooftop (already has a memory) and Bachata (none)."
+    - "Leo — Going to Rooftop, no memories."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: "`SCENARIO=myevent-memories-prompt task notify:trigger:scenario`"
+      expected: >
+        Stats include `memories_prompt: {"prompts": 2, "emailed": 2, "pushed": 0}`.
+
+    - id: 2
+      title: "Who is nudged"
+      description: "Check Mailpit and each user's Notifications → Reviews."
+      expected: >
+        Mia has one row "Relive the night — add memories from Bachata Night
+        at the Docks" (none for Rooftop). Leo has one for Rooftop Salsa
+        Social. Emails link to `/event/<id>/memories`.
+
+    - id: 3
+      title: "Deep link lands on Memories"
+      description: "As Leo, click the row."
+      expected: >
+        The event page opens on Overview, URL settles to
+        `/event/evt-mp-rooftop#memories`, scrolled to the Memories section
+        with the add tile.
+
+    - id: 4
+      title: "Review thank-you CTA"
+      description: "As Leo, rate Rooftop Salsa Social and submit."
+      expected: >
+        The thank-you screen shows "📸 Add memories from the night", which
+        closes the modal and scrolls to Memories.
+
+    - id: 5
+      title: '"You attended" CTA'
+      description: >
+        As Leo, open 'Bachata Night at the Docks' (he is not marked yet) and
+        tap "I attended".
+      expected: 'The confirmation sheet shows "📸 Add memories".'
+
+    - id: 6
+      title: "Idempotent re-trigger"
+      description: "Trigger again."
+      expected: '`memories_prompt: {"prompts": 0}`.'
+
+    - id: 7
+      title: "Notification settings"
+      description: "Account → Notifications."
+      expected: 'An "Event memories" row with Email/Push switches.'

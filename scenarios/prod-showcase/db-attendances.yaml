@@ -333,10 +333,6 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
-  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
     email: picks@joinmovida.com
     share_publicly: true
     share_audience: public
@@ -453,10 +449,6 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: 6dh36chlc8r62bb3cdi32b9k6lh3ab9oc4pmab9p6dim4d316hgm6opk6k
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: friends
-  - event_id: 6dh36chlc8r62bb3cdi32b9k6lh3ab9oc4pmab9p6dim4d316hgm6opk6k
     email: picks@joinmovida.com
     share_publicly: false
     share_audience: private
@@ -488,10 +480,6 @@ attendances:
     email: samir.ivanov@joinmovida.com
     share_publicly: false
     share_audience: friends
-  - event_id: c8oj2e9n70s66b9occqm4b9k6os30bb26grj2b9h68q34e1h6lj6acpi68
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
   - event_id: c8oj2e9n70s66b9occqm4b9k6os30bb26grj2b9h68q34e1h6lj6acpi68
     email: victor.schmidt@joinmovida.com
     share_publicly: false
@@ -572,10 +560,6 @@ attendances:
     email: leila.bauer@joinmovida.com
     share_publicly: false
     share_audience: private
-  - event_id: 68o3icj660s6abb6cgrj8b9k68p3abb26gp3gb9m6grm6ohh6co38cb36s
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
   - event_id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc
     email: ines.lopez@joinmovida.com
     share_publicly: true

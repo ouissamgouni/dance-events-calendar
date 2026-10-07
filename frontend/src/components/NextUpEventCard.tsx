@@ -6,7 +6,10 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useEventCardImage } from '../hooks/useEventCardImage';
 import { firstNameOf } from '../utils/displayName';
 import { shortLocation } from '../utils/locationShort';
+import { dayOfMonth, eventDisplayZone } from '../utils/eventDates';
 import ProgramAction from './ProgramAction';
+import { TicketActionButton } from './TicketAction';
+import { useTicketAction } from '../hooks/useTicketAction';
 
 interface NextUpEventCardProps {
     event: CalendarEvent;
@@ -88,12 +91,13 @@ function CardContent({ event, friendsVariant }: Pick<NextUpEventCardProps, 'even
         imageTestId: 'your-next-event-image',
     });
     const start = new Date(event.start);
+    const timeZone = eventDisplayZone(event);
     const location = shortLocation(event.location);
     const dateContent = (
         <>
-            <span className="text-xs">{start.toLocaleDateString(undefined, { weekday: 'short' })}</span>
-            <span className="text-xs">{start.toLocaleDateString(undefined, { month: 'short' })}</span>
-            <span className="text-3xl leading-none">{start.getDate()}</span>
+            <span className="text-xs">{start.toLocaleDateString(undefined, { weekday: 'short', timeZone })}</span>
+            <span className="text-xs">{start.toLocaleDateString(undefined, { month: 'short', timeZone })}</span>
+            <span className="text-3xl leading-none">{dayOfMonth(start, timeZone)}</span>
         </>
     );
 
@@ -121,6 +125,7 @@ function CardContent({ event, friendsVariant }: Pick<NextUpEventCardProps, 'even
                 </span>
             )}
             <span className={`min-w-0 flex-1 ${imageVisible ? '' : 'pl-4'}`}>
+                {event.is_cancelled && <span className="mb-1 inline-block bg-danger/10 px-1.5 py-0.5 text-xs font-semibold text-danger">Cancelled</span>}
                 <span className="line-clamp-2 block text-lg font-bold leading-6">{event.title}</span>
                 {location && (
                     <span className="mt-2 flex items-center gap-1.5 truncate text-sm font-medium text-ink-soft">
@@ -152,9 +157,13 @@ export default function NextUpEventCard({
     const { eventScheduleEnabled } = useFeatureFlags();
     const label = `Open ${event.title} event details`;
     const content: ReactNode = <CardContent event={event} friendsVariant={friendsVariant} />;
-    const programAction = eventScheduleEnabled && event.schedule_published ? (
-        <div className="absolute right-4 bottom-3 z-[2]">
-            <ProgramAction event={event} />
+    const ticketState = useTicketAction(event);
+    const ticket = ticketState?.inline ? ticketState : null;
+    const showProgram = eventScheduleEnabled && event.schedule_published;
+    const programAction = showProgram || ticket ? (
+        <div className="absolute right-4 bottom-3 z-[2] flex items-center gap-2">
+            {ticket && <TicketActionButton event={event} state={ticket} dismissible />}
+            {showProgram && <ProgramAction event={event} />}
         </div>
     ) : null;
     const detailsClassName = `${cardClassName} ${programAction ? 'pb-12' : ''}`;

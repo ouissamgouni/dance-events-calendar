@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { CalendarEvent } from '../types';
 import { renderWithProviders } from '../test/render';
-import { FeatureFlagsProvider } from '../context/FeatureFlagsContext';
+import { FeatureFlagsContext, FeatureFlagsProvider, defaultFlags } from '../context/FeatureFlagsContext';
 import EventActionDock from './EventActionDock';
 import EventActions from './event-summary/EventActions';
 
@@ -32,15 +32,56 @@ describe.each([
     it('shows Share inline for upcoming events', () => {
         renderActionBar(renderActions(false));
 
-        expect(screen.getByRole('button', { name: /share|copy link/i })).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: /share|copy link/i })[0]).toBeInTheDocument();
     });
+});
 
+describe('modal actions overflow', () => {
     it('moves Share into More for past events', async () => {
-        const { user } = renderActionBar(renderActions(true));
+        const { user } = renderActionBar(<EventActions {...commonProps} isPast canReviewInline />);
 
         expect(screen.queryByRole('button', { name: /share|copy link/i })).toBeNull();
         await user.click(screen.getByRole('button', { name: 'More actions' }));
         expect(screen.getByRole('button', { name: /share|copy link/i })).toBeInTheDocument();
+    });
+});
+
+describe('page action dock overflow', () => {
+    it('lists every secondary action on desktop and keeps More mobile-only', async () => {
+        const { user } = renderActionBar(<EventActionDock {...commonProps} isPast />);
+
+        const desktopShare = screen.getByRole('button', { name: /share|copy link/i });
+        expect(desktopShare).toHaveClass('hidden', 'lg:flex');
+        expect(screen.getByRole('button', { name: 'Start discussion' })).toHaveClass('hidden', 'lg:flex');
+        expect(screen.getByRole('button', { name: 'More actions' }).parentElement).toHaveClass('lg:hidden');
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        expect(screen.getAllByRole('button', { name: /share|copy link/i })).toHaveLength(2);
+    });
+});
+
+describe('organizer claim action', () => {
+    const renderWithClaims = (event: CalendarEvent) => renderWithProviders(
+        <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, organizerClaimsEnabled: true }, updateFlag: vi.fn() }}>
+            <EventActions {...commonProps} event={event} isPast={false} canReviewInline={false} />
+        </FeatureFlagsContext.Provider>,
+    );
+
+    it('offers "I organize this event" while the event has no organizer', async () => {
+        const { user } = renderWithClaims(EVENT);
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        expect(screen.getByRole('menuitem', { name: 'I organize this event' })).toBeInTheDocument();
+    });
+
+    it('hides it once the event has an organizer', async () => {
+        const { user } = renderWithClaims({
+            ...EVENT,
+            organizer: { user_id: 'u2', handle: 'olive', display_name: 'Olive', avatar_url: null, is_verified_organizer: true },
+        });
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        expect(screen.queryByRole('menuitem', { name: 'I organize this event' })).toBeNull();
     });
 });
 
@@ -63,7 +104,6 @@ describe('event action bar layout', () => {
         expect(container.firstElementChild).toHaveClass('bg-blue-50', 'lg:w-fit');
         expect(container.firstElementChild?.firstElementChild).toHaveClass('flex-nowrap', 'lg:w-max', 'lg:flex-col', 'lg:items-stretch');
         const moreButton = screen.getByRole('button', { name: 'More actions' });
-        expect(moreButton).toHaveClass('lg:w-full');
-        expect(moreButton.parentElement).toHaveClass('lg:w-full');
+        expect(moreButton.parentElement).toHaveClass('ml-auto', 'lg:hidden');
     });
 });

@@ -1,0 +1,39 @@
+# Tina marked Going 25h ago (past the 24h nudge delay).
+attendances:
+  - {
+      event_id: evt-tp-intl,
+      email: tina@example.com,
+      share_audience: public,
+      attending_since: now-25h,
+    }
+  - {
+      event_id: evt-tp-festival,
+      email: tina@example.com,
+      share_audience: public,
+      attending_since: now-25h,
+    }
+  - {
+      event_id: evt-tp-local,
+      email: tina@example.com,
+      share_audience: public,
+      attending_since: now-25h,
+    }
+  - {
+      event_id: evt-tp-pinned,
+      email: tina@example.com,
+      share_audience: public,
+      attending_since: now-25h,
+    }
+  - {
+      event_id: evt-tp-unpinned,
+      email: tina@example.com,
+      share_audience: public,
+      attending_since: now-25h,
+    }
+  - {
+      event_id: evt-tp-dismissed,
+      email: tina@example.com,
+      share_audience: public,
+      attending_since: now-25h,
+      ticket_not_needed: true,
+    }

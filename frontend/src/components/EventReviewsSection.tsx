@@ -12,6 +12,7 @@ import { useScrollDots } from '../hooks/useScrollDots';
 import { SENTIMENT_META } from '../utils/reviewSentiment';
 import ScrollDotsIndicator from './ScrollDots';
 import useBackToClose from '../hooks/useBackToClose';
+import { reportMailto } from '../utils/report';
 
 /** Max tags shown on a compact review card before the rest collapse into "+N more". */
 const CARD_TAGS_SHOWN = 5;
@@ -91,12 +92,20 @@ function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onC
                         ))}
                     </div>
                 )}
-                <Link
-                    to={`/event/${review.event_id}`}
-                    className="inline-block text-[9px] font-medium text-sky-600 hover:text-sky-700"
-                >
-                    From {review.event_title} →
-                </Link>
+                <div className="flex items-center justify-between gap-3">
+                    <Link
+                        to={`/event/${review.event_id}`}
+                        className="inline-block text-[9px] font-medium text-sky-600 hover:text-sky-700"
+                    >
+                        From {review.event_title} →
+                    </Link>
+                    <a
+                        href={reportMailto('review', `${window.location.origin}/event/${review.event_id}`, `review ${review.id}`)}
+                        className="text-[11px] text-ink-soft hover:text-ink"
+                    >
+                        Report
+                    </a>
+                </div>
             </div>
         </div>,
         document.body,
@@ -391,6 +400,14 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                                                 From {r.event_title} →
                                             </Link>
                                         )}
+                                        {r.comment && (
+                                            <a
+                                                href={reportMailto('review', `${window.location.origin}/event/${r.event_id}`, `review ${r.id}`)}
+                                                className="block text-[11px] text-ink-soft hover:text-ink"
+                                            >
+                                                Report
+                                            </a>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -414,6 +431,9 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                         onSelect={reviewDots.scrollToIndex}
                         label="Reviews scroll position"
                     />
+                    <p className="text-[11px] text-ink-soft">
+                        Reviews are written by signed-in members once the event is over. Written comments are checked by our team before they appear; attendance isn’t verified.
+                    </p>
 
                     {expandedReview && (
                         <ReviewDetailModal review={expandedReview} onClose={() => setExpandedReview(null)} />

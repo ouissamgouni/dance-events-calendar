@@ -174,6 +174,9 @@ export const handlers = [
     // ── Tags (suggestion modal mount) ───────────────────────────────────────
     http.get('*/api/tags', () => HttpResponse.json([])),
 
+    // ── Suggestion duplicate check (none by default) ────────────────────────
+    http.get('*/api/suggestions/similar', () => HttpResponse.json([])),
+
     // ── Suggestion geocode lookup ───────────────────────────────────────────
     http.get('*/api/suggestions/geocode', ({ request }) => {
         const url = new URL(request.url)
