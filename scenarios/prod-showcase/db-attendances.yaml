@@ -100,6 +100,22 @@ attendances:
     email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: friends
+  - event_id: lisbon-rooftop-salsa-social
+    email: alex.navarro@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: lisbon-rooftop-salsa-social
+    email: penny.valdez@joinmovida.com
+    share_publicly: true
+    share_audience: public
+  - event_id: lisbon-rooftop-salsa-social
+    email: sofia.torres@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: lisbon-rooftop-salsa-social
+    email: victor.schmidt@joinmovida.com
+    share_publicly: true
+    share_audience: public
   - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
     email: elena.moreau@joinmovida.com
     share_publicly: true

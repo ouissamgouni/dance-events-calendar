@@ -1,43 +1,27 @@
-# Curated inboxes: Lucía (dancer) and Penny (contributor) each surface a
+# Curated inboxes: Alex (dancer) and Penny (contributor) each surface a
 # broad mix of notification kinds. Rows already emitted by seeded follows or
 # messages are retimed rather than duplicated.
+# Inboxes sort by created_at, so minutes_ago encodes importance tiers:
+#   1 plans changed (5-20) · 2 needs action / decisions (25-55)
+#   3 direct to you (60-90) · 4 friends' activity (100-130)
+#   5 after the event (150-170) · 6 discovery & deals (200-240) · then read history.
 notifications:
   # Alex Navarro
+  # Tier 1: plans changed
   - recipient: alex.navarro@joinmovida.com
-    actor: theo.novak@joinmovida.com
-    kind: follow_request
-    minutes_ago: 12
+    actor: operations@joinmovida.com
+    kind: event_cancelled
+    event_id: lisbon-rooftop-salsa-social
+    context: Lisbon Rooftop Salsa Social
+    description: "Cancelled: The rooftop venue closed for renovation. Ticket holders are refunded automatically."
+    minutes_ago: 5
   - recipient: alex.navarro@joinmovida.com
-    kind: event_reminder
-    event_id: alfama-thursday-salsa-next
-    minutes_ago: 35
-  - recipient: alex.navarro@joinmovida.com
-    actor: sofia.torres@joinmovida.com
-    kind: subscription_going
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    minutes_ago: 50
-  - recipient: alex.navarro@joinmovida.com
-    actor: camille.laurent@joinmovida.com
-    kind: subscription_going
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    minutes_ago: 70
-  - recipient: alex.navarro@joinmovida.com
-    actor: penny.valdez@joinmovida.com
-    kind: subscription_going
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    minutes_ago: 95
-  - recipient: alex.navarro@joinmovida.com
-    actor: samir.ivanov@joinmovida.com
-    kind: new_follower
-    minutes_ago: 140
-  - recipient: alex.navarro@joinmovida.com
-    actor: sofia.torres@joinmovida.com
-    kind: plan_session_added
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    group_key: 30000000-0000-4000-8000-000000001703
-    context: Mambo Partnerwork Lab
-    description: 3 sessions planned
-    minutes_ago: 180
+    actor: operations@joinmovida.com
+    kind: event_changed
+    event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    context: Lisboa Beach Bachata Social 2027
+    description: "Venue: Cascais, Lisbon Coast, Portugal → Praia de Carcavelos, Cascais, Portugal"
+    minutes_ago: 10
   - recipient: alex.navarro@joinmovida.com
     actor: operations@joinmovida.com
     kind: planned_session_changed
@@ -46,32 +30,81 @@ notifications:
     group_key: 30000000-0000-4000-8000-000000001606
     context: Secrets to Social Dancing
     description: "Secrets to Social Dancing: has a new time."
-    minutes_ago: 260
+    minutes_ago: 15
+  - recipient: alex.navarro@joinmovida.com
+    kind: event_reminder
+    event_id: alfama-thursday-salsa-next
+    minutes_ago: 20
+  # Tier 2: needs action
+  - recipient: alex.navarro@joinmovida.com
+    actor: theo.novak@joinmovida.com
+    kind: follow_request
+    minutes_ago: 25
+  - recipient: alex.navarro@joinmovida.com
+    kind: event_ticket_prompt
+    event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    minutes_ago: 35
+  # Tier 3: direct to you
   - recipient: alex.navarro@joinmovida.com
     actor: victor.schmidt@joinmovida.com
     kind: event_message_reply
     event_id: alfama-thursday-salsa-next
     context: question
     description: It is smooth wood and there is a small changing room beside reception.
-    minutes_ago: 380
+    minutes_ago: 60
   - recipient: alex.navarro@joinmovida.com
     actor: camille.laurent@joinmovida.com
     kind: follow_request_approved
-    minutes_ago: 480
+    minutes_ago: 75
+  - recipient: alex.navarro@joinmovida.com
+    actor: samir.ivanov@joinmovida.com
+    kind: new_follower
+    minutes_ago: 90
+  # Tier 4: friends' activity
+  - recipient: alex.navarro@joinmovida.com
+    actor: sofia.torres@joinmovida.com
+    kind: subscription_going
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    minutes_ago: 100
+  - recipient: alex.navarro@joinmovida.com
+    actor: camille.laurent@joinmovida.com
+    kind: subscription_going
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    minutes_ago: 105
+  - recipient: alex.navarro@joinmovida.com
+    actor: penny.valdez@joinmovida.com
+    kind: subscription_going
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    minutes_ago: 110
+  - recipient: alex.navarro@joinmovida.com
+    actor: sofia.torres@joinmovida.com
+    kind: plan_session_added
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    group_key: 30000000-0000-4000-8000-000000001703
+    context: Mambo Partnerwork Lab
+    description: 3 sessions planned
+    minutes_ago: 130
+  # Tier 5: after the event
+  - recipient: alex.navarro@joinmovida.com
+    kind: event_review_prompt
+    event_id: alfama-thursday-salsa-autumn
+    minutes_ago: 150
+  - recipient: alex.navarro@joinmovida.com
+    kind: event_memories_prompt
+    event_id: alfama-thursday-salsa-autumn
+    minutes_ago: 170
+  # Tier 6: discovery & deals
   - recipient: alex.navarro@joinmovida.com
     kind: promo_code_added
     event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
     context: Sanja1
-    minutes_ago: 600
+    minutes_ago: 200
   - recipient: alex.navarro@joinmovida.com
     kind: interest_event
     event_id: vienna-bachata-nights
     context: Salsa + Bachata - Europe
-    minutes_ago: 720
-  - recipient: alex.navarro@joinmovida.com
-    kind: event_review_prompt
-    event_id: alfama-thursday-salsa-autumn
-    minutes_ago: 1100
+    minutes_ago: 240
+  # History (read)
   - recipient: alex.navarro@joinmovida.com
     actor: sofia.torres@joinmovida.com
     kind: new_friend
@@ -133,49 +166,77 @@ notifications:
     read: true
 
   # Penny Valdez
+  # Tier 1: plans changed
   - recipient: penny.valdez@joinmovida.com
-    kind: organizer_claim_decided
-    context: approved
-    minutes_ago: 8
+    actor: operations@joinmovida.com
+    kind: event_cancelled
+    event_id: lisbon-rooftop-salsa-social
+    context: Lisbon Rooftop Salsa Social
+    description: "Cancelled: The rooftop venue closed for renovation. Ticket holders are refunded automatically."
+    minutes_ago: 5
   - recipient: penny.valdez@joinmovida.com
-    kind: promo_code_approved
-    event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
-    context: EARLYBIRD
-    minutes_ago: 25
-  - recipient: penny.valdez@joinmovida.com
-    actor: alex.navarro@joinmovida.com
-    kind: new_follower
-    minutes_ago: 60
-  - recipient: penny.valdez@joinmovida.com
-    actor: clara.dubois@joinmovida.com
-    kind: event_message
-    event_id: london-salsa-sessions
-    context: meetup
-    description: First-time visitors, shall we meet by registration before the welcome class?
-    minutes_ago: 110
+    actor: operations@joinmovida.com
+    kind: event_changed
+    event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    context: Lisboa Beach Bachata Social 2027
+    description: "Venue: Cascais, Lisbon Coast, Portugal → Praia de Carcavelos, Cascais, Portugal"
+    minutes_ago: 10
   - recipient: penny.valdez@joinmovida.com
     kind: schedule_program_updated
     event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
     subject_key: "publication:2"
     context: "16"
     description: The event program has changed. Review the latest schedule.
-    minutes_ago: 180
+    minutes_ago: 15
+  - recipient: penny.valdez@joinmovida.com
+    kind: event_reminder
+    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    context: ask
+    minutes_ago: 20
+  # Tier 2: decisions on her contributions
+  - recipient: penny.valdez@joinmovida.com
+    kind: organizer_assigned
+    event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    context: Salsa Sunset Amalfi Coast 2027
+    minutes_ago: 25
+  - recipient: penny.valdez@joinmovida.com
+    kind: organizer_claim_decided
+    context: approved
+    minutes_ago: 30
   - recipient: penny.valdez@joinmovida.com
     kind: promo_code_rejected
     event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
     context: SALSA50
     description: This code has expired. Feel free to share a current one.
-    minutes_ago: 260
+    minutes_ago: 40
   - recipient: penny.valdez@joinmovida.com
-    kind: event_reminder
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    context: ask
-    minutes_ago: 420
+    kind: promo_code_approved
+    event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    context: EARLYBIRD
+    minutes_ago: 55
+  # Tier 3: direct to you
+  - recipient: penny.valdez@joinmovida.com
+    actor: clara.dubois@joinmovida.com
+    kind: event_message
+    event_id: london-salsa-sessions
+    context: meetup
+    description: First-time visitors, shall we meet by registration before the welcome class?
+    minutes_ago: 70
+  - recipient: penny.valdez@joinmovida.com
+    actor: alex.navarro@joinmovida.com
+    kind: new_follower
+    minutes_ago: 90
+  # Tier 5: after the event
   - recipient: penny.valdez@joinmovida.com
     kind: event_review_prompt
     event_id: athens-bachata-weekender-previous
     context: Elena Moreau
-    minutes_ago: 900
+    minutes_ago: 150
+  - recipient: penny.valdez@joinmovida.com
+    kind: event_memories_prompt
+    event_id: athens-bachata-weekender-previous
+    minutes_ago: 170
+  # History (read)
   - recipient: penny.valdez@joinmovida.com
     actor: elena.moreau@joinmovida.com
     kind: new_follower

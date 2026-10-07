@@ -66,6 +66,27 @@ events:
       - format:social
       - dance-style:salsa
       - reach:local
+  - id: lisbon-rooftop-salsa-social
+    calendar_id: movida-community-events
+    title: Lisbon Rooftop Salsa Social
+    description: Sunset salsa on a rooftop terrace above Baixa, with a taster class and a resident DJ until late.
+    location: Terraço Baixa, Lisbon, Portugal
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    latitude: 38.7110
+    longitude: -9.1366
+    start: w3 Sat 21:00
+    end: w3 Sun 02:00
+    price_min: 12
+    price_currency: EUR
+    price_is_free: false
+    is_cancelled: true
+    cancellation_note: The rooftop venue closed for renovation. Ticket holders are refunded automatically.
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
   - id: seine-salsa-social
     calendar_id: movida-community-events
     title: Seine Salsa Social
@@ -309,12 +330,12 @@ events:
     title: Lisboa Beach Bachata Social 2027
     description: Portuguese summer bachata vibes by the sea. Use code CASCAIS10 for 10% off all passes!
     image: 09_lisboa_beach_bachata_social_2027.png
-    location: Cascais, Lisbon Coast, Portugal
+    location: Praia de Carcavelos, Cascais, Portugal
     city: Cascais
     country: Portugal
     country_code: PT
-    latitude: 38.6953
-    longitude: -9.4167
+    latitude: 38.6790
+    longitude: -9.3366
     start: "2027-07-04T19:00:00+00:00"
     end: "2027-07-07T23:00:00+00:00"
     price_min: 200
