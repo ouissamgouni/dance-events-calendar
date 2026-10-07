@@ -93,7 +93,7 @@ export default function AudiencePicker({
             </div>
             {showZeroFriendsHint && (
                 <p
-                    className={`${isSheet ? 'mt-3 text-sm leading-5' : 'mt-1 text-[11px]'} text-ink-soft`}
+                    className={`${isSheet ? 'mt-3 text-sm leading-5' : 'mt-1 text-xs'} text-ink-soft`}
                     data-testid="audience-zero-friends-hint"
                 >
                     Visible to 0 people — you have no friends yet.{' '}

@@ -65,7 +65,7 @@ export default function EventImageEditor({ event, onChange }: EventImageEditorPr
                     />
                 ) : (
                     <div
-                        className="flex h-20 w-36 shrink-0 items-center justify-center rounded-card border border-dashed border-card-line text-[11px] text-ink-soft"
+                        className="flex h-20 w-36 shrink-0 items-center justify-center rounded-card border border-dashed border-card-line text-xs text-ink-soft"
                         data-testid="event-image-empty"
                     >
                         No picture

@@ -255,7 +255,7 @@ export default function ShareReferralBanner() {
                 {(status.handle ?? source.handle) ? (
                     <Link
                         to={`/u/${status.handle ?? source.handle}`}
-                        className="bg-action px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-action transition"
+                        className="min-h-8 bg-action px-3 text-sm font-semibold text-white hover:bg-action transition"
                     >
                         Open profile
                     </Link>
@@ -292,7 +292,7 @@ export default function ShareReferralBanner() {
                 </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-                <label className="flex items-center gap-1.5 text-[11px] text-ink-soft select-none">
+                <label className="flex items-center gap-1.5 text-xs text-ink-soft select-none">
                     <input
                         type="checkbox"
                         data-testid="share-referral-opt-in"
@@ -307,7 +307,7 @@ export default function ShareReferralBanner() {
                         type="button"
                         onClick={handleConfirm}
                         disabled={status.kind === 'redeeming'}
-                        className="bg-action px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-action transition disabled:opacity-60"
+                        className="min-h-8 bg-action px-3 text-sm font-semibold text-white hover:bg-action transition disabled:opacity-60"
                     >
                         {status.kind === 'redeeming' ? 'Following…' : 'Continue'}
                     </button>
@@ -321,7 +321,7 @@ export default function ShareReferralBanner() {
                             // effect above.
                             if (followOptIn) setIntent(shareCode);
                         }}
-                        className="bg-action px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-action transition"
+                        className="min-h-8 bg-action px-3 text-sm font-semibold text-white hover:bg-action transition"
                     >
                         Sign in
                     </Link>
@@ -336,7 +336,7 @@ export default function ShareReferralBanner() {
                 </button>
             </div>
             {status.kind === 'error' ? (
-                <p className="text-rose-600 text-[11px]">{status.message}</p>
+                <p className="text-rose-600 text-xs">{status.message}</p>
             ) : null}
         </div>
     );

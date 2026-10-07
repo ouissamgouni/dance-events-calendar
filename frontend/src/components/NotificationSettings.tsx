@@ -301,7 +301,7 @@ export default function NotificationSettings() {
                     Notifications &amp; email
                 </h2>
                 <span
-                    className="text-[11px] text-muted"
+                    className="text-xs text-muted"
                     role="status"
                     aria-live="polite"
                 >
@@ -309,7 +309,7 @@ export default function NotificationSettings() {
                 </span>
             </div>
 
-            <p className="text-[11px] text-ink-soft mb-3">
+            <p className="text-xs text-ink-soft mb-3">
                 In-app notifications always appear. Toggle email or push per feature.
             </p>
 
@@ -337,7 +337,7 @@ export default function NotificationSettings() {
                                     <div className="font-medium text-ink">
                                         {f.label}
                                     </div>
-                                    <div className="text-[11px] text-ink-soft">
+                                    <div className="text-xs text-ink-soft">
                                         {f.description}
                                     </div>
                                 </td>
@@ -386,7 +386,7 @@ export default function NotificationSettings() {
             >
                 <div>
                     <div className="font-medium text-ink text-xs">Email digest</div>
-                    <div className="text-[11px] text-ink-soft">
+                    <div className="text-xs text-ink-soft">
                         Master switch for the combined activity digest email. Off stops
                         the digest entirely, whatever the per-feature email toggles say.
                     </div>
@@ -404,7 +404,7 @@ export default function NotificationSettings() {
             </div>
 
             <div className="pt-3 mt-3 border-t border-card-line">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">
+                <div className="text-2xs font-semibold uppercase tracking-wide text-ink-soft mb-1.5">
                     Timezone
                 </div>
                 <p className="text-xs text-ink-soft">

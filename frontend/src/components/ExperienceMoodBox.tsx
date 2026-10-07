@@ -56,7 +56,7 @@ export default function ExperienceMoodBox({
 
     return (
         <div className={`border border-line ${bg} px-3 py-2.5 space-y-1`}>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+            <div className="text-2xs font-semibold uppercase tracking-wide text-ink-soft">
                 {label}
             </div>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -73,11 +73,11 @@ export default function ExperienceMoodBox({
                     <span className="font-semibold text-ink tabular-nums">{positivePct}%</span> rated it Great or Amazing
                 </span>
             </div>
-            <div className="text-[11px] text-muted">{subline}</div>
+            <div className="text-xs text-muted">{subline}</div>
             {link && (
                 <Link
                     to={link.to}
-                    className="inline-block text-[11px] font-medium text-sky-600 hover:text-sky-700"
+                    className="inline-block text-xs font-medium text-sky-600 hover:text-sky-700"
                 >
                     {link.label}
                 </Link>

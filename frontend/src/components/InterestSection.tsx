@@ -170,7 +170,7 @@ function FollowChipButton({
                 <span
                     title={`Follow request pending for @${handle}`}
                     aria-label={`Follow request pending for @${handle}`}
-                    className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] leading-none text-ink-soft border border-line bg-surface"
+                    className="inline-flex min-h-8 items-center justify-center px-3 text-xs leading-none text-ink-soft border border-line bg-surface"
                 >
                     Requested
                 </span>
@@ -181,7 +181,7 @@ function FollowChipButton({
                 <span
                     title={`Following @${handle}`}
                     aria-label={`Following @${handle}`}
-                    className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] leading-none text-ink-soft border border-line bg-surface"
+                    className="inline-flex min-h-8 items-center justify-center px-3 text-xs leading-none text-ink-soft border border-line bg-surface"
                 >
                     Following
                 </span>
@@ -197,7 +197,7 @@ function FollowChipButton({
                 disabled={busy}
                 title={label}
                 aria-label={label}
-                className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] leading-none bg-action text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex min-h-8 items-center justify-center px-3 text-xs leading-none bg-action text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {busy ? 'Following…' : errored ? 'Retry' : 'Follow'}
             </button>
@@ -210,7 +210,7 @@ function FollowChipButton({
             <span
                 title={`Following @${handle}`}
                 aria-label={`Following @${handle}`}
-                className="inline-flex items-center justify-center h-4 w-4 text-[10px] leading-none text-ink-soft border border-line bg-surface"
+                className="inline-flex items-center justify-center h-5 w-5 text-xs leading-none text-ink-soft border border-line bg-surface"
             >
                 ✓
             </span>
@@ -222,7 +222,7 @@ function FollowChipButton({
             <span
                 title={`Follow request pending for @${handle}`}
                 aria-label={`Follow request pending for @${handle}`}
-                className="inline-flex items-center justify-center h-4 w-4 text-[10px] leading-none text-muted border border-line bg-surface"
+                className="inline-flex items-center justify-center h-5 w-5 text-xs leading-none text-muted border border-line bg-surface"
             >
                 ·
             </span>
@@ -232,8 +232,7 @@ function FollowChipButton({
     const busy = state === 'busy';
     const errored = state === 'error';
     const label = errored ? `Retry follow @${handle}` : `Follow @${handle}`;
-    // Icon-only +/↻ button. Smallest practical hit target (h-4 w-4) per
-    // request — the chip row is already a compact horizontal strip.
+    // Visually compact +/↻ button; the ::before pad gives a ~44px touch target.
     return (
         <button
             type="button"
@@ -241,7 +240,7 @@ function FollowChipButton({
             disabled={busy}
             title={label}
             aria-label={label}
-            className="inline-flex items-center justify-center h-4 w-4 text-[10px] leading-none bg-action text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
+            className="relative inline-flex items-center justify-center h-5 w-5 text-xs leading-none bg-action text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed before:absolute before:-inset-3 before:content-['']"
         >
             {busy ? '…' : errored ? '↻' : '+'}
         </button>
@@ -289,7 +288,7 @@ function FofChip({ a }: { a: FofGoingAttendee }) {
                 className="text-xs whitespace-nowrap"
             />
             {a.via_friend_handle && (
-                <span className="text-[10px] text-ink-soft whitespace-nowrap">
+                <span className="text-xs text-ink-soft whitespace-nowrap">
                     · via{' '}
                     <Link
                         to={`/u/${a.via_friend_handle}`}
@@ -321,7 +320,7 @@ function OtherChip({ a, isSelf = false }: { a: Attendee; isSelf?: boolean }) {
                 className="text-xs whitespace-nowrap"
             />
             {isSelf ? (
-                <span className="text-[10px] text-ink-soft">(you)</span>
+                <span className="text-xs text-ink-soft">(you)</span>
             ) : (
                 <FollowChipButton handle={a.handle} initialStatus={a.viewer_follow_status} />
             )}
@@ -527,7 +526,7 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
                     {isEmpty ? (
                         hiddenCount > 0 ? (
                             <div
-                                className="text-[11px] text-ink-soft"
+                                className="text-xs text-ink-soft"
                                 data-testid="interest-hidden"
                             >
                                 {hiddenCount} {isPast ? 'attended' : 'going'} privately —
@@ -535,7 +534,7 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
                                 {isPast ? 'attended' : 'going'} publicly.
                             </div>
                         ) : (
-                            <div className="text-[11px] text-ink-soft">
+                            <div className="text-xs text-ink-soft">
                                 No one has shared their name yet — be the first by marking
                                 yourself {isPast ? 'attended' : 'going'} publicly.
                             </div>
@@ -605,7 +604,7 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
                             )}
                             {hiddenCount > 0 && (
                                 <div
-                                    className="text-[11px] text-ink-soft"
+                                    className="text-xs text-ink-soft"
                                     data-testid="interest-hidden"
                                 >
                                     {hiddenCount} more {isPast ? 'attended' : 'going'} privately
@@ -649,7 +648,7 @@ function BucketRow({
 }) {
     return (
         <div data-testid={testid}>
-            <div className="text-[10px] uppercase tracking-wide text-muted mb-1">
+            <div className="text-2xs uppercase tracking-wide text-ink-soft mb-1">
                 {label} ({count})
             </div>
             <ul className="flex gap-2 items-center overflow-x-auto pb-1 -mb-1">
@@ -733,7 +732,7 @@ function GoingModal({
                                 display_name={a.display_name}
                                 avatar_url={a.avatar_url}
                                 action={
-                                    <span className="text-[10px] uppercase tracking-wide text-action px-2 py-0.5 border border-blue-100 bg-blue-50">
+                                    <span className="text-2xs uppercase tracking-wide text-action px-2 py-0.5 border border-blue-100 bg-blue-50">
                                         Friend ✓
                                     </span>
                                 }
@@ -786,7 +785,7 @@ function GoingModal({
                                     avatar_url={a.avatar_url}
                                     action={
                                         isSelf ? (
-                                            <span className="text-[11px] text-ink-soft">(you)</span>
+                                            <span className="text-xs text-ink-soft">(you)</span>
                                         ) : (
                                             <FollowChipButton handle={a.handle} variant="text" initialStatus={a.viewer_follow_status} />
                                         )
@@ -795,7 +794,7 @@ function GoingModal({
                             );
                         })}
                         {anonymousTail > 0 && (
-                            <li className="px-3 py-2 text-[11px] text-ink-soft">
+                            <li className="px-3 py-2 text-xs text-ink-soft">
                                 +{anonymousTail} anonymous public {isPast ? 'attended' : 'going'}
                             </li>
                         )}
@@ -820,11 +819,11 @@ function ModalSection({
 }) {
     return (
         <div>
-            <div className="sticky top-0 z-10 bg-surface/95 backdrop-blur border-b border-card-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+            <div className="sticky top-0 z-10 bg-surface/95 backdrop-blur border-b border-card-line px-3 py-1.5 text-2xs font-semibold uppercase tracking-wide text-ink-soft">
                 {label} ({count})
             </div>
             {count === 0 ? (
-                <div className="px-3 py-2 text-[11px] text-muted">
+                <div className="px-3 py-2 text-xs text-muted">
                     {emptyCopy}
                 </div>
             ) : (
@@ -862,13 +861,13 @@ function ModalRow({
                         display_name={display_name}
                     />
                     {handle && (
-                        <span className="text-[10px] text-muted ml-1">
+                        <span className="text-xs text-muted ml-1">
                             @{handle}
                         </span>
                     )}
                 </div>
                 {subline && (
-                    <div className="text-[10px] text-ink-soft mt-0.5">
+                    <div className="text-xs text-ink-soft mt-0.5">
                         {subline}
                     </div>
                 )}

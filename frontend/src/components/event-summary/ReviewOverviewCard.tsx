@@ -39,7 +39,7 @@ export default function ReviewOverviewCard({ aggregate, crossEdition, onOpen }: 
                         {emoji} {headline}
                     </span>
                 </div>
-                <p className="text-[11px] text-ink-soft">
+                <p className="text-xs text-ink-soft">
                     <span className="font-semibold text-ink tabular-nums">{positivePct}%</span> rated it Great or Amazing
                     {' · '}
                     Based on {aggregate.count} review{aggregate.count === 1 ? '' : 's'}
@@ -49,7 +49,7 @@ export default function ReviewOverviewCard({ aggregate, crossEdition, onOpen }: 
                         {highlights.map((t) => (
                             <span
                                 key={t.tag_id}
-                                className="inline-flex items-center bg-green-50 px-1.5 py-px text-[10px] font-medium text-success"
+                                className="inline-flex items-center bg-green-50 px-1.5 py-px text-xs font-medium text-success"
                             >
                                 {t.label}
                             </span>

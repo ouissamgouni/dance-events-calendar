@@ -206,7 +206,7 @@ export default function EventCard({
         <>
             {isTrending && (
                 <span
-                    className="inline-flex items-center bg-orange-50 px-1.5 py-px text-[11px] font-medium text-orange-400"
+                    className="inline-flex items-center bg-orange-50 px-1.5 py-px text-xs font-medium text-orange-400"
                     data-testid="trending-badge"
                     title="Trending"
                 >
@@ -388,7 +388,7 @@ export default function EventCard({
                                 <span className="flex min-w-0 items-center gap-1.5 leading-tight" aria-hidden="true" data-testid="event-card-date-top-row">
                                     {dateSequence != null && (
                                         // eslint-disable-next-line no-restricted-syntax -- journey order badge is a circle by design
-                                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-action px-1 text-[11px] font-extrabold leading-none text-white shadow-sm" data-testid="event-date-sequence">
+                                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-action px-1 text-xs font-extrabold leading-none text-white shadow-sm" data-testid="event-date-sequence">
                                             {dateSequence}
                                         </span>
                                     )}

@@ -71,7 +71,7 @@ export default function MyPlanList({ schedule, entries, onOpen, onRemove, onProg
                                                 : <div className="min-w-0 flex-1 text-left">{sessionContent}</div>}
                                             {onRemove ? <button type="button" aria-label={`Remove ${entry.session.title} from My Plan`} onClick={() => onRemove(entry.session_id)} className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft hover:text-danger"><X size={20} /></button> : null}
                                         </div>
-                                        {overlap?.length ? <p className="mt-2 inline-flex max-w-full items-start gap-1 rounded-field bg-amber-50 px-2 py-1 text-[10px] font-medium leading-4 text-amber-900"><AlertTriangle size={12} className="mt-0.5 shrink-0" /><span><span className="font-semibold">Time conflict</span> with {overlap.join(', ')}</span></p> : null}
+                                        {overlap?.length ? <p className="mt-2 inline-flex max-w-full items-start gap-1 rounded-field bg-amber-50 px-2 py-1 text-xs font-medium leading-4 text-amber-900"><AlertTriangle size={12} className="mt-0.5 shrink-0" /><span><span className="font-semibold">Time conflict</span> with {overlap.join(', ')}</span></p> : null}
                                         {entry.status !== 'active' ? <p className="mt-3 text-xs font-medium text-danger">This session was {entry.status} by the organizer.{onRemove ? ' Remove it when you are ready.' : ''}</p> : null}
                                     </article>
                                 );

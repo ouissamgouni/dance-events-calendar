@@ -337,21 +337,21 @@ function AppShell() {
             </Suspense>
             {!isMyEvents && (
               <footer className={`py-3 text-center items-center justify-center gap-3 ${location.pathname.startsWith('/admin') ? 'hidden sm:flex' : 'flex'}`}>
-                <Link to="/privacy" className="text-[11px] text-muted hover:text-ink-soft transition">
+                <Link to="/privacy" className="text-xs text-muted hover:text-ink-soft transition">
                   Privacy
                 </Link>
-                <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
-                <Link to="/terms" className="text-[11px] text-muted hover:text-ink-soft transition">
+                <span className="text-xs text-gray-300" aria-hidden="true">·</span>
+                <Link to="/terms" className="text-xs text-muted hover:text-ink-soft transition">
                   Terms
                 </Link>
-                <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
-                <Link to="/legal" className="text-[11px] text-muted hover:text-ink-soft transition">
+                <span className="text-xs text-gray-300" aria-hidden="true">·</span>
+                <Link to="/legal" className="text-xs text-muted hover:text-ink-soft transition">
                   Legal notice
                 </Link>
-                <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
+                <span className="text-xs text-gray-300" aria-hidden="true">·</span>
                 <a
                   href="mailto:support@joinmovida.com?subject=Movida%20feedback"
-                  className="text-[11px] text-muted hover:text-ink-soft transition"
+                  className="text-xs text-muted hover:text-ink-soft transition"
                 >
                   Send feedback
                 </a>

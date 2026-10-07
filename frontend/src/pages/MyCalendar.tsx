@@ -444,7 +444,7 @@ function LegacyCalendar() {
                             {exportMenuOpen && (
                                 <div role="menu" className="absolute left-0 top-full mt-1 w-56 bg-surface border border-line shadow-lg z-[9000]">
                                     <div className="px-3 pt-2 pb-1.5 border-b border-card-line">
-                                        <div className="text-[10px] font-medium uppercase tracking-wide text-muted mb-1">Include</div>
+                                        <div className="text-2xs font-medium uppercase tracking-wide text-ink-soft mb-1">Include</div>
                                         <div className="inline-flex w-full overflow-hidden rounded border border-line">
                                             {([
                                                 { key: 'all' as Filter, label: 'All', count: allEventIds.length },
@@ -456,7 +456,7 @@ function LegacyCalendar() {
                                                     type="button"
                                                     onClick={() => setExportScope(opt.key)}
                                                     aria-pressed={exportScope === opt.key}
-                                                    className={`flex-1 px-1.5 py-1 text-[11px] transition ${exportScope === opt.key
+                                                    className={`flex-1 px-1.5 py-1 text-xs transition ${exportScope === opt.key
                                                         ? 'bg-action text-white'
                                                         : 'bg-surface text-ink-soft hover:bg-canvas'
                                                         }`}
@@ -578,7 +578,7 @@ function LegacyCalendar() {
                                                 >
                                                     {event.title}
                                                 </button>
-                                                <span className="shrink-0 text-[11px] text-muted">
+                                                <span className="shrink-0 text-xs text-muted">
                                                     {formatRelativeWhen(event.start)}
                                                 </span>
                                             </li>
@@ -608,7 +608,7 @@ function LegacyCalendar() {
                                 />
                             </div>
                             {subsLoading && subsEvents.length > 0 && (
-                                <span className="mt-1 shrink-0 text-[11px] text-muted">Updating…</span>
+                                <span className="mt-1 shrink-0 text-xs text-muted">Updating…</span>
                             )}
                         </div>
                     </div>
@@ -626,7 +626,7 @@ function LegacyCalendar() {
                                 <button
                                     key={f}
                                     onClick={() => setActiveFilter(f)}
-                                    className={`px-2 py-0.5 text-[11px] font-medium leading-5 border transition ${activeFilter === f
+                                    className={`px-2 py-0.5 text-xs font-medium leading-5 border transition ${activeFilter === f
                                         ? 'bg-blue-100 border-blue-200 text-action'
                                         : 'bg-surface border-line text-ink-soft hover:border-action hover:text-action'
                                         }`}
@@ -810,7 +810,7 @@ function LegacyCalendar() {
                                         📆 Add to Google Calendar
                                     </a>
                                 </div>
-                                <p className="text-[11px] text-muted">
+                                <p className="text-xs text-muted">
                                     Anyone with this link can see these events. Keep it private.
                                 </p>
                             </div>

@@ -110,7 +110,7 @@ function TribeRow({
                     );
                 })}
                 {overflow > 0 && (
-                    <span className="-ml-2.5 inline-flex h-7 min-w-7 items-center justify-center rounded-full border-2 border-surface bg-slate-100 px-1 text-[10px] font-semibold text-ink-soft">
+                    <span className="-ml-2.5 inline-flex h-7 min-w-7 items-center justify-center rounded-full border-2 border-surface bg-slate-100 px-1 text-xs font-semibold text-ink-soft">
                         +{overflow}
                     </span>
                 )}
@@ -418,7 +418,7 @@ export default function PeopleFilterPanel({
                     testId="who-friends"
                 />
                 {whoSelected === 'friends' && friendCount === 0 && (
-                    <p className="px-0.5 text-[11px] text-ink-soft" data-testid="people-zero-friends-hint">
+                    <p className="px-0.5 text-xs text-ink-soft" data-testid="people-zero-friends-hint">
                         You have no friends yet — friends are people who follow you back.{' '}
                         <button
                             type="button"

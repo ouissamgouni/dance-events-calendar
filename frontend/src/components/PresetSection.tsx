@@ -21,7 +21,7 @@ export default function PresetSection({ title, children, carouselLabel = title, 
                 aria-expanded={expanded}
                 className="flex min-h-8 w-full items-center justify-between text-left"
             >
-                <span className="text-[11px] font-bold uppercase tracking-wide text-ink-soft">{title}</span>
+                <span className="text-2xs font-bold uppercase tracking-wide text-ink-soft">{title}</span>
                 <span aria-hidden="true" className={`text-action transition-transform ${expanded ? 'rotate-180' : ''}`}>⌄</span>
             </button>
             {expanded && (

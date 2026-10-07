@@ -190,7 +190,7 @@ export default function PreferencesSection() {
                         {user ? 'Discovery Profiles' : 'Preferences'}
                     </h2>
                 </span>
-                <span className="text-[11px] text-muted" role="status" aria-live="polite">
+                <span className="text-xs text-muted" role="status" aria-live="polite">
                     {saving ? 'Saving…' : savedToast ? 'Saved.' : hasSetPrefs ? 'Saved' : ''}
                 </span>
             </button>
@@ -236,7 +236,7 @@ export default function PreferencesSection() {
                                     showMatchesToggle={false}
                                     areaNameControl={(
                                         <div className="flex shrink-0 items-center gap-2">
-                                            <label htmlFor="pref-area-name" className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                                            <label htmlFor="pref-area-name" className="text-2xs font-medium uppercase tracking-wide text-ink-soft">
                                                 Name
                                             </label>
                                             <input
@@ -259,7 +259,7 @@ export default function PreferencesSection() {
                                                 data-testid="preferences-area-name"
                                             />
                                             <span
-                                                className={`text-[11px] transition-opacity ${areaSavedFlash ? 'text-success opacity-100' : 'opacity-0'}`}
+                                                className={`text-xs transition-opacity ${areaSavedFlash ? 'text-success opacity-100' : 'opacity-0'}`}
                                                 role="status"
                                                 aria-live="polite"
                                             >

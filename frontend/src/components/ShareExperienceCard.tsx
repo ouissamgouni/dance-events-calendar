@@ -56,7 +56,7 @@ export default function ShareExperienceCard({ review, onReviewed }: Props) {
                     Review
                 </button>
                 {review.friend_proof && (
-                    <span className="text-right text-[10px] leading-tight text-ink-soft">
+                    <span className="text-right text-xs leading-tight text-ink-soft">
                         Reviewed by {review.friend_proof}
                     </span>
                 )}

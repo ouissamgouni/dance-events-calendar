@@ -147,7 +147,7 @@ function SegmentedMood<T>({
                         role="radio"
                         aria-checked={sel}
                         onClick={() => onSelect(it.value)}
-                        className={`flex-1 flex flex-col items-center gap-1 rounded-card border px-1 py-2.5 text-[11px] transition ${sel ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-surface text-ink-soft border-line hover:border-sky-200 hover:bg-sky-50'}`}
+                        className={`flex-1 flex flex-col items-center gap-1 rounded-card border px-1 py-2.5 text-xs transition ${sel ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-surface text-ink-soft border-line hover:border-sky-200 hover:bg-sky-50'}`}
                     >
                         <span className="text-xl leading-none">{it.emoji}</span>
                         {it.label}
@@ -589,20 +589,20 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                 <p className="text-sm text-ink whitespace-pre-wrap break-words">{trimmedComment}</p>
                             )}
                             {commentStatus === 'pending' && (
-                                <p className="text-[11px] text-amber-700">Your comment is pending moderation.</p>
+                                <p className="text-xs text-amber-700">Your comment is pending moderation.</p>
                             )}
                             {(viewAspectTags.length > 0 || viewAudienceTags.length > 0) && (
                                 <div className="flex flex-wrap gap-1.5">
                                     {viewAspectTags.map((t) => (
                                         <span
                                             key={`a-${t.id}`}
-                                            className={`rounded-full px-2 py-0.5 text-[11px] ${t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : t.polarity === 'positive' ? 'bg-green-50 text-success' : 'bg-slate-100 text-ink-soft'}`}
+                                            className={`rounded-full px-2 py-0.5 text-xs ${t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : t.polarity === 'positive' ? 'bg-green-50 text-success' : 'bg-slate-100 text-ink-soft'}`}
                                         >
                                             {t.label}
                                         </span>
                                     ))}
                                     {viewAudienceTags.map((t) => (
-                                        <span key={`u-${t.id}`} className="rounded-full px-2 py-0.5 text-[11px] bg-slate-100 text-ink-soft">
+                                        <span key={`u-${t.id}`} className="rounded-full px-2 py-0.5 text-xs bg-slate-100 text-ink-soft">
                                             {t.label}
                                         </span>
                                     ))}
@@ -697,7 +697,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                         <div>
                                             <label className="block text-sm font-semibold text-ink mb-2">
                                                 {'What stood out — good or bad?'}{' '}
-                                                <span className="text-[11px] font-normal text-muted">(optional — pick what shaped it)</span>
+                                                <span className="text-xs font-normal text-muted">(optional — pick what shaped it)</span>
                                             </label>
                                             <div className="flex flex-wrap gap-2.5">
                                                 {offeredAspects.map((g) => {
@@ -838,7 +838,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                         placeholder="Tell others about the event…"
                                         className="w-full rounded-card border border-line px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-300"
                                     />
-                                    <div className="mt-0.5 text-right text-[10px] text-muted tabular-nums">
+                                    <div className="mt-0.5 text-right text-xs text-muted tabular-nums">
                                         {comment.length}/{MAX_COMMENT}
                                     </div>
                                 </div>

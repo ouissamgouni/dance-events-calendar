@@ -50,7 +50,7 @@ export default function NotificationBell({ className }: { className?: string }) 
                 </svg>
                 {badge && (
                     <span
-                        className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-white text-[10px] font-semibold flex items-center justify-center leading-none"
+                        className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-white text-2xs font-semibold flex items-center justify-center leading-none"
                         aria-hidden="true"
                     >
                         {badge}

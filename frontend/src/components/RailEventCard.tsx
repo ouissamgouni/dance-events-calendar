@@ -216,7 +216,7 @@ export default function RailEventCard({
                     {isTrending && (
                         <div className="mt-1">
                             <span
-                                className="inline-flex items-center bg-orange-50 px-1.5 py-px text-[11px] font-medium text-orange-400"
+                                className="inline-flex items-center bg-orange-50 px-1.5 py-px text-xs font-medium text-orange-400"
                                 data-testid="trending-badge"
                                 title="Trending"
                             >
@@ -232,7 +232,7 @@ export default function RailEventCard({
                     )}
                     {location && (
                         <p
-                            className="mt-1 truncate text-[11px] text-ink-soft"
+                            className="mt-1 truncate text-xs text-ink-soft"
                             title={event.location ?? undefined}
                             data-testid="rail-card-location"
                         >

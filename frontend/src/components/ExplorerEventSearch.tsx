@@ -308,7 +308,7 @@ export default function ExplorerEventSearch({
                         className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none"
                     />
                     {headerInline && pastToggle && (
-                        <label className="flex items-center gap-1 text-[11px] text-ink-soft whitespace-nowrap select-none">
+                        <label className="flex items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
                             <input
                                 type="checkbox"
                                 checked={pastChecked}

@@ -269,7 +269,7 @@ export function FollowingPersonSearch({
                                         <path d="M4 10.5l4 4 8-8" />
                                     </svg>
                                 )}
-                                <span className="shrink-0 text-[11px] text-muted">({count})</span>
+                                <span className="shrink-0 text-xs text-muted">({count})</span>
                             </button>
                         );
                     })
@@ -543,7 +543,7 @@ export function InterestFilterChips({
                     onClick={() => onChange({ match: op })}
                     aria-pressed={interestMatch === op}
                     className={
-                        'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
+                        'px-1.5 py-0.5 text-xs transition sm:px-2 sm:py-1 sm:text-xs ' +
                         (interestMatch === op ? 'bg-blue-400 text-white' : 'text-ink-soft hover:text-action')
                     }
                     title={op === 'any' ? 'Match any selected person (or)' : 'Match all selected people (and)'}

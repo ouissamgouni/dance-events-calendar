@@ -172,7 +172,7 @@ export default function ForYouRail({
                                         aria-selected={isActive}
                                         data-testid={`for-you-lens-tab-${lens}`}
                                         onClick={() => setActiveLens(lens)}
-                                        className={`shrink-0 px-1.5 py-px text-[11px] font-medium transition border ${isActive
+                                        className={`shrink-0 px-1.5 py-px text-xs font-medium transition border ${isActive
                                             ? 'bg-surface border-blue-300 text-action shadow-sm'
                                             : 'bg-blue-50 border-blue-100 text-action hover:bg-surface hover:border-blue-300'}`}
                                     >
@@ -248,7 +248,7 @@ export default function ForYouRail({
                             onClick={handleMoreClick}
                             disabled={active.loading && !hasLocalMore}
                             data-testid="for-you-load-more"
-                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch border border-dashed border-blue-300 bg-blue-50/40 text-center text-[11px] font-semibold text-action shadow-sm transition hover:border-action hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
+                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch border border-dashed border-blue-300 bg-blue-50/40 text-center text-xs font-semibold text-action shadow-sm transition hover:border-action hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
                             aria-label={`Show more ${LENS_LABELS[activeLens].toLowerCase()} events`}
                         >
                             {active.loading && !hasLocalMore ? 'Loading…' : '+ more'}

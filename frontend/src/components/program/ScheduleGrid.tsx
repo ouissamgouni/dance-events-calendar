@@ -109,7 +109,7 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                             <button
                                 type="button"
                                 onClick={() => onTimeClick(minute)}
-                                className="sticky left-0 z-10 border-r border-t border-line bg-surface pr-2 pt-1 text-right text-[11px] font-medium text-ink-soft"
+                                className="sticky left-0 z-10 border-r border-t border-line bg-surface pr-2 pt-1 text-right text-xs font-medium text-ink-soft"
                                 style={{ gridColumn: 1, gridRow: row }}
                             >
                                 {label}
@@ -150,9 +150,9 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                             style={{ gridColumn: roomColumn(session.room_id), gridRow: sessionRow(session) }}
                         >
                             <span className={`block line-clamp-2 text-xs font-semibold leading-4 text-ink ${session.is_cancelled ? 'line-through' : ''}`}>{session.title}</span>
-                            {contributors ? <span className="mt-0.5 block whitespace-normal text-[11px] leading-4 text-ink-soft">{contributors}</span> : null}
-                            {level ? <span className="mt-1 block truncate text-[10px] font-medium text-action">{level.label}</span> : null}
-                            {activeNow ? <span className="mt-1 inline-block bg-action px-1.5 py-0.5 text-[10px] font-bold text-white">Now</span> : null}
+                            {contributors ? <span className="mt-0.5 block whitespace-normal text-xs leading-4 text-ink-soft">{contributors}</span> : null}
+                            {level ? <span className="mt-1 block truncate text-xs font-medium text-action">{level.label}</span> : null}
+                            {activeNow ? <span className="mt-1 inline-block bg-action px-1.5 py-0.5 text-xs font-bold text-white">Now</span> : null}
                             {attendance?.visible_count ? (
                                 <span className="mt-1 block" aria-label={`${attendance.visible_count} people in their plan`}>
                                     <SessionAttendeeStack summary={attendance} max={3} size="sm" />

@@ -139,7 +139,7 @@ function PopularityBadge({
     if (!isTrendingScore(score, allScores, threshold, topN, topPercent)) return null;
     return (
         <span
-            className="inline-flex items-center bg-orange-50 px-1.5 py-px text-[10px] font-medium text-orange-400"
+            className="inline-flex items-center bg-orange-50 px-1.5 py-px text-xs font-medium text-orange-400"
             data-testid="trending-badge"
             title="Trending"
         >
@@ -793,7 +793,7 @@ export default function EventListPanel({
                                 .github/instructions/frontend.instructions.md. */}
                             {showAnonymousMoreEventsGate && (
                                 <div className="m-3 border border-blue-100 bg-blue-50 p-4" data-testid="event-list-more-events-gate">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-action">
+                                    <p className="text-2xs font-semibold uppercase tracking-wide text-action">
                                         More events available
                                     </p>
                                     <p className="mt-1 text-sm font-medium text-ink">
@@ -809,7 +809,7 @@ export default function EventListPanel({
                                         >
                                             Sign in to see more
                                         </Link>
-                                        <span className="text-[11px] text-ink-soft">
+                                        <span className="text-xs text-ink-soft">
                                             {remainingInPeriod > 0
                                                 ? `${remainingInPeriod} more in this view`
                                                 : `${hiddenEventCount} more in the next available window`}

@@ -2069,7 +2069,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                             <button
                                                 type="button"
                                                 onClick={() => setAreaPresetMenuOpen((open) => !open)}
-                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-line bg-surface text-[11px] opacity-80 hover:opacity-100"
+                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-line bg-surface text-xs opacity-80 hover:opacity-100"
                                                 title="Choose your area"
                                                 data-testid="area-preset-menu-toggle"
                                                 aria-haspopup="menu"
@@ -2089,7 +2089,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                             setAreaPresetMenuOpen(false);
                                                             applyDefaultAreaInPlace();
                                                         }}
-                                                        className="block w-full border-b border-card-line px-2 py-1 text-left text-[11px] text-ink hover:bg-canvas"
+                                                        className="block w-full min-h-11 sm:min-h-0 border-b border-card-line px-3 py-2 sm:px-2 sm:py-1 text-left text-sm sm:text-xs text-ink hover:bg-canvas"
                                                         role="menuitem"
                                                         data-testid="area-snap-default"
                                                     >
@@ -2107,7 +2107,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                                 }
                                                                 applyPresetAreaInPlace(preset);
                                                             }}
-                                                            className="block w-full border-b border-card-line px-2 py-1 text-left text-[11px] text-ink hover:bg-canvas last:border-b-0"
+                                                            className="block w-full min-h-11 sm:min-h-0 border-b border-card-line px-3 py-2 sm:px-2 sm:py-1 text-left text-sm sm:text-xs text-ink hover:bg-canvas last:border-b-0"
                                                             role="menuitem"
                                                             data-testid={`area-preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
                                                         >
@@ -2127,7 +2127,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                             <img src="/setting.png" alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
                                         </Link>
                                         {explorerOffMapCount > 0 && (
-                                            <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-ink-soft" data-testid="map-footer-off-map-count">
+                                            <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-ink-soft" data-testid="map-footer-off-map-count">
                                                 {explorerOffMapCount} off map
                                             </span>
                                         )}

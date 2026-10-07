@@ -31,7 +31,7 @@ export default function CardReviewsLine({ eventId, showRatings, separator = true
                     to={`/event/${encodeURIComponent(eventId)}#community`}
                     onClick={(e) => e.stopPropagation()}
                     title="See reviews"
-                    className="flex min-w-0 items-center gap-1 text-[11px] text-ink-soft hover:text-ink"
+                    className="flex min-w-0 items-center gap-1 text-xs text-ink-soft hover:text-ink"
                 >
                     {hasMood ? (
                         <span className="truncate">
@@ -55,7 +55,7 @@ export default function CardReviewsLine({ eventId, showRatings, separator = true
                     className="ml-auto flex shrink-0 items-center gap-1 text-ink-soft hover:text-ink"
                 >
                     <img src="/question.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
-                    <span className="tabular-nums text-[10px] font-medium">{messages} posts</span>
+                    <span className="tabular-nums text-xs font-medium">{messages} posts</span>
                 </Link>
             )}
         </div>

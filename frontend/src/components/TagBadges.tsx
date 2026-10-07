@@ -101,7 +101,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
         const overflowLabel = overflow > 0 ? ` +${overflow}` : '';
         const title = enabledTags.map((t) => t.label).join(' \u00b7 ');
         return (
-            <p className="truncate text-[10px] text-ink-soft" title={title}>
+            <p className="truncate text-xs text-ink-soft" title={title}>
                 {visible.map((t, i) => (
                     <span key={t.id}>
                         {i > 0 && ' \u00b7 '}
@@ -116,7 +116,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
     // Badge mode. Colored variant is opt-in via `tagBadgeColored` flag
     // or explicit `forceColored` prop; otherwise render calm grey chips.
     const useColor = !neutral && (forceColored || tagBadgeColored);
-    const chip = size === 'sm' ? 'px-2 py-0.5 text-[11px] rounded-md' : 'px-1.5 py-px text-[9px] leading-3';
+    const chip = size === 'sm' ? 'px-2 py-0.5 text-xs rounded-md' : 'px-1.5 py-px text-2xs leading-4';
 
     const chipNode = (tag: Tag) => {
         if (useColor) {

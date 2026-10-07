@@ -205,7 +205,7 @@ export default function RateEventButton({
 
     const previewContent = myRating?.overall_sentiment ? (
         <span className="block text-left">
-            <span className="block text-[10px] font-semibold uppercase text-ink-soft">
+            <span className="block text-2xs font-semibold uppercase text-ink-soft">
                 {isEarlierEdition ? 'Your review · earlier edition' : 'Your review'}
             </span>
             <span className="mt-1 line-clamp-2 block text-sm leading-5 text-ink">
@@ -252,7 +252,7 @@ export default function RateEventButton({
                         <span className="tabular-nums">
                             Reviews <span className="text-muted">({countText})</span>
                             {hasRated && commentStatus === 'pending' && (
-                                <span className="ml-1.5 pl-1.5 border-l border-amber-300 text-[11px] text-amber-700">
+                                <span className="ml-1.5 pl-1.5 border-l border-amber-300 text-xs text-amber-700">
                                     Your comment pending
                                 </span>
                             )}
@@ -265,14 +265,14 @@ export default function RateEventButton({
         </>
     ) : appearance === 'count' ? (
         <>
-            <span className={`tabular-nums font-medium text-ink-soft ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`}>{aggCount}</span>
+            <span className={`tabular-nums font-medium text-ink-soft ${size === 'sm' ? 'text-xs' : 'text-xs'}`}>{aggCount}</span>
             <img src="/message.png" alt="" aria-hidden="true" className={iconSizeClass} />
         </>
     ) : (
         <>
             {ReviewIcon}
             {countText && (
-                <span className={`tabular-nums font-medium text-ink ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`}>{countText}</span>
+                <span className={`tabular-nums font-medium text-ink ${size === 'sm' ? 'text-xs' : 'text-xs'}`}>{countText}</span>
             )}
             {dotColor && <span className={`absolute top-0 right-0 w-1.5 h-1.5 ${dotColor}`} />}
         </>

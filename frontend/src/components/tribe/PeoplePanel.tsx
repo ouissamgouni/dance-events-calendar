@@ -313,7 +313,7 @@ export default function PeoplePanel({
         if (mode === 'select') {
             trailing = <CheckBox checked={selected.includes(r.card.handle)} />;
         } else if (tab === 'network') {
-            trailing = <span className="text-[11px] text-ink-soft">Following</span>;
+            trailing = <span className="text-xs text-ink-soft">Following</span>;
         } else {
             trailing = (
                 <button

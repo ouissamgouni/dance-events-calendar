@@ -239,12 +239,12 @@ export default function NotificationRow({
         ? 'text-sm leading-snug text-ink'
         : 'text-[15px] leading-snug text-ink';
     const timeClass = isPanel
-        ? 'text-[11px] text-muted mt-0.5'
+        ? 'text-xs text-muted mt-0.5'
         : 'text-[13px] text-muted mt-0.5';
     const specialTitle = mainCls;
-    const subLabelSize = isPanel ? 'text-[11px]' : 'text-[13px]';
+    const subLabelSize = isPanel ? 'text-xs' : 'text-[13px]';
     const descClass = isPanel
-        ? 'text-[11px] text-ink-soft mt-0.5'
+        ? 'text-xs text-ink-soft mt-0.5'
         : 'text-[13px] text-ink-soft mt-0.5';
 
     const avatarSize = isPanel ? 'w-8 h-8' : 'w-10 h-10';
@@ -306,7 +306,7 @@ export default function NotificationRow({
             {actorCount > 3 && (
                 <span
                     // eslint-disable-next-line no-restricted-syntax -- avatar overflow bubble (allowed exception per frontend rules)
-                    className="-ml-2 w-8 h-8 rounded-full bg-slate-100 ring-2 ring-surface text-[11px] font-semibold text-ink-soft flex items-center justify-center shrink-0"
+                    className="-ml-2 w-8 h-8 rounded-full bg-slate-100 ring-2 ring-surface text-xs font-semibold text-ink-soft flex items-center justify-center shrink-0"
                 >
                     +{actorCount - 3}
                 </span>
@@ -669,7 +669,7 @@ export default function NotificationRow({
     let actionNode: ReactNode = null;
     if (item.kind === 'new_follower') {
         actionNode = following ? (
-            <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
+            <span className="inline-flex min-h-9 items-center px-3 text-sm border border-line bg-surface text-ink-soft">
                 ✓ Following
             </span>
         ) : (
@@ -677,7 +677,7 @@ export default function NotificationRow({
                 type="button"
                 onClick={handleFollowBack}
                 disabled={followBusy}
-                className="px-2 py-1 text-[11px] bg-action text-white hover:bg-action disabled:opacity-60"
+                className="min-h-9 px-3 text-sm bg-action text-white hover:bg-action disabled:opacity-60"
             >
                 {followBusy ? 'Following…' : 'Follow back'}
             </button>
@@ -690,7 +690,7 @@ export default function NotificationRow({
                     e.stopPropagation();
                     navigate(destination);
                 }}
-                className="px-2 py-1 text-[11px] border border-line bg-surface text-ink hover:bg-canvas"
+                className="min-h-9 px-3 text-sm border border-line bg-surface text-ink hover:bg-canvas"
             >
                 View profile
             </button>
@@ -698,11 +698,11 @@ export default function NotificationRow({
     } else if (item.kind === 'follow_request') {
         actionNode =
             requestHandled === 'approved' ? (
-                <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
+                <span className="inline-flex min-h-9 items-center px-3 text-sm border border-line bg-surface text-ink-soft">
                     ✓ Approved
                 </span>
             ) : requestHandled === 'declined' ? (
-                <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
+                <span className="inline-flex min-h-9 items-center px-3 text-sm border border-line bg-surface text-ink-soft">
                     Declined
                 </span>
             ) : (
@@ -711,7 +711,7 @@ export default function NotificationRow({
                         type="button"
                         onClick={handleApprove}
                         disabled={requestBusy}
-                        className="px-2 py-1 text-[11px] bg-action text-white hover:bg-action disabled:opacity-60"
+                        className="min-h-9 px-3 text-sm bg-action text-white hover:bg-action disabled:opacity-60"
                     >
                         {requestBusy ? '…' : 'Approve'}
                     </button>
@@ -719,7 +719,7 @@ export default function NotificationRow({
                         type="button"
                         onClick={handleDecline}
                         disabled={requestBusy}
-                        className="px-2 py-1 text-[11px] border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-60"
+                        className="min-h-9 px-3 text-sm border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-60"
                     >
                         Decline
                     </button>

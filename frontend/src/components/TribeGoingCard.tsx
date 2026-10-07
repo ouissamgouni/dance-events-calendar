@@ -144,7 +144,7 @@ export default function TribeGoingCard({ event, onClick }: TribeGoingCardProps) 
                 <p className="truncate text-[12px] font-semibold leading-[15px] text-ink" title={names}>{names}</p>
                 <p className="truncate text-[12px] leading-[15px] text-ink-soft">
                     {additionalPeople > 0 && (
-                        <span className="text-[11px] font-semibold leading-[15px] text-ink">+{additionalPeople}</span>
+                        <span className="text-xs font-semibold leading-[15px] text-ink">+{additionalPeople}</span>
                     )}
                     {additionalPeople > 0 ? ` ${socialCopy}` : socialCopy}
                 </p>
@@ -160,12 +160,12 @@ export default function TribeGoingCard({ event, onClick }: TribeGoingCardProps) 
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-1.5">
-                <div className="flex min-w-0 items-center gap-1 truncate text-[11px] leading-3 text-ink-soft" title={metadata}>
+                <div className="flex min-w-0 items-center gap-1 truncate text-xs leading-3 text-ink-soft" title={metadata}>
                     <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3 shrink-0" aria-hidden="true">
                         <rect x="3.5" y="5" width="17" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
                         <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
                     </svg>
-                    <span className="truncate text-[11px]">{metadata}</span>
+                    <span className="truncate text-xs">{metadata}</span>
                 </div>
             </div>
         </article>

@@ -38,13 +38,13 @@ function ReviewCard({ review }: { review: EventReviewPublic }) {
             {tags.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                     {tags.map((t) => (
-                        <span key={t.key} className={`rounded-full px-2 py-0.5 text-[11px] ${t.cls}`}>{t.label}</span>
+                        <span key={t.key} className={`rounded-full px-2 py-0.5 text-xs ${t.cls}`}>{t.label}</span>
                     ))}
                 </div>
             )}
             <Link
                 to={`/event/${review.event_id}`}
-                className="mt-2 inline-block text-[11px] font-medium text-sky-600 hover:text-sky-700"
+                className="mt-2 inline-block text-xs font-medium text-sky-600 hover:text-sky-700"
             >
                 {review.event_title || 'View event'} →
             </Link>

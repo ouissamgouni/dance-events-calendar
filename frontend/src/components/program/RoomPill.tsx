@@ -25,7 +25,7 @@ interface Props {
 export default function RoomPill({ room, venue, compact = false }: Props) {
     const color = roomColor(room?.color ?? 'slate');
     return (
-        <span className={`inline-flex min-w-0 items-center gap-1 rounded-field font-semibold ${color.pill} ${compact ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'}`}>
+        <span className={`inline-flex min-w-0 items-center gap-1 rounded-field font-semibold ${color.pill} ${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-xs'}`}>
             <span className="truncate">{room?.name ?? venue?.name ?? 'Event-wide'}</span>
             {room && venue ? <span className="truncate font-normal opacity-75">· {venue.name}</span> : null}
         </span>

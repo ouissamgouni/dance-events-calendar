@@ -86,17 +86,17 @@ export default function UserResultCard({
                         />
                     )}
                     {isRich && user.is_friend && (
-                        <span className="ml-1 px-1 text-[10px] bg-blue-50 text-action border border-blue-200">
+                        <span className="ml-1 px-1 text-xs bg-blue-50 text-action border border-blue-200">
                             Friend
                         </span>
                     )}
                     {isRich && !user.is_friend && user.is_followed_by_viewer && (
-                        <span className="ml-1 px-1 text-[10px] bg-slate-100 text-ink-soft border border-line">
+                        <span className="ml-1 px-1 text-xs bg-slate-100 text-ink-soft border border-line">
                             Following
                         </span>
                     )}
                 </div>
-                <div className="text-[11px] text-ink-soft truncate">
+                <div className="text-xs text-ink-soft truncate">
                     {subtitle ?? (
                         <>
                             @{user.handle}

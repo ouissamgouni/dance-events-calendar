@@ -176,7 +176,7 @@ export default function UserSearchBox() {
                     className="block px-3 py-2 hover:bg-canvas"
                 >
                     <div className="text-xs font-medium text-ink">Find people</div>
-                    <div className="text-[11px] text-ink-soft">
+                    <div className="text-xs text-ink-soft">
                         Browse suggestions and curated calendars
                     </div>
                 </Link>
@@ -197,7 +197,7 @@ export default function UserSearchBox() {
             {!loading && results.length === 0 && (suggestionsLoading || suggestions.length > 0) && (
                 <>
                     <div className="border-t border-card-line px-3 pb-1 pt-3">
-                        <div className="text-[11px] font-semibold uppercase text-ink">Suggestions</div>
+                        <div className="text-2xs font-semibold uppercase text-ink">Suggestions</div>
                     </div>
                     {suggestionsLoading ? (
                         <div className="p-3 text-xs text-ink-soft">Loading…</div>
@@ -354,7 +354,7 @@ function UserRow({
                         />
                     )}
                 </div>
-                <div className="text-[11px] text-ink-soft truncate">
+                <div className="text-xs text-ink-soft truncate">
                     @{user.handle} · {user.subscribers_count} subscriber
                     {user.subscribers_count === 1 ? '' : 's'}
                 </div>

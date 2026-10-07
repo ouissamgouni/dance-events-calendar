@@ -16,7 +16,7 @@ export default function EventDateRail({ start, timeZone, sequence, tone = 'defau
             data-testid="rail-card-date-rail"
         >
             {sequence != null && (
-                <span className="mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-action px-1 text-[11px] font-extrabold leading-none text-white shadow-sm" data-testid="event-date-sequence">
+                <span className="mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-action px-1 text-xs font-extrabold leading-none text-white shadow-sm" data-testid="event-date-sequence">
                     {sequence}
                 </span>
             )}

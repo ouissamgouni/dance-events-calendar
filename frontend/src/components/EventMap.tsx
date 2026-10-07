@@ -365,7 +365,7 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                         e.preventDefault();
                         onOpenDetails(event);
                     } : undefined}
-                    className="text-[10px] font-medium text-action hover:text-action"
+                    className="text-xs font-medium text-action hover:text-action"
                 >
                     Details →
                 </Link>

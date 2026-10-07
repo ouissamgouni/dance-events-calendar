@@ -25,7 +25,7 @@ export default function PresetCard({ label, subLabel, isActive, onClick, testId,
         >
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{label}</span>
-                <span className="mt-1 block truncate text-[10px] leading-tight text-ink-soft">
+                <span className="mt-1 block truncate text-xs leading-tight text-ink-soft">
                     {subLabel}
                 </span>
             </span>

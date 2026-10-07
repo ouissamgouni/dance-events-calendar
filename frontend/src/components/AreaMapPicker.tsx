@@ -243,7 +243,7 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
                             key={preset.label}
                             type="button"
                             onClick={() => handlePreset(preset)}
-                            className="shrink-0 whitespace-nowrap border border-line bg-surface px-1.5 py-0.5 text-[10px] font-medium text-ink hover:bg-canvas"
+                            className="shrink-0 whitespace-nowrap border border-line bg-surface px-1.5 py-0.5 text-xs font-medium text-ink hover:bg-canvas"
                         >
                             {preset.label === 'Worldwide' ? '🌐' : preset.label}
                         </button>
@@ -287,7 +287,7 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
                     <span className="absolute -bottom-[6px] -right-[6px] h-3 w-3 rounded-full border-2 border-action bg-white" />
                     {/* eslint-enable no-restricted-syntax */}
                     {!autoCommit && (
-                        <div className="absolute left-2 top-2 bg-surface/90 px-2 py-1 text-[11px] font-medium text-action">
+                        <div className="absolute left-2 top-2 bg-surface/90 px-2 py-1 text-xs font-medium text-action">
                             Area to save
                         </div>
                     )}

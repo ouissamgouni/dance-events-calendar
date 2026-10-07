@@ -56,7 +56,7 @@ export default function CardActionCluster({
                         className={isSavedFlag ? 'text-ink' : ''}
                     />
                     {showSaveStats && savedCount > 0 && (
-                        <span className="text-[11px] text-ink-soft -ml-0.5 mr-1 tabular-nums" aria-label={`${savedCount} saved`}>
+                        <span className="text-xs text-ink-soft -ml-0.5 mr-1 tabular-nums" aria-label={`${savedCount} saved`}>
                             {savedCount}
                         </span>
                     )}
@@ -75,7 +75,7 @@ export default function CardActionCluster({
                         iconVariant={goingIconVariant}
                     />
                     {showGoingStats && goingCount > 0 && (
-                        <span className="text-[11px] text-action ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} ${isPast ? 'attended' : 'going'}`}>
+                        <span className="text-xs text-action ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} ${isPast ? 'attended' : 'going'}`}>
                             {goingCount}
                         </span>
                     )}

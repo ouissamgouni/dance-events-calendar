@@ -190,7 +190,7 @@ export default function TagFilterPills({
             {groupRows.map((row) => (
                 <div key={row.key} className="flex flex-col gap-2">
                     {showLabels && (
-                        <span className="text-[11px] font-bold uppercase tracking-wide text-ink-soft">
+                        <span className="text-2xs font-bold uppercase tracking-wide text-ink-soft">
                             {row.label}
                         </span>
                     )}

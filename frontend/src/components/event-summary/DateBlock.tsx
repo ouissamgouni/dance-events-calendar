@@ -15,9 +15,9 @@ export default function DateBlock({ date, timeZone }: Props) {
 
     return (
         <div className="flex w-[46px] shrink-0 flex-col items-center leading-none">
-            <span className="text-[11px] font-semibold tracking-wide text-danger">{weekday}</span>
+            <span className="text-xs font-semibold tracking-wide text-danger">{weekday}</span>
             <span className="text-2xl font-bold text-ink tabular-nums">{day}</span>
-            <span className="text-[11px] font-medium text-ink">{month}</span>
+            <span className="text-xs font-medium text-ink">{month}</span>
         </div>
     );
 }
