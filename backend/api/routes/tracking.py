@@ -44,6 +44,7 @@ from backend.services.notifications import (
     fan_out_going,
     fan_out_saved,
     withdraw_going,
+    sync_memory_notifications,
     withdraw_saved,
 )
 
@@ -444,6 +445,7 @@ def track_event_attendance(
         # authenticated owner toggles Going off entirely.
         if current_user is not None:
             withdraw_going(session, current_user, payload.event_id)
+            sync_memory_notifications(session, current_user.id, payload.event_id)
             _clear_creator_going_intent(session, current_user, payload.event_id)
 
     session.commit()

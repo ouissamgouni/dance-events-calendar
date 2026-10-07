@@ -792,6 +792,8 @@ class EventUserAssetResponse(BaseModel):
     is_owner: bool = True
     owner_display_name: Optional[str] = None
     owner_avatar_url: Optional[str] = None
+    owner_handle: Optional[str] = None
+    owner_is_friend: bool = False
 
 
 class EventAssetsResponse(BaseModel):
@@ -838,10 +840,16 @@ class EventAssetSummary(BaseModel):
     memory_window_closes_at: Optional[datetime] = None
     ticket_likely: bool = False
     ticket_not_needed: bool = False
+    shared_memory_count: int = 0
 
 
 class EventAssetSummaryRequest(BaseModel):
     event_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
+class FriendMemorySummary(BaseModel):
+    memory_count: int = 0
+    memory_thumbs: list[EventAssetThumb] = []
 
 
 # ---------------------------------------------------------------------------

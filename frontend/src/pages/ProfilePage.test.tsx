@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import ProfilePage from './ProfilePage'
 import { AuthProvider } from '../context/AuthContext'
+import { FeatureFlagsProvider } from '../context/FeatureFlagsContext'
 import { server } from '../test/server'
 import { makeProfile, makeUser } from '../test/handlers'
 
@@ -196,5 +197,80 @@ describe('ProfilePage Dance Passport tab', () => {
         expect(
             screen.getByText(/shares their Dance Passport with friends only/i),
         ).toBeInTheDocument()
+    })
+})
+
+describe('ProfilePage passport memories', () => {
+    const passport = (overrides: Record<string, unknown> = {}) => ({
+        display_name: 'Test Org',
+        stats: {
+            total_events_attended: 1, cities_visited: 1, countries_visited: 1, reviews_written: 0,
+            styles_danced: 1, top_style: null, active_months_last_12: 1, active_months_this_year: 1,
+            events_last_30_days: 0, avg_gap_days: null, first_event_date: '2024-01-01T00:00:00',
+            member_since: '2024-01-01T00:00:00', dancing_since: null,
+        },
+        collections: { cities: [], countries: [] },
+        milestones: [],
+        consistency: null,
+        events: [],
+        sections: ['timeline'],
+        timeline_items: [{ event_id: 'e1', title: 'Gala', start: '2026-01-01T20:00:00Z', location: null, city: 'Paris', country: 'France', lat: null, lng: null }],
+        timeline_markers: [],
+        handle: 'testorg',
+        is_self: false,
+        is_following: true,
+        ...overrides,
+    })
+
+    function setup(body: ReturnType<typeof passport>) {
+        const calls: string[] = []
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/settings', () => HttpResponse.json({ event_memories_enabled: true })),
+            http.get('*/api/social/users/:handle', ({ params }) =>
+                HttpResponse.json(makeProfile({ handle: String(params.handle), can_view_passport: true })),
+            ),
+            http.get('*/api/social/users/:handle/passport', () => HttpResponse.json(body)),
+            http.post('*/api/social/users/:handle/event-assets/summary', async ({ request, params }) => {
+                calls.push(`friend:${params.handle}:${JSON.stringify(await request.json())}`)
+                return HttpResponse.json({ e1: { memory_count: 2, memory_thumbs: [{ id: 'a', thumb_url: 'https://signed.test/a.webp', visibility: 'friends' }] } })
+            }),
+            http.post('*/api/me/event-assets/summary', () => {
+                calls.push('me')
+                return HttpResponse.json({})
+            }),
+        )
+        render(
+            <MemoryRouter initialEntries={['/u/testorg']}>
+                <FeatureFlagsProvider>
+                    <AuthProvider>
+                        <Routes>
+                            <Route path="/u/:handle" element={<ProfilePage />} />
+                        </Routes>
+                    </AuthProvider>
+                </FeatureFlagsProvider>
+            </MemoryRouter>,
+        )
+        return calls
+    }
+
+    it("shows a friend's server-filtered memories on their journey, never the viewer's own", async () => {
+        const calls = setup(passport())
+
+        await userEvent.click(await screen.findByRole('tab', { name: 'Journey' }))
+
+        const strip = await screen.findByTestId('memories-strip')
+        expect(strip.querySelector('a')).toHaveAttribute('href', '/event/e1?by=testorg#memories')
+        expect(calls).toEqual(['friend:testorg:{"event_ids":["e1"]}'])
+    })
+
+    it('does not ask for memories when the viewer does not follow the owner', async () => {
+        const calls = setup(passport({ is_following: false }))
+
+        await userEvent.click(await screen.findByRole('tab', { name: 'Journey' }))
+        await screen.findByText('Gala')
+
+        expect(screen.queryByTestId('memories-strip')).not.toBeInTheDocument()
+        expect(calls).toEqual([])
     })
 })

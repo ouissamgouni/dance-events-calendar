@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw'
 import SharedPassportPage from './SharedPassportPage'
 import { AuthProvider } from '../context/AuthContext'
 import { server } from '../test/server'
+import { makeUser } from '../test/handlers'
 
 const PUBLIC_PASSPORT = {
     display_name: 'Alba',
@@ -127,5 +128,35 @@ describe('SharedPassportPage', () => {
         await waitFor(() =>
             expect(screen.getByRole('link', { name: /sign in to follow/i })).toBeInTheDocument(),
         )
+    })
+
+    it('never requests or shows memories on a shared link, even for a signed-in friend', async () => {
+        const assetCalls: string[] = []
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/passport/shared/tok-abc', () =>
+                HttpResponse.json({
+                    ...PUBLIC_PASSPORT,
+                    sections: ['timeline'],
+                    is_following: true,
+                    timeline_items: [{ event_id: 'e1', title: 'Gala', start: '2026-01-01T20:00:00Z', location: null, city: 'Paris', country: 'France', lat: null, lng: null }],
+                }),
+            ),
+            http.post('*/api/*/event-assets/summary', ({ request }) => {
+                assetCalls.push(request.url)
+                return HttpResponse.json({})
+            }),
+            http.post('*/api/social/users/:handle/event-assets/summary', ({ request }) => {
+                assetCalls.push(request.url)
+                return HttpResponse.json({})
+            }),
+        )
+
+        renderShared()
+
+        fireEvent.click(await screen.findByRole('tab', { name: 'Journey' }))
+        expect(await screen.findByText('Gala')).toBeInTheDocument()
+        expect(screen.queryByTestId('memories-strip')).not.toBeInTheDocument()
+        expect(assetCalls).toEqual([])
     })
 })

@@ -44,6 +44,8 @@ const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: strin
     subscription_saved: { Icon: Bookmark, cls: 'bg-blue-100 text-action' },
     subscription_suggested: { Icon: CalendarPlus, cls: 'bg-emerald-100 text-emerald-600' },
     subscription_review: { Icon: SquarePen, cls: 'bg-violet-100 text-violet-600' },
+    subscription_memories: { Icon: Camera, cls: 'bg-violet-100 text-violet-600' },
+    event_memories_shared: { Icon: Camera, cls: 'bg-violet-100 text-violet-600' },
     subscription_milestone: { Icon: Trophy, cls: 'bg-amber-100 text-amber-600' },
     milestone_unlocked: { Icon: Trophy, cls: 'bg-amber-100 text-amber-600' },
     new_follower: { Icon: UserPlus, cls: 'bg-blue-100 text-action' },
@@ -88,6 +90,7 @@ const AVATAR_KINDS = new Set<NotificationItem['kind']>([
     'subscription_saved',
     'subscription_suggested',
     'subscription_review',
+    'subscription_memories',
     'subscription_milestone',
     'new_follower',
     'new_friend',
@@ -119,6 +122,8 @@ function groupVerb(item: NotificationItem): string {
             return 'added';
         case 'subscription_review':
             return 'reviewed';
+        case 'subscription_memories':
+            return 'shared memories from';
         default:
             return getNotificationVerb(item);
     }
@@ -499,6 +504,20 @@ export default function NotificationRow({
                         {item.event_title || 'an event'}
                     </span>
                     {item.context && <span className="text-ink-soft"> — add yours</span>}
+                </p>
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
+    } else if (item.kind === 'event_memories_shared') {
+        // Sharer-less by design: never render an actor for this kind.
+        body = (
+            <>
+                <p className={specialTitle}>
+                    <span className="text-ink-soft">New memories from</span>{' '}
+                    <span className="font-medium text-ink">
+                        {item.event_title || 'an event'}
+                    </span>
+                    <span className="text-ink-soft"> — see what dancers shared</span>
                 </p>
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
             </>

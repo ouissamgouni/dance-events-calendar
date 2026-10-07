@@ -122,6 +122,7 @@ from backend.services.notifications import (
     notify_follow_request_approved,
     notify_new_follower,
     notify_new_friend,
+    withdraw_memory_notifications_between,
 )
 from backend.services.follows import (
     ensure_approved_follow_with_subscription,
@@ -948,6 +949,7 @@ def unfollow_user(
             )
             if was_friend:
                 discard_new_friend_notifications(session, viewer.id, target.id)
+                withdraw_memory_notifications_between(session, viewer.id, target.id)
     # Phase B: unfollow also drops the implied calendar subscription so
     # the user stops receiving notifications and feed entries.
     sub = _get_subscription(session, viewer.id, target.id)
@@ -1343,6 +1345,7 @@ def remove_my_follower(
     ).first()
     if follow is not None:
         session.delete(follow)
+        withdraw_memory_notifications_between(session, viewer.id, target.id)
     sub = _get_subscription(session, target.id, viewer.id)
     if sub is not None:
         session.delete(sub)

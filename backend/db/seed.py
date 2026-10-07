@@ -336,7 +336,8 @@ class DatabaseSeeder:
         """Attach tickets/memories through the real processing pipeline.
 
         Going/limit/window rules are skipped on purpose so scenarios can stage
-        edge cases (over a lowered limit, tickets past retention).
+        edge cases (over a lowered limit, tickets past retention). Top-level
+        ``emit_notifications: true`` syncs shared-memory notifications.
         """
         if not path.exists():
             return
@@ -383,6 +384,7 @@ class DatabaseSeeder:
                 )
                 client = None
 
+        shared_pairs: set = set()
         for entry in entries:
             event_id = entry.get("event_id")
             email = (entry.get("email") or "").strip().lower()
@@ -432,7 +434,14 @@ class DatabaseSeeder:
                 client=client,
             )
             logger.info("Seeded %s %s for %s on %s", kind, filename, email, event_id)
+            if kind == event_assets.KIND_MEMORY:
+                shared_pairs.add((user.id, event_id))
 
+        if data.get("emit_notifications") and shared_pairs:
+            from backend.services.notifications import sync_memory_notifications
+
+            for user_id, event_id in sorted(shared_pairs, key=str):
+                sync_memory_notifications(self.session, user_id, event_id)
         self.session.commit()
 
     def _seed_tags(self, path: Path):

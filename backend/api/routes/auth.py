@@ -65,6 +65,7 @@ from backend.db.models import (
     EventMessage,
     EventRating,
     EventSuggestion,
+    EventUserAsset,
     MyPlanShareToken,
     Notification,
     PassportShareToken,
@@ -1601,6 +1602,7 @@ def purge_user_account(session: Session, user_id) -> None:
     ).all()
     from backend.services.notifications import (
         SUBSCRIPTION_REVIEW,
+        sync_memory_notifications,
         withdraw_review_notifications,
     )
 
@@ -1623,6 +1625,13 @@ def purge_user_account(session: Session, user_id) -> None:
 
     db_user = session.get(User, user_id)
     if db_user is not None:
+        shared_event_ids = set(
+            session.exec(
+                select(EventUserAsset.event_id)
+                .where(EventUserAsset.user_id == user_id)
+                .where(EventUserAsset.visibility == "attendees")
+            ).all()
+        )
         event_assets.delete_user_assets(session, user_id)
         delete_user_avatar(db_user.avatar_key)
         db_user.email = f"deleted-{db_user.id}@example.invalid"
@@ -1640,6 +1649,8 @@ def purge_user_account(session: Session, user_id) -> None:
         db_user.last_visit_user_agent = None
         db_user.deleted_at = datetime.now(timezone.utc)
         session.add(db_user)
+        for event_id in shared_event_ids:
+            sync_memory_notifications(session, user_id, event_id)
 
 
 @router.delete("/me")

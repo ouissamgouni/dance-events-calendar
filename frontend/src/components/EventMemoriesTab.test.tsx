@@ -1,6 +1,6 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../test/render';
 import { makeUser } from '../test/handlers';
 import { server } from '../test/server';
@@ -67,15 +67,102 @@ const data = (overrides: Partial<EventAssets>): EventAssets => ({
     ...overrides,
 });
 
-function renderTab(body: EventAssets) {
+function renderTab(body: EventAssets, routerEntries?: string[]) {
     server.use(
         http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
         http.get('*/api/events/evt/assets', () => HttpResponse.json(body)),
     );
-    return renderWithProviders(<EventMemoriesTab event={event} />);
+    return renderWithProviders(<EventMemoriesTab event={event} />, { routerEntries });
 }
 
+const trailNames = () =>
+    screen.getAllByTestId('memory-trail').map((trail) => within(trail).getByRole('heading').textContent);
+
 describe('EventMemoriesTab', () => {
+    it('groups memories into one trail per person: you, friends, then others', async () => {
+        renderTab(data({
+            assets: [
+                memory({ id: 'o1', owner_display_name: 'Olga', owner_handle: 'olga', created_at: '2026-01-05T00:00:00Z' }),
+                memory({ id: 'f1', owner_display_name: 'Fred', owner_handle: 'fred', owner_is_friend: true }),
+                memory({ id: 'f2', owner_display_name: 'Fred', owner_handle: 'fred', owner_is_friend: true }),
+                memory({ id: 'me', is_owner: true, visibility: 'private', owner_display_name: 'Me' }),
+            ],
+        }));
+
+        await screen.findAllByTestId('memory-trail');
+        expect(trailNames()).toEqual(['You· 1', 'Fred· 2', 'Olga· 1']);
+        expect(screen.getByRole('link', { name: 'Fred' })).toHaveAttribute('href', '/u/fred');
+        // Visibility badges only on your own photos.
+        expect(screen.getAllByLabelText('Only me')).toHaveLength(1);
+        expect(screen.queryByLabelText('Friends & people who went')).not.toBeInTheDocument();
+    });
+
+    it('counts only what the API returned and caps each trail with See all', async () => {
+        const many = Array.from({ length: 12 }, (_, i) => memory({ id: `m${i}`, owner_handle: 'mia', caption: `p${i}` }));
+        const { user } = renderTab(data({ assets: many }));
+
+        expect(await screen.findByRole('button', { name: 'See all 12' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'p10' })).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'See all 12' }));
+        expect(screen.getByRole('dialog', { name: 'Memory' })).toHaveTextContent('11 / 12');
+    });
+
+    it('filters to friends or mine', async () => {
+        const { user } = renderTab(data({
+            assets: [
+                memory({ id: 'f1', owner_display_name: 'Fred', owner_handle: 'fred', owner_is_friend: true }),
+                memory({ id: 'o1', owner_display_name: 'Olga', owner_handle: 'olga' }),
+                memory({ id: 'me', is_owner: true }),
+            ],
+        }));
+
+        await user.click(await screen.findByRole('button', { name: 'Friends' }));
+        expect(trailNames()).toEqual(['Fred· 1']);
+        await user.click(screen.getByRole('button', { name: 'Mine' }));
+        expect(trailNames()).toEqual(['You· 1']);
+    });
+
+    it('highlights the trail from a ?by= deep link', async () => {
+        renderTab(
+            data({ assets: [memory({ id: 'f1', owner_display_name: 'Fred', owner_handle: 'fred' })] }),
+            ['/event/evt?by=fred'],
+        );
+
+        await screen.findByRole('link', { name: 'Fred' });
+        const trail = document.getElementById('memories-by-fred');
+        expect(trail).not.toBeNull();
+        expect(trail?.className).toContain('ring-action');
+    });
+
+    it('asks who can see a batch before uploading and warns when it reveals a non-public RSVP', async () => {
+        // Reading multipart bodies hangs under jsdom+MSW, so capture the form fields instead.
+        const append = vi.spyOn(FormData.prototype, 'append');
+        let uploaded = false;
+        server.use(
+            http.post('*/api/events/evt/assets', () => {
+                uploaded = true;
+                return HttpResponse.json(data({}));
+            }),
+        );
+        const { user } = renderTab(data({}));
+
+        await screen.findByRole('button', { name: /Add/ });
+        const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' });
+        await user.upload(screen.getByTestId('memory-file-input'), file);
+
+        const dialog = screen.getByRole('dialog', { name: /Who can see this photo/ });
+        expect(within(dialog).getByRole('radio', { name: /^👥 Friends/ })).toBeChecked();
+        expect(within(dialog).queryByRole('note')).not.toBeInTheDocument();
+        await user.click(within(dialog).getByRole('radio', { name: /people who went/ }));
+        expect(within(dialog).getByRole('note')).toHaveTextContent(/they'll know you went/);
+        await user.click(within(dialog).getByRole('button', { name: 'Upload' }));
+
+        await waitFor(() => expect(uploaded).toBe(true));
+        expect(append).toHaveBeenCalledWith('visibility', 'attendees');
+        expect(localStorage.getItem('movida_memory_visibility')).toBe('attendees');
+        append.mockRestore();
+    });
+
     it('shows own and shared memories with the add tile and window', async () => {
         renderTab(data({ assets: [memory({ caption: 'Best rueda ever' })] }));
 

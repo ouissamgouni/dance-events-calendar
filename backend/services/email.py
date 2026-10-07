@@ -1074,6 +1074,7 @@ _CARD_PERSON_KINDS = frozenset(
     {
         "subscription_going",
         "subscription_review",
+        "subscription_memories",
         "subscription_milestone",
         "subscription_suggested",
         "new_follower",

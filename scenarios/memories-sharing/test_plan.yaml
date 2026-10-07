@@ -1,0 +1,95 @@
+test_plan:
+  name: "Shared memories — privacy matrix"
+  description: >
+    Sara shares one memory per visibility level on the Paris gala. Every
+    viewer must see exactly what the matrix allows on the event page, in
+    notifications, on Sara's profile Passport, and never on a share link.
+    Levels: Only me < Friends < Friends & people who went.
+
+  preconditions:
+    - "SCENARIO=memories-sharing RESET=1 task start:scenario"
+    - "Sign in with dev auth as each cast member below (sara@, fred@, fiona@, alex@, olga@, pat@, gina@example.com)."
+
+  cast:
+    - "Sara — sharer; Going to the gala with a friends-only RSVP; passport visible to friends with Journey on."
+    - "Fred — Sara's friend, Going. Also Gina's friend."
+    - "Fiona — Sara's friend, not Going."
+    - "Alex — stranger, Going."
+    - "Olga — stranger, not Going."
+    - "Pat — follows Sara one-way (not a friend)."
+    - "Gina — Fred's friend, Going; shares one friends-only photo."
+
+  steps:
+    - id: 1
+      title: "Event page matrix"
+      description: "As each person, open 'Paris Salsa Gala (shared memories)' → Memories tab."
+      expected: >
+        Sara: only her trail 'You · 3' (P, F, A, each with a visibility icon);
+        Gina's friends-only photo is not visible to her.
+        Fred: trails 'Sara · 2' (F, A) and 'Gina · 1', both marked Friend.
+        Fiona: 'Sara · 2' (F, A); no Gina.
+        Alex: 'Sara · 1' (A) only; no Friend label; no Gina.
+        Gina: 'You · 1' then 'Sara · 1' (A).
+        Olga and Pat: "No memories shared yet." — never P, never a count above
+        what is shown.
+
+    - id: 2
+      title: "Viewer is read-only for others"
+      description: "As Alex, open Sara's photo."
+      expected: "'Shared by Sara (sharer)', a 'Report this photo' link, no caption editor, no visibility buttons, no Delete."
+
+    - id: 3
+      title: "Notifications"
+      description: "As each person, open the bell and Tribe › Activity."
+      expected: >
+        Fred: one grouped row "Sara … and Gina … shared memories from Paris Salsa Gala".
+        Fiona: "Sara … shared memories from …"; clicking lands on
+        /event/evt-memshare-gala?by=sara#memories with Sara's trail highlighted.
+        Alex and Gina: "New memories from Paris Salsa Gala — see what dancers
+        shared" with NO name or avatar; not in Tribe › Activity.
+        Sara, Olga, Pat: no memories notification.
+
+    - id: 4
+      title: "Friend Passport"
+      description: "Open /u/sara → Dance Passport → Journey as Fred, Fiona, Alex, Pat."
+      expected: >
+        Fred and Fiona: the gala row shows Sara's 2 thumbnails linking to
+        /event/evt-memshare-gala?by=sara#memories. Alex and Pat: no thumbnails
+        (Alex can still see A on the event page). In devtools no response
+        contains the 'P — only me' asset.
+
+    - id: 5
+      title: "Share link never shows memories"
+      description: >
+        As Sara, Passport → Share → include Journey → copy link. Open it signed
+        out, then as Fred.
+      expected: "Journey lists the gala with no thumbnails; no request to any event-assets endpoint."
+
+    - id: 6
+      title: "Batch upload notifies once"
+      description: >
+        As Sara, open 'Lyon Bachata Night (upload here)' → Memories → Add,
+        pick 2 photos, choose 'Friends', Upload. Repeat with 1 more photo.
+        Then run `SCENARIO=memories-sharing task notify:trigger:scenario`.
+      expected: >
+        The picker defaults to the last choice and warns only when 'Friends &
+        people who went' is selected (Sara's RSVP is friends-only). Fred and
+        Fiona each get exactly one Lyon row and at most one push; the second
+        batch adds no row and no push.
+
+    - id: 7
+      title: "Narrowing withdraws"
+      description: "As Sara, on the gala set A → 'Only me', then F → 'Only me'."
+      expected: >
+        After A: Alex's and Gina's attendee rows disappear; Alex sees no Sara trail.
+        After F: Fiona's row disappears; Fred keeps only Gina's grouped row.
+
+    - id: 8
+      title: "Leaving the event hides everything"
+      description: "Reset, then as Sara toggle Going off for the gala."
+      expected: "Fred, Fiona and Alex see no Sara trail and no Sara-related memory notification."
+
+    - id: 9
+      title: "My Events chip"
+      description: "As Fred, open My Events → Past."
+      expected: "The gala card shows '📸 +3 from others' (Sara F, A + Gina)."

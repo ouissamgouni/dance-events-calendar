@@ -47,6 +47,7 @@ const SOCIAL_KINDS: NotificationKind[] = [
     'subscription_going',
     'subscription_suggested',
     'subscription_review',
+    'subscription_memories',
     'subscription_milestone',
     'plan_session_added',
     'new_follower',

@@ -718,6 +718,8 @@ export interface EventUserAsset {
     is_owner: boolean;
     owner_display_name: string | null;
     owner_avatar_url: string | null;
+    owner_handle?: string | null;
+    owner_is_friend?: boolean;
 }
 
 export interface EventAssets {
@@ -747,6 +749,13 @@ export interface EventAssetSummary {
     memory_window_closes_at: string | null;
     ticket_likely?: boolean;
     ticket_not_needed?: boolean;
+    /** Other people's memories the viewer may see on this event. */
+    shared_memory_count?: number;
+}
+
+export interface FriendMemorySummary {
+    memory_count: number;
+    memory_thumbs: EventAssetSummary['memory_thumbs'];
 }
 
 export interface AttendingEventEntry {

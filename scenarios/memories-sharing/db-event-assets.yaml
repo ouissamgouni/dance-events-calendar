@@ -1,0 +1,35 @@
+# Sara: one photo per level. Gina: one friends photo so Fred's feed groups.
+emit_notifications: true
+assets:
+  - {
+      event_id: evt-memshare-gala,
+      email: sara@example.com,
+      kind: memory,
+      file: memory-01.jpg,
+      visibility: private,
+      caption: "P — only me",
+    }
+  - {
+      event_id: evt-memshare-gala,
+      email: sara@example.com,
+      kind: memory,
+      file: memory-02.jpg,
+      visibility: friends,
+      caption: "F — friends",
+    }
+  - {
+      event_id: evt-memshare-gala,
+      email: sara@example.com,
+      kind: memory,
+      file: memory-03.jpg,
+      visibility: attendees,
+      caption: "A — friends & attendees",
+    }
+  - {
+      event_id: evt-memshare-gala,
+      email: gina@example.com,
+      kind: memory,
+      file: memory-04.jpg,
+      visibility: friends,
+      caption: "Gina's view",
+    }

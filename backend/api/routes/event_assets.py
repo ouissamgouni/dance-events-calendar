@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from slowapi import Limiter
 from sqlmodel import Session, col, select
 
-from backend.api.deps import require_user
+from backend.api.deps import can_view_passport, is_mutual_follow, require_user
 from backend.api.rate_limit import client_ip
 from backend.api.schemas import (
     EventAssetLinkRequest,
@@ -17,12 +17,17 @@ from backend.api.schemas import (
     EventAssetThumb,
     EventAssetUpdateRequest,
     EventUserAssetResponse,
+    FriendMemorySummary,
 )
 from backend.db.database import get_session
 from backend.db.models import CachedEvent, EventUserAsset, User, UserEventAttendance
 from backend.services import event_assets, object_storage
-from backend.services.event_visibility import event_is_user_facing
+from backend.services.event_visibility import (
+    eligible_event_ids,
+    event_is_user_facing,
+)
 from backend.services.image_processing import ImageValidationError
+from backend.services.notifications import sync_memory_notifications
 from backend.services.user_avatars import resolve_user_avatar
 
 
@@ -67,6 +72,7 @@ def _serialize(
     viewer_id: UUID,
     owners: dict[UUID, User],
     client,
+    friends: frozenset[UUID] | set[UUID] = frozenset(),
 ) -> EventUserAssetResponse:
     owner = owners.get(asset.user_id)
     return EventUserAssetResponse(
@@ -83,6 +89,8 @@ def _serialize(
         is_owner=asset.user_id == viewer_id,
         owner_display_name=owner.display_name if owner else None,
         owner_avatar_url=resolve_user_avatar(owner) if owner else None,
+        owner_handle=owner.handle if owner else None,
+        owner_is_friend=asset.user_id in friends,
         **event_assets.asset_urls(asset, client=client),
     )
 
@@ -94,9 +102,12 @@ def _build_response(
     is_going = attendance is not None
     tickets_on = event_assets.tickets_enabled(session)
     memories_on = event_assets.memories_enabled(session)
+    friends = event_assets.friend_ids(session, user.id) if memories_on else set()
     assets = [
         a
-        for a in event_assets.event_assets_for_viewer(session, user.id, event.event_id)
+        for a in event_assets.event_assets_for_viewer(
+            session, user.id, event.event_id, friends
+        )
         if (memories_on if a.kind == event_assets.KIND_MEMORY else tickets_on)
     ]
     owner_ids = {a.user_id for a in assets}
@@ -118,7 +129,7 @@ def _build_response(
     return EventAssetsResponse(
         event_id=event.event_id,
         is_going=is_going,
-        assets=[_serialize(a, user.id, owners, client) for a in assets],
+        assets=[_serialize(a, user.id, owners, client, friends) for a in assets],
         ticket_count=tickets,
         memory_count=memories,
         max_tickets=max_tickets,
@@ -213,6 +224,8 @@ def upload_event_asset(
         visibility=visibility,
         caption=caption,
     )
+    if kind == event_assets.KIND_MEMORY and visibility != "private":
+        sync_memory_notifications(session, user.id, event.event_id)
     session.commit()
     return _build_response(session, event, user)
 
@@ -255,10 +268,15 @@ def update_event_asset(
     if body.visibility is not None:
         if asset.kind != event_assets.KIND_MEMORY:
             raise HTTPException(status_code=400, detail="Only memories can be shared")
+        visibility_changed = asset.visibility != body.visibility
         asset.visibility = body.visibility
+    else:
+        visibility_changed = False
     if body.caption is not None:
         asset.caption = body.caption.strip() or None
     session.add(asset)
+    if visibility_changed:
+        sync_memory_notifications(session, user.id, asset.event_id)
     session.commit()
     return _build_response(session, _get_event(session, asset.event_id), user)
 
@@ -272,7 +290,12 @@ def delete_event_asset(
     asset = _get_own_asset(session, asset_id, user)
     _require_kind(session, asset.kind)
     event_id = asset.event_id
+    was_shared_memory = (
+        asset.kind == event_assets.KIND_MEMORY and asset.visibility != "private"
+    )
     event_assets.delete_asset(session, asset)
+    if was_shared_memory:
+        sync_memory_notifications(session, user.id, event_id)
     session.commit()
     return _build_response(session, _get_event(session, event_id), user)
 
@@ -306,6 +329,11 @@ def event_assets_summary(
     memories_on = event_assets.memories_enabled(session)
     max_memories = event_assets.int_setting(session, "event_assets_max_memories")
     ticket_hours = event_assets.ticket_min_hours(session)
+    shared_counts = (
+        event_assets.shared_memory_counts(session, user.id, list(attendances))
+        if memories_on
+        else {}
+    )
     now = datetime.now(timezone.utc)
     result: dict[str, EventAssetSummary] = {}
     for event_id, attendance in attendances.items():
@@ -337,8 +365,54 @@ def event_assets_summary(
             ticket_likely=tickets_on
             and event_assets.ticket_likely(event, ticket_hours)[0],
             ticket_not_needed=attendance.ticket_not_needed_at is not None,
+            shared_memory_count=shared_counts.get(event_id, 0),
         )
     return result
+
+
+@router.post(
+    "/api/social/users/{handle}/event-assets/summary",
+    response_model=dict[str, FriendMemorySummary],
+)
+def friend_memories_summary(
+    handle: str,
+    body: EventAssetSummaryRequest,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    """A friend's shared memories for their passport journey.
+
+    Only mutual follows ever get data, and only while the owner's passport
+    and its timeline are visible to them; everyone else gets ``{}``.
+    """
+    _require_kind(session, event_assets.KIND_MEMORY)
+    owner = session.exec(select(User).where(User.handle == handle.lower())).first()
+    if owner is None or owner.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Not found")
+    if (
+        owner.id == user.id
+        or not owner.passport_show_timeline
+        or not is_mutual_follow(session, user.id, owner.id)
+        or not can_view_passport(session, user, owner)
+    ):
+        return {}
+    event_ids = sorted(eligible_event_ids(session, body.event_ids, user.id))
+    grouped = event_assets.friend_memories_by_event(session, owner.id, event_ids)
+    client = object_storage.get_client() if grouped else None
+    return {
+        event_id: FriendMemorySummary(
+            memory_count=len(rows),
+            memory_thumbs=[
+                EventAssetThumb(
+                    id=a.id,
+                    thumb_url=event_assets.asset_urls(a, client=client)["thumb_url"],
+                    visibility=a.visibility,
+                )
+                for a in rows[: event_assets.SUMMARY_THUMBS]
+            ],
+        )
+        for event_id, rows in grouped.items()
+    }
 
 
 def _set_ticket_not_needed(

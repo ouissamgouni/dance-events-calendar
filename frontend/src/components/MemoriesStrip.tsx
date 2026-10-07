@@ -7,13 +7,17 @@ interface Props {
     summary: EventAssetSummary | undefined;
     /** 'tile' renders a compact "+" after the thumbnails instead of the text link. */
     addAffordance?: 'link' | 'tile';
+    /** Deep-link to this person's trail on the event page. */
+    by?: string | null;
 }
 
-export default function MemoriesStrip({ eventId, summary, addAffordance = 'link' }: Props) {
+export default function MemoriesStrip({ eventId, summary, addAffordance = 'link', by = null }: Props) {
     if (!summary || !showMemoriesRow(summary)) return null;
     const { thumbs, extra } = memoryStrip(summary);
-    if (addAffordance === 'tile' && thumbs.length === 0) return null;
-    const href = `/event/${encodeURIComponent(eventId)}#memories`;
+    const shared = summary.shared_memory_count ?? 0;
+    if (addAffordance === 'tile' && thumbs.length === 0 && shared === 0) return null;
+    const query = by ? `?by=${encodeURIComponent(by)}` : '';
+    const href = `/event/${encodeURIComponent(eventId)}${query}#memories`;
 
     return (
         <div className="flex min-h-11 items-center gap-2" data-testid="memories-strip" onClick={(e) => e.stopPropagation()}>
@@ -27,6 +31,15 @@ export default function MemoriesStrip({ eventId, summary, addAffordance = 'link'
                     {extra > 0 && <span className="px-1 text-xs font-medium text-ink-soft">+{extra}</span>}
                 </Link>
             ) : null}
+            {shared > 0 && (
+                <Link
+                    to={href}
+                    className="border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-canvas"
+                    data-testid="shared-memories-chip"
+                >
+                    📸 +{shared} from others
+                </Link>
+            )}
             {summary.can_add_memory && addAffordance === 'tile' && (
                 <Link
                     to={href}
