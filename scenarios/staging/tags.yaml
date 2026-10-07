@@ -275,17 +275,12 @@ tag_groups:
   # organisers from self-claiming them (Google/Yelp/Airbnb pattern).
 
   # ─────────────────────────────────────────────────────────────────────
-  # Review aspects (scope: aspect) — mirrors scenarios/prod/tags.yaml and
-  # scenarios/default/tags.yaml so the adaptive review flow works on remote
-  # staging. Each group is one aspect surfaced in the review flow: the user
-  # picks a headline sentiment, chooses the aspects that drove it, then rates
-  # (1-5 stars) and tags each. Tags carry a `polarity`
-  # (positive|negative|neutral) so appreciation stays separate from factual
-  # or cautionary mentions in the public community summary.
-  #
-  # NOTE: the aspect "Venue" group uses slug `venue-quality` (not `venue`)
-  # because the event-scope `venue` group above already owns that slug and
-  # the seeder matches tag groups by slug only.
+  # Review aspects (scope: aspect). Each group is one aspect surfaced in the
+  # adaptive review flow: the user picks a headline sentiment, chooses the
+  # aspects that drove it, then rates (1-5 stars) and tags each. Tags carry a
+  # `polarity` (positive|negative|neutral) so appreciation stays separate from
+  # factual or cautionary mentions. Kept generic (not scene-specific)
+  # so the vocabulary reads cleanly across salsa/bachata/kizomba/etc.
   # ─────────────────────────────────────────────────────────────────────
   - slug: music
     label: 🎵 Music

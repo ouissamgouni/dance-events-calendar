@@ -338,6 +338,30 @@ def test_submit_rejects_event_with_organizer(client, session, events, flag_on):
 
 
 @pytest.mark.unit
+def test_owner_can_claim_own_public_event_but_not_private(
+    client, session, events, flag_on
+):
+    assert _login(client, email="org@example.com").status_code == 200
+    owner = _set_profile(session, "org@example.com")
+    for ev in events[:2]:
+        ev.owner_user_id = owner.id
+        session.add(ev)
+    events[1].visibility = "private"
+    session.commit()
+
+    private = client.post(
+        "/api/me/organizer-claims/events", json={"event_ids": [events[1].event_id]}
+    )
+    # Private events are outside the claimable (public) scope altogether.
+    assert private.status_code == 404
+
+    public = client.post(
+        "/api/me/organizer-claims/events", json={"event_ids": [events[0].event_id]}
+    )
+    assert public.status_code == 200, public.text
+
+
+@pytest.mark.unit
 def test_add_events_opens_then_appends_to_pending_claim(
     client, session, events, flag_on
 ):

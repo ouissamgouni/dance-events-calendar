@@ -2330,12 +2330,22 @@ def test_send_push_prunes_stale_endpoints(session, monkeypatch):
             self.response = response
 
     class _Resp:
-        def __init__(self, status):
+        def __init__(self, status, text=""):
             self.status_code = status
+            self.text = text
 
     def fake_webpush(*, subscription_info, **kwargs):
         if "gone" in subscription_info["endpoint"]:
             raise FakeWebPushException("gone", response=_Resp(410))
+        if "rekeyed" in subscription_info["endpoint"]:
+            raise FakeWebPushException(
+                "forbidden",
+                response=_Resp(
+                    403,
+                    "the VAPID credentials in the authorization header do not "
+                    "correspond to the credentials used to create the subscriptions.",
+                ),
+            )
         return None  # delivered
 
     fake = types.ModuleType("pywebpush")
@@ -2358,6 +2368,11 @@ def test_send_push_prunes_stale_endpoints(session, monkeypatch):
     session.add(
         PushSubscription(
             user_id=alice.id, endpoint="https://push/gone", p256dh="a", auth="b"
+        )
+    )
+    session.add(
+        PushSubscription(
+            user_id=alice.id, endpoint="https://push/rekeyed", p256dh="a", auth="b"
         )
     )
     session.commit()

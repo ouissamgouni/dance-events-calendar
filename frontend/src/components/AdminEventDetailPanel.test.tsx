@@ -84,6 +84,8 @@ const PUBLIC_MODERATION: AdminEventModeration = {
     wants_public: false,
     submission: null,
     series_dates: 1,
+    affected_attendees: 2,
+    series_affected_attendees: 6,
     draft: null,
     open_revisions: [],
     history: [],
@@ -345,7 +347,9 @@ describe('AdminEventDetailPanel moderation', () => {
 
         await user.click(await screen.findByRole('button', { name: 'Cancel event…' }))
         expect(screen.getByRole('radio', { name: 'This date' })).toBeChecked()
+        expect(screen.getByLabelText('Notify 2 attendees')).toBeChecked()
         await user.click(screen.getByRole('radio', { name: 'All 4 upcoming dates' }))
+        expect(screen.getByLabelText('Notify 6 attendees')).toBeChecked()
         await user.click(screen.getByRole('button', { name: 'Mark cancelled' }))
 
         await waitFor(() => expect(api.setAdminEventStatus).toHaveBeenCalledWith(

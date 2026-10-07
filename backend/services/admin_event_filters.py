@@ -38,6 +38,7 @@ REACH_LABELS = {
 COUNT_KINDS = ("going", "saved", "engaged", "ratings", "messages", "memories")
 SORT_KEYS = (
     "start",
+    "added",
     "submitted",
     "title",
     "price",

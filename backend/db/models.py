@@ -446,6 +446,11 @@ class CachedEvent(SQLModel, table=True):
     # proposes what the source changed, not local edits it never had.
     source_values: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        index=True,
+        sa_column_kwargs={"server_default": text("CURRENT_TIMESTAMP")},
+    )
     deleted_at: Optional[datetime] = Field(default=None, index=True)
     is_hidden: bool = Field(default=False, index=True)
     # Per-event overrides for the ``show_prices`` / ``promo_codes_enabled``

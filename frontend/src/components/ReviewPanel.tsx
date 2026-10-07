@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Repeat, SlidersHorizontal } from 'lucide-react';
+import { createColumnHelper } from '@tanstack/react-table';
 import useBackToClose from '../hooks/useBackToClose';
 import useMediaQuery from '../hooks/useMediaQuery';
 import BottomSheet from './BottomSheet';
@@ -8,11 +9,15 @@ import type { CalendarSetting, ChangeScope, EventRevisionKind, EventRevisionSour
 import type { AdminChange, ChangeDecision, FilterOption } from '../api';
 import { decideAdminChange, fetchAdminCalendars, fetchAdminChanges } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
-import { describeRevisionValue, revisionFieldLabel } from '../utils/eventRevisions';
+import { CHANGE_KIND_META, describeRevisionValue, revisionFieldLabel } from '../utils/eventRevisions';
 import { formatCompactDateRange } from '../utils/eventDates';
 import { ADMIN_EVENT_STATUS_CHIP_CLASSES, ADMIN_EVENT_STATUS_LABELS } from '../utils/adminEventStatus';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 import { NotifyToggle, ScopeChoice } from './AdminEventModerationSection';
+import AdminDataTable from './admin-events/AdminDataTable';
+import AdminEventsColumnsMenu from './admin-events/AdminEventsColumnsMenu';
+import { adminTableFeatures } from './admin-events/adminEventColumns';
+import { useAdminTablePrefs } from './admin-events/useAdminEventsTablePrefs';
 
 interface Props {
     isOpen: boolean;
@@ -22,11 +27,11 @@ interface Props {
 const PAGE_SIZE = 25;
 
 const KIND_META: Record<EventRevisionKind, { label: string; cls: string; accept: string; reject: string }> = {
-    create: { label: 'New event', cls: 'bg-blue-100 text-action', accept: 'Publish', reject: 'Reject' },
-    go_public: { label: 'Go public', cls: 'bg-amber-100 text-amber-800', accept: 'Make public', reject: 'Keep private' },
-    edit: { label: 'Edit', cls: 'bg-orange-100 text-orange-800', accept: 'Apply', reject: 'Discard' },
-    cancel: { label: 'Cancellation', cls: 'bg-red-50 text-danger', accept: 'Mark cancelled', reject: 'Keep' },
-    remove: { label: 'Removal', cls: 'bg-slate-200 text-ink', accept: 'Remove', reject: 'Keep' },
+    create: { label: 'New event', cls: CHANGE_KIND_META.create.pill, accept: 'Publish', reject: 'Reject' },
+    go_public: { label: 'Go public', cls: CHANGE_KIND_META.go_public.pill, accept: 'Make public', reject: 'Keep private' },
+    edit: { label: 'Edit', cls: CHANGE_KIND_META.edit.pill, accept: 'Apply', reject: 'Discard' },
+    cancel: { label: 'Cancellation', cls: CHANGE_KIND_META.cancel.pill, accept: 'Mark cancelled', reject: 'Keep' },
+    remove: { label: 'Removal', cls: CHANGE_KIND_META.remove.pill, accept: 'Remove', reject: 'Keep' },
 };
 
 const SOURCE_LABELS: Record<EventRevisionSource, string> = {
@@ -71,27 +76,32 @@ function summary(change: AdminChange): string {
     return change.group_size > 1 ? `${fields} · on ${change.group_size} dates` : fields;
 }
 
-function Pills({ label, options, selected, onToggle }: {
+function Pills({ label, options, selected, onToggle, kinds = false }: {
     label: string;
     options: FilterOption[];
     selected: string[];
     onToggle: (value: string) => void;
+    /** Options are change kinds: show each kind's icon and colour. */
+    kinds?: boolean;
 }) {
     return (
         <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1">
             <span className="text-[10px] uppercase tracking-wide text-muted">{label}</span>
             {options.map((option) => {
                 const active = selected.includes(option.value);
+                const meta = kinds ? CHANGE_KIND_META[option.value as EventRevisionKind] : undefined;
+                const Icon = meta?.icon;
                 return (
                     <button
                         key={option.value}
                         type="button"
                         aria-pressed={active}
                         onClick={() => onToggle(option.value)}
-                        className={`border px-2 py-0.5 text-[10px] font-medium transition ${active
-                            ? 'border-blue-300 bg-blue-50 text-action'
-                            : 'border-line bg-surface text-ink-soft hover:bg-canvas'}`}
+                        className={`inline-flex items-center gap-1 border px-2 py-0.5 text-[10px] font-medium transition ${active
+                            ? 'border-action bg-action text-white'
+                            : meta ? `border-transparent ${meta.pill} hover:brightness-95` : 'border-line bg-surface text-ink-soft hover:bg-canvas'}`}
                     >
+                        {Icon && <Icon className="h-3 w-3" aria-hidden="true" />}
                         {option.label} ({option.count})
                     </button>
                 );
@@ -99,6 +109,92 @@ function Pills({ label, options, selected, onToggle }: {
         </div>
     );
 }
+
+const changeColumn = createColumnHelper<typeof adminTableFeatures, AdminChange>();
+
+const CHANGE_COLUMNS = [
+    changeColumn.display({
+        id: 'kind',
+        size: 110,
+        meta: { label: 'Change' },
+        cell: ({ row: { original: change } }) => (
+            <span className={`inline-block whitespace-nowrap px-1.5 py-0.5 text-[10px] font-medium ${KIND_META[change.kind].cls}`}>{KIND_META[change.kind].label}</span>
+        ),
+    }),
+    changeColumn.display({
+        id: 'event',
+        size: 300,
+        minSize: 160,
+        meta: { label: 'Event' },
+        cell: ({ row: { original: change } }) => (
+            <>
+                <p className="flex min-w-0 items-center gap-1 font-medium text-ink">
+                    {change.event && (change.event.occurrences > 1 || change.series_dates > 1) && (
+                        <Repeat className="h-3 w-3 shrink-0 text-ink-soft" aria-label="Series" role="img" />
+                    )}
+                    <span className="truncate">{change.event?.title ?? '—'}</span>
+                </p>
+                <p className="truncate text-[10px] text-muted">{summary(change)}</p>
+            </>
+        ),
+    }),
+    changeColumn.display({
+        id: 'date',
+        size: 140,
+        meta: { label: 'Date' },
+        cell: ({ row: { original: change } }) => (
+            <span className="whitespace-nowrap text-ink-soft">
+                {change.event ? formatCompactDateRange(change.event) : '—'}
+                {change.event && change.event.occurrences > 1 && <span className="ml-1 text-muted">×{change.event.occurrences}</span>}
+            </span>
+        ),
+    }),
+    changeColumn.display({
+        id: 'initiator',
+        size: 140,
+        meta: { label: 'Initiator' },
+        cell: ({ row: { original: change } }) => (
+            <span className="block truncate text-ink-soft" title={proposer(change)}>{proposer(change)}</span>
+        ),
+    }),
+    changeColumn.display({
+        id: 'source',
+        size: 110,
+        meta: { label: 'Source' },
+        cell: ({ row: { original: change } }) => <span className="block truncate text-ink-soft">{SOURCE_LABELS[change.source]}</span>,
+    }),
+    changeColumn.display({
+        id: 'outcome',
+        size: 90,
+        meta: { label: 'Age / Outcome' },
+        cell: ({ row: { original: change } }) => (
+            <span className="whitespace-nowrap text-ink-soft">
+                {change.status === 'pending' ? age(change.created_at) : STATUS_LABELS[change.status] ?? change.status}
+            </span>
+        ),
+    }),
+    changeColumn.display({
+        id: 'proposed',
+        size: 130,
+        meta: { label: 'Proposed', defaultHidden: true },
+        cell: ({ row: { original: change } }) => (
+            <span className="whitespace-nowrap text-ink-soft">{new Date(change.created_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
+        ),
+    }),
+    changeColumn.display({
+        id: 'decided',
+        size: 160,
+        meta: { label: 'Decided', defaultHidden: true },
+        cell: ({ row: { original: change } }) => (
+            <span className="block truncate text-ink-soft">
+                {change.decided_at ? new Date(change.decided_at).toLocaleDateString() : '—'}
+                {change.decided_by && ` · ${change.decided_by}`}
+            </span>
+        ),
+    }),
+];
+
+const CHANGE_CONFIGURABLE = CHANGE_COLUMNS.map((c) => ({ id: c.id as string, label: c.meta?.label ?? '', defaultHidden: Boolean(c.meta?.defaultHidden) }));
 
 function ChangeDetail({ change, onDecided, onOpenEvent, onClose }: {
     change: AdminChange;
@@ -277,6 +373,8 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
     const [eventId, setEventId] = useState<string | null>(null);
     const isMobile = useMediaQuery('(max-width: 639px)');
     const [filtersOpen, setFiltersOpen] = useState(false);
+    const tablePrefs = useAdminTablePrefs('admin:changes-table:v1', CHANGE_CONFIGURABLE);
+    const byId = useMemo(() => new Map(items.map((c) => [String(c.id), c])), [items]);
     // Mobile appends pages; reloads refetch everything already loaded.
     const loadedRef = useRef(0);
 
@@ -390,9 +488,10 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                             )}
                         </div>
                         {!isMobile && (
-                            <div className="flex flex-wrap gap-3">
+                            <div className="flex flex-wrap items-start gap-3">
                                 <Pills
                                     label="Kind"
+                                    kinds
                                     options={kindOptions}
                                     selected={kinds}
                                     onToggle={(v) => { setKinds((prev) => toggled(prev, v as EventRevisionKind)); setPage(0); }}
@@ -403,11 +502,23 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                                     selected={sources}
                                     onToggle={(v) => { setSources((prev) => toggled(prev, v as EventRevisionSource)); setPage(0); }}
                                 />
+                                <div className="ml-auto">
+                                    <AdminEventsColumnsMenu
+                                        columns={CHANGE_CONFIGURABLE}
+                                        prefs={tablePrefs.prefs}
+                                        onChange={tablePrefs.setPrefs}
+                                        onReset={tablePrefs.reset}
+                                        onSaveAsDefault={tablePrefs.saveAsDefault}
+                                        onFactoryReset={tablePrefs.factoryReset}
+                                        hasUserDefault={tablePrefs.hasUserDefault}
+                                        isDefault={tablePrefs.isDefault}
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>
                     {error && <p role="alert" className="border-b border-danger/20 bg-danger/10 px-4 py-1.5 text-[11px] text-danger">{error}</p>}
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-auto">
                         {loading && items.length === 0 ? (
                             <p className="mt-8 text-center text-xs text-muted">Loading…</p>
                         ) : items.length === 0 ? (
@@ -449,57 +560,15 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                                 <AdminLoadMore shown={items.length} total={total} loading={loading} onLoadMore={loadMore} />
                             </>
                         ) : (
-                            <table className="w-full table-fixed text-[11px]">
-                                <thead className="sticky top-0 z-10 border-b border-line bg-canvas">
-                                    <tr className="text-left uppercase tracking-wide text-ink-soft">
-                                        <th className="w-24 px-2 py-2 font-semibold">Change</th>
-                                        <th className="px-2 py-2 font-semibold">Event</th>
-                                        <th className="hidden w-32 px-2 py-2 font-semibold sm:table-cell">Date</th>
-                                        <th className="hidden w-28 px-2 py-2 font-semibold md:table-cell">Source</th>
-                                        <th className="hidden w-32 px-2 py-2 font-semibold sm:table-cell">By</th>
-                                        <th className="hidden w-20 px-2 py-2 font-semibold sm:table-cell">{state === 'open' ? 'Age' : 'Outcome'}</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {items.map((change) => (
-                                        <tr
-                                            key={change.id}
-                                            onClick={() => setSelected(change)}
-                                            className={`cursor-pointer transition hover:bg-canvas ${selected?.id === change.id ? 'bg-blue-50' : ''}`}
-                                        >
-                                            <td className="whitespace-nowrap px-2 py-1.5">
-                                                <span className={`inline-block px-1.5 py-0.5 text-[10px] font-medium ${KIND_META[change.kind].cls}`}>{KIND_META[change.kind].label}</span>
-                                            </td>
-                                            <td className="px-2 py-1.5">
-                                                <p className="flex min-w-0 items-center gap-1 font-medium text-ink">
-                                                    {change.event && (change.event.occurrences > 1 || change.series_dates > 1) && (
-                                                        <Repeat className="h-3 w-3 shrink-0 text-ink-soft" aria-label="Series" role="img" />
-                                                    )}
-                                                    <span className="truncate">{change.event?.title ?? '—'}</span>
-                                                </p>
-                                                <p className="truncate text-[10px] text-muted">{summary(change)}</p>
-                                                <p className="truncate text-[10px] text-ink-soft sm:hidden">
-                                                    {[
-                                                        change.event ? formatCompactDateRange(change.event) : null,
-                                                        SOURCE_LABELS[change.source],
-                                                        proposer(change),
-                                                        state === 'open' ? age(change.created_at) : STATUS_LABELS[change.status] ?? change.status,
-                                                    ].filter(Boolean).join(' · ')}
-                                                </p>
-                                            </td>
-                                            <td className="hidden whitespace-nowrap px-2 py-1.5 text-ink-soft sm:table-cell">
-                                                {change.event ? formatCompactDateRange(change.event) : '—'}
-                                                {change.event && change.event.occurrences > 1 && <span className="ml-1 text-muted">×{change.event.occurrences}</span>}
-                                            </td>
-                                            <td className="hidden truncate px-2 py-1.5 text-ink-soft md:table-cell">{SOURCE_LABELS[change.source]}</td>
-                                            <td className="hidden truncate px-2 py-1.5 text-ink-soft sm:table-cell" title={proposer(change)}>{proposer(change)}</td>
-                                            <td className="hidden whitespace-nowrap px-2 py-1.5 text-ink-soft sm:table-cell">
-                                                {state === 'open' ? age(change.created_at) : STATUS_LABELS[change.status] ?? change.status}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                            <AdminDataTable
+                                data={items}
+                                columns={CHANGE_COLUMNS}
+                                getRowId={(change) => String(change.id)}
+                                prefs={tablePrefs.prefs}
+                                setPrefs={tablePrefs.setPrefs}
+                                rowClassName={(change) => `${CHANGE_KIND_META[change.kind].row} hover:brightness-95 ${selected?.id === change.id ? 'outline outline-2 -outline-offset-2 outline-action' : ''}`}
+                                onRowClick={(id) => setSelected(byId.get(id) ?? null)}
+                            />
                         )}
                     </div>
                     {!isMobile && totalPages > 1 && (

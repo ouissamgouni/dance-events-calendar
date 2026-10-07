@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Plus, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, BookmarkPlus, ChevronRight, Plus, Search, X } from 'lucide-react';
 import type { AdminEventSort, EventFilterOptionsResponse } from '../../api';
 import AdminPopover from './AdminPopover';
 import FilterEditor from './FilterEditor';
@@ -16,9 +16,13 @@ import {
     dimensionPresenceCount,
     dimensionSummary,
     isDimensionActive,
+    loadCustomPresets,
     matchQuickView,
+    presetFrom,
+    saveCustomPresets,
     type AdminEventFilterState,
     type FilterDimension,
+    type QuickView,
     type SortOrder,
 } from './adminEventFilters';
 
@@ -95,6 +99,24 @@ export default function AdminEventsToolbar({
     const active = activeDimensions(filters).filter((d) => d.id !== 'dates' && !hiddenDimensions.includes(d.id));
     const addDim = dimensions.find((d) => d.id === addDimId) ?? null;
     const quickView = matchQuickView(filters);
+    const [presets, setPresets] = useState<QuickView[]>(loadCustomPresets);
+    const [savingPreset, setSavingPreset] = useState(false);
+    const [presetName, setPresetName] = useState('');
+    const customPreset = matchQuickView(filters, presets);
+    const updatePresets = (next: QuickView[]) => {
+        setPresets(next);
+        saveCustomPresets(next);
+    };
+    const closeSavePreset = () => {
+        setSavingPreset(false);
+        setPresetName('');
+    };
+    const savePreset = () => {
+        const label = presetName.trim();
+        if (!label) return;
+        updatePresets([...presets, presetFrom(label, filters)]);
+        closeSavePreset();
+    };
     const datesDim = FILTER_DIMENSIONS.find((d) => d.id === 'dates')!;
 
     useEffect(() => {
@@ -263,6 +285,67 @@ export default function AdminEventsToolbar({
                     );
                 })}
                 <span aria-hidden="true" className="mx-1 h-4 w-px bg-line" />
+                {presets.map((preset) => {
+                    const selected = customPreset === preset.id;
+                    return (
+                        <span key={preset.id} className={`inline-flex items-center text-[11px] font-medium ${selected ? 'bg-action text-white' : 'text-ink-soft'}`}>
+                            <button
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => onFiltersChange({ ...DEFAULT_FILTERS, ...preset.filters })}
+                                className={`py-0.5 pl-2 pr-1 transition ${selected ? '' : 'hover:bg-canvas hover:text-ink'}`}
+                            >
+                                {preset.label}
+                            </button>
+                            <button
+                                type="button"
+                                aria-label={`Delete preset ${preset.label}`}
+                                onClick={() => updatePresets(presets.filter((p) => p.id !== preset.id))}
+                                className={`px-1 py-0.5 ${selected ? 'text-white/80 hover:text-white' : 'text-muted hover:text-danger'}`}
+                            >
+                                <X className="h-3 w-3" aria-hidden="true" />
+                            </button>
+                        </span>
+                    );
+                })}
+                {quickView === null && customPreset === null && (
+                    <div className="relative">
+                        <button
+                            type="button"
+                            aria-haspopup="dialog"
+                            aria-expanded={savingPreset}
+                            onClick={() => (savingPreset ? closeSavePreset() : setSavingPreset(true))}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-action hover:underline"
+                        >
+                            <BookmarkPlus className="h-3.5 w-3.5" aria-hidden="true" />
+                            Save as preset
+                        </button>
+                        <AdminPopover open={savingPreset} onClose={closeSavePreset} label="Save filters as preset" className="w-64">
+                            <form
+                                onSubmit={(e) => { e.preventDefault(); savePreset(); }}
+                                className="flex items-center gap-1"
+                            >
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={presetName}
+                                    onChange={(e) => setPresetName(e.target.value)}
+                                    placeholder="Preset name"
+                                    aria-label="Preset name"
+                                    maxLength={40}
+                                    className="min-w-0 flex-1 border border-line px-2 py-1 text-xs text-ink placeholder:text-muted focus:border-action focus:outline-none"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!presetName.trim()}
+                                    className="bg-action px-2 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    Save
+                                </button>
+                            </form>
+                        </AdminPopover>
+                    </div>
+                )}
                 {addFilter}
             </div>
 

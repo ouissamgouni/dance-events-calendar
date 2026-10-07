@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import type { EventRevisionKind } from '../types';
 import { fetchAdminChanges, fetchAdminOrganizerClaims, fetchAdminPromoCodes, fetchAdminRatings, fetchAdminTagSuggestionCount, fetchDuplicateGroups, fetchEventFilterOptions, fetchSeriesGroups } from '../api';
 
 export interface AdminCounters {
@@ -21,6 +22,8 @@ export interface AdminCounters {
     reviewNew: number;
     /** Open edits, cancellations and removals. */
     reviewEdits: number;
+    /** Open changes per kind. */
+    reviewByKind: Partial<Record<EventRevisionKind, number>>;
     ungeolocated: number;
     tagSuggestions: number;
     feedbackPending: number;
@@ -33,6 +36,7 @@ export interface AdminCounters {
 const ZERO: AdminCounters = {
     reviewNew: 0,
     reviewEdits: 0,
+    reviewByKind: {},
     ungeolocated: 0,
     tagSuggestions: 0,
     feedbackPending: 0,
@@ -79,6 +83,7 @@ export function useAdminCounters(): { counters: AdminCounters; refresh: () => vo
                     ...prev,
                     reviewNew: count(['create', 'go_public']),
                     reviewEdits: count(['edit', 'cancel', 'remove']),
+                    reviewByKind: Object.fromEntries(res.kinds.map((k) => [k.value, k.count])),
                 }));
             })
             .catch(() => undefined);

@@ -2,18 +2,23 @@ import { useState } from 'react';
 import { ArrowDown, ArrowUp, Check, Columns3 } from 'lucide-react';
 import AdminPopover from './AdminPopover';
 import { CONFIGURABLE_COLUMNS } from './adminEventColumns';
-import type { AdminEventsTablePrefs } from './useAdminEventsTablePrefs';
+import type { AdminEventsTablePrefs, ConfigurableColumn } from './useAdminEventsTablePrefs';
 
 interface Props {
     prefs: AdminEventsTablePrefs;
     onChange: (prefs: AdminEventsTablePrefs) => void;
     onReset: () => void;
+    onSaveAsDefault: () => void;
+    onFactoryReset: () => void;
+    hasUserDefault: boolean;
+    /** Current layout equals the default Reset would restore. */
+    isDefault: boolean;
+    columns?: ConfigurableColumn[];
 }
 
-const LABELS = Object.fromEntries(CONFIGURABLE_COLUMNS.map((c) => [c.id, c.label]));
-
-export default function AdminEventsColumnsMenu({ prefs, onChange, onReset }: Props) {
+export default function AdminEventsColumnsMenu({ prefs, onChange, onReset, onSaveAsDefault, onFactoryReset, hasUserDefault, isDefault, columns = CONFIGURABLE_COLUMNS }: Props) {
     const [open, setOpen] = useState(false);
+    const LABELS: Record<string, string> = Object.fromEntries(columns.map((c) => [c.id, c.label]));
     const hidden = new Set(prefs.hidden);
     const visibleCount = prefs.order.length - prefs.hidden.length;
 
@@ -81,9 +86,21 @@ export default function AdminEventsColumnsMenu({ prefs, onChange, onReset }: Pro
                         );
                     })}
                 </ul>
-                <div className="mt-2 flex items-center justify-between border-t border-line pt-2 text-[11px] text-muted">
-                    <span>Drag column edges to resize</span>
-                    <button type="button" onClick={onReset} className="font-medium text-action hover:underline">Reset</button>
+                <div className="mt-2 space-y-1.5 border-t border-line pt-2 text-[11px] text-muted">
+                    <p>Drag column edges to resize</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <button type="button" onClick={onSaveAsDefault} disabled={isDefault} className="font-medium text-action hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline">
+                            Save as my default
+                        </button>
+                        <button type="button" onClick={onReset} disabled={isDefault} title={hasUserDefault ? 'Back to my saved default' : 'Back to the standard columns'} className="font-medium text-action hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline">
+                            Reset
+                        </button>
+                        {hasUserDefault && (
+                            <button type="button" onClick={onFactoryReset} className="ml-auto text-ink-soft hover:text-ink hover:underline">
+                                Standard columns
+                            </button>
+                        )}
+                    </div>
                 </div>
             </AdminPopover>
         </div>

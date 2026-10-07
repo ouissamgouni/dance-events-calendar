@@ -118,10 +118,22 @@ export function buildAdminEventColumns(ctx: AdminColumnContext) {
         helper.display({
             id: 'submitter',
             size: 120,
-            meta: { label: 'Submitter' },
+            meta: { label: 'Submitter', defaultHidden: true },
             cell: ({ row: { original: event } }) => (
                 <span className="block truncate text-ink-soft" title={event.submitter_name ?? undefined}>{event.submitter_name ?? dash}</span>
             ),
+        }),
+        helper.display({
+            id: 'added',
+            size: 130,
+            meta: { label: 'Added', sortKey: 'added', defaultHidden: true },
+            cell: ({ row: { original: event } }) => event.created_at
+                ? (
+                    <span className="whitespace-nowrap text-ink-soft" title={new Date(event.created_at).toLocaleString()}>
+                        {new Date(event.created_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                    </span>
+                )
+                : dash,
         }),
         helper.display({
             id: 'submitted',

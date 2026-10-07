@@ -213,9 +213,35 @@ export const QUICK_VIEWS: QuickView[] = [
 
 const paramsKey = (state: AdminEventFilterState) => JSON.stringify(toFilterParams(state));
 
-export function matchQuickView(state: AdminEventFilterState): string | null {
+export function matchQuickView(state: AdminEventFilterState, views: QuickView[] = QUICK_VIEWS): string | null {
     const key = paramsKey(state);
-    return QUICK_VIEWS.find((view) => paramsKey({ ...DEFAULT_FILTERS, ...view.filters }) === key)?.id ?? null;
+    return views.find((view) => paramsKey({ ...DEFAULT_FILTERS, ...view.filters }) === key)?.id ?? null;
+}
+
+const PRESETS_KEY = 'admin:events-presets:v1';
+
+/** Admin-saved quick views, kept in this browser. */
+export function loadCustomPresets(): QuickView[] {
+    try {
+        const raw = JSON.parse(localStorage.getItem(PRESETS_KEY) ?? '[]') as unknown;
+        if (!Array.isArray(raw)) return [];
+        return raw.filter((p): p is QuickView =>
+            Boolean(p) && typeof p.id === 'string' && typeof p.label === 'string' && typeof p.filters === 'object' && p.filters !== null);
+    } catch {
+        return [];
+    }
+}
+
+export function saveCustomPresets(presets: QuickView[]): void {
+    try {
+        localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+    } catch {
+        // Storage full or disabled: presets just won't persist.
+    }
+}
+
+export function presetFrom(label: string, state: AdminEventFilterState): QuickView {
+    return { id: `custom-${Date.now().toString(36)}`, label, filters: state };
 }
 
 export type SortOrder = 'asc' | 'desc';
@@ -232,6 +258,7 @@ export function nextSort(current: AdminEventSort, order: SortOrder, clicked: Adm
 
 export const SORT_OPTIONS: { value: AdminEventSort; label: string }[] = [
     { value: 'start', label: 'Date' },
+    { value: 'added', label: 'Added' },
     { value: 'submitted', label: 'Submitted' },
     { value: 'title', label: 'Title' },
     { value: 'going', label: 'Going' },

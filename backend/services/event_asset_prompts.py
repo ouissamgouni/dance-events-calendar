@@ -75,7 +75,7 @@ def ticket_prompt_push_copy(event_title: Optional[str]) -> tuple[str, str]:
 def memories_prompt_push_copy(event_title: Optional[str]) -> tuple[str, str]:
     return (
         "Relive the moment",
-        f"Add a few photos from {event_title or 'the event'} to remember it.",
+        f"Share your best shots from {event_title or 'the event'} and keep the memories alive.",
     )
 
 

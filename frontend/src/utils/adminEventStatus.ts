@@ -19,9 +19,10 @@ export function getAdminEventRowClass(event: CalendarEvent): string {
     const status = getAdminEventStatus(event);
     if (status === 'removed') return 'bg-admin-blocked hover:brightness-95';
     if (status === 'unpublished') return 'bg-admin-hidden hover:brightness-95';
-    if (status === 'cancelled') return 'bg-red-50/60 hover:bg-red-50';
-    if (status === 'new') return 'bg-blue-50 hover:bg-blue-100/70';
-    return 'bg-surface hover:bg-canvas/50';
+    if (status === 'cancelled') return 'bg-red-50 hover:bg-red-100';
+    if (event.visibility_state === 'private') return 'bg-violet-50 hover:bg-violet-100';
+    if (status === 'new') return 'bg-blue-50 hover:bg-blue-100';
+    return 'bg-surface hover:bg-canvas';
 }
 
 export function getAdminEventPanelClass(event: CalendarEvent | null): string {
@@ -30,6 +31,7 @@ export function getAdminEventPanelClass(event: CalendarEvent | null): string {
     if (status === 'removed') return 'bg-admin-blocked';
     if (status === 'unpublished') return 'bg-admin-hidden';
     if (status === 'cancelled') return 'bg-red-50';
+    if (event.visibility_state === 'private') return 'bg-violet-50';
     if (status === 'new') return 'bg-blue-50';
     return 'bg-surface';
 }

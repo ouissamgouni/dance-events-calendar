@@ -174,6 +174,8 @@ export interface CalendarEvent {
     memory_count?: number | null;
     program_status?: 'published' | 'draft' | null;
     submitted_at?: string | null;
+    /** Admin only: when the event first entered the database. */
+    created_at?: string | null;
     reach?: 'local' | 'regional' | 'international' | null;
     links: LinkItem[] | null;
     tags: Tag[];
@@ -1039,6 +1041,9 @@ export interface AdminEventModeration {
     submission: SubmissionInfo | null;
     /** Dates still to come in the event's series, the event included. */
     series_dates: number;
+    /** Signed-in people who saved or are going (this date / all upcoming dates). */
+    affected_attendees: number;
+    series_affected_attendees: number;
     draft: EventRevision | null;
     open_revisions: EventRevision[];
     history: EventRevision[];

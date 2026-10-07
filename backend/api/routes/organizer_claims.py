@@ -86,9 +86,10 @@ def _check_claimable_events(session: Session, user: User, event_ids: list[str]) 
     if len(existing) != len(event_ids):
         raise HTTPException(status_code=404, detail="One or more events not found")
     for ev in existing:
-        if ev.owner_user_id == user.id:
+        if ev.owner_user_id == user.id and ev.visibility != "public":
             raise HTTPException(
-                status_code=409, detail=f"You added “{ev.title}” yourself"
+                status_code=409,
+                detail=f"Make “{ev.title}” public before claiming it",
             )
         if ev.organizer_user_id == user.id:
             raise HTTPException(

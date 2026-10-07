@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { CONFIGURABLE_COLUMNS } from './adminEventColumns';
 
-const STORAGE_KEY = 'admin:events-table:v1';
+export interface ConfigurableColumn {
+    id: string;
+    label: string;
+    defaultHidden: boolean;
+}
 
 export interface AdminEventsTablePrefs {
     /** Configurable column ids in display order (pinned columns excluded). */
@@ -10,17 +14,17 @@ export interface AdminEventsTablePrefs {
     sizing: Record<string, number>;
 }
 
-export function defaultTablePrefs(): AdminEventsTablePrefs {
+export function defaultTablePrefs(columns: ConfigurableColumn[] = CONFIGURABLE_COLUMNS): AdminEventsTablePrefs {
     return {
-        order: CONFIGURABLE_COLUMNS.map((c) => c.id),
-        hidden: CONFIGURABLE_COLUMNS.filter((c) => c.defaultHidden).map((c) => c.id),
+        order: columns.map((c) => c.id),
+        hidden: columns.filter((c) => c.defaultHidden).map((c) => c.id),
         sizing: {},
     };
 }
 
 /** Drops unknown ids and slots columns added since the prefs were saved at their default spot. */
-export function sanitizeTablePrefs(raw: unknown): AdminEventsTablePrefs {
-    const defaults = defaultTablePrefs();
+export function sanitizeTablePrefs(raw: unknown, columns: ConfigurableColumn[] = CONFIGURABLE_COLUMNS): AdminEventsTablePrefs {
+    const defaults = defaultTablePrefs(columns);
     if (!raw || typeof raw !== 'object') return defaults;
     const value = raw as Partial<AdminEventsTablePrefs>;
     const known = new Set(defaults.order);
@@ -45,23 +49,50 @@ export function sanitizeTablePrefs(raw: unknown): AdminEventsTablePrefs {
     return { order, hidden: [...new Set(hidden)], sizing };
 }
 
-function load(): AdminEventsTablePrefs {
+function read(key: string, columns: ConfigurableColumn[]): AdminEventsTablePrefs | null {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        return sanitizeTablePrefs(raw ? JSON.parse(raw) : null);
+        const raw = localStorage.getItem(key);
+        return raw ? sanitizeTablePrefs(JSON.parse(raw), columns) : null;
     } catch {
-        return defaultTablePrefs();
+        return null;
     }
 }
 
+function write(key: string, value: AdminEventsTablePrefs): void {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+        // Storage full or disabled: prefs just won't persist.
+    }
+}
+
+/** Column layout persisted per table, plus an optional user-saved default that Reset returns to. */
+export function useAdminTablePrefs(storageKey: string, columns: ConfigurableColumn[]) {
+    const defaultKey = `${storageKey}:default`;
+    const [prefs, setPrefs] = useState<AdminEventsTablePrefs>(() => read(storageKey, columns) ?? defaultTablePrefs(columns));
+    const [userDefault, setUserDefault] = useState<AdminEventsTablePrefs | null>(() => read(defaultKey, columns));
+    useEffect(() => write(storageKey, prefs), [storageKey, prefs]);
+    const saveAsDefault = () => {
+        setUserDefault(prefs);
+        write(defaultKey, prefs);
+    };
+    const factoryReset = () => {
+        setUserDefault(null);
+        localStorage.removeItem(defaultKey);
+        setPrefs(defaultTablePrefs(columns));
+    };
+    const target = userDefault ?? defaultTablePrefs(columns);
+    return {
+        prefs,
+        setPrefs,
+        reset: () => setPrefs(target),
+        saveAsDefault,
+        factoryReset,
+        hasUserDefault: userDefault !== null,
+        isDefault: JSON.stringify(prefs) === JSON.stringify(target),
+    };
+}
+
 export default function useAdminEventsTablePrefs() {
-    const [prefs, setPrefs] = useState<AdminEventsTablePrefs>(load);
-    useEffect(() => {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-        } catch {
-            // Storage full or disabled: prefs just won't persist.
-        }
-    }, [prefs]);
-    return { prefs, setPrefs, reset: () => setPrefs(defaultTablePrefs()) };
+    return useAdminTablePrefs('admin:events-table:v1', CONFIGURABLE_COLUMNS);
 }

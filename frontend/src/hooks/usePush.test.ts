@@ -152,6 +152,29 @@ describe('usePush', () => {
         expect(result.current.status).toBe('on')
     })
 
+    it('re-subscribes when the existing subscription was made with another VAPID key', async () => {
+        const stale = { ...makeSub('https://push.example/old'), options: { applicationServerKey: new Uint8Array([1, 2, 3]).buffer } }
+        const { pushManager } = setupPush({ existing: stale, subscribe: makeSub('https://push.example/new') })
+        const posted: string[] = []
+        server.use(
+            http.get('*/api/push/vapid-public-key', () =>
+                HttpResponse.json({ public_key: VAPID_KEY }),
+            ),
+            http.post('*/api/push/unsubscribe', () => new HttpResponse(null, { status: 204 })),
+            http.post('*/api/push/subscribe', async ({ request }) => {
+                posted.push(((await request.json()) as PostedSubscriptionPayload).endpoint)
+                return new HttpResponse(null, { status: 204 })
+            }),
+        )
+
+        const { result } = renderHook(() => usePush())
+        await waitFor(() => expect(result.current.status).toBe('on'))
+
+        expect(stale.unsubscribe).toHaveBeenCalledTimes(1)
+        expect(pushManager.subscribe).toHaveBeenCalledTimes(1)
+        expect(posted).toEqual(['https://push.example/new'])
+    })
+
     it('auto-subscribes silently when permission is already granted', async () => {
         const { pushManager, requestPermissionMock } = setupPush({
             permission: 'granted',

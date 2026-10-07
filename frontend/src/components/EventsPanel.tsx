@@ -141,7 +141,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [groupBySeries, setGroupBySeries] = useState(false);
     const [sortBy, setSortBy] = useState<AdminEventSort>('start');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-    const { prefs: tablePrefs, setPrefs: setTablePrefs, reset: resetTablePrefs } = useAdminEventsTablePrefs();
+    const tablePrefsState = useAdminEventsTablePrefs();
+    const { prefs: tablePrefs, setPrefs: setTablePrefs } = tablePrefsState;
     const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const seriesSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const isMobile = useMediaQuery('(max-width: 639px)');
@@ -921,7 +922,17 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                         groupBySeries={groupBySeries}
                         onToggleGroupBySeries={() => { setGroupBySeries((v) => !v); setPage(0); }}
                         hiddenDimensions={hiddenDimensions}
-                        columnsMenu={<AdminEventsColumnsMenu prefs={tablePrefs} onChange={setTablePrefs} onReset={resetTablePrefs} />}
+                        columnsMenu={(
+                            <AdminEventsColumnsMenu
+                                prefs={tablePrefs}
+                                onChange={setTablePrefs}
+                                onReset={tablePrefsState.reset}
+                                onSaveAsDefault={tablePrefsState.saveAsDefault}
+                                onFactoryReset={tablePrefsState.factoryReset}
+                                hasUserDefault={tablePrefsState.hasUserDefault}
+                                isDefault={tablePrefsState.isDefault}
+                            />
+                        )}
                     />
                 )}
 

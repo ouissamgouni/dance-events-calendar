@@ -3454,7 +3454,7 @@ export type AdminEventDiscount = 'active' | 'expired';
 export type AdminEventProgram = 'published' | 'draft' | 'none';
 export type AdminEventReach = 'local' | 'regional' | 'international' | 'unset';
 export type AdminEventSort =
-    | 'start' | 'submitted' | 'title' | 'price' | 'views' | 'clicks'
+    | 'start' | 'added' | 'submitted' | 'title' | 'price' | 'views' | 'clicks'
     | 'going' | 'saved' | 'engaged' | 'ratings' | 'messages' | 'memories';
 export const ADMIN_EVENT_HAS_KEYS = [
     'has_ratings', 'has_messages', 'has_memories', 'has_organizer',

@@ -389,6 +389,22 @@ class TestRichFilters:
         assert client.get("/api/admin/events?price=cheap").status_code == 422
         assert client.get("/api/admin/events?sort=bogus").status_code == 422
 
+    def test_sort_by_added(self, client, engine):
+        _seed_calendar(engine)
+        now = datetime.now(timezone.utc)
+        with Session(engine) as s:
+            old = _event("old")
+            old.created_at = now - timedelta(days=3)
+            new = _event("new", days=9)
+            new.created_at = now
+            s.add_all([old, new])
+            s.commit()
+
+        assert self._ids(client, sort="added") == ["new", "old"]
+        assert self._ids(client, sort="added", order="asc") == ["old", "new"]
+        item = client.get("/api/admin/events").json()["items"][0]
+        assert item["created_at"] is not None
+
     def test_filter_options_scope_counts(self, client, engine):
         _seed_calendar(engine)
         with Session(engine) as s:

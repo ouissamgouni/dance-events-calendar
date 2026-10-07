@@ -2525,6 +2525,9 @@ class AdminEventModerationResponse(BaseModel):
     submission: Optional[SubmissionInfo] = None
     # Dates still to come in the event's series, the event included.
     series_dates: int = 1
+    # Signed-in people who saved or are going, i.e. who a status change would notify.
+    affected_attendees: int = 0
+    series_affected_attendees: int = 0
     draft: Optional[EventRevisionResponse] = None
     open_revisions: list[EventRevisionResponse] = []
     history: list[EventRevisionResponse] = []
@@ -2742,6 +2745,7 @@ class AdminEventResponse(EventResponse):
     memory_count: Optional[int] = None
     program_status: Optional[Literal["published", "draft"]] = None
     submitted_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
     reach: Optional[str] = None
 
 

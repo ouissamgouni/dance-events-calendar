@@ -267,6 +267,7 @@ def _admin_event_response(
         block_reason=blocked.reason if blocked else None,
         block_reason_detail=blocked.reason_detail if blocked else None,
         merged_into_event_id=event.merged_into_event_id,
+        created_at=event.created_at,
         is_submission=event.suggestion_id is not None,
         has_pending_changes=has_pending_changes,
         visibility_state=event_audience(event),
@@ -553,6 +554,8 @@ def _order_admin_events(stmt, sort: str, order: Optional[str]):
         key = col(EventSuggestion.created_at)
     elif sort == "title":
         key = func.lower(CachedEvent.title)
+    elif sort == "added":
+        key = col(CachedEvent.created_at)
     elif sort == "price":
         key = col(CachedEvent.price_min)
     elif sort == "start":
@@ -3856,11 +3859,20 @@ def get_event_moderation(
     draft = next(
         (r for r in revisions if r.status == event_revisions.STATUS_DRAFT), None
     )
+    series_ids = _upcoming_series_ids(session, event)
+    here = set(event_revisions.engaged_user_ids(session, [event.event_id]))
+    everywhere = (
+        set(event_revisions.engaged_user_ids(session, series_ids))
+        if len(series_ids) > 1
+        else here
+    )
     return AdminEventModerationResponse(
         visibility=event_audience(event),
         wants_public=event_wants_public(session, event),
         submission=submission,
-        series_dates=len(_upcoming_series_ids(session, event)),
+        series_dates=len(series_ids),
+        affected_attendees=len(here),
+        series_affected_attendees=len(everywhere),
         draft=_revision_response(session, draft, counts(draft)) if draft else None,
         open_revisions=[
             _revision_response(session, r, counts(r))

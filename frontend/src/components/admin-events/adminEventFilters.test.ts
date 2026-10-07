@@ -6,8 +6,11 @@ import {
     dimensionCount,
     dimensionPresenceCount,
     dimensionSummary,
+    loadCustomPresets,
     matchQuickView,
     nextSort,
+    presetFrom,
+    saveCustomPresets,
     toFilterParams,
 } from './adminEventFilters'
 import { defaultTablePrefs, sanitizeTablePrefs } from './useAdminEventsTablePrefs'
@@ -55,6 +58,17 @@ describe('admin event filters', () => {
         expect(matchQuickView(DEFAULT_FILTERS)).toBe('all')
         expect(matchQuickView({ ...DEFAULT_FILTERS, has: { has_tags: false } })).toBe('untagged')
         expect(matchQuickView({ ...DEFAULT_FILTERS, status: ['new'], price: ['free'] })).toBeNull()
+    })
+
+    it('saves custom presets and matches them', () => {
+        const state = { ...DEFAULT_FILTERS, status: ['new' as const], price: ['free' as const] }
+        const preset = presetFrom('Free new', state)
+        saveCustomPresets([preset])
+        const loaded = loadCustomPresets()
+        expect(loaded.map((p) => p.label)).toEqual(['Free new'])
+        expect(matchQuickView(state, loaded)).toBe(preset.id)
+        expect(matchQuickView(DEFAULT_FILTERS, loaded)).toBeNull()
+        localStorage.removeItem('admin:events-presets:v1')
     })
 
     it('cycles header sorting: default direction, reversed, then back to date', () => {

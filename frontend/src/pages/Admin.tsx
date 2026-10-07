@@ -44,6 +44,7 @@ import AdminBottomNav, { type AdminTab } from '../components/AdminBottomNav';
 import useMediaQuery from '../hooks/useMediaQuery';
 import { ArrowLeft, BadgeCheck, CalendarDays, ChevronRight, CloudOff, Copy, ListChecks, MapPinOff, MessageSquare, MoreHorizontal, RefreshCw, Repeat, Tags, Ticket, type LucideIcon } from 'lucide-react';
 import { useAdminCounters, notifyAdminDataChanged } from '../hooks/useAdminCounters';
+import { CHANGE_KINDS, CHANGE_KIND_META } from '../utils/eventRevisions';
 import { DATE_RANGE_PRESET_CHOICES, DEFAULT_EXPLORER_PERIOD } from '../utils/dateRangePresets';
 import type { DateRangePresetKey } from '../utils/dateRangePresets';
 
@@ -1677,13 +1678,16 @@ export default function Admin() {
         setEventsPanelOpen(true);
     };
 
-    type HubRow = { key: string; label: string; icon: LucideIcon; badges: { count: number; cls: string; title?: string }[]; onOpen: () => void; detail?: string };
+    type HubRow = { key: string; label: string; icon: LucideIcon; badges: { count: number; cls: string; title?: string; icon?: LucideIcon }[]; onOpen: () => void; detail?: string };
+    const reviewBadges = CHANGE_KINDS.map((kind) => ({
+        count: adminCounters.reviewByKind[kind] ?? 0,
+        cls: CHANGE_KIND_META[kind].badge,
+        title: CHANGE_KIND_META[kind].label,
+        icon: CHANGE_KIND_META[kind].icon,
+    }));
     const queueRows: HubRow[] = [
         {
-            key: 'review', label: 'Review', icon: ListChecks, onOpen: () => setReviewPanelOpen(true), badges: [
-                { count: adminCounters.reviewNew, cls: 'bg-action', title: 'New events or go-public requests' },
-                { count: adminCounters.reviewEdits, cls: 'bg-orange-500', title: 'Edits, cancellations or removals' },
-            ],
+            key: 'review', label: 'Review', icon: ListChecks, onOpen: () => setReviewPanelOpen(true), badges: reviewBadges,
         },
         { key: 'tags', label: 'Tag suggestions', icon: Tags, onOpen: () => setTagSuggestionsPanelOpen(true), badges: [{ count: tagSuggestionCount, cls: 'bg-violet-500' }] },
         { key: 'duplicates', label: 'Duplicates', icon: Copy, onOpen: () => setDuplicatesPanelOpen(true), badges: [{ count: duplicatesPendingCount, cls: 'bg-amber-500' }] },
@@ -1772,10 +1776,11 @@ export default function Admin() {
                                             {detail && <span className="shrink-0 text-xs text-ink-soft">{detail}</span>}
                                             {badges.filter((b) => b.count > 0).map((b) => (
                                                 <span
-                                                    key={b.cls}
+                                                    key={b.title ?? b.cls}
                                                     title={b.title}
-                                                    className={`inline-flex h-5 min-w-5 items-center justify-center px-1.5 text-[11px] font-semibold text-white ${b.cls}`}
+                                                    className={`inline-flex h-5 min-w-5 items-center justify-center gap-0.5 px-1.5 text-[11px] font-semibold text-white ${b.cls}`}
                                                 >
+                                                    {b.icon && <b.icon className="h-3 w-3" aria-hidden="true" />}
                                                     {b.count}
                                                 </span>
                                             ))}
@@ -1803,22 +1808,16 @@ export default function Admin() {
                         className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Review
-                        {adminCounters.reviewNew > 0 && (
+                        {reviewBadges.filter((b) => b.count > 0).map((b) => (
                             <span
-                                className="inline-flex items-center justify-center bg-action text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]"
-                                title={`${adminCounters.reviewNew} new event(s) or go-public request(s)`}
+                                key={b.title}
+                                className={`inline-flex items-center justify-center gap-0.5 ${b.cls} text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]`}
+                                title={`${b.count} ${b.title}`}
                             >
-                                {adminCounters.reviewNew}
+                                <b.icon className="h-3 w-3" aria-hidden="true" />
+                                {b.count}
                             </span>
-                        )}
-                        {adminCounters.reviewEdits > 0 && (
-                            <span
-                                className="inline-flex items-center justify-center bg-orange-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]"
-                                title={`${adminCounters.reviewEdits} edit(s), cancellation(s) or removal(s)`}
-                            >
-                                {adminCounters.reviewEdits}
-                            </span>
-                        )}
+                        ))}
                     </button>
                     <button
                         onClick={() => { setUnsyncedPanelOpen(true); }}

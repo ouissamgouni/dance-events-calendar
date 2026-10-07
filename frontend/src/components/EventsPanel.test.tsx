@@ -192,7 +192,7 @@ describe('EventsPanel on desktop', () => {
     it('labels plain columns and shows the default dates chip as active', async () => {
         await renderPanel()
 
-        expect(screen.getByRole('columnheader', { name: /^Submitter/ })).toBeInTheDocument()
+        expect(screen.queryByRole('columnheader', { name: /^Submitter/ })).not.toBeInTheDocument()
         expect(screen.getByRole('columnheader', { name: /^Image/ })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Edit filter: Upcoming' }).parentElement).toHaveClass('border-action')
     })
