@@ -7,10 +7,10 @@ from sqlalchemy import func
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from slowapi import Limiter
 from backend.api.rate_limit import client_ip
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import object_session, selectinload
 from sqlmodel import Session, col, select
 
-from backend.api.deps import get_client_ip, require_admin
+from backend.api.deps import require_admin
 from backend.api.schemas import (
     BulkTagSuggestionReviewRequest,
     BulkTagSuggestionReviewResponse,
@@ -22,7 +22,6 @@ from backend.api.schemas import (
     TagResponse,
     TagSuggestionApproveRequest,
     TagSuggestionCountResponse,
-    TagSuggestionCreate,
     TagSuggestionRejectRequest,
     TagSuggestionResponse,
     TagSynonymCreateRequest,
@@ -37,10 +36,11 @@ from backend.db.models import (
     TagGroup,
     TagSuggestion,
     TagSynonym,
+    User,
 )
 from backend.services.event_visibility import (
     apply_event_visibility,
-    event_is_user_facing,
+    discovery_clause,
     show_pending_events_enabled,
 )
 from backend.services.reach import assign_event_tag
@@ -103,6 +103,12 @@ def _suggestion_to_response(
 ) -> TagSuggestionResponse:
     """Centralised serialiser so heuristic metadata (source/confidence/matched_terms)
     is always carried through, regardless of which endpoint built the row."""
+    session = object_session(suggestion)
+    submitter = (
+        session.get(User, suggestion.submitter_user_id)
+        if session is not None and suggestion.submitter_user_id
+        else None
+    )
     return TagSuggestionResponse(
         id=suggestion.id,
         event_id=suggestion.event_id,
@@ -117,6 +123,9 @@ def _suggestion_to_response(
         group_slug=suggestion.group_slug,
         status=suggestion.status,
         submitter_device_id=suggestion.submitter_device_id,
+        submitter_name=(submitter.display_name or submitter.handle)
+        if submitter
+        else None,
         admin_notes=suggestion.admin_notes,
         reviewed_at=suggestion.reviewed_at,
         created_at=suggestion.created_at,
@@ -273,7 +282,7 @@ def list_tag_groups(
         .join(CachedEvent, CachedEvent.event_id == EventTag.event_id)
         .where(CachedEvent.deleted_at == None)  # noqa: E711
     )
-    count_q = apply_event_visibility(count_q, session)
+    count_q = apply_event_visibility(count_q, session).where(discovery_clause())
     if start_date:
         try:
             dt_start = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
@@ -301,87 +310,6 @@ def list_tag_groups(
         "no-store" if show_pending_events_enabled(session) else "public, max-age=30"
     )
     return response
-
-
-@router.post(
-    "/api/tags/suggestions",
-    response_model=TagSuggestionResponse,
-    status_code=201,
-)
-@limiter.limit("10/hour")
-def submit_tag_suggestion(
-    body: TagSuggestionCreate,
-    request: Request,
-    session: Session = Depends(get_session),
-):
-    """Public: suggest a tag for an existing event."""
-    event = session.get(CachedEvent, body.event_id)
-    if event is None or not event_is_user_facing(session, event):
-        raise HTTPException(status_code=404, detail="Event not found")
-
-    # Honeypot
-    if body.website:
-        from datetime import datetime
-
-        return TagSuggestionResponse(
-            id=0,
-            event_id=body.event_id,
-            status="pending",
-            created_at=datetime.now(timezone.utc),
-        )
-
-    # Validate: at least one of tag_id or free_text
-    if not body.tag_id and not body.free_text:
-        raise HTTPException(
-            status_code=400,
-            detail="Either tag_id or free_text is required",
-        )
-
-    # Validate tag_id if provided
-    if body.tag_id:
-        tag = session.get(Tag, body.tag_id)
-        if not tag:
-            raise HTTPException(status_code=404, detail="Tag not found")
-        group = session.get(TagGroup, tag.group_id)
-        if group and group.scope != "event":
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Review-scope tags cannot be suggested as event tags. "
-                    "Attach them through the rate-event flow instead."
-                ),
-            )
-
-    # Free-text suggestions targeting a review-scope group are also rejected.
-    if body.group_slug:
-        target_group = session.exec(
-            select(TagGroup).where(TagGroup.slug == body.group_slug)
-        ).first()
-        if target_group and target_group.scope != "event":
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Group '{body.group_slug}' is review-scope and does not "
-                    "accept event-tag suggestions."
-                ),
-            )
-
-    client_ip = get_client_ip(request)
-
-    suggestion = TagSuggestion(
-        event_id=body.event_id,
-        tag_id=body.tag_id,
-        free_text=body.free_text,
-        group_slug=body.group_slug,
-        submitter_device_id=body.device_id,
-        submitter_ip=client_ip,
-    )
-    session.add(suggestion)
-    session.commit()
-    session.refresh(suggestion)
-
-    tag = session.get(Tag, suggestion.tag_id) if suggestion.tag_id else None
-    return _suggestion_to_response(suggestion, tag=tag, event=event)
 
 
 # ── Admin: Tag Group listing with event counts ───────────────────────

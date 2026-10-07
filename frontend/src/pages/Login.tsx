@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchAuthMode, fetchDevUsers, requestEmailCode, type AuthMode, type DevUser } from '../api';
 import { getDeviceId } from '../utils/deviceId';
@@ -347,6 +347,13 @@ export default function Login() {
                         )}
                         {emailError && <p className="text-sm text-rose-600">{emailError}</p>}
                     </div>
+
+                    <p className="mt-6 text-center text-xs text-ink-soft">
+                        By continuing you agree to the{' '}
+                        <Link to="/terms" className="underline hover:text-ink">Terms</Link> and acknowledge the{' '}
+                        <Link to="/privacy" className="underline hover:text-ink">Privacy Policy</Link>.
+                        Movida is for people aged 16 and over. With Google, we receive your name, email and profile photo.
+                    </p>
                 </div>
             </div>
         </div>

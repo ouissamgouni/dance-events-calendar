@@ -541,3 +541,57 @@ def test_attendance_summaries_prioritize_friend_then_following(client, session):
         assert preview[1]["is_friend"] is False
         assert preview[1]["viewer_follow_status"] == "approved"
         assert preview[2]["viewer_follow_status"] is None
+
+
+@pytest.mark.unit
+def test_owner_sees_attendance_on_private_pending_event(client, session):
+    owner = _make_user(session, "owner@example.com", "Owner")
+    _make_user(session, "other@example.com", "Other")
+    event_id = "suggestion-private-pending"
+    session.add(
+        CachedEvent(
+            event_id=event_id,
+            calendar_id="test-calendar",
+            title=event_id,
+            start=datetime(2026, 1, 1),
+            end=datetime(2026, 1, 2),
+            review_status="pending",
+            visibility="private",
+            owner_user_id=owner.id,
+        )
+    )
+    session.add(
+        UserEventAttendance(
+            event_id=event_id,
+            device_id="d-owner",
+            user_id=owner.id,
+            share_publicly=False,
+            share_audience="private",
+        )
+    )
+    session.commit()
+
+    _login(client, "owner@example.com")
+    single = client.get(f"/api/events/{event_id}/attendance-summary")
+    batch = client.post(
+        "/api/events/attendance-summary", json={"event_ids": [event_id]}
+    )
+    attendees = client.get(f"/api/events/{event_id}/attendees")
+    assert single.status_code == 200, single.text
+    assert batch.status_code == 200, batch.text
+    assert attendees.status_code == 200, attendees.text
+    for summary in (single.json(), batch.json()[0]):
+        assert summary["total_going"] == 1
+        assert [row["user_id"] for row in summary["preview_attendees"]] == [
+            str(owner.id)
+        ]
+    assert [row["user_id"] for row in attendees.json()] == [str(owner.id)]
+
+    client.post("/api/auth/logout")
+    _login(client, "other@example.com")
+    assert client.get(f"/api/events/{event_id}/attendance-summary").status_code == 404
+    assert client.get(f"/api/events/{event_id}/attendees").status_code == 404
+    batch = client.post(
+        "/api/events/attendance-summary", json={"event_ids": [event_id]}
+    )
+    assert batch.json() == []

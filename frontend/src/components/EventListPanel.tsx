@@ -9,6 +9,7 @@ import TagBadges from './TagBadges';
 import { isTrendingScore } from '../utils/trending';
 import { shortLocation } from '../utils/locationShort';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
+import { allDayLastDay, dayOfMonth, eventDisplayZone, isSameEventDay } from '../utils/eventDates';
 import { PriceBadge, DiscountBadge } from './CardPriceBadges';
 import CardActionCluster from './CardActionCluster';
 import CardReviewsLine from './CardReviewsLine';
@@ -163,19 +164,19 @@ function isOnMap(event: CalendarEvent, bounds: MapBounds | null): boolean {
     return isInBounds(event, bounds);
 }
 
-const formatCardDate = (d: Date) =>
-    d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const formatCardDate = (d: Date, timeZone?: string) =>
+    d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone });
 
-const formatCardTime = (d: Date) =>
-    d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+const formatCardTime = (d: Date, timeZone?: string) =>
+    d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
 
 /** Short weekday label for the timeline rail, e.g. "SAT". */
-const formatRailWeekday = (d: Date) =>
-    d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase();
+const formatRailWeekday = (d: Date, timeZone?: string) =>
+    d.toLocaleDateString(undefined, { weekday: 'short', timeZone }).toUpperCase();
 
 /** Short month label for the timeline rail, e.g. "AUG". */
-const formatRailMonth = (d: Date) =>
-    d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
+const formatRailMonth = (d: Date, timeZone?: string) =>
+    d.toLocaleDateString(undefined, { month: 'short', timeZone }).toUpperCase();
 
 
 export function EventListCard({
@@ -208,14 +209,15 @@ export function EventListCard({
     const priceVisible = isPriceSectionVisible(event, showPrices);
     const start = new Date(event.start);
     const end = new Date(event.end);
+    const tz = eventDisplayZone(event);
     // Multi-day events must surface the end date, not just an end time, or a
     // range like "1:00 PM – 5:00 AM" reads as same-day when it isn't.
-    const sameDay = start.toDateString() === end.toDateString();
+    const sameDay = isSameEventDay(event);
     const timelineWhen = event.all_day
-        ? (sameDay ? 'All day' : `Until ${formatCardDate(new Date(end.getTime() - 1))}`)
+        ? (sameDay ? 'All day' : `Until ${formatCardDate(allDayLastDay(event), tz)}`)
         : (sameDay
-            ? `${formatCardTime(start)} – ${formatCardTime(end)}`
-            : `${formatCardTime(start)} – ${formatCardDate(end)}, ${formatCardTime(end)}`);
+            ? `${formatCardTime(start, tz)} – ${formatCardTime(end, tz)}`
+            : `${formatCardTime(start, tz)} – ${formatCardDate(end, tz)}, ${formatCardTime(end, tz)}`);
     const onMap = isOnMap(event, mapBounds);
     const offMapBadge = !onMap ? (
         <span className="event-card-offmap-badge" role="img" aria-label="Off map" title="Off map">
@@ -278,9 +280,9 @@ export function EventListCard({
                 {timeline && (
                     <div className="event-card-rail" aria-hidden="true" data-testid="event-card-rail">
                         <div className="event-card-rail-date">
-                            <span className="event-card-rail-weekday">{formatRailWeekday(start)}</span>
-                            <span className="event-card-rail-month">{formatRailMonth(start)}</span>
-                            <span className="event-card-rail-day">{start.getDate()}</span>
+                            <span className="event-card-rail-weekday">{formatRailWeekday(start, tz)}</span>
+                            <span className="event-card-rail-month">{formatRailMonth(start, tz)}</span>
+                            <span className="event-card-rail-day">{dayOfMonth(start, tz)}</span>
                         </div>
                         <div className="event-card-rail-track">
                             <span className="event-card-rail-dot" />
@@ -330,7 +332,7 @@ export function EventListCard({
                         <p className="event-card-date shrink-0">
                             {timeline
                                 ? timelineWhen
-                                : (event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`)}
+                                : (event.all_day ? formatCardDate(start, tz) : `${formatCardDate(start, tz)} · ${formatCardTime(start, tz)}`)}
                         </p>
                     </div>
                     {event.location ? (
@@ -366,6 +368,7 @@ export function EventListCard({
                                     onKeyDown={(e) => e.stopPropagation()}
                                 >
                                     <CardActionCluster
+                                        cancelled={event.is_cancelled}
                                         eventId={event.event_id}
                                         eventTitle={event.title}
                                         isPast={new Date(event.end).getTime() < Date.now()}
@@ -394,6 +397,7 @@ export function EventListCard({
                     ) : null}
                     <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
                         <CardActionCluster
+                            cancelled={event.is_cancelled}
                             eventId={event.event_id}
                             eventTitle={event.title}
                             isSavedFlag={isSavedFlag}

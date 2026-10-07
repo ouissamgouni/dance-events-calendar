@@ -238,6 +238,8 @@ def _unsubscribe_footer(user_id, category: str, label: str) -> str:
         "interest_matches": "notify-interest-matches",
         "promo_codes": "notify-promo-codes",
         "review_prompt": "notify-review-prompt",
+        "ticket_prompt": "notify-ticket-prompt",
+        "memories_prompt": "notify-memories-prompt",
         "milestone": "notify-milestone-unlocked",
         "activity": "notifications",
     }.get(category, "notifications")
@@ -365,6 +367,7 @@ def send_event_reminder_email(
     when_label: str,
     include_ask_cta: bool = False,
     notification_id: int | None = None,
+    include_ticket_cta: bool = False,
 ) -> bool:
     """Email a user a reminder for an event they're going to.
 
@@ -396,6 +399,20 @@ def send_event_reminder_email(
         if include_ask_cta
         else ""
     )
+    ticket_url = escape(
+        tracked_url(f"{base_event_url}/ticket", notification_id, "email")
+    )
+    ticket_cta = (
+        f"""
+    <p style="margin:4px 0 20px">
+      <a href="{ticket_url}" style="color:#1d4ed8;text-decoration:none;font-size:13px">
+        🎟 Add your ticket so it's handy at the door
+      </a>
+    </p>
+    """
+        if include_ticket_cta
+        else ""
+    )
     body = f"""
     <p>This is a reminder that you're going to:</p>
     <p style="font-size:18px;font-weight:600;margin:8px 0">{title_link}</p>
@@ -409,6 +426,7 @@ def send_event_reminder_email(
       </a>
     </p>
     {ask_cta}
+    {ticket_cta}
     {_engagement_ctas_html(f"{app}/account#notifications")}
     """
     footer = _unsubscribe_footer(user.id, "reminder", "event reminders")
@@ -464,6 +482,86 @@ def send_event_review_prompt_email(
     footer = _unsubscribe_footer(user.id, "review_prompt", "review prompts")
     html = _email_shell(heading, body, footer)
     return _send_email(user.email, subject, html, "review prompt")
+
+
+def _event_nudge_email(
+    user,
+    event,
+    *,
+    path: str,
+    notification_id: int | None,
+    subject: str,
+    heading: str,
+    lede: str,
+    tagline: str,
+    button: str,
+    category: str,
+    label: str,
+    log_label: str,
+) -> bool:
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    event_url = escape(
+        tracked_url(f"{app}/event/{event.event_id}/{path}", notification_id, "email")
+    )
+    title = escape(event.title or "the event")
+    body = f"""
+    <p>{lede}</p>
+    <p style="font-size:18px;font-weight:600;margin:8px 0">
+      <a href="{event_url}" style="color:#1d4ed8;text-decoration:none">{title}</a>
+    </p>
+    <p style="color:#374151;margin:4px 0">{tagline}</p>
+    <p style="margin:20px 0">
+      <a href="{event_url}"
+                 style="background:#3b82f6;color:#fff;text-decoration:none;
+                                padding:10px 18px;display:inline-block">
+        {button}
+      </a>
+    </p>
+    {_engagement_ctas_html(f"{app}/account#notifications")}
+    """
+    footer = _unsubscribe_footer(user.id, category, label)
+    html = _email_shell(heading, body, footer)
+    return _send_email(user.email, subject, html, log_label)
+
+
+def send_event_ticket_prompt_email(
+    user, event, notification_id: int | None = None
+) -> bool:
+    return _event_nudge_email(
+        user,
+        event,
+        path="ticket",
+        notification_id=notification_id,
+        subject=f"Got your ticket for {event.title or 'your event'}? Keep it handy here",
+        heading="Got your ticket? 🎟",
+        lede="You're going to:",
+        tagline="Save your ticket in Movida so it's one tap away at the door.",
+        button="Save my ticket",
+        category="ticket_prompt",
+        label="ticket reminders",
+        log_label="ticket prompt",
+    )
+
+
+def send_event_memories_prompt_email(
+    user, event, notification_id: int | None = None
+) -> bool:
+    return _event_nudge_email(
+        user,
+        event,
+        path="memories",
+        notification_id=notification_id,
+        subject=f"Relive {event.title or 'your night'} 📸",
+        heading="Relive the night 📸",
+        lede="You went to:",
+        tagline="Add a few photos to remember the night.",
+        button="Add memories",
+        category="memories_prompt",
+        label="event memories prompts",
+        log_label="memories prompt",
+    )
 
 
 def send_schedule_program_available_email(user, event, session_count: int) -> bool:
@@ -525,6 +623,149 @@ def send_schedule_plan_changed_email(user, event, description: str) -> bool:
         html,
         "planned session changed",
     )
+
+
+def send_event_changed_email(user, event, description: str) -> bool:
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    event_url = f"{app}/event/{escape(str(event.event_id))}"
+    title = escape(event.title or "the event")
+    body = f"""
+    <p><strong>{title}</strong> has changed.</p>
+    <p style="color:#374151;margin:8px 0">{escape(description)}</p>
+    <p style="margin:20px 0">
+      <a href="{event_url}"
+         style="background:#3b82f6;color:#fff;text-decoration:none;
+                padding:10px 18px;display:inline-block">
+        View event
+      </a>
+    </p>
+    {_engagement_ctas_html(f"{app}/account#notifications")}
+    """
+    footer = _unsubscribe_footer(user.id, "schedule_updates", "event updates")
+    html = _email_shell("An event you follow changed", body, footer)
+    return _send_email(
+        user.email,
+        f"{event.title or 'Event'}: details changed",
+        html,
+        "event changed",
+    )
+
+
+def send_event_cancelled_email(user, event) -> bool:
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    event_url = f"{app}/event/{escape(str(event.event_id))}"
+    title = escape(event.title or "The event")
+    note = (
+        f'<p style="color:#374151;margin:8px 0 0">{escape(event.cancellation_note)}</p>'
+        if event.cancellation_note
+        else ""
+    )
+    body = f"""
+    <div style="border:1px solid #FDA29B;background:#FEF3F2;padding:12px 16px;margin:0 0 16px">
+      <p style="color:#D92D20;font-weight:700;margin:0">&#10060; {title} was cancelled</p>
+      {note}
+    </div>
+    <p style="color:#374151;margin:8px 0">It no longer takes place. Plan something else for that day.</p>
+    <p style="margin:20px 0">
+      <a href="{event_url}"
+         style="background:#3b82f6;color:#fff;text-decoration:none;
+                padding:10px 18px;display:inline-block">
+        View event
+      </a>
+    </p>
+    """
+    footer = _unsubscribe_footer(user.id, "schedule_updates", "event updates")
+    html = _email_shell("An event you follow was cancelled", body, footer)
+    return _send_email(
+        user.email,
+        f"\u274c Cancelled: {event.title or 'Event'}",
+        html,
+        "event cancelled",
+    )
+
+
+def send_event_removed_email(
+    user, title: str, reason: str | None, link_path: str
+) -> bool:
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    lead = f"<p><strong>{escape(title or 'An event')}</strong> was removed.</p>"
+    if reason:
+        lead += f'<p style="color:#374151;margin:8px 0">{escape(reason)}</p>'
+    body = f"""
+    {lead}
+    <p style="margin:20px 0">
+      <a href="{app}{escape(link_path)}"
+         style="background:#3b82f6;color:#fff;text-decoration:none;
+                padding:10px 18px;display:inline-block">
+        Find another event
+      </a>
+    </p>
+    """
+    footer = _unsubscribe_footer(user.id, "schedule_updates", "event updates")
+    html = _email_shell("An event you follow was removed", body, footer)
+    return _send_email(
+        user.email, f"{title or 'Event'}: removed", html, "event removed"
+    )
+
+
+def send_suggestion_decision_email(
+    user,
+    title: str,
+    *,
+    approved: bool,
+    reason: str | None,
+    link_path: str,
+    kept_private: bool = False,
+) -> bool:
+    """Transactional: tell a submitter their event was approved or rejected."""
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    safe_title = escape(title or "your event")
+    if approved:
+        heading = "Your event is live"
+        lead = f"<p><strong>{safe_title}</strong> was approved and is now public.</p>"
+        cta = "View event"
+    else:
+        heading = (
+            "Your event stays private" if kept_private else "Your event was removed"
+        )
+        lead = (
+            f"<p><strong>{safe_title}</strong> won't be made public, "
+            "but it's still in your events.</p>"
+            if kept_private
+            else f"<p><strong>{safe_title}</strong> was removed.</p>"
+        )
+        if reason:
+            lead += (
+                f'<p style="color:#374151;margin:8px 0">Reason: {escape(reason)}</p>'
+            )
+        cta = "View event" if kept_private else "My events"
+    body = f"""
+    {lead}
+    <p style="margin:20px 0">
+      <a href="{app}{escape(link_path)}"
+         style="background:#3b82f6;color:#fff;text-decoration:none;
+                padding:10px 18px;display:inline-block">
+        {cta}
+      </a>
+    </p>
+    """
+    html = _email_shell(heading, body)
+    subject = (
+        f"Approved: {title}"
+        if approved
+        else f"Kept private: {title}"
+        if kept_private
+        else f"Removed: {title}"
+    )
+    return _send_email(user.email, subject, html, "suggestion decision")
 
 
 def send_schedule_program_updated_email(user, event) -> bool:

@@ -14,6 +14,7 @@ interface Props {
     overrideValue: boolean | null;
     onOverrideChange: (value: boolean | null) => void;
     overrideDisabled?: boolean;
+    overrideEffective?: { on: boolean; text: string; note?: string };
 }
 
 interface EditForm {
@@ -58,6 +59,7 @@ export default function AdminEventPromoCodes({
     overrideValue,
     onOverrideChange,
     overrideDisabled,
+    overrideEffective,
 }: Props) {
     const [expanded, setExpanded] = useState(false);
     const [rows, setRows] = useState<PromoCodeAdmin[]>([]);
@@ -156,6 +158,7 @@ export default function AdminEventPromoCodes({
                     value={overrideValue}
                     disabled={overrideDisabled}
                     onChange={onOverrideChange}
+                    effective={overrideEffective}
                 />
             </div>
             {expanded && (

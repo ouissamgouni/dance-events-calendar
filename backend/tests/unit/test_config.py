@@ -8,6 +8,9 @@ from backend.config.loader import (
     get_database_url,
     get_calendar_service_type,
     get_cors_origins,
+    get_milestone_sweep_lookback_days,
+    get_notification_debounce_seconds,
+    get_scheduler_tick_minutes,
     get_sync_interval_minutes,
 )
 
@@ -50,6 +53,35 @@ class TestConfigLoader:
     def test_get_sync_interval_custom(self, monkeypatch):
         monkeypatch.setenv("SYNC_INTERVAL_MINUTES", "30")
         assert get_sync_interval_minutes() == 30
+
+    @pytest.mark.parametrize(
+        "raw,expected", [(None, 15), ("60", 60), ("0", 1), ("abc", 15)]
+    )
+    def test_get_scheduler_tick_minutes(self, monkeypatch, raw, expected):
+        if raw is None:
+            monkeypatch.delenv("SCHEDULER_TICK_MINUTES", raising=False)
+        else:
+            monkeypatch.setenv("SCHEDULER_TICK_MINUTES", raw)
+        assert get_scheduler_tick_minutes() == expected
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [(None, 60.0), ("5", 5.0), ("-3", 0.0), ("9999", 300.0), ("x", 60.0)],
+    )
+    def test_get_notification_debounce_seconds(self, monkeypatch, raw, expected):
+        if raw is None:
+            monkeypatch.delenv("NOTIFICATION_DEBOUNCE_SECONDS", raising=False)
+        else:
+            monkeypatch.setenv("NOTIFICATION_DEBOUNCE_SECONDS", raw)
+        assert get_notification_debounce_seconds() == expected
+
+    @pytest.mark.parametrize("raw,expected", [(None, 30), ("7", 7), ("0", 1)])
+    def test_get_milestone_sweep_lookback_days(self, monkeypatch, raw, expected):
+        if raw is None:
+            monkeypatch.delenv("MILESTONE_SWEEP_LOOKBACK_DAYS", raising=False)
+        else:
+            monkeypatch.setenv("MILESTONE_SWEEP_LOOKBACK_DAYS", raw)
+        assert get_milestone_sweep_lookback_days() == expected
 
     def test_get_auto_sync_enabled_default_false(self, monkeypatch):
         monkeypatch.delenv("AUTO_SYNC_ENABLED", raising=False)

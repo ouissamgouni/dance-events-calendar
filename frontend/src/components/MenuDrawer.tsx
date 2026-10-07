@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { firstNameOf } from '../utils/displayName';
 import useBackToClose from '../hooks/useBackToClose';
 
@@ -11,6 +12,7 @@ import useBackToClose from '../hooks/useBackToClose';
  */
 export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { user, logout } = useAuth();
+    const { organizerClaimsEnabled } = useOptionalFeatureFlags();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -120,8 +122,20 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                                 className={rowClass}
                             >
                                 <img src="/schedule.png" alt="" aria-hidden="true" className={iconClass} />
-                                Submit Event
+                                Add Event
                             </Link>
+                            {user.is_verified_organizer && organizerClaimsEnabled ? (
+                                <Link to="/hosting" onClick={onClose} className={rowClass}>
+                                    <img src="/orga.png" alt="" aria-hidden="true" className={iconClass} />
+                                    Hosting
+                                </Link>
+                            ) : (
+                                <Link to="/me/submissions" onClick={onClose} className={rowClass}>
+                                    <img src="/schedule.png" alt="" aria-hidden="true" className={iconClass} />
+                                    Events I added
+                                </Link>
+                            )}
+                            {divider}
                             <Link to="/invite" onClick={onClose} className={rowClass}>
                                 <img src="/add-user.png" alt="" aria-hidden="true" className={iconClass} />
                                 Invite friends
@@ -159,7 +173,7 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                                 className={rowClass}
                             >
                                 <img src="/schedule.png" alt="" aria-hidden="true" className={iconClass} />
-                                Submit Event
+                                Add Event
                             </Link>
                             <Link to="/install" onClick={onClose} className={rowClass}>
                                 <img src="/save.png" alt="" aria-hidden="true" className={iconClass} />
@@ -172,6 +186,11 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                             </Link>
                         </>
                     )}
+                </nav>
+                <nav aria-label="Legal" className="mt-auto flex flex-wrap gap-x-4 gap-y-1 border-t border-line px-5 py-4 text-xs text-ink-soft">
+                    <Link to="/privacy" onClick={onClose} className="hover:text-ink">Privacy</Link>
+                    <Link to="/terms" onClick={onClose} className="hover:text-ink">Terms</Link>
+                    <Link to="/legal" onClick={onClose} className="hover:text-ink">Legal notice</Link>
                 </nav>
             </div>
         </div>

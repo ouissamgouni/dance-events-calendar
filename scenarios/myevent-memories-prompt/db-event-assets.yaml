@@ -1,0 +1,9 @@
+# Mia already added a memory to the rooftop event → no nudge for it.
+assets:
+  - {
+      event_id: evt-mp-rooftop,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-01.jpg,
+      caption: "Sunset rueda",
+    }

@@ -88,8 +88,6 @@ def _make_suggestion(**overrides) -> EventSuggestion:
         status="pending",
         submitter_name="John",
         submitter_email="john@example.com",
-        submitter_ip="1.2.3.4",
-        submitter_user_agent="Mozilla/5.0",
     )
     defaults.update(overrides)
     return EventSuggestion(**defaults)
@@ -101,6 +99,9 @@ class TestSubmitSuggestion:
         """Filled honeypot field → 201 returned, but no DB write."""
         mock_session = MagicMock(spec=Session)
         app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[get_current_user_optional] = lambda: User(
+            email="bot@example.com", provider="google", provider_subject="mock|bot"
+        )
 
         client = TestClient(app)
         resp = client.post(
@@ -121,55 +122,24 @@ class TestSubmitSuggestion:
 
         app.dependency_overrides.clear()
 
-    def test_submit_valid_suggestion(self):
-        """Valid submission → 201, session.add called with correct data."""
+    def test_anonymous_visitors_cannot_add_events(self):
         mock_session = MagicMock(spec=Session)
-        # Make refresh a no-op, and make the added object available
-        mock_session.refresh = MagicMock()
-        mock_session.commit = MagicMock()
-
-        captured = []
-        original_add = mock_session.add
-
-        def capture_add(obj):
-            captured.append(obj)
-
-        mock_session.add = capture_add
-
         app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[get_current_user_optional] = lambda: None
+        try:
+            resp = TestClient(app).post(
+                "/api/suggestions",
+                json={
+                    "title": "Salsa Tuesday",
+                    "start": "2027-06-15T20:00:00",
+                    "end": "2027-06-15T23:00:00",
+                },
+            )
+        finally:
+            app.dependency_overrides.clear()
 
-        client = TestClient(app)
-        resp = client.post(
-            "/api/suggestions",
-            json={
-                "title": "Salsa Tuesday",
-                "description": "Weekly salsa class",
-                "location": "Studio A",
-                "start": "2026-06-15T20:00:00",
-                "end": "2026-06-15T23:00:00",
-                "submitter_name": "Alice",
-                "submitter_email": "alice@example.com",
-                "screen_size": "1920x1080",
-                "timezone": "Europe/Berlin",
-            },
-        )
-
-        assert resp.status_code == 201
-        assert len(captured) == 1
-        suggestion = captured[0]
-        assert isinstance(suggestion, EventSuggestion)
-        assert suggestion.title == "Salsa Tuesday"
-        assert suggestion.status == "pending"
-        assert suggestion.submitter_name == "Alice"
-        assert suggestion.submitter_screen_size == "1920x1080"
-        assert suggestion.submitter_timezone == "Europe/Berlin"
-        # IP should be captured from test client
-        assert suggestion.submitter_ip is not None
-        # Anonymous submissions must NOT create a live/visible CachedEvent —
-        # only signed-in submitters get immediate visibility (pending review).
-        assert not any(isinstance(obj, CachedEvent) for obj in captured)
-
-        app.dependency_overrides.clear()
+        assert resp.status_code == 401
+        mock_session.add.assert_not_called()
 
     def test_submit_signed_in_user_creates_live_event_and_going(self):
         mock_session = MagicMock(spec=Session)
@@ -219,8 +189,8 @@ class TestSubmitSuggestion:
                 "location": "Studio A",
                 "latitude": 52.52,
                 "longitude": 13.405,
-                "start": "2026-06-15T20:00:00",
-                "end": "2026-06-15T23:00:00",
+                "start": "2027-06-15T20:00:00",
+                "end": "2027-06-15T23:00:00",
                 "going": True,
                 "going_audience": "friends",
                 "submitter_name": "Alice",
@@ -235,7 +205,9 @@ class TestSubmitSuggestion:
             for obj in added
         )
         assert any(
-            isinstance(obj, CachedEvent) and obj.review_status == "pending"
+            isinstance(obj, CachedEvent)
+            and obj.review_status == "reviewed"
+            and obj.visibility == "private"
             for obj in added
         )
         assert any(
@@ -245,9 +217,74 @@ class TestSubmitSuggestion:
 
         app.dependency_overrides.clear()
 
+    @staticmethod
+    def _signed_in_submit(payload):
+        from backend.api.routes.suggestions import limiter
+
+        limiter.reset()
+        mock_session = MagicMock(spec=Session)
+        added = []
+        mock_session.add = added.append
+        mock_session.get = lambda model, pk: None
+
+        def mock_exec(stmt):
+            result = MagicMock()
+            result.first.return_value = None
+            result.all.return_value = []
+            return result
+
+        mock_session.exec = mock_exec
+        user = User(
+            email="alice@example.com",
+            provider="google",
+            provider_subject="mock|alice@example.com",
+        )
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[get_current_user_optional] = lambda: user
+        try:
+            with patch("backend.api.routes.suggestions._notify_admin") as notify:
+                resp = TestClient(app).post("/api/suggestions", json=payload)
+        finally:
+            app.dependency_overrides.clear()
+        return resp, added, user, notify
+
+    def test_kept_for_myself_creates_a_private_owned_event(self):
+        resp, added, user, notify = self._signed_in_submit(
+            {
+                "title": "Salsa Tuesday",
+                "start": "2027-06-15T20:00:00",
+                "end": "2027-06-15T23:00:00",
+                "share_publicly": False,
+            }
+        )
+
+        assert resp.status_code == 201, resp.text
+        suggestion = next(o for o in added if isinstance(o, EventSuggestion))
+        assert suggestion.status == "private"
+        events = [o for o in added if isinstance(o, CachedEvent)]
+        assert events and all(e.visibility == "private" for e in events)
+        assert all(e.owner_user_id == user.id for e in events)
+        notify.assert_not_called()
+
+    def test_past_event_can_be_kept_but_not_shared(self):
+        past = {
+            "title": "Last week",
+            "start": "2020-06-15T20:00:00",
+            "end": "2020-06-15T23:00:00",
+        }
+
+        shared, *_ = self._signed_in_submit({**past, "share_publicly": True})
+        kept, *_ = self._signed_in_submit({**past, "share_publicly": False})
+
+        assert shared.status_code == 422
+        assert kept.status_code == 201, kept.text
+
     def test_submit_missing_title(self):
         """Missing title → 422 validation error."""
         app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
+        app.dependency_overrides[get_current_user_optional] = lambda: User(
+            email="alice@example.com", provider="google", provider_subject="mock|alice"
+        )
         try:
             client = TestClient(app)
             resp = client.post(
@@ -259,7 +296,7 @@ class TestSubmitSuggestion:
             )
             assert resp.status_code == 422
         finally:
-            app.dependency_overrides.pop(get_session, None)
+            app.dependency_overrides.clear()
 
 
 @pytest.mark.unit
@@ -552,6 +589,9 @@ class TestSuggestionImages:
         )
 
     def _submit(self, user, image_key):
+        from backend.api.routes.suggestions import limiter
+
+        limiter.reset()
         app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
         app.dependency_overrides[get_current_user_optional] = lambda: user
         try:
@@ -566,10 +606,6 @@ class TestSuggestionImages:
             )
         finally:
             app.dependency_overrides.clear()
-
-    def test_submit_rejects_image_for_anonymous(self):
-        resp = self._submit(None, "suggestions/someone/abc")
-        assert resp.status_code == 400
 
     def test_submit_rejects_another_users_image(self):
         resp = self._submit(self._user(), "suggestions/someone-else/abc")
@@ -608,30 +644,69 @@ class TestSuggestionImages:
 
 
 @pytest.mark.unit
-class TestRejectSuggestion:
-    def test_reject_sets_status(self):
-        """Rejecting a pending suggestion sets status and reviewed_at."""
-        suggestion = _make_suggestion()
+class TestRefuseSuggestion:
+    def test_decline_keeps_the_event_private_for_its_owner(self):
+        suggestion = _make_suggestion(
+            created_event_id="suggestion-live-1", image_key="suggestions/u1/abc"
+        )
+        live_event = CachedEvent(
+            event_id="suggestion-live-1",
+            calendar_id="user-submissions",
+            title=suggestion.title,
+            start=suggestion.start,
+            end=suggestion.end,
+            visibility="private",
+        )
+        mock_session = _mock_session_with_suggestions(suggestion)
+        added = []
+        base_add = mock_session.add
+
+        def tracking_add(obj):
+            added.append(obj)
+            base_add(obj)
+
+        mock_session.add = tracking_add
+
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            resp = TestClient(app).post(
+                f"/api/admin/suggestions/{suggestion.id}/decline",
+                json={"admin_notes": "Not a dance event"},
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 200, resp.text
+        assert suggestion.status == "declined"
+        assert suggestion.admin_notes == "Not a dance event"
+        assert suggestion.reviewed_at is not None
+        assert suggestion.image_key == "suggestions/u1/abc"
+        assert live_event.is_hidden is False
+        assert not any(isinstance(obj, BlockedEvent) for obj in added)
+
+    def test_decline_only_applies_to_a_pending_request(self):
+        suggestion = _make_suggestion(status="private")
         mock_session = _mock_session_with_suggestions(suggestion)
 
         app.dependency_overrides[get_session] = lambda: mock_session
         app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            resp = TestClient(app).post(
+                f"/api/admin/suggestions/{suggestion.id}/decline", json={}
+            )
+        finally:
+            app.dependency_overrides.clear()
 
-        client = TestClient(app)
-        resp = client.post(
-            f"/api/admin/suggestions/{suggestion.id}/reject",
-            json={"admin_notes": "Duplicate event"},
+        assert resp.status_code == 400
+
+    @pytest.mark.parametrize("status", ["pending", "private", "declined"])
+    def test_block_hides_the_event_for_everyone(self, status):
+        suggestion = _make_suggestion(
+            status=status,
+            created_event_id="suggestion-live-1",
+            image_key="suggestions/u1/abc",
         )
-
-        assert resp.status_code == 200
-        assert suggestion.status == "rejected"
-        assert suggestion.admin_notes == "Duplicate event"
-        assert suggestion.reviewed_at is not None
-
-        app.dependency_overrides.clear()
-
-    def test_reject_hides_created_event_and_blocks_reimport(self):
-        suggestion = _make_suggestion(created_event_id="suggestion-live-1")
         live_event = CachedEvent(
             event_id="suggestion-live-1",
             calendar_id="user-submissions",
@@ -667,35 +742,19 @@ class TestRejectSuggestion:
 
         app.dependency_overrides[get_session] = lambda: mock_session
         app.dependency_overrides[require_admin] = _fake_admin
-
-        client = TestClient(app)
-        resp = client.post(
-            f"/api/admin/suggestions/{suggestion.id}/reject",
-            json={"admin_notes": "Duplicate event"},
-        )
-
-        assert resp.status_code == 200, resp.text
-        assert suggestion.status == "rejected"
-        assert live_event.is_hidden is True
-        assert any(isinstance(obj, BlockedEvent) for obj in store.values())
-
-        app.dependency_overrides.clear()
-
-    def test_reject_drops_the_image_reference(self):
-        suggestion = _make_suggestion(image_key="suggestions/u1/abc")
-        mock_session = _mock_session_with_suggestions(suggestion)
-
-        app.dependency_overrides[get_session] = lambda: mock_session
-        app.dependency_overrides[require_admin] = _fake_admin
         try:
             resp = TestClient(app).post(
-                f"/api/admin/suggestions/{suggestion.id}/reject", json={}
+                f"/api/admin/suggestions/{suggestion.id}/block",
+                json={"admin_notes": "Spam"},
             )
         finally:
             app.dependency_overrides.clear()
 
         assert resp.status_code == 200, resp.text
+        assert suggestion.status == "blocked"
         assert suggestion.image_key is None
+        assert live_event.is_hidden is True
+        assert any(isinstance(obj, BlockedEvent) for obj in store.values())
 
 
 @pytest.mark.unit
@@ -839,23 +898,6 @@ class TestGetClientIp:
             ip = get_client_ip(mock_request)
 
         assert ip == "192.168.1.100"
-
-
-@pytest.mark.unit
-class TestGeolocatePrivateIp:
-    @pytest.mark.asyncio
-    async def test_private_ip_returns_none(self):
-        """Private/loopback IPs should return None without calling external API."""
-        from backend.services.ip_geolocation import geolocate_ip
-
-        result = await geolocate_ip("127.0.0.1")
-        assert result is None
-
-        result = await geolocate_ip("10.0.0.1")
-        assert result is None
-
-        result = await geolocate_ip("192.168.1.1")
-        assert result is None
 
 
 @pytest.mark.unit

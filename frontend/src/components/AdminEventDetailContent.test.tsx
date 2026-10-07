@@ -63,3 +63,52 @@ describe('AdminEventDetailContent calendar source', () => {
         expect(screen.getByText('Displayed description', { selector: 'p' })).toBeVisible()
     })
 })
+
+
+describe('AdminEventDetailContent when section', () => {
+    it('saves an unchanged datetime without shifting it', async () => {
+        const onFieldSave = vi.fn().mockResolvedValue(undefined)
+        render(<AdminEventDetailContent event={event()} onFieldSave={onFieldSave} />)
+
+        await userEvent.click(screen.getByRole('button', { name: 'Edit date and time' }))
+        await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+        expect(onFieldSave).toHaveBeenCalledWith({
+            start: '2026-10-01T20:00:00.000Z',
+            end: '2026-10-01T23:00:00.000Z',
+            all_day: false,
+        })
+    })
+
+    it('shows the end date of a multi-day event', () => {
+        const multiDay = { ...event(), start: '2026-10-01T12:00:00Z', end: '2026-10-03T12:00:00Z' }
+        render(<AdminEventDetailContent event={multiDay} onFieldSave={vi.fn()} />)
+
+        const end = new Date(multiDay.end).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+        expect(screen.getByText(new RegExp(end))).toBeInTheDocument()
+    })
+})
+
+
+describe('AdminEventDetailContent ticket eligible', () => {
+    it('shows the effective value and pins a choice', async () => {
+        const onFieldSave = vi.fn().mockResolvedValue(undefined)
+        const intl = { ...event(), ticket_likely: true, ticket_likely_reason: 'international' as const }
+        render(<AdminEventDetailContent event={intl} onFieldSave={onFieldSave} />)
+
+        expect(screen.getByText('Ticket eligible')).toBeInTheDocument()
+        expect(screen.getByText('international')).toBeInTheDocument()
+
+        await userEvent.click(screen.getByRole('button', { name: 'No' }))
+        expect(onFieldSave).toHaveBeenCalledWith({ advance_ticket_override: false })
+    })
+
+    it('resets an admin pin back to auto', async () => {
+        const onFieldSave = vi.fn().mockResolvedValue(undefined)
+        const pinned = { ...event(), advance_ticket_override: true, ticket_likely: true, ticket_likely_reason: 'admin' as const }
+        render(<AdminEventDetailContent event={pinned} onFieldSave={onFieldSave} />)
+
+        await userEvent.click(screen.getAllByRole('button', { name: 'Auto' }).at(-1)!)
+        expect(onFieldSave).toHaveBeenCalledWith({ advance_ticket_override: null })
+    })
+})

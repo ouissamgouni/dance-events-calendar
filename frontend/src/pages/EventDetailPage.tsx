@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchEvent, updateEvent, fetchTagGroups } from '../api';
+import { EventMergedError, fetchEvent, updateEvent } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { trackView } from '../utils/tracking';
-import { getDeviceId } from '../utils/deviceId';
+import { eventDisplayZone } from '../utils/eventDates';
 import { useReferralAttribution } from '../hooks/useReferralAttribution';
 import AdminEventDetailContent from '../components/AdminEventDetailContent';
-import SuggestTagsButton from '../components/SuggestTagsButton';
 import EventImageEditor from '../components/EventImageEditor';
 import GoingButton from '../components/GoingButton';
 import SaveEventButton from '../components/SaveEventButton';
@@ -16,6 +15,10 @@ import EventSummary, { type EventDetailTab } from '../components/EventSummary';
 import EventDetailTabsBar from '../components/EventDetailTabsBar';
 import SummaryHeader from '../components/event-summary/SummaryHeader';
 import EventActionDock from '../components/EventActionDock';
+import EventMemoriesTab from '../components/EventMemoriesTab';
+import TicketAction from '../components/TicketAction';
+import TicketSheet from '../components/TicketSheet';
+import OwnSuggestionActions from '../components/suggest/OwnSuggestionActions';
 import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import AboutTab from '../components/event-tabs/AboutTab';
 import LocationTab from '../components/event-tabs/LocationTab';
@@ -23,7 +26,8 @@ import PeopleTab from '../components/event-tabs/PeopleTab';
 import ReviewsTab from '../components/event-tabs/ReviewsTab';
 import DiscussionTab from '../components/event-tabs/DiscussionTab';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import type { CalendarEvent, TagGroup } from '../types';
+import { useEventAssetSummary } from '../context/EventAssetSummaryContext';
+import type { CalendarEvent } from '../types';
 
 export default function EventDetailPage() {
     const { eventId } = useParams<{ eventId: string }>();
@@ -34,15 +38,13 @@ export default function EventDetailPage() {
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
     const { user, loading: authLoading } = useAuth();
-    const { eventScheduleEnabled, showRatings } = useFeatureFlags();
+    const { eventScheduleEnabled, showRatings, eventTicketsEnabled, eventMemoriesEnabled } = useFeatureFlags();
+    const [nowMs] = useState(() => Date.now());
+    const assetSummary = useEventAssetSummary(user && eventMemoriesEnabled && eventId ? eventId : null);
 
     // Edit mode — admin must explicitly activate inline editing
     const [editMode, setEditMode] = useState(false);
     const [adminEditorEventId, setAdminEditorEventId] = useState<string | null>(null);
-
-    // Suggest tags
-    const [showSuggestTags, setShowSuggestTags] = useState(false);
-    const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
 
     // Title inline editing
     const [editingTitle, setEditingTitle] = useState(false);
@@ -67,9 +69,10 @@ export default function EventDetailPage() {
     // to an in-tab anchor (e.g. `#series`/`#discounts`) once the tab renders.
     const initialTab = ((): EventDetailTab => {
         const t = searchParams.get('tab');
-        if (t === 'overview' || t === 'about' || t === 'location' || t === 'people' || t === 'reviews' || t === 'discussion') return t;
+        if (t === 'overview' || t === 'about' || t === 'location' || t === 'people' || t === 'reviews' || t === 'discussion' || t === 'memories') return t;
         if (location.hash === '#community') return 'reviews';
         if (location.hash === '#messages') return 'discussion';
+        if (location.hash === '#memories') return 'memories';
         return 'overview';
     })();
     const [activeTab, setActiveTab] = useState<EventDetailTab>(initialTab);
@@ -79,6 +82,9 @@ export default function EventDetailPage() {
         if (tab === 'program') {
             navigate(`/event/${eventId}/program`, { state: { fromEventDetail: true } });
             return;
+        }
+        if (location.hash === '#memories') {
+            navigate({ pathname: location.pathname, search: location.search }, { replace: true });
         }
         setActiveTab(tab);
         setPendingAnchor(opts?.anchor ?? null);
@@ -168,6 +174,25 @@ export default function EventDetailPage() {
         setActiveTab('discussion');
     }, [location.hash, event]);
 
+    // `/ticket` and `/memories` arrive from ticket/memories nudges; rewrite to the
+    // matching hash (opens the ticket sheet / Memories tab below).
+    const assetPathRef = useRef(/\/(ticket|memories)$/.exec(location.pathname)?.[1] ?? null);
+    useEffect(() => {
+        if (!assetPathRef.current || !event || authLoading) return;
+        if (!user) {
+            const returnTo = `${location.pathname}${location.search}${location.hash}`;
+            navigate(`/login?next=${encodeURIComponent(returnTo)}`, { replace: true });
+            return;
+        }
+        const anchor = assetPathRef.current;
+        assetPathRef.current = null;
+        navigate(
+            { pathname: `/event/${eventId}`, search: location.search, hash: `#${anchor}` },
+            { replace: true },
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [event, user, authLoading]);
+
     // Capture `?ref=share&src=` from the URL so any subsequent RSVP on
     // this event can be attributed back to the originating share_code.
     useReferralAttribution(eventId);
@@ -189,7 +214,15 @@ export default function EventDetailPage() {
                         : searchParams.get('src') ?? 'direct';
                 trackView(eventId, source);
             })
-            .catch(() => { if (!cancelled) setError(true); })
+            .catch((err) => {
+                if (cancelled) return;
+                if (err instanceof EventMergedError) {
+                    cancelled = true;
+                    navigate({ pathname: `/event/${err.mergedInto}`, search: location.search, hash: location.hash }, { replace: true });
+                    return;
+                }
+                setError(true);
+            })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [eventId]);
@@ -256,12 +289,22 @@ export default function EventDetailPage() {
     }
 
     const start = new Date(event.start);
+    const timeZone = eventDisplayZone(event);
     const formatDate = (d: Date) =>
-        d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone });
     const formatTime = (d: Date) =>
-        d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
     const end = new Date(event.end);
     const isPast = end.getTime() < Date.now();
+    const showMemoriesTab = Boolean(user) && eventMemoriesEnabled && start.getTime() <= nowMs;
+    const requestedTab: EventDetailTab = location.hash === '#memories' ? 'memories' : activeTab;
+    const tab: EventDetailTab = requestedTab === 'memories' && !showMemoriesTab ? 'overview' : requestedTab;
+    // `#ticket` (nudges, post-RSVP popover) opens the ticket sheet; closing drops the hash.
+    const showTicketSheet = Boolean(user) && eventTicketsEnabled && location.hash === '#ticket';
+    const closeTicketSheet = () => {
+        navigate({ pathname: location.pathname, search: location.search }, { replace: true });
+    };
+    const memoryCount = assetSummary?.memory_count ?? 0;
 
     const pageTitle = `${event.title} — ${formatDate(start)}`;
     const pageDescription = [
@@ -376,20 +419,43 @@ export default function EventDetailPage() {
                     ) : (
                         <>
                             <SummaryHeader event={event} variant="page" />
+                            {event.owner_preview ? (
+                                <div className="mt-3 rounded-card border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-ink">
+                                    Only you can see this event — it isn't shared in discovery, feeds or notifications.
+                                </div>
+                            ) : null}
+                            {user && event.event_id.startsWith('suggestion-') && (
+                                <OwnSuggestionActions eventId={event.event_id} />
+                            )}
+                            <div className="mt-3 hidden flex-wrap items-center gap-2 has-[button]:flex">
+                                <span className="contents lg:hidden">
+                                    <TicketAction event={event} variant="full" dismissible />
+                                </span>
+                                {showMemoriesTab && (
+                                    <button
+                                        type="button"
+                                        onClick={() => goToTab('memories')}
+                                        className="inline-flex items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-action hover:bg-canvas"
+                                    >
+                                        📸 Memories{memoryCount > 0 ? ` · ${memoryCount}` : ''}
+                                    </button>
+                                )}
+                            </div>
 
                             <div className="mt-4 lg:mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8">
                                 <div className="min-w-0">
                                     {/* Tabs stay pinned while the active section scrolls. */}
                                     <div className="sticky top-0 z-20 -mx-3 lg:mx-0">
                                         <EventDetailTabsBar
-                                            active={activeTab}
+                                            active={tab}
                                             onSelect={(t) => goToTab(t)}
                                             showProgram={eventScheduleEnabled && Boolean(event.schedule_published)}
+                                            showMemories={showMemoriesTab}
                                         />
                                     </div>
 
                                     <div className="mt-4 px-2 lg:mt-6">
-                                        {activeTab === 'overview' && (
+                                        {tab === 'overview' && (
                                             <EventSummary
                                                 event={event}
                                                 variant="page"
@@ -400,10 +466,11 @@ export default function EventDetailPage() {
                                                 omitHeader
                                             />
                                         )}
-                                        {activeTab === 'about' && <AboutTab event={event} />}
-                                        {activeTab === 'location' && <LocationTab event={event} />}
-                                        {activeTab === 'people' && <PeopleTab eventId={event.event_id} />}
-                                        {activeTab === 'reviews' && (
+                                        {tab === 'memories' && <EventMemoriesTab event={event} />}
+                                        {tab === 'about' && <AboutTab event={event} />}
+                                        {tab === 'location' && <LocationTab event={event} />}
+                                        {tab === 'people' && <PeopleTab eventId={event.event_id} />}
+                                        {tab === 'reviews' && (
                                             showRatings ? (
                                                 <div id="community">
                                                     <ReviewsTab
@@ -418,7 +485,7 @@ export default function EventDetailPage() {
                                                 <p className="text-sm text-ink-soft">Reviews are not available for this event.</p>
                                             )
                                         )}
-                                        {activeTab === 'discussion' && (
+                                        {tab === 'discussion' && (
                                             <div id="messages">
                                                 <DiscussionTab
                                                     eventId={event.event_id}
@@ -439,10 +506,10 @@ export default function EventDetailPage() {
                                         onRatingChanged={() => setReviewsRefreshToken((t) => t + 1)}
                                         eventHasReviews={reviewCount > 0}
                                         onPostMessage={() => { setAskComposeToken((t) => t + 1); goToTab('discussion'); }}
-                                        onSuggestEdit={() => {
-                                            if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
-                                            setShowSuggestTags(true);
-                                        }}
+                                        onSuggestEdit={event.owner_preview || event.is_owner ? undefined : () =>
+                                            navigate(`/event/${event.event_id}/suggest-change`, { state: { backgroundLocation: location } })
+                                        }
+                                        suggestEditLabel={user && event.organizer?.user_id === user.user_id ? 'Edit event' : undefined}
                                         onAdminEdit={user?.is_admin ? () => setAdminEditorEventId(event.event_id) : undefined}
                                     />
                                 </aside>
@@ -450,16 +517,8 @@ export default function EventDetailPage() {
                         </>
                     )}
 
-                    {/* Suggest tags modal */}
-                    {showSuggestTags && (
-                        <SuggestTagsButton
-                            eventId={event.event_id}
-                            tagGroups={tagGroups}
-                            existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
-                            deviceId={getDeviceId()}
-                            onClose={() => setShowSuggestTags(false)}
-                        />
-                    )}
+                    {showTicketSheet && <TicketSheet event={event} onClose={closeTicketSheet} />}
+
                     <AdminEventDetailPanel
                         eventId={adminEditorEventId}
                         onClose={() => setAdminEditorEventId(null)}

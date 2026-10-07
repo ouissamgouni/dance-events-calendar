@@ -6,7 +6,12 @@ import { helpCls, inputCls } from './formState';
 
 interface Props {
     value: string;
-    onSelect: (location: string, latitude: number | null, longitude: number | null) => void;
+    onSelect: (
+        location: string,
+        latitude: number | null,
+        longitude: number | null,
+        timezone: string | null,
+    ) => void;
     onClose: () => void;
 }
 
@@ -50,13 +55,13 @@ export default function LocationPage({ value, onSelect, onClose }: Props) {
     const visible = tooShort ? [] : results;
 
     const pick = (s: GeocodeSuggestion) => {
-        onSelect(s.display_name, s.latitude, s.longitude);
+        onSelect(s.display_name, s.latitude, s.longitude, s.timezone ?? null);
         onClose();
     };
 
     const useAsTyped = () => {
         // The address may be a venue we can't geocode; let it through unverified.
-        onSelect(query.trim(), null, null);
+        onSelect(query.trim(), null, null, null);
         onClose();
     };
 

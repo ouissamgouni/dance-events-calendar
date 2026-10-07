@@ -21,6 +21,7 @@ from sqlalchemy.orm import aliased
 
 from backend.api.deps import (
     get_current_user_optional,
+    is_admin_user,
     is_mutual_follow,
     require_user,
 )
@@ -39,7 +40,7 @@ from backend.db.models import (
     UserFollow,
     UserSavedEvent,
 )
-from backend.services.event_visibility import eligible_event_ids, event_is_user_facing
+from backend.services.event_visibility import eligible_event_ids, viewer_can_see_event
 from backend.services.user_avatars import resolve_user_avatar
 
 router = APIRouter(prefix="/api/events", tags=["attendance"])
@@ -49,9 +50,16 @@ _WEDGE_FRIENDS_LIMIT = 12
 _WEDGE_FOF_LIMIT = 5
 
 
-def _require_user_facing_event(session: Session, event_id: str) -> None:
+def _require_user_facing_event(
+    session: Session, event_id: str, viewer: Optional[User]
+) -> None:
     event = session.get(CachedEvent, event_id)
-    if event is None or not event_is_user_facing(session, event):
+    if event is None or not viewer_can_see_event(
+        session,
+        event,
+        viewer.id if viewer else None,
+        is_admin=is_admin_user(viewer),
+    ):
         raise HTTPException(status_code=404, detail="Event not found")
 
 
@@ -190,7 +198,7 @@ def get_attendance_summary(
     session: Session = Depends(get_session),
     viewer: Optional[User] = Depends(get_current_user_optional),
 ):
-    _require_user_facing_event(session, event_id)
+    _require_user_facing_event(session, event_id, viewer)
     return _summarize_for_event(session, event_id, viewer)
 
 
@@ -202,7 +210,9 @@ def get_attendance_summary_batch(
 ):
     """Batch variant used by the event list to populate avatar stacks in a
     single round-trip (avoids N+1 fetches on /attendance-summary)."""
-    visible_event_ids = eligible_event_ids(session, payload.event_ids)
+    visible_event_ids = eligible_event_ids(
+        session, payload.event_ids, viewer.id if viewer else None
+    )
     rows = session.exec(
         select(UserEventAttendance).where(
             UserEventAttendance.event_id.in_(visible_event_ids)
@@ -222,7 +232,11 @@ def get_attendance_summary_batch(
     candidate_user_ids: set[UUID] = {
         r.user_id
         for r in rows
-        if r.user_id is not None and (r.share_audience or "private") != "private"
+        if r.user_id is not None
+        and (
+            (r.share_audience or "private") != "private"
+            or (viewer is not None and r.user_id == viewer.id)
+        )
     }
     users_by_id: dict[UUID, User] = {}
     followed_ids: set[UUID] = set()
@@ -290,7 +304,7 @@ def get_event_attendees(
     """
     if viewer is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    _require_user_facing_event(session, event_id)
+    _require_user_facing_event(session, event_id, viewer)
 
     rows = session.exec(
         select(UserEventAttendance)
@@ -450,7 +464,7 @@ def get_going_wedge(
     Anonymous callers are rejected by ``require_user`` — anon viewers
     see only the aggregate ``going_count`` on the public event endpoint.
     """
-    _require_user_facing_event(session, event_id)
+    _require_user_facing_event(session, event_id, viewer)
     rows = session.exec(
         select(UserEventAttendance).where(
             UserEventAttendance.event_id == event_id,

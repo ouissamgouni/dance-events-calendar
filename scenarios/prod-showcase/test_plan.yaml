@@ -216,3 +216,16 @@ test_plan:
         All but Athens already show community reviews and attendees, and each
         links to its upcoming edition through the series.
       verification: "Submitted reviews appear on the event and roll up into the upcoming edition."
+
+    - id: 20
+      title: "Open tickets and memories"
+      description: |
+        As Elena, open My Events, then Back 2 Mambo 2026, Amsterdam World Dance
+        Congress, Transilvania Salsa Fest, and London Salsa Sessions. Then open
+        the previous Milan, Brussels, and Athens weekender editions. Finally
+        sign in as one of Elena's friends and open the same past weekenders.
+      expected: |
+        The four upcoming events show a Ticket chip and Elena's saved passes
+        (two for Back 2 Mambo). Each past weekender shows five of Elena's
+        photos in Memories. Her friends see the photos; strangers do not.
+      verification: "Ticket PDFs and images open in the viewer and memories respect friends visibility."

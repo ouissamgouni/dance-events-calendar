@@ -18,6 +18,8 @@ interface Props {
     compact?: boolean;
     /** Sticky footer content, typically a primary confirm button. */
     footer?: ReactNode;
+    /** ``modal`` centres the sheet as a dialog from the ``sm`` breakpoint up. */
+    desktop?: 'sheet' | 'modal';
     children: ReactNode;
 }
 
@@ -27,8 +29,9 @@ interface Props {
  * footer clear of the iOS home indicator. The body scrolls independently so the
  * sheet never grows past 85% of the viewport height.
  */
-export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, dismissible = true, compact = false, footer, children }: Props) {
+export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, dismissible = true, compact = false, footer, desktop = 'sheet', children }: Props) {
     const floating = variant === 'floating';
+    const modal = desktop === 'modal';
     const titleClass = titleSize === 'xl' ? 'text-2xl' : titleSize === 'large' ? 'text-lg' : 'text-base';
     useBackToClose(onClose, dismissible);
     useEffect(() => {
@@ -49,7 +52,7 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
 
     return (
         <div
-            className={`fixed inset-0 flex items-end justify-center bg-black/50 animate-fade-in ${floating ? 'px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]' : ''} ${layer === 'transient' ? 'z-[12000]' : 'z-[10000]'}`}
+            className={`fixed inset-0 flex items-end justify-center bg-black/50 animate-fade-in ${floating ? 'px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]' : ''} ${modal ? 'sm:items-center sm:p-4' : ''} ${layer === 'transient' ? 'z-[12000]' : 'z-[10000]'}`}
             onClick={dismissible ? onClose : undefined}
         >
             <div
@@ -57,7 +60,7 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
                 aria-modal="true"
                 aria-label={title}
                 onClick={(e) => e.stopPropagation()}
-                className={`flex max-h-[85dvh] w-full max-w-lg flex-col bg-surface shadow-2xl animate-slide-up ${floating ? 'overflow-hidden rounded-card' : 'sm:rounded-t-card'}`}
+                className={`flex max-h-[85dvh] w-full max-w-lg flex-col bg-surface shadow-2xl animate-slide-up ${floating ? 'overflow-hidden rounded-card' : modal ? 'sm:overflow-hidden sm:rounded-card' : 'sm:rounded-t-card'}`}
             >
                 {floating ? (
                     <div className="flex shrink-0 justify-center pt-2" aria-hidden>

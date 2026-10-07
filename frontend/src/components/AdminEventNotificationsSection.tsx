@@ -10,6 +10,8 @@ const KIND_LABELS: Record<string, string> = {
     subscription_review: 'Friend review',
     event_reminder: 'Reminder',
     event_review_prompt: 'Review prompt',
+    event_ticket_prompt: 'Ticket prompt',
+    event_memories_prompt: 'Memories prompt',
     event_message: 'Message',
     event_message_reply: 'Message reply',
     promo_code_added: 'Promo code',

@@ -70,10 +70,12 @@ def _suggestion(session, *, status="pending", **overrides) -> EventSuggestion:
 
 
 def _materialize(session, suggestion, **kwargs):
+    review_status = kwargs.pop("review_status", "reviewed")
     events = _upsert_occurrences_from_suggestion(
         session,
         suggestion,
-        review_status=kwargs.pop("review_status", "reviewed"),
+        review_status=review_status,
+        visibility="public" if review_status == "reviewed" else "private",
         calendar_id=CALENDAR_ID,
         latitude=None,
         longitude=None,
@@ -183,6 +185,64 @@ class TestMaterialization:
             rows = session.exec(select(CachedEvent)).all()
             assert len(rows) == 3
             assert not any(row.is_hidden for row in rows)
+
+    def test_shifting_the_schedule_moves_rows_instead_of_replacing_them(self, engine):
+        with Session(engine) as session:
+            suggestion = _suggestion(
+                session, recurrence_rule="RRULE:FREQ=WEEKLY;COUNT=3"
+            )
+            before = [e.event_id for e in _materialize(session, suggestion)]
+            suggestion.start = START + timedelta(hours=1)
+            suggestion.end = END + timedelta(hours=1)
+            after = _materialize(session, suggestion)
+
+            assert [e.event_id for e in after] == before
+            assert after[1].start == START + timedelta(days=7, hours=1)
+            assert len(session.exec(select(CachedEvent)).all()) == 3
+
+    def test_inserting_a_date_does_not_repoint_existing_ids(self, engine):
+        with Session(engine) as session:
+            suggestion = _suggestion(
+                session,
+                recurrence_dates=[
+                    {"start": "2026-03-02T20:00:00", "end": "2026-03-02T23:00:00"},
+                    {"start": "2026-03-16T20:00:00", "end": "2026-03-16T23:00:00"},
+                ],
+            )
+            first = _materialize(session, suggestion)
+            ids_by_start = {e.start: e.event_id for e in first}
+            suggestion.recurrence_dates = [
+                {"start": "2026-03-02T20:00:00", "end": "2026-03-02T23:00:00"},
+                {"start": "2026-03-09T20:00:00", "end": "2026-03-09T23:00:00"},
+                {"start": "2026-03-16T20:00:00", "end": "2026-03-16T23:00:00"},
+            ]
+            after = _materialize(session, suggestion)
+
+            assert len(after) == 3
+            for event in after:
+                if event.start in ids_by_start:
+                    assert event.event_id == ids_by_start[event.start]
+            assert len({e.event_id for e in after}) == 3
+
+    def test_freeze_before_leaves_past_rows_untouched(self, engine):
+        with Session(engine) as session:
+            suggestion = _suggestion(
+                session, recurrence_rule="RRULE:FREQ=WEEKLY;COUNT=4"
+            )
+            original = _materialize(session, suggestion)
+            cutoff = START + timedelta(days=10)
+            suggestion.title = "Renamed"
+            suggestion.recurrence_rule = "RRULE:FREQ=WEEKLY;COUNT=1"
+            _materialize(session, suggestion, freeze_before=cutoff)
+
+            rows = {
+                row.event_id: row for row in session.exec(select(CachedEvent)).all()
+            }
+            past = [rows[e.event_id] for e in original[:2]]
+            future = [rows[e.event_id] for e in original[2:]]
+            assert not any(row.is_hidden for row in past)
+            assert past[1].title == "Monday Social"
+            assert all(row.is_hidden for row in future)
 
 
 class TestSeriesLinking:

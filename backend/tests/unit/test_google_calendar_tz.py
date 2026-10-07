@@ -55,3 +55,39 @@ def test_get_events_returns_naive_utc_datetimes():
     # Sanity check: the +02:00 event got shifted into UTC.
     e2 = next(e for e in result.events if e.event_id == "evt-2")
     assert e2.start.hour == 17  # 19:00+02:00 → 17:00 UTC
+
+
+@pytest.mark.unit
+def test_get_events_keeps_event_zone_else_calendar_zone():
+    fake_service = MagicMock()
+    fake_service.events.return_value.list.return_value.execute.return_value = {
+        "timeZone": "Europe/Paris",
+        "items": [
+            {
+                "id": "own-zone",
+                "summary": "Lisbon Social",
+                "start": {
+                    "dateTime": "2026-04-20T20:00:00+01:00",
+                    "timeZone": "Europe/Lisbon",
+                },
+                "end": {
+                    "dateTime": "2026-04-20T23:00:00+01:00",
+                    "timeZone": "Europe/Lisbon",
+                },
+            },
+            {
+                "id": "calendar-zone",
+                "summary": "Paris Social",
+                "start": {"dateTime": "2026-04-21T19:00:00+02:00"},
+                "end": {"dateTime": "2026-04-21T22:30:00+02:00"},
+            },
+        ],
+        "nextSyncToken": "tok-next",
+    }
+
+    svc = GoogleCalendarService()
+    with patch.object(svc, "_get_service", return_value=fake_service):
+        result = svc.get_events("cal-1")
+
+    zones = {e.event_id: e.timezone for e in result.events}
+    assert zones == {"own-zone": "Europe/Lisbon", "calendar-zone": "Europe/Paris"}

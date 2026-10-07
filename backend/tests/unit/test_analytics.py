@@ -1,7 +1,7 @@
-"""Unit tests for analytics endpoints and geo capture logic."""
+"""Unit tests for analytics endpoints."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -21,7 +21,14 @@ def _fake_admin():
     return {"email": "admin@example.com", "name": "Admin"}
 
 
-app.dependency_overrides[require_admin] = _fake_admin
+@pytest.fixture(autouse=True)
+def _visible_events(monkeypatch):
+    # Per test, so other modules' auth gates don't see a leaked admin override.
+    monkeypatch.setitem(app.dependency_overrides, require_admin, _fake_admin)
+    # Mocked sessions return MagicMock events, which carry no real status.
+    monkeypatch.setattr(
+        "backend.api.routes.tracking.viewer_can_see_event", lambda *a, **k: True
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -137,47 +144,6 @@ class TestSourceBreakdown:
 
 
 # ---------------------------------------------------------------------------
-# top-countries
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestTopCountries:
-    def test_aggregates_by_country(self):
-        mock_session = MagicMock(spec=Session)
-        country_rows = [_row("France", 40), _row("Germany", 25), _row("Spain", 10)]
-
-        def mock_exec(stmt):
-            result = MagicMock()
-            result.all.return_value = country_rows
-            return result
-
-        mock_session.exec = mock_exec
-        app.dependency_overrides[get_session] = lambda: mock_session
-
-        client = TestClient(app)
-        resp = client.get("/api/admin/analytics/top-countries")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert len(data) == 3
-        assert data[0]["country"] == "France"
-        assert data[0]["view_count"] == 40
-
-        app.dependency_overrides.pop(get_session, None)
-
-    def test_respects_limit_param(self):
-        mock_session = MagicMock(spec=Session)
-        mock_session.exec = lambda _: MagicMock(all=lambda: [_row("France", 40)])
-        app.dependency_overrides[get_session] = lambda: mock_session
-
-        client = TestClient(app)
-        resp = client.get("/api/admin/analytics/top-countries?limit=1")
-        assert resp.status_code == 200
-
-        app.dependency_overrides.pop(get_session, None)
-
-
-# ---------------------------------------------------------------------------
 # top-links
 # ---------------------------------------------------------------------------
 
@@ -278,42 +244,6 @@ class TestAnalyticsExports:
 
 
 # ---------------------------------------------------------------------------
-# Geo BackgroundTask — track_event_view
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestGeoCapture:
-    def test_geo_stored_on_view(self):
-        """After track_event_view, the geo update helper is called with the view id."""
-        mock_session = MagicMock(spec=Session)
-        mock_view = MagicMock()
-        mock_view.id = 42
-        mock_session.add = MagicMock()
-        mock_session.commit = MagicMock()
-        mock_session.refresh = lambda obj: setattr(obj, "id", 42)
-
-        app.dependency_overrides[get_session] = lambda: mock_session
-
-        with patch(
-            "backend.api.routes.tracking._update_view_geo",
-            new=AsyncMock(),
-        ) as mock_geo:
-            client = TestClient(app)
-            resp = client.post(
-                "/api/track/event-view",
-                json={
-                    "event_id": "evt-1",
-                    "device_id": "device-abc",
-                    "source": "direct",
-                },
-            )
-        assert resp.status_code == 201
-
-        app.dependency_overrides.pop(get_session, None)
-
-
-# ---------------------------------------------------------------------------
 # most-attended-events
 # ---------------------------------------------------------------------------
 
@@ -408,79 +338,3 @@ class TestMostAttendedEvents:
         assert data[0]["going_count"] == 3
 
         app.dependency_overrides.pop(get_session, None)
-
-
-# ---------------------------------------------------------------------------
-# Geo BackgroundTask — track_event_view
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestGeoCapture:
-    def test_geo_stored_on_view(self):
-        """After track_event_view, the geo update helper is called with the view id."""
-        mock_session = MagicMock(spec=Session)
-        mock_view = MagicMock()
-        mock_view.id = 42
-        mock_session.add = MagicMock()
-        mock_session.commit = MagicMock()
-        mock_session.refresh = lambda obj: setattr(obj, "id", 42)
-
-        app.dependency_overrides[get_session] = lambda: mock_session
-
-        with patch(
-            "backend.api.routes.tracking._update_view_geo",
-            new=AsyncMock(),
-        ) as mock_geo:
-            client = TestClient(app)
-            resp = client.post(
-                "/api/track/event-view",
-                json={
-                    "event_id": "evt-1",
-                    "device_id": "device-abc",
-                    "source": "direct",
-                },
-            )
-        assert resp.status_code == 201
-
-        app.dependency_overrides.pop(get_session, None)
-
-    def test_geo_stored_on_link_click(self):
-        """After track_link_click, the geo update helper is called."""
-        mock_session = MagicMock(spec=Session)
-        mock_session.add = MagicMock()
-        mock_session.commit = MagicMock()
-        mock_session.refresh = lambda obj: setattr(obj, "id", 99)
-
-        app.dependency_overrides[get_session] = lambda: mock_session
-
-        with patch(
-            "backend.api.routes.tracking._update_click_geo",
-            new=AsyncMock(),
-        ) as mock_geo:
-            client = TestClient(app)
-            resp = client.post(
-                "/api/track/link-click",
-                json={
-                    "event_id": "evt-1",
-                    "url": "https://tickets.example.com",
-                    "device_id": "device-abc",
-                },
-            )
-        assert resp.status_code == 201
-
-        app.dependency_overrides.pop(get_session, None)
-
-    @pytest.mark.asyncio
-    async def test_private_ip_skips_geo(self):
-        """geolocate_ip returns None for private IPs — _update_view_geo does nothing."""
-        with patch(
-            "backend.api.routes.tracking.geolocate_ip", return_value=None
-        ) as mock_geolocate:
-            from backend.api.routes.tracking import _update_view_geo
-
-            mock_engine = MagicMock()
-            with patch("backend.api.routes.tracking.engine", mock_engine, create=True):
-                await _update_view_geo(1, "127.0.0.1")
-
-            mock_geolocate.assert_called_once_with("127.0.0.1")

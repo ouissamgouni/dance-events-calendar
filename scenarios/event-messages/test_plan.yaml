@@ -4,8 +4,9 @@ test_plan:
     Signed-in users post a message on an event (question / accommodation /
     ride / tickets / meetup / lost_found / other) with flat replies. A new
     top-level post notifies everyone engaged with the event (Going ∪ Saved)
-    plus the site admin, minus the author, on in-app + push immediately and
-    email via the event_messages digest/instant route. Replies notify that
+    plus the site admin, minus the author, in-app immediately and by push +
+    email a few seconds later (deliver job, NOTIFICATION_DEBOUNCE_SECONDS)
+    via the event_messages digest/instant route. Replies notify that
     thread's participants, so the original author is pinged when someone
     answers. Posting is an implicit interest signal: the author is
     auto-engaged (auto-saved) so they receive later activity on the event.
@@ -73,27 +74,30 @@ test_plan:
         only — no visible change to her saved list).
 
     - id: 3
-      title: "Immediate push + single instant email to opted-in recipients"
+      title: "Push + single instant email to opted-in recipients"
       description: >
-        Trigger a plain dispatch tick:
-        `SCENARIO=event-messages task notify:trigger:scenario`. Then trigger a
-        forced digest tick:
+        Wait ~5s after step 2's post (the deliver job runs
+        NOTIFICATION_DEBOUNCE_SECONDS after posting). Then trigger a plain
+        dispatch tick: `SCENARIO=event-messages task notify:trigger:scenario`,
+        and a forced digest tick:
         `SCENARIO=event-messages task notify:trigger:scenario -- --immediate-emails`.
       expected: >
-        Carol (email + push ON) gets a push AND exactly ONE instant email
-        (instant_emailed_at stamped, emailed_at stays NULL — the digest tick
-        does NOT send a second email for the same row). Dave (email + push OFF)
-        gets neither; his in-app row remains. Bob gets one instant email; Admin
-        per its own event_messages flags.
+        Carol (email + push ON) gets a push titled "Alice asked a question
+        about …" AND exactly ONE instant email, both from the deliver job
+        (admin log: Delivery "instant · job"; instant_emailed_at stamped,
+        emailed_at stays NULL — neither tick sends a second email or push).
+        Dave (email + push OFF) gets neither; his in-app row remains. Bob gets
+        one instant email; Admin per its own event_messages flags.
 
     - id: 4
       title: "Reply notifies the thread author on all channels"
       description: >
         Sign in as Carol, open Alice's question thread on ev-board, and reply.
-        Trigger a tick: `SCENARIO=event-messages task notify:trigger:scenario`.
+        Wait ~5s for the deliver job.
       expected: >
         Alice receives an `event_message_reply` row rendered "Carol replied to
-        a message on Friday Salsa Social", plus a push and ONE instant email.
+        a message on Friday Salsa Social", plus a push and ONE instant email
+        a few seconds later, without any tick.
         Carol (reply author) is not self-notified. Users not in that thread get
         no reply row.
 

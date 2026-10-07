@@ -32,7 +32,8 @@ import { trackInstallPromptViewed } from '../utils/tracking';
  * gets nudged again later, on top of always being able to enable push from
  * the persistent toggle in Account Settings.
  *
- * Only shown to signed-in users: `usePush()` rebinds an existing browser
+ * The install banner is offered to anonymous visitors too; only the push
+ * opt-in requires sign-in: `usePush()` rebinds an existing browser
  * subscription's owner on the server whenever the signed-in user changes,
  * but there is no such rebind target while anonymous, so there is no upside
  * to prompting before sign-in — it would just create a device subscription
@@ -81,7 +82,7 @@ export default function InstallPrompt() {
         canInstall,
         isStandalone,
         isIos,
-        isIosSafari,
+        isInAppBrowser,
         invitation,
         clearInstallInvitation,
         promptInstall,
@@ -225,7 +226,7 @@ export default function InstallPrompt() {
                     Done
                 </button>
             )}>
-                <IosInstallInstructions isSafari={isIosSafari} />
+                <IosInstallInstructions inAppBrowser={isInAppBrowser} />
             </BottomSheet>
         );
     }
@@ -256,9 +257,7 @@ export default function InstallPrompt() {
     // SNOOZE_DAYS. Only bypasses the snooze, not the other conditions below.
     const forceInstall = Boolean(user?.force_install_prompt);
 
-    // Only offered to signed-in users — anonymous visitors get prompted to
-    // sign in first elsewhere; installing before that just adds friction.
-    if (!user || (!canInstall && !isIos) || isStandalone || (snoozed && !forceInstall && !programInvitation)) return null;
+    if ((!canInstall && !isIos) || isStandalone || (snoozed && !forceInstall && !programInvitation)) return null;
 
     const installSurface = programContext ? 'program-toast' : 'toast';
 
@@ -407,15 +406,23 @@ export function InstallPromptCard({
     );
 }
 
-export function IosInstallInstructions({ isSafari }: { isSafari: boolean }) {
+export function IosInstallInstructions({ inAppBrowser }: { inAppBrowser: boolean }) {
     return (
         <div className="space-y-4 text-sm leading-6 text-ink">
-            {!isSafari ? <p className="rounded-field bg-blue-50 p-3 text-action">Open this page in Safari to install Movida on your Home Screen.</p> : null}
+            {inAppBrowser ? <InAppBrowserNotice /> : null}
             <ol className="space-y-4">
-                <li className="flex gap-3"><Share size={20} className="mt-0.5 shrink-0 text-action" /><span><strong>1. Tap Share</strong><br /><span className="text-ink-soft">Use the Share button in Safari’s toolbar.</span></span></li>
-                <li className="flex gap-3"><Download size={20} className="mt-0.5 shrink-0 text-action" /><span><strong>2. Add to Home Screen</strong><br /><span className="text-ink-soft">Scroll through the actions and choose Add to Home Screen.</span></span></li>
-                <li className="flex gap-3"><img src="/icons/icon-192.png" alt="" className="mt-0.5 h-5 w-5 shrink-0" /><span><strong>3. Tap Add</strong><br /><span className="text-ink-soft">Open Movida from your Home Screen, then turn on notifications.</span></span></li>
+                <li className="flex gap-3"><Share size={20} className="mt-0.5 shrink-0 text-action" /><span><strong>1. Open the Share menu</strong><br /><span className="text-ink-soft">In Safari, tap ••• then Share (or the Share icon at the bottom). In Chrome or Edge, tap the Share icon next to the address bar.</span></span></li>
+                <li className="flex gap-3"><Download size={20} className="mt-0.5 shrink-0 text-action" /><span><strong>2. Add to Home Screen</strong><br /><span className="text-ink-soft">Tap View More if you don’t see it, then choose Add to Home Screen.</span></span></li>
+                <li className="flex gap-3"><img src="/icons/icon-192.png" alt="" className="mt-0.5 h-5 w-5 shrink-0" /><span><strong>3. Keep “Open as Web App” on, then tap Add</strong><br /><span className="text-ink-soft">Open Movida from your Home Screen, then turn on notifications.</span></span></li>
             </ol>
         </div>
+    );
+}
+
+export function InAppBrowserNotice() {
+    return (
+        <p className="rounded-field border border-blue-100 bg-blue-50 p-3 text-action">
+            You’re in another app’s browser. Tap ••• (or ⋮) and choose <strong>Open in browser</strong> to install Movida.
+        </p>
     );
 }

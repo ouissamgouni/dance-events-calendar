@@ -1,10 +1,13 @@
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+    BadgeCheck,
     Bell,
     Bookmark,
     CalendarCheck,
     CalendarPlus,
+    CalendarX,
+    Camera,
     Clock,
     Flag,
     type LucideIcon,
@@ -13,6 +16,7 @@ import {
     SquarePen,
     Star,
     Tag,
+    Ticket,
     Trophy,
     UserPlus,
     Users,
@@ -48,6 +52,8 @@ const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: strin
     new_friend: { Icon: Users, cls: 'bg-emerald-100 text-emerald-600' },
     event_reminder: { Icon: Clock, cls: 'bg-rose-100 text-rose-600' },
     event_review_prompt: { Icon: Star, cls: 'bg-violet-100 text-violet-600' },
+    event_ticket_prompt: { Icon: Ticket, cls: 'bg-blue-100 text-action' },
+    event_memories_prompt: { Icon: Camera, cls: 'bg-violet-100 text-violet-600' },
     interest_event: { Icon: Sparkles, cls: 'bg-blue-100 text-action' },
     promo_code_added: { Icon: Tag, cls: 'bg-amber-100 text-amber-600' },
     promo_code_approved: { Icon: Tag, cls: 'bg-amber-100 text-amber-600' },
@@ -57,6 +63,18 @@ const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: strin
     event_message_reply: { Icon: MessageCircle, cls: 'bg-sky-100 text-sky-600' },
     event_message_reported: { Icon: Flag, cls: 'bg-sky-100 text-sky-600' },
     planned_session_changed: { Icon: Clock, cls: 'bg-amber-100 text-amber-700' },
+    event_changed: { Icon: Clock, cls: 'bg-amber-100 text-amber-700' },
+    suggestion_approved: { Icon: CalendarCheck, cls: 'bg-emerald-100 text-emerald-600' },
+    suggestion_declined: { Icon: Bell, cls: 'bg-slate-100 text-ink-soft' },
+    suggestion_rejected: { Icon: Bell, cls: 'bg-slate-100 text-ink-soft' },
+    suggestion_change_applied: { Icon: CalendarCheck, cls: 'bg-emerald-100 text-emerald-600' },
+    suggestion_change_discarded: { Icon: Bell, cls: 'bg-slate-100 text-ink-soft' },
+    event_change_applied: { Icon: CalendarCheck, cls: 'bg-emerald-100 text-emerald-600' },
+    event_change_declined: { Icon: Bell, cls: 'bg-slate-100 text-ink-soft' },
+    event_change_reverted: { Icon: Bell, cls: 'bg-slate-100 text-ink-soft' },
+    event_removed: { Icon: Bell, cls: 'bg-slate-100 text-ink-soft' },
+    event_cancelled: { Icon: CalendarX, cls: 'bg-danger/10 text-danger' },
+    organizer_assigned: { Icon: BadgeCheck, cls: 'bg-blue-100 text-action' },
     plan_session_added: { Icon: CalendarPlus, cls: 'bg-emerald-100 text-emerald-600' },
     schedule_program_available: { Icon: CalendarCheck, cls: 'bg-blue-100 text-action' },
     schedule_program_updated: { Icon: CalendarCheck, cls: 'bg-blue-100 text-action' },
@@ -459,7 +477,7 @@ export default function NotificationRow({
         body = (
             <>
                 <p className={specialTitle}>
-                    <span className="text-ink-soft">Your organizer claim {outcome}</span>
+                    <span className="text-ink-soft">Your organizer request {outcome}</span>
                 </p>
                 {item.description && <p className={descClass}>{item.description}</p>}
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
@@ -477,6 +495,22 @@ export default function NotificationRow({
                     ) : (
                         <span className="text-ink-soft">How was it? Rate your experience at</span>
                     )}{' '}
+                    <span className="font-medium text-ink">
+                        {item.event_title || 'an event'}
+                    </span>
+                </p>
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
+    } else if (item.kind === 'event_ticket_prompt' || item.kind === 'event_memories_prompt') {
+        body = (
+            <>
+                <p className={specialTitle}>
+                    <span className="text-ink-soft">
+                        {item.kind === 'event_ticket_prompt'
+                            ? 'Got your ticket? Keep it handy here for'
+                            : 'Relive the night — add memories from'}
+                    </span>{' '}
                     <span className="font-medium text-ink">
                         {item.event_title || 'an event'}
                     </span>
@@ -503,6 +537,45 @@ export default function NotificationRow({
                 <p className={specialTitle}>
                     <span className="font-medium text-ink">Program update</span>
                     {item.event_title && <span className="text-ink-soft"> · {item.event_title}</span>}
+                </p>
+                {item.description && <p className={descClass}>{item.description}</p>}
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
+    } else if (
+        item.kind === 'event_changed' ||
+        item.kind === 'suggestion_approved' ||
+        item.kind === 'suggestion_declined' ||
+        item.kind === 'suggestion_rejected' ||
+        item.kind === 'suggestion_change_applied' ||
+        item.kind === 'suggestion_change_discarded' ||
+        item.kind === 'event_change_applied' ||
+        item.kind === 'event_change_declined' ||
+        item.kind === 'event_change_reverted' ||
+        item.kind === 'event_removed' ||
+        item.kind === 'event_cancelled' ||
+        item.kind === 'organizer_assigned'
+    ) {
+        const title = item.context || item.event_title;
+        const headlines: Partial<Record<NotificationItem['kind'], string>> = {
+            event_changed: 'Event updated',
+            event_cancelled: 'Event cancelled',
+            organizer_assigned: item.event_id || item.context ? "You're the organizer" : "You're a verified organizer",
+            event_change_reverted: 'Your change was reverted',
+            event_removed: 'Event removed',
+            event_change_applied: 'Your suggestion was applied',
+            event_change_declined: 'Your suggestion was not applied',
+            suggestion_approved: 'Your event is public',
+            suggestion_declined: 'Your event stays private',
+            suggestion_rejected: 'Your event was removed',
+            suggestion_change_applied: 'Your edit is live',
+        };
+        const headline = headlines[item.kind] ?? 'Your edit was not accepted';
+        body = (
+            <>
+                <p className={specialTitle}>
+                    <span className={`font-medium ${item.kind === 'event_cancelled' ? 'text-danger' : 'text-ink'}`}>{headline}</span>
+                    {title && <span className="text-ink-soft"> · {title}</span>}
                 </p>
                 {item.description && <p className={descClass}>{item.description}</p>}
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>

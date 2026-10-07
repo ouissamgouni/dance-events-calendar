@@ -1,0 +1,93 @@
+# Events for "myevent-memories". P1-P3 are inside the 30-day memory window,
+# P4/P5 are past it, U1 is upcoming (no memories section).
+base_week: 0
+events:
+  - id: evt-mem-p1
+    calendar_id: memories-cal-001
+    title: Paris Friday Salsa (3 memories, shared)
+    description: Memories with mixed visibility.
+    location: Studio Harmonic, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-1 Fri 21:00
+    end: w-1 Sat 01:00
+    price_is_free: true
+    tags: [dance-style:salsa, format:social, level:all-levels, venue:indoor, reach:local]
+
+  - id: evt-mem-p2
+    calendar_id: memories-cal-001
+    title: Lyon Bachata Night (5 memories, at limit)
+    description: Memory limit reached.
+    location: Salle Rameau, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-2 Sat 20:00
+    end: w-2 Sun 00:00
+    price_is_free: true
+    tags: [dance-style:bachata, format:social, level:all-levels, venue:indoor, reach:local]
+
+  - id: evt-mem-p3
+    calendar_id: memories-cal-001
+    title: Brussels Kizomba Night (no memories yet)
+    description: Upload memories here to test the real flow.
+    location: La Tricoterie, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    start: w-1 Sat 21:00
+    end: w-1 Sun 02:00
+    price_is_free: true
+    tags: [dance-style:kizomba, format:social, level:all-levels, venue:indoor, reach:local]
+
+  - id: evt-mem-p4
+    calendar_id: memories-cal-001
+    title: Lille Salsa Night (window closed, none)
+    description: Memory window has closed.
+    location: Le Grand Sud, Lille, France
+    latitude: 50.6292
+    longitude: 3.0573
+    city: Lille
+    country: France
+    country_code: FR
+    start: w-6 Fri 21:00
+    end: w-6 Sat 01:00
+    price_is_free: true
+    tags: [dance-style:salsa, format:social, level:all-levels, venue:indoor, reach:local]
+
+  - id: evt-mem-p5
+    calendar_id: memories-cal-001
+    title: Nantes Salsa Night (window closed, GPS photo)
+    description: Memory kept after the window; GPS stripped.
+    location: Stereolux, Nantes, France
+    latitude: 47.2184
+    longitude: -1.5536
+    city: Nantes
+    country: France
+    country_code: FR
+    start: w-6 Sat 21:00
+    end: w-6 Sun 01:00
+    price_is_free: true
+    tags: [dance-style:salsa, format:social, level:all-levels, venue:indoor, reach:local]
+
+  - id: evt-mem-u1
+    calendar_id: memories-cal-001
+    title: Marseille Rueda Social (upcoming)
+    description: Upcoming — no memories section yet.
+    location: Le Molotov, Marseille, France
+    latitude: 43.2965
+    longitude: 5.3698
+    city: Marseille
+    country: France
+    country_code: FR
+    start: w1 Fri 21:00
+    end: w1 Sat 01:00
+    price_is_free: true
+    tags: [dance-style:rueda, format:social, level:all-levels, venue:indoor, reach:local]

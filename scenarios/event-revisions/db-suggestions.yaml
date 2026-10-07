@@ -1,0 +1,17 @@
+# Seeded through the real submit/approve helpers, so occurrence ids are
+# suggestion-{id} for the first date and suggestion-{id}-{n} after it.
+base_week: 0
+suggestions:
+  - id: 5e0d0000-0000-4000-8000-0000000000a1
+    submitter_email: dev-user@example.com
+    status: approved
+    calendar_id: movida-salsa
+    title: Kizomba Thursday
+    description: Weekly kizomba social.
+    location: Tresor Garden, Köpenicker Str. 70, 10179 Berlin
+    latitude: 52.5103
+    longitude: 13.4197
+    start: w1 Thu 21:00
+    end: w1 Thu 23:59
+    recurrence_rule: RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TH;COUNT=6
+    tags: ["dance-style:kizomba", "reach:local"]

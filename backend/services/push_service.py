@@ -17,8 +17,11 @@ Resilience:
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import logging
+import re
 from uuid import UUID
 
 from sqlmodel import Session, delete, select
@@ -29,6 +32,20 @@ from backend.db.database import get_engine
 from backend.db.models import PushSubscription
 
 logger = logging.getLogger(__name__)
+
+# RFC 8030 Topic: at most 32 chars from the URL-safe base64 alphabet.
+_TOPIC_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
+
+
+class PushTransientError(Exception):
+    """Nothing was delivered and at least one endpoint failed transiently."""
+
+
+def _topic_header(topic: str) -> str:
+    if _TOPIC_RE.match(topic):
+        return topic
+    digest = hashlib.sha256(topic.encode()).digest()
+    return base64.urlsafe_b64encode(digest).decode().rstrip("=")[:32]
 
 
 def webpush_configured() -> bool:
@@ -45,8 +62,16 @@ def send_push(
     body: str,
     url: str = "/",
     tag: str | None = None,
+    topic: str | None = None,
+    raise_on_transient: bool = False,
 ) -> int:
-    """Push to every browser registered by ``user_id``. Returns delivery count."""
+    """Push to every browser registered by ``user_id``. Returns delivery count.
+
+    ``topic`` lets the push service replace a still-undelivered message with
+    the same topic. With ``raise_on_transient`` a run that delivered nothing
+    but hit a retryable failure (429/5xx/network) raises
+    :class:`PushTransientError` so the caller can retry later.
+    """
     if not webpush_configured():
         return 0
     try:
@@ -57,7 +82,9 @@ def send_push(
 
     cfg = get_vapid_config()
     payload = json.dumps({"title": title, "body": body, "url": url, "tag": tag})
+    headers = {"Topic": _topic_header(topic)} if topic else None
     delivered = 0
+    transient = 0
     stale: list[int] = []
 
     with Session(get_engine()) as session:
@@ -76,6 +103,7 @@ def send_push(
                     vapid_claims={"sub": cfg["subject"]},
                     timeout=10,
                     ttl=86400,
+                    headers=headers,
                 )
                 delivered += 1
             except WebPushException as exc:
@@ -83,9 +111,12 @@ def send_push(
                 if status in (404, 410):
                     stale.append(sub.id)  # endpoint gone — prune below
                 else:
+                    if status is None or status == 429 or status >= 500:
+                        transient += 1
                     logger.warning("Push failed (status=%s): %s", status, exc)
                     logger.exception("FULL PUSH ERROR")
             except Exception as exc:  # noqa: BLE001 — never let push break a worker
+                transient += 1
                 logger.warning("Push error: %s", exc)
 
         if stale:
@@ -96,4 +127,6 @@ def send_push(
             )
             session.commit()
     logger.info("Push delivered count: %s", delivered)
+    if raise_on_transient and delivered == 0 and transient:
+        raise PushTransientError(f"{transient} endpoint(s) failed transiently")
     return delivered

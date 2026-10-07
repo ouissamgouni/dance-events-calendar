@@ -89,6 +89,8 @@ describe('AppAccessGate', () => {
     it.each([
         '/login',
         '/privacy',
+        '/terms',
+        '/legal',
         '/invite',
         '/install',
         '/r/invite-code',

@@ -21,11 +21,12 @@
  *                 back to the request origin when unset.
  *   OG_FALLBACK_IMAGE — full URL to the branded 1200×630 fallback image
  *                       used when an event has no specific image. Defaults
- *                       to `${PUBLIC_BASE}/og-fallback.png`, which is
- *                       seeded from the app logo (`frontend/public/og-fallback.png`)
- *                       — swap that file for a dedicated 1200×630 social
- *                       card without touching this code.
+ *                       to `${PUBLIC_BASE}/og-card.jpg` (`frontend/public/og-card.jpg`,
+ *                       a compressed copy of og-fallback.png — chat apps skip
+ *                       preview images much over ~300 KB).
  */
+
+import { htmlEscape, isBot, type OgEnv as Env } from '../_lib/og';
 
 interface OgMeta {
     event_id: string;
@@ -39,56 +40,10 @@ interface OgMeta {
     price_is_free: boolean;
     price_min: number | null;
     price_currency: string | null;
+    image_url?: string | null;
 }
 
-interface Env {
-    API_BASE?: string;
-    PUBLIC_BASE?: string;
-    OG_FALLBACK_IMAGE?: string;
-}
-
-// Substring-matching is sufficient — Pages Functions run on every request
-// so the cost of a regex is non-trivial vs. a handful of `includes`.
-const BOT_UA_FRAGMENTS = [
-    'facebookexternalhit',
-    'facebot',
-    'twitterbot',
-    'linkedinbot',
-    'slackbot',
-    'slack-imgproxy',
-    'whatsapp',
-    'telegrambot',
-    'discordbot',
-    'pinterest',
-    'redditbot',
-    'embedly',
-    'quora link preview',
-    'showyoubot',
-    'outbrain',
-    'vkshare',
-    'w3c_validator',
-    'bingbot',
-    'googlebot',
-    'applebot',
-    'duckduckbot',
-];
-
-function isBot(userAgent: string | null): boolean {
-    if (!userAgent) return false;
-    const ua = userAgent.toLowerCase();
-    return BOT_UA_FRAGMENTS.some((frag) => ua.includes(frag));
-}
-
-function htmlEscape(str: string): string {
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-function renderHtml(meta: OgMeta, canonicalUrl: string, ogImage: string): string {
+function renderHtml(meta: OgMeta, canonicalUrl: string, ogImage: string, isFallbackImage: boolean): string {
     const title = htmlEscape(meta.title);
     const description = meta.description
         ? htmlEscape(meta.description)
@@ -140,8 +95,7 @@ function renderHtml(meta: OgMeta, canonicalUrl: string, ogImage: string): string
 <meta property="og:description" content="${description}">
 <meta property="og:url" content="${safeUrl}">
 <meta property="og:image" content="${safeImage}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
+${isFallbackImage ? '<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">' : ''}
 <meta property="og:site_name" content="Movida">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${title}">
@@ -181,8 +135,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const url = new URL(request.url);
     const publicBase = env.PUBLIC_BASE ?? `${url.protocol}//${url.host}`;
     const canonicalUrl = `${publicBase}/event/${encodeURIComponent(eventId)}`;
-    const ogImage =
-        env.OG_FALLBACK_IMAGE ?? `${publicBase}/og-fallback.png`;
+    const fallbackImage =
+        env.OG_FALLBACK_IMAGE ?? `${publicBase}/og-card.jpg`;
 
     let meta: OgMeta | null = null;
     try {
@@ -220,7 +174,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         };
     }
 
-    const html = renderHtml(meta, canonicalUrl, ogImage);
+    // Crawlers need an absolute https URL; anything else falls back to the brand card.
+    const eventImage = meta.image_url?.startsWith('https://') ? meta.image_url : null;
+    const html = renderHtml(meta, canonicalUrl, eventImage ?? fallbackImage, !eventImage);
     return new Response(html, {
         status: 200,
         headers: {

@@ -1,0 +1,5 @@
+attendances:
+  - event_id: suggestion-5e0d0000-0000-4000-8000-0000000000a1-1
+    email: sam@example.com
+    share_publicly: true
+    share_audience: public

@@ -1,8 +1,9 @@
 # Turn INSTANT email mode ON for the event_messages feature, on top of the
 # default digest mode, so this scenario exercises the immediate (no-schedule)
-# email path. With instant ON, a plain dispatch tick emails a new post/reply
-# right away (stamps instant_emailed_at); the digest step is skipped for that
-# notification (instant wins — exactly one email per row).
+# email path. With instant ON, the deliver job (a few seconds after a post or
+# reply) sends the rich instant email + push and stamps instant_emailed_at; the
+# digest step is skipped for that notification (instant wins — exactly one
+# email per row).
 #
 # Reviews are enabled (show_ratings) so the series roll-up on ev-series-upcoming
 # and the Community Experience block on ev-past render from first boot.

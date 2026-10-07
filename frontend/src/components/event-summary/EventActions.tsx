@@ -5,7 +5,11 @@ import GoingButton from '../GoingButton';
 import SaveEventButton from '../SaveEventButton';
 import ShareButton from '../ShareButton';
 import RateEventButton from '../RateEventButton';
+import TicketSheet from '../TicketSheet';
 import { useFeatureFlags } from '../../context/FeatureFlagsContext';
+import { useTicketAction } from '../../hooks/useTicketAction';
+import useOrganizerClaimAction from '../../hooks/useOrganizerClaimAction';
+import { reportMailto } from '../../utils/report';
 
 interface Props {
     event: CalendarEvent;
@@ -44,6 +48,9 @@ export default function EventActions({
     onAdminEdit,
 }: Props) {
     const { showRatings } = useFeatureFlags();
+    const ticket = useTicketAction(event);
+    const organizerClaim = useOrganizerClaimAction(event);
+    const [ticketOpen, setTicketOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -57,16 +64,19 @@ export default function EventActions({
     }, [menuOpen]);
 
     const reviewInline = showRatings && canReviewInline;
+    const cancelled = Boolean(event.is_cancelled);
+    const menuItem = 'block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface';
 
     return (
         <div className="flex w-full min-w-0 flex-nowrap items-center gap-1">
-            <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
-            <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
+            <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" disabled={cancelled} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
+            <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} ticketLikely={event.ticket_likely} cancelled={cancelled} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
             {!isPast && (
                 <ShareButton
                     eventId={event.event_id}
                     title={event.title}
                     url={shareUrl}
+                    disabled={cancelled}
                     labelClassName="hidden min-[375px]:inline"
                     className="flex h-10 shrink-0 items-center gap-2 rounded-field border border-line bg-surface px-2 text-sm text-ink transition hover:bg-canvas"
                 />
@@ -119,15 +129,27 @@ export default function EventActions({
                                 eventId={event.event_id}
                                 title={event.title}
                                 url={shareUrl}
+                                disabled={cancelled}
                                 onAction={() => setMenuOpen(false)}
-                                className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
+                                className={menuItem}
                             />
+                        )}
+                        {ticket && !ticket.inline && (
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => { setMenuOpen(false); setTicketOpen(true); }}
+                                className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
+                            >
+                                {ticket.label}
+                            </button>
                         )}
                         <button
                             type="button"
                             role="menuitem"
+                            disabled={cancelled}
                             onClick={() => { setMenuOpen(false); onPostMessage(); }}
-                            className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
+                            className={menuItem}
                         >
                             Post a message
                         </button>
@@ -135,10 +157,21 @@ export default function EventActions({
                             <button
                                 type="button"
                                 role="menuitem"
+                                disabled={cancelled}
                                 onClick={() => { setMenuOpen(false); onSuggestEdit(); }}
-                                className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
+                                className={menuItem}
                             >
                                 Suggest an edit
+                            </button>
+                        )}
+                        {organizerClaim.available && (
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => { setMenuOpen(false); organizerClaim.start(); }}
+                                className="block w-full px-3 py-2 text-left text-xs text-ink transition hover:bg-canvas"
+                            >
+                                I organize this event
                             </button>
                         )}
                         {onAdminEdit && (
@@ -151,9 +184,19 @@ export default function EventActions({
                                 Admin Edit
                             </button>
                         )}
+                        <a
+                            role="menuitem"
+                            href={reportMailto('event', `${window.location.origin}/event/${event.event_id}`, event.title)}
+                            onClick={() => setMenuOpen(false)}
+                            className="block w-full px-3 py-2 text-left text-xs text-ink-soft transition hover:bg-canvas"
+                        >
+                            Report or request removal
+                        </a>
                     </div>
                 )}
             </div>
+            {ticketOpen && <TicketSheet event={event} onClose={() => setTicketOpen(false)} />}
+            {organizerClaim.sheet}
         </div>
     );
 }

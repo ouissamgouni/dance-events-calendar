@@ -244,6 +244,32 @@ def put_private(key: str, data: bytes, content_type: str, client=None) -> None:
     )
 
 
+def presigned_private_url(
+    key: str,
+    expires_in: int,
+    content_type: Optional[str] = None,
+    content_disposition: Optional[str] = None,
+    client=None,
+) -> str:
+    """Short-lived signed GET for a private object (browser-readable, no cookie)."""
+    client = client or get_client()
+    params = {"Bucket": get_private_bucket(), "Key": key}
+    if content_type:
+        params["ResponseContentType"] = content_type
+    if content_disposition:
+        params["ResponseContentDisposition"] = content_disposition
+    url = client.generate_presigned_url(
+        "get_object", Params=params, ExpiresIn=expires_in
+    )
+    # Lets a same-origin proxy serve private objects when the endpoint is unreachable from the browser.
+    browser_base = os.getenv("OBJECT_STORAGE_PRIVATE_BASE_URL", "").strip().rstrip("/")
+    if browser_base:
+        prefix = f"{client.meta.endpoint_url.rstrip('/')}/{get_private_bucket()}"
+        if url.startswith(prefix):
+            url = browser_base + url[len(prefix) :]
+    return url
+
+
 def delete_prefix(prefix: str, bucket: str, client=None) -> int:
     """Delete every object under ``prefix``. Returns the number removed."""
     client = client or get_client()

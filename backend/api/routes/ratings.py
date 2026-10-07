@@ -21,7 +21,6 @@ from uuid import UUID, uuid4
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     HTTPException,
     Query,
@@ -33,7 +32,6 @@ from sqlalchemy import func
 from sqlmodel import Session, col, select
 
 from backend.api.deps import (
-    get_client_ip,
     get_current_user_optional,
     require_admin,
     require_user,
@@ -88,8 +86,7 @@ from backend.services.event_visibility import (
     eligible_event_ids,
     event_is_user_facing,
 )
-from backend.services.ip_geolocation import geolocate_ip
-from backend.services import activity_instant
+from backend.services import push_jobs
 from backend.services.notifications import fan_out_review, withdraw_review_notifications
 from backend.services.passport import attended_events
 from backend.services.profanity import contains_profanity
@@ -552,24 +549,6 @@ def _to_rating_response(
     )
 
 
-# ── Background tasks ────────────────────────────────────────────────
-
-
-async def _geolocate_rating(rating_id: UUID, ip: str) -> None:
-    from backend.db.database import get_engine
-
-    geo = await geolocate_ip(ip)
-    if not geo:
-        return
-    engine = get_engine()
-    with Session(engine) as session:
-        rating = session.get(EventRating, rating_id)
-        if rating:
-            rating.submitter_country = (geo.get("country") or "")[:8] or None
-            session.add(rating)
-            session.commit()
-
-
 # ── Anti-abuse helpers ──────────────────────────────────────────────
 
 
@@ -615,7 +594,6 @@ def submit_feedback(
     event_id: str,
     body: FeedbackSubmissionCreate,
     request: Request,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
@@ -677,8 +655,6 @@ def submit_feedback(
         )
     ).first()
     now = datetime.now(timezone.utc)
-    client_ip = get_client_ip(request)
-    user_agent = (request.headers.get("user-agent") or "")[:512] or None
 
     if existing:
         existing.stars = stars
@@ -692,8 +668,6 @@ def submit_feedback(
         existing.admin_notes = admin_notes
         existing.reviewed_at = None
         existing.reviewed_by = None
-        existing.submitter_ip = client_ip
-        existing.submitter_user_agent = user_agent
         existing.updated_at = now
         session.add(existing)
         rating = existing
@@ -710,8 +684,6 @@ def submit_feedback(
             feedback_submission_id=feedback_submission_id,
             status="approved",
             admin_notes=admin_notes,
-            submitter_ip=client_ip,
-            submitter_user_agent=user_agent,
             created_at=now,
             updated_at=now,
         )
@@ -738,7 +710,6 @@ def submit_feedback(
             tag_id=ts.tag_id,
             free_text=ts.free_text,
             group_slug=ts.group_slug,
-            submitter_ip=client_ip,
             feedback_submission_id=feedback_submission_id,
         )
         session.add(ts_row)
@@ -756,20 +727,12 @@ def submit_feedback(
         try:
             fan_out_review(session, user, event_id)
             session.commit()
-            # Deliver the friend-review emails now when that feature is in
-            # instant mode (otherwise the digest tick picks them up).
-            activity_instant.dispatch_activity_instant(
-                session,
-                kind="subscription_review",
-                actor=user,
-                event_id=event_id,
-            )
         except Exception:  # noqa: BLE001 — notification is best-effort
             session.rollback()
             logger.warning("Review fan-out failed", exc_info=True)
-
-    if client_ip:
-        background_tasks.add_task(_geolocate_rating, rating.id, client_ip)
+    # Review-count milestones can unlock on a new review.
+    if existing is None:
+        push_jobs.enqueue_milestone_check(user.id)
 
     return FeedbackSubmissionResponse(
         feedback_submission_id=feedback_submission_id,
@@ -1324,9 +1287,6 @@ def _to_admin_rating(
         linked_tag_suggestion_ids=linked_ids,
         status=rating.status,
         admin_notes=rating.admin_notes,
-        submitter_ip=rating.submitter_ip,
-        submitter_user_agent=rating.submitter_user_agent,
-        submitter_country=rating.submitter_country,
         auto_flagged=auto_flagged,
         reviewed_at=rating.reviewed_at,
         reviewed_by=rating.reviewed_by,

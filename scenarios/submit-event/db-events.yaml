@@ -126,3 +126,17 @@ events:
   - vibe:good-music
   - vibe:social-atmosphere
   - reach:international
+# Unreviewed synced event: public only while Admin → "Show unreviewed calendar
+# events" is ON — unlike user submissions, which stay private until approved.
+- id: mock-sug-unreviewed
+  calendar_id: salsa-cal-001
+  review_status: pending
+  title: Unreviewed Salsa Brunch – Berlin
+  location: Tanzhaus Berlin, Friedrichstraße 112, Berlin, Germany
+  latitude: 52.5244
+  longitude: 13.3884
+  start: w1 Sun 12:00
+  end: w1 Sun 15:00
+  tags:
+  - dance-style:salsa
+  - reach:local

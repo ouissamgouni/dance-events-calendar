@@ -1,156 +1,103 @@
 test_plan:
-  name: "Event Hide & Block — Admin Visibility Controls"
+  name: "Event status — unpublish, remove and restore"
   description: >
-    Verify the admin hide/block feature: hiding events from public view,
-    permanently blocking events (with sync guard), restoring blocked events, and
-    confirming that hidden/blocked events are excluded from all public endpoints
-    while remaining visible to admins. Uses 4 pre-seeded events: 2 visible, 1
-    already hidden, 1 already blocked.
+    Verify the admin status actions in the event side panel footer:
+    Unpublish / Republish, Remove… (with notify) and Restore, the status chip
+    and row colours in the Events grid, and that unpublished and removed
+    events are absent from every public endpoint while staying visible to
+    admins. Uses 4 pre-seeded events: 2 published, 1 unpublished, 1 removed
+    by an admin.
+
+  preconditions:
+    - "Run the scenario with: `SCENARIO=event-hide-block task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Signed in as admin (Dev Mock)."
+
   steps:
-    # ── Admin list: initial badge state ────────────────────────
+    # ── Admin list: initial state ──────────────────────────────
     - id: 1
-      title: "Hidden badge shown in admin event list"
+      title: "Status column shows each event's status"
       description: >
-        Open /admin/events. Find "Salsa On2 Workshop (hidden)" in the table.
-        Check the status cell.
+        Open Admin → Events, clear the filters and look at the four seeded
+        events.
       expected: >
-        An amber "Hidden" badge appears alongside the review-status badge in the
-        status column for "Salsa On2 Workshop (hidden)".
+        "Friday Salsa Social" and "Bachata Sensual Night" read Published on a
+        white row. "Salsa On2 Workshop (unpublished)" reads Unpublished on its
+        unpublished row colour. "Kizomba Urban Night (removed)" reads Removed
+        on its removed row colour. The Status filter pills count 2 / 1 / 1.
 
     - id: 2
-      title: "Blocked badge shown in admin event list"
-      description: >
-        In the admin event list, find "Kizomba Urban Night (blocked)". Check the
-        status cell.
+      title: "The side panel header shows the status and why it was removed"
+      description: "Open Kizomba Urban Night (removed)."
       expected: >
-        A slate "Blocked" badge appears in the status column. No "Hidden" badge
-        is shown alongside it (blocked supersedes hidden).
+        The header shows a Removed chip and a "Removed by admin" chip. The
+        footer offers only Restore.
 
+    # ── Public API excludes unpublished / removed ──────────────
     - id: 3
-      title: "Visible events have no hide/block badge"
-      description: >
-        Check the status cells for "Friday Salsa Social" and "Bachata Sensual
-        Night".
+      title: "Unpublished and removed events are not public"
+      description: "Open the home page signed out."
       expected: >
-        Only the review-status badge ("reviewed") is shown. No Hidden or Blocked
-        badge appears.
+        Friday Salsa Social and Bachata Sensual Night are listed; Salsa On2
+        Workshop and Kizomba Urban Night are not.
 
-    # ── Public API excludes hidden / blocked ───────────────────
     - id: 4
-      title: "Hidden events absent from public event list"
-      description: >
-        Open the home page (public Explorer view, not admin).
-      expected: >
-        "Salsa On2 Workshop (hidden)" does not appear in the event list.
-        "Kizomba Urban Night (blocked)" does not appear in the event list.
-        "Friday Salsa Social" and "Bachata Sensual Night" are visible.
+      title: "An unpublished event's page is not found"
+      description: "Open /event/evt-hide-003 signed out."
+      expected: 'The page shows "Event not found".'
 
+    # ── Unpublish / Republish ──────────────────────────────────
     - id: 5
-      title: "Hidden event detail page returns 404"
-      description: >
-        Navigate directly to /event/evt-hide-003 while not logged in as admin.
+      title: "Unpublish a published event"
+      description: "As Admin open Friday Salsa Social and click Unpublish in the footer."
       expected: >
-        The page shows a "not found" or 404 error — the event is not served to
-        public users.
+        The header chip turns Unpublished and the panel takes the unpublished
+        colour. The footer now offers Republish and Remove…. The event is gone
+        from the public home page but still listed in Admin → Events.
 
-    # ── Hide action ─────────────────────────────────────────────
     - id: 6
-      title: "Hide a visible event from admin detail panel"
-      description: >
-        In /admin/events, click on "Friday Salsa Social" to open the admin
-        detail panel. In the footer, click "Hide".
+      title: "Republish an unpublished event"
+      description: "Open Salsa On2 Workshop (unpublished) and click Republish."
       expected: >
-        The event immediately shows an amber "Hidden" badge in the panel header.
-        The footer changes to show "Unhide" and "Permanently Remove" buttons.
-        The "Hide" button is no longer visible.
+        The chip turns Published; the footer offers Unpublish, Cancel event…
+        and Remove…. The workshop appears on the public home page.
 
+    # ── Remove ─────────────────────────────────────────────────
     - id: 7
-      title: "Hidden event disappears from public list after hiding"
-      description: >
-        After hiding "Friday Salsa Social" in step 6, navigate to the public
-        home page and look for the event.
+      title: "Remove… asks for confirmation inline"
+      description: "Open Bachata Sensual Night and click Remove…."
       expected: >
-        "Friday Salsa Social" no longer appears in the public event list.
+        The footer is replaced by "Remove for everyone? It will not come back
+        on the next sync.", a "Notify attendees" checkbox (checked), Back and
+        "Yes, remove". No browser dialog appears.
 
     - id: 8
-      title: "Admin list still shows hidden event with badge"
-      description: >
-        Return to /admin/events and check for "Friday Salsa Social".
-      expected: >
-        "Friday Salsa Social" is still listed in the admin table. An amber
-        "Hidden" badge is now visible in its status cell.
+      title: "Back keeps the event"
+      description: "Click Back."
+      expected: "The normal footer returns and the event is still Published."
 
-    # ── Unhide action ───────────────────────────────────────────
     - id: 9
-      title: "Unhide a hidden event from admin detail panel"
-      description: >
-        In /admin/events, click on "Salsa On2 Workshop (hidden)" to open the
-        admin detail panel. In the footer, click "Unhide".
+      title: "Yes, remove removes it for everyone"
+      description: "Click Remove… again, then Yes, remove."
       expected: >
-        The amber "Hidden" badge disappears from the panel header. The footer
-        reverts to showing "Hide" and "Permanently Remove" buttons.
+        The chips read Removed and "Removed by admin"; the footer offers only
+        Restore. Bachata Sensual Night is gone from the public home page.
 
+    # ── Restore ────────────────────────────────────────────────
     - id: 10
-      title: "Unhidden event reappears on public list"
-      description: >
-        Navigate to the public home page after unhiding "Salsa On2 Workshop".
-      expected: >
-        "Salsa On2 Workshop" is now visible in the public event list.
+      title: "Restore asks for confirmation"
+      description: "Open Kizomba Urban Night (removed) and click Restore."
+      expected: '"Restore this event?" with Back and "Yes, restore"; no notify checkbox.'
 
-    # ── Permanently Remove (block) ──────────────────────────────
     - id: 11
-      title: "Permanently Remove button triggers inline confirmation"
-      description: >
-        Open "Bachata Sensual Night" in the admin detail panel. Click
-        "Permanently Remove" in the footer.
+      title: "Restore brings the event back"
+      description: "Click Yes, restore."
       expected: >
-        An inline confirmation row replaces the button: "Permanently remove?"
-        with "Yes, remove" and "Cancel" options. No browser confirm dialog
-        appears.
+        The event is listed again: Kizomba Urban Night appears on the public
+        home page, and a later sync does not remove it again.
 
     - id: 12
-      title: "Cancel aborts the Permanently Remove action"
-      description: >
-        With the confirmation row visible, click "Cancel".
+      title: "An unpublished event can be removed too"
+      description: "Open Friday Salsa Social (unpublished in step 5) → Remove… → Yes, remove."
       expected: >
-        The confirmation row disappears and the original "Hide" and "Permanently
-        Remove" buttons are restored. The event is unchanged.
-
-    - id: 13
-      title: "Confirm Permanently Remove blocks the event"
-      description: >
-        Click "Permanently Remove" again, then click "Yes, remove".
-      expected: >
-        The panel header shows a slate "Blocked" badge. The footer now shows
-        only a "Restore" button. "Bachata Sensual Night" disappears from the
-        public event list.
-
-    # ── Restore action ──────────────────────────────────────────
-    - id: 14
-      title: "Restore triggers inline confirmation"
-      description: >
-        Open "Kizomba Urban Night (blocked)" in the admin detail panel. Click
-        "Restore" in the footer.
-      expected: >
-        An inline confirmation row appears: "Restore this event?" with "Yes,
-        restore" and "Cancel" options.
-
-    - id: 15
-      title: "Confirm Restore removes blocked state"
-      description: >
-        Click "Yes, restore" in the confirmation row.
-      expected: >
-        The slate "Blocked" badge disappears from the panel header. The footer
-        reverts to "Hide" and "Permanently Remove" buttons. "Kizomba Urban
-        Night" reappears in the public event list.
-
-    # ── Permanently Remove from hidden state ───────────────────
-    - id: 16
-      title: "Can permanently remove an already-hidden event"
-      description: >
-        Hide "Friday Salsa Social" (if not already hidden from step 6). With the
-        panel showing "Unhide" and "Permanently Remove", click "Permanently
-        Remove" and confirm.
-      expected: >
-        The panel switches to showing a "Blocked" badge and a "Restore" button.
-        "Friday Salsa Social" remains absent from the public list.
+        The chips read Removed and "Removed by admin"; the footer offers only
+        Restore. The event stays absent from the public list.

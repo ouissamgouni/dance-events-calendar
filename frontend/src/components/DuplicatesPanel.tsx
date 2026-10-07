@@ -10,6 +10,7 @@ import {
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import type { DuplicateGroup, DuplicateScanLogEntry } from '../types';
 import DuplicateGroupCard from './DuplicateGroupCard';
+import MergeEventsDialog from './MergeEventsDialog';
 
 interface Props {
     isOpen: boolean;
@@ -29,6 +30,7 @@ export default function DuplicatesPanel({ isOpen, onClose, onOpenEvent }: Props)
     const [acting, setActing] = useState<number | null>(null);
     const [scanning, setScanning] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [mergeGroup, setMergeGroup] = useState<DuplicateGroup | null>(null);
 
     const load = () => {
         setLoading(true);
@@ -188,6 +190,7 @@ export default function DuplicatesPanel({ isOpen, onClose, onOpenEvent }: Props)
                                         onKeep={(eventId) => keep(g.id, eventId)}
                                         onDismiss={() => dismiss(g.id)}
                                         onOpenEvent={onOpenEvent}
+                                        onMerge={() => setMergeGroup(g)}
                                     />
                                 </li>
                             ))}
@@ -195,6 +198,17 @@ export default function DuplicatesPanel({ isOpen, onClose, onOpenEvent }: Props)
                     )}
                 </div>
             </div>
+            {mergeGroup && (
+                <MergeEventsDialog
+                    eventIds={mergeGroup.events.map((e) => e.event_id)}
+                    onClose={() => setMergeGroup(null)}
+                    onMerged={() => {
+                        setMergeGroup(null);
+                        load();
+                        notifyAdminDataChanged();
+                    }}
+                />
+            )}
         </div>
     );
 }

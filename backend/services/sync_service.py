@@ -29,6 +29,8 @@ def compute_content_hash(title: str, start: datetime, location: str | None) -> s
 
 
 from backend.services.calendar.base import BaseCalendarService
+from backend.services import event_revisions
+from backend.services.event_visibility import REASON_GOOGLE_CALENDAR
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.event_extractor import (
     apply_calendar_description,
@@ -441,6 +443,7 @@ class SyncService:
                 title_or_start_changed = (
                     existing.title != event.title or existing.start != event.start
                 )
+                live_before = event_revisions.snapshot(existing)
                 extractor_changed = apply_calendar_description(
                     existing, event.description, is_new=False
                 )
@@ -457,10 +460,19 @@ class SyncService:
                 existing.start = event.start
                 existing.end = event.end
                 existing.all_day = event.all_day
+                # Venue coordinates outrank the source's zone (see services/timezones.py).
+                if event.timezone and (
+                    existing.latitude is None or existing.timezone is None
+                ):
+                    existing.timezone = event.timezone
                 existing.content_hash = content_hash
                 existing.updated_at = datetime.now(timezone.utc)
                 existing.deleted_at = None  # un-delete if re-appeared
-                if fields_changed:
+                was_reviewed = existing.review_status == "reviewed"
+                # Published: keep what attendees see until an admin applies
+                # the source's edit.
+                event_revisions.stage_source_changes(session, existing, live_before)
+                if not was_reviewed and fields_changed:
                     existing.review_status = "pending"
                 if (
                     (event.location and existing.latitude is None)
@@ -516,11 +528,13 @@ class SyncService:
                         start=event.start,
                         end=event.end,
                         all_day=event.all_day,
+                        timezone=event.timezone,
                         content_hash=content_hash,
                     )
                     apply_calendar_description(
                         new_event, event.description, is_new=True
                     )
+                    new_event.source_values = event_revisions.snapshot(new_event)
                     session.add(new_event)
                     sync_event_reach(session, new_event, default_tag_ids)
                     for tag_id in default_tag_ids:
@@ -535,8 +549,12 @@ class SyncService:
         for event_id in result.deleted_event_ids:
             existing = session.get(CachedEvent, event_id)
             if existing and existing.deleted_at is None:
-                existing.deleted_at = datetime.now(timezone.utc)
-                session.add(existing)
+                event_revisions.propose_removal(
+                    session,
+                    existing,
+                    REASON_GOOGLE_CALENDAR,
+                    source=event_revisions.SOURCE_SYNC,
+                )
                 deleted += 1
 
         if result.next_sync_token:

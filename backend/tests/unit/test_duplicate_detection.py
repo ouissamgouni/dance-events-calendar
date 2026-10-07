@@ -106,7 +106,35 @@ class TestFindCandidateMatches:
     def test_ignores_events_outside_window(self, session):
         start = datetime.now(timezone.utc) + timedelta(days=3)
         a = _make_event(session, "evt-a", "Salsa Night", start)
-        _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=48))
+        _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=72))
+        matches = find_candidate_matches(session, a)
+        assert matches == []
+
+    def test_a_day_off_needs_a_near_identical_title(self, session):
+        start = datetime.now(timezone.utc) + timedelta(days=3)
+        a = _make_event(session, "evt-a", "Salsa Night at the Warehouse", start)
+        _make_event(
+            session,
+            "evt-same",
+            "Salsa Night at the Warehouse",
+            start + timedelta(hours=48),
+        )
+        _make_event(
+            session,
+            "evt-similar",
+            "Salsa Night at Warehouse 9",
+            start - timedelta(hours=48),
+        )
+        matches = find_candidate_matches(session, a)
+        assert {m.event_id for m in matches} == {"evt-same"}
+
+    def test_ignores_private_events(self, session):
+        start = datetime.now(timezone.utc) + timedelta(days=3)
+        a = _make_event(session, "evt-a", "Salsa Night", start)
+        b = _make_event(session, "evt-b", "Salsa Night", start + timedelta(hours=1))
+        b.visibility = "private"
+        session.add(b)
+        session.commit()
         matches = find_candidate_matches(session, a)
         assert matches == []
 

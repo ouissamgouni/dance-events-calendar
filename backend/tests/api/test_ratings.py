@@ -1314,15 +1314,3 @@ def test_public_tag_list_scope_audience_returns_audience_group(
 def test_public_tag_list_scope_invalid_rejected(client):
     resp = client.get("/api/tags?scope=bogus")
     assert resp.status_code == 422
-
-
-@pytest.mark.unit
-def test_tag_suggestion_rejects_aspect_scope_tag(client, event, aspect_group):
-    """A reviewer-vocabulary tag must not be suggestable as an event tag."""
-    _, pos, _ = aspect_group
-    resp = client.post(
-        "/api/tags/suggestions",
-        json={"event_id": event.event_id, "tag_id": pos.id, "device_id": "dev-1"},
-    )
-    assert resp.status_code == 400
-    assert "cannot be suggested" in resp.json()["detail"].lower()

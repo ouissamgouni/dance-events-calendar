@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
 import { usePwaInstall } from '../context/PwaInstallContext';
-import { useAuth } from '../context/AuthContext';
 import BottomSheet from '../components/BottomSheet';
-import { InstallPromptCard, IosInstallInstructions } from '../components/InstallPrompt';
+import { InAppBrowserNotice, InstallPromptCard, IosInstallInstructions } from '../components/InstallPrompt';
 
 /**
  * Dedicated, linkable "Install Movida" page — the destination for the
@@ -13,13 +11,12 @@ import { InstallPromptCard, IosInstallInstructions } from '../components/Install
  * Renders the exact same {@link InstallPromptCard} used by the bottom-of-
  * screen toast (same copy, same `usePwaInstall().promptInstall()` call,
  * same Umami tracking), just embedded in normal page flow instead of a
- * fixed banner. Falls back to a friendly explanation when the card can't
- * be shown here (not signed in, already installed, or the browser has no
- * `beforeinstallprompt` support, e.g. iOS Safari).
+ * fixed banner. Falls back to manual instructions when the card can't
+ * be shown here (already installed, in-app browser, or no
+ * `beforeinstallprompt` support).
  */
 export default function InstallPage() {
-    const { canInstall, isStandalone, isIos, isIosSafari, promptInstall } = usePwaInstall();
-    const { user, loading } = useAuth();
+    const { canInstall, isStandalone, isIos, isInAppBrowser, promptInstall } = usePwaInstall();
     const [showIosHelp, setShowIosHelp] = useState(false);
 
     const install = () => {
@@ -40,20 +37,12 @@ export default function InstallPage() {
                     </p>
                 </div>
 
-                {loading ? null : isStandalone ? (
+                {isStandalone ? (
                     <div className="w-full border border-line bg-canvas px-6 py-5 text-sm text-ink">
                         You already have Movida installed on this device 🎉
                     </div>
-                ) : !user ? (
-                    <div className="w-full border border-blue-100 bg-blue-50 px-6 py-5 text-sm text-action">
-                        <p className="mb-3">Sign in first to install Movida.</p>
-                        <Link
-                            to="/login?next=/install"
-                            className="inline-block bg-action text-white hover:bg-action px-4 py-2 text-sm font-medium transition"
-                        >
-                            Sign in
-                        </Link>
-                    </div>
+                ) : isInAppBrowser && !isIos ? (
+                    <InAppBrowserNotice />
                 ) : canInstall || isIos ? (
                     <div className="w-full flex justify-center">
                         <InstallPromptCard
@@ -65,8 +54,8 @@ export default function InstallPage() {
                 ) : (
                     <div className="w-full border border-line bg-canvas px-6 py-5 text-sm text-ink text-left space-y-2">
                         <p>Your browser can't install Movida directly here — but you can still add it manually:</p>
-                        <p><strong>iPhone/iPad:</strong> In Safari, tap Share, then "Add to Home Screen".</p>
-                        <p><strong>Android:</strong> In Chrome, tap the ⋮ menu, then "Install app" (or "Add to Home screen").</p>
+                        <p><strong>iPhone/iPad:</strong> In Safari, Chrome or Edge, open the Share menu (in Safari: ••• then Share), then "Add to Home Screen".</p>
+                        <p><strong>Android:</strong> In Chrome, tap the ⋮ menu, then "Add to Home screen" and "Install".</p>
                         <p>Once added, open Movida from your Home Screen and allow notifications so you don't miss reminders.</p>
                     </div>
                 )}
@@ -77,7 +66,7 @@ export default function InstallPage() {
                         Done
                     </button>
                 )}>
-                    <IosInstallInstructions isSafari={isIosSafari} />
+                    <IosInstallInstructions inAppBrowser={isInAppBrowser} />
                 </BottomSheet>
             ) : null}
         </>

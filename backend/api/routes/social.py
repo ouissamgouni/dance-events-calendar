@@ -33,6 +33,7 @@ from backend.api.deps import (
     get_current_user_optional,
     is_mutual_follow,
     require_admin,
+    require_flag,
     require_user,
 )
 from backend.api.event_serializer import serialize_events
@@ -62,6 +63,7 @@ from backend.api.schemas import (
     FollowingMostActiveResponse,
     FriendsLeaderboardEntry,
     FriendsLeaderboardResponse,
+    HostingResponse,
     InterestSummaryItem,
     InterestSummaryResponse,
     MutualSubscriberPreview,
@@ -98,7 +100,9 @@ from backend.db.models import (
     CalendarSubscription,
     EventPromoCode,
     EventRating,
+    EventRevision,
     EventSuggestion,
+    EventUserAsset,
     OrganizerClaim,
     PushSubscription,
     ShareToken,
@@ -134,22 +138,6 @@ logger = logging.getLogger(__name__)
 
 
 # --- Helpers ----------------------------------------------------------------
-
-
-def _dispatch_social_instant(session, *, kind: str, recipient_ids) -> None:
-    """Best-effort instant email for an event-less social_activity kind.
-
-    No-op unless the ``social_activity`` email mode is *instant*; otherwise
-    the activity-digest tick delivers these. Never raises into the caller.
-    """
-    from backend.services import activity_instant
-
-    try:
-        activity_instant.dispatch_activity_instant(
-            session, kind=kind, recipient_ids=recipient_ids
-        )
-    except Exception:  # noqa: BLE001 — best-effort, never breaks the action
-        logger.warning("Instant social email failed (%s)", kind, exc_info=True)
 
 
 def _friend_requests_enabled() -> bool:
@@ -852,9 +840,6 @@ def follow_user(
             sub, _ = ensure_calendar_subscription(session, viewer.id, target.id)
             notify_follow_request(session, target=target, requester=viewer)
             session.commit()
-            _dispatch_social_instant(
-                session, kind="follow_request", recipient_ids={target.id}
-            )
             return FollowActionResponse(
                 handle=target.handle or "",
                 is_following=False,
@@ -906,13 +891,6 @@ def follow_user(
             needs_commit = True
         if needs_commit:
             session.commit()
-    # Deliver instant social emails now (no-op unless social_activity email is
-    # in instant mode); the digest tick handles them otherwise.
-    _dispatch_social_instant(session, kind="new_follower", recipient_ids={target.id})
-    if is_friend and is_new_follow:
-        _dispatch_social_instant(
-            session, kind="new_friend", recipient_ids={target.id, viewer.id}
-        )
     sub_after = _get_subscription(session, viewer.id, target.id)
     return FollowActionResponse(
         handle=target.handle or "",
@@ -1127,14 +1105,6 @@ def approve_follow_request(
         session, target_id=viewer.id, requester_id=requester.id
     )
     session.commit()
-    # Instant social emails (no-op unless social_activity email is instant).
-    _dispatch_social_instant(
-        session, kind="follow_request_approved", recipient_ids={requester.id}
-    )
-    if is_friend:
-        _dispatch_social_instant(
-            session, kind="new_friend", recipient_ids={viewer.id, requester.id}
-        )
     return FollowActionResponse(
         handle=requester.handle or "",
         is_following=True,
@@ -1965,6 +1935,80 @@ def list_user_going(
         limit=limit,
         offset=offset,
         curated_event_ids=curated_ids,
+    )
+
+
+def _organized_event_ids(session: Session, user_id: UUID) -> list[str]:
+    return list(
+        session.exec(
+            select(CachedEvent.event_id).where(CachedEvent.organizer_user_id == user_id)
+        ).all()
+    )
+
+
+@router.get(
+    "/users/{handle}/hosting",
+    response_model=ProfileEventListResponse,
+    dependencies=[Depends(require_flag("organizer_claims_enabled"))],
+)
+@limiter.limit("60/minute")
+def list_user_hosting(
+    request: Request,
+    handle: str,
+    include_past: bool = Query(default=False),
+    limit: int = Query(
+        default=_PROFILE_TAB_LIMIT_DEFAULT, ge=1, le=_PROFILE_TAB_LIMIT_MAX
+    ),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    viewer: User | None = Depends(get_current_user_optional),
+):
+    """Events attributed to this organizer for the /u/{handle} Hosting tab."""
+    target = _resolve_handle(session, handle)
+    if not can_view(session, viewer, target):
+        raise HTTPException(status_code=404, detail="Not found")
+    page, total = _hydrate_profile_events(
+        session,
+        _organized_event_ids(session, target.id),
+        include_past=include_past,
+        limit=limit,
+        offset=offset,
+    )
+    return ProfileEventListResponse(
+        items=serialize_events(session, page), total=total, limit=limit, offset=offset
+    )
+
+
+@router.get(
+    "/me/hosting",
+    response_model=HostingResponse,
+    dependencies=[Depends(require_flag("organizer_claims_enabled"))],
+)
+def list_my_hosting(
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    """The organizer's own events, newest first, for the Hosting hub."""
+    page, _total = _hydrate_profile_events(
+        session,
+        _organized_event_ids(session, user.id),
+        include_past=True,
+        limit=200,
+        offset=0,
+    )
+    pending = (
+        session.exec(
+            select(EventRevision.event_id)
+            .where(col(EventRevision.event_id).in_([e.event_id for e in page]))
+            .where(EventRevision.source == "organizer")
+            .where(EventRevision.status == "pending")
+        ).all()
+        if page
+        else []
+    )
+    return HostingResponse(
+        items=serialize_events(session, page),
+        pending_change_event_ids=sorted({eid for eid in pending if eid}),
     )
 
 
@@ -3403,6 +3447,15 @@ def _merge_managed_user_account(
         summary,
         "organizer_claims_moved",
     )
+    _move_simple_user_fk(
+        session,
+        EventUserAsset,
+        "user_id",
+        source_user_id,
+        destination_user_id,
+        summary,
+        "event_assets_moved",
+    )
 
     destination.is_admin_managed = True
     destination.managed_label = destination.managed_label or source.managed_label
@@ -4447,8 +4500,6 @@ def onboarding_complete(
     handles = list(dict.fromkeys(handles))  # de-dup, preserve order
 
     followed: list[str] = []
-    followed_ids: set[int] = set()
-    friended_ids: set[int] = set()
     if handles:
         already = _already_followed_ids(session, viewer.id)
         # Resolve all in one query.
@@ -4469,7 +4520,6 @@ def onboarding_complete(
                 # Best-effort — never block onboarding on notification
                 # delivery (e.g. transient email/queue errors).
                 pass
-            followed_ids.add(target.id)
             # Detect mutual completion (the inviter may already follow
             # the new user back via an earlier referral redemption).
             if is_mutual_follow(session, viewer.id, target.id):
@@ -4478,7 +4528,6 @@ def onboarding_complete(
                     notify_new_friend(session, viewer, target)
                 except Exception:
                     pass
-                friended_ids.add(target.id)
             followed.append(target.handle or "")
 
     viewer.onboarded_at = datetime.now(timezone.utc)
@@ -4486,16 +4535,6 @@ def onboarding_complete(
     session.add(viewer)
     session.commit()
     session.refresh(viewer)
-
-    # Instant social emails for the batch-follows (no-op unless instant mode).
-    if followed_ids:
-        _dispatch_social_instant(
-            session, kind="new_follower", recipient_ids=followed_ids
-        )
-    if friended_ids:
-        _dispatch_social_instant(
-            session, kind="new_friend", recipient_ids=friended_ids | {viewer.id}
-        )
 
     return CompleteOnboardingResponse(
         onboarded_at=viewer.onboarded_at.isoformat(),

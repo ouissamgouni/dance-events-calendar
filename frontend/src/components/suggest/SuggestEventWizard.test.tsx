@@ -1,12 +1,21 @@
-import { describe, expect, it } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import SuggestEventWizard from './SuggestEventWizard'
 import { renderWithProviders } from '../../test/render'
 import { server } from '../../test/server'
 import { makeUser } from '../../test/handlers'
 
-function setupTagGroups() {
+vi.mock('../EventModal', () => ({
+    default: ({ event, onClose }: { event: { title: string }; onClose: () => void }) => (
+        <div role="dialog" aria-label="Event preview">
+            {event.title}
+            <button type="button" onClick={onClose}>Close preview</button>
+        </div>
+    ),
+}))
+
+function setupTagGroups(settings: Record<string, unknown> = {}) {
     server.use(
         http.get('*/api/tags', () =>
             HttpResponse.json([
@@ -124,6 +133,7 @@ function setupTagGroups() {
                 reminder_lead_hours: 24,
                 activity_digest_schedule: 'tue,fri @ 09:00',
                 interest_match_max_events_per_email: 10,
+                ...settings,
             }),
         ),
     )
@@ -134,16 +144,18 @@ function setupSignedInUser() {
 }
 
 /** Fills Step 1 and advances to Step 2. Location comes before the dates. */
-async function completeStep1(user: ReturnType<typeof renderWithProviders>['user']) {
+async function completeStep1(user: ReturnType<typeof renderWithProviders>['user'], day = '2026-07-01') {
     await user.type(screen.getByLabelText('Event name'), 'Salsa Social')
 
     await user.click(screen.getByRole('button', { name: /^Location/ }))
     await user.type(screen.getByLabelText('Search for a place or address'), 'Berlin')
     await user.click(await screen.findByText('Berlin Center'))
 
-    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2026-07-01T20:00' } })
-    fireEvent.change(screen.getByLabelText('End'), { target: { value: '2026-07-01T23:00' } })
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: `${day}T20:00` } })
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: `${day}T23:00` } })
     await user.click(screen.getByRole('button', { name: 'Next' }))
+    // Step 1 checks for look-alike events before moving on.
+    await screen.findByText(/Step 2 of 3|Is it one of these/)
 }
 
 /** Picks the required tags on Step 2 and advances to Step 3. */
@@ -154,6 +166,144 @@ async function completeStep2(user: ReturnType<typeof renderWithProviders>['user'
 }
 
 describe('SuggestEventWizard', () => {
+    // Adding an event requires an account.
+    beforeEach(() => setupSignedInUser())
+
+    it('asks anonymous visitors to sign in first', async () => {
+        server.use(http.get('*/api/auth/me', () => HttpResponse.json(null, { status: 401 })))
+        const onClose = vi.fn()
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={onClose} />)
+
+        expect(await screen.findByRole('dialog', { name: 'Sign in to add an event' })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?next=%2Fsuggest')
+        await user.click(screen.getByRole('button', { name: 'Not now' }))
+        expect(onClose).toHaveBeenCalled()
+    })
+
+    describe('suggesting a change', () => {
+        const liveEvent = (overrides: Record<string, unknown> = {}) => ({
+            event_id: 'ev-1',
+            calendar_id: 'src',
+            title: 'Salsa Friday',
+            description: 'Weekly social',
+            location: 'Studio A',
+            latitude: 52.5,
+            longitude: 13.4,
+            start: '2099-07-03T18:00:00Z',
+            end: '2099-07-03T21:00:00Z',
+            all_day: false,
+            timezone: 'Europe/Berlin',
+            color: null,
+            view_count: 0,
+            price_min: null,
+            price_max: null,
+            price_currency: null,
+            price_is_free: null,
+            links: [],
+            tags: [],
+            ...overrides,
+        })
+
+        it('sends only the fields the user changed', async () => {
+            setupTagGroups()
+            let payload: Record<string, unknown> | null = null
+            server.use(
+                http.get('*/api/events/ev-1', () => HttpResponse.json(liveEvent())),
+                http.post('*/api/events/ev-1/changes', async ({ request }) => {
+                    payload = (await request.json()) as Record<string, unknown>
+                    return HttpResponse.json({ id: 1, event_id: 'ev-1', source: 'user', status: 'pending', changes: {}, created_at: '', decided_at: null }, { status: 201 })
+                }),
+            )
+            const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} changeEventId="ev-1" />)
+
+            const title = await screen.findByLabelText('Event name')
+            expect(title).toHaveValue('Salsa Friday')
+            expect(screen.getByRole('heading', { name: 'Suggest a change' })).toBeInTheDocument()
+            expect(screen.queryByRole('button', { name: /^Repeat/ })).not.toBeInTheDocument()
+            await user.clear(title)
+            await user.type(title, 'Salsa Friday Social')
+            await user.click(screen.getByRole('button', { name: 'Next' }))
+            await user.click(await screen.findByRole('button', { name: 'Next' }))
+            expect(screen.queryByRole('switch', { name: 'Share publicly' })).not.toBeInTheDocument()
+            await user.click(screen.getByRole('button', { name: 'Send suggestion' }))
+
+            expect(await screen.findByText('Suggestion sent')).toBeInTheDocument()
+            expect(payload).toEqual({ title: 'Salsa Friday Social' })
+        })
+
+        it('sends the organizer edit for review', async () => {
+            setupTagGroups()
+            server.use(
+                http.get('*/api/events/ev-1', () =>
+                    HttpResponse.json(liveEvent({ organizer: { user_id: 'user-1', handle: 'dev', display_name: 'Dev', avatar_url: null, is_verified_organizer: true } })),
+                ),
+                http.post('*/api/events/ev-1/changes', () =>
+                    HttpResponse.json({ id: 1, event_id: 'ev-1', source: 'organizer', status: 'pending', changes: {}, created_at: '', decided_at: null }, { status: 201 }),
+                ),
+            )
+            const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} changeEventId="ev-1" />)
+
+            const title = await screen.findByLabelText('Event name')
+            expect(screen.getByRole('heading', { name: 'Edit event' })).toBeInTheDocument()
+            await user.type(title, '!')
+            await user.click(screen.getByRole('button', { name: 'Next' }))
+            await user.click(await screen.findByRole('button', { name: 'Next' }))
+            await user.click(screen.getByRole('button', { name: 'Submit for review' }))
+
+            expect(await screen.findByText('Changes sent for review')).toBeInTheDocument()
+        })
+    })
+
+    it('Discard closes the wizard, not just the confirmation', async () => {
+        setupTagGroups()
+        const onClose = vi.fn()
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={onClose} />)
+        await user.type(screen.getByLabelText('Event name'), 'Salsa Social')
+
+        await user.click(screen.getByRole('button', { name: 'Close' }))
+        await user.click(await screen.findByRole('button', { name: 'Discard' }))
+
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+        expect(screen.queryByText('Discard this event?')).not.toBeInTheDocument()
+    })
+
+    it('offers matching events before adding a duplicate', async () => {
+        setupTagGroups()
+        server.use(
+            http.get('*/api/suggestions/similar', () =>
+                HttpResponse.json([
+                    {
+                        event_id: 'evt-existing',
+                        title: 'Salsa Social Berlin',
+                        start: '2026-07-01T18:00:00Z',
+                        end: '2026-07-01T21:00:00Z',
+                        all_day: false,
+                        location: 'Club Havana',
+                    },
+                ]),
+            ),
+            http.get('*/api/events/evt-existing', () =>
+                HttpResponse.json({ event_id: 'evt-existing', title: 'Salsa Social Berlin' }),
+            ),
+        )
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+        await completeStep1(user)
+
+        expect(await screen.findByText('Is it one of these?')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: /Salsa Social Berlin/ }))
+        const preview = await screen.findByRole('dialog', { name: 'Event preview' })
+        await user.click(within(preview).getByRole('button', { name: 'Close preview' }))
+        expect(screen.queryByRole('dialog', { name: 'Event preview' })).not.toBeInTheDocument()
+        expect(screen.getByText('Is it one of these?')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'None of these, continue' }))
+
+        expect(await screen.findByRole('button', { name: 'Salsa' })).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Back' }))
+        await user.click(await screen.findByRole('button', { name: 'Next' }))
+        // Already checked for this title and date, so it goes straight on.
+        expect(await screen.findByRole('button', { name: 'Salsa' })).toBeInTheDocument()
+    })
     it('walks the three steps and submits', async () => {
         setupTagGroups()
         const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
@@ -165,7 +315,7 @@ describe('SuggestEventWizard', () => {
         expect(screen.getByText(/Step 3 of 3/)).toBeInTheDocument()
 
         await user.click(screen.getByRole('button', { name: 'Submit Event' }))
-        expect(await screen.findByText(/Your suggestion is under review/)).toBeInTheDocument()
+        expect(await screen.findByText(/Only you can see it/)).toBeInTheDocument()
     })
 
     it('blocks Step 2 until the required tags are picked and reports why', async () => {
@@ -217,7 +367,7 @@ describe('SuggestEventWizard', () => {
     })
 
     it('hides Submit Event while the promo page is open and Done does not submit', async () => {
-        setupTagGroups()
+        setupTagGroups({ promo_codes_enabled: true })
         let submitted = false
         server.use(
             http.post('*/api/suggestions', () => {
@@ -263,9 +413,69 @@ describe('SuggestEventWizard', () => {
         await completeStep2(user)
         await user.click(screen.getByRole('button', { name: 'Submit Event' }))
 
-        await screen.findByText(/Your suggestion is under review/)
+        await screen.findByText(/once a curator makes it public/)
         expect(payload).not.toBeNull()
+        expect(payload!.share_publicly).toBe(true)
         expect(payload!.recurrence_rule).toMatch(/^RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=/)
+    })
+
+    it('sends an all-day event as dates with an exclusive end', async () => {
+        setupTagGroups()
+        let payload: Record<string, unknown> | null = null
+        server.use(
+            http.post('*/api/suggestions', async ({ request }) => {
+                payload = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json({ message: 'under review' }, { status: 201 })
+            }),
+        )
+
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+        await completeStep1(user)
+        await user.click(screen.getByRole('button', { name: 'Back' }))
+        await user.click(screen.getByRole('switch', { name: 'All day' }))
+        fireEvent.change(screen.getByLabelText('End'), { target: { value: '2026-07-03' } })
+        await user.click(screen.getByRole('button', { name: 'Next' }))
+        await completeStep2(user)
+        await user.click(screen.getByRole('button', { name: 'Submit Event' }))
+
+        await screen.findByText(/Only you can see it/)
+        expect(payload).toMatchObject({ start: '2026-07-01', end: '2026-07-04', all_day: true })
+    })
+
+    it('reads the typed times in the venue time zone', async () => {
+        setupTagGroups()
+        let payload: Record<string, unknown> | null = null
+        server.use(
+            http.get('*/api/suggestions/geocode', () =>
+                HttpResponse.json([
+                    { display_name: 'Lisbon Center', latitude: 38.72, longitude: -9.14, timezone: 'Europe/Lisbon' },
+                ]),
+            ),
+            http.post('*/api/suggestions', async ({ request }) => {
+                payload = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json({ message: 'under review' }, { status: 201 })
+            }),
+        )
+
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+        await user.type(screen.getByLabelText('Event name'), 'Salsa Social')
+        await user.click(screen.getByRole('button', { name: /^Location/ }))
+        await user.type(screen.getByLabelText('Search for a place or address'), 'Lisbon')
+        await user.click(await screen.findByText('Lisbon Center'))
+        fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2026-07-01T20:00' } })
+        fireEvent.change(screen.getByLabelText('End'), { target: { value: '2026-07-01T23:00' } })
+        expect(screen.getByText(/Times in Lisbon time/)).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Next' }))
+        await completeStep2(user)
+        await user.click(screen.getByRole('button', { name: 'Submit Event' }))
+
+        await screen.findByText(/Only you can see it/)
+        // 20:00 in Lisbon (WEST, UTC+1) whatever the browser's zone.
+        expect(payload).toMatchObject({
+            start: '2026-07-01T19:00:00.000Z',
+            end: '2026-07-01T22:00:00.000Z',
+            event_timezone: 'Europe/Lisbon',
+        })
     })
 
     it('defaults Going on for signed-in users', async () => {
@@ -287,9 +497,9 @@ describe('SuggestEventWizard', () => {
         await completeStep1(user)
         await completeStep2(user)
 
-        expect(screen.getByText('Who can see it')).toBeInTheDocument()
+        expect(screen.getByText('Who can see it ?')).toBeInTheDocument()
         await user.click(screen.getByRole('switch', { name: "I'm going" }))
-        expect(screen.queryByText('Who can see it')).not.toBeInTheDocument()
+        expect(screen.queryByText('Who can see it ?')).not.toBeInTheDocument()
     })
 
     it('defaults pricing to No pricing and keeps Submit Event off the pricing page', async () => {
@@ -321,17 +531,7 @@ describe('SuggestEventWizard', () => {
         await user.click(screen.getByRole('button', { name: 'Submit Event' }))
 
         expect(await screen.findByText('Event already exists')).toBeInTheDocument()
-        expect(screen.queryByText(/Your suggestion is under review/)).not.toBeInTheDocument()
-    })
-
-    it('offers no cover photo to anonymous submitters', async () => {
-        setupTagGroups()
-        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
-
-        await completeStep1(user)
-
-        expect(await screen.findByRole('button', { name: 'Salsa' })).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: /^Cover photo/ })).not.toBeInTheDocument()
+        expect(screen.queryByText(/Only you can see it/)).not.toBeInTheDocument()
     })
 
     it('uploads a cover photo and submits its key', async () => {
@@ -366,7 +566,168 @@ describe('SuggestEventWizard', () => {
         await completeStep2(user)
         await user.click(screen.getByRole('button', { name: 'Submit Event' }))
 
-        await screen.findByText(/Your event is live/)
+        await screen.findByText(/Only you can see it/)
         expect(payload!.image_key).toBe('suggestions/u1/abc')
+        // A past one-off event can't go public.
+        expect(payload!.share_publicly).toBe(false)
+    })
+
+    it('shares an upcoming event publicly by default', async () => {
+        setupSignedInUser()
+        setupTagGroups()
+        let payload: Record<string, unknown> | null = null
+        server.use(
+            http.post('*/api/suggestions', async ({ request }) => {
+                payload = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json({ message: 'under review' }, { status: 201 })
+            }),
+        )
+
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+        await completeStep1(user, '2099-07-01')
+        await completeStep2(user)
+        expect(screen.getByRole('switch', { name: 'Share publicly' })).toBeChecked()
+        await user.click(screen.getByRole('button', { name: 'Submit Event' }))
+
+        await screen.findByText(/once a curator makes it public/)
+        expect(payload!.share_publicly).toBe(true)
+    })
+
+    it('keeps the event private when Share publicly is turned off', async () => {
+        setupSignedInUser()
+        setupTagGroups()
+        let payload: Record<string, unknown> | null = null
+        server.use(
+            http.post('*/api/suggestions', async ({ request }) => {
+                payload = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json({ message: 'under review' }, { status: 201 })
+            }),
+        )
+
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+        await completeStep1(user, '2099-07-01')
+        await completeStep2(user)
+        await user.click(screen.getByRole('switch', { name: 'Share publicly' }))
+        expect(screen.getByText('Only you will see this event.')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Submit Event' }))
+
+        await screen.findByText(/Only you can see it/)
+        expect(payload!.share_publicly).toBe(false)
+    })
+
+    it('keeps a past event private and hides the promo row when promo codes are off', async () => {
+        setupSignedInUser()
+        setupTagGroups()
+
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+        await completeStep1(user, '2020-07-01')
+        await completeStep2(user)
+
+        expect(screen.getByRole('switch', { name: 'Share publicly' })).toBeDisabled()
+        expect(screen.getByText('Past events stay private — only you will see it.')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /^Promo code/ })).not.toBeInTheDocument()
+    })
+
+    it('sends a tag that does not exist yet as a new-tag request', async () => {
+        setupSignedInUser()
+        setupTagGroups()
+        let payload: Record<string, unknown> | null = null
+        server.use(
+            http.post('*/api/suggestions', async ({ request }) => {
+                payload = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json({ message: 'ok' }, { status: 201 })
+            }),
+        )
+
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+        await completeStep1(user, '2099-07-01')
+        await user.click(await screen.findByRole('button', { name: 'Salsa' }))
+        await user.click(screen.getByRole('button', { name: 'Local' }))
+        await user.click(screen.getByRole('button', { name: 'Add more tags' }))
+        await user.type(screen.getByRole('searchbox', { name: 'Search tags' }), 'Rooftop')
+        await user.click(within(screen.getByTestId('request-new-tag')).getByRole('button', { name: '+ Format' }))
+        await user.click(screen.getByRole('button', { name: 'Done' }))
+        await user.click(screen.getByRole('button', { name: 'Next' }))
+        await user.click(screen.getByRole('button', { name: 'Submit Event' }))
+
+        await waitFor(() => expect(payload).not.toBeNull())
+        expect(payload!.suggested_new_tags).toEqual([{ free_text: 'Rooftop', group_slug: 'format' }])
+    })
+
+    describe('edit mode', () => {
+        const ownSuggestion = {
+            id: 'sug-1',
+            status: 'pending',
+            edit_locked: false,
+            can_edit: true,
+            title: 'Salsa Socail',
+            description: null,
+            location: 'Berlin Center',
+            links: null,
+            latitude: 52.52,
+            longitude: 13.4,
+            start: '2026-07-01T18:00:00Z',
+            end: '2026-07-01T21:00:00Z',
+            all_day: false,
+            recurrence_rule: 'RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=WE;COUNT=4',
+            recurrence_dates: null,
+            suggested_tag_ids: [101, 201],
+            price_min: null,
+            price_max: null,
+            price_currency: null,
+            price_is_free: true,
+            image_key: null,
+            image_thumb_url: null,
+            created_event_id: 'suggestion-sug-1',
+            created_at: '2026-06-01T10:00:00Z',
+        }
+
+        it('prefills the saved event and PATCHes the changes', async () => {
+            setupSignedInUser()
+            setupTagGroups()
+            let payload: Record<string, unknown> | null = null
+            server.use(
+                http.get('*/api/me/suggestions/sug-1', () => HttpResponse.json(ownSuggestion)),
+                http.patch('*/api/me/suggestions/sug-1', async ({ request }) => {
+                    payload = (await request.json()) as Record<string, unknown>
+                    return HttpResponse.json({ ...ownSuggestion, title: 'Salsa Social' })
+                }),
+            )
+
+            const { user } = renderWithProviders(
+                <SuggestEventWizard suggestionId="sug-1" onClose={() => { }} />,
+            )
+
+            const title = await screen.findByLabelText('Event name')
+            expect(title).toHaveValue('Salsa Socail')
+            expect(screen.getByRole('heading', { name: 'Edit event' })).toBeInTheDocument()
+            await user.clear(title)
+            await user.type(title, 'Salsa Social')
+            await user.click(screen.getByRole('button', { name: 'Next' }))
+            await user.click(await screen.findByRole('button', { name: 'Next' }))
+
+            expect(screen.queryByRole('button', { name: /^Promo code/ })).not.toBeInTheDocument()
+            await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+            expect(await screen.findByText('Changes saved')).toBeInTheDocument()
+            expect(payload!.title).toBe('Salsa Social')
+            expect(payload!.recurrence_rule).toBe('RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=WE;COUNT=4')
+            expect(payload!.suggested_tag_ids).toEqual([101, 201])
+            expect(payload).not.toHaveProperty('going')
+        })
+
+        it('explains why a locked event cannot be edited', async () => {
+            setupSignedInUser()
+            setupTagGroups()
+            server.use(
+                http.get('*/api/me/suggestions/sug-1', () =>
+                    HttpResponse.json({ ...ownSuggestion, edit_locked: true, can_edit: false }),
+                ),
+            )
+
+            renderWithProviders(<SuggestEventWizard suggestionId="sug-1" onClose={() => { }} />)
+
+            expect(await screen.findByText(/An admin has locked this event/)).toBeInTheDocument()
+        })
     })
 })

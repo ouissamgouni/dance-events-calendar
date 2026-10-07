@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import useBackToClose from '../hooks/useBackToClose';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { CalendarSetting, EventSuggestion, Tag } from '../types';
+import type { CalendarSetting, EventSuggestion } from '../types';
 import type { AdminTagGroup } from '../api';
 import {
     fetchAdminCalendars, updateCalendar, discoverCalendars, addCalendar,
@@ -9,20 +9,20 @@ import {
     fetchSuggestions, fetchMostSavedEvents, fetchMostViewedEvents,
     fetchAdminTagGroups,
     fetchCalendarDefaultTags, updateCalendarDefaultTags,
-    fetchSourceBreakdown, fetchTopCountries, fetchTopLinks, fetchExportStats,
+    fetchSourceBreakdown, fetchTopLinks, fetchExportStats,
     fetchMostAttendedEvents, getCurrentSyncJob,
     forceSendInterestMatches, sendDigestNow, fetchWebPushSubscriberCount,
     previewInterestMatches, fetchNotificationToggleCounts,
     sendReviewPromptNow, searchEvents, fetchReviewPromptCandidates,
 } from '../api';
-import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse, EventSearchResult, ReviewPromptCandidate } from '../api';
+import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse, EventSearchResult, ReviewPromptCandidate, AssetPromptKind } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useUpdateFeatureFlag } from '../context/FeatureFlagsContext';
 import SyncProgressCard from '../components/SyncProgressCard';
 import SyncJobsHistoryTable from '../components/SyncJobsHistoryTable';
 import EventsPanel from '../components/EventsPanel';
 import type { EventsPanelPreset } from '../components/EventsPanel';
-import SuggestionsPanel from '../components/SuggestionsPanel';
+import ReviewPanel from '../components/ReviewPanel';
 import UnsyncedSuggestionsPanel from '../components/UnsyncedSuggestionsPanel';
 import TagSuggestionsPanel from '../components/TagSuggestionsPanel';
 import PromoCodesAdminPanel from '../components/PromoCodesAdminPanel';
@@ -36,6 +36,7 @@ import AdminAnalytics from '../components/AdminAnalytics';
 import AdminUsersTab from '../components/AdminUsersTab';
 import AdminNotificationsTab from '../components/AdminNotificationsTab';
 import AdminUserMultiPicker from '../components/AdminUserMultiPicker';
+import AdminAssetPromptSendNow from '../components/AdminAssetPromptSendNow';
 import CalendarCurationRulesPanel from '../components/CalendarCurationRulesPanel';
 import { ConfirmDialog } from '../components/AppDialog';
 import { useAdminCounters, notifyAdminDataChanged } from '../hooks/useAdminCounters';
@@ -202,6 +203,49 @@ function FeatureEmailCard({
     );
 }
 
+type EventAssetLimitKey =
+    | 'event_assets_max_tickets'
+    | 'event_assets_max_memories'
+    | 'event_assets_ticket_retention_days'
+    | 'event_assets_memory_window_days'
+    | 'event_assets_max_ticket_mb'
+    | 'event_assets_max_memory_mb'
+    | 'ticket_likely_min_hours'
+    | 'ticket_prompt_delay_hours'
+    | 'ticket_prompt_min_lead_hours'
+    | 'memories_prompt_local_hour';
+
+type EventAssetFeature = 'tickets' | 'memories';
+
+const EVENT_ASSET_LIMITS: { key: EventAssetLimitKey; label: string; hint: string; min: number; max: number; fallback: number; feature?: EventAssetFeature; prompt?: AssetPromptKind }[] = [
+    { key: 'event_assets_max_tickets', label: 'Max tickets per event', hint: 'Lowering never deletes existing tickets', min: 1, max: 10, fallback: 2, feature: 'tickets' },
+    { key: 'event_assets_max_memories', label: 'Max memories per event', hint: 'Lowering never deletes existing photos', min: 1, max: 20, fallback: 5, feature: 'memories' },
+    { key: 'event_assets_ticket_retention_days', label: 'Delete tickets after event (days)', hint: 'Lowering deletes older tickets on the next clean-up run', min: 1, max: 365, fallback: 30, feature: 'tickets' },
+    { key: 'event_assets_memory_window_days', label: 'Memory upload window (days)', hint: 'Days after the event start when photos can be added', min: 1, max: 365, fallback: 30, feature: 'memories' },
+    { key: 'event_assets_max_ticket_mb', label: 'Max ticket file size (MB)', hint: 'Server-side cap per ticket file', min: 1, max: 20, fallback: 5, feature: 'tickets' },
+    { key: 'event_assets_max_memory_mb', label: 'Max memory file size (MB)', hint: 'Server-side cap per photo (photos are resized before upload)', min: 1, max: 25, fallback: 10, feature: 'memories' },
+    { key: 'ticket_likely_min_hours', label: 'Ticket likely: min event length (hours)', hint: 'Events this long (or international) get ticket prompts unless set per event', min: 1, max: 168, fallback: 20, prompt: 'ticket' },
+    { key: 'ticket_prompt_delay_hours', label: 'Delay after marking Going (hours)', hint: 'Hours after marking Going before the ticket notification', min: 1, max: 168, fallback: 24, prompt: 'ticket' },
+    { key: 'ticket_prompt_min_lead_hours', label: 'Min lead before event (hours)', hint: 'Closer events rely on the reminder line instead', min: 0, max: 168, fallback: 48, prompt: 'ticket' },
+    { key: 'memories_prompt_local_hour', label: 'Send hour (user local)', hint: 'Sent the day after the event at this hour', min: 0, max: 23, fallback: 11, prompt: 'memories' },
+];
+
+type EventAssetPromptKey = 'ticket_prompt_enabled' | 'memories_prompt_enabled';
+
+const EVENT_ASSET_PROMPTS: { key: EventAssetPromptKey; kind: AssetPromptKind; feature: EventAssetFeature; label: string; hint: string }[] = [
+    { key: 'ticket_prompt_enabled', kind: 'ticket', feature: 'tickets', label: 'Ticket prompt', hint: 'Pre-event "add your ticket" nudge (in-app + email + push) plus reminder line, for going users of ticket-likely events' },
+    { key: 'memories_prompt_enabled', kind: 'memories', feature: 'memories', label: 'Memories prompt', hint: 'Morning-after "add your photos" nudge (in-app + email + push) for going users' },
+];
+
+const EVENT_ASSET_FEATURES: { feature: EventAssetFeature; setting: 'event_tickets_enabled' | 'event_memories_enabled'; flag: 'eventTicketsEnabled' | 'eventMemoriesEnabled'; label: string; hint: string }[] = [
+    { feature: 'tickets', setting: 'event_tickets_enabled', flag: 'eventTicketsEnabled', label: 'Event tickets', hint: 'Going users keep private tickets (file, photo or link) for events' },
+    { feature: 'memories', setting: 'event_memories_enabled', flag: 'eventMemoriesEnabled', label: 'Event memories', hint: 'Going users add memory photos to events they attended' },
+];
+
+const DEFAULT_EVENT_ASSET_LIMITS = Object.fromEntries(
+    EVENT_ASSET_LIMITS.map((limit) => [limit.key, limit.fallback]),
+) as Record<EventAssetLimitKey, number>;
+
 
 export default function Admin() {
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
@@ -255,6 +299,9 @@ export default function Admin() {
     const [summaryTwoLineEnabled, setSummaryTwoLineEnabled] = useState(false);
     const [eventImagesEnabled, setEventImagesEnabled] = useState(false);
     const [eventCardPlaceholderStyle, setEventCardPlaceholderStyle] = useState<'gradient' | 'initial' | 'none'>('gradient');
+    const [eventAssetFlags, setEventAssetFlags] = useState<Record<EventAssetFeature, boolean>>({ tickets: false, memories: false });
+    const [eventAssetLimits, setEventAssetLimits] = useState<Record<EventAssetLimitKey, number>>(DEFAULT_EVENT_ASSET_LIMITS);
+    const [eventAssetPrompts, setEventAssetPrompts] = useState<Record<EventAssetPromptKey, boolean>>({ ticket_prompt_enabled: true, memories_prompt_enabled: true });
     // Notification / re-engagement gates. Booleans are master switches
     // that override the corresponding env vars in ``config/loader.py``;
     // ``digestSchedule`` follows the ``dow[,dow] @ HH:MM`` grammar the
@@ -322,7 +369,7 @@ export default function Admin() {
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
     const [eventsPanelPreset, setEventsPanelPreset] = useState<EventsPanelPreset>('all');
     const [eventsPanelCalendarId, setEventsPanelCalendarId] = useState<string>('');
-    const [suggestionsPanelOpen, setSuggestionsPanelOpen] = useState(false);
+    const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
     const [unsyncedPanelOpen, setUnsyncedPanelOpen] = useState(false);
     const [tagSuggestionsPanelOpen, setTagSuggestionsPanelOpen] = useState(false);
     const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
@@ -333,7 +380,6 @@ export default function Admin() {
     const { counters: adminCounters, refresh: refreshAdminCounters } = useAdminCounters();
     const feedbackPendingCount = adminCounters.feedbackPending;
     const tagSuggestionCount = adminCounters.tagSuggestions;
-    const pendingReviewCount = adminCounters.pendingReview;
     const ungeolocatedCount = adminCounters.ungeolocated;
     const organizerClaimsPendingCount = adminCounters.organizerClaimsPending;
     const promoCodesPendingCount = adminCounters.promoCodesPending;
@@ -346,7 +392,6 @@ export default function Admin() {
     const [mostViewed, setMostViewed] = useState<MostViewedEvent[]>([]);
     const [mostAttended, setMostAttended] = useState<MostAttendedEvent[]>([]);
     const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
-    const [topCountries, setTopCountries] = useState<CountryBreakdown[]>([]);
     const [topLinks, setTopLinks] = useState<TopLink[]>([]);
     const [exportStats, setExportStats] = useState<ExportStat[]>([]);
     const [expandedDefaultTagsCalId, setExpandedDefaultTagsCalId] = useState<string | null>(null);
@@ -355,7 +400,6 @@ export default function Admin() {
     useBackToClose(() => setOpenMenuCalId(null), openMenuCalId !== null);
     const [confirmReseedOpen, setConfirmReseedOpen] = useState(false);
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
-    const allTags = useMemo<Tag[]>(() => tagGroups.flatMap((g) => g.tags), [tagGroups]);
     const [calendarDefaultTagIds, setCalendarDefaultTagIds] = useState<Record<string, number[]>>({});
     const [activeConfigTab, setActiveConfigTab] = useState<ConfigurationTab>('events-settings');
     const [forceSendMessage, setForceSendMessage] = useState<string>('');
@@ -452,6 +496,14 @@ export default function Admin() {
             setSummaryTwoLineEnabled(s.summary_two_line_enabled ?? false);
             setEventImagesEnabled(s.event_images_enabled ?? true);
             setEventCardPlaceholderStyle(s.event_card_placeholder_style ?? 'none');
+            setEventAssetFlags({ tickets: s.event_tickets_enabled ?? false, memories: s.event_memories_enabled ?? false });
+            setEventAssetLimits(Object.fromEntries(
+                EVENT_ASSET_LIMITS.map((limit) => [limit.key, s[limit.key] ?? limit.fallback]),
+            ) as Record<EventAssetLimitKey, number>);
+            setEventAssetPrompts({
+                ticket_prompt_enabled: s.ticket_prompt_enabled ?? true,
+                memories_prompt_enabled: s.memories_prompt_enabled ?? true,
+            });
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
             setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
             setDigestV2Enabled(s.digest_v2_enabled ?? true);
@@ -501,7 +553,6 @@ export default function Admin() {
         fetchMostViewedEvents().then(setMostViewed).catch(() => { });
         fetchMostAttendedEvents().then(setMostAttended).catch(() => { });
         fetchSourceBreakdown().then(setSourceBreakdown).catch(() => { });
-        fetchTopCountries().then(setTopCountries).catch(() => { });
         fetchTopLinks().then(setTopLinks).catch(() => { });
         fetchExportStats().then(setExportStats).catch(() => { });
         fetchWebPushSubscriberCount().then((r) => setWebPushSubscriberCount(r.subscriber_count)).catch(() => { });
@@ -1005,6 +1056,41 @@ export default function Admin() {
         } catch {
             setEventImagesEnabled(!newVal);
             setMessage('Failed to update event pictures toggle.');
+        }
+    };
+
+    const handleToggleEventAssetFeature = async (entry: typeof EVENT_ASSET_FEATURES[number]) => {
+        const newVal = !eventAssetFlags[entry.feature];
+        setEventAssetFlags((prev) => ({ ...prev, [entry.feature]: newVal }));
+        try {
+            await updateSettings({ [entry.setting]: newVal });
+            updateFlagFn(entry.flag, newVal);
+            setMessage(`${entry.label} ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventAssetFlags((prev) => ({ ...prev, [entry.feature]: !newVal }));
+            setMessage(`Failed to update ${entry.label.toLowerCase()} toggle.`);
+        }
+    };
+
+    const handleEventAssetLimitChange = async (key: EventAssetLimitKey, value: number) => {
+        const limit = EVENT_ASSET_LIMITS.find((entry) => entry.key === key);
+        if (!limit || isNaN(value) || value < limit.min || value > limit.max) return;
+        setEventAssetLimits((prev) => ({ ...prev, [key]: value }));
+        try {
+            await updateSettings({ [key]: value });
+        } catch {
+            setMessage(`Failed to update ${limit.label.toLowerCase()}.`);
+        }
+    };
+
+    const handleToggleEventAssetPrompt = async (key: EventAssetPromptKey) => {
+        const newVal = !eventAssetPrompts[key];
+        setEventAssetPrompts((prev) => ({ ...prev, [key]: newVal }));
+        try {
+            await updateSettings({ [key]: newVal });
+        } catch {
+            setEventAssetPrompts((prev) => ({ ...prev, [key]: !newVal }));
+            setMessage('Failed to update nudge setting.');
         }
     };
 
@@ -1588,29 +1674,24 @@ export default function Admin() {
                         Events
                     </button>
                     <button
-                        onClick={() => { setEventsPanelPreset('pending'); setEventsPanelOpen(true); }}
+                        onClick={() => setReviewPanelOpen(true)}
                         className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
-                        Pending Review
-                        {pendingReviewCount > 0 && (
-                            <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
-                                {pendingReviewCount}
+                        Review
+                        {adminCounters.reviewNew > 0 && (
+                            <span
+                                className="inline-flex items-center justify-center bg-action text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]"
+                                title={`${adminCounters.reviewNew} new event(s) or go-public request(s)`}
+                            >
+                                {adminCounters.reviewNew}
                             </span>
                         )}
-                    </button>
-                    <button
-                        onClick={() => {
-                            setSuggestionsPanelOpen(true);
-                            if (tagGroups.length === 0) {
-                                fetchAdminTagGroups().then(setTagGroups).catch(() => { });
-                            }
-                        }}
-                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
-                    >
-                        Suggestions
-                        {suggestions.filter((s) => s.status === 'pending').length > 0 && (
-                            <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
-                                {suggestions.filter((s) => s.status === 'pending').length}
+                        {adminCounters.reviewEdits > 0 && (
+                            <span
+                                className="inline-flex items-center justify-center bg-orange-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]"
+                                title={`${adminCounters.reviewEdits} edit(s), cancellation(s) or removal(s)`}
+                            >
+                                {adminCounters.reviewEdits}
                             </span>
                         )}
                     </button>
@@ -2550,6 +2631,44 @@ export default function Admin() {
                                     </select>
                                 </div>
 
+                                {/* Event tickets / memories */}
+                                {EVENT_ASSET_FEATURES.map((entry) => (
+                                    <div key={entry.feature}>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <span className="text-[11px] font-medium text-ink">{entry.label}</span>
+                                                <p className="text-[10px] text-muted">{entry.hint}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleToggleEventAssetFeature(entry)}
+                                                aria-label={`Toggle ${entry.label.toLowerCase()}`}
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventAssetFlags[entry.feature] ? 'bg-success' : 'bg-gray-300'}`}
+                                            >
+                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventAssetFlags[entry.feature] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            </button>
+                                        </div>
+                                        {eventAssetFlags[entry.feature] && EVENT_ASSET_LIMITS.filter((limit) => limit.feature === entry.feature).map((limit) => (
+                                            <div key={limit.key} className="flex items-center justify-between mt-1 pl-1">
+                                                <div>
+                                                    <span className="text-[11px] font-medium text-ink-soft">{limit.label}</span>
+                                                    <p className="text-[10px] text-muted">{limit.hint}</p>
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    min={limit.min}
+                                                    max={limit.max}
+                                                    aria-label={limit.label}
+                                                    value={eventAssetLimits[limit.key]}
+                                                    onChange={(e) => setEventAssetLimits((prev) => ({ ...prev, [limit.key]: Number(e.target.value) }))}
+                                                    onBlur={(e) => handleEventAssetLimitChange(limit.key, Number(e.target.value))}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleEventAssetLimitChange(limit.key, eventAssetLimits[limit.key])}
+                                                    className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))}
+
                                 {/* Tribe > Calendars "Your Network" going snapshot */}
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -2651,12 +2770,12 @@ export default function Admin() {
 
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-ink">Show pending events</span>
-                                        <p className="text-[10px] text-muted">Include pending events in user-facing discovery, engagement, and notifications.</p>
+                                        <span className="text-[11px] font-medium text-ink">Show unreviewed calendar events</span>
+                                        <p className="text-[10px] text-muted">Publish new events from synced calendars before they are reviewed. User submissions always wait for approval.</p>
                                     </div>
                                     <button
                                         onClick={handleToggleShowPendingEvents}
-                                        aria-label="Toggle pending event visibility"
+                                        aria-label="Toggle unreviewed calendar event visibility"
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showPendingEvents ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${showPendingEvents ? 'translate-x-4' : 'translate-x-0.5'}`} />
@@ -3159,6 +3278,70 @@ export default function Admin() {
                                     </div>
                                 </div>
 
+                                {/* Ticket / memories prompts */}
+                                {EVENT_ASSET_PROMPTS.map((prompt) => {
+                                    const counts = toggleCounts?.[prompt.kind === 'ticket' ? 'ticket_prompt' : 'memories_prompt'];
+                                    const featureOn = eventAssetFlags[prompt.feature];
+                                    const featureLabel = EVENT_ASSET_FEATURES.find((f) => f.feature === prompt.feature)?.label;
+                                    return (
+                                        <div key={prompt.key} className="border border-card-line p-3 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className={`text-[11px] font-semibold uppercase tracking-wide ${featureOn ? 'text-ink' : 'text-muted'}`}>{prompt.label}</span>
+                                                <button
+                                                    onClick={() => handleToggleEventAssetPrompt(prompt.key)}
+                                                    disabled={!featureOn}
+                                                    aria-label={`Toggle ${prompt.label.toLowerCase()}`}
+                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition disabled:opacity-50 ${featureOn && eventAssetPrompts[prompt.key] ? 'bg-success' : 'bg-gray-300'}`}
+                                                >
+                                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventAssetPrompts[prompt.key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                </button>
+                                            </div>
+                                            <p className="text-[10px] text-muted">{prompt.hint}</p>
+                                            {!featureOn && (
+                                                <div className="flex items-center justify-between gap-2 text-[10px] text-ink-soft bg-canvas border border-line p-2">
+                                                    <span>Requires the {featureLabel} feature flag.</span>
+                                                    <button type="button" onClick={() => setActiveConfigTab('feature-flags')} className="text-action hover:underline whitespace-nowrap">
+                                                        Open feature flags
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {featureOn && !eventAssetPrompts[prompt.key] && (
+                                                <p className="text-[10px] text-amber-700">Scheduled sends are paused. Send now still works.</p>
+                                            )}
+                                            <fieldset disabled={!featureOn} className={`space-y-3 ${featureOn ? '' : 'opacity-50'}`}>
+                                                {counts && toggleCounts && (
+                                                    <p className="text-[10px] text-ink-soft">
+                                                        {counts.email} email · {counts.push} push enabled
+                                                        {' '}(of {toggleCounts.total_users} users)
+                                                    </p>
+                                                )}
+                                                {EVENT_ASSET_LIMITS.filter((limit) => limit.prompt === prompt.kind).map((limit) => (
+                                                    <div key={limit.key} className="flex items-center justify-between border-t border-card-line pt-2.5">
+                                                        <div>
+                                                            <span className="text-[11px] font-medium text-ink">{limit.label}</span>
+                                                            <p className="text-[10px] text-muted">{limit.hint}</p>
+                                                        </div>
+                                                        <input
+                                                            type="number"
+                                                            min={limit.min}
+                                                            max={limit.max}
+                                                            aria-label={limit.label}
+                                                            value={eventAssetLimits[limit.key]}
+                                                            onChange={(e) => setEventAssetLimits((prev) => ({ ...prev, [limit.key]: Number(e.target.value) }))}
+                                                            onBlur={(e) => handleEventAssetLimitChange(limit.key, Number(e.target.value))}
+                                                            onKeyDown={(e) => e.key === 'Enter' && handleEventAssetLimitChange(limit.key, eventAssetLimits[limit.key])}
+                                                            className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
+                                                        />
+                                                    </div>
+                                                ))}
+                                                {featureOn && (
+                                                    <AdminAssetPromptSendNow kind={prompt.kind} onMessage={setMessage} />
+                                                )}
+                                            </fieldset>
+                                        </div>
+                                    );
+                                })}
+
                                 {/* Activity digest */}
                                 <div className="border border-card-line p-3 space-y-3">
                                     <div className="flex items-center justify-between">
@@ -3363,7 +3546,6 @@ export default function Admin() {
                     mostSaved={mostSaved}
                     mostAttended={mostAttended}
                     sourceBreakdown={sourceBreakdown}
-                    topCountries={topCountries}
                     topLinks={topLinks}
                     exportStats={exportStats}
                 />
@@ -3386,22 +3568,14 @@ export default function Admin() {
                 preset={eventsPanelPreset}
                 initialCalendarId={eventsPanelCalendarId}
             />
-            <SuggestionsPanel
-                isOpen={suggestionsPanelOpen}
-                onClose={() => setSuggestionsPanelOpen(false)}
-                suggestions={suggestions}
-                calendars={calendars}
-                allTags={allTags}
-                onUpdated={(updated) => {
-                    setSuggestions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-                }}
-                onRefresh={refreshSuggestions}
+            <ReviewPanel
+                isOpen={reviewPanelOpen}
+                onClose={() => { setReviewPanelOpen(false); refreshSuggestions(); }}
             />
             <UnsyncedSuggestionsPanel
                 isOpen={unsyncedPanelOpen}
                 onClose={() => setUnsyncedPanelOpen(false)}
                 suggestions={suggestions}
-                calendars={calendars}
                 onUpdated={(updated) => {
                     setSuggestions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
                 }}

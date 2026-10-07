@@ -20,6 +20,7 @@ class CalendarEvent:
     start: datetime
     end: datetime
     all_day: bool = False
+    timezone: Optional[str] = None
 
 
 @dataclass

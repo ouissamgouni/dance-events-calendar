@@ -11,6 +11,7 @@ from backend.services.calendar.base import (
     CalendarInfo,
     SyncResult,
 )
+from backend.services.timezones import resolve_event_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +273,11 @@ class GoogleCalendarService(BaseCalendarService):
                         start=start,
                         end=end,
                         all_day=all_day,
+                        # Single events omit timeZone when they use the calendar's.
+                        timezone=resolve_event_timezone(
+                            source_event=start_data.get("timeZone"),
+                            source_calendar=result.get("timeZone"),
+                        ),
                     )
                 )
 

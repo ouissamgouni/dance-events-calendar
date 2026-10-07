@@ -187,7 +187,6 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                                                 <span className="truncate">
                                                     {r.is_anonymous ? 'Anonymous' : (r.user_email || r.user_display_name || 'Unknown')}
                                                 </span>
-                                                {r.submitter_country && <span title={r.submitter_country}>· {r.submitter_country}</span>}
                                             </div>
                                             {r.comment && (
                                                 <p className="text-ink-soft text-[11px] mt-1 line-clamp-2">

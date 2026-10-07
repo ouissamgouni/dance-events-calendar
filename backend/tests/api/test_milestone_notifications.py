@@ -463,3 +463,60 @@ def test_consistency_reach_emails_and_pushes(session, monkeypatch):
     session.refresh(consistency[0])
     assert consistency[0].emailed_at is not None
     assert consistency[0].pushed_at is not None
+
+
+def test_safety_net_only_scans_recent_attendance(session, monkeypatch):
+    """The tick's milestone safety net skips users whose last attendance is
+    older than MILESTONE_SWEEP_LOOKBACK_DAYS; the seed scan still sees them."""
+    monkeypatch.setenv("MILESTONE_SWEEP_LOOKBACK_DAYS", "30")
+    recent = _make_user(session, "recent@example.com", "recent")
+    stale = _make_user(session, "stale@example.com", "stale")
+    _attend_past_event(session, recent, "ev-recent", days_ago=5)
+    _attend_past_event(session, stale, "ev-stale", days_ago=200)
+    attendance = session.exec(
+        select(UserEventAttendance).where(UserEventAttendance.user_id == stale.id)
+    ).one()
+    attendance.attending_since = datetime.now(timezone.utc) - timedelta(days=45)
+    session.add(attendance)
+    session.commit()
+
+    assert milestone_notification_service._candidate_user_ids(session) == [recent.id]
+    assert set(
+        milestone_notification_service._candidate_user_ids(session, recent_only=False)
+    ) == {recent.id, stale.id}
+
+    milestone_notification_service.run_once()
+    recipients = {
+        n.recipient_user_id
+        for n in session.exec(
+            select(Notification).where(Notification.kind == "milestone_unlocked")
+        ).all()
+    }
+    assert recipients == {recent.id}
+
+
+def test_delivery_source_recorded_for_tick_and_job(session, monkeypatch):
+    session.add(SiteSetting(key="milestone_unlocked_email_instant", value="true"))
+    session.commit()
+    monkeypatch.setattr(milestone_notification_service, "send_push", lambda *a, **k: 1)
+    tick_user = _make_user(session, "tick@example.com", "tick")
+    job_user = _make_user(session, "job@example.com", "job")
+    _attend_past_event(session, tick_user, "ev-tick", days_ago=3)
+    milestone_notification_service.run_once()
+    _attend_past_event(session, job_user, "ev-job", days_ago=3)
+    milestone_notification_service.notify_milestones_for_user(
+        session, job_user, source="job"
+    )
+
+    rows = session.exec(
+        select(NotificationDelivery, Notification)
+        .join(Notification, Notification.id == NotificationDelivery.notification_id)
+        .where(NotificationDelivery.channel != "app")
+    ).all()
+    by_user = {(n.recipient_user_id, d.channel): (d.mode, d.source) for d, n in rows}
+    assert by_user == {
+        (tick_user.id, "email"): ("instant", "tick"),
+        (tick_user.id, "push"): (None, "tick"),
+        (job_user.id, "email"): ("instant", "job"),
+        (job_user.id, "push"): (None, "job"),
+    }

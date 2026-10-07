@@ -1,0 +1,238 @@
+# Event revisions — QA Test Plan
+# ================================
+# Changes to an already-published event never go live silently. A Google
+# source edit, an admin side-panel edit and a submitter's edit of an approved
+# event each become a revision; attendees keep seeing the approved version
+# until an admin applies it, and applying a time/venue/title change tells
+# everyone who saved or is going exactly what changed.
+
+test_plan:
+  name: "Event revisions — source, admin and submitter edits"
+  description: >
+    Covers the revision workflow end to end: edits to never-reviewed synced
+    events overwrite directly; edits to published synced events are staged
+    (deduplicated, apply/discard, discarded values not re-proposed); admin
+    side-panel edits are drafted and published with an optional notification;
+    submitter edits of approved events wait for review and apply to the whole
+    series; attendees receive the exact diff in-app and by email (per their
+    event-update email setting); the history tab records everything.
+
+  preconditions:
+    - "Run the scenario with: `SCENARIO=event-revisions task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Mailpit runs on http://localhost:8025 for email checks."
+    - "Emulating a Google edit: as Admin open the event's side panel → 'Dev · mock source' card → Edit at source → change fields → Save & sync. That runs an incremental sync of its calendar which, like Google, returns only the edited event. 'Delete at source…' emulates a deletion. Restarting the scenario resets the source."
+    - "Seed: ev-sync-live (published via db-events.yaml, Fri 20:00, Studio A; saved by Sam and Lee), ev-sync-desc (published), ev-sync-new (arrives through the sync only, never reviewed), and Dev User's approved weekly 'Kizomba Thursday' (Sam Going on its 2nd date)."
+
+  cast:
+    - "Admin — reviews and publishes changes."
+    - "Dev User — submitter of Kizomba Thursday."
+    - "Sam — saved ev-sync-live, Going to Kizomba Thursday; event-update emails ON."
+    - "Lee — saved ev-sync-live; event-update emails OFF (in-app only)."
+
+  steps:
+    # ---------------------------------------------------------------- sync
+    - id: 1
+      title: "B1 · A never-reviewed synced event stays private"
+      description: |
+        Make sure Admin → Settings → "Show unreviewed calendar events" is OFF.
+        As Sam, search Explore for "Zouk Night".
+      expected: |
+        "Zouk Night (new)" is not listed and /event/ev-sync-new is "not found".
+        As Admin it appears in Events on a light blue New row with the globe
+        (public) flag, and Review → Open lists a "New event" change for it.
+
+    - id: 2
+      title: "B2 · Editing a never-reviewed synced event overwrites it"
+      description: |
+        Open ev-sync-new → Edit at source → Start 22:00 → Save & sync.
+      expected: |
+        Admin's side panel for ev-sync-new shows 22:00 directly. There is no
+        "Changes pending" card and nobody is notified.
+
+    - id: 3
+      title: "B3 · A source edit of a published event waits for review"
+      description: |
+        Open ev-sync-live → Edit at source → Start 21:00, End 00:30 (next
+        day) → Save & sync.
+      expected: |
+        As Sam, Home / the event page still show 20:00. As Admin, the Events
+        row shows the orange pencil flag and orange left stripe, and the
+        Review badge counts it. The side panel shows a "Changes
+        pending" card tagged "Google source" with Start/End old → new values,
+        and "Notify 2 attendees about this change" (checked).
+
+    - id: 4
+      title: "B4 · Re-syncing the same values does not duplicate it"
+      description: |
+        Run Admin → Calendars → 'Berlin Salsa (Google)' → sync, once
+        incremental and once full (reseed), without editing the source.
+      expected: |
+        Still exactly one Changes pending card for ev-sync-live; the
+        incremental sync reports no changes.
+
+    - id: 5
+      title: "B5 · Applying notifies attendees with the exact diff"
+      description: "As Admin, click Apply on the card (notify checked)."
+      expected: |
+        The event now shows 21:00 everywhere. Sam and Lee each get an in-app
+        "Event updated · Friday Salsa at Studio A" notification reading
+        "Time: Fri … 20:00 → 21:00" that opens the event. Mailpit has one
+        "Friday Salsa at Studio A: details changed" email — to Sam only (Lee's
+        event-update emails are off). Sam also gets an "Event updated: …"
+        push if push is enabled in his browser. The orange pencil flag is gone.
+
+    - id: 6
+      title: "B6 · A discarded source value is not proposed again"
+      description: |
+        Edit at source: Location "Studio B, …" → Save & sync. Discard the new
+        card. Then run a full (reseed) sync of the calendar.
+      expected: |
+        The event keeps Studio A. After the full sync no new card appears
+        (the source still says Studio B, but that value was discarded); the
+        history lists the change as "rejected".
+
+    - id: 7
+      title: "B7 · Description-only changes are applied silently"
+      description: |
+        Open ev-sync-desc → Edit at source → change the description → Save &
+        sync, then Apply the card without touching the notify box.
+      expected: |
+        The card shows "Notify 2 attendees about this change" UNCHECKED with
+        "Off by default: minor change." After Apply the new description is
+        live and nobody is notified. (Ticking it first would send
+        "Updated: description".)
+
+    # --------------------------------------------------------------- admin
+    - id: 8
+      title: "B8 · Admin edits of a published event are drafted"
+      description: |
+        As Admin, open ev-sync-live in the side panel and edit the venue to
+        "Studio C, …" and the description.
+      expected: |
+        The panel shows the new values with an "Unpublished changes (n)" card
+        listing old → new and an "Unpublished draft" chip in the header. The
+        Events row shows the orange pencil flag. As Sam, the event still
+        shows the old venue and description.
+
+    - id: 9
+      title: "B9 · Publish with notification"
+      description: "Click Publish changes with the notify box checked."
+      expected: |
+        The notify box was CHECKED by default ("On by default: the time,
+        venue or title changed."). The venue and description are live. Sam
+        and Lee get "Venue: … → Studio C, …; Also updated: description".
+
+    - id: 10
+      title: "B10 · Publishing a typo fix without notifying"
+      description: |
+        Edit the title (fix a typo). The notify box is checked by default
+        (title changed) — untick it, then Publish.
+      expected: "The title is live; no notification and no email are sent."
+
+    - id: 11
+      title: "B11 · An admin value wins over a pending source value"
+      description: |
+        Edit at source: change ev-sync-live's location → Save & sync (card
+        appears). Then edit the venue in the panel to something else and
+        Publish.
+      expected: |
+        The admin's venue is live. The Google card disappears (marked
+        "superseded" in history); a source change to other fields would have
+        stayed pending.
+
+    - id: 12
+      title: "B12 · Operational actions stay immediate during a draft"
+      description: |
+        Start a draft (edit the description), then Unpublish the event and
+        move it to another calendar; Republish.
+      expected: |
+        Unpublish/Republish and the calendar move apply at once; the draft
+        card is still there afterwards.
+
+    # ----------------------------------------------------------- submitter
+    - id: 13
+      title: "B13 · A submitter's edit of an approved event waits for review"
+      description: |
+        As Dev User, open any Kizomba Thursday date → "Edit event". Change the
+        venue and save.
+      expected: |
+        The wizard says "Changes sent for review". The event still shows the
+        old venue; Events I added shows "Changes awaiting review: Venue" with
+        "Withdraw changes". As Admin, the panel's card is tagged
+        "Submitter: Dev User" and says it applies to every upcoming date.
+
+    - id: 14
+      title: "B14 · Applying a submitter edit updates the whole series"
+      description: "As Admin, Apply the submitter card."
+      expected: |
+        Every upcoming Kizomba Thursday date shows the new venue (past dates
+        unchanged). Sam (Going on one date) gets "Venue: … → …". Dev User gets
+        "Your edit is live" and is not sent an "Event updated" notification.
+
+    - id: 15
+      title: "B15 · Discarding a submitter edit"
+      description: |
+        As Dev User, change the start time and save. As Admin, Discard it.
+      expected: |
+        Times are unchanged. Dev User gets "Your edit was not accepted";
+        Events I added no longer shows pending changes.
+
+    - id: 16
+      title: "B16 · Pushing a submission to Google does not echo back"
+      description: |
+        As Admin, open a Kizomba Thursday date in the side panel → Show more
+        on the Submission card → "Sync to Google", then run a full (reseed)
+        sync.
+      expected: "No Changes pending card appears for the event."
+
+    # -------------------------------------------------------- source baseline
+    - id: 19
+      title: "B19 · A local fix is not offered back as a revert"
+      description: |
+        After B10 (the published title typo fix), run a full (reseed) sync
+        without editing the source. Then Edit at source: Start 22:00 → Save
+        & sync.
+      expected: |
+        The reseed creates no card, even though Google still has the old
+        title. The Start edit creates one card with Start/End only — not
+        the title — and the live title stays the fixed one.
+
+    - id: 20
+      title: "B20 · Google changing a locally edited field is proposed"
+      description: |
+        Edit at source: change ev-sync-live's title to something new → Save
+        & sync.
+      expected: |
+        A card proposes the title from the admin's fixed value to Google's
+        new one; Apply or Discard as usual.
+
+    # -------------------------------------------------------------- history
+    - id: 18
+      title: "B18 · Emulated source edits stay out of git and reset with the scenario"
+      description: |
+        After the steps above run `git status`, then restart the scenario and
+        open ev-sync-live's "Dev · mock source" card.
+      expected: |
+        git shows no change under scenarios/event-revisions (edits live in the
+        ignored .mock-source-overrides.json). After the restart the card says
+        "Emulate the organiser changing this event in Google." again.
+
+    - id: 17
+      title: "B17 · Change history"
+      description: "Open ev-sync-live → Show change history."
+      expected: |
+        Entries for the applied Google time change (2 notified), the discarded
+        venue, the admin publishes (with and without notifications) and the
+        superseded Google change, each with source, author/decider and the
+        field diff.
+
+    # -------------------------------------------------------------- removal
+    - id: 21
+      title: "B21 · Removing an event tells who saved it"
+      description: |
+        ev-sync-live → "Delete at source…" → confirm and sync. Then sign in
+        as Sam and Lee.
+      expected: |
+        Both get "Event removed · Friday Salsa at Studio A — The organizer
+        removed it from their calendar." in-app (tapping it opens Explore).
+        Mailpit has a "Friday Salsa at Studio A: removed" email to Sam only.

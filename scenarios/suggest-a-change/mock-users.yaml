@@ -1,0 +1,26 @@
+# suggest-a-change cast.
+#   Admin  — applies or discards suggested changes.
+#   Riley  — any signed-in user; suggests changes.
+#   Jamie  — owns the private "Jamie's Private Lesson".
+#   Sam    — saved "Friday Salsa at Studio A"; event-update emails ON.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: riley@example.com
+    name: Riley Stone
+    handle: riley
+    account_visibility: public
+
+  - email: jamie@example.com
+    name: Jamie Cruz
+    handle: jamie
+    account_visibility: public
+
+  - email: sam@example.com
+    name: Sam Lee
+    handle: sam
+    account_visibility: public
+    email_schedule_updates_enabled: true

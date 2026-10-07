@@ -8,6 +8,7 @@ from backend.services.recurrence import (
     MAX_OCCURRENCES,
     expand_occurrences,
     is_open_ended,
+    normalize_all_day,
     normalize_dates,
     normalize_rule,
     validate_rule,
@@ -15,6 +16,22 @@ from backend.services.recurrence import (
 
 START = datetime(2025, 3, 3, 20, 0, tzinfo=timezone.utc)  # a Monday
 END = datetime(2025, 3, 3, 23, 30, tzinfo=timezone.utc)
+
+
+class TestNormalizeAllDay:
+    def test_dates_get_an_exclusive_end(self):
+        assert normalize_all_day("2026-10-05", "2026-10-08") == (
+            datetime(2026, 10, 5, tzinfo=timezone.utc),
+            datetime(2026, 10, 8, tzinfo=timezone.utc),
+        )
+
+    @pytest.mark.parametrize(
+        "start", ["2026-10-04T22:00:00+00:00", "2026-10-05T04:00:00+00:00"]
+    )
+    def test_local_midnight_rounds_to_its_date(self, start):
+        first, end = normalize_all_day(start, start)
+        assert first == datetime(2026, 10, 5, tzinfo=timezone.utc)
+        assert end == first + timedelta(days=1)
 
 
 class TestNormalizeRule:
@@ -157,6 +174,23 @@ class TestExpandOccurrences:
     def test_open_ended_rule_is_capped_without_a_horizon(self):
         result = expand_occurrences(START, END, recurrence_rule="FREQ=WEEKLY")
         assert len(result) == MAX_OCCURRENCES
+
+    def test_local_time_survives_a_dst_change(self):
+        # Thursday 20:00 in Paris (CEST), weekly across the 25 Oct 2026 switch to CET.
+        start = datetime(2026, 10, 15, 18, 0, tzinfo=timezone.utc)
+        result = expand_occurrences(
+            start,
+            start + timedelta(hours=3),
+            recurrence_rule="FREQ=WEEKLY;COUNT=3",
+            timezone_name="Europe/Paris",
+        )
+        assert [s for s, _ in result] == [
+            start,
+            start + timedelta(days=7),
+            start + timedelta(days=14, hours=1),
+        ]
+        assert all(s.tzinfo == timezone.utc for s, _ in result)
+        assert all(e - s == timedelta(hours=3) for s, e in result)
 
     def test_explicit_dates_take_precedence_over_a_rule(self):
         result = expand_occurrences(

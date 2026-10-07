@@ -1,447 +1,359 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ExternalLink, X } from 'lucide-react';
 import useBackToClose from '../hooks/useBackToClose';
 import { decideOrganizerClaim, fetchAdminOrganizerClaims } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
-import type { OrganizerClaimAdmin, OrganizerClaimEvent } from '../types';
+import type { OrganizerClaimAdmin } from '../types';
+import BottomSheet from './BottomSheet';
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
 }
 
-const TABS = ['pending', 'approved', 'rejected', 'all'] as const;
+const TABS = ['pending', 'approved', 'rejected'] as const;
 type Tab = typeof TABS[number];
+const TAB_LABELS: Record<Tab, string> = { pending: 'To review', approved: 'Approved', rejected: 'Not approved' };
 
-const KIND_FILTERS = ['all', 'badge', 'events'] as const;
-type KindFilter = typeof KIND_FILTERS[number];
+const REJECT_REASONS = [
+    "We couldn't confirm you organize these events.",
+    'Please add links that show your organizer activity.',
+    'This event is organized by someone else.',
+];
 
-function statusBadge(status: string) {
-    const colors: Record<string, string> = {
-        pending: 'bg-amber-100 text-amber-700',
-        approved: 'bg-emerald-100 text-success',
-        rejected: 'bg-slate-200 text-ink',
-    };
-    return (
-        <span
-            className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-ink-soft'
-                }`}
-        >
-            {status}
-        </span>
+function formatDate(iso: string | null | undefined) {
+    return iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+}
+
+function claimantName(c: OrganizerClaimAdmin) {
+    return c.user_display_name ?? (c.user_handle ? `@${c.user_handle}` : c.user_email ?? 'user');
+}
+
+function Avatar({ url, size }: { url: string | null; size: 'sm' | 'lg' }) {
+    const cls = size === 'lg' ? 'h-12 w-12' : 'h-10 w-10';
+    return url ? (
+        // eslint-disable-next-line no-restricted-syntax -- avatar is a circle by design
+        <img src={url} alt="" className={`${cls} shrink-0 rounded-full object-cover`} />
+    ) : (
+        // eslint-disable-next-line no-restricted-syntax -- avatar placeholder is a circle by design
+        <span className={`${cls} shrink-0 rounded-full bg-canvas`} aria-hidden />
     );
 }
 
-interface DraftState {
-    grantBadge: boolean;
-    decisions: Record<string, 'approved' | 'rejected' | 'pending'>;
-    adminNotes: string;
-    overwrite: boolean;
-}
-
-function initialDraft(claim: OrganizerClaimAdmin): DraftState {
-    const decisions: Record<string, 'approved' | 'rejected' | 'pending'> = {};
-    for (const ev of claim.events) {
-        decisions[ev.event_id] = ev.decision;
-    }
-    return {
-        // Badge claims: default the grant checkbox ON.
-        // Events claims: badge grant has no effect server-side, keep OFF.
-        grantBadge: claim.kind === 'badge',
-        decisions,
-        adminNotes: claim.admin_notes ?? '',
-        overwrite: false,
-    };
-}
-
+/**
+ * Admin review queue for organizer requests: full-screen on mobile, a wide
+ * side panel on desktop. Tapping a request opens a review sheet with the
+ * claimant's trust signals and one decision per event.
+ */
 export default function OrganizerClaimsAdminPanel({ isOpen, onClose }: Props) {
-    useBackToClose(onClose, isOpen);
-    const [activeTab, setActiveTab] = useState<Tab>('pending');
-    const [kindFilter, setKindFilter] = useState<KindFilter>('all');
+    const [tab, setTab] = useState<Tab>('pending');
     const [rows, setRows] = useState<OrganizerClaimAdmin[]>([]);
     const [loading, setLoading] = useState(false);
-    const [acting, setActing] = useState<string | null>(null);
-    const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
     const [error, setError] = useState<string | null>(null);
-
-    const load = () => {
-        setLoading(true);
-        setError(null);
-        const status = activeTab === 'all' ? undefined : activeTab;
-        const kind = kindFilter === 'all' ? undefined : kindFilter;
-        fetchAdminOrganizerClaims(status, kind)
-            .then((data) => {
-                setRows(data);
-                setDrafts(
-                    Object.fromEntries(data.map((c) => [c.id, initialDraft(c)])),
-                );
-            })
-            .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
-            .finally(() => setLoading(false));
-    };
+    const [selected, setSelected] = useState<OrganizerClaimAdmin | null>(null);
+    const [counts, setCounts] = useState<Partial<Record<Tab, number>>>({});
+    const [countsToken, setCountsToken] = useState(0);
+    useBackToClose(onClose, isOpen && selected === null);
 
     useEffect(() => {
         if (!isOpen) return;
-        load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, activeTab, kindFilter]);
+        let cancelled = false;
+        Promise.all(TABS.map((t) => fetchAdminOrganizerClaims(t).then((list) => [t, list.length] as const)))
+            .then((entries) => { if (!cancelled) setCounts(Object.fromEntries(entries)); })
+            .catch(() => { });
+        return () => { cancelled = true; };
+    }, [isOpen, countsToken]);
 
-    const updateDraft = (claimId: string, patch: Partial<DraftState>) => {
-        setDrafts((prev) => ({
-            ...prev,
-            [claimId]: { ...prev[claimId], ...patch },
-        }));
-    };
-
-    const setDecision = (
-        claimId: string,
-        eventId: string,
-        decision: 'approved' | 'rejected' | 'pending',
-    ) => {
-        setDrafts((prev) => {
-            const cur = prev[claimId];
-            return {
-                ...prev,
-                [claimId]: {
-                    ...cur,
-                    decisions: { ...cur.decisions, [eventId]: decision },
-                },
-            };
-        });
-    };
-
-    const save = async (claim: OrganizerClaimAdmin) => {
-        const draft = drafts[claim.id];
-        if (!draft) return;
-        const approved_event_ids = Object.entries(draft.decisions)
-            .filter(([, d]) => d === 'approved')
-            .map(([id]) => id);
-        const rejected_event_ids = Object.entries(draft.decisions)
-            .filter(([, d]) => d === 'rejected')
-            .map(([id]) => id);
-        setActing(claim.id);
-        try {
-            const updated = await decideOrganizerClaim(claim.id, {
-                grant_badge: draft.grantBadge,
-                approved_event_ids,
-                rejected_event_ids,
-                admin_notes: draft.adminNotes.trim() || null,
-                overwrite: draft.overwrite,
-            });
-            setRows((prev) => prev.map((r) => (r.id === claim.id ? updated : r)));
-            setDrafts((prev) => ({ ...prev, [claim.id]: initialDraft(updated) }));
-            if (activeTab === 'pending' && updated.status !== 'pending') {
-                setRows((prev) => prev.filter((r) => r.id !== claim.id));
-            }
-            notifyAdminDataChanged();
-        } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to save');
-        } finally {
-            setActing(null);
-        }
-    };
+    useEffect(() => {
+        if (!isOpen) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- per-tab fetch lifecycle
+        setLoading(true);
+        setError(null);
+        fetchAdminOrganizerClaims(tab)
+            .then(setRows)
+            .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
+            .finally(() => setLoading(false));
+    }, [isOpen, tab]);
 
     if (!isOpen) return null;
 
+    const onDecided = (updated: OrganizerClaimAdmin) => {
+        setSelected(null);
+        setRows((prev) => prev.filter((r) => r.id !== updated.id));
+        setCountsToken((n) => n + 1);
+        notifyAdminDataChanged();
+    };
+
     return (
-        <div className="fixed inset-0 z-40 flex">
-            <div
-                className="flex-1 bg-black/30"
-                onClick={onClose}
-                aria-hidden="true"
-            />
-            <div className="w-full max-w-3xl bg-surface shadow-xl flex flex-col">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-line">
-                    <h2 className="text-sm font-semibold text-ink">
-                        Organizer claims
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        className="text-muted hover:text-ink text-sm px-2"
-                    >
-                        ✕
+        <div className="fixed inset-0 z-[9000] flex justify-end" role="dialog" aria-modal="true" aria-label="Organizer requests">
+            <button type="button" aria-label="Close" className="hidden flex-1 bg-black/30 md:block" onClick={onClose} />
+            <div className="flex h-full w-full flex-col bg-canvas shadow-xl md:max-w-2xl">
+                <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-3" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+                    <h2 className="text-lg font-bold text-ink">Organizer requests</h2>
+                    <button type="button" onClick={onClose} aria-label="Close" className="flex h-11 w-11 items-center justify-center text-ink-soft hover:text-ink">
+                        <X className="h-5 w-5" aria-hidden />
                     </button>
                 </div>
 
-                <div className="flex border-b border-line">
+                <div role="tablist" className="flex gap-2 overflow-x-auto border-b border-line bg-surface px-4 py-2">
                     {TABS.map((t) => (
                         <button
                             key={t}
-                            onClick={() => setActiveTab(t)}
-                            className={`px-3 py-2 text-xs font-medium capitalize ${activeTab === t
-                                ? 'text-action border-b-2 border-action'
-                                : 'text-ink-soft hover:text-ink'
-                                }`}
-                        >
-                            {t}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-line text-[11px] text-ink-soft">
-                    <span>Kind:</span>
-                    {KIND_FILTERS.map((k) => (
-                        <button
-                            key={k}
                             type="button"
-                            onClick={() => setKindFilter(k)}
-                            className={`px-2 py-0.5 capitalize ${kindFilter === k
-                                ? 'bg-slate-800 text-white'
-                                : 'bg-slate-100 text-ink-soft hover:bg-canvas'
-                                }`}
+                            role="tab"
+                            aria-selected={tab === t}
+                            onClick={() => setTab(t)}
+                            className={`min-h-9 shrink-0 rounded-field border px-3 text-sm font-semibold ${tab === t ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:border-action hover:text-action'}`}
                         >
-                            {k === 'badge'
-                                ? 'Verified badge'
-                                : k === 'events'
-                                    ? 'Events'
-                                    : 'All'}
+                            {TAB_LABELS[t]}{counts[t] !== undefined ? ` (${counts[t]})` : ''}
                         </button>
                     ))}
                 </div>
 
-                {error && (
-                    <div className="px-4 py-2 text-xs text-danger border-b border-red-200 bg-red-50">
-                        {error}
-                    </div>
-                )}
+                {error && <p role="alert" className="border-b border-danger/20 bg-danger/10 px-4 py-2 text-sm text-danger">{error}</p>}
 
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto px-4 py-3" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
                     {loading ? (
-                        <div className="p-6 text-center text-xs text-muted">
-                            Loading…
-                        </div>
+                        <p className="py-8 text-center text-sm text-muted">Loading…</p>
                     ) : rows.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-muted">
-                            No claims
-                        </div>
+                        <p className="py-8 text-center text-sm text-ink-soft">
+                            {tab === 'pending' ? 'Nothing to review. 🎉' : 'No requests.'}
+                        </p>
                     ) : (
-                        <ul className="divide-y divide-slate-100">
-                            {rows.map((claim) => (
-                                <ClaimRow
-                                    key={claim.id}
-                                    claim={claim}
-                                    draft={drafts[claim.id]}
-                                    saving={acting === claim.id}
-                                    onChangeDraft={(patch) => updateDraft(claim.id, patch)}
-                                    onSetDecision={(eventId, decision) =>
-                                        setDecision(claim.id, eventId, decision)
-                                    }
-                                    onSave={() => save(claim)}
-                                />
+                        <ul className="space-y-3">
+                            {rows.map((c) => (
+                                <li key={c.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelected(c)}
+                                        className="flex w-full items-center gap-3 rounded-card border border-card-line bg-surface p-3 text-left hover:border-action"
+                                    >
+                                        <Avatar url={c.user_avatar_url} size="sm" />
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block truncate text-sm font-semibold text-ink">{claimantName(c)}</span>
+                                            <span className="block truncate text-xs text-ink-soft">
+                                                {c.kind === 'badge' && !c.user_is_verified_organizer ? 'Organizer request' : 'Event claim'}
+                                                {c.events.length > 0 ? ` · ${c.events.length} event${c.events.length === 1 ? '' : 's'}` : ''}
+                                                {' · '}{formatDate(c.created_at)}
+                                            </span>
+                                        </span>
+                                        {c.events.some((e) => e.current_organizer_handle || e.competing_pending_claims) && (
+                                            <span className="shrink-0 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Conflict</span>
+                                        )}
+                                    </button>
+                                </li>
                             ))}
                         </ul>
                     )}
                 </div>
             </div>
+            {selected && (
+                <ClaimReviewSheet key={selected.id} claim={selected} onClose={() => setSelected(null)} onDecided={onDecided} />
+            )}
         </div>
     );
 }
 
-interface RowProps {
-    claim: OrganizerClaimAdmin;
-    draft: DraftState | undefined;
-    saving: boolean;
-    onChangeDraft: (patch: Partial<DraftState>) => void;
-    onSetDecision: (
-        eventId: string,
-        decision: 'approved' | 'rejected' | 'pending',
-    ) => void;
-    onSave: () => void;
-}
-
-function ClaimRow({
+function ClaimReviewSheet({
     claim,
-    draft,
-    saving,
-    onChangeDraft,
-    onSetDecision,
-    onSave,
-}: RowProps) {
-    const dirty = useMemo(() => {
-        if (!draft) return false;
-        if ((draft.adminNotes ?? '') !== (claim.admin_notes ?? '')) return true;
-        for (const ev of claim.events) {
-            if (draft.decisions[ev.event_id] !== ev.decision) return true;
-        }
-        const initialGrant = claim.kind === 'badge';
-        return draft.overwrite || draft.grantBadge !== initialGrant;
-    }, [draft, claim]);
+    onClose,
+    onDecided,
+}: {
+    claim: OrganizerClaimAdmin;
+    onClose: () => void;
+    onDecided: (c: OrganizerClaimAdmin) => void;
+}) {
+    const pending = claim.status === 'pending';
+    const takenByOther = (e: OrganizerClaimAdmin['events'][number]) =>
+        Boolean(e.current_organizer_handle && e.current_organizer_handle !== claim.user_handle);
+    const [decisions, setDecisions] = useState<Record<string, 'approved' | 'rejected'>>(() =>
+        Object.fromEntries(claim.events.map((e) => [
+            e.event_id,
+            e.decision === 'pending' ? (takenByOther(e) ? 'rejected' : 'approved') : e.decision,
+        ])),
+    );
+    const [notes, setNotes] = useState(claim.admin_notes ?? '');
+    const [rejecting, setRejecting] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const isBadge = claim.kind === 'badge';
 
-    const isBadgeClaim = claim.kind === 'badge';
-    const isEventsClaim = claim.kind === 'events';
+    const decide = async (approve: boolean) => {
+        setSaving(true);
+        setError(null);
+        const ids = claim.events.map((e) => e.event_id);
+        const approved = approve ? ids.filter((id) => decisions[id] === 'approved') : [];
+        try {
+            const updated = await decideOrganizerClaim(claim.id, {
+                grant_badge: approve,
+                approved_event_ids: approved,
+                rejected_event_ids: ids.filter((id) => !approved.includes(id)),
+                admin_notes: notes.trim() || null,
+                overwrite: claim.events.some((e) => approved.includes(e.event_id) && takenByOther(e)),
+            });
+            onDecided(updated);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to save');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const approvedCount = Object.values(decisions).filter((d) => d === 'approved').length;
+    const approveLabel = isBadge
+        ? claim.events.length ? `Approve organizer + ${approvedCount} event${approvedCount === 1 ? '' : 's'}` : 'Approve organizer'
+        : `Approve ${approvedCount} event${approvedCount === 1 ? '' : 's'}`;
+
+    const footer = !pending ? undefined : rejecting ? (
+        <div className="space-y-2">
+            {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+            <button type="button" onClick={() => decide(false)} disabled={saving} className="flex min-h-12 w-full items-center justify-center rounded-field bg-danger px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                {saving ? 'Saving…' : 'Confirm rejection'}
+            </button>
+            <button type="button" onClick={() => setRejecting(false)} className="flex min-h-11 w-full items-center justify-center text-sm font-semibold text-ink-soft hover:text-ink">
+                Back
+            </button>
+        </div>
+    ) : (
+        <div className="space-y-2">
+            {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+            <div className="flex gap-2">
+                <button type="button" onClick={() => setRejecting(true)} disabled={saving} className="min-h-12 flex-1 rounded-field border border-line bg-surface px-4 text-sm font-semibold text-danger hover:bg-canvas disabled:opacity-50">
+                    Reject
+                </button>
+                <button
+                    type="button"
+                    onClick={() => decide(true)}
+                    disabled={saving || (!isBadge && approvedCount === 0)}
+                    className="min-h-12 flex-[2] rounded-field bg-action px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                >
+                    {saving ? 'Saving…' : approveLabel}
+                </button>
+            </div>
+        </div>
+    );
 
     return (
-        <li className="p-3">
-            <div className="flex items-start gap-3">
-                {claim.user_avatar_url ? (
-                    <img
-                        src={claim.user_avatar_url}
-                        alt=""
-                        className="h-8 w-8 rounded-full object-cover"
-                    />
-                ) : (
-                    <div className="h-8 w-8 rounded-full bg-slate-200" />
-                )}
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm text-ink">
-                            {claim.user_handle
-                                ? `@${claim.user_handle}`
-                                : claim.user_display_name ?? claim.user_email ?? 'user'}
-                        </span>
-                        <span
-                            className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${isBadgeClaim
-                                ? 'bg-indigo-100 text-indigo-700'
-                                : 'bg-sky-100 text-sky-700'
-                                }`}
-                        >
-                            {isBadgeClaim ? 'Verified badge' : 'Events'}
-                        </span>
-                        {statusBadge(claim.status)}
-                        <span className="text-[10px] text-muted">
-                            {new Date(claim.created_at).toLocaleString()}
-                        </span>
+        <BottomSheet
+            title={claimantName(claim)}
+            subtitle={[claim.user_handle ? `@${claim.user_handle}` : null, claim.user_email].filter(Boolean).join(' · ')}
+            headerLeading={<Avatar url={claim.user_avatar_url} size="lg" />}
+            onClose={onClose}
+            footer={footer}
+        >
+            <div className="space-y-5 pb-2">
+                <dl className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-field bg-canvas p-2">
+                        <dt className="text-xs text-ink-soft">Joined</dt>
+                        <dd className="text-sm font-semibold text-ink">{formatDate(claim.user_created_at) || '—'}</dd>
                     </div>
-                    {claim.user_bio && (
-                        <p className="mt-1 text-xs text-ink-soft line-clamp-3">
-                            {claim.user_bio}
-                        </p>
-                    )}
-                    <div className="mt-1 flex gap-3 text-[11px]">
+                    <div className="rounded-field bg-canvas p-2">
+                        <dt className="text-xs text-ink-soft">Organizes</dt>
+                        <dd className="text-sm font-semibold text-ink">{claim.user_organized_count} events</dd>
+                    </div>
+                    <div className="rounded-field bg-canvas p-2">
+                        <dt className="text-xs text-ink-soft">Badge</dt>
+                        <dd className="text-sm font-semibold text-ink">{claim.user_is_verified_organizer ? 'Verified' : 'No'}</dd>
+                    </div>
+                </dl>
+
+                <section>
+                    <h3 className="text-sm font-semibold text-ink">Bio</h3>
+                    <p className="mt-1 whitespace-pre-line text-sm text-ink-soft">{claim.user_bio || '—'}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
                         {claim.user_instagram_url && (
-                            <a
-                                href={claim.user_instagram_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-action hover:underline"
-                            >
-                                Instagram
+                            <a href={claim.user_instagram_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 rounded-field border border-line px-3 text-sm font-semibold text-ink hover:bg-canvas">
+                                Instagram <ExternalLink className="h-4 w-4" aria-hidden />
                             </a>
                         )}
                         {claim.user_facebook_url && (
-                            <a
-                                href={claim.user_facebook_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-action hover:underline"
-                            >
-                                Facebook
+                            <a href={claim.user_facebook_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 rounded-field border border-line px-3 text-sm font-semibold text-ink hover:bg-canvas">
+                                Facebook <ExternalLink className="h-4 w-4" aria-hidden />
+                            </a>
+                        )}
+                        {claim.user_handle && (
+                            <a href={`/u/${claim.user_handle}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-1.5 rounded-field border border-line px-3 text-sm font-semibold text-ink hover:bg-canvas">
+                                Profile <ExternalLink className="h-4 w-4" aria-hidden />
                             </a>
                         )}
                     </div>
-                </div>
-            </div>
+                </section>
 
-            {isEventsClaim && claim.events.length > 0 && (
-                <>
-                    <div className="mt-3 text-[11px] text-ink-soft">
-                        Approving an event attributes it to this user and adds it
-                        to their public calendar as Going.
-                    </div>
-                    <ul className="mt-2 divide-y divide-slate-100 border border-line">
-                        {claim.events.map((ev) => (
-                            <EventDecisionRow
-                                key={ev.event_id}
-                                ev={ev}
-                                decision={draft?.decisions[ev.event_id] ?? ev.decision}
-                                disabled={saving || ev.decision !== 'pending'}
-                                onSet={(d) => onSetDecision(ev.event_id, d)}
-                            />
-                        ))}
-                    </ul>
-                </>
-            )}
+                {claim.events.length > 0 && (
+                    <section>
+                        <h3 className="text-sm font-semibold text-ink">Events</h3>
+                        <p className="mt-0.5 text-xs text-ink-soft">Approved events show this person as organizer and add them as Going.</p>
+                        <ul className="mt-2 space-y-2">
+                            {claim.events.map((e) => {
+                                const d = decisions[e.event_id];
+                                return (
+                                    <li key={e.event_id} className="rounded-field border border-card-line bg-surface p-3">
+                                        <a href={`/event/${e.event_id}`} target="_blank" rel="noreferrer" className="block text-sm font-medium text-ink hover:underline">
+                                            {e.event_title ?? e.event_id}
+                                        </a>
+                                        <p className="text-xs text-ink-soft">{formatDate(e.event_start)}</p>
+                                        {takenByOther(e) && (
+                                            <p className="mt-1 text-xs font-semibold text-amber-700">Currently organized by @{e.current_organizer_handle}. Approving reassigns it.</p>
+                                        )}
+                                        {Boolean(e.competing_pending_claims) && (
+                                            <p className="mt-1 text-xs font-semibold text-amber-700">Also claimed by {e.competing_pending_claims} other request{e.competing_pending_claims === 1 ? '' : 's'}.</p>
+                                        )}
+                                        {pending && !rejecting ? (
+                                            <div className="mt-2 grid grid-cols-2 gap-1" role="radiogroup" aria-label={`Decision for ${e.event_title ?? 'event'}`}>
+                                                {(['approved', 'rejected'] as const).map((opt) => (
+                                                    <button
+                                                        key={opt}
+                                                        type="button"
+                                                        role="radio"
+                                                        aria-checked={d === opt}
+                                                        onClick={() => setDecisions((prev) => ({ ...prev, [e.event_id]: opt }))}
+                                                        className={`min-h-10 rounded-field border text-sm font-semibold ${d === opt ? (opt === 'approved' ? 'border-action bg-action text-white' : 'border-danger bg-danger text-white') : 'border-line bg-surface text-ink-soft'}`}
+                                                    >
+                                                        {opt === 'approved' ? 'Approve' : 'Reject'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className={`mt-1 text-xs font-semibold ${e.decision === 'approved' ? 'text-success' : 'text-ink-soft'}`}>
+                                                {e.decision === 'approved' ? 'Approved' : e.decision === 'rejected' ? 'Rejected' : 'Will be rejected'}
+                                            </p>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </section>
+                )}
 
-            <div className="mt-3 flex items-center gap-3 text-xs">
-                {isBadgeClaim && (
-                    <label className="flex items-center gap-1.5">
-                        <input
-                            type="checkbox"
-                            checked={draft?.grantBadge ?? true}
-                            onChange={(e) =>
-                                onChangeDraft({ grantBadge: e.target.checked })
-                            }
+                {(rejecting || !pending || notes) && (
+                    <section>
+                        <label htmlFor="claim-notes" className="text-sm font-semibold text-ink">
+                            {rejecting ? 'Reason (shown to the requester)' : 'Note to the requester'}
+                        </label>
+                        {rejecting && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                {REJECT_REASONS.map((r) => (
+                                    <button key={r} type="button" onClick={() => setNotes(r)} className="rounded-field border border-line bg-surface px-3 py-1.5 text-left text-xs text-ink hover:border-action">
+                                        {r}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <textarea
+                            id="claim-notes"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            readOnly={!pending}
+                            rows={3}
+                            maxLength={500}
+                            className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-action focus:outline-none"
                         />
-                        Grant verified-organizer badge
-                    </label>
+                    </section>
                 )}
-                {isEventsClaim && (
-                    <label className="flex items-center gap-1.5">
-                        <input
-                            type="checkbox"
-                            checked={draft?.overwrite ?? false}
-                            onChange={(e) =>
-                                onChangeDraft({ overwrite: e.target.checked })
-                            }
-                        />
-                        Overwrite existing organizer
-                    </label>
+                {!pending && claim.reviewed_at && (
+                    <p className="text-xs text-muted">Decided {formatDate(claim.reviewed_at)}{claim.reviewed_by ? ` by ${claim.reviewed_by}` : ''}</p>
                 )}
             </div>
-
-            <textarea
-                value={draft?.adminNotes ?? ''}
-                onChange={(e) => onChangeDraft({ adminNotes: e.target.value })}
-                placeholder="Admin notes (shown to claimer)"
-                rows={2}
-                maxLength={500}
-                className="mt-2 w-full text-xs border border-line px-2 py-1 focus:outline-none focus:border-blue-400"
-            />
-
-            {claim.status === 'pending' && (
-                <div className="mt-2 flex justify-end">
-                    <button
-                        disabled={saving || !dirty}
-                        onClick={onSave}
-                        className="text-[11px] bg-action text-white px-3 py-1 hover:bg-action disabled:opacity-50"
-                    >
-                        {saving ? 'Saving…' : 'Save decision'}
-                    </button>
-                </div>
-            )}
-        </li>
-    );
-}
-
-interface EventRowProps {
-    ev: OrganizerClaimEvent;
-    decision: 'approved' | 'rejected' | 'pending';
-    disabled: boolean;
-    onSet: (d: 'approved' | 'rejected' | 'pending') => void;
-}
-
-function EventDecisionRow({ ev, decision, disabled, onSet }: EventRowProps) {
-    return (
-        <li className="p-2 flex items-center gap-2 text-xs">
-            <div className="flex-1 min-w-0">
-                <div className="truncate text-ink">
-                    {ev.event_title ?? ev.event_id}
-                </div>
-                {ev.event_start && (
-                    <div className="text-[10px] text-muted">
-                        {new Date(ev.event_start).toLocaleString()}
-                    </div>
-                )}
-            </div>
-            <div className="flex gap-1">
-                {(['approved', 'rejected', 'pending'] as const).map((d) => (
-                    <button
-                        key={d}
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => onSet(d)}
-                        className={`px-2 py-0.5 text-[10px] uppercase font-semibold ${decision === d
-                            ? d === 'approved'
-                                ? 'bg-action text-white'
-                                : d === 'rejected'
-                                    ? 'bg-danger text-white'
-                                    : 'bg-slate-300 text-ink'
-                            : 'bg-slate-100 text-ink-soft hover:bg-canvas'
-                            } disabled:opacity-50`}
-                    >
-                        {d}
-                    </button>
-                ))}
-            </div>
-        </li>
+        </BottomSheet>
     );
 }

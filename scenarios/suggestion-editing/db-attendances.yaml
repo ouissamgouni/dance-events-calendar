@@ -1,0 +1,22 @@
+# Occurrence ids come from db-suggestions.yaml: suggestion-{id} is the first
+# date, suggestion-{id}-{n} the n-th after it.
+attendances:
+  # Gina is Going on S2's 3rd and 4th dates — they must stay attached to the
+  # same rows when Olivia moves the practica to Wednesday (UC2).
+  - event_id: suggestion-5e0d0000-0000-4000-8000-000000000002-2
+    email: gina@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: suggestion-5e0d0000-0000-4000-8000-000000000002-3
+    email: gina@example.com
+    share_publicly: true
+    share_audience: public
+  # Gina attended S3 last week and is Going next week.
+  - event_id: suggestion-5e0d0000-0000-4000-8000-000000000003-1
+    email: gina@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: suggestion-5e0d0000-0000-4000-8000-000000000003-3
+    email: gina@example.com
+    share_publicly: true
+    share_audience: public

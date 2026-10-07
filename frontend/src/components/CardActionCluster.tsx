@@ -16,6 +16,7 @@ interface CardActionClusterProps {
     size?: 'sm' | 'md';
     /** Icon style for the going button. */
     goingIconVariant?: 'hand' | 'person';
+    cancelled?: boolean;
 }
 
 /**
@@ -36,6 +37,7 @@ export default function CardActionCluster({
     include = ['save', 'going'],
     size = 'sm',
     goingIconVariant,
+    cancelled = false,
 }: CardActionClusterProps) {
     const summary = useAttendanceSummary(eventId);
     const savedCount = summary?.total_saved ?? 0;
@@ -50,6 +52,7 @@ export default function CardActionCluster({
                         appearance="icon"
                         size={size}
                         stopPropagation
+                        disabled={cancelled}
                         className={isSavedFlag ? 'text-ink' : ''}
                     />
                     {showSaveStats && savedCount > 0 && (
@@ -68,6 +71,7 @@ export default function CardActionCluster({
                         size={size}
                         stopPropagation
                         isPast={isPast}
+                        cancelled={cancelled}
                         iconVariant={goingIconVariant}
                     />
                     {showGoingStats && goingCount > 0 && (

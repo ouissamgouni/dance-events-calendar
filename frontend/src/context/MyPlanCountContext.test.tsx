@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchMyPlanCounts } from '../api';
-import { MyPlanCountProvider, useMyPlanCount } from './MyPlanCountContext';
+import { MyPlanCountProvider, useMyPlanCount, useSetMyPlanCount } from './MyPlanCountContext';
 
 vi.mock('../api', () => ({
     fetchMyPlanCounts: vi.fn(),
@@ -37,5 +37,22 @@ describe('MyPlanCountProvider', () => {
         expect(screen.getByText('event-2:0')).toBeInTheDocument();
         expect(fetchMyPlanCounts).toHaveBeenCalledOnce();
         expect(fetchMyPlanCounts).toHaveBeenCalledWith(['event-1', 'event-2']);
+    });
+
+    it('updates a cached count when the plan changes', async () => {
+        function Clear() {
+            const setCount = useSetMyPlanCount();
+            return <button type="button" onClick={() => setCount('event-1', 0)}>clear</button>;
+        }
+        render(
+            <MyPlanCountProvider>
+                <Count eventId="event-1" />
+                <Clear />
+            </MyPlanCountProvider>,
+        );
+
+        expect(await screen.findByText('event-1:3')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'clear' }));
+        expect(screen.getByText('event-1:0')).toBeInTheDocument();
     });
 });

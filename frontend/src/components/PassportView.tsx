@@ -18,6 +18,8 @@ import {
     X,
 } from 'lucide-react';
 import EventMap from './EventMap';
+import MemoriesStrip from './MemoriesStrip';
+import { useEventAssetSummary } from '../context/EventAssetSummaryContext';
 import PassportActivityHeatmap from './PassportActivityHeatmap';
 import PassportSummaryCard from './PassportSummaryCard';
 import type {
@@ -471,11 +473,44 @@ interface JourneyEntry {
     markers: PassportTimelineMarker[];
 }
 
-function JourneyEntryRow({ entry, anchorMonth, highlighted }: { entry: JourneyEntry; anchorMonth?: string | null; highlighted?: boolean }) {
+function TimelineEventMemories({ eventId, children }: { eventId: string; children: ReactNode }) {
+    const summary = useEventAssetSummary(eventId);
+    const showAddIcon = Boolean(summary?.can_add_memory && summary.memory_thumbs.length === 0);
+    return (
+        <>
+            <div className="flex items-start">
+                <div className="min-w-0 flex-1">{children}</div>
+                {showAddIcon && (
+                    <Link
+                        to={`/event/${encodeURIComponent(eventId)}#memories`}
+                        aria-label="Add memories"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-medium text-action hover:bg-blue-50"
+                    >
+                        <span aria-hidden="true">+📸</span>
+                    </Link>
+                )}
+            </div>
+            <div className="px-1"><MemoriesStrip eventId={eventId} summary={summary ?? undefined} addAffordance="tile" /></div>
+        </>
+    );
+}
+
+function JourneyEntryRow({ entry, anchorMonth, highlighted, showMemories }: { entry: JourneyEntry; anchorMonth?: string | null; highlighted?: boolean; showMemories?: boolean }) {
     const date = railDate(entry.date);
     const place = entry.event
         ? [entry.event.city, entry.event.country].filter(Boolean).join(', ') || entry.event.location
         : null;
+    const eventLink = entry.event && (
+        <Link to={`/event/${entry.event.event_id}`} className="group block px-1 pb-2 pt-0.5">
+            <div className="text-sm font-semibold leading-5 text-ink group-hover:text-action">{entry.event.title}</div>
+            {place && (
+                <div className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{place}</span>
+                </div>
+            )}
+        </Link>
+    );
     return (
         <li className="relative grid grid-cols-[3rem_1.25rem_minmax(0,1fr)] gap-x-2 pb-5 last:pb-1" data-month-anchor={anchorMonth ?? undefined} data-testid="journey-entry">
             <div className="pt-0.5 text-center leading-none">
@@ -487,17 +522,9 @@ function JourneyEntryRow({ entry, anchorMonth, highlighted }: { entry: JourneyEn
                 <span className="relative z-10 mt-2 h-2.5 w-2.5 rounded-full bg-brand ring-[3px] ring-canvas" aria-hidden="true" />
             </div>
             <div className={`min-w-0 ${highlighted ? 'rounded-card bg-blue-50 ring-2 ring-action' : ''}`}>
-                {entry.event && (
-                    <Link to={`/event/${entry.event.event_id}`} className="group block px-1 pb-2 pt-0.5">
-                        <div className="text-sm font-semibold leading-5 text-ink group-hover:text-action">{entry.event.title}</div>
-                        {place && (
-                            <div className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
-                                <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                <span className="truncate">{place}</span>
-                            </div>
-                        )}
-                    </Link>
-                )}
+                {entry.event && (showMemories
+                    ? <TimelineEventMemories eventId={entry.event.event_id}>{eventLink}</TimelineEventMemories>
+                    : eventLink)}
                 {entry.markers.length > 0 && (
                     <div className="max-w-[420px] divide-y divide-orange-100">
                         {entry.markers.map((marker) => <MilestoneCard key={marker.key} marker={marker} />)}
@@ -696,6 +723,8 @@ export interface PassportViewProps {
     mapEvents?: PassportMapEvent[] | null;
     onNeedMapEvents?: () => void;
     onTimelineSearch?: (query: string) => void;
+    /** Owner view: show memory thumbnails under each timeline event. */
+    showTimelineMemories?: boolean;
 }
 
 export default function PassportView({
@@ -719,6 +748,7 @@ export default function PassportView({
     mapEvents = null,
     onNeedMapEvents,
     onTimelineSearch,
+    showTimelineMemories = false,
 }: PassportViewProps) {
     const [tab, setTab] = useState<PassportTab>(initialTab);
     const [selectedCategory, setSelectedCategory] = useState<MilestoneCategoryKey | null>(null);
@@ -899,6 +929,7 @@ export default function PassportView({
                                                                 entry={entry}
                                                                 anchorMonth={entry.event ? monthAnchorIds.get(entry.event.event_id) ?? null : null}
                                                                 highlighted={entry.event != null && highlightMonth != null && entry.event.start.slice(0, 7) === highlightMonth}
+                                                                showMemories={showTimelineMemories}
                                                             />
                                                         ))}
                                                     </ul>

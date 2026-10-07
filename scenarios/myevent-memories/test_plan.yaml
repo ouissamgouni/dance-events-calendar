@@ -1,0 +1,83 @@
+test_plan:
+  name: "My event memories"
+  description: >
+    A Going user adds up to 5 photos to a past event, from its start until
+    30 days later. Photos are private by default and can be shared with
+    friends or with other attendees. Memories are seeded through the real
+    pipeline from db-event-assets.yaml.
+
+  preconditions:
+    - "task start:scenario SCENARIO=myevent-memories"
+    - "Sign in as mia@example.com (Mia)."
+
+  steps:
+    - id: 1
+      title: "Past card shows a memories strip"
+      description: "Open My Events → Past."
+      expected: >
+        'Paris Friday Salsa' shows 3 thumbnails; 'Lyon Bachata Night' shows
+        3 thumbnails and "+2". 'Brussels Kizomba Night' shows "+ Add
+        memories · until <date>". 'Lille' shows no memories row at all;
+        'Nantes' shows its single photo. The review row is unchanged below.
+
+    - id: 2
+      title: "Event detail memories grid"
+      description: "Open 'Paris Friday Salsa (3 memories, shared)'."
+      expected: >
+        A "Memories" section shows "3 / 5", one tile per photo with a
+        visibility icon (only me / friends / people who went), Ana's photo
+        with her name, and "Add memories until <date>".
+
+    - id: 3
+      title: "Change visibility and caption"
+      description: "Open a photo, change 'Who can see' and edit the caption."
+      expected: "The change is saved and the tile icon updates."
+
+    - id: 4
+      title: "Limit reached"
+      description: "Open 'Lyon Bachata Night (5 memories, at limit)'."
+      expected: "Counter '5 / 5'; the Add tile is disabled."
+
+    - id: 5
+      title: "Upload a real memory"
+      description: >
+        From the Past card of 'Brussels Kizomba Night', tap "+ Add memories"
+        and pick a phone photo.
+      expected: >
+        The photo is resized in the browser before upload and appears in the
+        strip. A PDF is rejected ("Memories must be JPEG, PNG or WebP
+        images").
+
+    - id: 6
+      title: "Window closed"
+      description: "Open 'Lille Salsa Night (window closed, none)'."
+      expected: "No Add tile; 'Upload window closed'."
+
+    - id: 7
+      title: "GPS removed"
+      description: >
+        Open 'Nantes Salsa Night', open the photo, download it and inspect
+        its EXIF.
+      expected: "No GPS (or any EXIF) data in the stored file."
+
+    - id: 8
+      title: "Upcoming event"
+      description: "Open 'Marseille Rueda Social (upcoming)'."
+      expected: "No Memories section."
+
+    - id: 9
+      title: "Friend sees only friends photos"
+      description: "Sign in as fred@example.com and open 'Paris Friday Salsa'."
+      expected: "Only 'Best rueda ever' is visible, with Mia's name. No Add tile."
+
+    - id: 10
+      title: "Attendee sees attendees photos"
+      description: "Sign in as ana@example.com and open 'Paris Friday Salsa'."
+      expected: >
+        Ana sees 'The whole crowd' (Mia) and her own photo, not Mia's private
+        or friends-only photos.
+
+    - id: 11
+      title: "Stranger sees nothing"
+      description: "Sign in as stan@example.com and open 'Paris Friday Salsa'."
+      expected: "No Memories section."

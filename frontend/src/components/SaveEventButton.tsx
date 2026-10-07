@@ -19,6 +19,7 @@ interface Props {
     stopPropagation?: boolean;
     className?: string;
     labelClassName?: string;
+    disabled?: boolean;
 }
 
 function SavedBookmarkIcon({ className }: { className: string }) {
@@ -36,6 +37,7 @@ export default function SaveEventButton({
     stopPropagation = false,
     className = '',
     labelClassName = '',
+    disabled = false,
 }: Props) {
     const { isSaved, toggleSave, setSavedAudience, getSavedAudience } = useSavedEvents();
     const { user } = useAuth();
@@ -173,7 +175,8 @@ export default function SaveEventButton({
                 <button
                     ref={buttonRef}
                     onClick={handleClick}
-                    className={`flex h-10 items-center gap-2 rounded-xl bg-action-tile px-3 text-sm transition-colors focus-visible:outline-none ${className} ${saved ? 'text-saved' : 'text-ink-soft hover:text-ink'}`.trim()}
+                    disabled={disabled}
+                    className={`flex h-10 items-center gap-2 rounded-xl bg-action-tile px-3 text-sm transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${className} ${saved ? 'text-saved' : 'text-ink-soft hover:text-ink disabled:hover:text-ink-soft'}`.trim()}
                     aria-label={saved ? 'Unsave event' : 'Save event'}
                 >
                     <span className="flex h-[22px] w-[22px] items-center justify-center" aria-hidden="true">
@@ -207,7 +210,8 @@ export default function SaveEventButton({
             <button
                 ref={buttonRef}
                 onClick={handleClick}
-                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-action-tile transition-colors focus-visible:outline-none ${className} ${saved ? 'text-saved' : 'text-ink-soft hover:text-ink'}`.trim()}
+                disabled={disabled}
+                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-action-tile transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${className} ${saved ? 'text-saved' : 'text-ink-soft hover:text-ink disabled:hover:text-ink-soft'}`.trim()}
                 aria-label={saved ? 'Unsave event' : 'Save event'}
             >
                 <span className="flex h-[22px] w-[22px] items-center justify-center" aria-hidden="true">

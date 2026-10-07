@@ -1,0 +1,38 @@
+# Seeded tickets (files from scenarios/default/event-assets/).
+assets:
+  - {
+      event_id: evt-ticket-u1,
+      email: tina@example.com,
+      kind: ticket,
+      file: ticket-pass.pdf,
+    }
+  - {
+      event_id: evt-ticket-u2,
+      email: tina@example.com,
+      kind: ticket,
+      file: ticket-qr.png,
+    }
+  - {
+      event_id: evt-ticket-u2,
+      email: tina@example.com,
+      kind: ticket,
+      file: ticket-barcode.png,
+    }
+  - {
+      event_id: evt-ticket-u3,
+      email: tina@example.com,
+      kind: ticket_link,
+      url: "https://example.com/tickets/TEST-0003",
+    }
+  - {
+      event_id: evt-ticket-p1,
+      email: tina@example.com,
+      kind: ticket,
+      file: ticket-pass.pdf,
+    }
+  - {
+      event_id: evt-ticket-p2,
+      email: tina@example.com,
+      kind: ticket,
+      file: ticket-qr.png,
+    }

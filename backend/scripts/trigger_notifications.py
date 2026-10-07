@@ -327,7 +327,14 @@ def _render_terse(report: dict) -> str:
     if stats.get("skipped") == "locked":
         lines.append("  SKIPPED: advisory lock held by another instance")
     else:
-        for phase in ("reminders", "interest", "activity", "review_prompt"):
+        for phase in (
+            "reminders",
+            "interest",
+            "activity",
+            "review_prompt",
+            "ticket_prompt",
+            "memories_prompt",
+        ):
             v = stats.get(phase)
             if v is not None:
                 lines.append(f"  {phase:<9}: {v}")
@@ -444,6 +451,9 @@ def _render_text(report: dict) -> str:
             lines.append(f"  activity  : {a}")
         if rp is not None:
             lines.append(f"  review_prompt : {rp}")
+        for phase in ("ticket_prompt", "memories_prompt"):
+            if stats.get(phase) is not None:
+                lines.append(f"  {phase} : {stats[phase]}")
         if only != "all":
             lines.append(
                 f"             (--only {only}: other phases skipped in this run)"

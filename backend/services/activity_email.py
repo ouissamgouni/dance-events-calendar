@@ -61,7 +61,8 @@ from backend.services.notification_delivery import record_delivery, tracked_url
 from backend.services.notifications import filter_privacy_safe_notifications
 from backend.services.event_visibility import eligible_event_ids
 from backend.services.event_images import resolve_event_image
-from backend.services.push_service import send_push
+from backend.services.push_service import PushTransientError, send_push
+from backend.services.timezones import to_event_local
 from backend.services.user_avatars import resolve_user_avatar
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,24 @@ ACTIVITY_KINDS = (
     "event_message",
     "event_message_reply",
     "plan_session_added",
+)
+
+# Kinds created during requests. Their instant email + push are sent by the
+# post-request ``deliver`` job (``push_jobs``); the dispatch tick sweeps misses.
+FAST_PUSH_KINDS = frozenset(
+    {
+        "subscription_going",
+        "subscription_suggested",
+        "subscription_review",
+        "subscription_milestone",
+        "new_follower",
+        "new_friend",
+        "follow_request",
+        "follow_request_approved",
+        "event_message",
+        "event_message_reply",
+        "plan_session_added",
+    }
 )
 
 # One-to-one map from notification kind → feature bucket. Every kind in
@@ -516,6 +535,8 @@ def run_once(
     kinds: tuple[str, ...] | None = None,
     max_notifications_per_user: int | None = None,
     resend: bool = False,
+    immediate_only: bool = False,
+    source: str = "tick",
 ) -> dict:
     """Send pending activity digest emails and push notifications.
 
@@ -552,6 +573,13 @@ def run_once(
     cap keeps. Used by the admin "send now" control's "Resend" checkbox
     to force a re-delivery of recent activity a user already received —
     e.g. after fixing an email template, or for a manual re-notify.
+
+    ``immediate_only`` skips the digest path (instant email + push only); used
+    by the post-request ``deliver`` job. ``source`` is recorded on each
+    delivery-log row.
+
+    Pending rows are claimed with ``FOR UPDATE SKIP LOCKED`` until commit, so
+    a concurrent job and tick never deliver the same row twice.
     """
     if not get_activity_digest_email_enabled():
         return {"skipped": "activity_email_disabled"}
@@ -585,9 +613,12 @@ def run_once(
         )
         if not resend:
             pending_clauses = [
-                Notification.emailed_at.is_(None),  # type: ignore[union-attr]
                 Notification.pushed_at.is_(None),  # type: ignore[union-attr]
             ]
+            if not immediate_only:
+                pending_clauses.append(
+                    Notification.emailed_at.is_(None)  # type: ignore[union-attr]
+                )
             # Only widen the candidate pool to un-instant-emailed rows when
             # at least one feature is actually in instant mode; otherwise
             # already-digested rows would re-select on every tick forever.
@@ -598,6 +629,7 @@ def run_once(
             stmt = stmt.where(or_(*pending_clauses))
         if user_ids is not None:
             stmt = stmt.where(Notification.recipient_user_id.in_(user_ids))  # type: ignore[union-attr]
+        stmt = stmt.with_for_update(skip_locked=True, of=Notification)
         pending = session.exec(stmt).all()
         event_ids = {n.event_id for n in pending if n.event_id}
         visible_event_ids = eligible_event_ids(session, event_ids)
@@ -736,7 +768,8 @@ def run_once(
                 and bool(feat_instant.get(feature))
             )
             if (
-                (resend or n.emailed_at is None)
+                not immediate_only
+                and (resend or n.emailed_at is None)
                 and feature is not None
                 and feat_digest.get(feature, True)
                 and not instant_owned
@@ -844,7 +877,10 @@ def run_once(
                 return None
             bits: list[str] = []
             if event.start is not None:
-                bits.append(event.start.strftime("%b %-d"))
+                local = to_event_local(
+                    event.start, None if event.all_day else event.timezone
+                )
+                bits.append(local.strftime("%b %-d"))
             if event.city:
                 bits.append(event.city)
             elif event.location:
@@ -1048,10 +1084,12 @@ def run_once(
                 sent += 1
                 if ok:
                     for nid in delivered_ids:
-                        record_delivery(session, nid, "email", now)
+                        record_delivery(
+                            session, nid, "email", now, mode="digest", source=source
+                        )
             return sent
 
-        def _send_email_groups(groups: dict) -> int:
+        def _send_email_groups(groups: dict, mode: str) -> int:
             sent = 0
             for (recipient_id, feature), notifs in groups.items():
                 recipient = users[recipient_id]
@@ -1111,15 +1149,17 @@ def run_once(
                 sent += 1
                 if ok:
                     for n in visible:
-                        record_delivery(session, n.id, "email", now)
+                        record_delivery(
+                            session, n.id, "email", now, mode=mode, source=source
+                        )
             return sent
 
         digests = (
             _send_combined_digests(email_groups)
             if digest_v2
-            else _send_email_groups(email_groups)
+            else _send_email_groups(email_groups, "digest")
         )
-        instant_emails = _send_email_groups(instant_groups)
+        instant_emails = _send_email_groups(instant_groups, "instant")
 
         def _interest_push_payload(
             notifications: list[Notification],
@@ -1154,14 +1194,29 @@ def run_once(
             return f"New match: {alert}", body, tracked_url(url, headline.id, "push")
 
         pushed = 0
+        push_retry_ids: set = set()
+
+        def _push(recipient_id, notifs: list[Notification], **kwargs) -> int:
+            try:
+                return send_push(
+                    recipient_id,
+                    topic=kwargs["tag"],
+                    raise_on_transient=True,
+                    **kwargs,
+                )
+            except PushTransientError:
+                push_retry_ids.update(n.id for n in notifs)
+                return 0
+
         for (recipient_id, feature), notifs in push_groups.items():
             visible = [n for n in notifs if not _skip_past(n)]
             if not visible:
                 continue
             if feature == "interest_matches":
                 title, body, url = _interest_push_payload(visible)
-                delivered = send_push(
+                delivered = _push(
                     recipient_id,
+                    visible,
                     title=title,
                     body=body,
                     url=url,
@@ -1170,7 +1225,7 @@ def run_once(
                 pushed += delivered
                 if delivered:
                     for n in visible:
-                        record_delivery(session, n.id, "push", now)
+                        record_delivery(session, n.id, "push", now, source=source)
                 continue
             logical_groups = _logical_groups(visible)
             first_group = logical_groups[0]
@@ -1191,8 +1246,9 @@ def run_once(
             )
             extra = len(logical_groups) - 1
             body = first if extra <= 0 else f"{first} and {extra} more"
-            delivered = send_push(
+            delivered = _push(
                 recipient_id,
+                visible,
                 title="Movida",
                 body=body,
                 url=tracked_url("/notifications", first_notification.id, "push"),
@@ -1201,7 +1257,7 @@ def run_once(
             pushed += delivered
             if delivered:
                 for n in visible:
-                    record_delivery(session, n.id, "push", now)
+                    record_delivery(session, n.id, "push", now, source=source)
 
         # Stamp emailed_at on every notification considered for email this
         # run (whether emailed, or suppressed by the recipient's email
@@ -1213,6 +1269,8 @@ def run_once(
         # the email schedule gate or a per-channel cap stay unstamped on
         # that channel and roll into a future run.
         stamped = 0
+        # From the tick, these are request-created rows the deliver job missed.
+        fast_pushed = 0
         for n in included_for_email:
             n.emailed_at = now
             stamped += 1
@@ -1220,8 +1278,12 @@ def run_once(
             n.instant_emailed_at = now
             stamped += 1
         for n in included_for_push:
+            if n.id in push_retry_ids:
+                continue
             n.pushed_at = now
             stamped += 1
+            if n.kind in FAST_PUSH_KINDS:
+                fast_pushed += 1
             if n.kind == "interest_event":
                 user = users.get(n.recipient_user_id)
                 if user is not None:
@@ -1235,11 +1297,18 @@ def run_once(
         session.commit()
 
     logger.info(
-        "Activity digest run: %d emails, %d pushes, %d stamped, %d off-schedule "
+        "Activity delivery run (source=%s immediate_only=%s): %d digest emails, "
+        "%d instant emails, %d pushes (%d fast-kind rows), %d push retries, "
+        "%d stamped, %d off-schedule "
         "(wrong_weekday=%d before_scheduled_time=%d already_sent_today=%d), %d recipient(s) capped, "
         "%d interest push(es) deferred to schedule",
+        source,
+        immediate_only,
         digests,
+        instant_emails,
         pushed,
+        fast_pushed,
+        len(push_retry_ids),
         stamped,
         skipped_off_schedule,
         skip_reason_counts.get("wrong_weekday", 0),
@@ -1252,6 +1321,8 @@ def run_once(
         "digests": digests,
         "instant_emails": instant_emails,
         "pushed": pushed,
+        "fast_pushed": fast_pushed,
+        "push_retry": len(push_retry_ids),
         "stamped": stamped,
         "skipped_off_schedule": skipped_off_schedule,
         "interest_push_deferred": interest_push_deferred,
@@ -1261,3 +1332,13 @@ def run_once(
         ],
         "capped_recipients": len(capped_recipient_ids),
     }
+
+
+def deliver_immediate(user_ids: set, source: str = "job") -> dict:
+    """Instant email + push for ``user_ids``' request-created rows; never digests."""
+    return run_once(
+        user_ids=user_ids,
+        kinds=tuple(FAST_PUSH_KINDS),
+        immediate_only=True,
+        source=source,
+    )

@@ -271,3 +271,7 @@ export function useAttendingEvents(): AttendingEventsContextValue {
     if (!ctx) throw new Error('useAttendingEvents must be used within AttendingEventsProvider');
     return ctx;
 }
+
+export function useOptionalAttendingEvents(): AttendingEventsContextValue | null {
+    return useContext(AttendingEventsContext);
+}

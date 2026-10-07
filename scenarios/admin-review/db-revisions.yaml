@@ -1,0 +1,152 @@
+# Changes of every kind, source and outcome (backend/db/seed.py
+# _seed_event_revisions). Open "New event" and "Go public" changes come from
+# the seeded new events and pending submission; only history is listed here
+# for those two kinds.
+base_week: 0
+revisions:
+  # ---------------------------------------------------------------- open
+  - event_id: ev-edit-user
+    source: user
+    status: pending
+    proposed_by: riley@example.com
+    changes:
+      title:
+        { old: Salsa Social at Club Havanna, new: Salsa Social at Club Havana }
+
+  - event_id: ev-edit-organizer
+    source: organizer
+    status: pending
+    proposed_by: olivia@example.com
+    changes:
+      start: { old: w1 Sat 21:00, new: w1 Sat 22:00 }
+      end: { old: w1 Sat 23:59, new: w1 Sat 23:59 }
+
+  - event_id: ev-cancel-request
+    source: organizer
+    status: pending
+    proposed_by: olivia@example.com
+    changes:
+      is_cancelled: { old: false, new: true }
+      cancellation_note: { old: null, new: The venue closed for renovation. }
+
+  - event_id: ev-remove-request
+    source: sync
+    status: pending
+    changes:
+      status: { old: published, new: removed }
+      status_reason: { old: null, new: google_calendar }
+
+  - event_id: ev-draft
+    source: admin
+    status: draft
+    proposed_by_admin: admin@example.com
+    changes:
+      description:
+        { old: null, new: Five hours of on2 technique and partnerwork. }
+
+  - suggestion_id: 5e0d0000-0000-4000-8000-0000000000b4
+    source: submitter
+    status: pending
+    proposed_by: olivia@example.com
+    changes:
+      location:
+        {
+          old: "Salsa Lounge, Kastanienallee 7, 10435 Berlin",
+          new: "Salsa Lounge (2nd floor), Kastanienallee 7, 10435 Berlin",
+        }
+
+  # Google moved every Wednesday Rueda by 30 minutes: one Review row.
+  - event_id: ev-rueda-1
+    source: sync
+    status: pending
+    changes:
+      start: { old: w1 Wed 19:00, new: w1 Wed 19:30 }
+      end: { old: w1 Wed 21:00, new: w1 Wed 21:30 }
+  - event_id: ev-rueda-2
+    source: sync
+    status: pending
+    changes:
+      start: { old: w2 Wed 19:00, new: w2 Wed 19:30 }
+      end: { old: w2 Wed 21:00, new: w2 Wed 21:30 }
+  - event_id: ev-rueda-3
+    source: sync
+    status: pending
+    changes:
+      start: { old: w3 Wed 19:00, new: w3 Wed 19:30 }
+      end: { old: w3 Wed 21:00, new: w3 Wed 21:30 }
+
+  # ---------------------------------------------------------------- closed
+  - event_id: ev-live-sunday
+    source: user
+    status: accepted
+    proposed_by: riley@example.com
+    decided_by: admin@example.com
+    changes:
+      description: { old: Open practice., new: Open practica, all levels. }
+
+  - event_id: ev-live-sunday
+    source: user
+    status: rejected
+    proposed_by: riley@example.com
+    decided_by: admin@example.com
+    changes:
+      price_min: { old: null, new: 50 }
+
+  - event_id: ev-live-sunday
+    source: user
+    status: withdrawn
+    proposed_by: sam@example.com
+    changes:
+      title: { old: Sunday Bachata Practica, new: Sunday Bachata Practice }
+
+  - event_id: ev-live-sunday
+    source: sync
+    status: superseded
+    changes:
+      end: { old: w1 Sun 21:00, new: w1 Sun 21:30 }
+
+  - event_id: ev-edit-organizer
+    source: organizer
+    status: reverted
+    proposed_by: olivia@example.com
+    decided_by: admin@example.com
+    changes:
+      title: { old: Kizomba Lounge, new: KIZOMBA LOUNGE!!! }
+
+  - event_id: ev-removed-rejected
+    kind: create
+    source: sync
+    status: rejected
+    decided_by: admin@example.com
+    changes: {}
+
+  - event_id: ev-removed-admin
+    kind: create
+    source: sync
+    status: closed
+    changes: {}
+
+  - event_id: ev-live-friday
+    kind: create
+    source: sync
+    status: accepted
+    decided_by: admin@example.com
+    changes: {}
+
+  - suggestion_id: 5e0d0000-0000-4000-8000-0000000000b3
+    kind: go_public
+    source: submitter
+    status: rejected
+    proposed_by: olivia@example.com
+    decided_by: admin@example.com
+    changes:
+      visibility: { old: private, new: public }
+
+  - suggestion_id: 5e0d0000-0000-4000-8000-0000000000b4
+    kind: go_public
+    source: submitter
+    status: accepted
+    proposed_by: olivia@example.com
+    decided_by: admin@example.com
+    changes:
+      visibility: { old: private, new: public }

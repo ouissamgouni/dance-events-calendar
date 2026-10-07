@@ -367,13 +367,19 @@ def test_post_blocked_on_past_event(client, session):
 
 
 @pytest.mark.unit
-def test_instant_delivery_fires_at_post_time(client, session, event, monkeypatch):
-    """When the admin has enabled instant email for event messages, posting a
-    message delivers the email immediately (no scheduler tick) with a
-    content-aware subject, stamping ``instant_emailed_at`` on the recipient's
-    notification so the digest scheduler skips it."""
-    from backend.db.models import SiteSetting
+def test_instant_delivery_runs_in_deliver_job_not_request(
+    client, session, engine, event, monkeypatch
+):
+    """When the admin has enabled instant email for event messages, posting
+    sends nothing inline; the per-recipient deliver job then sends the
+    content-aware email + push, stamping ``instant_emailed_at``/``pushed_at``
+    so the digest scheduler skips them."""
+    from backend.db.models import NotificationDelivery, SiteSetting
     from backend.services import event_message_instant as em_instant
+    from backend.services import push_jobs
+
+    # The deliver job opens its own sessions on the app engine.
+    monkeypatch.setattr("backend.db.database._engine", engine)
 
     # Admin routes event messages to instant email.
     session.add(SiteSetting(key="event_messages_email_instant", value="true"))
@@ -381,6 +387,7 @@ def test_instant_delivery_fires_at_post_time(client, session, event, monkeypatch
 
     # Capture the content-aware email instead of really sending it.
     sent: list = []
+    pushes: list = []
     monkeypatch.setattr(
         em_instant,
         "send_event_message_instant_email",
@@ -389,7 +396,12 @@ def test_instant_delivery_fires_at_post_time(client, session, event, monkeypatch
             or True
         ),
     )
-    monkeypatch.setattr(em_instant, "webpush_configured", lambda: False)
+    monkeypatch.setattr(em_instant, "webpush_configured", lambda: True)
+    monkeypatch.setattr(
+        em_instant,
+        "send_push",
+        lambda user_id, **kw: pushes.append((user_id, kw["title"], kw["topic"])) or 1,
+    )
 
     # Bob is engaged (Going) before Alice posts, and has an email on file.
     assert _login(client, email="bob@example.com").status_code == 200
@@ -410,12 +422,18 @@ def test_instant_delivery_fires_at_post_time(client, session, event, monkeypatch
         json={"category": "question", "body": "Is parking available nearby?"},
     )
     assert posted.status_code == 201
+    assert sent == [] and pushes == []  # nothing sent on the request path
 
-    # Email was dispatched instantly to the engaged recipient.
+    push_jobs.deliver_for_recipient(str(bob.id))
+
     assert len(sent) == 1
     assert sent[0][0] == "bob@example.com"
     assert sent[0][2] == "event_message"
     assert sent[0][3] == "question"
+    assert len(pushes) == 1
+    assert pushes[0][0] == bob.id
+    assert "asked a question" in pushes[0][1]
+    assert pushes[0][2] == f"event-messages-{event.event_id}"
 
     notif = session.exec(
         select(Notification)
@@ -423,16 +441,34 @@ def test_instant_delivery_fires_at_post_time(client, session, event, monkeypatch
         .where(Notification.kind == "event_message")
     ).first()
     assert notif is not None
+    session.refresh(notif)
     assert notif.instant_emailed_at is not None
+    assert notif.pushed_at is not None
+    deliveries = session.exec(
+        select(NotificationDelivery)
+        .where(NotificationDelivery.notification_id == notif.id)
+        .where(NotificationDelivery.channel != "app")
+    ).all()
+    assert {(d.channel, d.mode, d.source) for d in deliveries} == {
+        ("email", "instant", "job"),
+        ("push", None, "job"),
+    }
+
+    # Idempotent: a second run (retry or tick sweep) sends nothing more.
+    push_jobs.deliver_for_recipient(str(bob.id))
+    assert len(sent) == 1 and len(pushes) == 1
 
 
 @pytest.mark.unit
 def test_instant_delivery_skipped_when_admin_toggle_off(
-    client, session, event, monkeypatch
+    client, session, engine, event, monkeypatch
 ):
-    """With instant email disabled (default), posting does not deliver an
+    """With instant email disabled (default), the deliver job sends no
     instant email — the notification stays pending for the digest scheduler."""
     from backend.services import event_message_instant as em_instant
+    from backend.services import push_jobs
+
+    monkeypatch.setattr("backend.db.database._engine", engine)
 
     sent: list = []
     monkeypatch.setattr(
@@ -460,6 +496,7 @@ def test_instant_delivery_skipped_when_admin_toggle_off(
         json={"category": "question", "body": "Any beginner lesson first?"},
     )
     assert posted.status_code == 201
+    push_jobs.deliver_for_recipient(str(bob.id))
 
     assert sent == []
     notif = session.exec(

@@ -1,0 +1,23 @@
+# Both events ended yesterday evening relative to seeding time (inside the
+# 72h lookback, past the 6h minimum).
+base_week: 0
+events:
+  - id: evt-mp-rooftop
+    calendar_id: memories-prompt-cal
+    title: Rooftop Salsa Social
+    location: Skybar, Lisbon, Portugal
+    latitude: 38.7139
+    longitude: -9.1394
+    start: now-32h
+    end: now-28h
+    tags: [dance-style:salsa, format:social, reach:local]
+
+  - id: evt-mp-bachata
+    calendar_id: memories-prompt-cal
+    title: Bachata Night at the Docks
+    location: Docas, Lisbon, Portugal
+    latitude: 38.7038
+    longitude: -9.1741
+    start: now-31h
+    end: now-27h
+    tags: [dance-style:bachata, format:social, reach:local]

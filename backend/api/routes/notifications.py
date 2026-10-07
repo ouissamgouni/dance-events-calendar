@@ -40,8 +40,8 @@ from backend.db.models import (
 )
 from backend.services.user_avatars import resolve_user_avatar
 from backend.services.event_visibility import (
+    apply_event_visibility,
     event_is_user_facing,
-    show_pending_events_enabled,
 )
 from backend.services.notifications import (
     filter_privacy_safe_notifications,
@@ -64,6 +64,8 @@ VALID_KINDS = {
     "follow_request_approved",
     "event_reminder",
     "event_review_prompt",
+    "event_ticket_prompt",
+    "event_memories_prompt",
     "interest_event",
     "promo_code_approved",
     "promo_code_rejected",
@@ -77,6 +79,18 @@ VALID_KINDS = {
     "plan_session_added",
     "schedule_program_available",
     "schedule_program_updated",
+    "event_changed",
+    "suggestion_approved",
+    "suggestion_declined",
+    "suggestion_rejected",
+    "suggestion_change_applied",
+    "suggestion_change_discarded",
+    "event_change_applied",
+    "event_change_declined",
+    "event_change_reverted",
+    "event_removed",
+    "event_cancelled",
+    "organizer_assigned",
 }
 
 
@@ -111,6 +125,10 @@ MATCHED_EVENTS_CAP = 20
 CATEGORY_KINDS: dict[str, set[str]] = {
     "plans": {
         "event_reminder",
+        "event_ticket_prompt",
+        "event_changed",
+        "event_removed",
+        "event_cancelled",
         "planned_session_changed",
         "schedule_program_available",
         "schedule_program_updated",
@@ -128,7 +146,7 @@ CATEGORY_KINDS: dict[str, set[str]] = {
         "follow_request",
         "follow_request_approved",
     },
-    "reviews": {"subscription_review", "event_review_prompt"},
+    "reviews": {"subscription_review", "event_review_prompt", "event_memories_prompt"},
     "milestones": {"subscription_milestone", "milestone_unlocked"},
 }
 # Tribe > Activity feed: friend/follow-triggered kinds only.
@@ -159,11 +177,9 @@ def _local_date(notification: Notification, tz: tzinfo):
     return _as_utc(notification.created_at).astimezone(tz).date()
 
 
-def _apply_visibility(statement, session: Session):
-    if show_pending_events_enabled(session):
-        return statement
-    visible_event_ids = select(CachedEvent.event_id).where(
-        CachedEvent.review_status != "pending"
+def _apply_visibility(statement, session: Session, viewer_id=None):
+    visible_event_ids = apply_event_visibility(
+        select(CachedEvent.event_id), session, viewer_id
     )
     return statement.where(
         or_(
@@ -414,13 +430,13 @@ def list_notifications(
             .where(Notification.created_at < end.replace(tzinfo=None))
         )
 
-    base = _apply_visibility(base, session)
+    base = _apply_visibility(base, session, user.id)
     unread_statement = (
         select(Notification)
         .where(Notification.recipient_user_id == user.id)
         .where(Notification.read_at.is_(None))
     )
-    unread_statement = _apply_visibility(unread_statement, session)
+    unread_statement = _apply_visibility(unread_statement, session, user.id)
     unread_rows = filter_privacy_safe_notifications(
         session, list(session.exec(unread_statement).all())
     )
@@ -482,7 +498,7 @@ def unread_count(
         .where(Notification.recipient_user_id == user.id)
         .where(Notification.read_at.is_(None))
     )
-    statement = _apply_visibility(statement, session)
+    statement = _apply_visibility(statement, session, user.id)
     rows = filter_privacy_safe_notifications(
         session, list(session.exec(statement).all())
     )

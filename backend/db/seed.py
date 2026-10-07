@@ -24,9 +24,11 @@ from backend.db.models import (
     EventRating,
     EventRatingAspectScore,
     EventRatingAspectTag,
+    EventRevision,
     EventSchedule,
     EventSeries,
     EventSeriesMember,
+    EventSuggestion,
     EventTag,
     EventView,
     OrganizerClaim,
@@ -88,6 +90,18 @@ def resolve_relative_dt(
     return datetime(target_date.year, target_date.month, target_date.day, hour, minute)
 
 
+def resolve_now_dt(value: str) -> Optional[datetime]:
+    """Parse 'now', 'now-30h' or 'now+90m' into a naive UTC datetime."""
+    m = SCHEDULE_NOW_RE.match(value)
+    if not m:
+        return None
+    result = datetime.now(timezone.utc).replace(tzinfo=None, second=0, microsecond=0)
+    if m.group(1):
+        amount = int(m.group(2)) * (60 if m.group(3) == "h" else 1)
+        result += timedelta(minutes=amount if m.group(1) == "+" else -amount)
+    return result
+
+
 logger = logging.getLogger(__name__)
 
 # Top-level scenarios/ directory (project root)
@@ -138,6 +152,11 @@ class DatabaseSeeder:
             logger.info(
                 "Skipping mock-sync-events pre-seed (calendar_service=mock) — events enter DB via sync"
             )
+            # A (re)started scenario starts from the YAML again, without the
+            # source edits QA emulated last time.
+            from backend.services.calendar.mock_calendar import OVERRIDES_FILENAME
+
+            (scenario_dir / OVERRIDES_FILENAME).unlink(missing_ok=True)
         else:
             self._seed_events(scenario_dir / "mock-sync-events.yaml")
             self._seed_event_tags(scenario_dir / "mock-sync-events.yaml")
@@ -150,6 +169,9 @@ class DatabaseSeeder:
         self._seed_event_series(scenario_dir / "db-events.yaml")
         self._seed_tracking(scenario_dir / "db-tracking.yaml")
         self._seed_users(scenario_file_with_default(scenario_dir, "mock-users.yaml"))
+        # Suggestions need their submitter (users) and must exist before the
+        # attendances/ratings that point at their occurrences.
+        self._seed_suggestions(scenario_dir / "db-suggestions.yaml")
         self._seed_generated_events(scenario_dir / "generated-events.yaml")
         # Follows must come AFTER users (FK on follower_id/followee_id).
         self._seed_follows(scenario_dir / "db-follows.yaml")
@@ -169,6 +191,7 @@ class DatabaseSeeder:
         self._seed_suggested_notifications(scenario_dir / "db-events.yaml")
         self._seed_promo_codes(scenario_dir / "db-promo-codes.yaml")
         self._seed_organizer_claims(scenario_dir / "db-organizer-claims.yaml")
+        self._seed_event_revisions(scenario_dir / "db-revisions.yaml")
         # Must run last so it can retime rows emitted by the fan-outs above.
         self._seed_notifications(scenario_dir / "db-notifications.yaml")
         default_settings_path = SCENARIOS_DIR / "default" / "settings.yaml"
@@ -179,6 +202,8 @@ class DatabaseSeeder:
         self.session.commit()
         self._seed_user_avatars(scenario_dir)
         self._seed_event_images(scenario_dir)
+        self._seed_event_assets(scenario_dir / "db-events.yaml", scenario_dir)
+        self._seed_event_assets(scenario_dir / "db-event-assets.yaml", scenario_dir)
         logger.info("Seeding complete")
 
     def _seed_user_avatars(self, scenario_dir: Path) -> None:
@@ -304,6 +329,109 @@ class DatabaseSeeder:
 
             event.image_key = key
             self.session.add(event)
+
+        self.session.commit()
+
+    def _seed_event_assets(self, path: Path, scenario_dir: Path) -> None:
+        """Attach tickets/memories through the real processing pipeline.
+
+        Going/limit/window rules are skipped on purpose so scenarios can stage
+        edge cases (over a lowered limit, tickets past retention).
+        """
+        if not path.exists():
+            return
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        entries = []
+        for entry in data.get("assets", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            if not entry.get("dir"):
+                entries.append(entry)
+                continue
+            folder = (scenario_dir / entry["dir"]).resolve()
+            if not folder.is_relative_to(scenario_dir.resolve()) or not folder.is_dir():
+                logger.warning("Asset seed: invalid dir %s", entry["dir"])
+                continue
+            entries.extend(
+                {**entry, "file": f"{entry['dir']}/{item.name}", "path": item}
+                for item in sorted(folder.iterdir())
+                if item.is_file() and not item.name.startswith(".")
+            )
+        if not entries:
+            return
+
+        from uuid import NAMESPACE_URL, uuid5
+
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        from backend.db.models import EventUserAsset
+        from backend.services import event_assets, object_storage
+
+        client = None
+        if any(e.get("file") for e in entries):
+            try:
+                client = object_storage.get_client()
+                object_storage.ensure_buckets(client)
+            except (
+                object_storage.ObjectStorageError,
+                BotoCoreError,
+                ClientError,
+            ) as exc:
+                logger.warning(
+                    "Object storage unavailable (%s) — skipping event asset files", exc
+                )
+                client = None
+
+        for entry in entries:
+            event_id = entry.get("event_id")
+            email = (entry.get("email") or "").strip().lower()
+            kind = entry.get("kind")
+            filename = entry.get("file")
+            asset_id = uuid5(
+                NAMESPACE_URL,
+                f"{event_id}|{email}|{kind}|{filename or entry.get('url')}",
+            )
+            if self.session.get(EventUserAsset, asset_id):
+                continue
+            user = self.session.exec(select(User).where(User.email == email)).first()
+            if not user or not self.session.get(CachedEvent, event_id):
+                logger.warning("Asset seed: unknown user/event %s/%s", email, event_id)
+                continue
+
+            if kind == event_assets.KIND_TICKET_LINK:
+                self.session.add(
+                    EventUserAsset(
+                        id=asset_id,
+                        user_id=user.id,
+                        event_id=event_id,
+                        kind=kind,
+                        url=entry["url"],
+                    )
+                )
+                continue
+            if client is None:
+                continue
+            source = entry.get("path") or scenario_dir / "event-assets" / filename
+            if not source.exists():
+                source = SCENARIOS_DIR / "default" / "event-assets" / filename
+            if not source.exists():
+                logger.warning("Asset seed: %s not found for %s", filename, event_id)
+                continue
+            raw = source.read_bytes()
+            processed = event_assets.process_file(raw, kind, len(raw))
+            event_assets.store_file_asset(
+                self.session,
+                user_id=user.id,
+                event_id=event_id,
+                kind=kind,
+                processed=processed,
+                visibility=entry.get("visibility", "private"),
+                caption=entry.get("caption"),
+                asset_id=asset_id,
+                client=client,
+            )
+            logger.info("Seeded %s %s for %s on %s", kind, filename, email, event_id)
 
         self.session.commit()
 
@@ -707,10 +835,14 @@ class DatabaseSeeder:
             start = evt_data["start"]
             end = evt_data["end"]
             if isinstance(start, str):
-                resolved = resolve_relative_dt(start, reference_monday, base_week)
+                resolved = resolve_relative_dt(
+                    start, reference_monday, base_week
+                ) or resolve_now_dt(start)
                 start = resolved if resolved else datetime.fromisoformat(start)
             if isinstance(end, str):
-                resolved = resolve_relative_dt(end, reference_monday, base_week)
+                resolved = resolve_relative_dt(
+                    end, reference_monday, base_week
+                ) or resolve_now_dt(end)
                 end = resolved if resolved else datetime.fromisoformat(end)
 
             existing = self.session.get(CachedEvent, evt_id)
@@ -740,13 +872,19 @@ class DatabaseSeeder:
                 )
                 existing.updated_at = datetime.now(timezone.utc)
                 existing.deleted_at = None
-                existing.review_status = "reviewed"
+                existing.review_status = evt_data.get("review_status", "reviewed")
                 if "is_hidden" in evt_data:
                     existing.is_hidden = evt_data["is_hidden"]
+                existing.is_cancelled = evt_data.get("is_cancelled", False)
+                existing.cancellation_note = evt_data.get("cancellation_note")
                 if "show_price_override" in evt_data:
                     existing.show_price_override = evt_data["show_price_override"]
                 if "show_promo_override" in evt_data:
                     existing.show_promo_override = evt_data["show_promo_override"]
+                if "advance_ticket_override" in evt_data:
+                    existing.advance_ticket_override = evt_data[
+                        "advance_ticket_override"
+                    ]
                 self.session.add(existing)
                 logger.info("Updated event: %s", evt_data["title"])
             else:
@@ -771,10 +909,13 @@ class DatabaseSeeder:
                         price_max=evt_data.get("price_max"),
                         price_currency=evt_data.get("price_currency"),
                         price_is_free=evt_data.get("price_is_free"),
-                        review_status="reviewed",
+                        review_status=evt_data.get("review_status", "reviewed"),
                         is_hidden=evt_data.get("is_hidden", False),
+                        is_cancelled=evt_data.get("is_cancelled", False),
+                        cancellation_note=evt_data.get("cancellation_note"),
                         show_price_override=evt_data.get("show_price_override"),
                         show_promo_override=evt_data.get("show_promo_override"),
+                        advance_ticket_override=evt_data.get("advance_ticket_override"),
                     )
                 )
                 logger.info("Created event: %s", evt_data["title"])
@@ -785,6 +926,16 @@ class DatabaseSeeder:
                 if not self.session.get(BlockedEvent, evt_id):
                     self.session.add(BlockedEvent(event_id=evt_id))
                     logger.info("Blocked event: %s", evt_id)
+            if evt_data.get("status"):
+                from backend.services.event_visibility import set_event_status
+
+                event = self.session.get(CachedEvent, evt_id)
+                set_event_status(
+                    event, evt_data["status"], evt_data.get("status_reason")
+                )
+                if evt_data.get("cancellation_note"):
+                    event.cancellation_note = evt_data["cancellation_note"]
+                self.session.add(event)
 
     def _seed_site_settings(self, path: Path) -> None:
         """Pre-seed SiteSetting key/value rows from scenario settings.yaml.
@@ -956,6 +1107,270 @@ class DatabaseSeeder:
                 free_text,
             )
 
+    def _seed_suggestions(self, path: Path) -> None:
+        """Seed EventSuggestion rows and materialise their occurrences.
+
+        Runs the same helpers as submit/approve, so occurrence ids are the
+        real ``suggestion-{id}`` / ``suggestion-{id}-{n}``. Structure::
+
+            base_week: 0
+            suggestions:
+              - id: 5e0d0000-0000-4000-8000-000000000001   # fixed, so ids are predictable
+                submitter_email: olivia@example.com         # omit for anonymous
+                status: private | pending | approved | declined | blocked | withdrawn
+                calendar_id: movida-salsa                   # approved only
+                edit_locked: false
+                title: ...
+                start: w1 Tue 20:00
+                end: w1 Tue 23:00
+                recurrence_rule: RRULE:FREQ=WEEKLY;COUNT=6  # optional
+                tags: ["dance-style:salsa", "reach:local"]
+                creator_going: true
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        entries = data.get("suggestions") or []
+        if not entries:
+            return
+
+        from backend.api.routes.suggestions import (
+            PREVIEW_HORIZON_DAYS,
+            PREVIEW_OCCURRENCE_LIMIT,
+            USER_SUBMISSION_CALENDAR_ID,
+            _apply_creator_going,
+            _apply_suggestion_tags,
+            _ensure_user_submission_calendar,
+            _link_occurrences_to_series,
+            _upsert_occurrences_from_suggestion,
+        )
+
+        base_week = data.get("base_week", 0)
+        today = date.today()
+        reference_monday = today - timedelta(days=today.weekday())
+
+        def resolve(value):
+            if isinstance(value, str):
+                resolved = resolve_relative_dt(value, reference_monday, base_week)
+                return resolved if resolved else datetime.fromisoformat(value)
+            return value
+
+        tag_lookup = self._build_tag_lookup()
+        _ensure_user_submission_calendar(self.session)
+        now = datetime.now(timezone.utc)
+
+        for entry in entries:
+            suggestion_id = UUID(str(entry["id"]))
+            email = (entry.get("submitter_email") or "").strip().lower()
+            submitter = None
+            if email:
+                submitter = self.session.exec(
+                    select(User).where(User.email == email)
+                ).first()
+                if submitter is None:
+                    logger.warning("Suggestion submitter %s not found", email)
+                    continue
+
+            tag_ids = []
+            for slug in entry.get("tags") or []:
+                tag_id = tag_lookup.get(slug)
+                if tag_id:
+                    tag_ids.append(tag_id)
+                else:
+                    logger.warning("Unknown tag slug '%s' for suggestion", slug)
+
+            status = entry.get("status", "pending")
+            suggestion = self.session.get(EventSuggestion, suggestion_id)
+            if suggestion is None:
+                suggestion = EventSuggestion(
+                    id=suggestion_id,
+                    title=entry["title"],
+                    start=resolve(entry["start"]),
+                    end=resolve(entry["end"]),
+                )
+            suggestion.title = entry["title"]
+            suggestion.description = entry.get("description")
+            suggestion.location = entry.get("location")
+            suggestion.latitude = entry.get("latitude")
+            suggestion.longitude = entry.get("longitude")
+            suggestion.links = entry.get("links")
+            suggestion.start = resolve(entry["start"])
+            suggestion.end = resolve(entry["end"])
+            suggestion.all_day = entry.get("all_day", False)
+            suggestion.recurrence_rule = entry.get("recurrence_rule")
+            suggestion.recurrence_dates = [
+                {
+                    "start": resolve(item["start"]).isoformat(),
+                    "end": resolve(item["end"]).isoformat(),
+                }
+                for item in entry.get("recurrence_dates") or []
+            ] or None
+            suggestion.submitter_user_id = submitter.id if submitter else None
+            suggestion.submitter_name = (
+                submitter.display_name if submitter else entry.get("submitter_name")
+            )
+            suggestion.submitter_email = email or entry.get("submitter_email")
+            suggestion.status = status
+            suggestion.edit_locked = entry.get("edit_locked", False)
+            suggestion.suggested_tag_ids = tag_ids or None
+            suggestion.price_min = entry.get("price_min")
+            suggestion.price_max = entry.get("price_max")
+            suggestion.price_currency = entry.get("price_currency")
+            suggestion.price_is_free = entry.get("price_is_free")
+            suggestion.creator_going = bool(entry.get("creator_going")) and bool(
+                submitter
+            )
+            suggestion.admin_notes = entry.get("admin_notes")
+            if status == "approved":
+                suggestion.assigned_calendar_id = entry["calendar_id"]
+                suggestion.reviewed_at = now
+                suggestion.reviewed_by = "admin@example.com"
+            self.session.add(suggestion)
+            self.session.flush()
+
+            # Anonymous submissions get no preview until an admin approves them.
+            if submitter is None and status != "approved":
+                continue
+
+            if status == "approved":
+                events = _upsert_occurrences_from_suggestion(
+                    self.session,
+                    suggestion,
+                    review_status="reviewed",
+                    visibility="public",
+                    calendar_id=entry["calendar_id"],
+                    latitude=suggestion.latitude,
+                    longitude=suggestion.longitude,
+                )
+            else:
+                events = _upsert_occurrences_from_suggestion(
+                    self.session,
+                    suggestion,
+                    review_status="reviewed",
+                    visibility="private",
+                    calendar_id=USER_SUBMISSION_CALENDAR_ID,
+                    latitude=suggestion.latitude,
+                    longitude=suggestion.longitude,
+                    limit=PREVIEW_OCCURRENCE_LIMIT,
+                    horizon_end=now + timedelta(days=PREVIEW_HORIZON_DAYS),
+                )
+            for event in events:
+                _apply_suggestion_tags(self.session, event.event_id, tag_ids)
+                if status in {"blocked", "withdrawn"}:
+                    event.is_hidden = True
+                    self.session.add(event)
+            _link_occurrences_to_series(self.session, suggestion, events, None)
+            _apply_creator_going(self.session, suggestion, events, fan_out=False)
+            self.session.add(suggestion)
+            self.session.flush()
+            logger.info(
+                "Seeded %s suggestion %s (%d occurrences)",
+                status,
+                suggestion.title,
+                len(events),
+            )
+
+    def _seed_event_revisions(self, path: Path) -> None:
+        """Seed changes (EventRevision rows) from db-revisions.yaml::
+
+            base_week: 0
+            revisions:
+              - event_id: ev-x               # or suggestion_id: <uuid> (submitter changes)
+                source: sync | admin | submitter | user | organizer
+                kind: create | go_public       # optional; edit kinds derive from changes
+                status: pending | draft | accepted | rejected | withdrawn | superseded | reverted | closed
+                proposed_by: sam@example.com   # optional
+                decided_by: admin@example.com  # optional
+                changes:
+                  start: {old: w1 Fri 20:00, new: w1 Fri 21:00}
+                  is_cancelled: {old: false, new: true}
+
+        New public events and pending submissions get their create / go_public
+        change from the event_visibility hooks; list them here only for history.
+        """
+        if not path.exists():
+            return
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        from backend.services import event_revisions as er
+
+        base_week = data.get("base_week", 0)
+        today = date.today()
+        reference_monday = today - timedelta(days=today.weekday())
+
+        def value(raw):
+            if isinstance(raw, str):
+                resolved = resolve_relative_dt(
+                    raw, reference_monday, base_week
+                ) or resolve_now_dt(raw)
+                if resolved is not None:
+                    return resolved.isoformat()
+            return raw
+
+        now = datetime.now(timezone.utc)
+        for entry in data.get("revisions") or []:
+            changes = {
+                field: {"old": value(c.get("old")), "new": value(c.get("new"))}
+                for field, c in (entry.get("changes") or {}).items()
+            }
+            event_id = entry.get("event_id")
+            suggestion_id = (
+                UUID(str(entry["suggestion_id"]))
+                if entry.get("suggestion_id")
+                else None
+            )
+            if event_id and self.session.get(CachedEvent, event_id) is None:
+                logger.warning("Revision event %s not found", event_id)
+                continue
+            status = entry.get("status", er.STATUS_PENDING)
+            content_hash = er._hash_changes(changes)
+            duplicate = self.session.exec(
+                select(EventRevision).where(
+                    EventRevision.event_id == event_id
+                    if event_id
+                    else EventRevision.event_id.is_(None),
+                    EventRevision.suggestion_id == suggestion_id
+                    if suggestion_id
+                    else EventRevision.suggestion_id.is_(None),
+                    EventRevision.source == entry["source"],
+                    EventRevision.status == status,
+                    EventRevision.content_hash == content_hash,
+                )
+            ).first()
+            if duplicate is not None:
+                continue
+            proposer = None
+            if entry.get("proposed_by"):
+                proposer = self.session.exec(
+                    select(User).where(User.email == entry["proposed_by"].lower())
+                ).first()
+            decided = status not in er.OPEN_STATUSES
+            self.session.add(
+                EventRevision(
+                    event_id=event_id,
+                    suggestion_id=suggestion_id,
+                    kind=entry.get("kind"),
+                    source=entry["source"],
+                    status=status,
+                    changes=changes,
+                    content_hash=content_hash,
+                    group_hash=er.group_hash(changes),
+                    proposed_by_user_id=proposer.id if proposer else None,
+                    proposed_by_admin_email=entry.get("proposed_by_admin"),
+                    decided_by=entry.get("decided_by") if decided else None,
+                    decided_at=now if decided else None,
+                )
+            )
+            logger.info(
+                "Seeded %s %s change for %s",
+                status,
+                entry["source"],
+                event_id or suggestion_id,
+            )
+        self.session.flush()
+
     def _seed_event_series(self, path: Path) -> None:
         """Pre-seed EventSeries + EventSeriesMember rows from db-events.yaml.
 
@@ -1099,6 +1514,10 @@ class DatabaseSeeder:
                 # Event Quality Layer P3 — post-event review-prompt toggles.
                 "email_review_prompt_enabled",
                 "push_review_prompt_enabled",
+                "email_ticket_prompt_enabled",
+                "push_ticket_prompt_enabled",
+                "email_memories_prompt_enabled",
+                "push_memories_prompt_enabled",
                 # Dance Passport Phase C — milestone-unlock toggles.
                 "email_milestone_unlocked_enabled",
                 "push_milestone_unlocked_enabled",
@@ -1402,8 +1821,6 @@ class DatabaseSeeder:
                             event_id=event_id,
                             device_id=device_id,
                             source=source,
-                            country="France" if idx % 2 == 0 else "Germany",
-                            city="Paris" if idx % 2 == 0 else "Berlin",
                         )
                     )
                     views_seeded += 1
@@ -1792,8 +2209,6 @@ class DatabaseSeeder:
                     event_id=row["event_id"],
                     device_id=row.get("device_id"),
                     source=row.get("source"),
-                    country=row.get("country"),
-                    city=row.get("city"),
                 )
             )
         views_count = len(data.get("views", []))
@@ -1806,8 +2221,6 @@ class DatabaseSeeder:
                     event_id=row["event_id"],
                     device_id=row.get("device_id"),
                     url=row["url"],
-                    country=row.get("country"),
-                    city=row.get("city"),
                 )
             )
         clicks_count = len(data.get("link_clicks", []))
@@ -1912,6 +2325,9 @@ class DatabaseSeeder:
             if self.session.exec(existing_q).first():
                 continue
 
+            attending_since = entry.get("attending_since")
+            if isinstance(attending_since, str):
+                attending_since = resolve_now_dt(attending_since)
             self.session.add(
                 UserEventAttendance(
                     event_id=event_id,
@@ -1920,6 +2336,20 @@ class DatabaseSeeder:
                     or _seed_device_id("seed-attend", event_id, email or "anon"),
                     share_publicly=share_publicly,
                     share_audience=share_audience,
+                    **(
+                        {
+                            "attending_since": attending_since.replace(
+                                tzinfo=timezone.utc
+                            )
+                        }
+                        if attending_since
+                        else {}
+                    ),
+                    ticket_not_needed_at=(
+                        datetime.now(timezone.utc)
+                        if entry.get("ticket_not_needed")
+                        else None
+                    ),
                 )
             )
             seeded += 1
@@ -2274,7 +2704,7 @@ class DatabaseSeeder:
         from backend.services import milestone_notification_service as milestones
         from backend.services.notification_delivery import record_delivery
 
-        for user_id in milestones._candidate_user_ids(self.session):
+        for user_id in milestones._candidate_user_ids(self.session, recent_only=False):
             user = self.session.get(User, user_id)
             if user is not None and user.deleted_at is None:
                 milestones._create_milestone_notifications(

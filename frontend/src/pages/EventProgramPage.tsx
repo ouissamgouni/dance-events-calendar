@@ -11,6 +11,7 @@ import { PlanAttendanceFeedbackSheet, SessionDetailsSheet, TimeSlotSheet } from 
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
+import { useSetMyPlanCount } from '../context/MyPlanCountContext';
 import { usePwaInstall } from '../context/PwaInstallContext';
 import type { CalendarEvent, EventSchedule, MyPlanEntry, PlanAudience, ScheduleSession, SessionAttendanceSummary } from '../types';
 import { defaultRsvpAudienceFor } from '../utils/audiencePreference';
@@ -104,6 +105,11 @@ export default function EventProgramPage() {
             setPlanAudienceLoaded(false);
         });
     }, [authLoading, eventId, preview, user]);
+
+    const setMyPlanCount = useSetMyPlanCount();
+    useEffect(() => {
+        if (eventId && planAudienceLoaded) setMyPlanCount(eventId, plan.length);
+    }, [eventId, plan.length, planAudienceLoaded, setMyPlanCount]);
 
     useEffect(() => {
         if (!eventId || authLoading || !user || preview) {

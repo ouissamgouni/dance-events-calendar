@@ -1,0 +1,108 @@
+# Seeded through the real submit/approve helpers (backend/db/seed.py
+# _seed_suggestions), so occurrence ids are suggestion-{id} for the first date
+# and suggestion-{id}-{n} after it. ids are fixed so the RSVP/save files can
+# point at specific dates.
+base_week: 0
+suggestions:
+  # S1 — pending one-off with a typo in the title (UC1, UC4).
+  - id: 5e0d0000-0000-4000-8000-000000000001
+    submitter_email: olivia@example.com
+    status: pending
+    title: Salsa Socail at Club Havana
+    description: Social dancing all night, beginners welcome.
+    location: Club Havana, Oranienstraße 25, 10999 Berlin
+    latitude: 52.5016
+    longitude: 13.4189
+    start: w1 Fri 21:00
+    end: w1 Fri 23:59
+    price_is_free: true
+    tags: ["dance-style:salsa", "reach:local"]
+    creator_going: true
+
+  # S2 — pending weekly practica (UC2, UC3).
+  - id: 5e0d0000-0000-4000-8000-000000000002
+    submitter_email: olivia@example.com
+    status: pending
+    title: Tuesday Bachata Practica
+    description: Weekly practica, open level.
+    location: Studio Mitte, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Tue 19:30
+    end: w1 Tue 22:00
+    recurrence_rule: RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TU;COUNT=6
+    tags: ["dance-style:bachata", "reach:local"]
+
+  # S3 — approved weekly social that started two weeks ago; not editable in
+  # phase 1 (UC9–UC13 land in phase 2).
+  - id: 5e0d0000-0000-4000-8000-000000000003
+    submitter_email: olivia@example.com
+    status: approved
+    calendar_id: movida-salsa
+    title: Thursday Salsa Social
+    description: The weekly Thursday social.
+    location: Salsa Lounge, Kastanienallee 7, 10435 Berlin
+    latitude: 52.5381
+    longitude: 13.4105
+    start: w-2 Thu 21:00
+    end: w-2 Thu 23:59
+    recurrence_rule: RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TH;COUNT=8
+    tags: ["dance-style:salsa", "reach:local"]
+
+  # S6 — pending, but an admin locked it (UC7).
+  - id: 5e0d0000-0000-4000-8000-000000000006
+    submitter_email: olivia@example.com
+    status: pending
+    edit_locked: true
+    title: Kizomba Night at Tresor Garden
+    location: Tresor Garden, Köpenicker Str. 70, 10179 Berlin
+    latitude: 52.5103
+    longitude: 13.4197
+    start: w2 Sat 22:00
+    end: w2 Sat 23:59
+    tags: ["dance-style:kizomba", "reach:local"]
+
+  # S7 — approved anonymous submission: read-only for everyone (UC6).
+  - id: 5e0d0000-0000-4000-8000-000000000007
+    submitter_name: Anonymous Organizer
+    status: approved
+    calendar_id: movida-salsa
+    title: Open Air Salsa at Mauerpark
+    location: Mauerpark, Bernauer Str. 63, 13355 Berlin
+    latitude: 52.5432
+    longitude: 13.4023
+    start: w2 Sun 16:00
+    end: w2 Sun 20:00
+    tags: ["dance-style:salsa", "reach:local"]
+
+  # S8 — blocked: removed for everyone, owner included (UC8).
+  - id: 5e0d0000-0000-4000-8000-000000000008
+    submitter_email: olivia@example.com
+    status: blocked
+    admin_notes: Duplicate of an existing listing.
+    title: Salsa Social (duplicate)
+    location: Club Havana, Oranienstraße 25, 10999 Berlin
+    start: w1 Sat 21:00
+    end: w1 Sat 23:59
+    tags: ["dance-style:salsa", "reach:local"]
+
+  # S9 — kept for herself, never asked to go public (UC9).
+  - id: 5e0d0000-0000-4000-8000-000000000009
+    submitter_email: olivia@example.com
+    status: private
+    title: Private Lesson with Marco
+    location: Tanzschule Berlin, Kastanienallee 12, 10435 Berlin
+    start: w1 Wed 18:00
+    end: w1 Wed 19:00
+    tags: ["dance-style:salsa", "reach:local"]
+
+  # S10 — asked to go public, a curator kept it private (UC10).
+  - id: 5e0d0000-0000-4000-8000-000000000010
+    submitter_email: olivia@example.com
+    status: declined
+    admin_notes: Looks like a private class, not a public event.
+    title: Salsa Rueda Practice Group
+    location: Volkspark Friedrichshain, 10249 Berlin
+    start: w2 Mon 19:00
+    end: w2 Mon 21:00
+    tags: ["dance-style:salsa", "reach:local"]

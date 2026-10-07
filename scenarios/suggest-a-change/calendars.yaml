@@ -1,0 +1,4 @@
+calendars:
+  - id: "salsa-src"
+    name: "Berlin Salsa (Google)"
+    color: "#2563eb"

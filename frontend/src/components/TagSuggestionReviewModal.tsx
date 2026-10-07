@@ -303,6 +303,11 @@ export default function TagSuggestionReviewModal({
                             {suggestion.reviewed_at && (
                                 <div><span className="text-muted">Reviewed:</span> {fmtDate(suggestion.reviewed_at)}</div>
                             )}
+                            {suggestion.submitter_name && (
+                                <div className="col-span-2 truncate">
+                                    <span className="text-muted">By:</span> {suggestion.submitter_name}
+                                </div>
+                            )}
                             {suggestion.submitter_device_id && (
                                 <div className="col-span-2 truncate">
                                     <span className="text-muted">Device:</span> {suggestion.submitter_device_id}

@@ -1,0 +1,26 @@
+# Mock users for "myevent-memories".
+#   * mia  — POV. Going to every event; memories seeded in db-event-assets.yaml.
+#   * fred — mutual friend of mia, NOT at P1: sees only mia's "friends" photo.
+#   * ana  — Going to P1, not a friend: sees mia's "attendees" photo + her own.
+#   * stan — stranger: sees none of mia's photos.
+#   * admin — matches ADMIN_EMAIL.
+users:
+  - email: mia@example.com
+    name: Mia (memories)
+    handle: mia
+    account_visibility: public
+  - email: fred@example.com
+    name: Fred (friend)
+    handle: fred
+    account_visibility: public
+  - email: ana@example.com
+    name: Ana (attendee)
+    handle: ana
+    account_visibility: public
+  - email: stan@example.com
+    name: Stan (stranger)
+    handle: stan
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

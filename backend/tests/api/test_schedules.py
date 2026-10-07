@@ -59,6 +59,32 @@ def client(engine):
 
 
 @pytest.fixture
+def run_jobs(engine, monkeypatch):
+    """Capture queued publication jobs; calling the fixture runs them on the test DB."""
+    from backend.api.routes import schedules as schedules_module
+    from backend.db import database
+    from backend.services import job_queue
+
+    queued: list = []
+
+    def _enqueue(name, key, delay=0):
+        if name == schedules_module.PUBLICATION_DELIVERY_JOB:
+            queued.append((name, key))
+
+    monkeypatch.setattr(job_queue, "enqueue", _enqueue)
+    monkeypatch.setattr(database, "_engine", engine)
+
+    def _run() -> list:
+        ran = list(queued)
+        queued.clear()
+        for name, key in ran:
+            job_queue.run_job(name, key)
+        return ran
+
+    return _run
+
+
+@pytest.fixture
 def schedule_event(engine):
     with Session(engine) as session:
         session.add(SiteSetting(key="event_schedule_enabled", value="true"))
@@ -521,11 +547,10 @@ def test_event_schedule_editor_grants_are_scoped_and_revocable(
 
 
 def test_schedule_publish_and_my_plan_lifecycle(
-    client, engine, schedule_event, monkeypatch
+    client, engine, schedule_event, monkeypatch, run_jobs
 ):
     emailed: list[str] = []
     pushed: list[str] = []
-    instant_kinds: list[str] = []
     monkeypatch.setattr(
         "backend.services.email.send_schedule_plan_changed_email",
         lambda user, event, changes: emailed.append(user.email) or True,
@@ -534,10 +559,6 @@ def test_schedule_publish_and_my_plan_lifecycle(
     monkeypatch.setattr(
         "backend.services.push_service.send_push",
         lambda user_id, **kwargs: pushed.append(str(user_id)) or 1,
-    )
-    monkeypatch.setattr(
-        "backend.api.routes.schedules.activity_instant.dispatch_activity_instant",
-        lambda session, *, kind, **kwargs: instant_kinds.append(kind) or {"emails": 0},
     )
     _login(client, "admin@example.com")
 
@@ -656,10 +677,13 @@ def test_schedule_publish_and_my_plan_lifecycle(
         "activity_type_ids": exported_session["activity_type_id"],
         "include_cancelled": False,
     }
-    assert client.get(
-        "/api/admin/events/back-2-mambo-2026/schedule/published-export",
-        params=filtered_params,
-    ).json()["sessions"] == []
+    assert (
+        client.get(
+            "/api/admin/events/back-2-mambo-2026/schedule/published-export",
+            params=filtered_params,
+        ).json()["sessions"]
+        == []
+    )
     program_ics = client.get(
         "/api/admin/events/back-2-mambo-2026/schedule/published-export/ics",
         params=filtered_params,
@@ -715,7 +739,6 @@ def test_schedule_publish_and_my_plan_lifecycle(
     saved = client.put(f"/api/events/back-2-mambo-2026/my-plan/{session_id}")
     assert saved.status_code == 201
     assert saved.json()["status"] == "active"
-    assert instant_kinds == ["plan_session_added"]
     plan_counts = client.post(
         "/api/my-plan/counts",
         json={
@@ -741,7 +764,6 @@ def test_schedule_publish_and_my_plan_lifecycle(
     )
     assert audience.status_code == 200
     assert audience.json()["audience"] == "followers"
-    assert instant_kinds == ["plan_session_added", "plan_session_added"]
     my_plan_ics = client.get("/api/events/back-2-mambo-2026/my-plan/ics")
     assert my_plan_ics.status_code == 200
     assert f"UID:{session_id}@program.joinmovida.com" in my_plan_ics.text
@@ -798,10 +820,16 @@ def test_schedule_publish_and_my_plan_lifecycle(
         "impacted_planners": 1,
         "going_attendees_notified": 0,
         "in_app_created": 1,
-        "emailed": 1,
-        "pushed": 1,
         "going_attendees": 0,
     }
+    assert emailed == [] and pushed == []
+    assert ("schedule_publication", "back-2-mambo-2026:2") in run_jobs()
+    assert emailed == ["dancer@example.com"]
+    assert len(pushed) == 1
+    # Re-running the job skips channels already stamped.
+    from backend.services import job_queue
+
+    job_queue.run_job("schedule_publication", "back-2-mambo-2026:2")
     assert emailed == ["dancer@example.com"]
     assert len(pushed) == 1
 
@@ -957,17 +985,21 @@ def test_schedule_import_preview_hides_generated_external_id_backfill(
     client, schedule_event
 ):
     _login(client, "admin@example.com")
-    assert client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule",
-        json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
-    ).status_code == 201
-    assert client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule/venues",
-        json={"name": "Slovanský dům", "address": "Na Příkopě 22"},
-    ).status_code == 201
-    document = client.get(
-        "/api/admin/events/back-2-mambo-2026/schedule/export"
-    ).json()
+    assert (
+        client.post(
+            "/api/admin/events/back-2-mambo-2026/schedule",
+            json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            "/api/admin/events/back-2-mambo-2026/schedule/venues",
+            json={"name": "Slovanský dům", "address": "Na Příkopě 22"},
+        ).status_code
+        == 201
+    )
+    document = client.get("/api/admin/events/back-2-mambo-2026/schedule/export").json()
 
     preview = client.post(
         "/api/admin/events/back-2-mambo-2026/schedule/import-preview",
@@ -998,9 +1030,7 @@ def test_schedule_change_details_render_contributor_names_and_roles():
             {
                 "id": "session-1",
                 "title": "Workshop",
-                "contributors": [
-                    {"contributor_id": 2, "role": "dj", "position": 0}
-                ],
+                "contributors": [{"contributor_id": 2, "role": "dj", "position": 0}],
             }
         ],
     }
@@ -1024,10 +1054,13 @@ def test_schedule_json_import_v2_round_trips_session_contributors(
     client, schedule_event
 ):
     _login(client, "admin@example.com")
-    assert client.post(
-        "/api/admin/events/back-2-mambo-2026/schedule",
-        json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
-    ).status_code == 201
+    assert (
+        client.post(
+            "/api/admin/events/back-2-mambo-2026/schedule",
+            json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
+        ).status_code
+        == 201
+    )
     document = {
         "schema_version": 2,
         "event_id": "back-2-mambo-2026",
@@ -1064,9 +1097,7 @@ def test_schedule_json_import_v2_round_trips_session_contributors(
             {
                 "external_id": "party",
                 "title": "Evening Party",
-                "contributors": [
-                    {"contributor_external_id": "dj-marta", "role": "dj"}
-                ],
+                "contributors": [{"contributor_external_id": "dj-marta", "role": "dj"}],
                 "start": "2026-10-16T20:00:00",
                 "end": "2026-10-16T23:00:00",
             },
@@ -1079,9 +1110,7 @@ def test_schedule_json_import_v2_round_trips_session_contributors(
     )
 
     assert applied.status_code == 200
-    exported = client.get(
-        "/api/admin/events/back-2-mambo-2026/schedule/export"
-    ).json()
+    exported = client.get("/api/admin/events/back-2-mambo-2026/schedule/export").json()
     assert exported["schema_version"] == 2
     assert [row["external_id"] for row in exported["contributors"]] == [
         "maya",
@@ -1135,7 +1164,7 @@ def test_schedule_json_import_rejects_unknown_reference_without_writes(
 
 
 def test_publish_announces_first_program_and_optionally_broadcasts_updates(
-    client, engine, schedule_event, monkeypatch
+    client, engine, schedule_event, monkeypatch, run_jobs
 ):
     emailed: list[str] = []
     monkeypatch.setattr(
@@ -1194,10 +1223,10 @@ def test_publish_announces_first_program_and_optionally_broadcasts_updates(
         "impacted_planners": 0,
         "going_attendees_notified": 2,
         "in_app_created": 2,
-        "emailed": 1,
-        "pushed": 0,
         "going_attendees": 2,
     }
+    assert emailed == []
+    assert run_jobs() == [("schedule_publication", "back-2-mambo-2026:1")]
     assert emailed == ["dancer@example.com"]
 
     silent_update = client.post(
@@ -1206,6 +1235,7 @@ def test_publish_announces_first_program_and_optionally_broadcasts_updates(
     assert silent_update.status_code == 200
     assert silent_update.json()["notification_summary"]["going_attendees_notified"] == 0
     assert silent_update.json()["notification_summary"]["in_app_created"] == 0
+    assert run_jobs() == []
 
     broad_update = client.post(
         "/api/admin/events/back-2-mambo-2026/schedule/publish",
@@ -1214,7 +1244,7 @@ def test_publish_announces_first_program_and_optionally_broadcasts_updates(
     assert broad_update.status_code == 200
     assert broad_update.json()["notification_summary"]["going_attendees_notified"] == 2
     assert broad_update.json()["notification_summary"]["in_app_created"] == 2
-    assert broad_update.json()["notification_summary"]["emailed"] == 1
+    assert run_jobs() == [("schedule_publication", "back-2-mambo-2026:3")]
     assert emailed == ["dancer@example.com", "dancer@example.com"]
 
     with Session(engine) as session:
@@ -1239,3 +1269,63 @@ def test_publish_announces_first_program_and_optionally_broadcasts_updates(
         row["kind"] == "schedule_program_updated"
         for row in notifications.json()["items"]
     )
+
+
+def test_tick_sweep_delivers_a_lost_publication_job_once(
+    client, engine, schedule_event, monkeypatch, run_jobs
+):
+    from datetime import timedelta, timezone
+
+    from backend.services.scheduler import sweep_fanout_jobs
+
+    emailed: list[str] = []
+    monkeypatch.setattr(
+        "backend.services.email.send_schedule_program_available_email",
+        lambda user, event, session_count: emailed.append(user.email) or True,
+    )
+    monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 1)
+
+    _login(client, "admin@example.com")
+    client.post(
+        "/api/admin/events/back-2-mambo-2026/schedule",
+        json={"timezone": "Europe/Prague", "days": ["2026-10-16"]},
+    )
+    _login(client, "dancer@example.com")
+    with Session(engine) as session:
+        dancer = session.exec(
+            select(User).where(User.email == "dancer@example.com")
+        ).one()
+        session.add(
+            UserEventAttendance(
+                device_id="dancer-device",
+                event_id="back-2-mambo-2026",
+                user_id=dancer.id,
+            )
+        )
+        session.commit()
+
+    _login(client, "admin@example.com")
+    assert (
+        client.post(
+            "/api/admin/events/back-2-mambo-2026/schedule/publish", json={}
+        ).status_code
+        == 200
+    )
+
+    assert sweep_fanout_jobs() == {"jobs": 1, "failed": 0}
+    assert emailed == ["dancer@example.com"]
+    assert sweep_fanout_jobs() == {"jobs": 0, "failed": 0}
+    run_jobs()  # the debounced job arriving late finds nothing left to send
+    assert emailed == ["dancer@example.com"]
+
+    with Session(engine) as session:
+        row = session.exec(
+            select(Notification).where(
+                Notification.kind == "schedule_program_available"
+            )
+        ).one()
+        row.created_at = datetime.now(timezone.utc) - timedelta(hours=25)
+        row.emailed_at = None
+        session.add(row)
+        session.commit()
+    assert sweep_fanout_jobs() == {"jobs": 0, "failed": 0}

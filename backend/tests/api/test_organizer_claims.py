@@ -33,6 +33,8 @@ from backend.api.routes import organizer_claims as organizer_claims_module  # no
 from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
     CachedEvent,
+    CalendarSetting,
+    EventRevision,
     Notification,
     OrganizerClaim,
     OrganizerClaimEvent,
@@ -309,14 +311,78 @@ def test_submit_events_when_not_verified_returns_409(client, session, events, fl
 
 
 @pytest.mark.unit
-def test_submit_badge_rejects_event_ids(client, session, events, flag_on):
+def test_submit_badge_with_events(client, session, events, flag_on):
     assert _login(client, email="org@example.com").status_code == 200
-    _set_profile(session, "org@example.com")  # not verified, can submit badge
+    _set_profile(session, "org@example.com")  # not verified
     resp = client.post(
         "/api/me/organizer-claims",
         json={"kind": "badge", "event_ids": [events[0].event_id]},
     )
+    assert resp.status_code == 201, resp.text
+    assert [e["event_id"] for e in resp.json()["events"]] == [events[0].event_id]
+
+
+@pytest.mark.unit
+def test_submit_rejects_event_with_organizer(client, session, events, flag_on):
+    events[0].organizer_user_id = uuid4()
+    session.add(events[0])
+    session.commit()
+    assert _login(client, email="org@example.com").status_code == 200
+    _set_profile(session, "org@example.com")
+    resp = client.post(
+        "/api/me/organizer-claims",
+        json={"kind": "badge", "event_ids": [events[0].event_id]},
+    )
+    assert resp.status_code == 409
+    assert "already has an organizer" in resp.json()["detail"]
+
+
+@pytest.mark.unit
+def test_add_events_opens_then_appends_to_pending_claim(
+    client, session, events, flag_on
+):
+    assert _login(client, email="org@example.com").status_code == 200
+    _set_profile(session, "org@example.com")
+    first = client.post(
+        "/api/me/organizer-claims/events", json={"event_ids": [events[0].event_id]}
+    )
+    assert first.status_code == 200, first.text
+    assert first.json()["kind"] == "badge"
+    second = client.post(
+        "/api/me/organizer-claims/events",
+        json={"event_ids": [events[0].event_id, events[1].event_id]},
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["id"] == first.json()["id"]
+    assert {e["event_id"] for e in second.json()["events"]} == {
+        events[0].event_id,
+        events[1].event_id,
+    }
+
+
+@pytest.mark.unit
+def test_add_events_requires_profile_for_new_badge_claim(
+    client, session, events, flag_on
+):
+    assert _login(client, email="org@example.com").status_code == 200
+    _set_profile(session, "org@example.com", bio=None)
+    resp = client.post(
+        "/api/me/organizer-claims/events", json={"event_ids": [events[0].event_id]}
+    )
     assert resp.status_code == 422
+
+
+@pytest.mark.unit
+def test_remove_event_from_pending_claim(client, session, events, flag_on):
+    claim_id = _submit_two_event_claim(client, session, events)
+    resp = client.delete(
+        f"/api/me/organizer-claims/{claim_id}/events/{events[0].event_id}"
+    )
+    assert resp.status_code == 204
+    remaining = client.get("/api/me/organizer-claims").json()[0]["events"]
+    assert [e["event_id"] for e in remaining] == [events[1].event_id]
+    client.delete(f"/api/me/organizer-claims/{claim_id}/events/{events[1].event_id}")
+    assert client.get("/api/me/organizer-claims").json() == []
 
 
 @pytest.mark.unit
@@ -468,13 +534,12 @@ def test_admin_decision_rejects_events_outside_claim(client, session, events, fl
 
 @pytest.mark.unit
 def test_overwrite_guard_blocks_takeover(client, session, events, flag_on):
-    # Pre-assign events[0] to a different organizer.
-    other_id = uuid4()
-    events[0].organizer_user_id = other_id
+    claim_id = _submit_two_event_claim(client, session, events)
+    # Another organizer got the event while the claim was pending.
+    events[0].organizer_user_id = uuid4()
     session.add(events[0])
     session.commit()
 
-    claim_id = _submit_two_event_claim(client, session, events)
     assert _login(client, email="admin@example.com").status_code == 200
     resp = client.post(
         f"/api/admin/organizer-claims/{claim_id}/decide",
@@ -489,12 +554,11 @@ def test_overwrite_guard_blocks_takeover(client, session, events, flag_on):
 
 @pytest.mark.unit
 def test_overwrite_true_allows_takeover(client, session, events, flag_on):
-    other_id = uuid4()
-    events[0].organizer_user_id = other_id
+    claim_id = _submit_two_event_claim(client, session, events)
+    events[0].organizer_user_id = uuid4()
     session.add(events[0])
     session.commit()
 
-    claim_id = _submit_two_event_claim(client, session, events)
     assert _login(client, email="admin@example.com").status_code == 200
     resp = client.post(
         f"/api/admin/organizer-claims/{claim_id}/decide",
@@ -638,3 +702,192 @@ def test_decide_badge_does_not_create_attendance(client, session, flag_on):
         select(UserEventAttendance).where(UserEventAttendance.user_id == user.id)
     ).all()
     assert rows == []
+
+
+def _submit_badge_with_events(client, session, events) -> str:
+    assert _login(client, email="org@example.com").status_code == 200
+    _set_profile(session, "org@example.com")
+    resp = client.post(
+        "/api/me/organizer-claims",
+        json={"kind": "badge", "event_ids": [events[0].event_id, events[1].event_id]},
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
+
+
+@pytest.mark.unit
+def test_badge_claim_approval_decides_events_too(client, session, events, flag_on):
+    claim_id = _submit_badge_with_events(client, session, events)
+    assert _login(client, email="admin@example.com").status_code == 200
+    resp = client.post(
+        f"/api/admin/organizer-claims/{claim_id}/decide",
+        json={
+            "grant_badge": True,
+            "approved_event_ids": [events[0].event_id],
+            "rejected_event_ids": [events[1].event_id],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "approved"
+    user = session.exec(select(User).where(User.email == "org@example.com")).first()
+    session.refresh(user)
+    session.refresh(events[0])
+    session.refresh(events[1])
+    assert user.is_verified_organizer is True
+    assert events[0].organizer_user_id == user.id
+    assert events[1].organizer_user_id is None
+
+
+@pytest.mark.unit
+def test_badge_rejection_rejects_its_events(client, session, events, flag_on):
+    claim_id = _submit_badge_with_events(client, session, events)
+    assert _login(client, email="admin@example.com").status_code == 200
+    resp = client.post(
+        f"/api/admin/organizer-claims/{claim_id}/decide",
+        json={"grant_badge": False, "admin_notes": "Could not verify"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "rejected"
+    assert {e["decision"] for e in body["events"]} == {"rejected"}
+    session.refresh(events[0])
+    assert events[0].organizer_user_id is None
+
+
+@pytest.mark.unit
+def test_admin_assigns_and_clears_event_organizer(client, session, events, flag_on):
+    assert _login(client, email="org@example.com").status_code == 200
+    user = _set_profile(session, "org@example.com")
+    assert _login(client, email="admin@example.com").status_code == 200
+    resp = client.put(
+        f"/api/admin/events/{events[0].event_id}/organizer",
+        json={"user_id": str(user.id)},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["organizer"]["user_id"] == str(user.id)
+    session.refresh(user)
+    session.refresh(events[0])
+    assert user.is_verified_organizer is True
+    assert events[0].organizer_user_id == user.id
+
+    listed = client.get(f"/api/admin/users/id/{user.id}/organized-events")
+    assert [e["event_id"] for e in listed.json()] == [events[0].event_id]
+
+    cleared = client.put(
+        f"/api/admin/events/{events[0].event_id}/organizer", json={"user_id": None}
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["organizer"] is None
+    session.refresh(events[0])
+    assert events[0].organizer_user_id is None
+
+
+def _organizer_notifications(session, user):
+    return session.exec(
+        select(Notification)
+        .where(Notification.recipient_user_id == user.id)
+        .where(Notification.kind == "organizer_assigned")
+    ).all()
+
+
+@pytest.mark.unit
+def test_admin_saves_staged_organizer_changes_with_one_notification(
+    client, session, events, flag_on
+):
+    assert _login(client, email="org@example.com").status_code == 200
+    user = _set_profile(session, "org@example.com")
+    events[2].organizer_user_id = user.id
+    session.add(events[2])
+    session.commit()
+    assert _login(client, email="admin@example.com").status_code == 200
+
+    resp = client.put(
+        f"/api/admin/users/id/{user.id}/organizer",
+        json={
+            "is_verified_organizer": False,
+            "add_event_ids": [events[0].event_id, events[1].event_id],
+            "remove_event_ids": [events[2].event_id],
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["is_verified_organizer"] is True
+    assert {e["event_id"] for e in body["events"]} == {
+        events[0].event_id,
+        events[1].event_id,
+    }
+    session.expire_all()
+    assert session.get(CachedEvent, events[2].event_id).organizer_user_id is None
+    [notification] = _organizer_notifications(session, user)
+    assert (notification.event_id, notification.context) == (None, "2 events")
+
+
+@pytest.mark.unit
+def test_admin_single_event_assignment_notifies_with_the_event(
+    client, session, events, flag_on
+):
+    assert _login(client, email="org@example.com").status_code == 200
+    user = _set_profile(session, "org@example.com")
+    assert _login(client, email="admin@example.com").status_code == 200
+
+    client.put(
+        f"/api/admin/events/{events[0].event_id}/organizer",
+        json={"user_id": str(user.id)},
+    )
+    client.put(
+        f"/api/admin/events/{events[0].event_id}/organizer",
+        json={"user_id": str(user.id)},
+    )
+
+    [notification] = _organizer_notifications(session, user)
+    assert notification.event_id == events[0].event_id
+
+
+@pytest.mark.unit
+def test_admin_organizer_save_with_unknown_event_is_404(
+    client, session, events, flag_on
+):
+    assert _login(client, email="org@example.com").status_code == 200
+    user = _set_profile(session, "org@example.com")
+    assert _login(client, email="admin@example.com").status_code == 200
+
+    resp = client.put(
+        f"/api/admin/users/id/{user.id}/organizer",
+        json={"is_verified_organizer": True, "add_event_ids": ["nope"]},
+    )
+
+    assert resp.status_code == 404
+    session.refresh(user)
+    assert user.is_verified_organizer is False
+    assert _organizer_notifications(session, user) == []
+
+
+@pytest.mark.unit
+def test_hosting_lists_organized_events(client, session, events, flag_on):
+    session.add(CalendarSetting(calendar_id="cal-1", name="Cal 1", enabled=True))
+    assert _login(client, email="org@example.com").status_code == 200
+    user = _set_profile(session, "org@example.com", verified=True)
+    user.handle = "olive"
+    session.add(user)
+    events[0].organizer_user_id = user.id
+    session.add(events[0])
+    session.add(
+        EventRevision(
+            event_id=events[0].event_id,
+            source="organizer",
+            status="pending",
+            changes={"title": {"old": "a", "new": "b"}},
+            proposed_by_user_id=user.id,
+        )
+    )
+    session.commit()
+
+    mine = client.get("/api/social/me/hosting")
+    assert mine.status_code == 200, mine.text
+    assert [e["event_id"] for e in mine.json()["items"]] == [events[0].event_id]
+    assert mine.json()["pending_change_event_ids"] == [events[0].event_id]
+
+    public = client.get("/api/social/users/olive/hosting")
+    assert public.status_code == 200, public.text
+    assert public.json()["total"] == 1

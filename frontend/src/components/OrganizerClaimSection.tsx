@@ -1,478 +1,234 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { X } from 'lucide-react';
 import {
     cancelOrganizerClaim,
     fetchMyOrganizerClaims,
     fetchPublicProfile,
-    searchEvents,
-    submitOrganizerClaim,
-    type EventSearchResult,
+    removeEventFromClaim,
 } from '../api';
 import type { OrganizerClaim } from '../types';
+import { ConfirmDialog } from './AppDialog';
+import OrganizerClaimSheet from './OrganizerClaimSheet';
 
 interface Props {
     handle: string | null;
 }
 
-function statusBadge(status: string) {
-    const colors: Record<string, string> = {
-        pending: 'bg-amber-100 text-amber-700',
-        approved: 'bg-emerald-100 text-success',
-        rejected: 'bg-slate-200 text-ink',
-    };
-    return (
-        <span
-            className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-ink-soft'
-                }`}
-        >
-            {status}
-        </span>
-    );
-}
-
-function kindBadge(kind: 'badge' | 'events') {
-    const label = kind === 'badge' ? 'Verified badge' : 'Events';
-    const cls =
-        kind === 'badge'
-            ? 'bg-indigo-100 text-indigo-700'
-            : 'bg-sky-100 text-sky-700';
-    return (
-        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${cls}`}>
-            {label}
-        </span>
-    );
+function formatDate(iso?: string | null) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /**
- * Organizer claim panel.
- *
- * Two distinct flows backed by one section:
- *
- * 1. **Not verified** → submit a ``badge`` claim (no events). Requires
- *    bio + ≥1 social link. Approval flips ``is_verified_organizer``.
- * 2. **Already verified** → submit an ``events`` claim by freely
- *    searching the catalogue and picking events the user organizes.
- *    Approval attributes the events to the organizer AND auto-marks
- *    them as Going with public visibility.
- *
- * Claims history (both kinds) is always shown below the active form.
+ * Settings status card for the organizer role: pitch → request in review
+ * (events removable, add more, withdraw) → verified (claim more, Hosting).
+ * All submission happens in ``OrganizerClaimSheet``.
  */
 export default function OrganizerClaimSection({ handle }: Props) {
-    // Profile-derived gating.
-    const [bio, setBio] = useState<string | null>(null);
-    const [instagramUrl, setInstagramUrl] = useState<string | null>(null);
-    const [facebookUrl, setFacebookUrl] = useState<string | null>(null);
-    const [isVerifiedOrganizer, setIsVerifiedOrganizer] = useState(false);
+    const [verified, setVerified] = useState(false);
     const [claims, setClaims] = useState<OrganizerClaim[]>([]);
-
-    // Events-claim picker state.
-    const [picked, setPicked] = useState<EventSearchResult[]>([]);
-    const [searchQ, setSearchQ] = useState('');
-    const [searchResults, setSearchResults] = useState<EventSearchResult[]>([]);
-    const [searching, setSearching] = useState(false);
-
-    // UI state.
     const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [message, setMessage] = useState<string | null>(null);
-    const [collapsed, setCollapsed] = useState(true);
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const [historyOpen, setHistoryOpen] = useState(false);
+    const [confirmWithdraw, setConfirmWithdraw] = useState<OrganizerClaim | null>(null);
 
-    const hasBio = !!(bio && bio.trim());
-    const hasSocial =
-        !!(instagramUrl && instagramUrl.trim()) ||
-        !!(facebookUrl && facebookUrl.trim());
-    const prerequisitesMet = hasBio && hasSocial;
-
-    const pendingBadgeClaim = useMemo(
-        () => claims.find((c) => c.status === 'pending' && c.kind === 'badge'),
-        [claims],
-    );
-    const pendingEventsClaim = useMemo(
-        () => claims.find((c) => c.status === 'pending' && c.kind === 'events'),
-        [claims],
-    );
-
-    const load = () => {
-        setLoading(true);
-        const profilePromise = handle
-            ? fetchPublicProfile(handle).catch(() => null)
-            : Promise.resolve(null);
-        Promise.all([profilePromise, fetchMyOrganizerClaims().catch(() => [])])
-            .then(([profile, cl]) => {
-                if (profile) {
-                    setBio(profile.bio);
-                    setInstagramUrl(profile.instagram_url);
-                    setFacebookUrl(profile.facebook_url);
-                    setIsVerifiedOrganizer(profile.is_verified_organizer);
-                }
-                setClaims(cl);
+    const load = useCallback(() => {
+        Promise.all([
+            handle ? fetchPublicProfile(handle).catch(() => null) : Promise.resolve(null),
+            fetchMyOrganizerClaims().catch(() => []),
+        ])
+            .then(([profile, rows]) => {
+                setVerified(Boolean(profile?.is_verified_organizer));
+                setClaims(rows);
             })
             .finally(() => setLoading(false));
-    };
-
-    useEffect(() => {
-        load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [handle]);
 
-    // Debounced typeahead — only active for verified organizers.
-    const searchTimerRef = useRef<number | null>(null);
-    useEffect(() => {
-        if (!isVerifiedOrganizer) return;
-        const q = searchQ.trim();
-        if (q.length < 2) {
-            setSearchResults([]);
-            setSearching(false);
-            return;
-        }
-        if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-        setSearching(true);
-        searchTimerRef.current = window.setTimeout(async () => {
-            try {
-                const rows = await searchEvents(q, { limit: 10, dateScope: 'upcoming' });
-                setSearchResults(rows);
-            } catch {
-                setSearchResults([]);
-            } finally {
-                setSearching(false);
-            }
-        }, 200);
-        return () => {
-            if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-        };
-    }, [searchQ, isVerifiedOrganizer]);
+    useEffect(load, [load]);
 
-    const pickEvent = (e: EventSearchResult) => {
-        setPicked((prev) =>
-            prev.find((p) => p.event_id === e.event_id) ? prev : [...prev, e],
-        );
-        setSearchQ('');
-        setSearchResults([]);
-    };
+    const pending = claims.find((c) => c.status === 'pending') ?? null;
+    const history = claims.filter((c) => c.status !== 'pending');
+    const lastRejected = history[0]?.status === 'rejected' ? history[0] : null;
 
-    const removePicked = (id: string) =>
-        setPicked((prev) => prev.filter((p) => p.event_id !== id));
-
-    const submitBadge = async () => {
-        if (!prerequisitesMet) return;
-        setSubmitting(true);
+    const removeEvent = async (claimId: string, eventId: string) => {
         setError(null);
-        setMessage(null);
         try {
-            await submitOrganizerClaim({ kind: 'badge' });
-            setMessage(
-                'Verified-organizer request submitted — an admin will review it shortly.',
-            );
+            await removeEventFromClaim(claimId, eventId);
             load();
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Submission failed');
-        } finally {
-            setSubmitting(false);
+            setError(e instanceof Error ? e.message : 'Could not remove the event');
         }
     };
 
-    const submitEvents = async () => {
-        if (picked.length === 0) return;
-        setSubmitting(true);
+    const withdraw = async () => {
+        if (!confirmWithdraw) return;
+        const target = confirmWithdraw;
+        setConfirmWithdraw(null);
         setError(null);
-        setMessage(null);
         try {
-            await submitOrganizerClaim({
-                kind: 'events',
-                event_ids: picked.map((p) => p.event_id),
-            });
-            setMessage(
-                'Event claim submitted — once approved you will be marked as Going on these events.',
-            );
-            setPicked([]);
+            await cancelOrganizerClaim(target.id);
             load();
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Submission failed');
-        } finally {
-            setSubmitting(false);
+            setError(e instanceof Error ? e.message : 'Could not withdraw the request');
         }
     };
 
-    const cancel = async (id: string) => {
-        try {
-            await cancelOrganizerClaim(id);
-            load();
-        } catch (e) {
-            setError(e instanceof Error ? e.message : 'Cancel failed');
-        }
-    };
-
-    const headerTitle = isVerifiedOrganizer
-        ? 'Claim events you organize'
-        : 'Become a verified organizer';
+    const headerTitle = verified ? 'Organizer' : 'Are you an event organizer?';
+    const headerSubtitle = verified
+        ? 'Claim more events you organize and manage them from Hosting.'
+        : 'Get verified to show your name on your events and propose updates.';
 
     return (
-        <section className="rounded-lg border border-line bg-surface p-6 mb-6">
-            <button
-                type="button"
-                onClick={() => setCollapsed((v) => !v)}
-                aria-expanded={!collapsed}
-                className="flex w-full items-center justify-between gap-2 mb-2 text-left"
-            >
-                <div className="flex items-center gap-2">
-                    <span
-                        className={`inline-block text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
-                        aria-hidden="true"
-                    >
-                        ▶
+        <section id="organizer" className="scroll-mt-4 rounded-card border border-card-line bg-surface p-4">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h2 className="text-base font-semibold text-ink">{headerTitle}</h2>
+                    <p className="mt-0.5 text-sm text-ink-soft">{headerSubtitle}</p>
+                </div>
+                {verified && (
+                    <span className="inline-flex shrink-0 items-center gap-1 bg-emerald-50 px-2 py-1 text-xs font-semibold text-success">
+                        <img src="/orga.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
+                        Verified
                     </span>
-                    <h2 className="text-base text-sm font-semibold text-ink">
-                        {headerTitle}
-                    </h2>
-                </div>
-                <div className="flex items-center gap-1">
-                    {(pendingBadgeClaim || pendingEventsClaim) && statusBadge('pending')}
-                    {isVerifiedOrganizer && (
-                        <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-emerald-100 text-success inline-flex items-center gap-1">
-                            <img
-                                src="/orga.png"
-                                alt=""
-                                aria-hidden="true"
-                                className="w-3 h-3 object-contain"
-                            />
-                            verified organizer
-                        </span>
-                    )}
-                </div>
-            </button>
-            {!collapsed && (
-                <>
-                    {error && (
-                        <div className="text-xs bg-red-50 border border-red-200 text-danger p-2 mb-3">
-                            {error}
+                )}
+            </div>
+
+            {loading ? (
+                <p className="mt-3 text-sm text-muted">Loading…</p>
+            ) : (
+                <div className="mt-4 space-y-4">
+                    {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+
+                    {pending && (
+                        <div className="rounded-field border border-blue-100 bg-blue-50 p-3">
+                            <p className="text-sm font-semibold text-ink">In review</p>
+                            <p className="mt-0.5 text-xs text-ink-soft">
+                                Sent {formatDate(pending.created_at)} · usually reviewed within two days
+                            </p>
+                            {pending.events.length > 0 && (
+                                <ul className="mt-3 space-y-1">
+                                    {pending.events.map((e) => (
+                                        <li key={e.event_id} className="flex min-h-10 items-center gap-2 rounded-field bg-surface pl-3 text-sm text-ink">
+                                            <span className="min-w-0 flex-1 truncate">{e.event_title ?? e.event_id}</span>
+                                            <span className="shrink-0 text-xs text-muted">{formatDate(e.event_start)}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeEvent(pending.id, e.event_id)}
+                                                aria-label={`Remove ${e.event_title ?? 'event'} from request`}
+                                                className="flex h-10 w-10 shrink-0 items-center justify-center text-ink-soft hover:text-ink"
+                                            >
+                                                <X className="h-4 w-4" aria-hidden />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     )}
-                    {message && (
-                        <div className="text-xs bg-emerald-50 border border-emerald-200 text-success p-2 mb-3">
-                            {message}
+
+                    {!pending && lastRejected && !verified && (
+                        <div className="rounded-field border border-line bg-canvas p-3">
+                            <p className="text-sm font-semibold text-ink">Your last request wasn&apos;t approved</p>
+                            {lastRejected.admin_notes && (
+                                <p className="mt-1 text-sm text-ink-soft">“{lastRejected.admin_notes}”</p>
+                            )}
                         </div>
                     )}
 
-                    {/* Flow A — not yet verified: badge claim form. */}
-                    {!isVerifiedOrganizer && (
-                        <>
-                            <p className="text-xs text-ink-soft mb-3">
-                                Request the verified-organizer badge. Once approved
-                                you'll be able to claim individual events you
-                                organize.
-                            </p>
-
-                            {!prerequisitesMet && (
-                                <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2 mb-3">
-                                    Before submitting a claim you must add{' '}
-                                    {!hasBio && <strong>a profile bio</strong>}
-                                    {!hasBio && !hasSocial && ' and '}
-                                    {!hasSocial && (
-                                        <strong>at least one social link</strong>
-                                    )}{' '}
-                                    above.
-                                </div>
-                            )}
-
-                            {!pendingBadgeClaim && prerequisitesMet && (
-                                <div className="mb-4">
-                                    <button
-                                        disabled={submitting}
-                                        onClick={submitBadge}
-                                        className="bg-action text-white text-xs px-3 py-1.5 hover:bg-action disabled:opacity-50"
-                                    >
-                                        {submitting
-                                            ? 'Submitting…'
-                                            : 'Request verified-organizer badge'}
-                                    </button>
-                                </div>
-                            )}
-
-                            {pendingBadgeClaim && (
-                                <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2 mb-3">
-                                    Your verified-organizer request is pending admin
-                                    review.
-                                </div>
-                            )}
-                        </>
+                    {!pending && !verified && !lastRejected && (
+                        <ul className="space-y-1 text-sm text-ink-soft">
+                            <li>• A verified badge on your profile and posts</li>
+                            <li>• “Organized by” with your name on your events</li>
+                            <li>• Propose updates to your events and manage them in one place</li>
+                        </ul>
                     )}
 
-                    {/* Flow B — already verified: events claim form. */}
-                    {isVerifiedOrganizer && (
-                        <>
-                            <p className="text-xs text-ink-soft mb-3">
-                                Search the catalogue and pick the events you
-                                organize. On approval, each event will be
-                                attributed to you and added to your public
-                                calendar as Going.
-                            </p>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setSheetOpen(true)}
+                            className="min-h-11 rounded-field bg-action px-4 text-sm font-semibold text-white hover:opacity-90"
+                        >
+                            {verified ? 'Claim more events' : pending ? 'Add events' : lastRejected ? 'Request again' : 'Become an organizer'}
+                        </button>
+                        {verified && (
+                            <Link
+                                to="/hosting"
+                                className="flex min-h-11 items-center rounded-field border border-line bg-surface px-4 text-sm font-semibold text-ink hover:bg-canvas"
+                            >
+                                Open Hosting
+                            </Link>
+                        )}
+                        {pending && (
+                            <button
+                                type="button"
+                                onClick={() => setConfirmWithdraw(pending)}
+                                className="min-h-11 rounded-field px-3 text-sm font-semibold text-danger hover:bg-canvas"
+                            >
+                                Withdraw request
+                            </button>
+                        )}
+                    </div>
 
-                            {pendingEventsClaim && (
-                                <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2 mb-3">
-                                    You have a pending event claim awaiting admin
-                                    review. You can submit another batch once
-                                    that one is decided.
-                                </div>
-                            )}
-
-                            {!pendingEventsClaim && (
-                                <div className="mb-4">
-                                    <div className="text-xs font-medium text-ink mb-1">
-                                        Find events ({picked.length} picked, max 20)
-                                    </div>
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={searchQ}
-                                            onChange={(e) => setSearchQ(e.target.value)}
-                                            placeholder="Type at least 2 characters…"
-                                            className="w-full text-xs border border-line px-2 py-1.5 focus:outline-none focus:border-action"
-                                        />
-                                        {(searching || searchResults.length > 0) && (
-                                            <div className="absolute left-0 right-0 mt-1 z-10 bg-surface border border-line shadow-lg max-h-56 overflow-y-auto">
-                                                {searching && (
-                                                    <div className="text-xs text-muted px-2 py-1.5">
-                                                        Searching…
-                                                    </div>
-                                                )}
-                                                {!searching &&
-                                                    searchResults.length === 0 && (
-                                                        <div className="text-xs text-muted px-2 py-1.5">
-                                                            No matches.
-                                                        </div>
-                                                    )}
-                                                {searchResults.map((r) => {
-                                                    const already = picked.some(
-                                                        (p) => p.event_id === r.event_id,
-                                                    );
-                                                    return (
-                                                        <button
-                                                            type="button"
-                                                            key={r.event_id}
-                                                            disabled={already || picked.length >= 20}
-                                                            onClick={() => pickEvent(r)}
-                                                            className="w-full text-left flex items-center gap-2 px-2 py-1.5 hover:bg-canvas disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        >
-                                                            <span className="flex-1 text-xs text-ink truncate">
-                                                                {r.title}
-                                                            </span>
-                                                            {r.start && (
-                                                                <span className="text-[10px] text-muted">
-                                                                    {new Date(r.start).toLocaleDateString()}
-                                                                </span>
-                                                            )}
-                                                            {already && (
-                                                                <span className="text-[10px] text-success">
-                                                                    added
-                                                                </span>
-                                                            )}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {picked.length > 0 && (
-                                        <ul className="mt-2 border border-line max-h-48 overflow-y-auto divide-y divide-slate-100">
-                                            {picked.map((p) => (
-                                                <li
-                                                    key={p.event_id}
-                                                    className="flex items-center gap-2 px-2 py-1.5"
-                                                >
-                                                    <span className="flex-1 text-xs text-ink truncate">
-                                                        {p.title}
-                                                    </span>
-                                                    {p.start && (
-                                                        <span className="text-[10px] text-muted">
-                                                            {new Date(p.start).toLocaleDateString()}
-                                                        </span>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removePicked(p.event_id)}
-                                                        className="text-[11px] text-danger hover:text-danger"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-
-                                    <div className="mt-3">
-                                        <button
-                                            disabled={submitting || picked.length === 0}
-                                            onClick={submitEvents}
-                                            className="bg-action text-white text-xs px-3 py-1.5 hover:bg-action disabled:opacity-50"
-                                        >
-                                            {submitting
-                                                ? 'Submitting…'
-                                                : `Submit ${picked.length || ''} event claim${picked.length === 1 ? '' : 's'}`.trim()}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {loading && (
-                        <div className="text-xs text-muted">Loading…</div>
-                    )}
-
-                    {claims.length > 0 && (
-                        <div>
-                            <div className="text-xs font-medium text-ink mb-1">
-                                My claims
-                            </div>
-                            <ul className="divide-y divide-slate-100 border border-line">
-                                {claims.map((c) => (
-                                    <li key={c.id} className="p-2">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                {kindBadge(c.kind)}
-                                                {statusBadge(c.status)}
-                                                <span className="text-[11px] text-ink-soft">
-                                                    {new Date(c.created_at).toLocaleString()}
+                    {history.length > 0 && (
+                        <div className="border-t border-card-line pt-3">
+                            <button
+                                type="button"
+                                onClick={() => setHistoryOpen((v) => !v)}
+                                aria-expanded={historyOpen}
+                                className="text-sm font-medium text-ink-soft hover:text-ink"
+                            >
+                                Past requests ({history.length}) {historyOpen ? '▲' : '▼'}
+                            </button>
+                            {historyOpen && (
+                                <ul className="mt-2 divide-y divide-card-line">
+                                    {history.map((c) => (
+                                        <li key={c.id} className="py-2 text-sm">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-ink">
+                                                    {c.kind === 'badge' ? 'Organizer request' : 'Event claim'} · {formatDate(c.created_at)}
+                                                </span>
+                                                <span className={`text-xs font-semibold ${c.status === 'approved' ? 'text-success' : 'text-ink-soft'}`}>
+                                                    {c.status === 'approved' ? 'Approved' : 'Not approved'}
                                                 </span>
                                             </div>
-                                            {c.status === 'pending' && (
-                                                <button
-                                                    onClick={() => cancel(c.id)}
-                                                    className="text-[11px] text-danger hover:text-danger"
-                                                >
-                                                    Cancel
-                                                </button>
+                                            {c.events.length > 0 && (
+                                                <ul className="mt-1 space-y-0.5 text-xs text-ink-soft">
+                                                    {c.events.map((e) => (
+                                                        <li key={e.event_id} className="flex justify-between gap-2">
+                                                            <span className="truncate">{e.event_title ?? e.event_id}</span>
+                                                            <span>{e.decision === 'approved' ? '✓' : '—'}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
                                             )}
-                                        </div>
-                                        {c.events.length > 0 && (
-                                            <ul className="mt-1 ml-1 text-[11px] text-ink-soft">
-                                                {c.events.map((e) => (
-                                                    <li
-                                                        key={e.event_id}
-                                                        className="flex items-center gap-2"
-                                                    >
-                                                        <span>•</span>
-                                                        <span className="truncate flex-1">
-                                                            {e.event_title ?? e.event_id}
-                                                        </span>
-                                                        {statusBadge(e.decision)}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
-                                        {c.admin_notes && (
-                                            <div className="mt-1 text-[11px] italic text-ink-soft">
-                                                Admin notes: {c.admin_notes}
-                                            </div>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
+                                            {c.admin_notes && <p className="mt-1 text-xs italic text-ink-soft">“{c.admin_notes}”</p>}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     )}
-                </>
+                </div>
             )}
+
+            {sheetOpen && (
+                <OrganizerClaimSheet
+                    onClose={() => { setSheetOpen(false); load(); }}
+                    onSubmitted={load}
+                />
+            )}
+            <ConfirmDialog
+                open={confirmWithdraw !== null}
+                title="Withdraw your request?"
+                message="Your request and the events in it will no longer be reviewed."
+                confirmLabel="Withdraw"
+                destructive
+                onConfirm={withdraw}
+                onCancel={() => setConfirmWithdraw(null)}
+            />
         </section>
     );
 }

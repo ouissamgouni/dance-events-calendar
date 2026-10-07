@@ -1,0 +1,7 @@
+calendars:
+  - id: "salsa-src"
+    name: "Berlin Salsa (Google)"
+    color: "#2563eb"
+  - id: "movida-salsa"
+    name: "Movida Salsa"
+    color: "#a22e43"

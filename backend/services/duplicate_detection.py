@@ -35,21 +35,36 @@ from backend.db.models import (
     EventDuplicateScanLog,
     SiteSetting,
 )
+from backend.services import event_revisions
+from backend.services.event_visibility import (
+    REASON_DUPLICATE,
+    STATUS_REMOVED,
+    pending_request_ids,
+    set_event_status,
+)
 
 # Candidate window: how far apart two events' start times may be to still
 # be considered for a title match. Generous enough to catch "same event,
 # slightly different time" listings across calendars.
 CANDIDATE_WINDOW_HOURS = 36
+# Beyond that, a day either side still catches wrong-date / time-zone slips,
+# but only for near-identical titles so weekly series don't flood the queue.
+EXTENDED_WINDOW_HOURS = CANDIDATE_WINDOW_HOURS + 24
 
 # Minimum difflib.SequenceMatcher ratio (0-1) on normalized titles for a
 # pair to be flagged as a likely duplicate.
 TITLE_SIMILARITY_THRESHOLD = 0.72
+EXTENDED_TITLE_SIMILARITY_THRESHOLD = 0.9
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _normalize_title(title: str) -> str:
     return _WHITESPACE_RE.sub(" ", (title or "").strip().lower())
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
 def _title_similarity(a: str, b: str) -> float:
@@ -95,10 +110,12 @@ def _existing_pair_recorded(session: Session, event_id_a: str, event_id_b: str) 
 def find_candidate_matches(
     session: Session, event: CachedEvent, *, now: datetime | None = None
 ) -> list[CachedEvent]:
-    """Active, upcoming events (any calendar) with a similar title and a
-    start time within ``CANDIDATE_WINDOW_HOURS`` of ``event.start``."""
+    """Active, upcoming public events (any calendar) with a similar title and
+    a start within ``CANDIDATE_WINDOW_HOURS`` of ``event.start``, or within
+    ``EXTENDED_WINDOW_HOURS`` for a near-identical title."""
     now = now or datetime.now(timezone.utc)
-    window = timedelta(hours=CANDIDATE_WINDOW_HOURS)
+    window = timedelta(hours=EXTENDED_WINDOW_HOURS)
+    close = timedelta(hours=CANDIDATE_WINDOW_HOURS)
 
     narrowed = session.exec(
         select(CachedEvent).where(
@@ -106,6 +123,7 @@ def find_candidate_matches(
             ~CachedEvent.event_id.in_(select(BlockedEvent.event_id)),
             CachedEvent.deleted_at == None,  # noqa: E711
             CachedEvent.is_hidden == False,  # noqa: E712
+            CachedEvent.visibility == "public",
             CachedEvent.end > now,
             CachedEvent.start >= event.start - window,
             CachedEvent.start <= event.start + window,
@@ -115,7 +133,12 @@ def find_candidate_matches(
     return [
         c
         for c in narrowed
-        if _title_similarity(event.title, c.title) >= TITLE_SIMILARITY_THRESHOLD
+        if _title_similarity(event.title, c.title)
+        >= (
+            TITLE_SIMILARITY_THRESHOLD
+            if abs(_as_utc(c.start) - _as_utc(event.start)) <= close
+            else EXTENDED_TITLE_SIMILARITY_THRESHOLD
+        )
     ]
 
 
@@ -188,6 +211,10 @@ def detect_duplicates_for_event(
             and not event.is_hidden
             and session.get(BlockedEvent, event_id) is None
             and event.end > datetime.now(timezone.utc)
+            and (
+                event.visibility == "public"
+                or bool(pending_request_ids(session, [event.suggestion_id]))
+            )
         ):
             matches = find_candidate_matches(session, event)
             candidates_found = len(matches)
@@ -238,6 +265,7 @@ def run_full_scan(
                 CachedEvent.deleted_at == None,  # noqa: E711
                 CachedEvent.is_hidden == False,  # noqa: E712
                 ~CachedEvent.event_id.in_(select(BlockedEvent.event_id)),
+                CachedEvent.visibility == "public",
                 CachedEvent.end > now,
             )
             .order_by(CachedEvent.start)
@@ -319,6 +347,13 @@ def keep_event(
 
     kept_event = session.get(CachedEvent, keep_event_id)
     kept_title = kept_event.title if kept_event else keep_event_id
+    removed_keys: list[str | None] = []
+    # Resolved first: removing a pending group's member would drop it from the group.
+    group.status = "resolved"
+    group.kept_event_id = keep_event_id
+    group.resolved_at = datetime.now(timezone.utc)
+    group.resolved_by_admin = admin_email
+    session.add(group)
 
     for event_id in member_ids:
         if event_id == keep_event_id:
@@ -326,9 +361,8 @@ def keep_event(
         event = session.get(CachedEvent, event_id)
         if event is None:
             continue
-        event.is_hidden = True
+        set_event_status(event, STATUS_REMOVED, REASON_DUPLICATE)
         event.rejected_duplicate_reason = f"Duplicate of {keep_event_id} — {kept_title}"
-        event.updated_at = datetime.now(timezone.utc)
         session.add(event)
         if not session.get(BlockedEvent, event_id):
             session.add(
@@ -338,13 +372,19 @@ def keep_event(
                     reason_detail=event.rejected_duplicate_reason,
                 )
             )
+        removed_keys.append(
+            event_revisions.notify_event_removed(
+                session,
+                [event_id],
+                title=event.title,
+                reason=f"It was listed twice; see {kept_title}.",
+                replacement_event_id=keep_event_id,
+            )
+        )
 
-    group.status = "resolved"
-    group.kept_event_id = keep_event_id
-    group.resolved_at = datetime.now(timezone.utc)
-    group.resolved_by_admin = admin_email
-    session.add(group)
     session.commit()
+    for key in removed_keys:
+        event_revisions.enqueue_removed_notices(key)
     session.refresh(group)
     return group
 
@@ -382,3 +422,48 @@ def get_groups_for_event(session: Session, event_id: str) -> list[EventDuplicate
             EventDuplicateGroup.status == "pending",
         )
     ).all()
+
+
+# A venue within this distance counts as the same place.
+SAME_VENUE_KM = 0.2
+
+
+def _same_venue(a: CachedEvent, b: CachedEvent) -> bool:
+    from backend.services.profile_geography import haversine_km
+
+    if None not in (a.latitude, a.longitude, b.latitude, b.longitude):
+        return (
+            haversine_km(a.latitude, a.longitude, b.latitude, b.longitude)
+            <= SAME_VENUE_KM
+        )
+    return bool(
+        a.location
+        and b.location
+        and _normalize_title(a.location) == _normalize_title(b.location)
+    )
+
+
+def find_overlapping_events(
+    session: Session, event: CachedEvent
+) -> list[tuple[CachedEvent, float, bool, bool]]:
+    """Events whose time range intersects ``event``'s, likely duplicates first.
+
+    Returns ``(event, title_similarity, same_venue, likely_duplicate)``.
+    """
+    rows = session.exec(
+        select(CachedEvent).where(
+            CachedEvent.event_id != event.event_id,
+            CachedEvent.deleted_at == None,  # noqa: E711
+            CachedEvent.start < event.end,
+            CachedEvent.end > event.start,
+        )
+    ).all()
+    scored = []
+    for row in rows:
+        similarity = _title_similarity(event.title, row.title)
+        venue = _same_venue(event, row)
+        scored.append(
+            (row, similarity, venue, venue or similarity >= TITLE_SIMILARITY_THRESHOLD)
+        )
+    scored.sort(key=lambda item: (not item[3], -item[1], _as_utc(item[0].start)))
+    return scored

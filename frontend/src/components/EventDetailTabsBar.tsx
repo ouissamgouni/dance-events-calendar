@@ -14,6 +14,7 @@ const TABS: TabDef[] = [
     { id: 'people', label: 'People' },
     { id: 'reviews', label: 'Reviews' },
     { id: 'discussion', label: 'Discussion' },
+    { id: 'memories', label: 'Memories' },
 ];
 
 interface Props {
@@ -23,6 +24,7 @@ interface Props {
      * `section` = the bar shown under the section header. */
     variant?: 'entry' | 'section';
     showProgram?: boolean;
+    showMemories?: boolean;
 }
 
 /**
@@ -31,7 +33,7 @@ interface Props {
  * tabs. Stickiness is owned by the caller so it can pin the section header and
  * tabs together.
  */
-export default function EventDetailTabsBar({ active, onSelect, variant = 'section', showProgram = false }: Props) {
+export default function EventDetailTabsBar({ active, onSelect, variant = 'section', showProgram = false, showMemories = false }: Props) {
     const listRef = useRef<HTMLDivElement>(null);
 
     // Keep the active tab visible in the horizontal scroller (e.g. Discussion opened from a link).
@@ -43,7 +45,7 @@ export default function EventDetailTabsBar({ active, onSelect, variant = 'sectio
         const right = left + btn.offsetWidth;
         if (left < list.scrollLeft) list.scrollTo({ left });
         else if (right > list.scrollLeft + list.clientWidth) list.scrollTo({ left: right - list.clientWidth });
-    }, [active, showProgram]);
+    }, [active, showProgram, showMemories]);
 
     return (
         <div className={`bg-surface ${variant === 'entry' ? 'border-y border-line' : 'border-b border-line'}`}>
@@ -53,7 +55,7 @@ export default function EventDetailTabsBar({ active, onSelect, variant = 'sectio
                 aria-label="Event details"
                 className="flex flex-nowrap gap-1 overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-                {TABS.filter((tab) => tab.id !== 'program' || showProgram).map((tab) => {
+                {TABS.filter((tab) => (tab.id !== 'program' || showProgram) && (tab.id !== 'memories' || showMemories)).map((tab) => {
                     const isActive = tab.id === active;
                     return (
                         <button

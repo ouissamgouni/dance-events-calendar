@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Repeat } from 'lucide-react';
 import useBackToClose from '../hooks/useBackToClose';
-import type { AdminEventStatus, CalendarEvent, EventInterestReach, SeriesGroup, DuplicateGroup } from '../types';
+import type { AdminEventStatus, CalendarEvent, EventInterestReach, EventVisibilityState, SeriesGroup, DuplicateGroup } from '../types';
 import type {
+    AdminEventFlag,
     AdminEventGeoStatus,
     EventFilterParams,
     EventFilterOptionsResponse,
+    FilterOption,
 } from '../api';
 import {
     fetchAdminEvents,
@@ -34,17 +37,21 @@ import AdminEventDetailPanel from './AdminEventDetailPanel';
 import TagsPicker from './TagsPicker';
 import SeriesGroupCard from './SeriesGroupCard';
 import DuplicateGroupCard from './DuplicateGroupCard';
+import MergeEventsDialog from './MergeEventsDialog';
+import { FlagIcon, WantsPublicChip } from './VisibilityChip';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import {
-    ADMIN_EVENT_HIDDEN_CHIP_CLASS,
     ADMIN_EVENT_STATUS_CHIP_CLASSES,
+    ADMIN_EVENT_STATUS_LABELS,
     getAdminEventRowClass,
     getAdminEventStatus,
     getAdminEventStatusIcon,
-    getBlockReasonLabel,
+    getRemovalReasonLabel,
+    reviewLockReason,
 } from '../utils/adminEventStatus';
+import { formatCompactDateRange } from '../utils/eventDates';
 
-export type EventsPanelPreset = 'all' | 'pending' | 'ungeolocated';
+export type EventsPanelPreset = 'all' | 'ungeolocated';
 
 interface Props {
     isOpen: boolean;
@@ -57,17 +64,67 @@ const PAGE_SIZE = 25;
 
 const PRESET_FILTERS: Record<EventsPanelPreset, Partial<EventFilterParams>> = {
     all: {},
-    pending: { status: 'pending' },
     ungeolocated: { ungeolocated: true },
 };
 
 const PRESET_TITLES: Record<EventsPanelPreset, string> = {
     all: 'Events',
-    pending: 'Pending Review',
     ungeolocated: 'Ungeolocated Events',
 };
 
+function toggled<T>(list: T[], value: T): T[] {
+    return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+function PillGroup<T extends string>({ label, options, selected, onToggle, icons = false }: {
+    label: string;
+    options: FilterOption[];
+    selected: T[];
+    onToggle: (value: T) => void;
+    icons?: boolean;
+}) {
+    return (
+        <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] uppercase tracking-wide text-muted">{label}</span>
+            {options.map((option) => {
+                const active = selected.includes(option.value as T);
+                return (
+                    <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={active}
+                        aria-label={icons ? `${option.label} (${option.count})` : undefined}
+                        title={icons ? option.label : undefined}
+                        onClick={() => onToggle(option.value as T)}
+                        className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 border transition ${active
+                            ? 'bg-blue-50 border-blue-300 text-action'
+                            : 'bg-surface border-line text-ink-soft hover:bg-canvas'
+                            }`}
+                    >
+                        {icons ? <><FlagIcon flag={option.value} size={12} /> {option.count}</> : `${option.label} (${option.count})`}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 const ENGAGEMENT_TOOLTIP = 'Visitors who accepted analytics cookies only; admins excluded.';
+
+function hasOpenChanges(event: CalendarEvent): boolean {
+    return Boolean(event.has_pending_changes) && getAdminEventStatus(event) !== 'removed';
+}
+
+function EventFlagIcons({ event }: { event: CalendarEvent }) {
+    return (
+        <span className="inline-flex items-center gap-1.5">
+            {event.visibility_state && <FlagIcon flag={event.visibility_state} />}
+            {event.wants_public && <WantsPublicChip />}
+            {event.is_submission && <FlagIcon flag="submitted" />}
+            {hasOpenChanges(event) && <FlagIcon flag="changes" />}
+        </span>
+    );
+}
 
 export function MatchesCell({ reach }: { reach?: EventInterestReach | null }) {
     if (!reach) return <span className="text-muted">—</span>;
@@ -106,7 +163,9 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [filterOptions, setFilterOptions] = useState<EventFilterOptionsResponse | null>(null);
     const [selectedCalendar, setSelectedCalendar] = useState<string>('');
-    const [selectedStatus, setSelectedStatus] = useState<AdminEventStatus | ''>('');
+    const [selectedAudience, setSelectedAudience] = useState<EventVisibilityState[]>([]);
+    const [selectedStatus, setSelectedStatus] = useState<AdminEventStatus[]>([]);
+    const [selectedFlags, setSelectedFlags] = useState<AdminEventFlag[]>([]);
     const [selectedGeoStatus, setSelectedGeoStatus] = useState<AdminEventGeoStatus | ''>('');
     const [selectedTagIds, setSelectedTagIds] = useState<string>('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -121,6 +180,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     // visible until the admin resolves (approve/keep) or dismisses them.
     const [seriesGroupResult, setSeriesGroupResult] = useState<SeriesGroup | null>(null);
     const [duplicateGroupResult, setDuplicateGroupResult] = useState<DuplicateGroup | null>(null);
+    const [mergeIds, setMergeIds] = useState<string[] | null>(null);
     const [inlineActing, setInlineActing] = useState(false);
     // Add-to-existing-series picker state.
     const [addSeriesPickerOpen, setAddSeriesPickerOpen] = useState(false);
@@ -136,10 +196,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [selectedCurateHandles, setSelectedCurateHandles] = useState<Set<string>>(new Set());
     const [curateKind, setCurateKind] = useState<AdminBulkEngagementKind>('save');
     const [curateAudience, setCurateAudience] = useState<AdminBulkEngagementAudience | ''>('');
-    const [hiddenOnly, setHiddenOnly] = useState(false);
-    // Hide past events by default; toggle to include them. Local to this panel
-    // so the Events and Pending Review panels filter independently.
+    // Hide past events by default; toggle to include them.
     const [hidePast, setHidePast] = useState(true);
+    const [groupBySeries, setGroupBySeries] = useState(false);
+    const [sortBy, setSortBy] = useState<'start' | 'submitted'>('start');
     const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const seriesSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -151,16 +211,19 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 limit: PAGE_SIZE,
                 offset: (pageOverride ?? page) * PAGE_SIZE,
                 search: debouncedSearch || undefined,
-                status: selectedStatus || undefined,
+                audience: selectedAudience,
+                status: selectedStatus,
+                flags: selectedFlags,
                 calendar_id: selectedCalendar || undefined,
                 tag_ids: selectedTagIds || undefined,
                 geo_status: selectedGeoStatus || undefined,
                 ungeolocated: presetFilters.ungeolocated || undefined,
                 include_past: !hidePast || undefined,
-                hidden: hiddenOnly || undefined,
+                group: groupBySeries ? 'series' : undefined,
+                sort: sortBy,
             };
         },
-        [preset, page, debouncedSearch, selectedStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast, hiddenOnly],
+        [preset, page, debouncedSearch, selectedAudience, selectedStatus, selectedFlags, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast, groupBySeries, sortBy],
     );
 
     // Load events
@@ -171,7 +234,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 const params = buildParams(pageOverride);
                 // Fetch filter options without calendar_id so the calendar dropdown
                 // always shows all calendars regardless of the current selection.
-                const { calendar_id: _calId, ...optionParams } = params;
+                const { calendar_id: _calId, ...rest } = params;
+                const optionParams = { ...rest, group: undefined, sort: undefined };
                 const [eventsRes, optionsRes] = await Promise.all([
                     fetchAdminEvents(params),
                     fetchEventFilterOptions(optionParams),
@@ -195,10 +259,11 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setSearch('');
             setDebouncedSearch('');
             setSelectedCalendar(initialCalendarId ?? '');
-            setSelectedStatus(PRESET_FILTERS[preset].status ?? '');
+            setSelectedAudience(PRESET_FILTERS[preset].audience ?? []);
+            setSelectedStatus(PRESET_FILTERS[preset].status ?? []);
+            setSelectedFlags([]);
             setSelectedGeoStatus('');
             setSelectedTagIds('');
-            setHiddenOnly(false);
             setSelectedIds(new Set());
             setAllMatchingSelected(false);
             setMessage('');
@@ -207,6 +272,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setBulkTagIds([]);
             setSelectedCurateHandles(new Set());
             setHidePast(true);
+            setGroupBySeries(false);
+            setSortBy('start');
         }
     }, [isOpen, preset, initialCalendarId]);
 
@@ -561,11 +628,6 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         }
     };
 
-    const formatDate = (iso: string) => {
-        const d = new Date(iso);
-        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    };
-
     return (
         <>
             {isOpen && (
@@ -637,24 +699,27 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 </select>
                             )}
 
-                            {/* Status chips */}
-                            {filterOptions.statuses.map((statusOption) => (
-                                <button
-                                    key={statusOption.value}
-                                    onClick={() => {
-                                        setSelectedStatus((prev) => (
-                                            prev === statusOption.value ? '' : statusOption.value as AdminEventStatus
-                                        ));
-                                        setPage(0);
-                                    }}
-                                    className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedStatus === statusOption.value
-                                        ? 'bg-blue-50 border-blue-300 text-action'
-                                        : 'bg-surface border-line text-ink-soft hover:bg-canvas'
-                                        }`}
-                                >
-                                    {statusOption.label} ({statusOption.count})
-                                </button>
-                            ))}
+                            {/* Status pills: OR within a group, AND across groups */}
+                            <PillGroup<EventVisibilityState>
+                                label="Audience"
+                                options={filterOptions.audiences}
+                                selected={selectedAudience}
+                                icons
+                                onToggle={(v) => { setSelectedAudience((prev) => toggled(prev, v)); setPage(0); }}
+                            />
+                            <PillGroup<AdminEventStatus>
+                                label="Status"
+                                options={filterOptions.statuses}
+                                selected={selectedStatus}
+                                onToggle={(v) => { setSelectedStatus((prev) => toggled(prev, v)); setPage(0); }}
+                            />
+                            <PillGroup<AdminEventFlag>
+                                label="Flags"
+                                options={filterOptions.flags}
+                                selected={selectedFlags}
+                                icons
+                                onToggle={(v) => { setSelectedFlags((prev) => toggled(prev, v)); setPage(0); }}
+                            />
 
                             {/* Geo status chips */}
                             {preset === 'all' && filterOptions.geo_statuses.map((gs) => (
@@ -704,14 +769,27 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             </button>
 
                             <button
-                                onClick={() => { setHiddenOnly((value) => !value); setPage(0); }}
-                                className={`text-[10px] font-medium px-2 py-0.5 border transition ${hiddenOnly
-                                    ? 'bg-slate-200 border-line text-ink'
+                                type="button"
+                                aria-pressed={groupBySeries}
+                                onClick={() => { setGroupBySeries((v) => !v); setPage(0); }}
+                                className={`text-[10px] font-medium px-2 py-0.5 border transition ${groupBySeries
+                                    ? 'bg-blue-50 border-blue-300 text-action'
                                     : 'bg-surface border-line text-ink-soft hover:bg-canvas'
                                     }`}
+                                title="One row per series"
                             >
-                                Hidden
+                                Group by series
                             </button>
+
+                            <select
+                                value={sortBy}
+                                onChange={(e) => { setSortBy(e.target.value as 'start' | 'submitted'); setPage(0); }}
+                                aria-label="Sort"
+                                className="border border-line text-[10px] text-ink-soft px-1.5 py-1 bg-surface focus:outline-none focus:ring-1 focus:ring-action"
+                            >
+                                <option value="start">By date</option>
+                                <option value="submitted">Newest submitted</option>
+                            </select>
                         </div>
                     )}
                 </div>
@@ -725,7 +803,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 )}
 
                 {/* Table */}
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-auto">
                     {loading && events.length === 0 ? (
                         <div className="flex items-center justify-center h-full text-muted">
                             <p className="text-xs">Loading…</p>
@@ -746,15 +824,17 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                             className="h-3 w-3"
                                         />
                                     </th>
-                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide">Title</th>
-                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Date</th>
-                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-16">Image</th>
+                                    <th className="w-full px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide">Title</th>
+                                    <th className="hidden sm:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide whitespace-nowrap">Date</th>
+                                    <th className="hidden md:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Submitter</th>
+                                    <th className="hidden md:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-16">Image</th>
                                     <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-20">Status</th>
-                                    <th className="px-2 py-2 text-center font-semibold text-ink-soft uppercase tracking-wide w-10">Geo</th>
-                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Tags</th>
-                                    <th className="px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24" title="Users whose saved searches match: notified / matching">Matches</th>
-                                    <th className="px-2 py-2 text-right font-semibold text-ink-soft uppercase tracking-wide w-12" title={ENGAGEMENT_TOOLTIP}>Views</th>
-                                    <th className="px-2 py-2 text-right font-semibold text-ink-soft uppercase tracking-wide w-12" title={ENGAGEMENT_TOOLTIP}>Clicks</th>
+                                    <th className="hidden sm:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-20">Flags</th>
+                                    <th className="hidden md:table-cell px-2 py-2 text-center font-semibold text-ink-soft uppercase tracking-wide w-10">Geo</th>
+                                    <th className="hidden md:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24">Tags</th>
+                                    <th className="hidden md:table-cell px-2 py-2 text-left font-semibold text-ink-soft uppercase tracking-wide w-24" title="Users whose saved searches match: notified / matching">Matches</th>
+                                    <th className="hidden md:table-cell px-2 py-2 text-right font-semibold text-ink-soft uppercase tracking-wide w-12" title={ENGAGEMENT_TOOLTIP}>Views</th>
+                                    <th className="hidden md:table-cell px-2 py-2 text-right font-semibold text-ink-soft uppercase tracking-wide w-12" title={ENGAGEMENT_TOOLTIP}>Clicks</th>
                                     <th className="px-2 py-2 w-16"></th>
                                 </tr>
                             </thead>
@@ -765,7 +845,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                         className={`transition cursor-pointer ${getAdminEventRowClass(event)}`}
                                         onClick={() => setAdminDetailEventId(event.event_id)}
                                     >
-                                        <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
+                                        <td className={`px-2 py-1.5 ${hasOpenChanges(event) ? 'border-l-4 border-orange-400' : ''}`} onClick={(e) => e.stopPropagation()}>
                                             <input
                                                 type="checkbox"
                                                 checked={selectedIds.has(event.event_id)}
@@ -773,7 +853,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                                 className="h-3 w-3"
                                             />
                                         </td>
-                                        <td className="px-2 py-1.5">
+                                        <td className="max-w-0 px-2 py-1.5">
                                             <div className="flex items-center gap-1.5 min-w-0">
                                                 {event.color && (
                                                     <span
@@ -781,20 +861,33 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                                         style={{ backgroundColor: event.color }}
                                                     />
                                                 )}
-                                                <span className="truncate font-medium text-ink max-w-[260px]">
+                                                {(event.in_series || (event.occurrence_count ?? 1) > 1) && (
+                                                    <Repeat className="h-3 w-3 shrink-0 text-ink-soft" aria-label="Series" role="img" />
+                                                )}
+                                                <span className={`truncate font-medium ${getAdminEventStatus(event) === 'cancelled' ? 'text-ink-soft line-through' : 'text-ink'}`}>
                                                     {event.title}
                                                 </span>
                                             </div>
                                             {event.location && (
-                                                <p className="text-[10px] text-muted truncate max-w-[260px] mt-0.5">
+                                                <p className="text-[10px] text-muted truncate mt-0.5">
                                                     {event.location}
                                                 </p>
                                             )}
+                                            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-ink-soft sm:hidden">
+                                                <span className="whitespace-nowrap">{formatCompactDateRange(event)}</span>
+                                                <EventFlagIcons event={event} />
+                                            </div>
                                         </td>
-                                        <td className="px-2 py-1.5 text-ink-soft whitespace-nowrap">
-                                            {formatDate(event.start)}
+                                        <td className="hidden sm:table-cell px-2 py-1.5 text-ink-soft whitespace-nowrap">
+                                            {formatCompactDateRange(event)}
+                                            {(event.occurrence_count ?? 1) > 1 && (
+                                                <span className="ml-1 text-muted" title={`${event.occurrence_count} dates in this series`}>×{event.occurrence_count}</span>
+                                            )}
                                         </td>
-                                        <td className="w-16 px-2 py-1.5">
+                                        <td className="hidden md:table-cell max-w-[120px] truncate px-2 py-1.5 text-ink-soft" title={event.submitter_name ?? undefined}>
+                                            {event.submitter_name ?? <span className="text-muted">—</span>}
+                                        </td>
+                                        <td className="hidden md:table-cell w-16 px-2 py-1.5">
                                             {(event.image_thumb_url ?? event.image_url) && (
                                                 <img
                                                     src={event.image_thumb_url ?? event.image_url ?? undefined}
@@ -816,22 +909,22 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                                     />
                                                 )}
                                                 <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${ADMIN_EVENT_STATUS_CHIP_CLASSES[getAdminEventStatus(event)]}`}>
-                                                    {getAdminEventStatus(event)}
+                                                    {ADMIN_EVENT_STATUS_LABELS[getAdminEventStatus(event)]}
                                                 </span>
-                                                {event.is_hidden && getAdminEventStatus(event) !== 'blocked' && (
-                                                    <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${ADMIN_EVENT_HIDDEN_CHIP_CLASS}`}>Hidden</span>
-                                                )}
-                                                {getAdminEventStatus(event) === 'blocked' && getBlockReasonLabel(event.block_reason) && (
+                                                {getRemovalReasonLabel(event) && (
                                                     <span
                                                         className="inline-block bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-soft"
                                                         title={event.block_reason_detail ?? undefined}
                                                     >
-                                                        {getBlockReasonLabel(event.block_reason)}
+                                                        {getRemovalReasonLabel(event)}
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-2 py-1.5 text-center">
+                                        <td className="hidden sm:table-cell px-2 py-1.5">
+                                            <EventFlagIcons event={event} />
+                                        </td>
+                                        <td className="hidden md:table-cell px-2 py-1.5 text-center">
                                             <LocationBadge
                                                 location={event.location}
                                                 latitude={event.latitude}
@@ -839,7 +932,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                                 size="sm"
                                             />
                                         </td>
-                                        <td className="px-2 py-1.5">
+                                        <td className="hidden md:table-cell px-2 py-1.5">
                                             <div className="flex flex-wrap gap-0.5">
                                                 {event.tags.slice(0, 2).map((t) => (
                                                     <span
@@ -854,20 +947,20 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-2 py-1.5">
+                                        <td className="hidden md:table-cell px-2 py-1.5">
                                             <MatchesCell reach={event.interest_reach} />
                                         </td>
                                         <td
-                                            className="px-2 py-1.5 text-right text-ink-soft"
+                                            className="hidden md:table-cell px-2 py-1.5 text-right text-ink-soft"
                                             title={`${event.unique_viewers ?? 0} unique viewers`}
                                         >
                                             {event.view_count ?? 0}
                                         </td>
-                                        <td className="px-2 py-1.5 text-right text-ink-soft">
+                                        <td className="hidden md:table-cell px-2 py-1.5 text-right text-ink-soft">
                                             {event.link_clicks ?? 0}
                                         </td>
                                         <td className="px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
-                                            {getAdminEventStatus(event) === 'pending' && (
+                                            {getAdminEventStatus(event) === 'new' && reviewLockReason(event) === null && (
                                                 <button
                                                     onClick={() => handleSingleReview(event.event_id)}
                                                     className="text-[10px] text-action hover:text-blue-800 font-medium"
@@ -1211,6 +1304,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             {busy === 'bulk-flag-duplicates' ? 'Flagging…' : 'Flag as Duplicates'}
                         </button>
                         <button
+                            onClick={() => setMergeIds([...selectedIds])}
+                            disabled={!!busy || selectedIds.size < 2 || selectedIds.size > 6}
+                            className="text-[10px] font-medium px-2 py-1 bg-orange-700 text-white hover:bg-orange-800 disabled:opacity-50 transition"
+                            title="Merge the selected events (2–6) into one."
+                        >
+                            Merge…
+                        </button>
+                        <button
                             onClick={handleGroupAsSeries}
                             disabled={!!busy || selectedIds.size < 2 || selectedIds.size > 20}
                             className="text-[10px] font-medium px-2 py-1 bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 transition"
@@ -1242,6 +1343,20 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 onClose={() => setAdminDetailEventId(null)}
                 onEventUpdated={() => loadEvents()}
             />
+            {mergeIds && (
+                <MergeEventsDialog
+                    eventIds={mergeIds}
+                    onClose={() => setMergeIds(null)}
+                    onMerged={(result) => {
+                        setMergeIds(null);
+                        setSelectedIds(new Set());
+                        setAllMatchingSelected(false);
+                        setMessage(`Merged ${result.merged_event_ids.length + 1} events.`);
+                        notifyAdminDataChanged();
+                        loadEvents();
+                    }}
+                />
+            )}
         </>
     );
 }

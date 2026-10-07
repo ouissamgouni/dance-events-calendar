@@ -8,6 +8,7 @@ from datetime import datetime
 from sqlmodel import Session, col, select
 
 from backend.db.models import BlockedEvent, CachedEvent
+from backend.services.event_visibility import is_processable, processable_clause
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ class EnrichmentPipeline:
         results: dict[str, StageResult] = {
             stage.name: StageResult() for stage in self.stages
         }
-        if event.deleted_at is not None or session.get(BlockedEvent, event.event_id):
+        if not is_processable(event) or session.get(BlockedEvent, event.event_id):
             return results
         for stage in self.stages:
             result = results[stage.name]
@@ -166,7 +167,7 @@ class EnrichmentPipeline:
                 select(CachedEvent)
                 .where(
                     CachedEvent.event_id.in_(chunk_ids),  # type: ignore[attr-defined]
-                    CachedEvent.deleted_at == None,
+                    processable_clause(),
                     ~CachedEvent.event_id.in_(select(BlockedEvent.event_id)),
                 )
                 .order_by(col(CachedEvent.start).desc())

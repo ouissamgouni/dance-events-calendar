@@ -82,6 +82,29 @@ def test_minio_public_base_url_uses_the_bucket_on_the_endpoint(storage_env):
     )
 
 
+@pytest.mark.parametrize(
+    "browser_base, expected_prefix",
+    [
+        (None, "http://127.0.0.1:9000/b-private/"),
+        ("/private-objects", "/private-objects/"),
+    ],
+)
+def test_presigned_private_url_browser_base(storage_env, browser_base, expected_prefix):
+    storage_env.setenv("OBJECT_STORAGE_PROVIDER", "minio")
+    storage_env.setenv("OBJECT_STORAGE_ENDPOINT", "http://127.0.0.1:9000")
+    storage_env.setenv("OBJECT_STORAGE_ACCESS_KEY_ID", "key")
+    storage_env.setenv("OBJECT_STORAGE_SECRET_ACCESS_KEY", "secret")
+    if browser_base:
+        storage_env.setenv("OBJECT_STORAGE_PRIVATE_BASE_URL", browser_base)
+    else:
+        storage_env.delenv("OBJECT_STORAGE_PRIVATE_BASE_URL", raising=False)
+
+    url = object_storage.presigned_private_url("a/t.pdf", 60)
+
+    assert url.startswith(f"{expected_prefix}a/t.pdf?")
+    assert "X-Amz-Signature=" in url
+
+
 def test_ensure_buckets_grants_anonymous_read_on_minio(storage_env):
     storage_env.setenv("OBJECT_STORAGE_PROVIDER", "minio")
     client = _StubClient()

@@ -5,6 +5,7 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import EventSummary, { type EventDetailTab } from './EventSummary';
 import EventActions from './event-summary/EventActions';
 import ProgramAction from './ProgramAction';
+import TicketAction from './TicketAction';
 
 interface Props {
     event: CalendarEvent;
@@ -122,16 +123,19 @@ export default function EventDetailsPanel({
                 />
             </div>
             <div className="border-t border-card-line bg-surface">
-                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="flex flex-nowrap items-center gap-2 px-3 py-3 sm:px-4">
                     {eventScheduleEnabled && event.schedule_published ? (
                         <ProgramAction event={event} variant="full" onNavigate={onClose} />
-                    ) : <span />}
+                    ) : null}
+                    <TicketAction event={event} variant="full" dismissible />
                     <Link
                         to={detailPath}
                         onClick={() => onClose?.()}
-                        className="text-xs font-medium text-action hover:underline"
+                        aria-label="See full details"
+                        className="ml-auto shrink-0 whitespace-nowrap text-xs font-medium text-action hover:underline"
                     >
-                        See full details →
+                        <span className="sm:hidden">Details →</span>
+                        <span className="hidden sm:inline">See full details →</span>
                     </Link>
                 </div>
                 <div className="border-t border-blue-100 bg-blue-50 px-4 py-3 shadow-[0_-2px_10px_rgba(15,23,42,0.06)]">

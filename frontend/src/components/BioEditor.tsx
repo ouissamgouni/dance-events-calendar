@@ -5,6 +5,7 @@ import {
     type PublicProfile,
 } from '../api';
 import { useAuth } from '../context/AuthContext';
+import useProfileChanged from '../hooks/useProfileChanged';
 
 
 const BIO_MAX = 280;
@@ -48,6 +49,10 @@ export default function BioEditor({ handle }: { handle: string | null }) {
     }, [handle]);
 
     useEffect(() => { load(); }, [load, user?.user_id]);
+    useProfileChanged((p) => {
+        setProfile(p);
+        setBio(p.bio ?? '');
+    });
 
     if (!handle) {
         return (

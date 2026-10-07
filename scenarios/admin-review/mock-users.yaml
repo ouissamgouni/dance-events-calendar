@@ -1,0 +1,25 @@
+# admin-review cast.
+#   Admin  — reviews everything.
+#   Olivia — submits events and edits the ones she organizes.
+#   Riley  — suggests fixes to public events.
+#   Sam    — saved a few events, so changes show "Notify N attendees".
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: olivia@example.com
+    name: Olivia Organizer
+    handle: olivia
+    account_visibility: public
+
+  - email: riley@example.com
+    name: Riley Rivera
+    handle: riley
+    account_visibility: public
+
+  - email: sam@example.com
+    name: Sam Lee
+    handle: sam
+    account_visibility: public

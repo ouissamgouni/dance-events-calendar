@@ -11,6 +11,7 @@ from backend.api.deps import (
     _audience_passes,
     can_view,
     get_current_user_optional,
+    is_admin_user,
 )
 from backend.api.rate_limit import client_ip
 from backend.api.routes.settings import _get_since_date
@@ -39,10 +40,15 @@ from backend.db.models import (
     UserInterestProfileTag,
     UserSavedEvent,
 )
+from backend.services import event_assets
 from backend.services.event_images import event_image_fields
+from backend.services.event_merge import resolve_merged
 from backend.services.event_visibility import (
     apply_event_visibility,
+    discovery_clause,
     eligible_event_ids,
+    is_private,
+    viewer_can_see_event,
     show_pending_events_enabled,
 )
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
@@ -657,7 +663,7 @@ def get_events(
         CachedEvent.is_hidden == False,
         CachedEvent.end >= effective_start,
     )
-    query = apply_event_visibility(query, session)
+    query = apply_event_visibility(query, session).where(discovery_clause())
     if end_date:
         end_dt = datetime.fromisoformat(end_date)
         # Include full end day
@@ -826,6 +832,7 @@ def get_events(
             "trending_floor_going",
             "following_badge_enabled",
             "promo_codes_enabled",
+            "ticket_likely_min_hours",
         ],
     )
 
@@ -903,6 +910,9 @@ def get_events(
         ).all()
         events_with_promos = {row for row in promo_rows}
 
+    ticket_hours = event_assets.clamp_int_setting(
+        "ticket_likely_min_hours", feature_settings.get("ticket_likely_min_hours")
+    )
     data = [
         EventResponse(
             event_id=e.event_id,
@@ -916,6 +926,7 @@ def get_events(
             start=e.start,
             end=e.end,
             all_day=e.all_day,
+            timezone=e.timezone,
             latitude=e.latitude,
             longitude=e.longitude,
             color=color_map.get(e.calendar_id),
@@ -929,6 +940,8 @@ def get_events(
             friends_going_preview=friends_going_previews.get(e.event_id, []),
             tribe_going_count=tribe_going_counts.get(e.event_id, 0),
             tribe_going_preview=tribe_going_previews.get(e.event_id, []),
+            is_cancelled=e.is_cancelled,
+            cancellation_note=e.cancellation_note,
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -938,6 +951,7 @@ def get_events(
             has_active_promo_codes=e.event_id in events_with_promos,
             show_price_override=e.show_price_override,
             show_promo_override=e.show_promo_override,
+            **event_assets.ticket_fields(e, ticket_hours),
             schedule_published=e.event_id in published_schedule_ids,
         )
         for e in events
@@ -1043,7 +1057,7 @@ def search_events(
         .where(CachedEvent.is_hidden.is_(False))  # type: ignore[union-attr]
         .where(*token_predicates)
     )
-    stmt = apply_event_visibility(stmt, session)
+    stmt = apply_event_visibility(stmt, session).where(discovery_clause())
     if exclude_attended and current_user is not None:
         attended_ids = session.exec(
             select(UserEventAttendance.event_id).where(
@@ -1133,6 +1147,7 @@ def search_events(
                 for tag in tags_by_event.get(event.event_id, [])
                 if text_matches(tag.label)
             ],
+            has_organizer=event.organizer_user_id is not None,
         )
         for event in rows
     ]
@@ -1172,7 +1187,7 @@ def popular_cities(
         .order_by(func.count(col(CachedEvent.event_id)).desc())
         .limit(limit)
     )
-    statement = apply_event_visibility(statement, session)
+    statement = apply_event_visibility(statement, session).where(discovery_clause())
     rows = session.exec(statement).all()
     if show_pending_events_enabled(session):
         response.headers["Cache-Control"] = "no-store"
@@ -1212,7 +1227,9 @@ def get_events_by_ids(
         CachedEvent.deleted_at == None,
         CachedEvent.is_hidden == False,
     )
-    statement = apply_event_visibility(statement, session)
+    statement = apply_event_visibility(
+        statement, session, current_user.id if current_user else None
+    )
     events = session.exec(statement).all()
 
     event_ids = [e.event_id for e in events]
@@ -1282,6 +1299,7 @@ def get_events_by_ids(
         ).all()
         events_with_promos = {row for row in promo_rows}
 
+    ticket_hours = event_assets.ticket_min_hours(session)
     return [
         EventResponse(
             event_id=e.event_id,
@@ -1295,6 +1313,7 @@ def get_events_by_ids(
             start=e.start,
             end=e.end,
             all_day=e.all_day,
+            timezone=e.timezone,
             latitude=e.latitude,
             longitude=e.longitude,
             color=color_map.get(e.calendar_id),
@@ -1306,6 +1325,8 @@ def get_events_by_ids(
             following_friends_preview=following_previews.get(e.event_id, []),
             friends_going_count=friends_going_counts.get(e.event_id, 0),
             friends_going_preview=friends_going_previews.get(e.event_id, []),
+            is_cancelled=e.is_cancelled,
+            cancellation_note=e.cancellation_note,
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -1315,7 +1336,10 @@ def get_events_by_ids(
             has_active_promo_codes=e.event_id in events_with_promos,
             show_price_override=e.show_price_override,
             show_promo_override=e.show_promo_override,
+            **event_assets.ticket_fields(e, ticket_hours),
             schedule_published=e.event_id in published_schedule_ids,
+            review_status=e.review_status,
+            owner_preview=is_private(e),
         )
         for e in events
     ]
@@ -1327,6 +1351,7 @@ def get_event(
     event_id: str,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """Public single-event endpoint for shareable event pages."""
     statement = select(CachedEvent).where(
@@ -1334,10 +1359,21 @@ def get_event(
         CachedEvent.deleted_at == None,
         CachedEvent.is_hidden == False,
     )
-    statement = apply_event_visibility(statement, session)
     event = session.exec(statement).first()
-    if not event:
+    viewer_id = current_user.id if current_user else None
+    if event is None:
+        merged = session.get(CachedEvent, event_id)
+        target_id = merged and resolve_merged(session, merged)
+        if target_id:
+            raise HTTPException(
+                status_code=410,
+                detail={"message": "Event merged", "merged_into": target_id},
+            )
+    if not event or not viewer_can_see_event(
+        session, event, viewer_id, is_admin=is_admin_user(current_user)
+    ):
         raise HTTPException(status_code=404, detail="Event not found")
+    owner_preview = is_private(event)
 
     # Check calendar is visible
     calendar = session.exec(
@@ -1415,6 +1451,7 @@ def get_event(
         start=event.start,
         end=event.end,
         all_day=event.all_day,
+        timezone=event.timezone,
         latitude=event.latitude,
         longitude=event.longitude,
         color=calendar.color,
@@ -1428,15 +1465,23 @@ def get_event(
         links=event.links,
         tags=tags_map.get(event_id, []),
         organizer=organizer_mini,
+        is_cancelled=event.is_cancelled,
+        cancellation_note=event.cancellation_note,
         show_price_override=event.show_price_override,
         show_promo_override=event.show_promo_override,
+        **event_assets.ticket_fields(event, event_assets.ticket_min_hours(session)),
         has_active_promo_codes=has_active_promo_codes,
         schedule_published=schedule_published,
+        owner_preview=owner_preview,
+        is_owner=viewer_id is not None and event.owner_user_id == viewer_id,
     )
     response = JSONResponse(content=data.model_dump(mode="json"))
-    response.headers["Cache-Control"] = (
-        "no-store" if show_pending_events_enabled(session) else "public, max-age=60"
-    )
+    if owner_preview or data.is_owner:
+        response.headers["Cache-Control"] = "private, no-store"
+    else:
+        response.headers["Cache-Control"] = (
+            "no-store" if show_pending_events_enabled(session) else "public, max-age=60"
+        )
     return response
 
 
@@ -1492,6 +1537,7 @@ def get_event_og_meta(
         "price_is_free": event.price_is_free,
         "price_min": event.price_min,
         "price_currency": event.price_currency,
+        "image_url": event_image_fields(event)["image_url"],
     }
     response = JSONResponse(content=payload)
     # Cache aggressively — bots re-fetch frequently and event metadata
@@ -1528,7 +1574,7 @@ def get_sitemap(
             CachedEvent.deleted_at == None,
             CachedEvent.is_hidden == False,
         )
-        statement = apply_event_visibility(statement, session)
+        statement = apply_event_visibility(statement, session).where(discovery_clause())
         events = session.exec(statement).all()
 
     urls = [

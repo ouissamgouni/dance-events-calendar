@@ -5,7 +5,7 @@ const CARTO_BASEMAP_KEY = (import.meta.env.VITE_CARTO_BASEMAP_KEY as string | un
 export const BASEMAP_CONFIG = {
     attribution: CARTO_BASEMAP_KEY ? CARTO_ATTRIBUTION : OSM_ATTRIBUTION,
     url: CARTO_BASEMAP_KEY
-        ? `https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(CARTO_BASEMAP_KEY)}`
+        ? `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(CARTO_BASEMAP_KEY)}`
         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     subdomains: CARTO_BASEMAP_KEY ? 'abcd' : 'abc',
     maxZoom: 20,

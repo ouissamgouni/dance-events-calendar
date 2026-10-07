@@ -55,6 +55,7 @@ export default function Step2Details({
                 .filter((t) => state.tagsValue.selectedTagIds.includes(t.id)),
         [otherGroups, state.tagsValue.selectedTagIds],
     );
+    const requestedTags = Object.values(state.tagsValue.freeTexts).filter((text) => text.trim());
 
     const openLink = (index: number | null) => {
         setLinkIndex(index);
@@ -241,7 +242,7 @@ export default function Step2Details({
 
             {otherGroups.length > 0 ? (
                 <div>
-                    {selectedOtherTags.length > 0 ? (
+                    {selectedOtherTags.length > 0 || requestedTags.length > 0 ? (
                         // The chips themselves are the entry point once tags exist,
                         // so there is no separate "Add more tags" row.
                         <button
@@ -253,6 +254,11 @@ export default function Step2Details({
                             {selectedOtherTags.map((tag) => (
                                 <span key={tag.id} className={chipCls(true)}>
                                     {tag.label}
+                                </span>
+                            ))}
+                            {requestedTags.map((text) => (
+                                <span key={`new-${text}`} className={chipCls(false)}>
+                                    {text} (new)
                                 </span>
                             ))}
                         </button>

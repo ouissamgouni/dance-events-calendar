@@ -23,6 +23,7 @@ from sqlmodel import Session, select
 
 from backend.db.database import get_engine
 from backend.db.models import BlockedEvent, CachedEvent, EventCalendarSource, EventTag
+from backend.services import event_revisions
 from backend.services.calendar.base import CalendarEvent
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.event_extractor import (
@@ -828,6 +829,7 @@ class EventPipelineProcessor:
                 return existing, "unchanged"
 
             # Known event ID — update fields (including any enriched columns)
+            live_before = event_revisions.snapshot(existing)
             extractor_changed = apply_calendar_description(
                 existing, buffer.source_description, is_new=False
             )
@@ -855,7 +857,11 @@ class EventPipelineProcessor:
                 existing.geocode_provider = buffer.geocode_provider
             if existing.links is None and buffer.links is not None:
                 existing.links = buffer.links
-            if fields_changed:
+            was_reviewed = existing.review_status == "reviewed"
+            # Published: keep what attendees see until an admin applies the
+            # source's edit.
+            event_revisions.stage_source_changes(session, existing, live_before)
+            if not was_reviewed and fields_changed:
                 existing.review_status = "pending"
             session.add(existing)
             _upsert_calendar_source(session, buffer.event_id, task.calendar_id)
@@ -882,6 +888,7 @@ class EventPipelineProcessor:
             return canonical, "deduped"
 
         # Genuinely new event — buffer is already a CachedEvent with all enriched fields.
+        buffer.source_values = event_revisions.snapshot(buffer)
         session.add(buffer)
         sync_event_reach(session, buffer, task.default_tag_ids)
         for tag_id in task.default_tag_ids:

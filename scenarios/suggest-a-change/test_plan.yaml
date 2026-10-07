@@ -1,0 +1,136 @@
+# Suggest a change — QA Test Plan
+# ================================
+# Any signed-in user can suggest a fix to a public event. The change waits
+# for an admin; applying it updates the event (tags included), tells the
+# proposer, and notifies attendees about time, venue or title changes.
+
+test_plan:
+  name: "Suggest a change — community edits of public events"
+  description: >
+    Covers the signed-in user's "Suggest an edit" flow end to end: the sign-in
+    gate, the prefilled form that sends only what changed, the one-open-per-
+    event limit, admin apply/discard with proposer notifications, withdrawing
+    from Events I added, owners and private events, and synced events whose
+    local fixes are not offered back as reverts by the next sync.
+
+  preconditions:
+    - "Run the scenario with: `SCENARIO=suggest-a-change task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Mailpit runs on http://localhost:8025 for email checks."
+    - "Seed: ev-friday (Friday Salsa at Studio A, published, saved by Sam) and ev-sunday (Sunday Bachata Practica, published), both synced from the mock 'Berlin Salsa (Google)' source; Jamie's private 'Jamie's Private Lesson'."
+
+  cast:
+    - "Admin — applies or discards suggestions."
+    - "Riley — any signed-in user."
+    - "Jamie — owns the private lesson."
+    - "Sam — saved ev-friday; event-update emails ON."
+
+  steps:
+    - id: 1
+      title: "Signed-out visitors are asked to sign in"
+      description: |
+        Signed out, open ev-friday and click "Suggest an edit" (desktop: the
+        action dock; mobile: the ••• menu).
+      expected: |
+        A dialog "Sign in to suggest a change" opens with Not now / Sign in;
+        Sign in goes to /login?next=/event/ev-friday/suggest-change.
+
+    - id: 2
+      title: "The form is prefilled and sends only the change"
+      description: |
+        As Riley, open ev-friday → "Suggest an edit". Change Start to 21:00,
+        go to Step 2 and add the "Beginner-friendly" tag, Next, "Send
+        suggestion".
+      expected: |
+        The form titled "Suggest a change" shows the event's name, venue,
+        times, links and tags. There is no Repeat, picture or Share publicly
+        option, and the dance-style/reach groups are not forced. The request
+        to POST /api/events/ev-friday/changes carries only start/end/all_day
+        and tag_ids. "Suggestion sent — Thanks — a curator will review it."
+        The event still shows 20:00 for everyone.
+
+    - id: 3
+      title: "One open suggestion per event"
+      description: |
+        As Riley, open ev-friday → Suggest an edit again → change the title →
+        Send suggestion.
+      expected: |
+        The form shows "You already suggested a change to this event;
+        withdraw it to send a new one". (After 10 open suggestions overall a
+        further one is refused with a limit message.)
+
+    - id: 4
+      title: "Admin sees the suggestion"
+      description: |
+        As Admin, open Review → Open → the Edit from Riley on ev-friday,
+        then open the event in Events.
+      expected: |
+        The Events row carries the orange pencil flag and stripe. The side
+        panel shows a "Changes
+        pending" card tagged "Suggested: Riley Stone" with Start/End and Tags
+        old → new, and "Notify 1 attendee about this change" checked.
+
+    - id: 5
+      title: "Applying updates the event and tells everyone involved"
+      description: "Click Apply on the card."
+      expected: |
+        ev-friday shows 21:00 and the Beginner-friendly tag. Riley gets "Your
+        suggestion was applied · Friday Salsa at Studio A" (and no "Event
+        updated"). Sam gets "Event updated · Friday Salsa at Studio A" with
+        the time diff, an email in Mailpit and, if enabled, a push.
+
+    - id: 6
+      title: "A discarded suggestion tells the proposer"
+      description: |
+        As Riley, suggest a new description for ev-sunday. As Admin, Discard
+        it. As Riley, open Events I added.
+      expected: |
+        Riley gets "Your suggestion was not applied · Sunday Bachata
+        Practica". Events I added → "Changes I suggested" lists ev-friday as
+        "Applied" and ev-sunday as "Not applied", with the changed fields.
+
+    - id: 7
+      title: "Withdrawing an open suggestion"
+      description: |
+        As Riley, suggest a venue change for ev-sunday, then in Events I
+        added → Changes I suggested click "Withdraw".
+      expected: |
+        It turns "Not applied" and leaves the admin's Review → Open list.
+        Riley can now send a new suggestion for ev-sunday.
+
+    - id: 8
+      title: "Owners and private events"
+      description: |
+        As Jamie, open "Jamie's Private Lesson". As Riley, open its URL.
+      expected: |
+        Jamie sees her owner actions (Edit event / Keep it private / Delete)
+        and no "Suggest an edit". Riley gets "Event not found"; calling
+        POST /api/events/{id}/changes for it answers 404.
+
+    - id: 9
+      title: "A sync does not undo an applied suggestion"
+      description: |
+        As Admin, run a full (reseed) sync of 'Berlin Salsa (Google)' without
+        editing the source (Google still says 20:00 for ev-friday).
+      expected: |
+        No "Changes pending" card appears and ev-friday keeps 21:00. Editing
+        the source's description afterwards proposes only the description.
+
+    - id: 10
+      title: "Only enabled event tags can be suggested"
+      description: |
+        As Admin, disable the "Beginner-friendly" tag in Admin → Tags. As
+        Riley, call POST /api/events/ev-sunday/changes with its tag id in
+        `tag_ids` from the browser devtools.
+      expected: |
+        The API answers 422 "The tag Beginner-friendly can't be used on
+        events". Re-enable the tag afterwards.
+
+    - id: 11
+      title: "Suggesting a tag that doesn't exist yet"
+      description: |
+        As Riley, open ev-sunday → Suggest an edit → Next → Add more tags →
+        search "Rooftop" → "+ Venue" → Done → Next → Send suggestion.
+      expected: |
+        Step 2 shows "Rooftop (new)". The suggestion is sent with no other
+        change, and no Edit appears in Review. As Admin, Tag Suggestions lists
+        "Rooftop" (Venue) on Sunday Bachata Practica with "By: Riley Stone".

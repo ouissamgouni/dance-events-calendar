@@ -318,6 +318,73 @@ class TestDatabaseSeeder:
         assert user.email_schedule_updates_enabled is False
         assert user.push_schedule_updates_enabled is False
 
+    def test_seed_event_statuses_and_changes(self, tmp_path, monkeypatch):
+        from backend.db.models import CalendarSetting, EventRevision
+
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n  - email: riley@example.com\n    name: Riley\n"
+        )
+        (scenario_dir / "db-events.yaml").write_text(
+            "events:\n"
+            "  - id: ev-new\n    calendar_id: cal\n    title: New\n"
+            "    start: w1 Fri 20:00\n    end: w1 Fri 23:00\n    review_status: pending\n"
+            "  - id: ev-off\n    calendar_id: cal\n    title: Off\n"
+            "    start: w1 Fri 20:00\n    end: w1 Fri 23:00\n"
+            "    status: cancelled\n    cancellation_note: Rain\n"
+            "  - id: ev-gone\n    calendar_id: cal\n    title: Gone\n"
+            "    start: w1 Fri 20:00\n    end: w1 Fri 23:00\n"
+            "    status: removed\n    status_reason: rejected\n"
+        )
+        (scenario_dir / "db-revisions.yaml").write_text(
+            "revisions:\n"
+            "  - event_id: ev-off\n    source: user\n    status: pending\n"
+            "    proposed_by: riley@example.com\n"
+            "    changes:\n      start: {old: w1 Fri 20:00, new: w1 Fri 21:00}\n"
+            "  - event_id: ev-off\n    source: organizer\n    status: pending\n"
+            "    changes:\n      is_cancelled: {old: false, new: true}\n"
+            "  - event_id: ev-gone\n    kind: create\n    source: sync\n"
+            "    status: rejected\n    decided_by: admin@example.com\n    changes: {}\n"
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            session.add(CalendarSetting(calendar_id="cal", name="Cal"))
+            session.commit()
+            DatabaseSeeder(session).seed(scenario_dir)
+            DatabaseSeeder(session).seed(scenario_dir)
+            statuses = {
+                e.event_id: (e.status, e.status_reason, e.cancellation_note)
+                for e in session.exec(select(CachedEvent)).all()
+            }
+            changes = sorted(
+                (
+                    r.event_id,
+                    r.kind,
+                    r.source,
+                    r.status,
+                    r.proposed_by_user_id is not None,
+                )
+                for r in session.exec(select(EventRevision)).all()
+            )
+
+        assert statuses == {
+            "ev-new": ("new", None, None),
+            "ev-off": ("cancelled", None, "Rain"),
+            "ev-gone": ("removed", "rejected", None),
+        }
+        assert changes == [
+            ("ev-gone", "create", "sync", "rejected", False),
+            ("ev-new", "create", "sync", "pending", False),
+            ("ev-off", "cancel", "organizer", "pending", False),
+            ("ev-off", "edit", "user", "pending", True),
+        ]
+
     def test_seed_mock_users_auto_onboard_by_default(self, tmp_path, monkeypatch):
         """Phase G — scenarios that don't set ``auto_onboard`` (the vast
         majority) auto-stamp mock users as already onboarded so the
@@ -1036,3 +1103,190 @@ class TestDatabaseSeeder:
                     assert tag_slug in available_tags, (
                         f"{events_path}: tag suggestion references unknown tag {tag_slug}"
                     )
+
+    @pytest.mark.parametrize(
+        "scenario,rows,files", [("myevent-memories", 10, 10), ("myevent-ticket", 6, 5)]
+    )
+    def test_seed_event_assets_runs_real_pipeline_and_is_idempotent(
+        self, monkeypatch, scenario, rows, files
+    ):
+        from unittest.mock import MagicMock
+
+        from backend.db.models import EventUserAsset
+        from backend.db.seed import SCENARIOS_DIR
+        from backend.services import object_storage
+
+        stored: dict[str, bytes] = {}
+        monkeypatch.setattr(object_storage, "get_client", lambda: MagicMock())
+        monkeypatch.setattr(object_storage, "ensure_buckets", lambda client=None: [])
+        monkeypatch.setattr(
+            object_storage,
+            "put_private",
+            lambda key, data, ct, client=None: stored.__setitem__(key, data),
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(SCENARIOS_DIR / scenario)
+            first = len(session.exec(select(EventUserAsset)).all())
+            DatabaseSeeder(session).seed(SCENARIOS_DIR / scenario)
+            second = len(session.exec(select(EventUserAsset)).all())
+
+        assert first == second == rows
+        assert (
+            sum(key.endswith(("/full.webp", "/ticket.pdf")) for key in stored) == files
+        )
+
+    def test_seed_event_assets_expands_dir_entries(self, tmp_path, monkeypatch):
+        from io import BytesIO
+        from unittest.mock import MagicMock
+
+        from PIL import Image
+
+        from backend.db.models import EventUserAsset
+        from backend.services import object_storage
+
+        scenario_dir = tmp_path / "scenario"
+        folder = scenario_dir / "memories" / "mia" / "evt-1"
+        folder.mkdir(parents=True)
+        for name in ("1.png", "2.png"):
+            buffer = BytesIO()
+            Image.new("RGB", (8, 8), "red").save(buffer, "PNG")
+            (folder / name).write_bytes(buffer.getvalue())
+        (folder / ".DS_Store").write_bytes(b"")
+        (scenario_dir / "db-event-assets.yaml").write_text(
+            "assets:\n"
+            "  - {event_id: evt-1, email: mia@x.org, kind: memory,"
+            " dir: memories/mia/evt-1, visibility: friends}\n"
+            "  - {event_id: evt-1, email: mia@x.org, kind: memory, dir: ../outside}\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "outside").mkdir()
+        (tmp_path / "outside" / "x.png").write_bytes((folder / "1.png").read_bytes())
+
+        stored: dict[str, bytes] = {}
+        monkeypatch.setattr(object_storage, "get_client", lambda: MagicMock())
+        monkeypatch.setattr(object_storage, "ensure_buckets", lambda client=None: [])
+        monkeypatch.setattr(
+            object_storage,
+            "put_private",
+            lambda key, data, ct, client=None: stored.__setitem__(key, data),
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            session.add(User(email="mia@x.org"))
+            session.add(
+                CachedEvent(
+                    event_id="evt-1",
+                    calendar_id="calendar",
+                    start=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                    end=datetime(2026, 1, 2, tzinfo=timezone.utc),
+                )
+            )
+            session.commit()
+            path = scenario_dir / "db-event-assets.yaml"
+            DatabaseSeeder(session)._seed_event_assets(path, scenario_dir)
+            DatabaseSeeder(session)._seed_event_assets(path, scenario_dir)
+            assets = session.exec(select(EventUserAsset)).all()
+
+        assert len(assets) == 2
+        assert {a.visibility for a in assets} == {"friends"}
+        assert sum(key.endswith("/full.webp") for key in stored) == 2
+
+    @pytest.mark.parametrize(
+        "scenario,runner,expected",
+        [
+            (
+                "myevent-ticket-prompt",
+                "run_ticket_prompts",
+                {"evt-tp-intl", "evt-tp-festival", "evt-tp-pinned"},
+            ),
+            (
+                "myevent-memories-prompt",
+                "run_memories_prompts",
+                {"evt-mp-rooftop", "evt-mp-bachata"},
+            ),
+        ],
+    )
+    def test_asset_prompt_scenarios_fire_expected_nudges(
+        self, monkeypatch, scenario, runner, expected
+    ):
+        from unittest.mock import MagicMock
+
+        from sqlalchemy.pool import StaticPool
+
+        from backend.db import database as database_module
+        from backend.db.models import Notification
+        from backend.db.seed import SCENARIOS_DIR
+        from backend.services import event_asset_prompts, object_storage
+
+        monkeypatch.setattr(object_storage, "get_client", lambda: MagicMock())
+        monkeypatch.setattr(object_storage, "ensure_buckets", lambda client=None: [])
+        monkeypatch.setattr(object_storage, "put_private", lambda *a, **k: None)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+        for name in (
+            "send_event_ticket_prompt_email",
+            "send_event_memories_prompt_email",
+        ):
+            monkeypatch.setattr(event_asset_prompts, name, lambda *a, **k: True)
+        monkeypatch.setattr(event_asset_prompts, "send_push", lambda *a, **k: 0)
+
+        engine = create_engine(
+            "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
+        SQLModel.metadata.create_all(engine)
+        monkeypatch.setattr(database_module, "_engine", engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(SCENARIOS_DIR / scenario)
+
+        getattr(event_asset_prompts, runner)()
+
+        with Session(engine) as session:
+            rows = session.exec(select(Notification)).all()
+        assert {n.event_id for n in rows} == expected
+        assert len(rows) == len(expected)
+
+    def test_db_event_assets_reference_existing_events_users_and_files(self):
+        import yaml
+
+        from backend.db.seed import SCENARIOS_DIR
+
+        for assets_path in [
+            *SCENARIOS_DIR.glob("*/db-event-assets.yaml"),
+            *SCENARIOS_DIR.glob("*/db-events.yaml"),
+        ]:
+            scenario_dir = assets_path.parent
+            data = yaml.safe_load(assets_path.read_text()) or {}
+            if not data.get("assets"):
+                continue
+            events = yaml.safe_load((scenario_dir / "db-events.yaml").read_text()) or {}
+            users = yaml.safe_load((scenario_dir / "mock-users.yaml").read_text()) or {}
+            event_ids = {e["id"] for e in events.get("events") or []}
+            emails = {u["email"] for u in users.get("users") or []}
+            for asset in data.get("assets") or []:
+                assert asset["event_id"] in event_ids, f"{assets_path}: {asset}"
+                assert asset["email"] in emails, f"{assets_path}: {asset}"
+                assert asset["kind"] in ("ticket", "ticket_link", "memory")
+                if asset["kind"] == "ticket_link":
+                    assert asset["url"].startswith("https://"), (
+                        f"{assets_path}: {asset}"
+                    )
+                    continue
+                if asset.get("dir"):
+                    folder = scenario_dir / asset["dir"]
+                    assert folder.is_dir() and any(folder.iterdir()), (
+                        f"{assets_path}: missing or empty dir {asset['dir']}"
+                    )
+                    continue
+                filename = asset["file"]
+                assert (scenario_dir / "event-assets" / filename).exists() or (
+                    SCENARIOS_DIR / "default" / "event-assets" / filename
+                ).exists(), f"{assets_path}: missing file {filename}"

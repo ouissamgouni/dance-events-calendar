@@ -6,6 +6,7 @@ import GoingButton from './GoingButton';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
 import EventDateRail from './EventDateRail';
 import { shortLocation } from '../utils/locationShort';
+import { eventDisplayZone } from '../utils/eventDates';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useEventCardImage } from '../hooks/useEventCardImage';
 
@@ -60,9 +61,9 @@ interface RailEventCardProps {
     supplementalContent?: ReactNode;
 }
 
-function formatRailDate(value: string): string {
+function formatRailDate(value: string, timeZone?: string): string {
     const date = new Date(value);
-    return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone });
 }
 
 /**
@@ -106,7 +107,8 @@ export default function RailEventCard({
         imageTestId: 'my-events-row-image',
     });
     const start = new Date(event.start);
-    const startLabel = formatRailDate(event.start);
+    const tz = eventDisplayZone(event);
+    const startLabel = formatRailDate(event.start, tz);
     const label = `Open ${event.title}, ${contextLabel} on ${startLabel}`;
     const location = shortLocation(event.location);
     const compact = variant === 'compact';
@@ -122,7 +124,7 @@ export default function RailEventCard({
     if (presentation === 'my-events') {
         const time = event.all_day
             ? 'All day'
-            : start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+            : start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: tz });
         return (
             <div
                 className="group relative flex min-h-28 w-full overflow-hidden rounded-card border border-card-line bg-surface text-left shadow-sm transition hover:border-line focus-within:ring-2 focus-within:ring-action/30"
@@ -135,11 +137,14 @@ export default function RailEventCard({
                     className="absolute inset-0 z-0 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-action/30"
                 />
                 <div className="pointer-events-none relative z-[1] flex shrink-0 self-stretch">
-                    <EventDateRail start={start} tone={pastPresentation ? 'neutral' : 'default'} />
+                    <EventDateRail start={start} timeZone={tz} tone={pastPresentation ? 'neutral' : 'default'} />
                 </div>
                 {imageSlot}
                 <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 flex-col justify-center px-3 py-3">
-                    <h3 className="line-clamp-2 text-sm font-semibold text-ink group-hover:text-action sm:text-base" title={event.title}>{event.title}</h3>
+                    <h3 className="line-clamp-2 text-sm font-semibold text-ink group-hover:text-action sm:text-base" title={event.title}>
+                        {event.is_cancelled && <span className="mr-1.5 bg-danger/10 px-1.5 py-0.5 align-middle text-xs font-semibold text-danger">Cancelled</span>}
+                        <span className={event.is_cancelled ? 'text-ink-soft line-through' : undefined}>{event.title}</span>
+                    </h3>
                     <p className="mt-1 truncate text-sm text-ink-soft">{[time, location].filter(Boolean).join(' · ')}</p>
                     {!pastPresentation && <div className="mt-2 flex min-h-6 items-center gap-2">
                         <AttendeeAvatarStack
@@ -180,8 +185,8 @@ export default function RailEventCard({
                     data-testid={actionsTestId}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation />
-                    <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation isPast={new Date(event.end).getTime() < Date.now()} />
+                    <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation disabled={event.is_cancelled} />
+                    <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation isPast={new Date(event.end).getTime() < Date.now()} cancelled={event.is_cancelled} />
                 </div>
             )}
             <button
@@ -193,7 +198,7 @@ export default function RailEventCard({
                 className={`flex flex-1 text-left focus:outline-none focus:ring-2 focus:ring-action ${dateRail ? 'flex-row' : 'flex-col'}`}
             >
                 {dateRail && (
-                    <EventDateRail start={start} />
+                    <EventDateRail start={start} timeZone={tz} />
                 )}
                 <div className={`flex min-w-0 flex-1 flex-col ${dateRail ? 'px-2.5 py-2.5' : ''}`}>
                     <h3 className={`min-w-0 line-clamp-2 text-sm font-semibold leading-snug text-ink group-hover:text-action ${compact ? '' : 'pr-16'}`} title={event.title}>
@@ -205,7 +210,8 @@ export default function RailEventCard({
                                 data-testid={newDotTestId}
                             />
                         )}
-                        {event.title}
+                        {event.is_cancelled && <span className="mr-1.5 bg-danger/10 px-1.5 py-0.5 align-middle text-xs font-semibold text-danger">Cancelled</span>}
+                        <span className={event.is_cancelled ? 'text-ink-soft line-through' : undefined}>{event.title}</span>
                     </h3>
                     {isTrending && (
                         <div className="mt-1">

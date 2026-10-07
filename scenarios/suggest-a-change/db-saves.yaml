@@ -1,0 +1,4 @@
+saves:
+  - event_id: ev-friday
+    email: sam@example.com
+    audience: public

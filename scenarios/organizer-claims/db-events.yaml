@@ -41,10 +41,9 @@ events:
     calendar_id: organizer-cal-001
     title: Open Kizomba Class — unclaimed
     description: |
-      Not attached to any organizer claim yet. Use this event together
-      with evt-organizer-002 to exercise the events-claim search picker
-      from the Account page (after Carl's badge claim has been
-      approved).
+      Not attached to any organizer claim yet. Use it to exercise
+      "I organize this event" from the event ••• menu and the event
+      picker in the organizer request sheet.
     location: Test Venue 3, Madrid, Spain
     latitude: 40.42
     longitude: -3.7038

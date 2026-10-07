@@ -1,0 +1,84 @@
+test_plan:
+  name: "My event tickets"
+  description: >
+    A Going user keeps a private ticket (PDF, image or link) on an event.
+    Tickets are seeded through the real upload pipeline from
+    db-event-assets.yaml, so every state is visible without uploading by
+    hand. Settings: event_tickets_enabled + event_memories_enabled, max 2 tickets per event, tickets
+    removed 30 days after the event ends.
+
+  preconditions:
+    - "task start:scenario SCENARIO=myevent-ticket"
+    - "Sign in as tina@example.com (Tina)."
+
+  steps:
+    - id: 1
+      title: "PDF ticket on an upcoming event"
+      description: "Open 'Paris Salsa Gala (PDF ticket)'."
+      expected: >
+        A "My ticket" section shows one PDF tile and the counter "1 / 2",
+        with "Only you can see this. Removed on <event end + 30 days>".
+        Tapping the PDF tile opens the ticket in a new tab.
+
+    - id: 2
+      title: "Two image tickets = limit reached"
+      description: "Open 'Lyon Bachata Weekender (2 tickets, at limit)'."
+      expected: >
+        Two image tiles (QR and barcode), counter "2 / 2", and the Add tile
+        is disabled ("Limit reached"). Tapping a tile opens a full-screen
+        viewer; the arrows switch between the QR and the barcode ticket.
+
+    - id: 3
+      title: "Ticket link"
+      description: "Open 'Brussels Kizomba Night (ticket link)'."
+      expected: >
+        A link tile shows example.com. Tapping it opens the link in a new tab.
+
+    - id: 4
+      title: "Upload a real ticket"
+      description: >
+        Open 'Marseille Rueda Social (no ticket yet)'. It is a short local
+        social (not ticket-likely), so the section is a quiet "🎟 Add ticket"
+        link. Tap it and pick a PDF or screenshot.
+      expected: >
+        The empty state disappears and the new ticket tile shows with
+        "1 / 2". Uploading a renamed .html/.txt file shows an inline error
+        ("Only PDF, JPEG, PNG and WebP files are supported"). A file over
+        5MB is rejected before upload.
+
+    - id: 5
+      title: "Delete a ticket"
+      description: "Open a ticket in the viewer and tap Delete."
+      expected: "The ticket disappears and the counter decreases."
+
+    - id: 6
+      title: "Ticket chip on My Events"
+      description: "Open My Events → Upcoming."
+      expected: >
+        Cards for U1, U2, U3 show a "Ticket" chip; U4 does not. Tapping the
+        chip opens the event's ticket.
+
+    - id: 7
+      title: "Retention notice and clean-up"
+      description: >
+        Open 'Lille Salsa Night'. Then trigger the notification dispatch
+        (POST /api/admin/trigger-notifications as admin) and open 'Nantes Salsa
+        Night'.
+      expected: >
+        Lille still shows its ticket with "Removed on <date>". After the
+        dispatch, the Nantes ticket (past retention) is gone.
+
+    - id: 8
+      title: "Non-attendee sees nothing"
+      description: "Sign in as sam@example.com and open 'Paris Salsa Gala'."
+      expected: "No 'My ticket' section, and no trace of Tina's ticket."
+
+    - id: 9
+      title: "Admin settings"
+      description: >
+        Sign in as admin@example.com → Admin → settings, find "Event tickets
+        & memories". Set Max tickets per event to 1, then sign back in as Tina
+        and open the Lyon event.
+      expected: >
+        Both existing tickets are kept; the counter reads "2 / 1" and Add
+        stays disabled. Turning the feature off hides the section everywhere.

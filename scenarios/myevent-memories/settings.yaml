@@ -1,0 +1,8 @@
+settings:
+  show_ratings: true
+  my_events_route_enabled: true
+  event_tickets_enabled: true
+  event_memories_enabled: true
+  event_assets_max_memories: 5
+  event_assets_memory_window_days: 30
+  event_assets_max_memory_mb: 10

@@ -21,12 +21,17 @@ def record_delivery(
     notification_id: int,
     channel: str,
     when: Optional[datetime] = None,
+    *,
+    mode: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> None:
     """Insert a delivery-log row. Caller owns the transaction (no commit)."""
     session.add(
         NotificationDelivery(
             notification_id=notification_id,
             channel=channel,
+            mode=mode,
+            source=source,
             delivered_at=when or datetime.now(timezone.utc),
         )
     )

@@ -579,6 +579,29 @@ class TestEventsEndpoint:
         assert response.headers["cache-control"] == "no-store"
         assert client.get("/api/events/pending").status_code == 200
 
+    def test_og_meta_includes_event_picture(self, sqlite_client):
+        client, engine = sqlite_client
+        now = datetime.now(UTC)
+        with Session(engine) as session:
+            session.add(CalendarSetting(calendar_id="cal-1", name="Cal", enabled=True))
+            session.add(
+                CachedEvent(
+                    event_id="with-pic",
+                    calendar_id="cal-1",
+                    title="Salsa Night",
+                    start=now + timedelta(days=1),
+                    end=now + timedelta(days=1, hours=3),
+                    image_url="https://cdn.example.com/flyer.jpg",
+                    review_status="reviewed",
+                )
+            )
+            session.commit()
+
+        response = client.get("/api/events/with-pic/og-meta")
+
+        assert response.status_code == 200
+        assert response.json()["image_url"] == "https://cdn.example.com/flyer.jpg"
+
     def test_get_events_returns_list(self, sample_calendar, sample_events):
         mock_session = make_session_with_data(
             calendars=[sample_calendar],
@@ -1087,6 +1110,9 @@ class TestEventsEndpoint:
 class TestTrackingEndpoint:
     def test_track_event_view(self):
         mock_session = MagicMock(spec=Session)
+        mock_session.get.return_value = MagicMock(
+            visibility="public", status="published"
+        )
         app.dependency_overrides[get_session] = lambda: mock_session
         try:
             client = TestClient(app)
@@ -1611,7 +1637,7 @@ class TestHideBlockEndpoints:
             data = resp.json()
             assert data["is_hidden"] is True
             assert data["is_blocked"] is True
-            assert data["status"] == "blocked"
+            assert (data["status"], data["status_reason"]) == ("removed", "admin")
             assert data["block_reason"] == "deleted"
         finally:
             app.dependency_overrides.clear()
@@ -1651,7 +1677,7 @@ class TestHideBlockEndpoints:
             data = resp.json()
             assert data["is_hidden"] is False
             assert data["is_blocked"] is False
-            assert data["status"] == "pending"
+            assert data["status"] == "new"
             assert data["block_reason"] is None
         finally:
             app.dependency_overrides.clear()

@@ -1,0 +1,165 @@
+# Events seeded straight into the DB, one or more per status.
+base_week: 0
+events:
+  # Published copies of two synced events (same ids as mock-sync-events.yaml).
+  - id: ev-live-friday
+    calendar_id: salsa-src
+    title: Friday Salsa at Studio A
+    description: Weekly Friday social with a beginner class at 19:30.
+    location: Studio A, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Fri 20:00
+    end: w1 Fri 23:30
+    tags: ["dance-style:salsa", "reach:local"]
+
+  - id: ev-live-sunday
+    calendar_id: salsa-src
+    title: Sunday Bachata Practica
+    description: Open practica, all levels.
+    location: Studio Mitte, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Sun 18:00
+    end: w1 Sun 21:00
+    tags: ["dance-style:bachata", "reach:local"]
+
+  # New, created by an admin in the Movida calendar (open "New event" change).
+  - id: ev-new-admin
+    calendar_id: movida-salsa
+    title: Salsa Cubana Workshop (new)
+    location: Tanzschule Mitte, Rosenthaler Str. 40, 10178 Berlin
+    latitude: 52.5263
+    longitude: 13.4020
+    start: w2 Sat 14:00
+    end: w2 Sat 17:00
+    review_status: pending
+    tags: ["dance-style:salsa"]
+
+  - id: ev-unpublished
+    calendar_id: movida-salsa
+    title: Bachata Sensual Bootcamp (unpublished)
+    location: Studio Mitte, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w2 Fri 19:00
+    end: w2 Fri 22:00
+    status: unpublished
+    tags: ["dance-style:bachata"]
+
+  - id: ev-cancelled
+    calendar_id: movida-salsa
+    title: Rooftop Salsa (cancelled)
+    location: Klunkerkranich, Karl-Marx-Straße 66, 12043 Berlin
+    latitude: 52.4812
+    longitude: 13.4352
+    start: w1 Sat 19:00
+    end: w1 Sat 23:00
+    status: cancelled
+    cancellation_note: Rain forecast all evening — see you next month.
+    tags: ["dance-style:salsa", "reach:local"]
+
+  - id: ev-removed-admin
+    calendar_id: salsa-src
+    title: Spam Party (removed by admin)
+    start: w1 Wed 20:00
+    end: w1 Wed 23:00
+    status: removed
+    status_reason: admin
+    is_blocked: true
+    tags: ["dance-style:salsa"]
+
+  - id: ev-removed-rejected
+    calendar_id: salsa-src
+    title: Not a dance event (rejected)
+    start: w2 Thu 18:00
+    end: w2 Thu 20:00
+    status: removed
+    status_reason: rejected
+    is_blocked: true
+    tags: ["dance-style:bachata"]
+
+  # Published events that carry open changes (see db-revisions.yaml).
+  - id: ev-edit-user
+    calendar_id: movida-salsa
+    title: Salsa Social at Club Havanna
+    location: Club Havana, Oranienstraße 25, 10999 Berlin
+    latitude: 52.5016
+    longitude: 13.4189
+    start: w1 Thu 21:00
+    end: w1 Thu 23:59
+    tags: ["dance-style:salsa", "reach:local"]
+
+  - id: ev-edit-organizer
+    calendar_id: movida-salsa
+    title: Kizomba Lounge
+    location: Tresor Garden, Köpenicker Str. 70, 10179 Berlin
+    latitude: 52.5103
+    longitude: 13.4197
+    start: w1 Sat 21:00
+    end: w1 Sat 23:59
+    tags: ["dance-style:kizomba"]
+
+  - id: ev-cancel-request
+    calendar_id: movida-salsa
+    title: Salsa Brunch
+    location: Café Nord, Kollwitzstraße 50, 10405 Berlin
+    latitude: 52.5370
+    longitude: 13.4170
+    start: w2 Sun 11:00
+    end: w2 Sun 14:00
+    tags: ["dance-style:salsa"]
+
+  - id: ev-remove-request
+    calendar_id: salsa-src
+    title: Midweek Bachata
+    location: Studio A, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Wed 20:00
+    end: w1 Wed 23:00
+    tags: ["dance-style:bachata"]
+
+  - id: ev-draft
+    calendar_id: movida-salsa
+    title: Salsa on2 Intensive
+    location: Tanzschule Mitte, Rosenthaler Str. 40, 10178 Berlin
+    latitude: 52.5263
+    longitude: 13.4020
+    start: w3 Sat 13:00
+    end: w3 Sat 18:00
+    tags: ["dance-style:salsa"]
+
+  # A confirmed admin series (not a submission): shows the series icon.
+  - id: ev-rueda-1
+    calendar_id: movida-salsa
+    title: Wednesday Rueda
+    location: Salsa Lounge, Kastanienallee 7, 10435 Berlin
+    latitude: 52.5381
+    longitude: 13.4105
+    start: w1 Wed 19:00
+    end: w1 Wed 21:00
+    tags: ["dance-style:salsa"]
+  - id: ev-rueda-2
+    calendar_id: movida-salsa
+    title: Wednesday Rueda
+    location: Salsa Lounge, Kastanienallee 7, 10435 Berlin
+    latitude: 52.5381
+    longitude: 13.4105
+    start: w2 Wed 19:00
+    end: w2 Wed 21:00
+    tags: ["dance-style:salsa"]
+  - id: ev-rueda-3
+    calendar_id: movida-salsa
+    title: Wednesday Rueda
+    location: Salsa Lounge, Kastanienallee 7, 10435 Berlin
+    latitude: 52.5381
+    longitude: 13.4105
+    start: w3 Wed 19:00
+    end: w3 Wed 21:00
+    tags: ["dance-style:salsa"]
+
+event_series:
+  - canonical_title: Wednesday Rueda
+    status: resolved
+    members: [ev-rueda-1, ev-rueda-2, ev-rueda-3]

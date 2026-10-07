@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchEventsPage, type PreferredAreaPayload } from '../api';
 import { filterEventsByTags } from '../utils/tagFilter';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
+import { formatLocalDate } from '../utils/calendarRange';
 import type { CalendarEvent, TagGroup } from '../types';
 
 /** Worldwide footprint used to sample events for the preview map. The map
@@ -10,7 +11,7 @@ const WORLD_AREA = { min_lat: -55, min_lng: -170, max_lat: 75, max_lng: 170 } as
 const WORLD_FETCH_LIMIT = 200;
 
 function todayISODate(): string {
-    return new Date().toISOString().slice(0, 10);
+    return formatLocalDate(new Date());
 }
 
 interface Params {

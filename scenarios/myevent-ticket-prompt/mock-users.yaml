@@ -1,0 +1,10 @@
+# Mock users for "myevent-ticket-prompt".
+#   * tina  — POV. Marked Going 25h ago to every event.
+#   * admin — matches ADMIN_EMAIL; flips the per-event "Advance ticket" switch.
+users:
+  - email: tina@example.com
+    name: Tina (ticket nudges)
+    handle: tina
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

@@ -1,6 +1,27 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanCount, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleContributor, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanCount, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleContributor, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 import type { AdminEventNotificationStats, SharedMyPlanResponse } from './types';
+import type {
+    AdminEventModeration,
+    AdminEventStatus,
+    ChangeScope,
+    EventAssets,
+    EventAssetSummary,
+    EventAssetVisibility,
+    EventOrganizerMini,
+    EventRevision,
+    EventRevisionKind,
+    EventRevisionSource,
+    EventChangeCreate,
+    EventVisibilityState,
+    MockSourceEvent,
+    MockSourceSyncResult,
+    OrganizedEvent,
+    OwnEventChange,
+    OwnSuggestion,
+    OwnSuggestionUpdate,
+    SuggestionAuditEntry,
+} from './types';
 
 declare const __VITE_API_URL__: string;
 
@@ -197,13 +218,28 @@ export async function fetchEventsPage(
     };
 }
 
+export class EventMergedError extends Error {
+    mergedInto: string;
+
+    constructor(mergedInto: string) {
+        super('Event merged');
+        this.mergedInto = mergedInto;
+    }
+}
+
 export async function fetchEvent(eventId: string, opts?: { fresh?: boolean }): Promise<CalendarEvent> {
     // `fresh: true` bypasses the browser HTTP cache. The public endpoint sets
     // `Cache-Control: public, max-age=60`; admin flows that re-fetch after a
     // mutation (approve a tag suggestion, edit a field, retry geocoding…) need
     // the fresh server state immediately.
-    const init: RequestInit = opts?.fresh ? { cache: 'no-store' } : {};
+    // Credentials let a submitter open their own event while it awaits review.
+    const init: RequestInit = { credentials: 'include', ...(opts?.fresh ? { cache: 'no-store' } : {}) };
     const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}`, init);
+    if (res.status === 410) {
+        const body = await res.json().catch(() => null);
+        const target = body?.detail?.merged_into;
+        if (typeof target === 'string') throw new EventMergedError(target);
+    }
     if (!res.ok) throw new Error('Failed to fetch event');
     return res.json();
 }
@@ -357,8 +393,6 @@ export interface SchedulePublishResponse extends EventSchedule {
         impacted_planners: number;
         going_attendees_notified: number;
         in_app_created: number;
-        emailed: number;
-        pushed: number;
         going_attendees: number;
     };
 }
@@ -735,6 +769,20 @@ export interface SiteSettings {
     /** Minimum "Going" attendees before an event reminder includes an
      * "Ask a question" CTA to the message board. 1-10000, client default 3. */
     event_message_cta_min_going?: number;
+    event_tickets_enabled?: boolean;
+    event_memories_enabled?: boolean;
+    event_assets_max_tickets?: number;
+    event_assets_max_memories?: number;
+    event_assets_ticket_retention_days?: number;
+    event_assets_memory_window_days?: number;
+    event_assets_max_ticket_mb?: number;
+    event_assets_max_memory_mb?: number;
+    ticket_likely_min_hours?: number;
+    ticket_prompt_delay_hours?: number;
+    ticket_prompt_min_lead_hours?: number;
+    memories_prompt_local_hour?: number;
+    ticket_prompt_enabled?: boolean;
+    memories_prompt_enabled?: boolean;
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -896,6 +944,73 @@ export async function fetchReviewPromptCandidates(
     return parseJsonResponse<ReviewPromptCandidate[]>(res, 'Failed to load attendees');
 }
 
+export type AssetPromptKind = 'ticket' | 'memories';
+export type AssetPromptChannel = 'app' | 'email' | 'push';
+
+export interface AssetPromptCandidate {
+    user_id: string;
+    email: string;
+    name: string | null;
+    handle: string | null;
+    blocker: 'has_ticket' | 'ticket_not_needed' | 'has_memory' | null;
+    email_enabled: boolean;
+    push_enabled: boolean;
+    has_push_subscription: boolean;
+    curator_marked: boolean;
+    notification: {
+        created_at: string;
+        read_at: string | null;
+        emailed_at: string | null;
+        pushed_at: string | null;
+    } | null;
+}
+
+export interface AssetPromptCandidatesResponse {
+    event_id: string;
+    title: string | null;
+    start: string;
+    end: string;
+    ticket_likely: boolean;
+    ticket_likely_reason: string | null;
+    ineligible_reason: 'not_upcoming' | 'not_ended' | 'window_closed' | null;
+    candidates: AssetPromptCandidate[];
+}
+
+export async function fetchAssetPromptCandidates(
+    eventId: string,
+    kind: AssetPromptKind,
+): Promise<AssetPromptCandidatesResponse> {
+    const res = await fetch(
+        `${BASE}/admin/events/${encodeURIComponent(eventId)}/asset-prompt-candidates?kind=${kind}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<AssetPromptCandidatesResponse>(res, 'Failed to load attendees');
+}
+
+export interface AssetPromptSendNowResponse {
+    in_app_created: number;
+    in_app_resurfaced: number;
+    emailed: number;
+    pushed: number;
+    results: ForceSendUserResult[];
+}
+
+export async function sendAssetPromptNow(body: {
+    kind: AssetPromptKind;
+    event_id: string;
+    user_ids: string[];
+    channels: AssetPromptChannel[];
+    resend: boolean;
+}): Promise<AssetPromptSendNowResponse> {
+    const res = await fetch(`${BASE}/admin/notifications/asset-prompt/send-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse<AssetPromptSendNowResponse>(res, 'Failed to send prompt now');
+}
+
 export interface NotificationToggleCountEntry {
     email: number;
     push: number;
@@ -908,6 +1023,8 @@ export interface NotificationToggleCounts {
     activity_digest: NotificationToggleCountEntry;
     review_prompt: NotificationToggleCountEntry;
     milestones: NotificationToggleCountEntry;
+    ticket_prompt?: NotificationToggleCountEntry;
+    memories_prompt?: NotificationToggleCountEntry;
 }
 
 export async function fetchNotificationToggleCounts(): Promise<NotificationToggleCounts> {
@@ -917,6 +1034,8 @@ export async function fetchNotificationToggleCounts(): Promise<NotificationToggl
 
 export type NotificationLogType = 'interest_match' | 'activity_digest' | 'event_reminder' | 'review_prompt';
 export type NotificationLogChannel = 'app' | 'email' | 'push';
+export type NotificationLogMode = 'instant' | 'digest';
+export type NotificationLogSource = 'request' | 'job' | 'tick' | 'admin';
 
 export interface NotificationLogEntry {
     id: number;
@@ -925,6 +1044,9 @@ export interface NotificationLogEntry {
     kind: string;
     type: NotificationLogType | string;
     channel: NotificationLogChannel | string;
+    mode: NotificationLogMode | string | null;
+    source: NotificationLogSource | string | null;
+    latency_seconds: number | null;
     recipient_user_id: string;
     recipient_email: string;
     recipient_handle: string | null;
@@ -943,11 +1065,21 @@ export interface NotificationLogList {
 }
 
 export async function fetchAdminNotificationsLog(
-    opts?: { type?: NotificationLogType; channel?: NotificationLogChannel; q?: string; limit?: number; offset?: number },
+    opts?: {
+        type?: NotificationLogType;
+        channel?: NotificationLogChannel;
+        mode?: NotificationLogMode;
+        source?: NotificationLogSource;
+        q?: string;
+        limit?: number;
+        offset?: number;
+    },
 ): Promise<NotificationLogList> {
     const sp = new URLSearchParams();
     if (opts?.type) sp.set('type', opts.type);
     if (opts?.channel) sp.set('channel', opts.channel);
+    if (opts?.mode) sp.set('mode', opts.mode);
+    if (opts?.source) sp.set('source', opts.source);
     if (opts?.q) sp.set('q', opts.q);
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));
@@ -1079,6 +1211,7 @@ export interface AuthUser {
     avatar_url?: string | null;
     has_custom_avatar?: boolean;
     is_admin?: boolean;
+    is_verified_organizer?: boolean;
     share_attendance_default?: boolean;
     /** New 3-tier replacement for ``share_attendance_default``. May be
      * absent on older payloads — fall back to the boolean. */
@@ -1138,6 +1271,10 @@ export interface AuthUser {
     email_schedule_updates_enabled?: boolean;
     push_schedule_updates_enabled?: boolean;
     digest_email_enabled?: boolean;
+    email_ticket_prompt_enabled?: boolean;
+    push_ticket_prompt_enabled?: boolean;
+    email_memories_prompt_enabled?: boolean;
+    push_memories_prompt_enabled?: boolean;
     /** Legacy four-flag aliases returned for one release so older
      *  clients keep working. Derived from the six new flags on the
      *  server (see PHASE_G_NOTIFICATION_GATING.md §G.9). */
@@ -1319,6 +1456,10 @@ export interface NotificationPreferences {
     push_promo_codes_enabled: boolean;
     email_review_prompt_enabled: boolean;
     push_review_prompt_enabled: boolean;
+    email_ticket_prompt_enabled?: boolean;
+    push_ticket_prompt_enabled?: boolean;
+    email_memories_prompt_enabled?: boolean;
+    push_memories_prompt_enabled?: boolean;
     email_milestone_unlocked_enabled: boolean;
     push_milestone_unlocked_enabled: boolean;
     email_friends_going_enabled: boolean;
@@ -1373,6 +1514,10 @@ export interface UpdateNotificationPreferencesPayload {
     push_schedule_updates_enabled?: boolean;
     /** Master opt-out for the combined activity digest email (v2). */
     digest_email_enabled?: boolean;
+    email_ticket_prompt_enabled?: boolean;
+    push_ticket_prompt_enabled?: boolean;
+    email_memories_prompt_enabled?: boolean;
+    push_memories_prompt_enabled?: boolean;
     /** Legacy aliases accepted for one release — server writes through
      *  to the corresponding new flags. */
     reminder_email_enabled?: boolean;
@@ -1392,20 +1537,6 @@ export async function updateNotificationPreferences(
     });
     if (!res.ok) throw new Error('Failed to update notification preferences');
     return res.json();
-}
-
-/** Best-effort IP -> city geo prefill for the home-pin picker in
- * onboarding Step 2. Returns null when the backend returned 204
- * (private IP / geolocation failed) so the caller can fall back to
- * browser geolocation or manual city typeahead. */
-export async function geolocateFromIP(): Promise<HomeLocationPayload | null> {
-    const res = await fetch(`${BASE}/auth/geolocate-ip`, { credentials: 'include' });
-    if (res.status === 204 || !res.ok) return null;
-    try {
-        return (await res.json()) as HomeLocationPayload;
-    } catch {
-        return null;
-    }
 }
 
 export type ReachFilter = 'any' | 'regional_plus' | 'international';
@@ -1589,6 +1720,81 @@ export async function deleteUserAvatar(): Promise<UserAvatarUpdate> {
         credentials: 'include',
     });
     return parseJsonResponse<UserAvatarUpdate>(res, 'Failed to remove profile picture');
+}
+
+export async function fetchEventAssets(eventId: string): Promise<EventAssets> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/assets`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventAssets>(res, 'Failed to load your files');
+}
+
+export async function uploadEventAsset(
+    eventId: string,
+    kind: 'ticket' | 'memory',
+    file: Blob,
+    fileName: string,
+): Promise<EventAssets> {
+    const form = new FormData();
+    form.append('kind', kind);
+    form.append('file', file, fileName);
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/assets`, {
+        method: 'POST',
+        credentials: 'include',
+        body: form,
+    });
+    return parseJsonResponse<EventAssets>(res, 'Failed to upload file');
+}
+
+export async function addEventTicketLink(eventId: string, url: string): Promise<EventAssets> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/assets/link`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+    });
+    return parseJsonResponse<EventAssets>(res, 'Failed to save ticket link');
+}
+
+export async function updateEventAsset(
+    assetId: string,
+    update: { visibility?: EventAssetVisibility; caption?: string },
+): Promise<EventAssets> {
+    const res = await fetch(`${BASE}/event-assets/${encodeURIComponent(assetId)}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(update),
+    });
+    return parseJsonResponse<EventAssets>(res, 'Failed to update file');
+}
+
+export async function deleteEventAsset(assetId: string): Promise<EventAssets> {
+    const res = await fetch(`${BASE}/event-assets/${encodeURIComponent(assetId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventAssets>(res, 'Failed to delete file');
+}
+
+export async function setTicketNotNeeded(eventId: string, notNeeded: boolean): Promise<EventAssets> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/ticket-not-needed`, {
+        method: notNeeded ? 'PUT' : 'DELETE',
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventAssets>(res, 'Failed to update ticket preference');
+}
+
+export async function fetchEventAssetSummaries(
+    eventIds: string[],
+): Promise<Record<string, EventAssetSummary>> {
+    const res = await fetch(`${BASE}/me/event-assets/summary`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    return parseJsonResponse<Record<string, EventAssetSummary>>(res, 'Failed to load your files');
 }
 
 export interface HandleAvailability {
@@ -2271,12 +2477,26 @@ export type NotificationKind =
     | 'organizer_claim_decided'
     | 'event_reminder'
     | 'event_review_prompt'
+    | 'event_ticket_prompt'
+    | 'event_memories_prompt'
     | 'interest_event'
     | 'milestone_unlocked'
     | 'event_message'
     | 'event_message_reply'
     | 'event_message_reported'
     | 'planned_session_changed'
+    | 'event_changed'
+    | 'suggestion_approved'
+    | 'suggestion_declined'
+    | 'suggestion_rejected'
+    | 'suggestion_change_applied'
+    | 'suggestion_change_discarded'
+    | 'event_change_applied'
+    | 'event_change_declined'
+    | 'event_change_reverted'
+    | 'event_removed'
+    | 'event_cancelled'
+    | 'organizer_assigned'
     | 'plan_session_added'
     | 'schedule_program_available'
     | 'schedule_program_updated';
@@ -2767,7 +2987,15 @@ export async function updateMySocialLinks(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(links),
     });
-    return parseJsonResponse<PublicProfile>(res, 'Failed to update social links');
+    return notifyProfileChanged(await parseJsonResponse<PublicProfile>(res, 'Failed to update social links'));
+}
+
+export const PROFILE_CHANGED_EVENT = 'profile:changed';
+
+// Lets independently-loaded profile editors (bio, links, organizer claim) stay in sync.
+function notifyProfileChanged(profile: PublicProfile): PublicProfile {
+    window.dispatchEvent(new CustomEvent<PublicProfile>(PROFILE_CHANGED_EVENT, { detail: profile }));
+    return profile;
 }
 
 // --- Phase D: profile bio + content tabs + discovery ---
@@ -2779,7 +3007,7 @@ export async function updateMyBio(bio: string | null): Promise<PublicProfile> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bio }),
     });
-    return parseJsonResponse<PublicProfile>(res, 'Failed to update bio');
+    return notifyProfileChanged(await parseJsonResponse<PublicProfile>(res, 'Failed to update bio'));
 }
 
 export interface ProfileEventListResponse {
@@ -2792,13 +3020,13 @@ export interface ProfileEventListResponse {
 
 async function fetchProfileEventList(
     handle: string,
-    tab: 'going' | 'saved' | 'suggested',
+    tab: 'going' | 'saved' | 'suggested' | 'hosting',
     opts?: { limit?: number; offset?: number; includePast?: boolean },
 ): Promise<ProfileEventListResponse> {
     const sp = new URLSearchParams();
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));
-    if (tab === 'going' && opts?.includePast) sp.set('include_past', '1');
+    if ((tab === 'going' || tab === 'hosting') && opts?.includePast) sp.set('include_past', '1');
     const qs = sp.toString();
     const res = await fetch(
         `${BASE}/social/users/${encodeURIComponent(handle)}/${tab}${qs ? `?${qs}` : ''}`,
@@ -2809,6 +3037,24 @@ async function fetchProfileEventList(
         res,
         `Failed to fetch ${tab} list`,
     );
+}
+
+export function fetchUserHosting(
+    handle: string,
+    opts?: { limit?: number; offset?: number; includePast?: boolean },
+) {
+    return fetchProfileEventList(handle, 'hosting', opts);
+}
+
+export interface HostingResponse {
+    items: CalendarEvent[];
+    pending_change_event_ids: string[];
+}
+
+/** The signed-in organizer's own events for the Hosting hub. */
+export async function fetchMyHosting(): Promise<HostingResponse> {
+    const res = await fetch(`${BASE}/social/me/hosting`, { credentials: 'include' });
+    return parseJsonResponse<HostingResponse>(res, 'Failed to load your events');
 }
 
 export function fetchUserGoing(
@@ -3201,11 +3447,16 @@ export interface PaginatedEventsResponse {
 
 export type AdminEventGeoStatus = 'geolocated' | 'ungeolocated' | 'no-location';
 
+export type AdminEventFlag = 'submitted' | 'wants_public' | 'changes';
+
 export interface EventFilterParams {
     limit?: number;
     offset?: number;
     search?: string;
-    status?: 'pending' | 'reviewed' | 'blocked';
+    /** OR within each list, AND across lists. Removed events only show when asked for. */
+    audience?: EventVisibilityState[];
+    status?: AdminEventStatus[];
+    flags?: AdminEventFlag[];
     calendar_id?: string;
     tag_ids?: string;
     geo_status?: AdminEventGeoStatus;
@@ -3217,8 +3468,9 @@ export interface EventFilterParams {
      * widen the scope (audits, archives, etc.).
      */
     include_past?: boolean;
-    /** When true, return hidden events only. Composes with status. */
-    hidden?: boolean;
+    /** One row per submission series (list only). */
+    group?: 'series';
+    sort?: 'start' | 'submitted';
 }
 
 export interface FilterOption {
@@ -3229,10 +3481,18 @@ export interface FilterOption {
 
 export interface EventFilterOptionsResponse {
     calendars: FilterOption[];
+    audiences: FilterOption[];
     statuses: FilterOption[];
+    flags: FilterOption[];
     geo_statuses: FilterOption[];
     tags: FilterOption[];
     total_count: number;
+}
+
+function setStatusParams(qs: URLSearchParams, params: EventFilterParams) {
+    if (params.audience?.length) qs.set('audience', params.audience.join(','));
+    if (params.status?.length) qs.set('status', params.status.join(','));
+    if (params.flags?.length) qs.set('flags', params.flags.join(','));
 }
 
 export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<PaginatedEventsResponse> {
@@ -3240,14 +3500,15 @@ export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<
     if (params.limit != null) qs.set('limit', String(params.limit));
     if (params.offset != null) qs.set('offset', String(params.offset));
     if (params.search) qs.set('search', params.search);
-    if (params.status) qs.set('status', params.status);
+    setStatusParams(qs, params);
     if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.geo_status) qs.set('geo_status', params.geo_status);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
-    if (params.hidden) qs.set('hidden', 'true');
+    if (params.group) qs.set('group', params.group);
+    if (params.sort && params.sort !== 'start') qs.set('sort', params.sort);
     const res = await fetch(`${BASE}/admin/events?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch events');
     return res.json();
@@ -3256,14 +3517,13 @@ export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<
 export async function fetchEventFilterOptions(params: EventFilterParams = {}): Promise<EventFilterOptionsResponse> {
     const qs = new URLSearchParams();
     if (params.search) qs.set('search', params.search);
-    if (params.status) qs.set('status', params.status);
+    setStatusParams(qs, params);
     if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.geo_status) qs.set('geo_status', params.geo_status);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
-    if (params.hidden) qs.set('hidden', 'true');
     const res = await fetch(`${BASE}/admin/events/filter-options?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch filter options');
     return res.json();
@@ -3502,6 +3762,8 @@ export interface GeocodeSuggestion {
         max_lat: number;
         max_lng: number;
     } | null;
+    /** IANA zone at the coordinates. */
+    timezone?: string | null;
 }
 
 export async function searchAddress(query: string): Promise<GeocodeSuggestion[]> {
@@ -3528,6 +3790,191 @@ export async function fetchTestPlan(scenario: string): Promise<TestPlan> {
 
 // --- Review ---
 
+export async function fetchAdminEventModeration(eventId: string): Promise<AdminEventModeration> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/moderation`, {
+        cache: 'no-store',
+        credentials: 'include',
+    });
+    return parseJsonResponse<AdminEventModeration>(res, 'Failed to load moderation details');
+}
+
+/** Merge side-panel edits into the event's unpublished draft (null = no draft left). */
+export async function updateAdminEventDraft(
+    eventId: string,
+    changes: Record<string, unknown>,
+): Promise<EventRevision | null> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/draft`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changes }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventRevision | null>(res, 'Failed to save draft');
+}
+
+export async function discardAdminEventDraft(eventId: string): Promise<void> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/draft`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to discard draft');
+}
+
+export async function publishAdminEventDraft(eventId: string, notify: boolean, scope: ChangeScope = 'date'): Promise<EventRevision> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/draft/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notify, scope }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventRevision>(res, 'Failed to publish changes');
+}
+
+export async function applyEventRevision(
+    revisionId: number,
+    notify: boolean,
+    asStatus?: 'cancelled' | 'removed',
+    scope: ChangeScope = 'date',
+): Promise<EventRevision> {
+    const res = await fetch(`${BASE}/admin/revisions/${revisionId}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(asStatus ? { notify, as_status: asStatus, scope } : { notify, scope }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventRevision>(res, 'Failed to apply changes');
+}
+
+/** Cancel, remove or restore an event as an applied admin change. */
+export async function setAdminEventStatus(
+    eventId: string,
+    body: { status: 'published' | 'cancelled' | 'removed'; note?: string; notify?: boolean; scope?: ChangeScope },
+): Promise<EventRevision> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventRevision>(res, 'Failed to change the event status');
+}
+
+export async function discardEventRevision(revisionId: number, scope: ChangeScope = 'date'): Promise<EventRevision> {
+    const res = await fetch(`${BASE}/admin/revisions/${revisionId}/discard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventRevision>(res, 'Failed to discard changes');
+}
+
+/** Undo an applied organizer or user change; fields edited since are left alone. */
+export async function revertEventRevision(revisionId: number, notify?: boolean): Promise<EventRevision> {
+    const res = await fetch(`${BASE}/admin/revisions/${revisionId}/revert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notify: notify ?? null }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventRevision>(res, 'Failed to revert changes');
+}
+
+export interface ChangeEventSummary {
+    event_id: string;
+    title: string;
+    start: string;
+    end: string;
+    all_day: boolean;
+    timezone: string | null;
+    location: string | null;
+    status: AdminEventStatus;
+    visibility_state: EventVisibilityState;
+    occurrences: number;
+    is_submission: boolean;
+}
+
+export interface AdminChange extends EventRevision {
+    event: ChangeEventSummary | null;
+    submitter_name: string | null;
+}
+
+export interface AdminChangesResponse {
+    items: AdminChange[];
+    total: number;
+    kinds: FilterOption[];
+    sources: FilterOption[];
+}
+
+export async function fetchAdminChanges(params: {
+    kind?: EventRevisionKind[];
+    source?: EventRevisionSource[];
+    state?: 'open' | 'decided';
+    limit?: number;
+    offset?: number;
+} = {}): Promise<AdminChangesResponse> {
+    const qs = new URLSearchParams();
+    if (params.kind?.length) qs.set('kind', params.kind.join(','));
+    if (params.source?.length) qs.set('source', params.source.join(','));
+    if (params.state) qs.set('state', params.state);
+    if (params.limit != null) qs.set('limit', String(params.limit));
+    if (params.offset != null) qs.set('offset', String(params.offset));
+    const res = await fetch(`${BASE}/admin/changes?${qs}`, { credentials: 'include', cache: 'no-store' });
+    return parseJsonResponse<AdminChangesResponse>(res, 'Failed to load changes');
+}
+
+export interface ChangeDecision {
+    decision: 'accept' | 'reject';
+    note?: string;
+    notify?: boolean;
+    as_status?: 'cancelled' | 'removed';
+    calendar_id?: string;
+    scope?: ChangeScope;
+}
+
+export async function decideAdminChange(revisionId: number, body: ChangeDecision): Promise<AdminChange> {
+    const res = await fetch(`${BASE}/admin/changes/${revisionId}/decide`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
+    });
+    return parseJsonResponse<AdminChange>(res, 'Failed to decide the change');
+}
+
+/** Dev only: the event as the mock calendar source has it; null outside mock mode. */
+export async function fetchMockSourceEvent(eventId: string): Promise<MockSourceEvent | null> {
+    const res = await fetch(`${BASE}/admin/mock-source/events/${encodeURIComponent(eventId)}`, {
+        cache: 'no-store',
+        credentials: 'include',
+    });
+    if (!res.ok) return null;
+    return res.json();
+}
+
+/** Dev only: emulate the organiser editing the event in Google, then sync. */
+export async function editMockSourceEvent(
+    eventId: string,
+    changes: Partial<Pick<MockSourceEvent, 'title' | 'description' | 'location' | 'start' | 'end' | 'all_day'>>,
+): Promise<MockSourceSyncResult> {
+    const res = await fetch(`${BASE}/admin/mock-source/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...changes, sync: true }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<MockSourceSyncResult>(res, 'Failed to edit the source event');
+}
+
+/** Dev only: emulate the organiser deleting the event in Google, then sync. */
+export async function deleteMockSourceEvent(eventId: string): Promise<MockSourceSyncResult> {
+    const res = await fetch(`${BASE}/admin/mock-source/events/${encodeURIComponent(eventId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    return parseJsonResponse<MockSourceSyncResult>(res, 'Failed to delete the source event');
+}
+
 export async function reviewEvent(eventId: string): Promise<CalendarEvent> {
     const res = await fetch(`${BASE}/admin/events/${eventId}/review`, {
         method: 'POST',
@@ -3550,7 +3997,15 @@ export async function submitSuggestion(data: EventSuggestionCreate): Promise<{ i
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || 'Failed to submit suggestion');
     }
-    return res.json();
+    return notifySubmissionsChanged(await res.json());
+}
+
+export const SUBMISSIONS_CHANGED_EVENT = 'submissions:changed';
+
+// The wizard opens over the lists it changes, so they refresh on this signal.
+function notifySubmissionsChanged<T>(value: T): T {
+    window.dispatchEvent(new Event(SUBMISSIONS_CHANGED_EVENT));
+    return value;
 }
 
 export interface SuggestionImage {
@@ -3580,10 +4035,119 @@ export async function importSuggestionImageFromUrl(url: string): Promise<Suggest
     return parseJsonResponse<SuggestionImage>(res, 'Failed to import image');
 }
 
+export interface SimilarEvent {
+    event_id: string;
+    title: string;
+    start: string;
+    end: string;
+    all_day: boolean;
+    location: string | null;
+}
+
+/** Public events that look like the one being added. */
+export async function fetchSimilarEvents(title: string, start: string, end: string): Promise<SimilarEvent[]> {
+    const qs = new URLSearchParams({ title, start, end });
+    const res = await fetch(`${BASE}/suggestions/similar?${qs}`, { credentials: 'include' });
+    if (!res.ok) return [];
+    return res.json();
+}
+
 export async function searchSuggestionAddress(query: string): Promise<GeocodeSuggestion[]> {
     const res = await fetch(`${BASE}/suggestions/geocode?q=${encodeURIComponent(query)}`);
     if (!res.ok) return [];
     return res.json();
+}
+
+/** The viewer's own suggestion behind an event, or null when it isn't theirs. */
+export async function fetchOwnSuggestionForEvent(eventId: string): Promise<OwnSuggestion | null> {
+    const res = await fetch(`${BASE}/me/suggestions/for-event/${encodeURIComponent(eventId)}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) return null;
+    return res.json();
+}
+
+export async function fetchOwnSuggestion(id: string): Promise<OwnSuggestion> {
+    const res = await fetch(`${BASE}/me/suggestions/${id}`, { credentials: 'include' });
+    return parseJsonResponse<OwnSuggestion>(res, 'Failed to load your event');
+}
+
+export async function updateOwnSuggestion(id: string, data: OwnSuggestionUpdate): Promise<OwnSuggestion> {
+    const res = await fetch(`${BASE}/me/suggestions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'include',
+    });
+    return notifySubmissionsChanged(await parseJsonResponse<OwnSuggestion>(res, 'Failed to save changes'));
+}
+
+/** Everything the viewer submitted, newest first. */
+export async function fetchMySubmissions(): Promise<OwnSuggestion[]> {
+    const res = await fetch(`${BASE}/me/suggestions`, { credentials: 'include' });
+    return parseJsonResponse<OwnSuggestion[]>(res, 'Failed to load your submissions');
+}
+
+/** Drop an approved event's edit before an admin reviews it. */
+export async function withdrawOwnSuggestionChanges(id: string): Promise<OwnSuggestion> {
+    const res = await fetch(`${BASE}/me/suggestions/${id}/changes/withdraw`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<OwnSuggestion>(res, 'Failed to withdraw your changes');
+}
+
+/** Suggest a change to a public event; every change is reviewed by an admin.
+ * Null when only new tags were requested (no change to review). */
+export async function proposeEventChange(eventId: string, body: EventChangeCreate): Promise<OwnEventChange | null> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/changes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    if (res.status === 202) return null;
+    return notifySubmissionsChanged(await parseJsonResponse<OwnEventChange>(res, 'Failed to send your suggestion'));
+}
+
+export async function fetchOwnEventChanges(): Promise<OwnEventChange[]> {
+    const res = await fetch(`${BASE}/me/changes`, { credentials: 'include' });
+    return parseJsonResponse<OwnEventChange[]>(res, 'Failed to load your suggestions');
+}
+
+export async function withdrawOwnEventChange(id: number): Promise<OwnEventChange> {
+    const res = await fetch(`${BASE}/me/changes/${id}`, { method: 'DELETE', credentials: 'include' });
+    return parseJsonResponse<OwnEventChange>(res, 'Failed to withdraw your suggestion');
+}
+
+/** Cancel a request to go public; the event stays the owner's. */
+export async function withdrawOwnSuggestion(id: string): Promise<OwnSuggestion> {
+    const res = await fetch(`${BASE}/me/suggestions/${id}/withdraw`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<OwnSuggestion>(res, 'Failed to cancel the request');
+}
+
+export async function requestOwnSuggestionPublic(id: string): Promise<OwnSuggestion> {
+    const res = await fetch(`${BASE}/me/suggestions/${id}/request-public`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<OwnSuggestion>(res, 'Failed to send for review');
+}
+
+export async function deleteOwnSuggestion(id: string): Promise<OwnSuggestion> {
+    const res = await fetch(`${BASE}/me/suggestions/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    return parseJsonResponse<OwnSuggestion>(res, 'Failed to delete event');
+}
+
+export async function fetchSuggestionAudit(id: string): Promise<SuggestionAuditEntry[]> {
+    const res = await fetch(`${BASE}/admin/suggestions/${id}/audit`, { credentials: 'include' });
+    return parseJsonResponse<SuggestionAuditEntry[]>(res, 'Failed to load edit history');
 }
 
 export async function fetchSuggestions(status?: string): Promise<EventSuggestion[]> {
@@ -3591,6 +4155,11 @@ export async function fetchSuggestions(status?: string): Promise<EventSuggestion
     const res = await fetch(`${BASE}/admin/suggestions${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch suggestions');
     return res.json();
+}
+
+export async function fetchAdminSuggestion(id: string): Promise<EventSuggestion> {
+    const res = await fetch(`${BASE}/admin/suggestions/${id}`, { credentials: 'include' });
+    return parseJsonResponse<EventSuggestion>(res, 'Failed to load submission');
 }
 
 export interface SuggestionOccurrence {
@@ -3638,14 +4207,14 @@ export async function approveSuggestion(id: string, calendarId: string): Promise
     return res.json();
 }
 
-export async function rejectSuggestion(id: string, adminNotes?: string): Promise<EventSuggestion> {
-    const res = await fetch(`${BASE}/admin/suggestions/${id}/reject`, {
+export async function rejectSuggestion(id: string, adminNotes?: string, block = false): Promise<EventSuggestion> {
+    const res = await fetch(`${BASE}/admin/suggestions/${id}/${block ? 'block' : 'decline'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ admin_notes: adminNotes }),
         credentials: 'include',
     });
-    if (!res.ok) throw new Error('Failed to reject suggestion');
+    if (!res.ok) throw new Error(block ? 'Failed to block event' : 'Failed to keep event private');
     return res.json();
 }
 
@@ -3729,6 +4298,7 @@ export async function fetchEventsByIds(eventIds: string[]): Promise<CalendarEven
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event_ids: eventIds }),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch events by IDs');
     return res.json();
@@ -3897,17 +4467,6 @@ export async function fetchSourceBreakdown(): Promise<SourceBreakdown[]> {
     return res.json();
 }
 
-export interface CountryBreakdown {
-    country: string;
-    view_count: number;
-}
-
-export async function fetchTopCountries(limit = 10): Promise<CountryBreakdown[]> {
-    const res = await fetch(`${BASE}/admin/analytics/top-countries?limit=${limit}`, { credentials: 'include' });
-    if (!res.ok) throw new Error('Failed to fetch top countries');
-    return res.json();
-}
-
 export interface TopLink {
     event_id: string;
     event_title: string;
@@ -4006,15 +4565,6 @@ export async function fetchTagGroups(
     const init: RequestInit = opts?.fresh ? { cache: 'no-store' } : {};
     const res = await fetch(url, init);
     return parseJsonResponse<TagGroup[]>(res, 'Failed to fetch tags');
-}
-
-export async function submitTagSuggestion(body: TagSuggestionCreate): Promise<void> {
-    const res = await fetch(`${BASE}/tags/suggestions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error('Failed to submit tag suggestion');
 }
 
 function buildAdminTagSuggestionParams(
@@ -4276,14 +4826,13 @@ export async function retryGeocodingSingle(eventId: string): Promise<{ geocoded:
 export async function fetchAdminEventIds(params: EventFilterParams = {}): Promise<{ ids: string[] }> {
     const qs = new URLSearchParams();
     if (params.search) qs.set('search', params.search);
-    if (params.status) qs.set('status', params.status);
+    setStatusParams(qs, params);
     if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.geo_status) qs.set('geo_status', params.geo_status);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
-    if (params.hidden) qs.set('hidden', 'true');
     const res = await fetch(`${BASE}/admin/events/ids?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch event IDs');
     return res.json();
@@ -4840,6 +5389,7 @@ export interface EventSearchResult {
     country: string | null;
     matched_fields: Array<'title' | 'city' | 'country' | 'tag'>;
     matched_tags: string[];
+    has_organizer?: boolean;
 }
 
 export type EventSearchDateScope = 'upcoming' | 'past' | 'all';
@@ -4943,6 +5493,62 @@ export async function cancelOrganizerClaim(claimId: string): Promise<void> {
     }
 }
 
+/** Claim events: adds them to the open organizer request, or opens one. */
+export async function claimEvents(eventIds: string[]): Promise<OrganizerClaim> {
+    const res = await fetch(`${BASE}/me/organizer-claims/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    return parseJsonResponse<OrganizerClaim>(res, 'Failed to send your request');
+}
+
+export async function removeEventFromClaim(claimId: string, eventId: string): Promise<void> {
+    const res = await fetch(
+        `${BASE}/me/organizer-claims/${claimId}/events/${encodeURIComponent(eventId)}`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to remove event');
+    }
+}
+
+export async function adminSetEventOrganizer(
+    eventId: string,
+    userId: string | null,
+): Promise<{ event_id: string; organizer: EventOrganizerMini | null }> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/organizer`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_id: userId }),
+    });
+    return parseJsonResponse(res, 'Failed to update organizer');
+}
+
+/** Apply an admin's staged organizer edits for one user; the user is notified once. */
+export async function adminUpdateUserOrganizer(
+    userId: string,
+    body: { is_verified_organizer: boolean; add_event_ids: string[]; remove_event_ids: string[] },
+): Promise<{ is_verified_organizer: boolean; events: OrganizedEvent[] }> {
+    const res = await fetch(`${BASE}/admin/users/id/${encodeURIComponent(userId)}/organizer`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse(res, 'Failed to save organizer changes');
+}
+
+export async function fetchAdminOrganizedEvents(userId: string): Promise<OrganizedEvent[]> {
+    const res = await fetch(`${BASE}/admin/users/id/${userId}/organized-events`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<OrganizedEvent[]>(res, 'Failed to load organized events');
+}
+
 export async function fetchAdminOrganizerClaims(
     status?: string,
     kind?: 'badge' | 'events',
@@ -5035,6 +5641,93 @@ export async function fetchEventDuplicateCandidates(
         credentials: 'include',
     });
     return parseJsonResponse<DuplicateGroupListResponse>(res, 'Failed to fetch duplicate candidates');
+}
+
+/** Runs automatic duplicate detection for one event and returns its groups. */
+export async function scanEventDuplicates(eventId: string): Promise<DuplicateGroupListResponse> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/duplicates/scan`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<DuplicateGroupListResponse>(res, 'Failed to scan for duplicates');
+}
+
+export interface OverlappingEvent {
+    event_id: string;
+    title: string;
+    start: string;
+    end: string;
+    all_day: boolean;
+    location: string | null;
+    calendar_id: string;
+    visibility: EventVisibilityState;
+    status: AdminEventStatus;
+    title_similarity: number;
+    same_venue: boolean;
+    likely_duplicate: boolean;
+    in_duplicate_group: boolean;
+}
+
+/** Events happening at the same time as this one, likely duplicates first. */
+export async function fetchOverlappingEvents(
+    eventId: string,
+    limit = 10,
+): Promise<{ items: OverlappingEvent[]; total: number }> {
+    const res = await fetch(
+        `${BASE}/admin/events/${encodeURIComponent(eventId)}/overlapping?limit=${limit}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<{ items: OverlappingEvent[]; total: number }>(res, 'Failed to fetch overlapping events');
+}
+
+export type MergeFieldKey = 'title' | 'description' | 'location' | 'time' | 'links' | 'price' | 'picture';
+
+export interface MergeEventPreview {
+    event_id: string;
+    calendar_id: string;
+    status: AdminEventStatus | null;
+    is_submission: boolean;
+    values: Record<MergeFieldKey, unknown>;
+    tag_ids: number[];
+    counts: Record<string, number>;
+}
+
+export interface MergePreview {
+    events: MergeEventPreview[];
+    fields: { key: MergeFieldKey; label: string; identical: boolean }[];
+    affected_users: number;
+}
+
+export interface MergeEventsResult {
+    target_event_id: string;
+    merged_event_ids: string[];
+    moved: Record<string, number>;
+    notified: number;
+}
+
+export async function fetchMergePreview(eventIds: string[]): Promise<MergePreview> {
+    const params = new URLSearchParams();
+    for (const id of eventIds) params.append('ids', id);
+    const res = await fetch(`${BASE}/admin/event-merge/preview?${params}`, { credentials: 'include' });
+    return parseJsonResponse<MergePreview>(res, 'Failed to load the merge preview');
+}
+
+export async function mergeEvents(body: {
+    target_event_id: string;
+    event_ids: string[];
+    fields: Partial<Record<MergeFieldKey, string>>;
+    combine_tags: boolean;
+    combine_links: boolean;
+    note: string | null;
+    notify: boolean;
+}): Promise<MergeEventsResult> {
+    const res = await fetch(`${BASE}/admin/event-merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse<MergeEventsResult>(res, 'Failed to merge events');
 }
 
 export async function fetchAdminEventNotificationStats(

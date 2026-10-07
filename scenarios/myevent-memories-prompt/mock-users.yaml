@@ -1,0 +1,13 @@
+# Mock users for "myevent-memories-prompt".
+#   * mia — Going to both events; already added a memory to Rooftop.
+#   * leo — Going to Rooftop only, no memories.
+users:
+  - email: mia@example.com
+    name: Mia (memories)
+    handle: mia
+  - email: leo@example.com
+    name: Leo (memories)
+    handle: leo
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

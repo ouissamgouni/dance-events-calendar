@@ -137,6 +137,11 @@ async function mockApi(
             return
         }
 
+        if (path.endsWith('/api/suggestions/similar')) {
+            await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+            return
+        }
+
         if (path.endsWith('/api/suggestions/geocode')) {
             await route.fulfill({
                 status: 200,
@@ -209,7 +214,7 @@ async function mockApi(
     })
 }
 
-test('anonymous user keeps the submit wizard open after auth resolves', async ({ page }) => {
+test('anonymous user is asked to sign in before adding an event', async ({ page }) => {
     let resolveAuth!: () => void
     const authPending = new Promise<void>((resolve) => {
         resolveAuth = resolve
@@ -218,19 +223,20 @@ test('anonymous user keeps the submit wizard open after auth resolves', async ({
 
     await page.goto('/')
     await page.getByRole('button', { name: 'Menu' }).click()
-    await page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'Submit Event' }).click()
+    await page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'Add Event' }).click()
 
     await expect(page).toHaveURL(/\/suggest$/)
-    await expect(page.getByRole('heading', { name: 'Suggest an event' })).toBeVisible()
 
     const authResponse = page.waitForResponse((response) => response.url().endsWith('/api/auth/me'))
     resolveAuth()
     expect((await authResponse).status()).toBe(401)
 
     await expect(page).toHaveURL(/\/suggest$/)
-    await expect(page.getByRole('heading', { name: 'Suggest an event' })).toBeVisible()
+    const prompt = page.getByRole('dialog', { name: 'Sign in to add an event' })
+    await expect(prompt).toBeVisible()
+    await expect(prompt.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?next=%2Fsuggest')
 
-    await page.getByRole('dialog', { name: 'Suggest an event' }).getByRole('button', { name: 'Close' }).click()
+    await prompt.getByRole('button', { name: 'Not now' }).click()
     await expect.poll(() => new URL(page.url()).pathname).toBe('/')
     expect(new URL(page.url()).searchParams.has('submit')).toBe(false)
 })
@@ -305,7 +311,8 @@ test('logged-in user submits stepped event with going default on', async ({ page
 
     await page.getByRole('button', { name: 'Submit Event' }).click()
 
-    await expect(page.getByText('Your event is live and under review.')).toBeVisible()
+    await expect(page.getByText('once a curator makes it public', { exact: false })).toBeVisible()
+    await expect.poll(() => suggestionPayload?.share_publicly).toBe(true)
     await expect.poll(() => suggestionPayload?.going).toBe(true)
     await expect.poll(() => suggestionPayload?.going_audience).toBe('friends')
     await expect.poll(() => suggestionPayload?.recurrence_rule).toMatch(/^RRULE:FREQ=WEEKLY/)

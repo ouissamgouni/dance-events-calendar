@@ -1,0 +1,7 @@
+saves:
+  - event_id: suggestion-5e0d0000-0000-4000-8000-000000000002-1
+    email: sean@example.com
+    audience: public
+  - event_id: suggestion-5e0d0000-0000-4000-8000-000000000003-3
+    email: sean@example.com
+    audience: public

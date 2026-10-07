@@ -1,0 +1,57 @@
+# Seeded through the real submit/approve helpers, so occurrence ids are
+# suggestion-{id} for the first date and suggestion-{id}-{n} after it.
+base_week: 0
+suggestions:
+  # Private, never asked to go public.
+  - id: 5e0d0000-0000-4000-8000-0000000000b1
+    submitter_email: olivia@example.com
+    status: private
+    title: Private Lesson with Marco
+    location: Studio Mitte, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Mon 18:00
+    end: w1 Mon 19:00
+    tags: ["dance-style:salsa"]
+
+  # Asked to go public: an open "Go public" change for the whole series.
+  - id: 5e0d0000-0000-4000-8000-0000000000b2
+    submitter_email: olivia@example.com
+    status: pending
+    title: Tuesday Bachata Practica
+    description: Weekly practica, open level.
+    location: Studio Mitte, Torstraße 100, 10119 Berlin
+    latitude: 52.5291
+    longitude: 13.4010
+    start: w1 Tue 19:30
+    end: w1 Tue 22:00
+    recurrence_rule: RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TU;COUNT=4
+    tags: ["dance-style:bachata", "reach:local"]
+
+  # Asked to go public, kept private by a curator (rejected go-public change).
+  - id: 5e0d0000-0000-4000-8000-0000000000b3
+    submitter_email: olivia@example.com
+    status: declined
+    title: Rueda Practice Group
+    location: Volkspark Friedrichshain, 10249 Berlin
+    latitude: 52.5277
+    longitude: 13.4336
+    start: w1 Sun 15:00
+    end: w1 Sun 17:00
+    admin_notes: Private group, not open to everyone.
+    tags: ["dance-style:salsa"]
+
+  # Made public, weekly (series icon; a pending submitter change).
+  - id: 5e0d0000-0000-4000-8000-0000000000b4
+    submitter_email: olivia@example.com
+    status: approved
+    calendar_id: movida-salsa
+    title: Thursday Salsa Social
+    description: The weekly Thursday social.
+    location: Salsa Lounge, Kastanienallee 7, 10435 Berlin
+    latitude: 52.5381
+    longitude: 13.4105
+    start: w1 Thu 21:00
+    end: w1 Thu 23:59
+    recurrence_rule: RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TH;COUNT=4
+    tags: ["dance-style:salsa", "reach:local"]

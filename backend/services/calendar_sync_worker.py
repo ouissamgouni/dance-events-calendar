@@ -14,6 +14,8 @@ from datetime import UTC, datetime
 from sqlmodel import Session, select
 
 from backend.db.models import CachedEvent, CalendarDefaultTag, CalendarSetting
+from backend.services import event_revisions
+from backend.services.event_visibility import REASON_GOOGLE_CALENDAR
 from backend.services.calendar.base import BaseCalendarService
 from backend.services.event_pipeline_processor import (
     CalendarProgress,
@@ -230,8 +232,12 @@ class CalendarSyncWorker:
             for event_id in deleted_event_ids:
                 event = session.get(CachedEvent, event_id)
                 if event and event.deleted_at is None:
-                    event.deleted_at = _utcnow()
-                    session.add(event)
+                    event_revisions.propose_removal(
+                        session,
+                        event,
+                        REASON_GOOGLE_CALENDAR,
+                        source=event_revisions.SOURCE_SYNC,
+                    )
                     deleted += 1
             session.commit()
         return deleted

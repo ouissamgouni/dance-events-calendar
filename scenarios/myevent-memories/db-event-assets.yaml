@@ -1,0 +1,73 @@
+# Seeded memories (files from scenarios/default/event-assets/).
+assets:
+  # P1: one per visibility tier.
+  - {
+      event_id: evt-mem-p1,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-01.jpg,
+      visibility: private,
+      caption: "Just for me",
+    }
+  - {
+      event_id: evt-mem-p1,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-02.jpg,
+      visibility: friends,
+      caption: "Best rueda ever",
+    }
+  - {
+      event_id: evt-mem-p1,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-03.jpg,
+      visibility: attendees,
+      caption: "The whole crowd",
+    }
+  - {
+      event_id: evt-mem-p1,
+      email: ana@example.com,
+      kind: memory,
+      file: memory-04.jpg,
+      visibility: attendees,
+      caption: "Ana's view",
+    }
+  # P2: at the 5-memory limit.
+  - {
+      event_id: evt-mem-p2,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-01.jpg,
+    }
+  - {
+      event_id: evt-mem-p2,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-02.jpg,
+    }
+  - {
+      event_id: evt-mem-p2,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-03.jpg,
+    }
+  - {
+      event_id: evt-mem-p2,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-04.jpg,
+    }
+  - {
+      event_id: evt-mem-p2,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-05.jpg,
+    }
+  # P5: photo with EXIF GPS in the source; the stored copy must have none.
+  - {
+      event_id: evt-mem-p5,
+      email: mia@example.com,
+      kind: memory,
+      file: memory-gps.jpg,
+    }

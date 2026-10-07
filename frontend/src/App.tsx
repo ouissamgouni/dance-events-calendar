@@ -12,6 +12,7 @@ import { RatingAggregatesProvider } from './context/RatingAggregatesContext';
 import { MessageCountsProvider } from './context/MessageCountsContext';
 import { MyRatingsProvider } from './context/MyRatingsContext';
 import { MyPlanCountProvider } from './context/MyPlanCountContext';
+import { EventAssetSummaryProvider } from './context/EventAssetSummaryContext';
 import { PwaInstallProvider } from './context/PwaInstallContext';
 import { QaTestPlanProvider, useQaPinnedWidth } from './components/QaTestPlanPanel';
 import { StatusBar } from './components/StatusBar';
@@ -45,6 +46,8 @@ const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
 const SharedPassportPage = lazy(() => import('./pages/SharedPassportPage'));
 const SharedMyPlanPage = lazy(() => import('./pages/SharedMyPlanPage'));
 const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
+const LegalNotice = lazy(() => import('./pages/LegalNotice'));
 const OnboardingWizard = lazy(() => import('./pages/OnboardingWizard'));
 const ReferralLanding = lazy(() => import('./pages/ReferralLanding'));
 const ForYouPage = lazy(() => import('./pages/ForYouPage'));
@@ -54,6 +57,8 @@ const InvitePage = lazy(() => import('./pages/InvitePage'));
 const NetworkPage = lazy(() => import('./pages/NetworkPage'));
 const FollowingReviewsPage = lazy(() => import('./pages/FollowingReviewsPage'));
 const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
+const MySubmissionsPage = lazy(() => import('./pages/MySubmissionsPage'));
+const HostingPage = lazy(() => import('./pages/HostingPage'));
 const DiscoveryProfilesPage = lazy(() => import('./pages/DiscoveryProfilesPage'));
 const SearchProfileEditorPage = lazy(() => import('./pages/SearchProfileEditorPage'));
 const SectionLayout = lazy(() => import('./components/SectionTabs'));
@@ -79,10 +84,14 @@ interface ModalLocationState {
 function SuggestEventRoute() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { suggestionId, eventId } = useParams();
   const hasBackground = Boolean((location.state as ModalLocationState | null)?.backgroundLocation);
   return (
     <SuggestEventWizard
-      onClose={() => (hasBackground ? navigate(-1) : navigate('/', { replace: true }))}
+      key={suggestionId ?? eventId ?? 'new'}
+      suggestionId={suggestionId}
+      changeEventId={eventId}
+      onClose={() => (hasBackground ? navigate(-1) : navigate(eventId ? `/event/${eventId}` : '/', { replace: true }))}
     />
   );
 }
@@ -122,11 +131,13 @@ export default function App() {
                       <MessageCountsProvider>
                         <MyRatingsProvider>
                           <AttendingEventsProvider>
-                            <PwaInstallProvider>
-                              <QaTestPlanProvider>
-                                <AppShell />
-                              </QaTestPlanProvider>
-                            </PwaInstallProvider>
+                            <EventAssetSummaryProvider>
+                              <PwaInstallProvider>
+                                <QaTestPlanProvider>
+                                  <AppShell />
+                                </QaTestPlanProvider>
+                              </PwaInstallProvider>
+                            </EventAssetSummaryProvider>
                           </AttendingEventsProvider>
                         </MyRatingsProvider>
                       </MessageCountsProvider>
@@ -230,6 +241,8 @@ function AppShell() {
                 <Route path="/event/:eventId/program/edit" element={<ProtectedRoute><AdminEventSchedulePage /></ProtectedRoute>} />
                 <Route path="/event/:eventId/program/export" element={<ProtectedRoute><EventProgramExportPage /></ProtectedRoute>} />
                 <Route path="/event/:eventId/review" element={<EventDetailPage />} />
+                <Route path="/event/:eventId/ticket" element={<EventDetailPage />} />
+                <Route path="/event/:eventId/memories" element={<EventDetailPage />} />
                 <Route path="/event/:eventId/ask" element={<EventDetailPage />} />
                 <Route path="/series/:seriesId" element={<SeriesPage />} />
                 <Route path="/tribe" element={<SectionLayout section="tribe" />}>
@@ -250,6 +263,8 @@ function AppShell() {
                 <Route path="/my-events" element={<MyCalendar />} />
                 <Route path="/passport" element={<ProtectedRoute><PassportPage /></ProtectedRoute>} />
                 <Route path="/reviews" element={<MyReviewsPage />} />
+                <Route path="/me/submissions" element={<MySubmissionsPage />} />
+                <Route path="/hosting" element={<HostingPage />} />
                 <Route path="/saved-searches" element={<DiscoveryProfilesPage />} />
                 <Route path="/saved-searches/new" element={<SearchProfileEditorPage />} />
                 <Route path="/saved-searches/:profileId/edit" element={<SearchProfileEditorPage />} />
@@ -264,6 +279,8 @@ function AppShell() {
                 <Route path="/shared/passport/:token" element={<SharedPassportPage />} />
                 <Route path="/shared/plan/:token" element={<SharedMyPlanPage />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/legal" element={<LegalNotice />} />
                 <Route path="/install" element={<InstallPage />} />
                 <Route path="/invite" element={<InvitePage />} />
                 <Route path="/login" element={<Login />} />
@@ -278,6 +295,8 @@ function AppShell() {
                 />
                 <Route path="/u/:handle" element={<ProfilePage />} />
                 <Route path="/suggest" element={<SuggestEventRoute />} />
+                <Route path="/suggest/:suggestionId/edit" element={<SuggestEventRoute />} />
+                <Route path="/event/:eventId/suggest-change" element={<SuggestEventRoute />} />
                 <Route
                   path="/admin/events/:eventId/schedule"
                   element={
@@ -306,13 +325,23 @@ function AppShell() {
               {backgroundLocation ? (
                 <Routes>
                   <Route path="/suggest" element={<SuggestEventRoute />} />
+                  <Route path="/suggest/:suggestionId/edit" element={<SuggestEventRoute />} />
+                  <Route path="/event/:eventId/suggest-change" element={<SuggestEventRoute />} />
                 </Routes>
               ) : null}
             </Suspense>
             {!isMyEvents && (
               <footer className="py-3 text-center flex items-center justify-center gap-3">
                 <Link to="/privacy" className="text-[11px] text-muted hover:text-ink-soft transition">
-                  Privacy Policy
+                  Privacy
+                </Link>
+                <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
+                <Link to="/terms" className="text-[11px] text-muted hover:text-ink-soft transition">
+                  Terms
+                </Link>
+                <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
+                <Link to="/legal" className="text-[11px] text-muted hover:text-ink-soft transition">
+                  Legal notice
                 </Link>
                 <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
                 <a

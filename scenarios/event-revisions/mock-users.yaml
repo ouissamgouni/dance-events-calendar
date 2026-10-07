@@ -1,0 +1,28 @@
+# event-revisions cast.
+#   Admin    — reviews, applies or discards changes.
+#   Dev User — submitted the approved weekly "Kizomba Thursday".
+#   Sam      — saved ev-sync-live, Going to Kizomba Thursday; event-update
+#              emails ON (in-app + email).
+#   Lee      — saved ev-sync-live; event-update emails OFF (in-app only).
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: dev-user@example.com
+    name: Dev User
+    handle: dev-user
+    account_visibility: public
+
+  - email: sam@example.com
+    name: Sam Lee
+    handle: sam
+    account_visibility: public
+    email_schedule_updates_enabled: true
+
+  - email: lee@example.com
+    name: Lee Park
+    handle: lee
+    account_visibility: public
+    email_schedule_updates_enabled: false

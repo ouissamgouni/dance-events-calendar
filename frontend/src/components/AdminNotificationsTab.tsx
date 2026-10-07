@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchAdminNotificationsLog } from '../api';
-import type { NotificationLogChannel, NotificationLogEntry, NotificationLogType } from '../api';
+import type {
+    NotificationLogChannel,
+    NotificationLogEntry,
+    NotificationLogMode,
+    NotificationLogSource,
+    NotificationLogType,
+} from '../api';
 
 const PAGE_SIZE = 50;
 
@@ -27,6 +33,19 @@ const CHANNEL_LABELS: Record<string, string> = {
 function ChannelBadge({ channel }: { channel: string }) {
     const cls = CHANNEL_BADGE[channel] ?? CHANNEL_BADGE_FALLBACK;
     return <span className={cls}>{CHANNEL_LABELS[channel] ?? channel}</span>;
+}
+
+function formatLatency(seconds: number | null): string | null {
+    if (seconds == null) return null;
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+    return `${Math.round(seconds / 86400)}d`;
+}
+
+function DeliveryCell({ row }: { row: NotificationLogEntry }) {
+    const parts = [row.mode, row.source, formatLatency(row.latency_seconds)].filter(Boolean);
+    return <span className="text-ink-soft whitespace-nowrap">{parts.length ? parts.join(' · ') : '—'}</span>;
 }
 
 /**
@@ -71,6 +90,8 @@ export default function AdminNotificationsTab() {
     const [q, setQ] = useState('');
     const [type, setType] = useState<NotificationLogType | ''>('');
     const [channel, setChannel] = useState<NotificationLogChannel | ''>('');
+    const [mode, setMode] = useState<NotificationLogMode | ''>('');
+    const [source, setSource] = useState<NotificationLogSource | ''>('');
     const [offset, setOffset] = useState(0);
 
     const load = useCallback(async () => {
@@ -80,6 +101,8 @@ export default function AdminNotificationsTab() {
             const res = await fetchAdminNotificationsLog({
                 type: type || undefined,
                 channel: channel || undefined,
+                mode: mode || undefined,
+                source: source || undefined,
                 q: q.trim() || undefined,
                 limit: PAGE_SIZE,
                 offset,
@@ -91,13 +114,13 @@ export default function AdminNotificationsTab() {
         } finally {
             setLoading(false);
         }
-    }, [type, channel, q, offset]);
+    }, [type, channel, mode, source, q, offset]);
 
     useEffect(() => { load(); }, [load]);
 
     // Reset pagination whenever a filter changes — avoids landing on an
     // empty page after narrowing the result set.
-    useEffect(() => { setOffset(0); }, [type, channel]);
+    useEffect(() => { setOffset(0); }, [type, channel, mode, source]);
 
     const fmtDateTime = (iso: string): string => {
         try { return new Date(iso).toLocaleString(); } catch { return iso; }
@@ -162,6 +185,34 @@ export default function AdminNotificationsTab() {
                         <option value="push">Push</option>
                     </select>
                 </label>
+                <label className="flex items-center gap-1.5">
+                    Email mode
+                    <select
+                        value={mode}
+                        onChange={(e) => setMode(e.target.value as NotificationLogMode | '')}
+                        className="border border-line px-2 py-1 text-xs"
+                        aria-label="Filter by email mode"
+                    >
+                        <option value="">Any</option>
+                        <option value="instant">Instant</option>
+                        <option value="digest">Digest</option>
+                    </select>
+                </label>
+                <label className="flex items-center gap-1.5">
+                    Sent by
+                    <select
+                        value={source}
+                        onChange={(e) => setSource(e.target.value as NotificationLogSource | '')}
+                        className="border border-line px-2 py-1 text-xs"
+                        aria-label="Filter by sender"
+                    >
+                        <option value="">Any</option>
+                        <option value="job">Delivery job</option>
+                        <option value="tick">Scheduler tick</option>
+                        <option value="admin">Admin trigger</option>
+                        <option value="request">Request</option>
+                    </select>
+                </label>
             </div>
 
             {error && (
@@ -178,13 +229,14 @@ export default function AdminNotificationsTab() {
                             <th className="px-3 py-2">User</th>
                             <th className="px-3 py-2">Type</th>
                             <th className="px-3 py-2">Channel</th>
+                            <th className="px-3 py-2" title="Email mode · sender · time since the notification was created">Delivery</th>
                             <th className="px-3 py-2">About</th>
                         </tr>
                     </thead>
                     <tbody>
                         {!loading && rows.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-3 py-8 text-center text-ink-soft">
+                                <td colSpan={6} className="px-3 py-8 text-center text-ink-soft">
                                     No notifications match these filters.
                                 </td>
                             </tr>
@@ -202,6 +254,9 @@ export default function AdminNotificationsTab() {
                                 </td>
                                 <td className="px-3 py-2">
                                     <ChannelBadge channel={row.channel} />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <DeliveryCell row={row} />
                                 </td>
                                 <td className="px-3 py-2">
                                     <AboutCell row={row} />

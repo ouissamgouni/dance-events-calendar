@@ -43,6 +43,7 @@ from backend.db.models import (
     UserEventAttendance,
     UserSavedEvent,
 )
+from backend.services import job_queue
 from backend.services.email import (
     send_promo_code_added_email,
     send_promo_code_notification,
@@ -57,6 +58,7 @@ router = APIRouter(tags=["promo-codes"])
 limiter = Limiter(key_func=client_ip)
 
 PROMO_CODE_ADDED = "promo_code_added"
+PROMO_CODE_ADDED_JOB = "promo_code_added"
 
 
 # --- helpers ---
@@ -215,45 +217,49 @@ def _fan_out_saved_event_promo_code(
     return list(recipients)
 
 
-def _send_promo_code_added_notifications(
-    promo_id: UUID, recipient_ids: list[UUID]
-) -> None:
-    """Background task: email/push the users fanned out to by
-    ``_fan_out_saved_event_promo_code``. Own session; stamps
-    ``emailed_at``/``pushed_at`` and records deliveries for channels that
-    actually send, same durability convention as ``reminder_service.py``.
+def _deliver_promo_code_added(promo_id: str) -> None:
+    """Job: email/push the saved-event fan-out of an approved code. Own
+    session; skips channels already stamped so a re-run never re-sends.
     """
     from backend.db.database import get_engine
     from backend.services.push_service import send_push
     from sqlmodel import Session as SyncSession
 
-    if not recipient_ids:
-        return
-    engine = get_engine()
-    with SyncSession(engine) as session:
-        promo = session.get(EventPromoCode, promo_id)
-        if not promo:
+    with SyncSession(get_engine()) as session:
+        promo = session.get(EventPromoCode, UUID(promo_id))
+        if not promo or promo.status != "approved":
             return
         event = session.get(CachedEvent, promo.event_id)
         notifs = session.exec(
             select(Notification)
             .where(Notification.kind == PROMO_CODE_ADDED)
             .where(Notification.event_id == promo.event_id)
-            .where(col(Notification.recipient_user_id).in_(recipient_ids))
+            .where(Notification.context == promo.code)
+            .where(
+                col(Notification.emailed_at).is_(None)
+                | col(Notification.pushed_at).is_(None)
+            )
+            .with_for_update(skip_locked=True, of=Notification)
         ).all()
+        if not notifs:
+            return
         notif_by_user = {n.recipient_user_id: n for n in notifs}
-        users = session.exec(select(User).where(col(User.id).in_(recipient_ids))).all()
+        users = session.exec(
+            select(User).where(col(User.id).in_(list(notif_by_user)))
+        ).all()
         stamp_now = datetime.now(timezone.utc)
         for user in users:
-            notif = notif_by_user.get(user.id)
-            if notif is None:
+            if user.deleted_at is not None:
                 continue
-            if user.email_promo_codes_enabled and send_promo_code_added_email(
-                user, event, promo
+            notif = notif_by_user[user.id]
+            if (
+                notif.emailed_at is None
+                and user.email_promo_codes_enabled
+                and send_promo_code_added_email(user, event, promo)
             ):
                 notif.emailed_at = stamp_now
-                record_delivery(session, notif.id, "email", stamp_now)
-            if user.push_promo_codes_enabled:
+                record_delivery(session, notif.id, "email", stamp_now, source="job")
+            if notif.pushed_at is None and user.push_promo_codes_enabled:
                 delivered = send_push(
                     user.id,
                     title="New promo code",
@@ -263,9 +269,12 @@ def _send_promo_code_added_notifications(
                 )
                 if delivered:
                     notif.pushed_at = stamp_now
-                    record_delivery(session, notif.id, "push", stamp_now)
+                    record_delivery(session, notif.id, "push", stamp_now, source="job")
             session.add(notif)
         session.commit()
+
+
+job_queue.register(PROMO_CODE_ADDED_JOB, _deliver_promo_code_added)
 
 
 # --- Public endpoints ---
@@ -536,7 +545,6 @@ def admin_get_promo_code(
 )
 def admin_approve_promo_code(
     promo_id: UUID,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     admin: dict = Depends(require_admin),
 ):
@@ -556,9 +564,7 @@ def admin_approve_promo_code(
     session.commit()
     session.refresh(promo)
     if recipient_ids:
-        background_tasks.add_task(
-            _send_promo_code_added_notifications, promo.id, recipient_ids
-        )
+        job_queue.enqueue(PROMO_CODE_ADDED_JOB, str(promo.id))
     submitter = session.get(User, promo.submitter_user_id)
     event = session.get(CachedEvent, promo.event_id)
     return _to_admin_out(

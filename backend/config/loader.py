@@ -180,13 +180,36 @@ def get_notification_scheduler_enabled() -> bool:
     return val.strip().lower() in ("true", "1")
 
 
-def get_notification_interval_minutes() -> int:
-    """How often the notification dispatch loop runs (minutes)."""
-    raw = os.getenv("NOTIFICATION_INTERVAL_MINUTES", "15")
+def get_scheduler_tick_minutes() -> int:
+    """How often the background scheduler loop wakes up (minutes)."""
+    raw = os.getenv("SCHEDULER_TICK_MINUTES", "15")
     try:
         return max(1, int(raw))
     except (TypeError, ValueError):
         return 15
+
+
+# Debounce + retry backoff (60+120+240s) must stay well under the 1-hour tick.
+_MAX_NOTIFICATION_DEBOUNCE_SECONDS = 300.0
+
+
+def get_notification_debounce_seconds() -> float:
+    """Delay before a request-triggered per-recipient delivery job runs."""
+    raw = os.getenv("NOTIFICATION_DEBOUNCE_SECONDS", "60")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 60.0
+    return min(max(0.0, value), _MAX_NOTIFICATION_DEBOUNCE_SECONDS)
+
+
+def get_milestone_sweep_lookback_days() -> int:
+    """Only users who attended within this window are scanned by the milestone safety net."""
+    raw = os.getenv("MILESTONE_SWEEP_LOOKBACK_DAYS", "30")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 30
 
 
 def get_event_reminders_enabled() -> bool:

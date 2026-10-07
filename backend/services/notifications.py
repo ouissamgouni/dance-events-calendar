@@ -71,6 +71,23 @@ EVENT_MESSAGE_REPLY = "event_message_reply"
 EVENT_MESSAGE_REPORTED = "event_message_reported"
 PLANNED_SESSION_CHANGED = "planned_session_changed"
 PLAN_SESSION_ADDED = "plan_session_added"
+# Outcomes of a user's own event submission, sent to the submitter.
+SUGGESTION_APPROVED = "suggestion_approved"
+# Kept private: the event stays the submitter's.
+SUGGESTION_DECLINED = "suggestion_declined"
+# Blocked: removed for everyone, including the submitter.
+SUGGESTION_REJECTED = "suggestion_rejected"
+SUGGESTION_CHANGE_APPLIED = "suggestion_change_applied"
+SUGGESTION_CHANGE_DISCARDED = "suggestion_change_discarded"
+# Outcome of a change a user suggested to someone else's public event.
+EVENT_CHANGE_APPLIED = "event_change_applied"
+EVENT_CHANGE_DECLINED = "event_change_declined"
+EVENT_CHANGE_REVERTED = "event_change_reverted"
+# An event someone saved or is going to was removed.
+EVENT_REMOVED = "event_removed"
+EVENT_CANCELLED = "event_cancelled"
+# An admin made the recipient an event's organizer (or a verified organizer).
+ORGANIZER_ASSIGNED = "organizer_assigned"
 
 
 def reconcile_plan_activity_notifications(
@@ -1061,3 +1078,41 @@ def notify_message_reported(
             description=None,
         )
     return len(recipients)
+
+
+def notify_submitter(
+    session: Session,
+    recipient: User,
+    kind: str,
+    *,
+    subject_key: str,
+    actor: User | None = None,
+    event_id: str | None = None,
+    context: str | None = None,
+    description: str | None = None,
+) -> Notification | None:
+    """Tell a submitter what happened to their suggestion. Idempotent."""
+    actor_id = actor.id if actor is not None else recipient.id
+    duplicate = session.exec(
+        select(Notification.id).where(
+            Notification.recipient_user_id == recipient.id,
+            Notification.kind == kind,
+            Notification.actor_user_id == actor_id,
+            Notification.subject_key == subject_key,
+        )
+    ).first()
+    if duplicate is not None:
+        return None
+    notification = Notification(
+        recipient_user_id=recipient.id,
+        actor_user_id=actor_id,
+        kind=kind,
+        event_id=event_id,
+        subject_key=subject_key,
+        context=context,
+        description=(description or None) and description[:255],
+    )
+    session.add(notification)
+    session.flush()
+    record_delivery(session, notification.id, "app")
+    return notification

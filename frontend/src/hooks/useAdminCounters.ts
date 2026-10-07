@@ -14,10 +14,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { fetchAdminOrganizerClaims, fetchAdminPromoCodes, fetchAdminRatings, fetchAdminTagSuggestionCount, fetchDuplicateGroups, fetchEventFilterOptions, fetchSeriesGroups } from '../api';
+import { fetchAdminChanges, fetchAdminOrganizerClaims, fetchAdminPromoCodes, fetchAdminRatings, fetchAdminTagSuggestionCount, fetchDuplicateGroups, fetchEventFilterOptions, fetchSeriesGroups } from '../api';
 
 export interface AdminCounters {
-    pendingReview: number;
+    /** Open new-event and go-public changes. */
+    reviewNew: number;
+    /** Open edits, cancellations and removals. */
+    reviewEdits: number;
     ungeolocated: number;
     tagSuggestions: number;
     feedbackPending: number;
@@ -28,7 +31,8 @@ export interface AdminCounters {
 }
 
 const ZERO: AdminCounters = {
-    pendingReview: 0,
+    reviewNew: 0,
+    reviewEdits: 0,
     ungeolocated: 0,
     tagSuggestions: 0,
     feedbackPending: 0,
@@ -57,14 +61,24 @@ export function useAdminCounters(): { counters: AdminCounters; refresh: () => vo
         // Each call is fire-and-forget; failures keep the last known value
         // rather than zeroing out (avoids the badge flickering to 0 on a
         // transient network blip).
-        fetchEventFilterOptions({})
+        fetchEventFilterOptions({ audience: ['public', 'private'] })
             .then((opts) => {
                 setCounters((prev) => ({
                     ...prev,
-                    pendingReview:
-                        opts.statuses.find((s) => s.value === 'pending')?.count ?? 0,
                     ungeolocated:
                         opts.geo_statuses.find((s) => s.value === 'ungeolocated')?.count ?? 0,
+                }));
+            })
+            .catch(() => undefined);
+
+        fetchAdminChanges({ limit: 1 })
+            .then((res) => {
+                const count = (kinds: string[]) =>
+                    res.kinds.filter((k) => kinds.includes(k.value)).reduce((sum, k) => sum + k.count, 0);
+                setCounters((prev) => ({
+                    ...prev,
+                    reviewNew: count(['create', 'go_public']),
+                    reviewEdits: count(['edit', 'cancel', 'remove']),
                 }));
             })
             .catch(() => undefined);
