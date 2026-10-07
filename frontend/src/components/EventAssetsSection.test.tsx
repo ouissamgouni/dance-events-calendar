@@ -76,7 +76,7 @@ function renderSection(data: EventAssets, start = '2099-01-01T20:00:00Z', isPast
             return HttpResponse.json(data);
         }),
     );
-    const flags = { ...defaultFlags, eventAssetsEnabled: true };
+    const flags = { ...defaultFlags, eventTicketsEnabled: true, eventMemoriesEnabled: true };
     return renderWithProviders(
         <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
             <EventAssetsSection event={event(start)} isPast={isPast} />

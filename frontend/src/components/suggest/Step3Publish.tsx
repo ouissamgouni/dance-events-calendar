@@ -10,7 +10,6 @@ import {
     inputCls,
     isLinkFilled,
     scrollIntoViewOnFocus,
-    sectionLabelCls,
     type GoingAudience,
     type PatchState,
     type SuggestFormState,

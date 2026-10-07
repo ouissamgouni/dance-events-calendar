@@ -37,7 +37,7 @@ const TILE = 'relative flex h-24 w-24 shrink-0 items-center justify-center overf
 
 export default function EventAssetsSection({ event, isPast }: Props) {
     const { user } = useAuth();
-    const { eventAssetsEnabled } = useFeatureFlags();
+    const { eventTicketsEnabled, eventMemoriesEnabled } = useFeatureFlags();
     const [data, setData] = useState<EventAssets | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -49,7 +49,7 @@ export default function EventAssetsSection({ event, isPast }: Props) {
     const ticketInput = useRef<HTMLInputElement>(null);
     const memoryInput = useRef<HTMLInputElement>(null);
 
-    const enabled = Boolean(user) && eventAssetsEnabled;
+    const enabled = Boolean(user) && (eventTicketsEnabled || eventMemoriesEnabled);
 
     const load = useCallback(() => {
         if (!enabled) return;
@@ -88,9 +88,9 @@ export default function EventAssetsSection({ event, isPast }: Props) {
 
     const tickets = data.assets.filter((a) => a.is_owner && a.kind !== 'memory');
     const memories = data.assets.filter((a) => a.kind === 'memory');
-    const showTickets = data.is_going && (!isPast || tickets.length > 0);
+    const showTickets = eventTicketsEnabled && data.is_going && (!isPast || tickets.length > 0);
     // can_add_memory already implies the event has started.
-    const showMemories = memories.length > 0 || data.can_add_memory;
+    const showMemories = eventMemoriesEnabled && (memories.length > 0 || data.can_add_memory);
     if (!showTickets && !showMemories) return null;
 
     const runUpload = async (files: File[], kind: UploadKind) => {
