@@ -1,5 +1,4 @@
 import { useRef } from 'react';
-import { Link } from 'react-router-dom';
 import type { PassportMilestone } from '../types';
 import ScrollDotsIndicator from './ScrollDots';
 import SectionHeading from './SectionHeading';
@@ -7,9 +6,10 @@ import { useScrollDots } from '../hooks/useScrollDots';
 
 interface MilestoneCarouselProps {
     milestones: PassportMilestone[];
+    onSelectCategory?: (category: string) => void;
 }
 
-export default function MilestoneCarousel({ milestones }: MilestoneCarouselProps) {
+export default function MilestoneCarousel({ milestones, onSelectCategory }: MilestoneCarouselProps) {
     const scrollerRef = useRef<HTMLDivElement>(null);
     const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [milestones.length]);
 
@@ -26,10 +26,11 @@ export default function MilestoneCarousel({ milestones }: MilestoneCarouselProps
                 className="flex overflow-x-auto snap-x snap-mandatory gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
                 {milestones.map((m) => (
-                    <Link
+                    <button
                         key={m.key}
-                        to="/passport"
-                        className="w-full shrink-0 snap-start flex h-28 items-center gap-3 rounded-card border border-card-line bg-surface p-4 shadow-sm transition hover:border-action focus:outline-none focus:ring-2 focus:ring-action"
+                        type="button"
+                        onClick={() => onSelectCategory?.(m.category)}
+                        className="w-full shrink-0 snap-start flex h-28 items-center gap-3 rounded-card border border-card-line bg-surface p-4 shadow-sm transition text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-action"
                     >
                         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-line bg-surface/70 text-3xl" aria-hidden="true">{m.icon || '🏆'}</span>
                         <span className="min-w-0 flex-1">
@@ -44,7 +45,7 @@ export default function MilestoneCarousel({ milestones }: MilestoneCarouselProps
                                 />
                             </span>
                         </span>
-                    </Link>
+                    </button>
                 ))}
             </div>
             <ScrollDotsIndicator count={dotCount} activeIndex={activeIndex} onSelect={scrollToIndex} className="mt-2" />

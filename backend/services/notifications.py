@@ -544,10 +544,12 @@ def fan_out_review(
     event_id: str,
     *,
     anonymous: bool = False,
+    past_edition: bool = False,
 ) -> int:
     """Notify subscribers that ``actor`` reviewed ``event_id``.
 
-    Reviews only exist on past events, so the past-event guard is skipped.
+    Reviews only exist on started events (or upcoming ones, for an earlier
+    edition), so the past-event guard is skipped.
     Anonymous reviews never fan out because even a masked activity row can
     correlate the review with its author through notification metadata.
     """
@@ -558,6 +560,7 @@ def fan_out_review(
         actor,
         event_id,
         SUBSCRIPTION_REVIEW,
+        context="past_edition" if past_edition else None,
         skip_past_guard=True,
     )
 

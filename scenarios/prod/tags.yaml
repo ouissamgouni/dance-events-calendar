@@ -10,13 +10,53 @@ tag_groups:
         label: Salsa
         is_hero_filter: true
         hero_ordinal: 1
-        synonyms: ["salsa on1", "salsa on2", "linea", "línea", "la"]
-      - slug: cuban
-        label: Cuban (Casino)
-        synonyms: ["cubana", "salsa cubana", "casino", "rueda de casino"]
+      - slug: salsa-on1
+        label: Salsa On1 (LA)
+        synonyms: ["salsa on1", "on1", "la style", "linea", "línea"]
       - slug: mambo
-        label: Mambo (On2)
-        synonyms: ["ny style", "new york style", "on2"]
+        label: Salsa On2 (Mambo)
+        synonyms:
+          [
+            "salsa on2",
+            "on2",
+            "mambo",
+            "salsa mambo",
+            "ny style",
+            "new york style",
+          ]
+      - slug: cuban
+        label: Cuban Salsa (Casino)
+        synonyms:
+          [
+            "cubana",
+            "salsa cubana",
+            "cuban salsa",
+            "casino",
+            "rueda de casino",
+            "timba",
+          ]
+      - slug: son
+        label: Son
+        synonyms: ["son cubano"]
+      - slug: rueda
+        label: Rueda
+        synonyms: ["rueda de casino"]
+      - slug: afro-cuban
+        label: Afro-Cuban
+        synonyms:
+          [
+            "afro cubano",
+            "afro-cubano",
+            "rumba",
+            "rumba cubana",
+            "guaguancó",
+            "guaguanco",
+            "orishas",
+            "orisha",
+          ]
+      - slug: cha-cha
+        label: Cha-Cha
+        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
       - slug: bachata
         label: Bachata
         is_hero_filter: true
@@ -38,16 +78,16 @@ tag_groups:
         synonyms: ["kompa", "compas"]
       - slug: zouk
         label: Zouk
-        synonyms: ["brazilian zouk", "lambazouk"]
-      - slug: rueda
-        label: Rueda
-        synonyms: ["rueda de casino"]
-      - slug: cha-cha
-        label: Cha-Cha
-        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
-      - slug: son
-        label: Son
-        synonyms: ["son cubano"]
+        synonyms: ["brazilian zouk", "lambazouk", "lambada"]
+      - slug: argentine-tango
+        label: Argentine Tango
+        synonyms: ["tango", "tango argentino", "milonga"]
+      - slug: west-coast-swing
+        label: West Coast Swing
+        synonyms: ["wcs"]
+      - slug: lindy-hop
+        label: Lindy Hop
+        synonyms: ["lindy", "lindyhop"]
 
   - slug: format
     label: Format
@@ -132,10 +172,6 @@ tag_groups:
     allow_multiple: true
     color: "#f422b8"
     tags:
-      - slug: ogouni-going
-        label: OGoing !
-        is_hero_filter: true
-        hero_ordinal: 0
       - slug: live-band
         label: Live band
         ordinal: 1
@@ -337,7 +373,6 @@ tag_groups:
       - { slug: international-crowd, label: International crowd }
       - { slug: mostly-locals, label: Mostly locals }
       - { slug: small-event, label: Small event, enabled: false }
-      - { slug: large-event, label: Large event, enabled: false }
       - {
           slug: good-gender-balance,
           label: Good lead/follow balance,
@@ -386,18 +421,6 @@ tag_groups:
       - { slug: poor-lighting, label: Poor lighting, polarity: negative }
       - { slug: poor-parking, label: Hard to park, polarity: negative }
       - { slug: hard-to-find, label: Hard to find, polarity: negative }
-      - {
-          slug: poor-food,
-          label: Poor food,
-          polarity: negative,
-          enabled: false,
-        }
-      - {
-          slug: poor-drinks,
-          label: Poor drinks,
-          polarity: negative,
-          enabled: false,
-        }
       - { slug: dirty-bathrooms, label: Dirty facilities, polarity: negative }
 
   - slug: organization

@@ -6,6 +6,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { SyncJobRecord } from '../api';
 import { fetchSyncJobs } from '../api';
+import useMediaQuery from '../hooks/useMediaQuery';
+import AdminLoadMore from './AdminLoadMore';
 import JobDetailDrawer from './JobDetailDrawer';
 
 const STATUS_DOT: Record<string, string> = {
@@ -70,17 +72,7 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [page, setPage] = useState(0);
     const [openJobId, setOpenJobId] = useState<string | null>(null);
-    const [isMobile, setIsMobile] = useState(
-        () => typeof window !== 'undefined' && window.innerWidth < 640,
-    );
-
-    useEffect(() => {
-        const mq = window.matchMedia('(max-width: 639px)');
-        const handler = () => setIsMobile(mq.matches);
-        handler();
-        mq.addEventListener('change', handler);
-        return () => mq.removeEventListener('change', handler);
-    }, []);
+    const isMobile = useMediaQuery('(max-width: 639px)');
 
     const pageSize = isMobile ? MOBILE_PAGE_SIZE : PAGE_SIZE;
 
@@ -93,7 +85,10 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
     const refresh = async () => {
         setLoading(true);
         try {
-            const res = await fetchSyncJobs(pageSize, page * pageSize);
+            // Mobile grows the list in place (load more), so it refetches every loaded row.
+            const res = isMobile
+                ? await fetchSyncJobs(Math.min((page + 1) * pageSize, 200), 0)
+                : await fetchSyncJobs(pageSize, page * pageSize);
             setJobs(res.items);
             setTotal(res.total);
             setError(null);
@@ -161,94 +156,128 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
 
             {error && <div className="px-4 py-2 text-xs text-danger">{error}</div>}
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                    <thead>
-                        <tr className="text-left text-[10px] uppercase tracking-wide text-muted border-b border-card-line bg-canvas">
-                            <th className="px-3 py-2 font-medium">Job</th>
-                            <th className="px-3 py-2 font-medium">Status</th>
-                            <th className="px-3 py-2 font-medium">Started</th>
-                            <th className="px-3 py-2 font-medium">Duration</th>
-                            <th className="px-3 py-2 font-medium">Mode</th>
-                            <th className="px-3 py-2 font-medium text-right">Calendars</th>
-                            <th className="px-3 py-2 font-medium text-right">New</th>
-                            <th className="px-3 py-2 font-medium text-right">Issues</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filtered.length === 0 && !loading && (
-                            <tr>
-                                <td colSpan={8} className="px-3 py-6 text-center text-xs text-muted">
-                                    No jobs found.
-                                </td>
-                            </tr>
-                        )}
+            {isMobile ? (
+                <>
+                    {filtered.length === 0 && !loading && (
+                        <p className="px-4 py-6 text-center text-sm text-muted">No jobs found.</p>
+                    )}
+                    <ul className="divide-y divide-line">
                         {filtered.map((j) => {
-                            // Only count actionable issues (geocoding warnings +
-                            // persistence/exception failures). Link/price stage
-                            // failures are no-ops (event simply had no link /
-                            // no parseable price text) and should not inflate
-                            // the Issues counter.
-                            const stageTotals = j.stage_totals ?? {};
-                            const issues =
-                                (stageTotals.geocoding?.failed ?? 0) +
-                                (stageTotals.persistence?.failed ?? 0);
+                            const issues = (j.stage_totals?.geocoding?.failed ?? 0) + (j.stage_totals?.persistence?.failed ?? 0);
                             return (
-                                <tr
-                                    key={j.job_id}
-                                    onClick={() => setOpenJobId(j.job_id)}
-                                    className="cursor-pointer hover:bg-canvas border-b border-gray-50"
-                                >
-                                    <td className="px-3 py-2 font-mono text-[10px] text-ink-soft" title={j.job_id}>
-                                        {j.job_id.slice(0, 8)}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                        <div className="flex items-center gap-2">
-                                            <span
-                                                className={`inline-block w-2 h-2 rounded-full ${STATUS_DOT[j.status] ?? 'bg-gray-300'
-                                                    }`}
-                                            />
-                                            <span
-                                                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_BADGE[j.status] ?? 'bg-gray-100 text-ink-soft'
-                                                    }`}
-                                            >
-                                                {j.status}
-                                            </span>
+                                <li key={j.job_id}>
+                                    <button type="button" onClick={() => setOpenJobId(j.job_id)} className="flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-canvas">
+                                        <span className="flex items-center gap-2">
+                                            <span className={`px-1.5 py-0.5 text-xs font-medium ${STATUS_BADGE[j.status] ?? 'bg-gray-100 text-ink-soft'}`}>{j.status}</span>
                                             {j.is_stale && (
-                                                <span
-                                                    className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200"
-                                                    title="No heartbeat received — worker likely crashed"
-                                                >
-                                                    stale
-                                                </span>
+                                                <span className="border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-700">stale</span>
                                             )}
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2 text-ink whitespace-nowrap">
-                                        {formatTime(j.started_at)}
-                                    </td>
-                                    <td className="px-3 py-2 text-ink-soft">{durationLabel(j)}</td>
-                                    <td className="px-3 py-2 text-ink-soft capitalize">{j.mode}</td>
-                                    <td className="px-3 py-2 text-right text-ink-soft">
-                                        {j.totals.calendars_synced}
-                                    </td>
-                                    <td className="px-3 py-2 text-right text-ink-soft">
-                                        {j.totals.events_upserted}
-                                    </td>
-                                    <td
-                                        className={`px-3 py-2 text-right ${issues > 0 ? 'text-amber-600' : 'text-muted'
-                                            }`}
-                                    >
-                                        {issues}
-                                    </td>
-                                </tr>
+                                            <span className="ml-auto text-xs text-ink-soft">{durationLabel(j)}</span>
+                                        </span>
+                                        <span className="text-sm text-ink">
+                                            {formatTime(j.started_at)} <span className="capitalize text-ink-soft">· {j.mode}</span>
+                                        </span>
+                                        <span className="text-xs text-ink-soft">
+                                            {j.totals.calendars_synced} calendars · {j.totals.events_upserted} new ·{' '}
+                                            <span className={issues > 0 ? 'text-amber-600' : ''}>{issues} issues</span>
+                                        </span>
+                                    </button>
+                                </li>
                             );
                         })}
-                    </tbody>
-                </table>
-            </div>
+                    </ul>
+                    <AdminLoadMore shown={jobs.length} total={total} loading={loading} onLoadMore={() => setPage((p) => p + 1)} />
+                </>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="text-left text-[10px] uppercase tracking-wide text-muted border-b border-card-line bg-canvas">
+                                <th className="px-3 py-2 font-medium">Job</th>
+                                <th className="px-3 py-2 font-medium">Status</th>
+                                <th className="px-3 py-2 font-medium">Started</th>
+                                <th className="px-3 py-2 font-medium">Duration</th>
+                                <th className="px-3 py-2 font-medium">Mode</th>
+                                <th className="px-3 py-2 font-medium text-right">Calendars</th>
+                                <th className="px-3 py-2 font-medium text-right">New</th>
+                                <th className="px-3 py-2 font-medium text-right">Issues</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.length === 0 && !loading && (
+                                <tr>
+                                    <td colSpan={8} className="px-3 py-6 text-center text-xs text-muted">
+                                        No jobs found.
+                                    </td>
+                                </tr>
+                            )}
+                            {filtered.map((j) => {
+                                // Only count actionable issues (geocoding warnings +
+                                // persistence/exception failures). Link/price stage
+                                // failures are no-ops (event simply had no link /
+                                // no parseable price text) and should not inflate
+                                // the Issues counter.
+                                const stageTotals = j.stage_totals ?? {};
+                                const issues =
+                                    (stageTotals.geocoding?.failed ?? 0) +
+                                    (stageTotals.persistence?.failed ?? 0);
+                                return (
+                                    <tr
+                                        key={j.job_id}
+                                        onClick={() => setOpenJobId(j.job_id)}
+                                        className="cursor-pointer hover:bg-canvas border-b border-gray-50"
+                                    >
+                                        <td className="px-3 py-2 font-mono text-[10px] text-ink-soft" title={j.job_id}>
+                                            {j.job_id.slice(0, 8)}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <span
+                                                    className={`inline-block w-2 h-2 rounded-full ${STATUS_DOT[j.status] ?? 'bg-gray-300'
+                                                        }`}
+                                                />
+                                                <span
+                                                    className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_BADGE[j.status] ?? 'bg-gray-100 text-ink-soft'
+                                                        }`}
+                                                >
+                                                    {j.status}
+                                                </span>
+                                                {j.is_stale && (
+                                                    <span
+                                                        className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200"
+                                                        title="No heartbeat received — worker likely crashed"
+                                                    >
+                                                        stale
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 text-ink whitespace-nowrap">
+                                            {formatTime(j.started_at)}
+                                        </td>
+                                        <td className="px-3 py-2 text-ink-soft">{durationLabel(j)}</td>
+                                        <td className="px-3 py-2 text-ink-soft capitalize">{j.mode}</td>
+                                        <td className="px-3 py-2 text-right text-ink-soft">
+                                            {j.totals.calendars_synced}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-ink-soft">
+                                            {j.totals.events_upserted}
+                                        </td>
+                                        <td
+                                            className={`px-3 py-2 text-right ${issues > 0 ? 'text-amber-600' : 'text-muted'
+                                                }`}
+                                        >
+                                            {issues}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
-            {totalPages > 1 && (
+            {!isMobile && totalPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-2 border-t border-card-line text-xs">
                     <button
                         onClick={() => setPage((p) => Math.max(0, p - 1))}

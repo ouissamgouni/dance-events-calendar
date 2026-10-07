@@ -99,8 +99,9 @@ events:
     title: Tuesday Salsa Night — Upcoming
     description: |
       Upcoming occurrence of the weekly Tuesday Salsa Night. Not yet happened,
-      so it cannot be reviewed — the review section shows the series' Typical
-      Experience instead and the Rate button is disabled.
+      so it can't be reviewed for itself — but anyone who went to an earlier
+      edition can review that one from here ("Review past edition" behind ••• /
+      at the top of the Reviews tab, with an edition picker).
       All levels welcome; smooth-soled shoes recommended.
     location: Milonga Hall, Lisbon, Portugal
     latitude: 38.7223
@@ -153,6 +154,45 @@ events:
       - format:social
       - dance-style:salsa
       - reach:local
+  - id: evt-rating-upcoming-solo
+    calendar_id: rating-cal-001
+    title: Zouk Summer Congress — Next Edition
+    description: |
+      Upcoming yearly congress with NO previous edition in the app and no
+      series. Regulars from past years can still review an earlier edition
+      from here; the review is stored on this event as "past_edition".
+      All levels welcome.
+    location: Congress Center, Porto, Portugal
+    latitude: 41.1579
+    longitude: -8.6291
+    start: w3 Fri 18:00
+    end: w3 Sun 23:00
+    price_is_free: false
+    price_min: 90
+    price_currency: EUR
+    tags:
+      - format:festival
+      - dance-style:zouk
+      - reach:international
+  - id: evt-rating-ongoing
+    calendar_id: rating-cal-001
+    title: Kizomba Weekend — Happening Now
+    description: |
+      Multi-day event that has started but not ended yet. Reviews for this
+      edition are already open (no need to wait for the end).
+      All levels welcome.
+    location: Dance Hub, Lyon, France
+    latitude: 45.764
+    longitude: 4.8357
+    start: now-30h
+    end: now+30h
+    price_is_free: false
+    price_min: 45
+    price_currency: EUR
+    tags:
+      - format:festival
+      - dance-style:kizomba
+      - reach:regional
 tag_suggestions:
   - event_id: evt-rating-001
     free_text: live-band
@@ -322,6 +362,38 @@ ratings:
     aspect_scores:
       music: 4
       venue-quality: 3
+  # --- Earlier-edition reviews (scope: past_edition) ---
+  # Written from an upcoming edition about an earlier one, so they never
+  # count as that edition's own reviews.
+  - event_id: evt-rating-series-3
+    email: chloe@example.com
+    scope: past_edition
+    overall_sentiment: amazing
+    comment: Went every Tuesday last spring — the best weekly social in town.
+    aspect_scores:
+      atmosphere: 5
+    aspect_tags:
+      - atmosphere:friendly-crowd
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-upcoming-solo
+    email: bruno@example.com
+    scope: past_edition
+    overall_sentiment: great
+    comment: Last year's edition had amazing workshops, parties ran late.
+    aspect_scores:
+      music: 4
+    aspect_tags:
+      - music:great-dj
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-002
+    email: chloe@example.com
+    scope: past_edition
+    overall_sentiment: great
+    comment: Took this workshop last season — clear teaching, worth it.
+    comment_status: approved
+    status: approved
     aspect_tags:
       - music:great-dj
       - venue-quality:crowded

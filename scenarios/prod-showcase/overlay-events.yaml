@@ -2021,18 +2021,22 @@ assets:
     kind: memory
     dir: memories/elena/athens-bachata-weekender-previous
     visibility: friends
+  - event_id: seville-salsa-weekender
+    email: elena.moreau@joinmovida.com
+    kind: ticket
+    dir: tickets/elena/seville-salsa-weekender
   - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
     email: elena.moreau@joinmovida.com
     kind: ticket
     dir: tickets/elena/71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-  - event_id: 71im6or5cgr38bb1cko3ib9k6kqj6b9ocdhjgbb260omco9n74q3adj26o
+  - event_id: brussels-latin-weekender
     email: elena.moreau@joinmovida.com
     kind: ticket
-    dir: tickets/elena/71im6or5cgr38bb1cko3ib9k6kqj6b9ocdhjgbb260omco9n74q3adj26o
-  - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    dir: tickets/elena/brussels-latin-weekender
+  - event_id: athens-bachata-weekender
     email: elena.moreau@joinmovida.com
     kind: ticket
-    dir: tickets/elena/ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    dir: tickets/elena/athens-bachata-weekender
   - event_id: london-salsa-sessions
     email: elena.moreau@joinmovida.com
     kind: ticket

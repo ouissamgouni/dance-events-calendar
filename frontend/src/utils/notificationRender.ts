@@ -27,7 +27,7 @@ export function getNotificationVerb(item: NotificationItem): string {
         case 'plan_session_added':
             return `added ${item.context || 'a session'} to their plan for`;
         case 'subscription_review':
-            return 'reviewed';
+            return item.context === 'past_edition' ? 'reviewed an earlier edition of' : 'reviewed';
         case 'subscription_milestone':
             return item.context
                 ? `reached a milestone: ${item.context}`

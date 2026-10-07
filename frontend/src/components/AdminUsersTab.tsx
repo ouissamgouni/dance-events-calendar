@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronRight, SlidersHorizontal } from 'lucide-react';
 import useBackToClose from '../hooks/useBackToClose';
+import useMediaQuery from '../hooks/useMediaQuery';
+import BottomSheet from './BottomSheet';
+import AdminLoadMore from './AdminLoadMore';
 import {
     fetchAdminUsers,
     adminDeleteUser,
@@ -19,6 +23,8 @@ import { FeatureStatusCell, PushSubscriptionCell } from './NotificationStatusBad
 import { parseUserAgent } from '../utils/userAgent';
 
 const PAGE_SIZE = 50;
+
+type UserActionKey = 'organizer' | 'managed' | 'label' | 'push' | 'install' | 'install-email' | 'onboarding' | 'merge' | 'unblock' | 'block' | 'delete';
 
 type AdminUserSortField =
     | 'created_at'
@@ -61,8 +67,13 @@ export default function AdminUsersTab() {
     const [mergeTarget, setMergeTarget] = useState<AdminUserRow | null>(null);
     const [organizerTarget, setOrganizerTarget] = useState<AdminUserRow | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+    const isMobile = useMediaQuery('(max-width: 639px)');
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [actionRow, setActionRow] = useState<AdminUserRow | null>(null);
+    // Mobile appends pages; reloads refetch everything already loaded.
+    const loadedRef = useRef(0);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (fresh = false) => {
         setLoading(true);
         setError(null);
         try {
@@ -72,19 +83,44 @@ export default function AdminUsersTab() {
                 verifiedOnly,
                 sortBy,
                 sortDir,
-                limit: PAGE_SIZE,
-                offset,
+                limit: isMobile ? (fresh ? PAGE_SIZE : Math.min(Math.max(loadedRef.current, PAGE_SIZE), 200)) : PAGE_SIZE,
+                offset: isMobile ? 0 : offset,
             });
             setRows(res.items);
+            loadedRef.current = res.items.length;
             setTotal(res.total);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to load users');
         } finally {
             setLoading(false);
         }
-    }, [q, includeDeleted, verifiedOnly, sortBy, sortDir, offset]);
+    }, [q, includeDeleted, verifiedOnly, sortBy, sortDir, offset, isMobile]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => { load(true); }, [load]);
+
+    const loadMore = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchAdminUsers({
+                q: q.trim() || undefined,
+                includeDeleted,
+                verifiedOnly,
+                sortBy,
+                sortDir,
+                limit: PAGE_SIZE,
+                offset: loadedRef.current,
+            });
+            const seen = new Set(rows.map((r) => r.user_id));
+            const next = [...rows, ...res.items.filter((r) => !seen.has(r.user_id))];
+            setRows(next);
+            loadedRef.current = next.length;
+            setTotal(res.total);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to load users');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Reset pagination whenever a filter or sort changes — avoids landing
     // on an empty page after narrowing/reordering the result set.
@@ -277,6 +313,21 @@ export default function AdminUsersTab() {
         return new Date(iso).toLocaleDateString();
     };
 
+    const runUserAction = (key: UserActionKey, row: AdminUserRow) => {
+        setActionRow(null);
+        if (key === 'organizer') setOrganizerTarget(row);
+        else if (key === 'managed') void onToggleManaged(row);
+        else if (key === 'label') void onEditManagedLabel(row);
+        else if (key === 'push') void onToggleForceEnablePush(row);
+        else if (key === 'install') void onToggleForceInstall(row);
+        else if (key === 'install-email') void onSendInstallEmail(row);
+        else if (key === 'onboarding') void onResetOnboarding(row);
+        else if (key === 'merge') setMergeTarget(row);
+        else if (key === 'unblock') setUnblockTarget(row);
+        else if (key === 'block') setBlockPrompt(row);
+        else void onDelete(row);
+    };
+
     const sortIndicator = (field: AdminUserSortField) => {
         if (sortBy !== field) return null;
         return <span aria-hidden>{sortDir === 'asc' ? '▲' : '▼'}</span>;
@@ -305,7 +356,7 @@ export default function AdminUsersTab() {
                 <span className="text-xs text-ink-soft">
                     {loading ? 'Loading…' : `${total.toLocaleString()} total`}
                 </span>
-                <div className="ml-auto">
+                <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
                     <input
                         type="search"
                         value={q}
@@ -314,30 +365,45 @@ export default function AdminUsersTab() {
                             setOffset(0);
                         }}
                         placeholder="Search handle, name, email"
-                        className="w-64 border border-line px-2 py-1 text-xs"
+                        className="min-h-11 min-w-0 flex-1 border border-line px-3 text-base sm:min-h-0 sm:w-64 sm:flex-none sm:px-2 sm:py-1 sm:text-xs"
                         aria-label="Search users"
                     />
+                    {isMobile && (
+                        <button
+                            type="button"
+                            onClick={() => setFiltersOpen(true)}
+                            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 border border-line bg-surface px-3 text-sm font-medium text-ink"
+                        >
+                            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                            Filters
+                            {Number(includeDeleted) + Number(verifiedOnly) > 0 && (
+                                <span className="inline-flex h-5 min-w-5 items-center justify-center bg-action px-1 text-[11px] font-semibold text-white">{Number(includeDeleted) + Number(verifiedOnly)}</span>
+                            )}
+                        </button>
+                    )}
                 </div>
             </header>
 
-            <div className="flex flex-wrap items-center gap-4 text-xs">
-                <label className="flex items-center gap-1.5">
-                    <input
-                        type="checkbox"
-                        checked={includeDeleted}
-                        onChange={(e) => setIncludeDeleted(e.target.checked)}
-                    />
-                    Include deleted
-                </label>
-                <label className="flex items-center gap-1.5">
-                    <input
-                        type="checkbox"
-                        checked={verifiedOnly}
-                        onChange={(e) => setVerifiedOnly(e.target.checked)}
-                    />
-                    Verified organizers only
-                </label>
-            </div>
+            {!isMobile && (
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <label className="flex items-center gap-1.5">
+                        <input
+                            type="checkbox"
+                            checked={includeDeleted}
+                            onChange={(e) => setIncludeDeleted(e.target.checked)}
+                        />
+                        Include deleted
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                        <input
+                            type="checkbox"
+                            checked={verifiedOnly}
+                            onChange={(e) => setVerifiedOnly(e.target.checked)}
+                        />
+                        Verified organizers only
+                    </label>
+                </div>
+            )}
 
             {error && (
                 <div className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-danger">
@@ -350,299 +416,336 @@ export default function AdminUsersTab() {
                 </div>
             )}
 
-            <div className="overflow-x-auto border border-line">
-                <table className="w-full text-xs">
-                    <thead className="bg-canvas text-left text-xs uppercase text-ink-soft">
-                        <tr>
-                            <th className="px-3 py-2">User</th>
-                            <th className="px-3 py-2">Email</th>
-                            {sortableTh('last_visit_at', 'Last visit')}
-                            {sortableTh('followers_count', 'Followers', 'right')}
-                            {sortableTh('following_count', 'Following', 'right')}
-                            <th className="px-3 py-2">Interest-match</th>
-                            <th className="px-3 py-2">Reminders</th>
-                            <th className="px-3 py-2">Digest</th>
-                            {sortableTh('has_push_subscription', 'Push')}
-                            {sortableTh('installed_at', 'Installed app')}
-                            <th className="px-3 py-2">Onboarding</th>
-                            <th className="px-3 py-2">Created</th>
-                            <th className="px-3 py-2">Status</th>
-                            <th className="px-3 py-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {!loading && rows.length === 0 && (
+            {isMobile ? (
+                <div className="-mx-4">
+                    {!loading && rows.length === 0 && (
+                        <p className="px-4 py-8 text-center text-sm text-ink-soft">No users match these filters.</p>
+                    )}
+                    <ul className="divide-y divide-line border-y border-line bg-surface">
+                        {rows.map((row) => (
+                            <li key={row.user_id}>
+                                <button type="button" onClick={() => setActionRow(row)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-canvas">
+                                    {row.avatar_url ? (
+                                        // eslint-disable-next-line no-restricted-syntax -- avatar
+                                        <img src={row.avatar_url} alt="" className="h-10 w-10 shrink-0 rounded-full" />
+                                    ) : (
+                                        // eslint-disable-next-line no-restricted-syntax -- avatar
+                                        <span className="h-10 w-10 shrink-0 rounded-full bg-slate-200" aria-hidden />
+                                    )}
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-sm font-medium text-ink">
+                                            {row.display_name || '—'}
+                                            <span className="ml-1 font-normal text-ink-soft">{row.handle ? `@${row.handle}` : ''}</span>
+                                        </span>
+                                        <span className="block truncate text-xs text-ink-soft">{row.email}</span>
+                                        <span className="mt-0.5 block truncate text-xs text-muted">
+                                            {row.last_visit_at ? `Seen ${formatRelative(row.last_visit_at)}` : 'Never visited'}
+                                            {` · ${row.followers_count} followers · ${row.following_count} following`}
+                                        </span>
+                                        <UserStatusChips row={row} />
+                                    </span>
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                    <AdminLoadMore shown={rows.length} total={total} loading={loading} onLoadMore={loadMore} />
+                </div>
+            ) : (
+                <div className="overflow-x-auto border border-line">
+                    <table className="w-full text-xs">
+                        <thead className="bg-canvas text-left text-xs uppercase text-ink-soft">
                             <tr>
-                                <td colSpan={13} className="px-3 py-8 text-center text-ink-soft">
-                                    No users match these filters.
-                                </td>
+                                <th className="px-3 py-2">User</th>
+                                <th className="px-3 py-2">Email</th>
+                                {sortableTh('last_visit_at', 'Last visit')}
+                                {sortableTh('followers_count', 'Followers', 'right')}
+                                {sortableTh('following_count', 'Following', 'right')}
+                                <th className="px-3 py-2">Interest-match</th>
+                                <th className="px-3 py-2">Reminders</th>
+                                <th className="px-3 py-2">Digest</th>
+                                {sortableTh('has_push_subscription', 'Push')}
+                                {sortableTh('installed_at', 'Installed app')}
+                                <th className="px-3 py-2">Onboarding</th>
+                                <th className="px-3 py-2">Created</th>
+                                <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2">Actions</th>
                             </tr>
-                        )}
-                        {rows.map((row) => {
-                            const isDeleted = row.deleted_at !== null;
-                            const isBlocked = row.active_block_id !== null;
-                            return (
-                                <tr key={row.user_id} className="border-t border-line hover:bg-canvas">
-                                    <td className="px-3 py-2">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            {row.avatar_url ? (
-                                                <img src={row.avatar_url} alt="" className="w-7 h-7 rounded-full" />
-                                            ) : (
-                                                <div className="w-7 h-7 rounded-full bg-slate-200" aria-hidden />
-                                            )}
-                                            <div className="min-w-0">
-                                                <div className="truncate font-medium">
-                                                    {row.display_name || '—'}
-                                                </div>
-                                                <div className="text-xs text-ink-soft truncate">
-                                                    {row.handle ? `@${row.handle}` : '(no handle)'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2 text-ink truncate max-w-[16rem]">
-                                        {row.email}
-                                    </td>
-                                    <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
-                                        {row.last_visit_at ? (() => {
-                                            const parsed = parseUserAgent(row.last_visit_user_agent);
-                                            const details = [
-                                                `Last visit: ${new Date(row.last_visit_at).toLocaleString()}`,
-                                                `${parsed.browserLabel} on ${parsed.osLabel} (${parsed.device})`,
-                                                row.last_visit_user_agent || '',
-                                            ].filter(Boolean).join('\n');
-                                            return (
-                                                <div className="flex items-center gap-1" title={details}>
-                                                    <span>{formatRelative(row.last_visit_at)}</span>
-                                                    {parsed.osIcon && (
-                                                        <img src={parsed.osIcon} alt={parsed.osLabel} className="w-4 h-4 shrink-0" />
-                                                    )}
-                                                    {parsed.browserIcon && (
-                                                        <img src={parsed.browserIcon} alt={parsed.browserLabel} className="w-4 h-4 shrink-0" />
-                                                    )}
-                                                </div>
-                                            );
-                                        })() : (
-                                            <span className="text-muted">—</span>
-                                        )}
-                                    </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
-                                        {row.followers_count}
-                                    </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
-                                        {row.following_count}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                        <FeatureStatusCell
-                                            label="Interest-match"
-                                            email={row.email_interest_matches_enabled}
-                                            push={row.push_interest_matches_enabled}
-                                        />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                        <FeatureStatusCell
-                                            label="Event reminders"
-                                            email={row.email_event_reminders_enabled}
-                                            push={row.push_event_reminders_enabled}
-                                        />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                        <FeatureStatusCell
-                                            label="Activity digest"
-                                            email={row.email_social_activity_enabled}
-                                            push={row.push_social_activity_enabled}
-                                        />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                        <div className="flex items-center gap-2">
-                                            <PushSubscriptionCell on={row.has_push_subscription} />
-                                            <button
-                                                type="button"
-                                                disabled={isDeleted || busyUserId === row.user_id}
-                                                onClick={() => onToggleForceEnablePush(row)}
-                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={row.force_enable_push_prompt ? 'Stop forcing the enable-notifications banner (normal 24h snooze applies)' : "Force-show the enable-notifications banner, bypassing this user's 24h dismiss snooze"}
-                                            >
-                                                {row.force_enable_push_prompt ? 'Unforce push' : 'Force push'}
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
-                                        <div className="flex items-center gap-2">
-                                            {row.installed_at ? (
-                                                <span title={`Installed ${fmtDate(row.installed_at)}`}>
-                                                    {fmtDate(row.installed_at)}
-                                                </span>
-                                            ) : (
-                                                <span className="text-muted">Not installed</span>
-                                            )}
-                                            <button
-                                                type="button"
-                                                disabled={isDeleted || busyUserId === row.user_id}
-                                                onClick={() => onToggleForceInstall(row)}
-                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={row.force_install_prompt ? 'Stop forcing the install-app banner (normal 14-day snooze applies)' : "Force-show the install-app banner, bypassing this user's 14-day dismiss snooze"}
-                                            >
-                                                {row.force_install_prompt ? 'Unforce install' : 'Force install'}
-                                            </button>
-                                            {!row.installed_at && (
-                                                <button
-                                                    type="button"
-                                                    disabled={isDeleted || busyUserId === row.user_id}
-                                                    onClick={() => onSendInstallEmail(row)}
-                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
-                                                    title="Email this user an invitation to install the app, with a link to the /install page"
-                                                >
-                                                    Send install email
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2 whitespace-nowrap">
-                                        <div className="flex items-center gap-2">
-                                            {row.needs_onboarding ? (
-                                                <span className="text-ink-soft" title="Will be sent through onboarding on next visit">
-                                                    {row.onboarded_at ? 'Pending (v↑)' : 'Never'}
-                                                </span>
-                                            ) : (
-                                                <span
-                                                    className="text-success"
-                                                    title={`Onboarded ${fmtDate(row.onboarded_at)} (v${row.onboarding_version})`}
-                                                >
-                                                    ✓ Done
-                                                </span>
-                                            )}
-                                            <button
-                                                type="button"
-                                                disabled={isDeleted || busyUserId === row.user_id || row.needs_onboarding}
-                                                onClick={() => onResetOnboarding(row)}
-                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title="Force this user back through the onboarding wizard on their next visit. Non-destructive: their saved preferences and follows are kept and the wizard re-opens pre-filled."
-                                            >
-                                                Retrigger
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
-                                        {fmtDate(row.created_at)}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                        <div className="flex flex-wrap items-center gap-1">
-                                            {row.is_admin && (
-                                                <span className="px-1.5 py-px text-xs bg-amber-100 text-amber-800">
-                                                    admin
-                                                </span>
-                                            )}
-                                            {row.is_verified_organizer && (
-                                                <span className="px-1.5 py-px text-xs bg-emerald-100 text-emerald-800">
-                                                    verified
-                                                </span>
-                                            )}
-                                            {row.is_admin_managed && (
-                                                <span
-                                                    className="px-1.5 py-px text-xs bg-blue-50 text-action border border-blue-200"
-                                                    title={row.managed_label || 'Admin-managed curator account'}
-                                                >
-                                                    managed{row.managed_label ? `: ${row.managed_label}` : ''}
-                                                </span>
-                                            )}
-                                            {isDeleted && (
-                                                <span className="px-1.5 py-px text-xs bg-slate-200 text-ink">
-                                                    deleted
-                                                </span>
-                                            )}
-                                            {isBlocked && (
-                                                <span
-                                                    className="px-1.5 py-px text-xs bg-red-50 text-danger border border-red-200"
-                                                    title={row.blocked_at ? `Blocked ${fmtDate(row.blocked_at)}` : 'Blocked from signing in'}
-                                                >
-                                                    blocked
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2">
-                                        <div className="flex items-center gap-1.5">
-                                            <button
-                                                type="button"
-                                                disabled={isDeleted || busyUserId === row.user_id}
-                                                onClick={() => setOrganizerTarget(row)}
-                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title="Verified badge and organized events"
-                                            >
-                                                {row.is_verified_organizer ? 'Organizer ✓' : 'Organizer'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
-                                                onClick={() => onToggleManaged(row)}
-                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={row.is_admin_managed ? 'Unmark as admin-managed account' : 'Mark as admin-managed curator account'}
-                                            >
-                                                {row.is_admin_managed ? 'Unmanage' : 'Manage'}
-                                            </button>
-                                            {row.is_admin_managed && (
-                                                <button
-                                                    type="button"
-                                                    disabled={isDeleted || busyUserId === row.user_id}
-                                                    onClick={() => onEditManagedLabel(row)}
-                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
-                                                    title="Edit internal managed label"
-                                                >
-                                                    Label
-                                                </button>
-                                            )}
-                                            {row.is_admin_managed && (
-                                                <button
-                                                    type="button"
-                                                    disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
-                                                    onClick={() => setMergeTarget(row)}
-                                                    className="px-2 py-1 text-xs border border-red-300 text-danger bg-surface hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                                                    title="Merge this managed account into another user"
-                                                >
-                                                    Merge
-                                                </button>
-                                            )}
-                                            <button
-                                                type="button"
-                                                disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
-                                                onClick={() => onDelete(row)}
-                                                className="px-2 py-1 text-xs border border-red-300 text-danger bg-surface hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={row.is_admin ? "Can't delete the admin from here" : 'Delete this account'}
-                                            >
-                                                Delete
-                                            </button>
-                                            {isBlocked ? (
-                                                <button
-                                                    type="button"
-                                                    disabled={busyUserId === row.user_id}
-                                                    onClick={() => setUnblockTarget(row)}
-                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
-                                                    title="Allow this account to sign in again"
-                                                >
-                                                    Unblock
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
-                                                    onClick={() => setBlockPrompt(row)}
-                                                    className="px-2 py-1 text-xs border border-red-300 text-danger bg-surface hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                                                    title={row.is_admin ? "Can't block the admin from here" : 'Block this account from signing in'}
-                                                >
-                                                    Block
-                                                </button>
-                                            )}
-                                        </div>
+                        </thead>
+                        <tbody>
+                            {!loading && rows.length === 0 && (
+                                <tr>
+                                    <td colSpan={13} className="px-3 py-8 text-center text-ink-soft">
+                                        No users match these filters.
                                     </td>
                                 </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                            )}
+                            {rows.map((row) => {
+                                const isDeleted = row.deleted_at !== null;
+                                const isBlocked = row.active_block_id !== null;
+                                return (
+                                    <tr key={row.user_id} className="border-t border-line hover:bg-canvas">
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {row.avatar_url ? (
+                                                    <img src={row.avatar_url} alt="" className="w-7 h-7 rounded-full" />
+                                                ) : (
+                                                    <div className="w-7 h-7 rounded-full bg-slate-200" aria-hidden />
+                                                )}
+                                                <div className="min-w-0">
+                                                    <div className="truncate font-medium">
+                                                        {row.display_name || '—'}
+                                                    </div>
+                                                    <div className="text-xs text-ink-soft truncate">
+                                                        {row.handle ? `@${row.handle}` : '(no handle)'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 text-ink truncate max-w-[16rem]">
+                                            {row.email}
+                                        </td>
+                                        <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
+                                            {row.last_visit_at ? (() => {
+                                                const parsed = parseUserAgent(row.last_visit_user_agent);
+                                                const details = [
+                                                    `Last visit: ${new Date(row.last_visit_at).toLocaleString()}`,
+                                                    `${parsed.browserLabel} on ${parsed.osLabel} (${parsed.device})`,
+                                                    row.last_visit_user_agent || '',
+                                                ].filter(Boolean).join('\n');
+                                                return (
+                                                    <div className="flex items-center gap-1" title={details}>
+                                                        <span>{formatRelative(row.last_visit_at)}</span>
+                                                        {parsed.osIcon && (
+                                                            <img src={parsed.osIcon} alt={parsed.osLabel} className="w-4 h-4 shrink-0" />
+                                                        )}
+                                                        {parsed.browserIcon && (
+                                                            <img src={parsed.browserIcon} alt={parsed.browserLabel} className="w-4 h-4 shrink-0" />
+                                                        )}
+                                                    </div>
+                                                );
+                                            })() : (
+                                                <span className="text-muted">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2 text-right tabular-nums">
+                                            {row.followers_count}
+                                        </td>
+                                        <td className="px-3 py-2 text-right tabular-nums">
+                                            {row.following_count}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <FeatureStatusCell
+                                                label="Interest-match"
+                                                email={row.email_interest_matches_enabled}
+                                                push={row.push_interest_matches_enabled}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <FeatureStatusCell
+                                                label="Event reminders"
+                                                email={row.email_event_reminders_enabled}
+                                                push={row.push_event_reminders_enabled}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <FeatureStatusCell
+                                                label="Activity digest"
+                                                email={row.email_social_activity_enabled}
+                                                push={row.push_social_activity_enabled}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <PushSubscriptionCell on={row.has_push_subscription} />
+                                                <button
+                                                    type="button"
+                                                    disabled={isDeleted || busyUserId === row.user_id}
+                                                    onClick={() => onToggleForceEnablePush(row)}
+                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title={row.force_enable_push_prompt ? 'Stop forcing the enable-notifications banner (normal 24h snooze applies)' : "Force-show the enable-notifications banner, bypassing this user's 24h dismiss snooze"}
+                                                >
+                                                    {row.force_enable_push_prompt ? 'Unforce push' : 'Force push'}
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                {row.installed_at ? (
+                                                    <span title={`Installed ${fmtDate(row.installed_at)}`}>
+                                                        {fmtDate(row.installed_at)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted">Not installed</span>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    disabled={isDeleted || busyUserId === row.user_id}
+                                                    onClick={() => onToggleForceInstall(row)}
+                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title={row.force_install_prompt ? 'Stop forcing the install-app banner (normal 14-day snooze applies)' : "Force-show the install-app banner, bypassing this user's 14-day dismiss snooze"}
+                                                >
+                                                    {row.force_install_prompt ? 'Unforce install' : 'Force install'}
+                                                </button>
+                                                {!row.installed_at && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={isDeleted || busyUserId === row.user_id}
+                                                        onClick={() => onSendInstallEmail(row)}
+                                                        className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        title="Email this user an invitation to install the app, with a link to the /install page"
+                                                    >
+                                                        Send install email
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                {row.needs_onboarding ? (
+                                                    <span className="text-ink-soft" title="Will be sent through onboarding on next visit">
+                                                        {row.onboarded_at ? 'Pending (v↑)' : 'Never'}
+                                                    </span>
+                                                ) : (
+                                                    <span
+                                                        className="text-success"
+                                                        title={`Onboarded ${fmtDate(row.onboarded_at)} (v${row.onboarding_version})`}
+                                                    >
+                                                        ✓ Done
+                                                    </span>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    disabled={isDeleted || busyUserId === row.user_id || row.needs_onboarding}
+                                                    onClick={() => onResetOnboarding(row)}
+                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title="Force this user back through the onboarding wizard on their next visit. Non-destructive: their saved preferences and follows are kept and the wizard re-opens pre-filled."
+                                                >
+                                                    Retrigger
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
+                                            {fmtDate(row.created_at)}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex flex-wrap items-center gap-1">
+                                                {row.is_admin && (
+                                                    <span className="px-1.5 py-px text-xs bg-amber-100 text-amber-800">
+                                                        admin
+                                                    </span>
+                                                )}
+                                                {row.is_verified_organizer && (
+                                                    <span className="px-1.5 py-px text-xs bg-emerald-100 text-emerald-800">
+                                                        verified
+                                                    </span>
+                                                )}
+                                                {row.is_admin_managed && (
+                                                    <span
+                                                        className="px-1.5 py-px text-xs bg-blue-50 text-action border border-blue-200"
+                                                        title={row.managed_label || 'Admin-managed curator account'}
+                                                    >
+                                                        managed{row.managed_label ? `: ${row.managed_label}` : ''}
+                                                    </span>
+                                                )}
+                                                {isDeleted && (
+                                                    <span className="px-1.5 py-px text-xs bg-slate-200 text-ink">
+                                                        deleted
+                                                    </span>
+                                                )}
+                                                {isBlocked && (
+                                                    <span
+                                                        className="px-1.5 py-px text-xs bg-red-50 text-danger border border-red-200"
+                                                        title={row.blocked_at ? `Blocked ${fmtDate(row.blocked_at)}` : 'Blocked from signing in'}
+                                                    >
+                                                        blocked
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    disabled={isDeleted || busyUserId === row.user_id}
+                                                    onClick={() => setOrganizerTarget(row)}
+                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title="Verified badge and organized events"
+                                                >
+                                                    {row.is_verified_organizer ? 'Organizer ✓' : 'Organizer'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
+                                                    onClick={() => onToggleManaged(row)}
+                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title={row.is_admin_managed ? 'Unmark as admin-managed account' : 'Mark as admin-managed curator account'}
+                                                >
+                                                    {row.is_admin_managed ? 'Unmanage' : 'Manage'}
+                                                </button>
+                                                {row.is_admin_managed && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={isDeleted || busyUserId === row.user_id}
+                                                        onClick={() => onEditManagedLabel(row)}
+                                                        className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        title="Edit internal managed label"
+                                                    >
+                                                        Label
+                                                    </button>
+                                                )}
+                                                {row.is_admin_managed && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
+                                                        onClick={() => setMergeTarget(row)}
+                                                        className="px-2 py-1 text-xs border border-red-300 text-danger bg-surface hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        title="Merge this managed account into another user"
+                                                    >
+                                                        Merge
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
+                                                    onClick={() => onDelete(row)}
+                                                    className="px-2 py-1 text-xs border border-red-300 text-danger bg-surface hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title={row.is_admin ? "Can't delete the admin from here" : 'Delete this account'}
+                                                >
+                                                    Delete
+                                                </button>
+                                                {isBlocked ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled={busyUserId === row.user_id}
+                                                        onClick={() => setUnblockTarget(row)}
+                                                        className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        title="Allow this account to sign in again"
+                                                    >
+                                                        Unblock
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
+                                                        onClick={() => setBlockPrompt(row)}
+                                                        className="px-2 py-1 text-xs border border-red-300 text-danger bg-surface hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        title={row.is_admin ? "Can't block the admin from here" : 'Block this account from signing in'}
+                                                    >
+                                                        Block
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
-            {total > PAGE_SIZE && (
+            {!isMobile && total > PAGE_SIZE && (
                 <div className="flex items-center justify-between text-xs">
                     <button
                         type="button"
@@ -664,6 +767,66 @@ export default function AdminUsersTab() {
                         Next →
                     </button>
                 </div>
+            )}
+
+            {isMobile && filtersOpen && (
+                <BottomSheet
+                    title="Filters"
+                    onClose={() => setFiltersOpen(false)}
+                    footer={
+                        <button type="button" onClick={() => setFiltersOpen(false)} className="min-h-11 w-full bg-action text-sm font-semibold text-white hover:opacity-90">
+                            {loading ? 'Loading…' : `Show ${total.toLocaleString()} user${total === 1 ? '' : 's'}`}
+                        </button>
+                    }
+                >
+                    <div className="space-y-5 pb-2">
+                        <section className="space-y-2">
+                            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">Sort</h3>
+                            <div className="flex gap-2">
+                                <select
+                                    aria-label="Sort by"
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value as AdminUserSortField)}
+                                    className="min-h-11 min-w-0 flex-1 border border-line bg-surface px-3 text-base text-ink"
+                                >
+                                    <option value="created_at">Created</option>
+                                    <option value="last_visit_at">Last visit</option>
+                                    <option value="followers_count">Followers</option>
+                                    <option value="following_count">Following</option>
+                                    <option value="has_push_subscription">Push</option>
+                                    <option value="installed_at">Installed app</option>
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                                    className="min-h-11 shrink-0 border border-line bg-surface px-3 text-sm text-ink"
+                                >
+                                    {sortDir === 'asc' ? 'Ascending ▲' : 'Descending ▼'}
+                                </button>
+                            </div>
+                        </section>
+                        <div className="-mx-4 divide-y divide-line border-y border-line">
+                            {([
+                                ['Include deleted', includeDeleted, setIncludeDeleted],
+                                ['Verified organizers only', verifiedOnly, setVerifiedOnly],
+                            ] as const).map(([label, checked, set]) => (
+                                <label key={label} className="flex min-h-12 items-center justify-between gap-3 px-4 text-sm text-ink">
+                                    {label}
+                                    <input type="checkbox" checked={checked} onChange={(e) => set(e.target.checked)} className="h-5 w-5" />
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                </BottomSheet>
+            )}
+            {isMobile && actionRow && (
+                <UserActionsSheet
+                    row={actionRow}
+                    busy={busyUserId === actionRow.user_id}
+                    fmtDate={fmtDate}
+                    onAction={runUserAction}
+                    onClose={() => setActionRow(null)}
+                />
             )}
 
             <PromptDialog
@@ -726,6 +889,73 @@ export default function AdminUsersTab() {
                 }}
             />
         </section>
+    );
+}
+
+function UserActionsSheet({ row, busy, fmtDate, onAction, onClose }: {
+    row: AdminUserRow;
+    busy: boolean;
+    fmtDate: (iso: string | null) => string;
+    onAction: (key: UserActionKey, row: AdminUserRow) => void;
+    onClose: () => void;
+}) {
+    const isDeleted = row.deleted_at !== null;
+    const actions: { key: UserActionKey; label: string; disabled?: boolean; danger?: boolean }[] = [
+        { key: 'organizer', label: row.is_verified_organizer ? 'Organizer ✓' : 'Organizer', disabled: isDeleted },
+        { key: 'managed', label: row.is_admin_managed ? 'Unmanage' : 'Manage', disabled: isDeleted || row.is_admin },
+        ...(row.is_admin_managed ? [{ key: 'label' as const, label: 'Edit label', disabled: isDeleted }] : []),
+        { key: 'push', label: row.force_enable_push_prompt ? 'Unforce push prompt' : 'Force push prompt', disabled: isDeleted },
+        { key: 'install', label: row.force_install_prompt ? 'Unforce install prompt' : 'Force install prompt', disabled: isDeleted },
+        ...(!row.installed_at ? [{ key: 'install-email' as const, label: 'Send install email', disabled: isDeleted }] : []),
+        { key: 'onboarding', label: 'Retrigger onboarding', disabled: isDeleted || row.needs_onboarding },
+        ...(row.is_admin_managed ? [{ key: 'merge' as const, label: 'Merge into…', disabled: isDeleted || row.is_admin, danger: true }] : []),
+        row.active_block_id !== null
+            ? { key: 'unblock', label: 'Unblock' }
+            : { key: 'block', label: 'Block…', disabled: isDeleted || row.is_admin, danger: true },
+        { key: 'delete', label: 'Delete…', disabled: isDeleted || row.is_admin, danger: true },
+    ];
+    return (
+        <BottomSheet title={row.display_name || (row.handle ? `@${row.handle}` : row.email)} subtitle={row.email} onClose={onClose}>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 pb-3 text-sm">
+                <dt className="text-ink-soft">Created</dt><dd className="text-ink">{fmtDate(row.created_at)}</dd>
+                <dt className="text-ink-soft">Installed</dt><dd className="text-ink">{row.installed_at ? fmtDate(row.installed_at) : 'Not installed'}</dd>
+                <dt className="text-ink-soft">Onboarding</dt><dd className="text-ink">{row.needs_onboarding ? (row.onboarded_at ? 'Pending (v↑)' : 'Never') : '✓ Done'}</dd>
+                <dt className="text-ink-soft">Push</dt><dd><PushSubscriptionCell on={row.has_push_subscription} /></dd>
+                <dt className="text-ink-soft">Interest-match</dt><dd><FeatureStatusCell label="Interest-match" email={row.email_interest_matches_enabled} push={row.push_interest_matches_enabled} /></dd>
+                <dt className="text-ink-soft">Reminders</dt><dd><FeatureStatusCell label="Event reminders" email={row.email_event_reminders_enabled} push={row.push_event_reminders_enabled} /></dd>
+                <dt className="text-ink-soft">Digest</dt><dd><FeatureStatusCell label="Activity digest" email={row.email_social_activity_enabled} push={row.push_social_activity_enabled} /></dd>
+            </dl>
+            <ul className="-mx-4 divide-y divide-line border-t border-line">
+                {actions.map((a) => (
+                    <li key={a.key}>
+                        <button
+                            type="button"
+                            disabled={a.disabled || busy}
+                            onClick={() => onAction(a.key, row)}
+                            className={`flex min-h-12 w-full items-center px-4 text-left text-sm hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40 ${a.danger ? 'text-danger' : 'text-ink'}`}
+                        >
+                            {a.label}
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </BottomSheet>
+    );
+}
+
+function UserStatusChips({ row }: { row: AdminUserRow }) {
+    const chips: [string, string][] = [
+        ...(row.is_admin ? [['admin', 'bg-amber-100 text-amber-800'] as [string, string]] : []),
+        ...(row.is_verified_organizer ? [['verified', 'bg-emerald-100 text-emerald-800'] as [string, string]] : []),
+        ...(row.is_admin_managed ? [[`managed${row.managed_label ? `: ${row.managed_label}` : ''}`, 'border border-blue-200 bg-blue-50 text-action'] as [string, string]] : []),
+        ...(row.deleted_at !== null ? [['deleted', 'bg-slate-200 text-ink'] as [string, string]] : []),
+        ...(row.active_block_id !== null ? [['blocked', 'border border-red-200 bg-red-50 text-danger'] as [string, string]] : []),
+    ];
+    if (chips.length === 0) return null;
+    return (
+        <span className="mt-1 flex flex-wrap gap-1">
+            {chips.map(([label, cls]) => <span key={label} className={`px-1.5 py-px text-xs ${cls}`}>{label}</span>)}
+        </span>
     );
 }
 

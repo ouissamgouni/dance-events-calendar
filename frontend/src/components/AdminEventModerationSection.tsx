@@ -14,7 +14,6 @@ import {
 import type { AdminEventModeration, CalendarEvent, CalendarSetting, ChangeScope, EventRevision, RevisionChange } from '../types';
 import { describeRevisionValue, hasTimeChange, revisionFieldLabel, statusRequest } from '../utils/eventRevisions';
 import { getAdminEventStatus } from '../utils/adminEventStatus';
-import VisibilityChip, { VISIBILITY_META, WantsPublicChip } from './VisibilityChip';
 import SubmissionDetails from './SubmissionDetails';
 
 interface Props {
@@ -209,21 +208,9 @@ export default function AdminEventModerationSection({ event, moderation, onChang
         scopeFor(revision) === 'series' ? revision.series_affected_attendees : revision.affected_attendees;
     const notifyFor = (revision: EventRevision) =>
         countFor(revision) > 0 && (notify[revision.id] ?? notifyByDefault(revision));
-    const submitterName = submission?.submitter?.display_name ?? submission?.submitter_name ?? null;
-    const visibilityText =
-        moderation.visibility === 'private' && submitterName
-            ? `Only ${submitterName} — not in discovery, feeds or notifications`
-            : VISIBILITY_META[moderation.visibility].description;
 
     return (
         <section className="space-y-3" aria-label="Moderation">
-            <p className="flex flex-wrap items-center gap-2 text-xs text-ink">
-                <span className={labelCls}>Visible to</span>
-                <VisibilityChip state={moderation.visibility} />
-                {moderation.wants_public && <WantsPublicChip />}
-                <span data-testid="event-audience">{visibilityText}</span>
-            </p>
-
             {submission && (
                 <div className={cardCls} data-testid="submission-card">
                     <div className="flex flex-wrap items-center gap-2">

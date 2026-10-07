@@ -374,6 +374,11 @@ def _render_line(
             f"to their plan for {title}{suffix}"
         )
     if kind == "subscription_review":
+        if context == "past_edition":
+            return (
+                f"<strong>{who}</strong> shared their experience of an earlier "
+                f"edition of {title}"
+            )
         return f"<strong>{who}</strong> shared their experience of {title}"
     if kind == "subscription_milestone":
         total_milestones = milestone_count or len(milestone_names or [])
@@ -462,6 +467,8 @@ def _render_plain(
         line = f"{who} added {context or 'a session'} to their plan for {title}"
         return f"{line} · {description}" if description else line
     if kind == "subscription_review":
+        if context == "past_edition":
+            return f"{who} shared their experience of an earlier edition of {title}"
         return f"{who} shared their experience of {title}"
     if kind == "subscription_milestone":
         if milestone_names and len(milestone_names) > 1:

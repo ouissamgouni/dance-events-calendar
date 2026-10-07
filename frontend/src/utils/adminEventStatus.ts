@@ -74,3 +74,7 @@ export function getRemovalReasonLabel(event: CalendarEvent): string | null {
     if (getAdminEventStatus(event) !== 'removed' || !event.status_reason) return null;
     return REMOVAL_REASON_LABELS[event.status_reason];
 }
+
+export function hasOpenChanges(event: CalendarEvent): boolean {
+    return Boolean(event.has_pending_changes) && getAdminEventStatus(event) !== 'removed';
+}

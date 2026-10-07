@@ -268,7 +268,7 @@ describe('AdminEventDetailPanel moderation', () => {
             submission: submission('pending'),
         })
 
-        expect(await screen.findByTestId('event-audience')).toHaveTextContent('Only Dev User')
+        await waitFor(() => expect(screen.getAllByTestId('visibility-chip')[0]).toHaveAttribute('title', expect.stringContaining('only Dev User')))
         const card = screen.getByTestId('submission-card')
         expect(card).toHaveTextContent('Public request')
         expect(card).toHaveTextContent('@dev-user')
@@ -310,7 +310,7 @@ describe('AdminEventDetailPanel moderation', () => {
             submission: submission('private'),
         })
 
-        expect(await screen.findByTestId('event-audience')).toHaveTextContent('Only Dev User')
+        await waitFor(() => expect(screen.getAllByTestId('visibility-chip')[0]).toHaveAttribute('title', expect.stringContaining('only Dev User')))
         expect(screen.queryByRole('button', { name: 'Make public' })).not.toBeInTheDocument()
         await user.click(screen.getByRole('button', { name: 'Mark reviewed' }))
         await waitFor(() => expect(api.updateEvent).toHaveBeenCalledWith('evt-review-1', { status: 'published' }))

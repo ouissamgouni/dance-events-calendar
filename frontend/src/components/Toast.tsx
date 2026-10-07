@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
-export type ToastVariant = 'info' | 'success' | 'warning' | 'error';
+export type ToastVariant = 'info' | 'success' | 'warning' | 'error' | 'celebration';
 
 export interface ToastAction {
     label: string;
@@ -14,6 +14,7 @@ export interface ToastInput {
     variant?: ToastVariant;
     duration?: number; // ms; default 6000. Pass 0 for sticky.
     action?: ToastAction;
+    icon?: string; // emoji; used by the celebration variant
 }
 
 interface Toast extends ToastInput {
@@ -32,6 +33,7 @@ const VARIANT_STYLES: Record<ToastVariant, string> = {
     success: 'bg-surface border-emerald-200 text-ink',
     warning: 'bg-surface border-amber-200 text-ink',
     error: 'bg-surface border-rose-200 text-ink',
+    celebration: 'bg-surface border-line text-ink',
 };
 
 const VARIANT_DOT: Record<ToastVariant, string> = {
@@ -39,6 +41,7 @@ const VARIANT_DOT: Record<ToastVariant, string> = {
     success: 'bg-success',
     warning: 'bg-amber-500',
     error: 'bg-rose-500',
+    celebration: 'bg-brand',
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -87,6 +90,43 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 z-[12000] flex flex-col gap-2 sm:w-80">
                 {toasts.map((t) => {
                     const variant = t.variant ?? 'info';
+                    if (variant === 'celebration') {
+                        return (
+                            <div
+                                key={t.id}
+                                className="pointer-events-auto rounded-card bg-surface border border-line border-l-4 border-l-brand shadow-xl px-4 py-3 flex items-start gap-3 text-ink"
+                                role="status"
+                            >
+                                <span className="h-10 w-10 rounded-full bg-brand/10 flex items-center justify-center text-2xl flex-shrink-0" aria-hidden="true">
+                                    {t.icon || '🏅'}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-base font-semibold leading-snug">{t.title}</div>
+                                    {t.message && (
+                                        <div className="text-sm text-ink-soft mt-0.5 break-words">{t.message}</div>
+                                    )}
+                                    {t.action && (
+                                        <button
+                                            onClick={() => {
+                                                t.action!.onClick();
+                                                dismiss(t.id);
+                                            }}
+                                            className="mt-2 bg-action text-white text-sm font-medium px-3 py-1.5 hover:opacity-90"
+                                        >
+                                            {t.action.label}
+                                        </button>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => dismiss(t.id)}
+                                    aria-label="Dismiss"
+                                    className="text-muted hover:text-ink-soft text-xl leading-none h-8 w-8 -mr-2 -mt-1 flex items-center justify-center"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        );
+                    }
                     return (
                         <div
                             key={t.id}

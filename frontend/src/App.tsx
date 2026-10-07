@@ -161,7 +161,7 @@ function AppShell() {
   const mainRef = useRef<HTMLElement | null>(null);
   const backgroundLocation = (location.state as ModalLocationState | null)?.backgroundLocation;
   const isMyEvents = location.pathname === '/my-events' || location.pathname === '/mine/calendar';
-  const isProgram = /^\/event\/[^/]+\/program/.test(location.pathname);
+  const isProgram = /^\/event\/[^/]+\/program/.test((backgroundLocation ?? location).pathname);
 
   // Full-screen flows (auth, onboarding), admin and shared views suppress the primary bottom nav.
   const hideBottomNav =
@@ -176,10 +176,13 @@ function AppShell() {
 
   useNotificationOpenAttribution();
 
+  const previousBackgroundRef = useRef<Location | undefined>(undefined);
   useLayoutEffect(() => {
     // An overlay route leaves the page behind it mounted — resetting its scroll
-    // would silently lose the user's place when they close the overlay.
-    if (backgroundLocation) return;
+    // would silently lose the user's place when they open or close the overlay.
+    const closingOverlay = previousBackgroundRef.current?.pathname === location.pathname;
+    previousBackgroundRef.current = backgroundLocation;
+    if (backgroundLocation || closingOverlay) return;
     mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [location.pathname, backgroundLocation]);
@@ -324,6 +327,8 @@ function AppShell() {
               </Routes>
               {backgroundLocation ? (
                 <Routes>
+                  <Route path="/event/:eventId/program" element={<EventProgramPage />} />
+                  <Route path="/event/:eventId/program/plan" element={<EventProgramPage />} />
                   <Route path="/suggest" element={<SuggestEventRoute />} />
                   <Route path="/suggest/:suggestionId/edit" element={<SuggestEventRoute />} />
                   <Route path="/event/:eventId/suggest-change" element={<SuggestEventRoute />} />
@@ -331,7 +336,7 @@ function AppShell() {
               ) : null}
             </Suspense>
             {!isMyEvents && (
-              <footer className="py-3 text-center flex items-center justify-center gap-3">
+              <footer className={`py-3 text-center items-center justify-center gap-3 ${location.pathname.startsWith('/admin') ? 'hidden sm:flex' : 'flex'}`}>
                 <Link to="/privacy" className="text-[11px] text-muted hover:text-ink-soft transition">
                   Privacy
                 </Link>

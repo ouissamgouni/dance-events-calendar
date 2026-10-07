@@ -464,6 +464,33 @@ def test_review_prompt_skips_already_rated(session, monkeypatch):
     assert sent == []
 
 
+def test_review_prompt_still_sent_after_earlier_edition_review(session, monkeypatch):
+    """A review written about an earlier edition doesn't count as reviewing
+    the edition the user just attended."""
+    monkeypatch.setattr(
+        review_prompt_service, "send_event_review_prompt_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(
+        session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6)
+    )
+    _going(session, alice, "ev-past")
+    session.add(
+        EventRating(
+            event_id="ev-past",
+            user_id=alice.id,
+            stars=5,
+            status="approved",
+            scope="past_edition",
+        )
+    )
+    session.commit()
+
+    assert review_prompt_service.run_once()["prompts"] == 1
+
+
 def test_review_prompt_email_optout_keeps_inapp(session, monkeypatch):
     sent: list = []
     monkeypatch.setattr(

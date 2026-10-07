@@ -60,6 +60,34 @@ describe('page action dock overflow', () => {
     });
 });
 
+describe('upcoming edition review', () => {
+    const upcoming = { ...EVENT, start: '2099-01-01T20:00:00Z', end: '2099-01-02T01:00:00Z' } as CalendarEvent;
+    const withRatings = (element: React.ReactElement) => renderWithProviders(
+        <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, showRatings: true }, updateFlag: vi.fn() }}>
+            {element}
+        </FeatureFlagsContext.Provider>,
+    );
+
+    it('keeps the earlier-edition review behind More in modal actions', async () => {
+        const { user } = withRatings(
+            <EventActions {...commonProps} event={upcoming} isPast={false} canReviewInline={false} />,
+        );
+
+        expect(screen.queryByRole('button', { name: /earlier edition/i })).toBeNull();
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        expect(screen.getByRole('menu')).toContainElement(screen.getByRole('button', { name: /earlier edition/i }));
+    });
+
+    it('keeps the earlier-edition review in the mobile More menu of the dock', async () => {
+        const { user } = withRatings(<EventActionDock {...commonProps} event={upcoming} isPast={false} />);
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        const inMenu = screen.getAllByRole('button', { name: /earlier edition/i })
+            .filter((el) => screen.getByRole('menu').contains(el));
+        expect(inMenu).toHaveLength(1);
+    });
+});
+
 describe('organizer claim action', () => {
     const renderWithClaims = (event: CalendarEvent) => renderWithProviders(
         <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, organizerClaimsEnabled: true }, updateFlag: vi.fn() }}>

@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Repeat } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Repeat, SlidersHorizontal } from 'lucide-react';
 import useBackToClose from '../hooks/useBackToClose';
+import useMediaQuery from '../hooks/useMediaQuery';
+import BottomSheet from './BottomSheet';
+import AdminLoadMore from './AdminLoadMore';
 import type { CalendarSetting, ChangeScope, EventRevisionKind, EventRevisionSource } from '../types';
 import type { AdminChange, ChangeDecision, FilterOption } from '../api';
 import { decideAdminChange, fetchAdminCalendars, fetchAdminChanges } from '../api';
@@ -148,16 +151,19 @@ function ChangeDetail({ change, onDecided, onOpenEvent, onClose }: {
     };
 
     return (
-        <aside className="absolute inset-0 z-20 flex h-full w-full flex-col border-l border-line bg-surface sm:static sm:z-auto sm:w-[420px] sm:max-w-full sm:shrink-0" aria-label="Change detail">
+        <aside className="absolute inset-0 z-20 flex h-full w-full flex-col border-l border-line bg-surface pt-[env(safe-area-inset-top)] sm:static sm:z-auto sm:w-[420px] sm:max-w-full sm:shrink-0 sm:pt-0" aria-label="Change detail">
             <div className="flex items-start justify-between gap-2 border-b border-line px-4 py-3">
                 <div className="min-w-0">
                     <span className={`inline-block px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${meta.cls}`}>{meta.label}</span>
                     <p className="mt-1 truncate text-sm font-semibold text-ink">{change.event?.title ?? 'Event'}</p>
                     <p className="text-[11px] text-muted">{SOURCE_LABELS[change.source]} · {proposer(change)} · {age(change.created_at)} ago</p>
                 </div>
-                <button type="button" onClick={onClose} aria-label="Close change" className="p-1 text-sm text-muted hover:text-ink-soft">✕</button>
+                <button type="button" onClick={onClose} aria-label="Close change" className="-ml-3 order-first inline-flex h-11 w-11 shrink-0 items-center justify-center text-sm text-ink sm:order-none sm:ml-0 sm:h-auto sm:w-auto sm:p-1 sm:text-muted sm:hover:text-ink-soft">
+                    <ArrowLeft className="h-5 w-5 sm:hidden" aria-hidden="true" />
+                    <span className="hidden sm:inline">✕</span>
+                </button>
             </div>
-            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-xs">
+            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm sm:text-xs">
                 {change.event && (
                     <div className="space-y-1">
                         <p className="text-ink-soft">
@@ -232,12 +238,12 @@ function ChangeDetail({ change, onDecided, onOpenEvent, onClose }: {
                 {error && <p role="alert" className="text-danger">{error}</p>}
             </div>
             {open && (
-                <div className="flex gap-2 border-t border-line px-4 py-3">
+                <div className="flex gap-2 border-t border-line px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3">
                     <button
                         type="button"
                         onClick={() => decide('accept')}
                         disabled={busy !== null || (change.kind === 'go_public' && !calendarId)}
-                        className="bg-action px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="min-h-11 flex-1 bg-action px-3 py-1 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 sm:flex-none sm:text-xs"
                     >
                         {busy === 'accept' ? 'Saving…' : meta.accept}
                     </button>
@@ -245,7 +251,7 @@ function ChangeDetail({ change, onDecided, onOpenEvent, onClose }: {
                         type="button"
                         onClick={() => decide('reject')}
                         disabled={busy !== null}
-                        className="border border-line bg-surface px-3 py-1 text-xs font-semibold text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+                        className="min-h-11 flex-1 border border-line bg-surface px-3 py-1 text-sm font-semibold text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 sm:flex-none sm:text-xs"
                     >
                         {busy === 'reject' ? 'Saving…' : meta.reject}
                     </button>
@@ -269,13 +275,20 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
     const [error, setError] = useState('');
     const [selected, setSelected] = useState<AdminChange | null>(null);
     const [eventId, setEventId] = useState<string | null>(null);
+    const isMobile = useMediaQuery('(max-width: 639px)');
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    // Mobile appends pages; reloads refetch everything already loaded.
+    const loadedRef = useRef(0);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (fresh = false) => {
         setLoading(true);
         setError('');
         try {
-            const res = await fetchAdminChanges({ kind: kinds, source: sources, state, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
+            const limit = isMobile ? (fresh ? PAGE_SIZE : Math.min(Math.max(loadedRef.current, PAGE_SIZE), 100)) : PAGE_SIZE;
+            const offset = isMobile ? 0 : page * PAGE_SIZE;
+            const res = await fetchAdminChanges({ kind: kinds, source: sources, state, limit, offset });
             setItems(res.items);
+            loadedRef.current = res.items.length;
             setTotal(res.total);
             setKindOptions(res.kinds);
             setSourceOptions(res.sources);
@@ -284,11 +297,27 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
         } finally {
             setLoading(false);
         }
-    }, [kinds, sources, state, page]);
+    }, [kinds, sources, state, page, isMobile]);
+
+    const loadMore = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchAdminChanges({ kind: kinds, source: sources, state, limit: PAGE_SIZE, offset: loadedRef.current });
+            const seen = new Set(items.map((c) => c.id));
+            const next = [...items, ...res.items.filter((c) => !seen.has(c.id))];
+            setItems(next);
+            loadedRef.current = next.length;
+            setTotal(res.total);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to load changes');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch lifecycle
-        if (isOpen) load();
+        if (isOpen) load(true);
     }, [isOpen, load]);
 
     const close = () => {
@@ -297,6 +326,8 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
         onClose();
     };
     useBackToClose(close, isOpen);
+    // On phones the change detail covers the list, so back should return to it.
+    useBackToClose(() => setSelected(null), isOpen && isMobile && selected !== null);
 
     const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -309,42 +340,71 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                 aria-label="Review"
             >
                 <div className="flex min-w-0 flex-1 flex-col">
-                    <div className="flex shrink-0 items-center justify-between border-b border-line bg-canvas px-4 py-2.5">
-                        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink">
-                            Review
-                            {!loading && <span className="ml-2 text-[10px] font-normal normal-case text-muted">{total} change{total !== 1 ? 's' : ''}</span>}
-                        </h2>
-                        <button type="button" onClick={close} className="p-1 text-sm leading-none text-muted hover:text-ink-soft" aria-label="Close">✕</button>
-                    </div>
+                    {isMobile ? (
+                        <div className="flex min-h-14 shrink-0 items-center gap-1 border-b border-line bg-surface px-1 pt-[env(safe-area-inset-top)]">
+                            <button type="button" onClick={close} aria-label="Close" className="inline-flex h-11 w-11 items-center justify-center text-ink">
+                                <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+                            </button>
+                            <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">
+                                Review
+                                {!loading && <span className="ml-2 text-sm font-normal text-ink-soft">{total}</span>}
+                            </h2>
+                        </div>
+                    ) : (
+                        <div className="flex shrink-0 items-center justify-between border-b border-line bg-canvas px-4 py-2.5">
+                            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink">
+                                Review
+                                {!loading && <span className="ml-2 text-[10px] font-normal normal-case text-muted">{total} change{total !== 1 ? 's' : ''}</span>}
+                            </h2>
+                            <button type="button" onClick={close} className="p-1 text-sm leading-none text-muted hover:text-ink-soft" aria-label="Close">✕</button>
+                        </div>
+                    )}
                     <div className="shrink-0 space-y-2 border-b border-card-line px-4 py-2">
-                        <div role="tablist" className="flex gap-1">
-                            {(['open', 'decided'] as const).map((value) => (
+                        <div className="flex gap-2">
+                            <div role="tablist" className="flex flex-1 gap-1 sm:flex-none">
+                                {(['open', 'decided'] as const).map((value) => (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={state === value}
+                                        onClick={() => { setState(value); setPage(0); setSelected(null); }}
+                                        className={`min-h-11 flex-1 border px-3 py-1 text-sm font-semibold transition sm:min-h-0 sm:flex-none sm:text-[11px] ${state === value ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:bg-canvas'}`}
+                                    >
+                                        {value === 'open' ? 'Open' : 'Closed'}
+                                    </button>
+                                ))}
+                            </div>
+                            {isMobile && (
                                 <button
-                                    key={value}
                                     type="button"
-                                    role="tab"
-                                    aria-selected={state === value}
-                                    onClick={() => { setState(value); setPage(0); setSelected(null); }}
-                                    className={`border px-3 py-1 text-[11px] font-semibold transition ${state === value ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:bg-canvas'}`}
+                                    onClick={() => setFiltersOpen(true)}
+                                    className="inline-flex min-h-11 shrink-0 items-center gap-1.5 border border-line bg-surface px-3 text-sm font-medium text-ink"
                                 >
-                                    {value === 'open' ? 'Open' : 'Closed'}
+                                    <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                                    Filters
+                                    {kinds.length + sources.length > 0 && (
+                                        <span className="inline-flex h-5 min-w-5 items-center justify-center bg-action px-1 text-[11px] font-semibold text-white">{kinds.length + sources.length}</span>
+                                    )}
                                 </button>
-                            ))}
+                            )}
                         </div>
-                        <div className="flex flex-wrap gap-3">
-                            <Pills
-                                label="Kind"
-                                options={kindOptions}
-                                selected={kinds}
-                                onToggle={(v) => { setKinds((prev) => toggled(prev, v as EventRevisionKind)); setPage(0); }}
-                            />
-                            <Pills
-                                label="Source"
-                                options={sourceOptions}
-                                selected={sources}
-                                onToggle={(v) => { setSources((prev) => toggled(prev, v as EventRevisionSource)); setPage(0); }}
-                            />
-                        </div>
+                        {!isMobile && (
+                            <div className="flex flex-wrap gap-3">
+                                <Pills
+                                    label="Kind"
+                                    options={kindOptions}
+                                    selected={kinds}
+                                    onToggle={(v) => { setKinds((prev) => toggled(prev, v as EventRevisionKind)); setPage(0); }}
+                                />
+                                <Pills
+                                    label="Source"
+                                    options={sourceOptions}
+                                    selected={sources}
+                                    onToggle={(v) => { setSources((prev) => toggled(prev, v as EventRevisionSource)); setPage(0); }}
+                                />
+                            </div>
+                        )}
                     </div>
                     {error && <p role="alert" className="border-b border-danger/20 bg-danger/10 px-4 py-1.5 text-[11px] text-danger">{error}</p>}
                     <div className="flex-1 overflow-y-auto">
@@ -352,6 +412,42 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                             <p className="mt-8 text-center text-xs text-muted">Loading…</p>
                         ) : items.length === 0 ? (
                             <p className="mt-8 text-center text-xs text-muted">{state === 'open' ? 'Nothing to review.' : 'No closed changes.'}</p>
+                        ) : isMobile ? (
+                            <>
+                                <ul className="divide-y divide-line">
+                                    {items.map((change) => (
+                                        <li key={change.id}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelected(change)}
+                                                className="flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-canvas"
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    <span className={`inline-block px-1.5 py-0.5 text-[11px] font-medium ${KIND_META[change.kind].cls}`}>{KIND_META[change.kind].label}</span>
+                                                    <span className="ml-auto text-xs text-ink-soft">
+                                                        {state === 'open' ? age(change.created_at) : STATUS_LABELS[change.status] ?? change.status}
+                                                    </span>
+                                                </span>
+                                                <span className="flex min-w-0 items-start gap-1 text-sm font-medium text-ink">
+                                                    {change.event && (change.event.occurrences > 1 || change.series_dates > 1) && (
+                                                        <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-soft" aria-label="Series" role="img" />
+                                                    )}
+                                                    <span className="line-clamp-2">{change.event?.title ?? '—'}</span>
+                                                </span>
+                                                <span className="truncate text-xs text-ink-soft">{summary(change)}</span>
+                                                <span className="truncate text-xs text-muted">
+                                                    {[
+                                                        change.event ? formatCompactDateRange(change.event) : null,
+                                                        SOURCE_LABELS[change.source],
+                                                        proposer(change),
+                                                    ].filter(Boolean).join(' · ')}
+                                                </span>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <AdminLoadMore shown={items.length} total={total} loading={loading} onLoadMore={loadMore} />
+                            </>
                         ) : (
                             <table className="w-full table-fixed text-[11px]">
                                 <thead className="sticky top-0 z-10 border-b border-line bg-canvas">
@@ -406,7 +502,7 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                             </table>
                         )}
                     </div>
-                    {totalPages > 1 && (
+                    {!isMobile && totalPages > 1 && (
                         <div className="flex shrink-0 items-center justify-between border-t border-line bg-canvas px-4 py-2">
                             <span className="text-[10px] text-muted">{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}</span>
                             <div className="flex gap-1">
@@ -431,6 +527,47 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                 onClose={() => setEventId(null)}
                 onEventUpdated={() => load()}
             />
+            {isMobile && isOpen && filtersOpen && (
+                <BottomSheet
+                    title="Filters"
+                    onClose={() => setFiltersOpen(false)}
+                    headerAction={kinds.length + sources.length > 0 ? (
+                        <button type="button" onClick={() => { setKinds([]); setSources([]); setPage(0); }} className="min-h-11 px-2 text-sm font-medium text-action">Reset</button>
+                    ) : undefined}
+                    footer={
+                        <button type="button" onClick={() => setFiltersOpen(false)} className="min-h-11 w-full bg-action text-sm font-semibold text-white hover:opacity-90">
+                            {loading ? 'Loading…' : `Show ${total} change${total === 1 ? '' : 's'}`}
+                        </button>
+                    }
+                >
+                    <div className="space-y-5 pb-2">
+                        {([
+                            ['Kind', kindOptions, kinds as string[], (v: string) => setKinds((prev) => toggled(prev, v as EventRevisionKind))],
+                            ['Source', sourceOptions, sources as string[], (v: string) => setSources((prev) => toggled(prev, v as EventRevisionSource))],
+                        ] as const).map(([label, options, selectedValues, onToggle]) => (
+                            <section key={label} className="space-y-2">
+                                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">{label}</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {options.map((o) => {
+                                        const active = selectedValues.includes(o.value);
+                                        return (
+                                            <button
+                                                key={o.value}
+                                                type="button"
+                                                aria-pressed={active}
+                                                onClick={() => { onToggle(o.value); setPage(0); }}
+                                                className={`inline-flex min-h-10 items-center gap-1.5 border px-3 text-sm transition ${active ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:border-action hover:text-action'}`}
+                                            >
+                                                {o.label} <span className="opacity-70">{o.count}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        ))}
+                    </div>
+                </BottomSheet>
+            )}
         </>
     );
 }

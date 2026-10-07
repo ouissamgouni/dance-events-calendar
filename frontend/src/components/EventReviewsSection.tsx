@@ -114,10 +114,13 @@ function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onC
 
 interface Props {
     eventId: string;
-    /** Whether the edition has already taken place. Upcoming editions can't be
-     * reviewed, so their section shows the series' typical experience instead of
-     * a review list. Defaults to true (treat as reviewable) when unknown. */
+    /** Whether the edition has already taken place. Upcoming editions in a
+     * series show the series' pooled experience instead of their own list.
+     * Defaults to true when unknown. */
     isPast?: boolean;
+    /** Whether the edition has started (defaults to `isPast`); from then on,
+     * reviews written about earlier editions move to their own block. */
+    hasStarted?: boolean;
     /** Notifies parent when aggregate count is known (so the rate button can highlight). */
     onAggregateLoaded?: (agg: EventRatingAggregate | null) => void;
     /** Called when user clicks "Be the first to review" in the empty state. Allows parent to open the review form. */
@@ -132,7 +135,7 @@ interface Props {
 
 const PAGE_SIZE = 5;
 
-export default function EventReviewsSection({ eventId, isPast = true, onAggregateLoaded, onOpenReviewForm, refreshToken, collapsible = false }: Props) {
+export default function EventReviewsSection({ eventId, isPast = true, hasStarted, onAggregateLoaded, onOpenReviewForm, refreshToken, collapsible = false }: Props) {
     const { user } = useAuth();
     const location = useLocation();
     const [collapsed, setCollapsed] = useState(false);
@@ -167,14 +170,31 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
         loadAggregate();
     }, [loadAggregate]);
 
-    useEffect(() => {
-        if (!user) { setSeries(null); return; }
+    const loadSeries = useCallback(() => {
+        if (!user) { setSeries(null); return () => { }; }
         let cancelled = false;
         fetchEventSeriesRollup(eventId)
             .then((s) => { if (!cancelled) setSeries(s); })
             .catch(() => { if (!cancelled) setSeries(null); });
         return () => { cancelled = true; };
     }, [eventId, user]);
+
+    useEffect(() => loadSeries(), [loadSeries]);
+
+    // Once this edition has started, reviews written about earlier editions
+    // (while it was upcoming) are listed separately from its own.
+    const started = hasStarted ?? isPast;
+    const [earlierReviews, setEarlierReviews] = useState<EventReviewPublic[]>([]);
+    const loadEarlier = useCallback(() => {
+        if (!user || !started) { setEarlierReviews([]); return; }
+        fetchEventReviews(eventId, { scope: 'past_edition', limit: 20 })
+            .then((res) => setEarlierReviews(res.items))
+            .catch(() => setEarlierReviews([]));
+    }, [eventId, user, started]);
+
+    useEffect(() => {
+        loadEarlier();
+    }, [loadEarlier]);
 
     useEffect(() => {
         fetchAspectTagGroups()
@@ -234,7 +254,9 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
         lastRefreshToken.current = refreshToken;
         loadAggregate();
         loadPage(0, true);
-    }, [refreshToken, loadAggregate, loadPage]);
+        loadSeries();
+        loadEarlier();
+    }, [refreshToken, loadAggregate, loadPage, loadSeries, loadEarlier]);
 
     // Signed-out visitors: report the public review count so the parent (rate
     // button highlight / anchor) stays in sync even though content is gated.
@@ -260,6 +282,28 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                 ▸
             </span>
         </button>
+    ) : null;
+
+    const earlierBlock = started && !crossEdition && earlierReviews.length > 0 ? (
+        <details className="border-t border-line pt-3 text-xs">
+            <summary className="cursor-pointer font-medium text-ink-soft">
+                From earlier editions ({earlierReviews.length})
+            </summary>
+            <ul className="mt-2 space-y-2">
+                {earlierReviews.map((r) => {
+                    const meta = r.overall_sentiment ? SENTIMENT_META[r.overall_sentiment] : null;
+                    return (
+                        <li key={r.id} className="space-y-0.5">
+                            <div className="text-ink-soft">
+                                <span className="font-medium text-ink">{r.reviewer_label}</span>
+                                {meta && <> · {meta.emoji} {meta.label}</>}
+                            </div>
+                            {r.comment && <p className="text-ink whitespace-pre-wrap break-words">{r.comment}</p>}
+                        </li>
+                    );
+                })}
+            </ul>
+        </details>
     ) : null;
 
     if (!user) {
@@ -291,7 +335,7 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                 {!collapsed && (
                     <>
                         {typicalCard}
-                        {isPast ? (
+                        {started ? (
                             <p className="text-[11px] text-ink-soft">
                                 No reviews for this edition yet.{' '}
                                 {onOpenReviewForm ? (
@@ -307,9 +351,20 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                             </p>
                         ) : (
                             <p className="text-[11px] text-ink-soft">
-                                Reviews open after the event takes place.
+                                No reviews yet.{' '}
+                                {onOpenReviewForm ? (
+                                    <button
+                                        onClick={onOpenReviewForm}
+                                        className="text-sky-600 hover:text-sky-700 font-medium"
+                                    >
+                                        Been to an earlier edition? Share how it was.
+                                    </button>
+                                ) : (
+                                    <span>Been to an earlier edition? Share how it was.</span>
+                                )}
                             </p>
                         )}
+                        {earlierBlock}
                     </>
                 )}
             </section>
@@ -374,6 +429,11 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                                         {r.comment && (
                                             <p className="text-xs text-ink whitespace-pre-wrap break-words">{r.comment}</p>
                                         )}
+                                        {r.scope === 'past_edition' && (
+                                            <span className="inline-block bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-ink-soft">
+                                                Attended an earlier edition
+                                            </span>
+                                        )}
                                         {tags.length > 0 && (
                                             <div className="flex flex-wrap gap-1.5">
                                                 {shown.map((t) => (
@@ -431,8 +491,9 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                         onSelect={reviewDots.scrollToIndex}
                         label="Reviews scroll position"
                     />
+                    {earlierBlock}
                     <p className="text-[11px] text-ink-soft">
-                        Reviews are written by signed-in members once the event is over. Written comments are checked by our team before they appear; attendance isn’t verified.
+                        Reviews are written by signed-in members who attended this or an earlier edition. Written comments are checked by our team before they appear; attendance isn’t verified.
                     </p>
 
                     {expandedReview && (

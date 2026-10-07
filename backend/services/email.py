@@ -460,12 +460,12 @@ def send_event_review_prompt_email(
         subject = f"{friend_proof} shared their experience at {event.title or 'your event'} — share yours"
         heading = "Your friends shared their experience 💃"
         lede = f"<p><strong>{who}</strong> shared their experience of:</p>"
-        tagline = "Add yours to help others discover great nights out."
+        tagline = "Add yours to help others discover great events."
     else:
         subject = f"How was {event.title or 'your event'}?"
-        heading = "How was your night? 💃"
+        heading = "How was it? 💃"
         lede = "<p>You went to:</p>"
-        tagline = "Share a quick rating to help others discover great nights out."
+        tagline = "Share a quick rating to help others discover great events."
     body = f"""
     {lede}
     <p style="font-size:18px;font-weight:600;margin:8px 0">{title_link}</p>
@@ -553,10 +553,10 @@ def send_event_memories_prompt_email(
         event,
         path="memories",
         notification_id=notification_id,
-        subject=f"Relive {event.title or 'your night'} 📸",
-        heading="Relive the night 📸",
+        subject=f"Relive {event.title or 'the moment'} 📸",
+        heading="Relive the moment 📸",
         lede="You went to:",
-        tagline="Add a few photos to remember the night.",
+        tagline="Add a few photos to remember it.",
         button="Add memories",
         category="memories_prompt",
         label="event memories prompts",

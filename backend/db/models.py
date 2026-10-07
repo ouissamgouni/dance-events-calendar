@@ -1528,6 +1528,9 @@ class EventRating(SQLModel, table=True):
     stars: int = Field(ge=1, le=5)
     comment: Optional[str] = Field(default=None, sa_column=Column(Text))
     is_anonymous: bool = Field(default=False)
+    # this_edition | past_edition (written from an upcoming edition about an
+    # earlier one). Unique per (user_id, event_id, scope) via partial index.
+    scope: str = Field(default="this_edition", max_length=20)
 
     # Headline sentiment (amazing|great|okay|disappointing|bad). Required by the
     # API; nullable at the column level only for defensive backfill.

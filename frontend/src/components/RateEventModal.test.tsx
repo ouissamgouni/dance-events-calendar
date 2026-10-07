@@ -268,3 +268,67 @@ describe('RateEventModal', () => {
         expect(await screen.findByRole('heading', { name: 'You wanna say something?' })).toBeInTheDocument()
     })
 })
+
+describe('RateEventModal — earlier edition', () => {
+    const renderPastEdition = () => renderWithProviders(
+        <FeatureFlagsProvider>
+            <RateEventModal
+                eventId="evt-upcoming"
+                scope="past_edition"
+                initialRating={null}
+                onClose={() => { }}
+                onSubmitted={() => { }}
+            />
+        </FeatureFlagsProvider>,
+    )
+
+    const captureSubmit = () => {
+        const submitted: { eventId: string; body: Record<string, unknown> }[] = []
+        server.use(
+            http.get('*/api/tags', () => HttpResponse.json([])),
+            http.post('*/api/events/:eventId/feedback', async ({ request, params }) => {
+                const body = (await request.json()) as Record<string, unknown>
+                submitted.push({ eventId: String(params.eventId), body })
+                return HttpResponse.json(ratingResponse(body), { status: 201 })
+            }),
+        )
+        return submitted
+    }
+
+    const submitAmazing = async (user: ReturnType<typeof renderWithProviders>['user']) => {
+        await user.click(await screen.findByRole('radio', { name: /Amazing/i }))
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        await user.click(screen.getByRole('button', { name: /Submit/i }))
+        expect(await screen.findByText('Thanks for your feedback!')).toBeInTheDocument()
+    }
+
+    it('reviews the picked past edition of a series', async () => {
+        const submitted = captureSubmit()
+        server.use(http.get('*/api/events/:eventId/series', () => HttpResponse.json({
+            series_id: 1,
+            editions: [
+                { event_id: 'evt-upcoming', title: 'Social', start: '2099-01-01T20:00:00Z' },
+                { event_id: 'evt-last-month', title: 'Social', start: '2020-01-01T20:00:00Z' },
+            ],
+        })))
+        const { user } = renderPastEdition()
+
+        expect(await screen.findByRole('heading', { name: 'Which edition did you go to?' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /An earlier one/ })).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: new RegExp(new Date('2020-01-01T20:00:00Z').toLocaleDateString().replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')) }))
+        await submitAmazing(user)
+
+        expect(submitted).toEqual([{ eventId: 'evt-last-month', body: expect.objectContaining({ scope: 'this_edition' }) }])
+    })
+
+    it('stores an earlier-edition review on the upcoming event when no past edition is listed', async () => {
+        const submitted = captureSubmit()
+        server.use(http.get('*/api/events/:eventId/series', () => HttpResponse.json(null)))
+        const { user } = renderPastEdition()
+
+        await submitAmazing(user)
+
+        expect(submitted).toEqual([{ eventId: 'evt-upcoming', body: expect.objectContaining({ scope: 'past_edition' }) }])
+    })
+})

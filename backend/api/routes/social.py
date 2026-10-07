@@ -3213,6 +3213,7 @@ def _merge_ratings(
             select(EventRating).where(
                 (EventRating.user_id == destination_user_id)
                 & (EventRating.event_id == rating.event_id)
+                & (EventRating.scope == rating.scope)
             )
         ).first()
         if existing:

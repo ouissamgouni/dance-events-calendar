@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { CalendarDays } from 'lucide-react';
 import { EventMergedError, fetchEvent, updateEvent } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { trackView } from '../utils/tracking';
 import { eventDisplayZone } from '../utils/eventDates';
 import { useReferralAttribution } from '../hooks/useReferralAttribution';
+import useMediaQuery from '../hooks/useMediaQuery';
 import AdminEventDetailContent from '../components/AdminEventDetailContent';
 import EventImageEditor from '../components/EventImageEditor';
 import GoingButton from '../components/GoingButton';
@@ -27,6 +29,7 @@ import ReviewsTab from '../components/event-tabs/ReviewsTab';
 import DiscussionTab from '../components/event-tabs/DiscussionTab';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useEventAssetSummary } from '../context/EventAssetSummaryContext';
+import { useMyPlanCount } from '../context/MyPlanCountContext';
 import type { CalendarEvent } from '../types';
 
 export default function EventDetailPage() {
@@ -41,6 +44,8 @@ export default function EventDetailPage() {
     const { eventScheduleEnabled, showRatings, eventTicketsEnabled, eventMemoriesEnabled } = useFeatureFlags();
     const [nowMs] = useState(() => Date.now());
     const assetSummary = useEventAssetSummary(user && eventMemoriesEnabled && eventId ? eventId : null);
+    const isMobile = useMediaQuery('(max-width: 639px)');
+    const hasPlan = (useMyPlanCount(eventScheduleEnabled && event?.schedule_published ? event.event_id : null) ?? 0) > 0;
 
     // Edit mode — admin must explicitly activate inline editing
     const [editMode, setEditMode] = useState(false);
@@ -78,9 +83,12 @@ export default function EventDetailPage() {
     const [activeTab, setActiveTab] = useState<EventDetailTab>(initialTab);
     const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
 
-    const goToTab = (tab: EventDetailTab, opts?: { anchor?: string }) => {
+    const goToTab = (tab: EventDetailTab, opts?: { anchor?: string; plan?: boolean }) => {
         if (tab === 'program') {
-            navigate(`/event/${eventId}/program`, { state: { fromEventDetail: true } });
+            // Mobile pushes Program over the mounted event page so back keeps its tab and scroll.
+            navigate(`/event/${eventId}/program${opts?.plan ? '/plan' : ''}`, {
+                state: isMobile ? { fromEventDetail: true, backgroundLocation: location } : { fromEventDetail: true },
+            });
             return;
         }
         if (location.hash === '#memories') {
@@ -297,6 +305,7 @@ export default function EventDetailPage() {
     const end = new Date(event.end);
     const isPast = end.getTime() < Date.now();
     const showMemoriesTab = Boolean(user) && eventMemoriesEnabled && start.getTime() <= nowMs;
+    const hasProgram = eventScheduleEnabled && Boolean(event.schedule_published);
     const requestedTab: EventDetailTab = location.hash === '#memories' ? 'memories' : activeTab;
     const tab: EventDetailTab = requestedTab === 'memories' && !showMemoriesTab ? 'overview' : requestedTab;
     // `#ticket` (nudges, post-RSVP popover) opens the ticket sheet; closing drops the hash.
@@ -431,6 +440,16 @@ export default function EventDetailPage() {
                                 <span className="contents lg:hidden">
                                     <TicketAction event={event} variant="full" dismissible />
                                 </span>
+                                {isMobile && hasProgram && (
+                                    <button
+                                        type="button"
+                                        onClick={() => goToTab('program', { plan: hasPlan })}
+                                        className="inline-flex items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-action hover:bg-canvas"
+                                    >
+                                        <CalendarDays size={16} aria-hidden="true" />
+                                        {hasPlan ? 'My Plan' : 'Program'}
+                                    </button>
+                                )}
                                 {showMemoriesTab && (
                                     <button
                                         type="button"
@@ -449,7 +468,7 @@ export default function EventDetailPage() {
                                         <EventDetailTabsBar
                                             active={tab}
                                             onSelect={(t) => goToTab(t)}
-                                            showProgram={eventScheduleEnabled && Boolean(event.schedule_published)}
+                                            showProgram={hasProgram && !isMobile}
                                             showMemories={showMemoriesTab}
                                         />
                                     </div>
@@ -476,8 +495,10 @@ export default function EventDetailPage() {
                                                     <ReviewsTab
                                                         eventId={event.event_id}
                                                         isPast={isPast}
+                                                        hasStarted={start.getTime() <= nowMs}
                                                         onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)}
                                                         onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)}
+                                                        onRatingChanged={() => setReviewsRefreshToken((t) => t + 1)}
                                                         refreshToken={reviewsRefreshToken}
                                                     />
                                                 </div>

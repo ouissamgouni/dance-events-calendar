@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { SlidersHorizontal } from 'lucide-react';
 import { fetchAdminNotificationsLog } from '../api';
+import useMediaQuery from '../hooks/useMediaQuery';
+import BottomSheet from './BottomSheet';
+import AdminLoadMore from './AdminLoadMore';
 import type {
     NotificationLogChannel,
     NotificationLogEntry,
@@ -93,6 +97,8 @@ export default function AdminNotificationsTab() {
     const [mode, setMode] = useState<NotificationLogMode | ''>('');
     const [source, setSource] = useState<NotificationLogSource | ''>('');
     const [offset, setOffset] = useState(0);
+    const isMobile = useMediaQuery('(max-width: 639px)');
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -105,7 +111,7 @@ export default function AdminNotificationsTab() {
                 source: source || undefined,
                 q: q.trim() || undefined,
                 limit: PAGE_SIZE,
-                offset,
+                offset: isMobile ? 0 : offset,
             });
             setRows(res.items);
             setTotal(res.total);
@@ -114,9 +120,39 @@ export default function AdminNotificationsTab() {
         } finally {
             setLoading(false);
         }
-    }, [type, channel, mode, source, q, offset]);
+    }, [type, channel, mode, source, q, offset, isMobile]);
 
     useEffect(() => { load(); }, [load]);
+
+    const loadMore = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchAdminNotificationsLog({
+                type: type || undefined,
+                channel: channel || undefined,
+                mode: mode || undefined,
+                source: source || undefined,
+                q: q.trim() || undefined,
+                limit: PAGE_SIZE,
+                offset: rows.length,
+            });
+            const seen = new Set(rows.map((r) => r.id));
+            setRows([...rows, ...res.items.filter((r) => !seen.has(r.id))]);
+            setTotal(res.total);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to load notifications');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filterSelects: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }[] = [
+        { label: 'Type', value: type, onChange: (v) => setType(v as NotificationLogType | ''), options: [['', 'Any'], ['interest_match', 'Interest match'], ['activity_digest', 'Activity digest'], ['event_reminder', 'Reminder'], ['review_prompt', 'Review prompt']] },
+        { label: 'Channel', value: channel, onChange: (v) => setChannel(v as NotificationLogChannel | ''), options: [['', 'Any'], ['app', 'App'], ['email', 'Email'], ['push', 'Push']] },
+        { label: 'Email mode', value: mode, onChange: (v) => setMode(v as NotificationLogMode | ''), options: [['', 'Any'], ['instant', 'Instant'], ['digest', 'Digest']] },
+        { label: 'Sent by', value: source, onChange: (v) => setSource(v as NotificationLogSource | ''), options: [['', 'Any'], ['job', 'Delivery job'], ['tick', 'Scheduler tick'], ['admin', 'Admin trigger'], ['request', 'Request']] },
+    ];
+    const activeFilterCount = filterSelects.filter((f) => f.value !== '').length;
 
     // Reset pagination whenever a filter changes — avoids landing on an
     // empty page after narrowing the result set.
@@ -144,76 +180,102 @@ export default function AdminNotificationsTab() {
                 </span>
             </header>
 
-            <div className="flex flex-wrap items-center gap-4 text-xs">
-                <input
-                    type="search"
-                    value={q}
-                    onChange={(e) => {
-                        setQ(e.target.value);
-                        setOffset(0);
-                    }}
-                    placeholder="Search recipient handle, name, email"
-                    className="w-40 border border-line px-2 py-1 text-xs"
-                    aria-label="Search notifications by recipient"
-                />
-                <label className="flex items-center gap-1.5">
-                    Type
-                    <select
-                        value={type}
-                        onChange={(e) => setType(e.target.value as NotificationLogType | '')}
-                        className="border border-line px-2 py-1 text-xs"
-                        aria-label="Filter by notification type"
+            {isMobile && (
+                <div className="flex gap-2">
+                    <input
+                        type="search"
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        placeholder="Search recipient"
+                        className="min-h-11 min-w-0 flex-1 border border-line px-3 text-base"
+                        aria-label="Search notifications by recipient"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setFiltersOpen(true)}
+                        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 border border-line bg-surface px-3 text-sm font-medium text-ink"
                     >
-                        <option value="">Any</option>
-                        <option value="interest_match">Interest match</option>
-                        <option value="activity_digest">Activity digest</option>
-                        <option value="event_reminder">Reminder</option>
-                        <option value="review_prompt">Review prompt</option>
-                    </select>
-                </label>
-                <label className="flex items-center gap-1.5">
-                    Channel
-                    <select
-                        value={channel}
-                        onChange={(e) => setChannel(e.target.value as NotificationLogChannel | '')}
-                        className="border border-line px-2 py-1 text-xs"
-                        aria-label="Filter by delivery channel"
-                    >
-                        <option value="">Any</option>
-                        <option value="app">App</option>
-                        <option value="email">Email</option>
-                        <option value="push">Push</option>
-                    </select>
-                </label>
-                <label className="flex items-center gap-1.5">
-                    Email mode
-                    <select
-                        value={mode}
-                        onChange={(e) => setMode(e.target.value as NotificationLogMode | '')}
-                        className="border border-line px-2 py-1 text-xs"
-                        aria-label="Filter by email mode"
-                    >
-                        <option value="">Any</option>
-                        <option value="instant">Instant</option>
-                        <option value="digest">Digest</option>
-                    </select>
-                </label>
-                <label className="flex items-center gap-1.5">
-                    Sent by
-                    <select
-                        value={source}
-                        onChange={(e) => setSource(e.target.value as NotificationLogSource | '')}
-                        className="border border-line px-2 py-1 text-xs"
-                        aria-label="Filter by sender"
-                    >
-                        <option value="">Any</option>
-                        <option value="job">Delivery job</option>
-                        <option value="tick">Scheduler tick</option>
-                        <option value="admin">Admin trigger</option>
-                        <option value="request">Request</option>
-                    </select>
-                </label>
-            </div>
+                        <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                        Filters
+                        {activeFilterCount > 0 && (
+                            <span className="inline-flex h-5 min-w-5 items-center justify-center bg-action px-1 text-[11px] font-semibold text-white">{activeFilterCount}</span>
+                        )}
+                    </button>
+                </div>
+            )}
+
+            {!isMobile && (
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <input
+                        type="search"
+                        value={q}
+                        onChange={(e) => {
+                            setQ(e.target.value);
+                            setOffset(0);
+                        }}
+                        placeholder="Search recipient handle, name, email"
+                        className="w-40 border border-line px-2 py-1 text-xs"
+                        aria-label="Search notifications by recipient"
+                    />
+                    <label className="flex items-center gap-1.5">
+                        Type
+                        <select
+                            value={type}
+                            onChange={(e) => setType(e.target.value as NotificationLogType | '')}
+                            className="border border-line px-2 py-1 text-xs"
+                            aria-label="Filter by notification type"
+                        >
+                            <option value="">Any</option>
+                            <option value="interest_match">Interest match</option>
+                            <option value="activity_digest">Activity digest</option>
+                            <option value="event_reminder">Reminder</option>
+                            <option value="review_prompt">Review prompt</option>
+                        </select>
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                        Channel
+                        <select
+                            value={channel}
+                            onChange={(e) => setChannel(e.target.value as NotificationLogChannel | '')}
+                            className="border border-line px-2 py-1 text-xs"
+                            aria-label="Filter by delivery channel"
+                        >
+                            <option value="">Any</option>
+                            <option value="app">App</option>
+                            <option value="email">Email</option>
+                            <option value="push">Push</option>
+                        </select>
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                        Email mode
+                        <select
+                            value={mode}
+                            onChange={(e) => setMode(e.target.value as NotificationLogMode | '')}
+                            className="border border-line px-2 py-1 text-xs"
+                            aria-label="Filter by email mode"
+                        >
+                            <option value="">Any</option>
+                            <option value="instant">Instant</option>
+                            <option value="digest">Digest</option>
+                        </select>
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                        Sent by
+                        <select
+                            value={source}
+                            onChange={(e) => setSource(e.target.value as NotificationLogSource | '')}
+                            className="border border-line px-2 py-1 text-xs"
+                            aria-label="Filter by sender"
+                        >
+                            <option value="">Any</option>
+                            <option value="job">Delivery job</option>
+                            <option value="tick">Scheduler tick</option>
+                            <option value="admin">Admin trigger</option>
+                            <option value="request">Request</option>
+                        </select>
+                    </label>
+                </div>
+            )}
 
             {error && (
                 <div className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-danger">
@@ -221,53 +283,76 @@ export default function AdminNotificationsTab() {
                 </div>
             )}
 
-            <div className="overflow-x-auto border border-line">
-                <table className="w-full text-xs">
-                    <thead className="bg-canvas text-left text-xs uppercase text-ink-soft">
-                        <tr>
-                            <th className="px-3 py-2">Date/time</th>
-                            <th className="px-3 py-2">User</th>
-                            <th className="px-3 py-2">Type</th>
-                            <th className="px-3 py-2">Channel</th>
-                            <th className="px-3 py-2" title="Email mode · sender · time since the notification was created">Delivery</th>
-                            <th className="px-3 py-2">About</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {!loading && rows.length === 0 && (
-                            <tr>
-                                <td colSpan={6} className="px-3 py-8 text-center text-ink-soft">
-                                    No notifications match these filters.
-                                </td>
-                            </tr>
-                        )}
+            {isMobile ? (
+                <div className="-mx-4">
+                    {!loading && rows.length === 0 && (
+                        <p className="px-4 py-8 text-center text-sm text-ink-soft">No notifications match these filters.</p>
+                    )}
+                    <ul className="divide-y divide-line border-y border-line bg-surface">
                         {rows.map((row) => (
-                            <tr key={row.id} className="border-t border-line hover:bg-canvas">
-                                <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
-                                    {fmtDateTime(row.delivered_at)}
-                                </td>
-                                <td className="px-3 py-2 truncate max-w-[20rem]">
-                                    {recipientLabel(row)}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap" title={row.kind}>
-                                    {TYPE_LABELS[row.type] || row.type}
-                                </td>
-                                <td className="px-3 py-2">
+                            <li key={row.id} className="space-y-1 px-4 py-3 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium text-ink" title={row.kind}>{TYPE_LABELS[row.type] || row.type}</span>
                                     <ChannelBadge channel={row.channel} />
-                                </td>
-                                <td className="px-3 py-2">
-                                    <DeliveryCell row={row} />
-                                </td>
-                                <td className="px-3 py-2">
-                                    <AboutCell row={row} />
-                                </td>
-                            </tr>
+                                    <span className="ml-auto text-xs text-ink-soft">{fmtDateTime(row.delivered_at)}</span>
+                                </div>
+                                <p className="truncate text-xs text-ink-soft">{recipientLabel(row)}</p>
+                                <div className="text-xs"><AboutCell row={row} /></div>
+                                <div className="text-xs"><DeliveryCell row={row} /></div>
+                            </li>
                         ))}
-                    </tbody>
-                </table>
-            </div>
+                    </ul>
+                    <AdminLoadMore shown={rows.length} total={total} loading={loading} onLoadMore={loadMore} />
+                </div>
+            ) : (
+                <div className="overflow-x-auto border border-line">
+                    <table className="w-full text-xs">
+                        <thead className="bg-canvas text-left text-xs uppercase text-ink-soft">
+                            <tr>
+                                <th className="px-3 py-2">Date/time</th>
+                                <th className="px-3 py-2">User</th>
+                                <th className="px-3 py-2">Type</th>
+                                <th className="px-3 py-2">Channel</th>
+                                <th className="px-3 py-2" title="Email mode · sender · time since the notification was created">Delivery</th>
+                                <th className="px-3 py-2">About</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {!loading && rows.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} className="px-3 py-8 text-center text-ink-soft">
+                                        No notifications match these filters.
+                                    </td>
+                                </tr>
+                            )}
+                            {rows.map((row) => (
+                                <tr key={row.id} className="border-t border-line hover:bg-canvas">
+                                    <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
+                                        {fmtDateTime(row.delivered_at)}
+                                    </td>
+                                    <td className="px-3 py-2 truncate max-w-[20rem]">
+                                        {recipientLabel(row)}
+                                    </td>
+                                    <td className="px-3 py-2 whitespace-nowrap" title={row.kind}>
+                                        {TYPE_LABELS[row.type] || row.type}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <ChannelBadge channel={row.channel} />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <DeliveryCell row={row} />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <AboutCell row={row} />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
-            {total > PAGE_SIZE && (
+            {!isMobile && total > PAGE_SIZE && (
                 <div className="flex items-center justify-between text-xs">
                     <button
                         type="button"
@@ -289,6 +374,35 @@ export default function AdminNotificationsTab() {
                         Next →
                     </button>
                 </div>
+            )}
+            {isMobile && filtersOpen && (
+                <BottomSheet
+                    title="Filters"
+                    onClose={() => setFiltersOpen(false)}
+                    headerAction={activeFilterCount > 0 ? (
+                        <button type="button" onClick={() => filterSelects.forEach((f) => f.onChange(''))} className="min-h-11 px-2 text-sm font-medium text-action">Reset</button>
+                    ) : undefined}
+                    footer={
+                        <button type="button" onClick={() => setFiltersOpen(false)} className="min-h-11 w-full bg-action text-sm font-semibold text-white hover:opacity-90">
+                            {loading ? 'Loading…' : `Show ${total.toLocaleString()} result${total === 1 ? '' : 's'}`}
+                        </button>
+                    }
+                >
+                    <div className="space-y-4 pb-2">
+                        {filterSelects.map((f) => (
+                            <label key={f.label} className="block space-y-1">
+                                <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">{f.label}</span>
+                                <select
+                                    value={f.value}
+                                    onChange={(e) => f.onChange(e.target.value)}
+                                    className="min-h-11 w-full border border-line bg-surface px-3 text-base text-ink"
+                                >
+                                    {f.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                </select>
+                            </label>
+                        ))}
+                    </div>
+                </BottomSheet>
             )}
         </section>
     );

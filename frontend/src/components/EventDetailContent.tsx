@@ -680,7 +680,7 @@ export default function EventDetailContent({
                     <div className="border-t border-card-line pt-3 flex items-center gap-2 flex-wrap">
                         <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" />
                         <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={new Date(event.end).getTime() < Date.now()} />
-                        {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" isEventDetailPage showCount={false} isPast={new Date(event.end).getTime() < Date.now()} />}
+                        {showRatings && new Date(event.start).getTime() <= Date.now() && <RateEventButton eventId={event.event_id} appearance="pill" isEventDetailPage showCount={false} hasStarted />}
                         <ShareButton
                             eventId={event.event_id}
                             title={event.title}

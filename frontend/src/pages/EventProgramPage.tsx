@@ -37,6 +37,8 @@ export default function EventProgramPage() {
     const unavailable = flagsReady && !eventScheduleEnabled && !preview;
     const activeTab = location.pathname.endsWith('/plan') ? 'plan' : 'program';
     const fromEventDetail = Boolean((location.state as { fromEventDetail?: boolean } | null)?.fromEventDetail);
+    const inOverlay = Boolean((location.state as { backgroundLocation?: unknown } | null)?.backgroundLocation);
+    const [leaving, setLeaving] = useState(false);
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [schedule, setSchedule] = useState<EventSchedule | null>(null);
     const [plan, setPlan] = useState<MyPlanEntry[]>([]);
@@ -331,16 +333,27 @@ export default function EventProgramPage() {
         }
     };
     const backToEvent = () => {
-        if (fromEventDetail && window.history.length > 1) navigate(-1);
+        if (inOverlay && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) setLeaving(true);
+        else if (fromEventDetail && window.history.length > 1) navigate(-1);
         else navigate(`/event/${eventId}`, { replace: true });
     };
     const navigateProgramTab = (path: string) => navigate(path, { replace: true, state: location.state });
+    const shell = (content: React.ReactNode) => inOverlay ? (
+        <div
+            className={`fixed inset-0 z-[9000] flex flex-col bg-surface pt-[env(safe-area-inset-top)] shadow-2xl ${leaving ? 'animate-slide-out-right' : 'animate-slide-right'} motion-reduce:animate-none`}
+            onAnimationEnd={(animationEvent) => {
+                if (leaving && animationEvent.target === animationEvent.currentTarget) navigate(-1);
+            }}
+        >
+            <div className="min-h-0 flex-1">{content}</div>
+        </div>
+    ) : content;
 
-    if (unavailable) return <ProgramState title="Program unavailable" detail="The event program is not available." onBack={backToEvent} />;
-    if (error) return <ProgramState title="Program unavailable" detail={error} onBack={backToEvent} />;
-    if (!event || !schedule) return <ProgramState title="Loading program…" onBack={backToEvent} />;
+    if (unavailable) return shell(<ProgramState title="Program unavailable" detail="The event program is not available." onBack={backToEvent} />);
+    if (error) return shell(<ProgramState title="Program unavailable" detail={error} onBack={backToEvent} />);
+    if (!event || !schedule) return shell(<ProgramState title="Loading program…" onBack={backToEvent} />);
 
-    return (
+    return shell(
         <div className="flex h-full min-h-0 flex-col bg-canvas">
             {preview && !embeddedProgram ? <div className="shrink-0 bg-amber-50 px-4 py-2 text-center text-xs font-semibold text-amber-900">Draft preview · changes are not visible to attendees</div> : null}
             {!embeddedProgram ? <header className="shrink-0 bg-surface px-3 py-3">
@@ -371,7 +384,7 @@ export default function EventProgramPage() {
                         {plan.length ? <div className="shrink-0 border-b border-line bg-surface px-4 py-2 text-right">
                             <MyPlanUtilityMenu eventId={event.event_id} audience={planAudience} onAudienceChange={persistPlanAudience} />
                         </div> : null}
-                        <MyPlanList schedule={schedule} entries={plan} onOpen={openSession} onRemove={removePlanEntry} onProgram={() => navigate(`/event/${event.event_id}/program`)} />
+                        <MyPlanList schedule={schedule} entries={plan} onOpen={openSession} onRemove={removePlanEntry} onProgram={() => navigateProgramTab(`/event/${event.event_id}/program`)} />
                     </div>
                 ) : (
                     <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">

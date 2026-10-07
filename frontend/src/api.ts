@@ -20,6 +20,7 @@ import type {
     OwnEventChange,
     OwnSuggestion,
     OwnSuggestionUpdate,
+    ReviewScope,
     SuggestionAuditEntry,
 } from './types';
 
@@ -3448,6 +3449,18 @@ export interface PaginatedEventsResponse {
 export type AdminEventGeoStatus = 'geolocated' | 'ungeolocated' | 'no-location';
 
 export type AdminEventFlag = 'submitted' | 'wants_public' | 'changes';
+export type AdminEventPrice = 'paid' | 'free' | 'unknown';
+export type AdminEventDiscount = 'active' | 'expired';
+export type AdminEventProgram = 'published' | 'draft' | 'none';
+export type AdminEventReach = 'local' | 'regional' | 'international' | 'unset';
+export type AdminEventSort =
+    | 'start' | 'submitted' | 'title' | 'price' | 'views' | 'clicks'
+    | 'going' | 'saved' | 'engaged' | 'ratings' | 'messages' | 'memories';
+export const ADMIN_EVENT_HAS_KEYS = [
+    'has_ratings', 'has_messages', 'has_memories', 'has_organizer',
+    'has_image', 'has_links', 'has_tags', 'in_series',
+] as const;
+export type AdminEventHasKey = typeof ADMIN_EVENT_HAS_KEYS[number];
 
 export interface EventFilterParams {
     limit?: number;
@@ -3470,7 +3483,19 @@ export interface EventFilterParams {
     include_past?: boolean;
     /** One row per submission series (list only). */
     group?: 'series';
-    sort?: 'start' | 'submitted';
+    sort?: AdminEventSort;
+    order?: 'asc' | 'desc';
+    price?: AdminEventPrice[];
+    discount?: AdminEventDiscount[];
+    program?: AdminEventProgram[];
+    reach?: AdminEventReach[];
+    going_min?: number;
+    saved_min?: number;
+    engaged_min?: number;
+    /** Explicit dates replace the upcoming-only default. */
+    start_from?: string;
+    start_to?: string;
+    has?: Partial<Record<AdminEventHasKey, boolean>>;
 }
 
 export interface FilterOption {
@@ -3486,29 +3511,47 @@ export interface EventFilterOptionsResponse {
     flags: FilterOption[];
     geo_statuses: FilterOption[];
     tags: FilterOption[];
+    prices?: FilterOption[];
+    discounts?: FilterOption[];
+    programs?: FilterOption[];
+    reaches?: FilterOption[];
     total_count: number;
+    quick_views?: Record<string, number>;
+    has_counts?: Partial<Record<AdminEventHasKey, { yes: number; no: number }>>;
+    min_counts?: Partial<Record<'going_min' | 'saved_min' | 'engaged_min', number>>;
+    /** Each active filter alone (with search + dates), keyed by query param; `dates` = search + dates. */
+    dimension_counts?: Record<string, number>;
 }
 
-function setStatusParams(qs: URLSearchParams, params: EventFilterParams) {
-    if (params.audience?.length) qs.set('audience', params.audience.join(','));
-    if (params.status?.length) qs.set('status', params.status.join(','));
-    if (params.flags?.length) qs.set('flags', params.flags.join(','));
-}
-
-export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<PaginatedEventsResponse> {
-    const qs = new URLSearchParams();
-    if (params.limit != null) qs.set('limit', String(params.limit));
-    if (params.offset != null) qs.set('offset', String(params.offset));
+function setFilterParams(qs: URLSearchParams, params: EventFilterParams) {
     if (params.search) qs.set('search', params.search);
-    setStatusParams(qs, params);
+    for (const key of ['audience', 'status', 'flags', 'price', 'discount', 'program', 'reach'] as const) {
+        if (params[key]?.length) qs.set(key, params[key].join(','));
+    }
     if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.geo_status) qs.set('geo_status', params.geo_status);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
+    for (const key of ['going_min', 'saved_min', 'engaged_min'] as const) {
+        if (params[key]) qs.set(key, String(params[key]));
+    }
+    if (params.start_from) qs.set('start_from', params.start_from);
+    if (params.start_to) qs.set('start_to', params.start_to);
+    for (const [key, value] of Object.entries(params.has ?? {})) {
+        if (value != null) qs.set(key, String(value));
+    }
+}
+
+export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<PaginatedEventsResponse> {
+    const qs = new URLSearchParams();
+    if (params.limit != null) qs.set('limit', String(params.limit));
+    if (params.offset != null) qs.set('offset', String(params.offset));
+    setFilterParams(qs, params);
     if (params.group) qs.set('group', params.group);
     if (params.sort && params.sort !== 'start') qs.set('sort', params.sort);
+    if (params.order) qs.set('order', params.order);
     const res = await fetch(`${BASE}/admin/events?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch events');
     return res.json();
@@ -3516,14 +3559,7 @@ export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<
 
 export async function fetchEventFilterOptions(params: EventFilterParams = {}): Promise<EventFilterOptionsResponse> {
     const qs = new URLSearchParams();
-    if (params.search) qs.set('search', params.search);
-    setStatusParams(qs, params);
-    if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
-    if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
-    if (params.geo_status) qs.set('geo_status', params.geo_status);
-    if (params.ungeolocated) qs.set('ungeolocated', 'true');
-    if (params.future_only) qs.set('future_only', 'true');
-    if (params.include_past) qs.set('include_past', 'true');
+    setFilterParams(qs, params);
     const res = await fetch(`${BASE}/admin/events/filter-options?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch filter options');
     return res.json();
@@ -4768,7 +4804,10 @@ export async function deleteTag(tagId: number): Promise<void> {
         method: 'DELETE',
         credentials: 'include',
     });
-    if (!res.ok) throw new Error('Failed to delete tag');
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { detail?: string }).detail || 'Failed to delete tag');
+    }
 }
 
 // --- Tag Synonyms (heuristic suggester) ---
@@ -4825,14 +4864,7 @@ export async function retryGeocodingSingle(eventId: string): Promise<{ geocoded:
 
 export async function fetchAdminEventIds(params: EventFilterParams = {}): Promise<{ ids: string[] }> {
     const qs = new URLSearchParams();
-    if (params.search) qs.set('search', params.search);
-    setStatusParams(qs, params);
-    if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
-    if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
-    if (params.geo_status) qs.set('geo_status', params.geo_status);
-    if (params.ungeolocated) qs.set('ungeolocated', 'true');
-    if (params.future_only) qs.set('future_only', 'true');
-    if (params.include_past) qs.set('include_past', 'true');
+    setFilterParams(qs, params);
     const res = await fetch(`${BASE}/admin/events/ids?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch event IDs');
     return res.json();
@@ -4882,8 +4914,8 @@ export async function fetchMyRating(eventId: string): Promise<EventRating | null
     return JSON.parse(text) as EventRating;
 }
 
-export async function deleteMyRating(eventId: string): Promise<void> {
-    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating`, {
+export async function deleteMyRating(eventId: string, scope: ReviewScope = 'this_edition'): Promise<void> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating?scope=${scope}`, {
         method: 'DELETE',
         credentials: 'include',
     });
@@ -4974,12 +5006,13 @@ export async function fetchSeriesRollup(seriesId: number): Promise<SeriesRatingR
 
 export async function fetchEventReviews(
     eventId: string,
-    opts?: { limit?: number; offset?: number; sort?: 'recent' | 'positive' | 'critical' },
+    opts?: { limit?: number; offset?: number; sort?: 'recent' | 'positive' | 'critical'; scope?: ReviewScope },
 ): Promise<EventReviewsList> {
     const sp = new URLSearchParams();
     if (opts?.limit != null) sp.set('limit', String(opts.limit));
     if (opts?.offset != null) sp.set('offset', String(opts.offset));
     if (opts?.sort) sp.set('sort', opts.sort);
+    if (opts?.scope) sp.set('scope', opts.scope);
     const qs = sp.toString();
     const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/reviews${qs ? `?${qs}` : ''}`, {
         credentials: 'include',

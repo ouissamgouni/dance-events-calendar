@@ -25,7 +25,7 @@ import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useToast } from '../components/Toast';
 import useBackToClose from '../hooks/useBackToClose';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
-import PassportView, { type PassportTab } from '../components/PassportView';
+import PassportView, { type PassportTab, MilestoneCategorySheetFor } from '../components/PassportView';
 import MilestoneCarousel from '../components/MilestoneCarousel';
 import PassportShareCard from '../components/PassportShareCard';
 import { scopePassport, type ShareScope } from '../utils/passportScope';
@@ -1099,6 +1099,7 @@ export default function PassportPage() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [mapEvents, setMapEvents] = useState<PassportMapEvent[] | null>(null);
+    const [milestoneCategory, setMilestoneCategory] = useState<string | null>(null);
     const navigate = useNavigate();
     const location = useLocation();
     const initialTab = (() => {
@@ -1335,7 +1336,7 @@ export default function PassportPage() {
                         }
                         initialTab={initialTab}
                         onTabChange={(tab) => navigate({ pathname: location.pathname, search: `?tab=${tab}` }, { replace: true })}
-                        milestonesLead={<div className="px-4"><MilestoneCarousel milestones={nextMilestones} /></div>}
+                        milestonesLead={<div className="px-4"><MilestoneCarousel milestones={nextMilestones} onSelectCategory={setMilestoneCategory} /></div>}
                         timelineItems={items}
                         timelineMarkers={markers}
                         timelineHasMore={hasMore}
@@ -1347,6 +1348,13 @@ export default function PassportPage() {
                         showTimelineMemories={eventMemoriesEnabled}
                     />
                 </>
+            )}
+            {data && milestoneCategory && (
+                <MilestoneCategorySheetFor
+                    data={data}
+                    categoryKey={milestoneCategory}
+                    onClose={() => setMilestoneCategory(null)}
+                />
             )}
         </div>
     );

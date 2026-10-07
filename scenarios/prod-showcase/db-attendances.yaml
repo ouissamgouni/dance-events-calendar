@@ -169,10 +169,6 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
-  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
     email: picks@joinmovida.com
     share_publicly: false
     share_audience: friends
@@ -262,10 +258,6 @@ attendances:
     share_audience: private
   - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
     email: bruno.santos@joinmovida.com
-    share_publicly: true
-    share_audience: public
-  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
-    email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
@@ -436,10 +428,6 @@ attendances:
     email: theo.novak@joinmovida.com
     share_publicly: false
     share_audience: private
-  - event_id: ccsm8or6clj38b9i60oj8b9k70rm6bb161hj8b9i6os30p1p6kq30e9lc4
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
   - event_id: ccsm8or6clj38b9i60oj8b9k70rm6bb161hj8b9i6os30p1p6kq30e9lc4
     email: victor.schmidt@joinmovida.com
     share_publicly: false
@@ -788,18 +776,6 @@ attendances:
     email: ines.lopez@joinmovida.com
     share_publicly: true
     share_audience: friends
-  - event_id: madrid-salsa-congress-night
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
-  - event_id: new-york-mambo-reunion
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
-  - event_id: seoul-bachata-weekender
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
   - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
     email: picks@joinmovida.com
     share_publicly: true
@@ -814,10 +790,6 @@ attendances:
     share_audience: public
   - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
     email: camille.laurent@joinmovida.com
-    share_publicly: true
-    share_audience: public
-  - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
-    email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: public
   - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
@@ -1001,10 +973,6 @@ attendances:
     share_publicly: false
     share_audience: public
   - event_id: 68pjipb574qm6b9g6dj3eb9k6opj4bb168pjeb9l6ooj6e34cdj3ap3374
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: private
-  - event_id: 68pjipb574qm6b9g6dj3eb9k6opj4bb168pjeb9l6ooj6e34cdj3ap3374
     email: maya.rivera@joinmovida.com
     share_publicly: false
     share_audience: public
@@ -1056,10 +1024,6 @@ attendances:
     email: ines.lopez@joinmovida.com
     share_publicly: false
     share_audience: friends
-  - event_id: 6dgj0d1oc5h68bb1ccqjgb9k6so3cb9pc9h68b9jcphjcd9ic4r34p3160
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: private
   - event_id: 6dgj0d1oc5h68bb1ccqjgb9k6so3cb9pc9h68b9jcphjcd9ic4r34p3160
     email: ines.lopez@joinmovida.com
     share_publicly: true
@@ -1121,14 +1085,6 @@ attendances:
     share_publicly: false
     share_audience: private
   - event_id: 6di38dj36grjibb2ckr34b9k6cpjabb2c8oj2b9m6ss3cchk61h64dhpco
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: friends
-  - event_id: 6di38dj36grjibb2ckr34b9k6cpjabb2c8oj2b9m6ss3cchk61h64dhpco
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
-  - event_id: 6di38dj36grjibb2ckr34b9k6cpjabb2c8oj2b9m6ss3cchk61h64dhpco
     email: picks@joinmovida.com
     share_publicly: true
     share_audience: friends
@@ -1139,10 +1095,6 @@ attendances:
   - event_id: 6di38dj36grjibb2ckr34b9k6cpjabb2c8oj2b9m6ss3cchk61h64dhpco
     email: ines.lopez@joinmovida.com
     share_publicly: true
-    share_audience: private
-  - event_id: 6di38dj36grjibb2ckr34b9k6cpjabb2c8oj2b9m6ss3cchk61h64dhpco
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
     share_audience: private
   - event_id: 6gqmaob3c8sm6bb569hj4b9kcoo62bb1ccp30bb5cor30dpkchj68e9k70
     email: ines.lopez@joinmovida.com
@@ -1156,10 +1108,6 @@ attendances:
     email: picks@joinmovida.com
     share_publicly: false
     share_audience: private
-  - event_id: 6gqmaob3c8sm6bb569hj4b9kcoo62bb1ccp30bb5cor30dpkchj68e9k70
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: friends
   - event_id: 6gqmaob3c8sm6bb569hj4b9kcoo62bb1ccp30bb5cor30dpkchj68e9k70
     email: picks@joinmovida.com
     share_publicly: false
@@ -1197,21 +1145,9 @@ attendances:
     share_publicly: false
     share_audience: public
   - event_id: 6lj30e9gclijgb9pc9hjgb9kcorm8bb269ij2bb464o6ce1jccsm2cpjck
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: public
-  - event_id: 6lj30e9gclijgb9pc9hjgb9kcorm8bb269ij2bb464o6ce1jccsm2cpjck
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
-  - event_id: 6lj30e9gclijgb9pc9hjgb9kcorm8bb269ij2bb464o6ce1jccsm2cpjck
     email: leo.martin@joinmovida.com
     share_publicly: false
     share_audience: private
-  - event_id: 6lj30e9gclijgb9pc9hjgb9kcorm8bb269ij2bb464o6ce1jccsm2cpjck
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
   - event_id: 6lj30e9gclijgb9pc9hjgb9kcorm8bb269ij2bb464o6ce1jccsm2cpjck
     email: ines.lopez@joinmovida.com
     share_publicly: false
@@ -1229,16 +1165,8 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: 6lj30e9gclijgb9pc9hjgb9kcorm8bb269ij2bb464o6ce1jccsm2cpjck
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: private
-  - event_id: 6lj30e9gclijgb9pc9hjgb9kcorm8bb269ij2bb464o6ce1jccsm2cpjck
     email: leo.martin@joinmovida.com
     share_publicly: false
-    share_audience: private
-  - event_id: 6lj30e9gclijgb9pc9hjgb9kcorm8bb269ij2bb464o6ce1jccsm2cpjck
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
     share_audience: private
   - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
     email: noah.kim@joinmovida.com
@@ -1253,15 +1181,7 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: friends
-  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
     email: ines.lopez@joinmovida.com
-    share_publicly: true
-    share_audience: private
-  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
-    email: elena.moreau@joinmovida.com
     share_publicly: true
     share_audience: private
   - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
@@ -1307,10 +1227,6 @@ attendances:
   - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
     email: maya.rivera@joinmovida.com
     share_publicly: true
-    share_audience: public
-  - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
     share_audience: public
   - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
     email: alex.navarro@joinmovida.com
@@ -1336,14 +1252,6 @@ attendances:
     email: picks@joinmovida.com
     share_publicly: false
     share_audience: public
-  - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: public
-  - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: friends
   - event_id: 6so6aohncdhj4b9g6ormcb9kclgm2b9pchi3ab9j6cp64cb5cosm2e1j6s
     email: sea.sun.salsa@joinmovida.com
     share_publicly: true
@@ -1361,17 +1269,9 @@ attendances:
     share_publicly: false
     share_audience: private
   - event_id: 6sojioj3cli3ab9j71j3gb9k61hjebb268s64b9n68r6cp1mcdj3iphk6s
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: private
-  - event_id: 6sojioj3cli3ab9j71j3gb9k61hjebb268s64b9n68r6cp1mcdj3iphk6s
     email: ines.lopez@joinmovida.com
     share_publicly: true
     share_audience: friends
-  - event_id: 6sojioj3cli3ab9j71j3gb9k61hjebb268s64b9n68r6cp1mcdj3iphk6s
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: public
   - event_id: 6sojioj3cli3ab9j71j3gb9k61hjebb268s64b9n68r6cp1mcdj3iphk6s
     email: noah.kim@joinmovida.com
     share_publicly: true
@@ -1388,10 +1288,6 @@ attendances:
     email: ines.lopez@joinmovida.com
     share_publicly: false
     share_audience: private
-  - event_id: 6sojioj3cli3ab9j71j3gb9k61hjebb268s64b9n68r6cp1mcdj3iphk6s
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: friends
   - event_id: 6sojioj3cli3ab9j71j3gb9k61hjebb268s64b9n68r6cp1mcdj3iphk6s
     email: maya.rivera@joinmovida.com
     share_publicly: false
@@ -1448,10 +1344,6 @@ attendances:
     email: noah.kim@joinmovida.com
     share_publicly: false
     share_audience: public
-  - event_id: 6sq34ohhc8ojebb56tgj2b9k70o32b9o74rj0bb26pi62oj170s30pho6o
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
   - event_id: 6sqj2pb474s62bb5c4s3eb9k6hh64b9ocpi30bb271i32cpm6oq62phj60
     email: alex.navarro@joinmovida.com
     share_publicly: true
@@ -1472,14 +1364,6 @@ attendances:
     email: noah.kim@joinmovida.com
     share_publicly: true
     share_audience: private
-  - event_id: 6sqj2pb474s62bb5c4s3eb9k6hh64b9ocpi30bb271i32cpm6oq62phj60
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
-  - event_id: 6sqj2pb474s62bb5c4s3eb9k6hh64b9ocpi30bb271i32cpm6oq62phj60
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: friends
   - event_id: 6sqj2pb474s62bb5c4s3eb9k6hh64b9ocpi30bb271i32cpm6oq62phj60
     email: picks@joinmovida.com
     share_publicly: true
@@ -1512,10 +1396,6 @@ attendances:
     email: picks@joinmovida.com
     share_publicly: false
     share_audience: private
-  - event_id: 6tgjaohj68q66b9o6dj36b9k6hhj6b9ochi68b9k60s34c9mccsj8dr368
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: friends
   - event_id: 70p3coj669im8b9mccq62b9kc4r36b9o6op6abb66dhj2c9lcksm4d1oco
     email: alex.navarro@joinmovida.com
     share_publicly: true
@@ -1565,10 +1445,6 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: public
-  - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
     email: picks@joinmovida.com
     share_publicly: true
     share_audience: friends
@@ -1596,10 +1472,6 @@ attendances:
     email: maya.rivera@joinmovida.com
     share_publicly: false
     share_audience: public
-  - event_id: 71im6or5cgr38bb1cko3ib9k6kqj6b9ocdhjgbb260omco9n74q3adj26o
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
   - event_id: 71im6or5cgr38bb1cko3ib9k6kqj6b9ocdhjgbb260omco9n74q3adj26o
     email: maya.rivera@joinmovida.com
     share_publicly: true
@@ -1629,10 +1501,6 @@ attendances:
     share_publicly: false
     share_audience: private
   - event_id: 74pm4c9m6gsj2b9kckq36b9kccr3cbb2ccqj4b9k60qj2opmc8r3ie1pco
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: friends
-  - event_id: 74pm4c9m6gsj2b9kckq36b9kccr3cbb2ccqj4b9k60qj2opmc8r3ie1pco
     email: ines.lopez@joinmovida.com
     share_publicly: true
     share_audience: private
@@ -1673,14 +1541,6 @@ attendances:
     share_publicly: true
     share_audience: friends
   - event_id: 75j6aoho6gs3abb575gm2b9kcgsm4bb16kom6b9g6dhm8ohl65gjccph74
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: public
-  - event_id: 75j6aoho6gs3abb575gm2b9kcgsm4bb16kom6b9g6dhm8ohl65gjccph74
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: public
-  - event_id: 75j6aoho6gs3abb575gm2b9kcgsm4bb16kom6b9g6dhm8ohl65gjccph74
     email: maya.rivera@joinmovida.com
     share_publicly: true
     share_audience: private
@@ -1719,10 +1579,6 @@ attendances:
   - event_id: 75j6aoho6gs3abb575gm2b9kcgsm4bb16kom6b9g6dhm8ohl65gjccph74
     email: leo.martin@joinmovida.com
     share_publicly: true
-    share_audience: public
-  - event_id: 75j6aoho6gs3abb575gm2b9kcgsm4bb16kom6b9g6dhm8ohl65gjccph74
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
     share_audience: public
   - event_id: c4pm2opickpm8b9h6grj2b9kc8pjebb1cosm8bb1cos36ohh64sm6e1j6c
     email: noah.kim@joinmovida.com
@@ -1737,17 +1593,9 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: c4pm2opickpm8b9h6grj2b9kc8pjebb1cosm8bb1cos36ohh64sm6e1j6c
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
-  - event_id: c4pm2opickpm8b9h6grj2b9kc8pjebb1cosm8bb1cos36ohh64sm6e1j6c
     email: leo.martin@joinmovida.com
     share_publicly: false
     share_audience: friends
-  - event_id: c4pm2opickpm8b9h6grj2b9kc8pjebb1cosm8bb1cos36ohh64sm6e1j6c
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
   - event_id: c4pm2opickpm8b9h6grj2b9kc8pjebb1cosm8bb1cos36ohh64sm6e1j6c
     email: maya.rivera@joinmovida.com
     share_publicly: false
@@ -1801,16 +1649,8 @@ attendances:
     share_publicly: true
     share_audience: public
   - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: public
-  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
     email: ines.lopez@joinmovida.com
     share_publicly: false
-    share_audience: private
-  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
     share_audience: private
   - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
     email: maya.rivera@joinmovida.com
@@ -1847,10 +1687,6 @@ attendances:
   - event_id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
     email: leo.martin@joinmovida.com
     share_publicly: true
-    share_audience: friends
-  - event_id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
     share_audience: friends
   - event_id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
     email: maya.rivera@joinmovida.com
@@ -1876,10 +1712,6 @@ attendances:
     email: sea.sun.salsa@joinmovida.com
     share_publicly: true
     share_audience: friends
-  - event_id: ccp34c1i74q6cb9g60o32b9kckpjabb1c9gjib9o71h68o9ickr62ob5cc
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
   - event_id: ccp34c1i74q6cb9g60o32b9kckpjabb1c9gjib9o71h68o9ickr62ob5cc
     email: sea.sun.salsa@joinmovida.com
     share_publicly: false
@@ -1929,10 +1761,6 @@ attendances:
     share_publicly: true
     share_audience: private
   - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
-  - event_id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
     email: alex.navarro@joinmovida.com
     share_publicly: true
     share_audience: friends
@@ -1984,10 +1812,6 @@ attendances:
     email: ines.lopez@joinmovida.com
     share_publicly: false
     share_audience: friends
-  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: private
   - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
     email: alex.navarro@joinmovida.com
     share_publicly: true
@@ -2093,10 +1917,6 @@ attendances:
     share_publicly: false
     share_audience: friends
   - event_id: imgjf21msul58hop4dd7ukgkbo
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
-  - event_id: imgjf21msul58hop4dd7ukgkbo
     email: sea.sun.salsa@joinmovida.com
     share_publicly: true
     share_audience: private
@@ -2104,10 +1924,6 @@ attendances:
     email: ines.lopez@joinmovida.com
     share_publicly: false
     share_audience: private
-  - event_id: porto-kizomba-weekender
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
   - event_id: porto-kizomba-weekender
     email: noah.kim@joinmovida.com
     share_publicly: false
@@ -2191,10 +2007,6 @@ attendances:
   - event_id: budapest-salsa-weekender
     email: mina.silva@joinmovida.com
     share_publicly: false
-    share_audience: friends
-  - event_id: milan-bachata-weekender
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
     share_audience: friends
   - event_id: milan-bachata-weekender
     email: noah.kim@joinmovida.com
@@ -2365,10 +2177,6 @@ attendances:
     share_publicly: true
     share_audience: friends
   - event_id: suggestion-1ecd43cb-35f6-4287-bb96-2a2904e62a7c
-    email: elena.moreau@joinmovida.com
-    share_publicly: false
-    share_audience: private
-  - event_id: suggestion-1ecd43cb-35f6-4287-bb96-2a2904e62a7c
     email: noah.kim@joinmovida.com
     share_publicly: true
     share_audience: public
@@ -2392,10 +2200,6 @@ attendances:
     email: maya.rivera@joinmovida.com
     share_publicly: false
     share_audience: friends
-  - event_id: suggestion-1ecd43cb-35f6-4287-bb96-2a2904e62a7c
-    email: elena.moreau@joinmovida.com
-    share_publicly: true
-    share_audience: public
   - event_id: suggestion-1ecd43cb-35f6-4287-bb96-2a2904e62a7c
     email: picks@joinmovida.com
     share_publicly: true
@@ -2672,3 +2476,363 @@ attendances:
     email: penny.valdez@joinmovida.com
     share_publicly: true
     share_audience: friends
+  - event_id: budapest-salsa-weekender-previous
+    email: elena.moreau@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: seville-salsa-weekender-previous
+    email: elena.moreau@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6kojac1mchh64b9nc5hmcb9kc9j36bb268r30bb4c5gj2dpgckq6adj5cg
+    email: elena.moreau@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: amira.haddad@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: bruno.santos@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: camille.laurent@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: clara.dubois@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: ines.lopez@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: alex.navarro@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: amira.haddad@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: bruno.santos@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: camille.laurent@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: clara.dubois@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: ines.lopez@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: ivo.diallo@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: jonas.meyer@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: leila.bauer@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: leo.martin@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: mateo.vega@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: milan.horvat@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: mina.silva@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: nadia.fischer@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0pml6gsm0w
+    email: nina.khan@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: athens-bachata-weekender
+    email: amira.haddad@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: athens-bachata-weekender
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: athens-bachata-weekender
+    email: bruno.santos@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: athens-bachata-weekender
+    email: camille.laurent@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: athens-bachata-weekender
+    email: ivo.diallo@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: athens-bachata-weekender
+    email: jonas.meyer@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: athens-bachata-weekender
+    email: leila.bauer@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: brussels-latin-weekender
+    email: amira.haddad@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: brussels-latin-weekender
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: brussels-latin-weekender
+    email: bruno.santos@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: brussels-latin-weekender
+    email: camille.laurent@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: brussels-latin-weekender
+    email: ivo.diallo@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: brussels-latin-weekender
+    email: jonas.meyer@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: brussels-latin-weekender
+    email: leila.bauer@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: budapest-salsa-weekender
+    email: alex.navarro@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: budapest-salsa-weekender
+    email: amira.haddad@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: budapest-salsa-weekender
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: budapest-salsa-weekender
+    email: bruno.santos@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: budapest-salsa-weekender
+    email: camille.laurent@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: budapest-salsa-weekender
+    email: ivo.diallo@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: copenhagen-zouk-weekender
+    email: alex.navarro@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: copenhagen-zouk-weekender
+    email: amira.haddad@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: copenhagen-zouk-weekender
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: copenhagen-zouk-weekender
+    email: bruno.santos@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: copenhagen-zouk-weekender
+    email: camille.laurent@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: copenhagen-zouk-weekender
+    email: clara.dubois@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: copenhagen-zouk-weekender
+    email: ivo.diallo@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: copenhagen-zouk-weekender
+    email: leila.bauer@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: dublin-salsa-christmas-weekender
+    email: amira.haddad@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: dublin-salsa-christmas-weekender
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: dublin-salsa-christmas-weekender
+    email: bruno.santos@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: dublin-salsa-christmas-weekender
+    email: camille.laurent@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: dublin-salsa-christmas-weekender
+    email: clara.dubois@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: dublin-salsa-christmas-weekender
+    email: ivo.diallo@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: dublin-salsa-christmas-weekender
+    email: jonas.meyer@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: milan-bachata-weekender
+    email: alex.navarro@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: milan-bachata-weekender
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: milan-bachata-weekender
+    email: bruno.santos@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: milan-bachata-weekender
+    email: camille.laurent@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: milan-bachata-weekender
+    email: clara.dubois@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: milan-bachata-weekender
+    email: ines.lopez@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: milan-bachata-weekender
+    email: ivo.diallo@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: milan-bachata-weekender
+    email: jonas.meyer@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: milan-bachata-weekender
+    email: leila.bauer@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: milan-bachata-weekender
+    email: mateo.vega@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: milan-bachata-weekender
+    email: milan.horvat@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: porto-kizomba-weekender
+    email: alex.navarro@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: porto-kizomba-weekender
+    email: amira.haddad@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: porto-kizomba-weekender
+    email: ana.garcia@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: porto-kizomba-weekender
+    email: bruno.santos@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: porto-kizomba-weekender
+    email: camille.laurent@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: porto-kizomba-weekender
+    email: ines.lopez@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: porto-kizomba-weekender
+    email: ivo.diallo@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: porto-kizomba-weekender
+    email: leila.bauer@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: porto-kizomba-weekender
+    email: leo.martin@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: porto-kizomba-weekender
+    email: mateo.vega@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: porto-kizomba-weekender
+    email: maya.rivera@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: seville-salsa-weekender
+    email: ana.garcia@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: seville-salsa-weekender
+    email: bruno.santos@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: seville-salsa-weekender
+    email: camille.laurent@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: seville-salsa-weekender
+    email: clara.dubois@joinmovida.com
+    share_publicly: false
+    share_audience: public
+  - event_id: seville-salsa-weekender
+    email: ivo.diallo@joinmovida.com
+    share_publicly: true
+    share_audience: friends
+  - event_id: seville-salsa-weekender
+    email: jonas.meyer@joinmovida.com
+    share_publicly: true
+    share_audience: private
+  - event_id: seville-salsa-weekender
+    email: leila.bauer@joinmovida.com
+    share_publicly: false
+    share_audience: public
