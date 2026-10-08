@@ -318,7 +318,7 @@ EMAIL_MODE_FEATURES = (
 )
 
 
-# Self-service nudges that email instantly by default but may be digested.
+# Self-service nudges that may be digested; ticket prompts digest by default.
 DIGEST_PROMPT_FEATURES = ("ticket_prompt", "memories_prompt", "review_prompt")
 # Time-sensitive features: push + instant email only, never digested.
 INSTANT_ONLY_FEATURES = ("event_reminders", "schedule_updates", "promo_codes")
@@ -326,7 +326,9 @@ INSTANT_ONLY_FEATURES = ("event_reminders", "schedule_updates", "promo_codes")
 NOTIFICATION_FEATURES = (
     EMAIL_MODE_FEATURES + DIGEST_PROMPT_FEATURES + INSTANT_ONLY_FEATURES
 )
-_INSTANT_BY_DEFAULT = frozenset(DIGEST_PROMPT_FEATURES + INSTANT_ONLY_FEATURES)
+_INSTANT_BY_DEFAULT = frozenset(DIGEST_PROMPT_FEATURES + INSTANT_ONLY_FEATURES) - {
+    "ticket_prompt"
+}
 
 
 def get_feature_email_instant(feature: str, session: Optional[Session] = None) -> bool:

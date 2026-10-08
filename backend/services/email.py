@@ -1206,6 +1206,29 @@ def _render_card(entry: dict, more_href: str | None = None) -> str:
         )
     else:
         more_html = ""
+    if children[0].get("kind") == "interest_event":
+        # Each matched event gets its own thumbnail row under the shared alert header.
+        header = (
+            f'<div style="color:#111827;font-size:14px;line-height:1.4;margin-bottom:4px">{group_header_html}</div>'
+            if group_header_html
+            else ""
+        )
+        rows = "".join(
+            f"""
+      <tr>
+        <td style="width:40px;vertical-align:top;padding:4px 10px 4px 0">{_card_avatar_html(child)}</td>
+        <td style="vertical-align:top;padding:4px 0">{block}</td>
+      </tr>"""
+            for child, block in zip(children, child_blocks)
+        )
+        return f"""
+    <div style="margin:8px 0">
+      {header}
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%">{rows}
+      </table>
+      {more_html}
+    </div>
+    """
     return f"""
     <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0">
       <tr>

@@ -2,3 +2,4 @@ settings:
   my_events_route_enabled: true
   event_tickets_enabled: true
   ticket_prompt_enabled: true
+  ticket_prompt_email_instant: true

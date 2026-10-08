@@ -296,7 +296,7 @@ def test_digest_schedule_default_when_row_blank(session):
     [
         ("friends_going", False, True),
         ("milestone_unlocked", False, True),
-        ("ticket_prompt", True, False),
+        ("ticket_prompt", False, True),
         ("review_prompt", True, False),
         ("event_reminders", True, False),
     ],
