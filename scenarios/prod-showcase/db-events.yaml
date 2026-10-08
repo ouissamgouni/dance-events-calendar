@@ -5564,6 +5564,29 @@ events:
       - dance-style:bachata
       - misc:live-band
       - reach:international
+  - id: costa-brava-salsa-summer-festival-previous
+    calendar_id: movida-community-events
+    title: Costa Brava Salsa Summer Festival
+    description:
+      Vibrant energy of Costa Brava with multiple salsa socials and beach
+      parties.
+    image: 10_costa_brava_salsa_summer_festival_2027.png
+    location: Tossa de Mar, Costa Brava, Spain
+    city: Tossa de Mar
+    country: Spain
+    country_code: ES
+    latitude: 41.7371
+    longitude: 2.948
+    start: w-12 Fri 20:00
+    end: w-12 Sun 23:00
+    price_min: 180
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - misc:beach-side
+      - reach:international
   - id: seville-salsa-weekender-previous
     calendar_id: movida-community-events
     title: Seville Salsa Weekender
@@ -5719,6 +5742,12 @@ event_series:
     members:
       - athens-bachata-weekender-previous
       - athens-bachata-weekender
+  - canonical_title: Costa Brava Salsa Summer Festival
+    status: resolved
+    source: manual
+    members:
+      - costa-brava-salsa-summer-festival-previous
+      - 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
 ratings:
   - event_id: alfama-thursday-salsa-summer
     email: maya.rivera@joinmovida.com
@@ -6136,18 +6165,6 @@ ratings:
       - audience:relaxed-dancing
     comment_status: approved
     status: approved
-  - event_id: vienna-bachata-nights
-    email: maya.rivera@joinmovida.com
-    overall_sentiment: great
-    comment: A reliable Friday social with smooth DJ sets.
-    aspect_scores:
-      music: 4
-    aspect_tags:
-      - music:smooth-transitions
-    audience_tags:
-      - audience:music-lovers
-    comment_status: approved
-    status: approved
   - event_id: rome-latin-social
     email: ana.garcia@joinmovida.com
     overall_sentiment: great
@@ -6356,7 +6373,7 @@ ratings:
       - audience:meet-new-people
     comment_status: approved
     status: approved
-  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+  - event_id: costa-brava-salsa-summer-festival-previous
     email: pablo.rossi@joinmovida.com
     overall_sentiment: great
     comment: Plenty of socials and beach parties, great energy throughout.
@@ -6370,7 +6387,7 @@ ratings:
       - audience:high-energy-dancing
     comment_status: approved
     status: approved
-  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+  - event_id: costa-brava-salsa-summer-festival-previous
     email: alex.navarro@joinmovida.com
     overall_sentiment: okay
     comment: Good festival, though the main room was too hot on Saturday.
@@ -6384,7 +6401,7 @@ ratings:
       - audience:late-night-dancers
     comment_status: approved
     status: approved
-  - event_id: 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+  - event_id: costa-brava-salsa-summer-festival-previous
     email: omar.costa@joinmovida.com
     overall_sentiment: great
     comment: Well organized and worth the early bird price.
@@ -6396,6 +6413,102 @@ ratings:
       - value:worth-it
     audience_tags:
       - audience:budget-friendly
+    comment_status: approved
+    status: approved
+  - event_id: costa-brava-salsa-summer-festival-previous
+    email: maya.rivera@joinmovida.com
+    overall_sentiment: amazing
+    comment: Beach parties every evening and the Tossa sunsets made it unforgettable.
+    aspect_scores:
+      atmosphere: 5
+      music: 5
+    aspect_tags:
+      - atmosphere:high-energy
+      - music:great-playlist
+    audience_tags:
+      - audience:high-energy-dancing
+    comment_status: approved
+    status: approved
+  - event_id: costa-brava-salsa-summer-festival-previous
+    email: leo.martin@joinmovida.com
+    overall_sentiment: great
+    comment: Clear schedule and helpful organizers, the workshops were well levelled.
+    aspect_scores:
+      organization: 5
+      music: 4
+    aspect_tags:
+      - organization:well-organized
+      - music:good-variety
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: costa-brava-salsa-summer-festival-previous
+    email: ines.lopez@joinmovida.com
+    overall_sentiment: great
+    comment: Second year coming back, the beach social on Saturday is the highlight.
+    aspect_scores:
+      atmosphere: 4
+      venue-quality: 4
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - venue-quality:great-dance-floor
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: costa-brava-salsa-summer-festival-previous
+    email: noah.kim@joinmovida.com
+    overall_sentiment: okay
+    comment: Beautiful location, but the late-night shuttles back to town were hard to find.
+    aspect_scores:
+      organization: 3
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: costa-brava-salsa-summer-festival-previous
+    email: clara.dubois@joinmovida.com
+    overall_sentiment: amazing
+    comment: Best beach social I have been to, and the DJs kept the floor full until dawn.
+    aspect_scores:
+      music: 5
+      atmosphere: 5
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:high-energy
+    audience_tags:
+      - audience:high-energy-dancing
+    comment_status: approved
+    status: approved
+  - event_id: costa-brava-salsa-summer-festival-previous
+    email: jonas.meyer@joinmovida.com
+    overall_sentiment: great
+    comment: Good value for the early bird price, and the salsa and bachata mix was great.
+    aspect_scores:
+      value: 5
+      music: 4
+    aspect_tags:
+      - value:worth-it
+      - music:good-variety
+    audience_tags:
+      - audience:budget-friendly
+    comment_status: approved
+    status: approved
+  - event_id: costa-brava-salsa-summer-festival-previous
+    email: theo.novak@joinmovida.com
+    overall_sentiment: okay
+    comment: Fun weekend, but the main room got crowded and hard to move in.
+    aspect_scores:
+      venue-quality: 3
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:first-social
     comment_status: approved
     status: approved
   - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
@@ -6480,20 +6593,6 @@ ratings:
       - atmosphere:good-mix-of-dancers
     audience_tags:
       - audience:meet-new-people
-    comment_status: approved
-    status: approved
-  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    email: maya.rivera@joinmovida.com
-    overall_sentiment: amazing
-    comment: The best mambo bootcamp I have attended, world class teachers and socials.
-    aspect_scores:
-      workshop: 5
-      atmosphere: 5
-    aspect_tags:
-      - workshop:great-instructor
-      - atmosphere:great-atmosphere
-    audience_tags:
-      - audience:workshop-lovers
     comment_status: approved
     status: approved
   - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
@@ -7042,7 +7141,7 @@ ratings:
       - audience:meet-new-people
     comment_status: approved
     status: approved
-  - event_id: athens-bachata-weekender
+  - event_id: athens-bachata-weekender-previous
     email: maya.rivera@joinmovida.com
     overall_sentiment: great
     comment:

@@ -403,6 +403,33 @@ messages:
     event_id: budapest-salsa-weekender
     email: rita.petrov@joinmovida.com
     body: Me too, let us share, I will message you.
+  - key: budapest-ride
+    event_id: budapest-salsa-weekender
+    email: clara.dubois@joinmovida.com
+    category: ride
+    body: Driving from Vienna on Friday afternoon, three seats free. We can leave around 15h and make the Friday social at 20h.
+  - reply_to: budapest-ride
+    event_id: budapest-salsa-weekender
+    email: jonas.meyer@joinmovida.com
+    body: I would love a seat, can we meet at Wien Hauptbahnhof? I am happy to split the fuel.
+  - key: budapest-meetup
+    event_id: budapest-salsa-weekender
+    email: maya.rivera@joinmovida.com
+    category: meetup
+    body: Thermal bath on Sunday before the recovery social? I will book the Széchenyi slot for 14h, meeting at the main entrance.
+  - reply_to: budapest-meetup
+    event_id: budapest-salsa-weekender
+    email: leo.martin@joinmovida.com
+    body: Great idea, I will bring a towel and see you at the entrance.
+  - key: budapest-tickets
+    event_id: budapest-salsa-weekender
+    email: mina.silva@joinmovida.com
+    category: tickets
+    body: Looking for one extra Saturday boat party ticket, I will pay face value. The organizers said the boat sold out last year.
+  - reply_to: budapest-tickets
+    event_id: budapest-salsa-weekender
+    email: alex.navarro@joinmovida.com
+    body: I have one spare from my pass, message me and we can sort the transfer before Saturday.
   - key: brussels-meetup
     event_id: brussels-latin-weekender
     email: camille.laurent@joinmovida.com

@@ -15,6 +15,7 @@ interface TrendingEventsBannerProps {
     onEventHover?: (eventId: string | null) => void;
     followingBadgeEnabled?: boolean;
     className?: string;
+    defaultCollapsed?: boolean;
 }
 
 
@@ -29,8 +30,9 @@ export default function TrendingEventsBanner({
     onEventHover,
     followingBadgeEnabled = false,
     className = '',
+    defaultCollapsed = false,
 }: TrendingEventsBannerProps) {
-    const [collapsed, setCollapsed] = useState(false);
+    const [collapsed, setCollapsed] = useState(defaultCollapsed);
     const scrollerRef = useRef<HTMLDivElement>(null);
     const trendingEvents = useMemo(() => {
         if (!showPopularity || events.length === 0) return [];

@@ -185,6 +185,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         trending_banner_enabled=_get_bool_setting(
             session, "trending_banner_enabled", default=True
         ),
+        trending_trail_collapsed_default=_get_bool_setting(
+            session, "trending_trail_collapsed_default"
+        ),
         trending_window_days=_get_int_setting(session, "trending_window_days", 30),
         trending_floor_going=_get_int_setting(session, "trending_floor_going", 3),
         trending_top_n=_get_int_setting(session, "trending_top_n", 3),
@@ -475,6 +478,13 @@ def update_settings(
     if body.trending_banner_enabled is not None:
         _set_bool_setting(
             session, "trending_banner_enabled", body.trending_banner_enabled
+        )
+
+    if body.trending_trail_collapsed_default is not None:
+        _set_bool_setting(
+            session,
+            "trending_trail_collapsed_default",
+            body.trending_trail_collapsed_default,
         )
 
     if body.trending_window_days is not None:

@@ -626,6 +626,7 @@ export interface SiteSettings {
     unseen_state_enabled?: boolean;
     trending_enabled?: boolean;
     trending_banner_enabled?: boolean;
+    trending_trail_collapsed_default?: boolean;
     trending_window_days?: number;
     trending_floor_going?: number;
     trending_top_n?: number;
