@@ -40,16 +40,17 @@ tag_groups:
         label: Bachata
       - slug: kizomba
         label: Kizomba
-      - slug: zouk
-        label: Zouk
-      - slug: semba
-        label: Semba
-      - slug: rueda
-        label: Rueda
       - slug: cha-cha
         label: Cha-Cha
+        synonyms: ["chacha", "chachacha", "cha cha cha", "cha-cha-cha"]
       - slug: son
         label: Son
+      - slug: rueda
+        label: Rueda
+      - slug: semba
+        label: Semba
+      - slug: zouk
+        label: Zouk
 
   - slug: reach
     label: Event reach

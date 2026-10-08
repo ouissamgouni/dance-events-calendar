@@ -22,10 +22,10 @@ tag_groups:
     tags:
       - slug: salsa
         label: Salsa
-      - slug: bachata
-        label: Bachata
       - slug: mambo
         label: Mambo
+      - slug: bachata
+        label: Bachata
       - slug: kizomba
         label: Kizomba
 

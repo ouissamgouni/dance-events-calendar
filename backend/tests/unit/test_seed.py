@@ -188,13 +188,29 @@ class TestDatabaseSeeder:
         scenario_dir = scenarios_dir / "sparse"
         default_dir.mkdir(parents=True)
         scenario_dir.mkdir()
-        (default_dir / "tags.yaml").write_text(
+        (scenarios_dir / "tags.yaml").write_text(
             "tag_groups:\n"
             "  - slug: format\n"
             "    label: Format\n"
             "    tags:\n"
             "      - slug: social\n"
             "        label: Social\n"
+            "      - slug: class\n"
+            "        label: Class\n"
+        )
+        (default_dir / "tags.override.yaml").write_text(
+            "tag_groups:\n"
+            "  - slug: format\n"
+            "    tags:\n"
+            "      - slug: social\n"
+            "        label: Social Night\n"
+            "      - slug: class\n"
+            "        remove: true\n"
+            "  - slug: vibe\n"
+            "    label: Vibe\n"
+            "    tags:\n"
+            "      - slug: good-music\n"
+            "        label: Good Music\n"
         )
         (default_dir / "mock-users.yaml").write_text(
             "users:\n  - email: fallback@example.com\n    name: Fallback User\n"
@@ -213,13 +229,38 @@ class TestDatabaseSeeder:
                 select(TagGroup).where(TagGroup.slug == "format")
             ).first()
             tag = session.exec(select(Tag).where(Tag.slug == "social")).first()
+            removed = session.exec(select(Tag).where(Tag.slug == "class")).first()
+            added = session.exec(select(Tag).where(Tag.slug == "good-music")).first()
             user = session.exec(
                 select(User).where(User.email == "fallback@example.com")
             ).first()
 
         assert group is not None
-        assert tag is not None
+        assert tag is not None and tag.label == "Social Night"
+        assert removed is None
+        assert added is not None
         assert user is not None
+
+    def test_scenario_tags_override_blocks_default_override(
+        self, tmp_path, monkeypatch
+    ):
+        scenarios_dir = tmp_path / "scenarios"
+        (scenarios_dir / "default").mkdir(parents=True)
+        (scenarios_dir / "prod").mkdir()
+        (scenarios_dir / "tags.yaml").write_text(
+            "tag_groups:\n  - slug: format\n    label: Format\n    tags: []\n"
+        )
+        (scenarios_dir / "default" / "tags.override.yaml").write_text(
+            "tag_groups:\n  - slug: vibe\n    label: Vibe\n"
+        )
+        (scenarios_dir / "prod" / "tags.override.yaml").write_text("tag_groups: []\n")
+        monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
+
+        prod = seed_module.load_scenario_tags(scenarios_dir / "prod")
+        default = seed_module.load_scenario_tags(scenarios_dir / "default")
+
+        assert [g["slug"] for g in prod["tag_groups"]] == ["format"]
+        assert [g["slug"] for g in default["tag_groups"]] == ["format", "vibe"]
 
     def test_seed_layers_scenario_settings_over_defaults(self, tmp_path, monkeypatch):
         scenarios_dir = tmp_path / "scenarios"
@@ -1032,26 +1073,38 @@ class TestDatabaseSeeder:
 
         from backend.db.seed import SCENARIOS_DIR
 
-        default_tags = SCENARIOS_DIR / "default" / "tags.yaml"
+        shared_tags = SCENARIOS_DIR / "tags.yaml"
         default_users = SCENARIOS_DIR / "default" / "mock-users.yaml"
-        assert default_tags.exists()
+        assert shared_tags.exists()
         assert default_users.exists()
-        assert yaml.safe_load(default_tags.read_text()).get("tag_groups")
+        assert yaml.safe_load(shared_tags.read_text()).get("tag_groups")
         assert yaml.safe_load(default_users.read_text()).get("users")
         for scenario_dir in SCENARIOS_DIR.iterdir():
             if not scenario_dir.is_dir():
                 continue
-            assert (scenario_dir / "tags.yaml").exists() or default_tags.exists()
             assert (scenario_dir / "mock-users.yaml").exists() or default_users.exists()
 
-    @pytest.mark.parametrize("scenario", ["staging", "prod"])
-    def test_reference_taxonomies_have_unique_event_tag_slugs(self, scenario):
+    def test_scenario_tags_yaml_is_not_a_copy_of_shared_taxonomy(self):
         import yaml
 
         from backend.db.seed import SCENARIOS_DIR
 
-        tags_path = SCENARIOS_DIR / scenario / "tags.yaml"
-        data = yaml.safe_load(tags_path.read_text()) or {}
+        shared = yaml.safe_load((SCENARIOS_DIR / "tags.yaml").read_text())
+        # prod-showcase/tags.yaml is a generated prod-DB snapshot (refresh_showcase).
+        for tags_path in SCENARIOS_DIR.glob("*/tags.yaml"):
+            if tags_path.parent.name == "prod-showcase":
+                continue
+            assert yaml.safe_load(tags_path.read_text()) != shared, (
+                f"{tags_path} duplicates scenarios/tags.yaml; delete it or use "
+                "tags.override.yaml"
+            )
+
+    @pytest.mark.parametrize("scenario", ["staging", "prod"])
+    def test_reference_taxonomies_have_unique_event_tag_slugs(self, scenario):
+        from backend.db.seed import SCENARIOS_DIR, load_scenario_tags
+
+        tags_path = SCENARIOS_DIR / scenario
+        data = load_scenario_tags(tags_path)
         seen: dict[str, str] = {}
         for group in data.get("tag_groups") or []:
             if group.get("scope", "event") != "event":
@@ -1067,15 +1120,12 @@ class TestDatabaseSeeder:
     def test_db_events_use_resolvable_fixture_tags(self):
         import yaml
 
-        from backend.db.seed import SCENARIOS_DIR
+        from backend.db.seed import SCENARIOS_DIR, load_scenario_tags
 
         tag_test_scenarios = {"event-tags", "tag-enhancer"}
 
         def tag_slugs(scenario_dir: Path) -> set[str]:
-            tags_path = scenario_dir / "tags.yaml"
-            if not tags_path.exists():
-                tags_path = SCENARIOS_DIR / "default" / "tags.yaml"
-            data = yaml.safe_load(tags_path.read_text()) or {}
+            data = load_scenario_tags(scenario_dir)
             slugs: set[str] = set()
             for group in data.get("tag_groups") or []:
                 group_slug = group.get("slug")

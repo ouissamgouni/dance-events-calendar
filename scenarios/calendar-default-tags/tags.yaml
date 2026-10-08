@@ -60,12 +60,12 @@ tag_groups:
         label: Bachata
       - slug: kizomba
         label: Kizomba
+      - slug: rueda
+        label: Rueda
       - slug: semba
         label: Semba
       - slug: zouk
         label: Zouk
-      - slug: rueda
-        label: Rueda
 
   - slug: level
     label: Level

@@ -81,12 +81,12 @@ tag_groups:
       - slug: kizomba
         label: Kizomba
         synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
+      - slug: cha-cha
+        label: Cha-Cha
+        synonyms: ["chacha", "chachacha", "cha cha cha", "cha-cha-cha"]
       - slug: zouk
         label: Zouk
         synonyms: ["brazilian zouk", "lambazouk"]
-      - slug: cha-cha
-        label: Cha-Cha
-        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
 
   - slug: level
     label: Level

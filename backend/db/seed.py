@@ -1,3 +1,4 @@
+import copy
 import json
 import hashlib
 import logging
@@ -127,6 +128,69 @@ def scenario_file_with_default(scenario_dir: Path, filename: str) -> Path:
     return path
 
 
+SHARED_TAGS_FILENAME = "tags.yaml"
+TAG_OVERRIDES_FILENAME = "tags.override.yaml"
+
+
+def _load_yaml_dict(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    with open(path) as f:
+        return yaml.safe_load(f) or {}
+
+
+def _merge_tag_entry(target: dict, override: dict) -> None:
+    target.update({k: copy.deepcopy(v) for k, v in override.items() if k != "tags"})
+    tags = target.setdefault("tags", [])
+    for tag_override in override.get("tags") or []:
+        slug = tag_override.get("slug")
+        if tag_override.get("remove"):
+            tags[:] = [t for t in tags if t.get("slug") != slug]
+            continue
+        existing = next((t for t in tags if t.get("slug") == slug), None)
+        if existing is None:
+            tags.append(copy.deepcopy(tag_override))
+        else:
+            existing.update(copy.deepcopy(tag_override))
+
+
+def merge_tag_overrides(base: dict, overrides: dict) -> dict:
+    """Layer a tags.override.yaml document onto the shared taxonomy.
+
+    Groups match by slug, tags by slug within their group; given fields replace
+    base values, unknown slugs are appended, and ``remove: true`` drops the entry.
+    """
+    groups = copy.deepcopy(base.get("tag_groups") or [])
+    for group_override in overrides.get("tag_groups") or []:
+        slug = group_override.get("slug")
+        if group_override.get("remove"):
+            groups = [g for g in groups if g.get("slug") != slug]
+            continue
+        target = next((g for g in groups if g.get("slug") == slug), None)
+        if target is None:
+            target = {}
+            groups.append(target)
+        _merge_tag_entry(target, group_override)
+    return {**base, "tag_groups": groups}
+
+
+def load_scenario_tags(scenario_dir: Path) -> dict:
+    """Resolve a scenario's taxonomy.
+
+    A scenario ``tags.yaml`` fully replaces the shared ``scenarios/tags.yaml``;
+    otherwise the shared file is used, layered with the scenario's (or default's)
+    ``tags.override.yaml``.
+    """
+    own = scenario_dir / "tags.yaml"
+    if own.exists():
+        return _load_yaml_dict(own)
+    data = _load_yaml_dict(SCENARIOS_DIR / SHARED_TAGS_FILENAME)
+    overrides_path = scenario_file_with_default(scenario_dir, TAG_OVERRIDES_FILENAME)
+    if overrides_path.exists():
+        data = merge_tag_overrides(data, _load_yaml_dict(overrides_path))
+    return data
+
+
 class DatabaseSeeder:
     def __init__(self, session: Session):
         self.session = session
@@ -143,7 +207,9 @@ class DatabaseSeeder:
 
         uses_mock_calendar = get_calendar_service_type() == "mock"
 
-        self._seed_tags(scenario_file_with_default(scenario_dir, "tags.yaml"))
+        self._seed_tag_document(
+            load_scenario_tags(scenario_dir), f"{scenario_dir.name} taxonomy"
+        )
         self._ensure_system_tag_groups()
         self._seed_tag_synonyms_defaults()
         self._seed_calendars(scenario_dir / "calendars.yaml")
@@ -469,13 +535,13 @@ class DatabaseSeeder:
             logger.info("No tags.yaml found at %s", path)
             return
 
-        with open(path) as f:
-            data = yaml.safe_load(f) or {}
+        self._seed_tag_document(_load_yaml_dict(path), str(path))
 
+    def _seed_tag_document(self, data: dict, source: str):
         groups_data = data.get("tag_groups", [])
         if not isinstance(groups_data, list):
             logger.warning(
-                "Invalid tags.yaml format at %s: tag_groups must be a list", path
+                "Invalid tags.yaml format at %s: tag_groups must be a list", source
             )
             return
 
@@ -679,11 +745,11 @@ class DatabaseSeeder:
                         ),
                     ),
                     ("kizomba", dict(label="Kizomba", ordinal=2)),
-                    ("semba", dict(label="Semba", ordinal=3)),
-                    ("zouk", dict(label="Zouk", ordinal=4)),
+                    ("cha-cha", dict(label="Cha-Cha", ordinal=3)),
+                    ("son", dict(label="Son", ordinal=4)),
                     ("rueda", dict(label="Rueda", ordinal=5)),
-                    ("cha-cha", dict(label="Cha-Cha", ordinal=6)),
-                    ("son", dict(label="Son", ordinal=7)),
+                    ("semba", dict(label="Semba", ordinal=6)),
+                    ("zouk", dict(label="Zouk", ordinal=7)),
                 ],
             ),
         ]

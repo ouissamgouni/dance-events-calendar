@@ -1,0 +1,2 @@
+# Uses scenarios/tags.yaml as-is; this file blocks inheriting default/tags.override.yaml.
+tag_groups: []

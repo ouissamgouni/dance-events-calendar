@@ -31,7 +31,7 @@ TAG_SYNONYMS: dict[str, list[str]] = {
     "kizomba": ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"],
     "zouk": ["brazilian zouk", "lambazouk"],
     "merengue": [],
-    "cha-cha": ["chachacha", "cha cha cha", "cha-cha-cha"],
+    "cha-cha": ["chacha", "chachacha", "cha cha cha", "cha-cha-cha"],
     "reggaeton": ["reggaetón", "perreo"],
     # Format
     "social": ["social dance", "fiesta", "party", "soirée", "soiree", "noche"],
