@@ -214,7 +214,6 @@ events:
       - format:workshop
       - misc:beach-side
       - misc:live-band
-      - misc:ogouni-going
       - misc:pool-party
       - misc:trip
       - reach:international
@@ -1015,7 +1014,6 @@ events:
       - format:social
       - format:weekender
       - format:workshop
-      - misc:ogouni-going
       - reach:international
   - id: 6dh36chlc8r62bb3cdi32b9k6lh3ab9oc4pmab9p6dim4d316hgm6opk6k
     calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
@@ -1262,7 +1260,6 @@ events:
       - format:festival
       - format:social
       - format:workshop
-      - misc:ogouni-going
       - reach:international
   - id: 6sq34ohhc8ojebb56tgj2b9k70o32b9o74rj0bb26pi62oj170s30pho6o
     calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
@@ -1647,7 +1644,6 @@ events:
       - format:festival
       - format:social
       - format:workshop
-      - misc:ogouni-going
       - reach:international
   - id: 65j30d1o6pi62b9n6himab9kcpi66bb26cqj2b9l69ij2dr5chhj6c1h70
     calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
@@ -3060,7 +3056,6 @@ events:
       - format:festival
       - format:social
       - format:workshop
-      - misc:ogouni-going
       - reach:international
   - id: 74pm4c9m6gsj2b9kckq36b9kccr3cbb2ccqj4b9k60qj2opmc8r3ie1pco
     calendar_id: c9f97611396839b34602d48cc6fe04555217e5f924d4c3ef11d184af36be2234@group.calendar.google.com
@@ -3776,7 +3771,6 @@ events:
       - format:festival
       - format:social
       - format:workshop
-      - misc:ogouni-going
       - reach:international
   - id: cgojae1j61i38bb1cpi64b9kc5j32bb16dh3gbb174p6cc1jcgp6cob264
     calendar_id: c9f97611396839b34602d48cc6fe04555217e5f924d4c3ef11d184af36be2234@group.calendar.google.com
@@ -4268,7 +4262,6 @@ events:
       - format:social
       - format:workshop
       - misc:live-band
-      - misc:ogouni-going
       - reach:international
   - id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
     calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
@@ -4574,7 +4567,6 @@ events:
       - format:social
       - format:weekender
       - misc:food
-      - misc:ogouni-going
       - misc:pool-party
       - reach:international
       - venue:pool

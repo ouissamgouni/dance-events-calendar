@@ -519,3 +519,304 @@ schedules:
         session_id: "32000000-0000-4000-8000-000000000205"
       - email: elena.moreau@joinmovida.com
         session_id: "32000000-0000-4000-8000-000000000212"
+
+  # Seville Salsa Weekender (synthetic, week-relative). Times are Seville wall-clock.
+  - event_id: seville-salsa-weekender
+    timezone: Europe/Madrid
+    day_start_hour: 6
+    days:
+      - w1 Fri
+      - w1 Sat
+      - w1 Sun
+    venues:
+      - name: Casa Triana
+        address: Triana, Seville
+        sort_order: 0
+    rooms:
+      - name: Patio Grande
+        venue: Casa Triana
+        color: amber
+        sort_order: 0
+      - name: Sala Azulejos
+        venue: Casa Triana
+        color: pink
+        sort_order: 1
+      - name: Azotea
+        venue: Casa Triana
+        color: brown
+        sort_order: 2
+    levels:
+      - label: Beginner-Friendly
+        notation: "*"
+        sort_order: 0
+      - label: Intermediate
+        notation: "**"
+        sort_order: 1
+      - label: Advanced
+        notation: "***"
+        sort_order: 2
+      - label: All Levels
+        sort_order: 3
+    activity_types:
+      - name: Workshop
+        color: blue
+        sort_order: 0
+      - name: Social
+        color: amber
+        sort_order: 1
+      - name: Show
+        color: pink
+        sort_order: 2
+    sessions:
+      - id: "31000000-0000-4000-8000-000000000101"
+        title: Registration and Welcome Drinks
+        start: w1 Fri 19:00
+        end: w1 Fri 20:30
+        room: Patio Grande
+        venue: Casa Triana
+        activity_type: Social
+        attendee_note: Badge pickup at the Casa Triana entrance.
+      - id: "31000000-0000-4000-8000-000000000102"
+        title: Welcome Patio Party
+        contributors:
+          - display_name: DJ Lucía Ferrer
+            role: dj
+        start: w1 Fri 21:00
+        end: w1 Sat 02:00
+        room: Patio Grande
+        venue: Casa Triana
+        activity_type: Social
+      - id: "31000000-0000-4000-8000-000000000201"
+        title: Cuban Salsa Foundations
+        contributors:
+          - display_name: Yoel and Dayana
+            role: instructor
+        start: w1 Sat 11:00
+        end: w1 Sat 12:00
+        room: Sala Azulejos
+        venue: Casa Triana
+        level: Beginner-Friendly
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000202"
+        title: Rueda Basics
+        contributors:
+          - display_name: Ernesto Vidal
+            role: instructor
+        start: w1 Sat 11:00
+        end: w1 Sat 12:00
+        room: Patio Grande
+        venue: Casa Triana
+        level: Beginner-Friendly
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000203"
+        title: Son Clave Footwork
+        contributors:
+          - display_name: Lía Mora
+            role: instructor
+        start: w1 Sat 11:00
+        end: w1 Sat 12:00
+        room: Azotea
+        venue: Casa Triana
+        level: All Levels
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000204"
+        title: Rueda de Casino Intermediate
+        contributors:
+          - display_name: Ernesto Vidal
+            role: instructor
+          - display_name: Carla Puig
+            role: instructor
+        start: w1 Sat 12:15
+        end: w1 Sat 13:15
+        room: Patio Grande
+        venue: Casa Triana
+        level: Intermediate
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000205"
+        title: Timba Musicality
+        contributors:
+          - display_name: Yoel and Dayana
+            role: instructor
+        start: w1 Sat 12:15
+        end: w1 Sat 13:15
+        room: Sala Azulejos
+        venue: Casa Triana
+        level: Intermediate
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000206"
+        title: Cross-Body Leads
+        contributors:
+          - display_name: Lía Mora
+            role: instructor
+        start: w1 Sat 12:15
+        end: w1 Sat 13:15
+        room: Azotea
+        venue: Casa Triana
+        level: Intermediate
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000207"
+        title: Afternoon Patio Social
+        contributors:
+          - display_name: DJ Lucía Ferrer
+            role: dj
+        start: w1 Sat 14:30
+        end: w1 Sat 18:00
+        room: Patio Grande
+        venue: Casa Triana
+        activity_type: Social
+      - id: "31000000-0000-4000-8000-000000000208"
+        title: Rueda Styling Lab
+        contributors:
+          - display_name: Ernesto Vidal
+            role: instructor
+          - display_name: Carla Puig
+            role: instructor
+        start: w1 Sat 16:00
+        end: w1 Sat 17:00
+        room: Sala Azulejos
+        venue: Casa Triana
+        level: Advanced
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000209"
+        title: Son Timing Clinic
+        contributors:
+          - display_name: Lía Mora
+            role: instructor
+        start: w1 Sat 16:00
+        end: w1 Sat 17:00
+        room: Azotea
+        venue: Casa Triana
+        level: Intermediate
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000210"
+        title: Live Son Showcase
+        contributors:
+          - display_name: Son de Triana Band
+            role: performer
+        start: w1 Sat 22:00
+        end: w1 Sat 23:00
+        room: Patio Grande
+        venue: Casa Triana
+        activity_type: Show
+      - id: "31000000-0000-4000-8000-000000000211"
+        title: Sunset Rueda Showcase
+        contributors:
+          - display_name: Yoel and Dayana
+            role: performer
+          - display_name: Ernesto Vidal
+            role: performer
+        start: w1 Sat 21:00
+        end: w1 Sat 22:00
+        room: Azotea
+        venue: Casa Triana
+        activity_type: Show
+      - id: "31000000-0000-4000-8000-000000000212"
+        title: Patio Son and Timba Party
+        contributors:
+          - display_name: DJ Lucía Ferrer
+            role: dj
+          - display_name: DJ Rafa Coronado
+            role: dj
+        start: w1 Sat 23:00
+        end: w1 Sun 04:00
+        room: Patio Grande
+        venue: Casa Triana
+        activity_type: Social
+      - id: "31000000-0000-4000-8000-000000000213"
+        title: Azotea Timba Lounge
+        contributors:
+          - display_name: DJ Rafa Coronado
+            role: dj
+        start: w1 Sat 23:00
+        end: w1 Sun 03:00
+        room: Azotea
+        venue: Casa Triana
+        activity_type: Social
+      - id: "31000000-0000-4000-8000-000000000301"
+        title: Rueda Flow Workshop
+        contributors:
+          - display_name: Carla Puig
+            role: instructor
+        start: w1 Sun 11:00
+        end: w1 Sun 12:00
+        room: Patio Grande
+        venue: Casa Triana
+        level: Intermediate
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000302"
+        title: Salsa Shines Footwork
+        contributors:
+          - display_name: Yoel and Dayana
+            role: instructor
+        start: w1 Sun 11:00
+        end: w1 Sun 12:00
+        room: Sala Azulejos
+        venue: Casa Triana
+        level: All Levels
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000303"
+        title: Cuban Styling for Followers
+        contributors:
+          - display_name: Lía Mora
+            role: instructor
+        start: w1 Sun 11:00
+        end: w1 Sun 12:00
+        room: Azotea
+        venue: Casa Triana
+        level: All Levels
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000304"
+        title: Advanced Partnerwork Lines
+        contributors:
+          - display_name: Yoel and Dayana
+            role: instructor
+        start: w1 Sun 12:15
+        end: w1 Sun 13:15
+        room: Patio Grande
+        venue: Casa Triana
+        level: Advanced
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000305"
+        title: Timba Footwork Lab
+        contributors:
+          - display_name: Mateo Ruiz
+            role: instructor
+        start: w1 Sun 12:15
+        end: w1 Sun 13:15
+        room: Sala Azulejos
+        venue: Casa Triana
+        level: Intermediate
+        activity_type: Workshop
+      - id: "31000000-0000-4000-8000-000000000306"
+        title: Closing Rueda Jam
+        contributors:
+          - display_name: DJ Rafa Coronado
+            role: dj
+        start: w1 Sun 14:30
+        end: w1 Sun 17:00
+        room: Patio Grande
+        venue: Casa Triana
+        activity_type: Social
+      - id: "31000000-0000-4000-8000-000000000307"
+        title: Farewell Patio Social
+        contributors:
+          - display_name: DJ Lucía Ferrer
+            role: dj
+        start: w1 Sun 19:00
+        end: w1 Sun 22:00
+        room: Patio Grande
+        venue: Casa Triana
+        activity_type: Social
+        attendee_note: Closing announcements at 21:30.
+    published: true
+    plans:
+      - email: elena.moreau@joinmovida.com
+        session_id: "31000000-0000-4000-8000-000000000208"
+      - email: elena.moreau@joinmovida.com
+        session_id: "31000000-0000-4000-8000-000000000211"
+      - email: elena.moreau@joinmovida.com
+        session_id: "31000000-0000-4000-8000-000000000212"
+      - email: elena.moreau@joinmovida.com
+        session_id: "31000000-0000-4000-8000-000000000301"
+      - email: elena.moreau@joinmovida.com
+        session_id: "31000000-0000-4000-8000-000000000304"
