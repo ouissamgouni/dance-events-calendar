@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import NotificationSettings from './NotificationSettings'
+import { FeatureFlagsProvider } from '../context/FeatureFlagsContext'
 import { renderWithProviders } from '../test/render'
 import { server } from '../test/server'
 import { makeUser } from '../test/handlers'
@@ -176,6 +177,39 @@ describe('NotificationSettings', () => {
     expect(
       screen.queryByRole('switch', { name: 'Event reminders \u2014 push' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('hides channels the admin switched off for a feature', async () => {
+    server.use(
+      http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+      http.get('*/api/settings', () =>
+        HttpResponse.json({
+          notification_channels: {
+            ticket_prompt: { push: false, email_instant: true, email_digest: false },
+            promo_codes: { push: false, email_instant: false, email_digest: false },
+            review_prompt: { push: true, email_instant: false, email_digest: true },
+          },
+        }),
+      ),
+    )
+    renderWithProviders(
+      <FeatureFlagsProvider>
+        <NotificationSettings />
+      </FeatureFlagsProvider>,
+    )
+    expect(
+      await screen.findByRole('switch', { name: 'Ticket reminders \u2014 email' }),
+    ).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('switch', { name: 'Ticket reminders \u2014 push' }),
+      ).not.toBeInTheDocument(),
+    )
+    expect(screen.queryByText('Promo codes')).not.toBeInTheDocument()
+    // Digest-only email still counts as email on.
+    expect(
+      screen.getByRole('switch', { name: 'Rate your experience \u2014 email' }),
+    ).toBeInTheDocument()
   })
 
   it('surfaces an error when the preference write fails', async () => {

@@ -337,21 +337,21 @@ function AppShell() {
             </Suspense>
             {!isMyEvents && (
               <footer className={`py-3 text-center items-center justify-center gap-3 ${location.pathname.startsWith('/admin') ? 'hidden sm:flex' : 'flex'}`}>
-                <Link to="/privacy" className="text-xs text-muted hover:text-ink-soft transition">
+                <Link to="/privacy" className="text-xs text-ink-soft hover:text-ink transition">
                   Privacy
                 </Link>
                 <span className="text-xs text-gray-300" aria-hidden="true">·</span>
-                <Link to="/terms" className="text-xs text-muted hover:text-ink-soft transition">
+                <Link to="/terms" className="text-xs text-ink-soft hover:text-ink transition">
                   Terms
                 </Link>
                 <span className="text-xs text-gray-300" aria-hidden="true">·</span>
-                <Link to="/legal" className="text-xs text-muted hover:text-ink-soft transition">
+                <Link to="/legal" className="text-xs text-ink-soft hover:text-ink transition">
                   Legal notice
                 </Link>
                 <span className="text-xs text-gray-300" aria-hidden="true">·</span>
                 <a
                   href="mailto:support@joinmovida.com?subject=Movida%20feedback"
-                  className="text-xs text-muted hover:text-ink-soft transition"
+                  className="text-xs text-ink-soft hover:text-ink transition"
                 >
                   Send feedback
                 </a>

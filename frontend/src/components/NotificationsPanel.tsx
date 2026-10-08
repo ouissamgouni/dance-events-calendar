@@ -153,7 +153,7 @@ export default function NotificationsPanel({
                     {error ? (
                         <div className="px-4 py-3 text-xs text-danger">{error}</div>
                     ) : items === null ? (
-                        <p className="px-4 py-3 text-xs text-muted">Loading…</p>
+                        <p className="px-4 py-3 text-xs text-ink-soft">Loading…</p>
                     ) : items.length === 0 ? (
                         <p className="px-4 py-6 text-xs text-ink-soft text-center">
                             No notifications yet.

@@ -56,7 +56,7 @@ export default function ExpandableDescription({
     const description = (
         <div
             ref={ref}
-            className={`whitespace-pre-line text-ink-soft ${details ? 'text-sm leading-relaxed' : `leading-relaxed ${compact ? 'text-xs' : 'text-sm'}`} ${expanded || maxLines != null ? '' : clampClass}`}
+            className={`whitespace-pre-line text-ink ${details ? 'text-body leading-relaxed' : `leading-relaxed ${compact ? 'text-sm' : 'text-body'}`} ${expanded || maxLines != null ? '' : clampClass}`}
             style={!expanded && maxLines != null ? {
                 display: '-webkit-box',
                 WebkitBoxOrient: 'vertical',
@@ -110,7 +110,7 @@ export default function ExpandableDescription({
                     <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
-                        className={`absolute bottom-0 right-0 pl-1 text-xs font-medium text-action hover:underline ${moreBackgroundClassName}`}
+                        className={`absolute bottom-0 right-0 pl-1 text-sm font-medium text-action hover:underline ${moreBackgroundClassName}`}
                     >
                         …more
                     </button>
@@ -120,7 +120,7 @@ export default function ExpandableDescription({
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
-                    className="mt-1 text-xs font-medium text-action hover:underline"
+                    className="mt-1 py-1 text-sm font-medium text-action hover:underline"
                 >
                     Show less
                 </button>

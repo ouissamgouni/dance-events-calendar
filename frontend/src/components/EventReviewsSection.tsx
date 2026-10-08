@@ -81,7 +81,7 @@ function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onC
                     </button>
                 </div>
                 {review.comment && (
-                    <p className="text-sm text-ink whitespace-pre-wrap break-words">{review.comment}</p>
+                    <p className="text-body text-ink whitespace-pre-wrap break-words">{review.comment}</p>
                 )}
                 {tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
@@ -421,13 +421,13 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                                             </span>
                                             <span className="text-sm font-medium text-ink truncate">{r.reviewer_label}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-xs text-ink-soft">
+                                        <div className="flex items-center gap-1.5 text-meta text-ink-soft">
                                             {meta && <span title={meta.label}>{meta.emoji} {meta.label}</span>}
                                             {meta && <span className="text-slate-300">·</span>}
                                             <span>{new Date(r.created_at).toLocaleDateString()}</span>
                                         </div>
                                         {r.comment && (
-                                            <p className="text-xs text-ink whitespace-pre-wrap break-words">{r.comment}</p>
+                                            <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap break-words">{r.comment}</p>
                                         )}
                                         {r.scope === 'past_edition' && (
                                             <span className="inline-block bg-slate-100 px-2 py-0.5 text-xs font-medium text-ink-soft">

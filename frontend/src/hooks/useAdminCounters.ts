@@ -25,6 +25,8 @@ export interface AdminCounters {
     /** Open changes per kind. */
     reviewByKind: Partial<Record<EventRevisionKind, number>>;
     ungeolocated: number;
+    /** Upcoming events still in the `new` status. */
+    newEvents: number;
     tagSuggestions: number;
     feedbackPending: number;
     organizerClaimsPending: number;
@@ -38,6 +40,7 @@ const ZERO: AdminCounters = {
     reviewEdits: 0,
     reviewByKind: {},
     ungeolocated: 0,
+    newEvents: 0,
     tagSuggestions: 0,
     feedbackPending: 0,
     organizerClaimsPending: 0,
@@ -71,11 +74,12 @@ export function useAdminCounters(): { counters: AdminCounters; refresh: () => vo
                     ...prev,
                     ungeolocated:
                         opts.geo_statuses.find((s) => s.value === 'ungeolocated')?.count ?? 0,
+                    newEvents: opts.statuses.find((s) => s.value === 'new')?.count ?? 0,
                 }));
             })
             .catch(() => undefined);
 
-        fetchAdminChanges({ limit: 1 })
+        fetchAdminChanges({ limit: 1, when: 'upcoming' })
             .then((res) => {
                 const count = (kinds: string[]) =>
                     res.kinds.filter((k) => kinds.includes(k.value)).reduce((sum, k) => sum + k.count, 0);

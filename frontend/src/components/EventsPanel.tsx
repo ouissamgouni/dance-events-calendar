@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, Check, RefreshCw, Repeat, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpDown, Check, RefreshCw, Repeat, SlidersHorizontal, X } from 'lucide-react';
 import useBackToClose from '../hooks/useBackToClose';
 import useMediaQuery from '../hooks/useMediaQuery';
 import useLongPress from '../hooks/useLongPress';
@@ -151,6 +151,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const loadedCountRef = useRef(0);
     const [selectMode, setSelectMode] = useState(false);
     const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
+    const [sortSheetOpen, setSortSheetOpen] = useState(false);
     const [actionsSheetOpen, setActionsSheetOpen] = useState(false);
     const [prevSelectedCount, setPrevSelectedCount] = useState(0);
     if (prevSelectedCount !== selectedIds.size) {
@@ -253,6 +254,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setSortOrder('asc');
             setSelectMode(false);
             setFiltersSheetOpen(false);
+            setSortSheetOpen(false);
             setActionsSheetOpen(false);
         }
     }, [isOpen, preset, initialCalendarId]);
@@ -613,16 +615,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         ...activeDimensions(filters)
             .filter((dim) => !hiddenDimensions.includes(dim.id))
             .map((dim) => ({ key: dim.id, label: dimensionSummary(dim, filters, filterOptions), onRemove: () => setFiltersState(clearDimension(dim, filters)) })),
-        ...(groupBySeries ? [{ key: 'series', label: 'Grouped by series', onRemove: () => setGroupBySeries(false) }] : []),
-        ...(sortBy !== 'start' || sortOrder !== 'asc'
-            ? [{ key: 'sort', label: `Sort: ${SORT_OPTIONS.find((o) => o.value === sortBy)?.label} ${sortOrder === 'asc' ? '↑' : '↓'}`, onRemove: () => handleSort('start', 'asc') }]
-            : []),
     ];
-    const resetFilters = () => {
-        setFilters(DEFAULT_FILTERS);
-        setGroupBySeries(false);
-        handleSort('start', 'asc');
-    };
+    const resetFilters = () => setFilters(DEFAULT_FILTERS);
+    const sortIsDefault = sortBy === 'start' && sortOrder === 'asc' && !groupBySeries;
+    const sortLabel = `${SORT_OPTIONS.find((o) => o.value === sortBy)?.label} ${sortOrder === 'asc' ? '↑' : '↓'}`;
     const columnContext = useMemo<AdminColumnContext>(() => ({
         selectedIds,
         allPageSelected: events.length > 0 && selectedIds.size === events.length,
@@ -853,6 +849,16 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 {activeFilterChips.length > 0 && (
                                     <span className="inline-flex h-5 min-w-5 items-center justify-center bg-action px-1 text-[11px] font-semibold text-white">{activeFilterChips.length}</span>
                                 )}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSortSheetOpen(true)}
+                                aria-label={`Sort and view: ${sortLabel}${groupBySeries ? ', grouped by series' : ''}`}
+                                className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 border px-3 text-sm font-medium ${sortIsDefault ? 'border-line bg-surface text-ink' : 'border-action bg-blue-50 text-action'}`}
+                            >
+                                <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+                                {sortLabel}
+                                {groupBySeries && <Repeat className="h-3.5 w-3.5" aria-hidden="true" />}
                             </button>
                         </div>
                         {activeFilterChips.length > 0 && (
@@ -1360,15 +1366,6 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 >
                     {filterOptions ? (
                         <div className="space-y-5 pb-2">
-                            {sheetSection('Sort', (
-                                <div className="flex flex-wrap gap-2">
-                                    {SORT_OPTIONS.map(({ value, label }) => (
-                                        <button key={value} type="button" aria-pressed={sortBy === value} onClick={() => handleSort(value, defaultSortOrder(value))} className={sheetPillClass(sortBy === value)}>
-                                            {label}
-                                        </button>
-                                    ))}
-                                </div>
-                            ))}
                             {FILTER_GROUPS.map((group) => {
                                 const dims = FILTER_DIMENSIONS.filter((dim) => dim.group === group && !hiddenDimensions.includes(dim.id)
                                     && !('optionsKey' in dim && (filterOptions[dim.optionsKey] ?? []).length === 0));
@@ -1384,13 +1381,49 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     </div>
                                 );
                             })}
-                            <div className="divide-y divide-line border-y border-line">
-                                {sheetSwitch('Group by series', groupBySeries, () => setGroupBySeries((v) => !v))}
-                            </div>
                         </div>
                     ) : (
                         <p className="py-6 text-center text-sm text-muted">Loading…</p>
                     )}
+                </BottomSheet>
+            )}
+
+            {isMobile && isOpen && sortSheetOpen && (
+                <BottomSheet
+                    title="Sort & view"
+                    onClose={() => setSortSheetOpen(false)}
+                    headerAction={sortIsDefault ? undefined : (
+                        <button type="button" onClick={() => { handleSort('start', 'asc'); setGroupBySeries(false); }} className="min-h-11 px-2 text-sm font-medium text-action">Reset</button>
+                    )}
+                    footer={
+                        <button type="button" onClick={() => setSortSheetOpen(false)} className={sheetPrimaryClass}>Done</button>
+                    }
+                >
+                    <div className="space-y-5 pb-2">
+                        {sheetSection('Sort by', (
+                            <div className="flex flex-wrap gap-2">
+                                {SORT_OPTIONS.map(({ value, label }) => (
+                                    <button key={value} type="button" aria-pressed={sortBy === value} onClick={() => handleSort(value, defaultSortOrder(value))} className={sheetPillClass(sortBy === value)}>
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                        {sheetSection('Order', (
+                            <div className="flex flex-wrap gap-2">
+                                {(['asc', 'desc'] as const).map((order) => (
+                                    <button key={order} type="button" aria-pressed={sortOrder === order} onClick={() => handleSort(sortBy, order)} className={sheetPillClass(sortOrder === order)}>
+                                        {order === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                        {sheetSection('View', (
+                            <div className="divide-y divide-line border-y border-line">
+                                {sheetSwitch('Group by series', groupBySeries, () => setGroupBySeries((v) => !v))}
+                            </div>
+                        ))}
+                    </div>
                 </BottomSheet>
             )}
 

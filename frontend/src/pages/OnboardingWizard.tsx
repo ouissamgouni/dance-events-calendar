@@ -666,7 +666,7 @@ export function LegacyOnboardingWizard() {
                                         {selectedProfileTags.length > 0 ? (
                                             <TagChips tags={selectedProfileTags} />
                                         ) : (
-                                            <span className="text-xs text-muted">No styles yet — tap to choose</span>
+                                            <span className="text-xs text-ink-soft">No styles yet — tap to choose</span>
                                         )}
                                     </div>
                                     <span className="shrink-0 text-xs font-medium text-action">Edit</span>
@@ -892,7 +892,7 @@ export function LegacyOnboardingWizard() {
                                             </ul>
                                         )}
                                         {citySearching && (
-                                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted">…</span>
+                                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-ink-soft">…</span>
                                         )}
                                     </div>
                                     <button

@@ -9,7 +9,7 @@ import TagBadges from './TagBadges';
 import { isTrendingScore } from '../utils/trending';
 import { shortLocation } from '../utils/locationShort';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
-import { allDayLastDay, dayOfMonth, eventDisplayZone, isSameEventDay } from '../utils/eventDates';
+import { allDayLastDay, dayOfMonth, eventDisplayZone, formatCardTime as formatCardTimeUtil, isSameEventDay } from '../utils/eventDates';
 import { PriceBadge, DiscountBadge } from './CardPriceBadges';
 import CardActionCluster from './CardActionCluster';
 import CardReviewsLine from './CardReviewsLine';
@@ -167,8 +167,7 @@ function isOnMap(event: CalendarEvent, bounds: MapBounds | null): boolean {
 const formatCardDate = (d: Date, timeZone?: string) =>
     d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone });
 
-const formatCardTime = (d: Date, timeZone?: string) =>
-    d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
+const formatCardTime = (d: Date, timeZone?: string) => formatCardTimeUtil(d, timeZone);
 
 /** Short weekday label for the timeline rail, e.g. "SAT". */
 const formatRailWeekday = (d: Date, timeZone?: string) =>
@@ -201,7 +200,7 @@ export function EventListCard({
     timeline = false,
     tribeLayout = false,
 }: EventListCardProps) {
-    const { tagsPerCard, eventCardImgoingLocationBottomEnabled, eventCardImgoingShowStatsEnabled, eventCardSaveShowStatsEnabled, explorerEventCardCardStyleEnabled, eventScheduleEnabled } = useFeatureFlags();
+    const { tagsPerCard, eventCardImgoingLocationBottomEnabled, eventCardImgoingShowStatsEnabled, eventCardSaveShowStatsEnabled, explorerEventCardCardStyleEnabled, explorerCardTitleTopEnabled, explorerCardSaveBottomEnabled, eventScheduleEnabled } = useFeatureFlags();
     const { node: imageSlot } = useEventCardImage(event, {
         show: !isPast,
         className: 'event-card-image',
@@ -237,6 +236,8 @@ export function EventListCard({
                     onOpen={onEventClick}
                     onHover={onEventHover}
                     dateRail={timeline}
+                    titleTop={explorerCardTitleTopEnabled}
+                    saveBottom={explorerCardSaveBottomEnabled}
                     highlighted={isHighlighted}
                     isNew={isNew}
                     isTrending={showPopularity && isTrendingScore(event.popularity_score ?? 0, allViewCounts, popularityThreshold, trendingTopN, trendingTopPercent)}
@@ -754,7 +755,7 @@ export default function EventListPanel({
                                     return (
                                         <Fragment key={event.event_id}>
                                             {idx === firstPastIndex && (
-                                                <div className="px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-t border-line mt-2">
+                                                <div className="px-3 py-2 text-xs font-semibold text-ink-soft uppercase tracking-wide border-t border-line mt-2">
                                                     Past events
                                                 </div>
                                             )}

@@ -201,7 +201,7 @@ export default function TagsPicker({
                                 </p>
                             )}
                             {allFiltered ? (
-                                <p className="text-xs text-muted italic">No tags available.</p>
+                                <p className="text-xs text-ink-soft italic">No tags available.</p>
                             ) : (
                                 <div className={wrap ? 'flex flex-wrap gap-1' : 'flex flex-nowrap gap-1 overflow-x-auto scrollbar-hide pb-0.5'}>
                                     {group.tags.map((tag) => {
@@ -230,7 +230,7 @@ export default function TagsPicker({
                 })}
 
                 {totalTagsAcrossGroups === 0 && search.trim() && (
-                    <p className="text-xs text-muted italic">No tags match "{search}".</p>
+                    <p className="text-xs text-ink-soft italic">No tags match "{search}".</p>
                 )}
             </div>
 

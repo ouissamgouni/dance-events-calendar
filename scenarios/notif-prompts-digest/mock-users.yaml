@@ -1,0 +1,10 @@
+# Mock users for "notif-prompts-digest".
+#   * nora  — POV. Going to every event.
+#   * admin — matches ADMIN_EMAIL; edits Delivery channels and sends the digest.
+users:
+  - email: nora@example.com
+    name: Nora (digest prompts)
+    handle: nora
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

@@ -39,6 +39,8 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from backend.services.app_settings import (
+    get_feature_email_instant,
+    get_feature_push_enabled,
     get_review_prompt_delay_hours,
     get_review_prompt_enabled,
     get_review_prompt_lookback_hours,
@@ -154,7 +156,14 @@ def review_prompt_push_copy(
     return ("How was it?", f"Rate your experience at {title}.")
 
 
-def _due_pairs(session: Session, now: datetime, delay_hours: int, lookback_hours: int):
+def _due_pairs(
+    session: Session,
+    now: datetime,
+    delay_hours: int,
+    lookback_hours: int,
+    email_on: bool = True,
+    push_on: bool = True,
+):
     """Return (user, event, existing_notif) triples due a review prompt.
 
     ``existing_notif`` is the already-created ``Notification`` row for this
@@ -218,8 +227,12 @@ def _due_pairs(session: Session, now: datetime, delay_hours: int, lookback_hours
         if existing is None:
             due.append((u, e, None))
             continue
-        needs_email = u.email_review_prompt_enabled and existing.emailed_at is None
-        needs_push = u.push_review_prompt_enabled and existing.pushed_at is None
+        needs_email = (
+            email_on and u.email_review_prompt_enabled and existing.emailed_at is None
+        )
+        needs_push = (
+            push_on and u.push_review_prompt_enabled and existing.pushed_at is None
+        )
         if needs_email or needs_push:
             due.append((u, e, existing))
     return due
@@ -238,7 +251,9 @@ def run_once() -> dict:
     notif_ids: dict[tuple, int] = {}
 
     with Session(get_engine(), expire_on_commit=False) as session:
-        due = _due_pairs(session, now, delay_hours, lookback_hours)
+        email_on = get_feature_email_instant("review_prompt", session)
+        push_on = get_feature_push_enabled("review_prompt", session)
+        due = _due_pairs(session, now, delay_hours, lookback_hours, email_on, push_on)
         if not due:
             return {"prompts": 0}
         created = 0
@@ -265,12 +280,16 @@ def run_once() -> dict:
                     existing.context = context
                     session.add(existing)
             notif_ids[(user.id, event.event_id)] = notif_id
-            if user.email_review_prompt_enabled and (
-                existing is None or existing.emailed_at is None
+            if (
+                email_on
+                and user.email_review_prompt_enabled
+                and (existing is None or existing.emailed_at is None)
             ):
                 to_email.append((user, event, context))
-            if user.push_review_prompt_enabled and (
-                existing is None or existing.pushed_at is None
+            if (
+                push_on
+                and user.push_review_prompt_enabled
+                and (existing is None or existing.pushed_at is None)
             ):
                 to_push.append((user.id, event.title, event.event_id, context))
         session.commit()

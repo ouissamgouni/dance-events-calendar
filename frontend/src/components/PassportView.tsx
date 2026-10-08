@@ -280,7 +280,7 @@ function MilestoneStateIcons({ cards, wrap }: { cards: MilestoneCardModel[]; wra
                     {card.icon}
                 </span>
             ))}
-            {cards.length === 0 && <span className="text-xs text-muted">No milestones yet</span>}
+            {cards.length === 0 && <span className="text-xs text-ink-soft">No milestones yet</span>}
         </span>
     );
 }

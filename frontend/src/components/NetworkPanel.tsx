@@ -340,7 +340,7 @@ export default function NetworkPanel() {
                                 >
                                     {t.label}
                                     {typeof t.count === 'number' && (
-                                        <span className="ml-1.5 text-xs text-muted">{t.count}</span>
+                                        <span className="ml-1.5 text-xs text-ink-soft">{t.count}</span>
                                     )}
                                 </button>
                             );
@@ -491,7 +491,7 @@ function FollowingView({
 
             {sub === 'all' ? (
                 list === null ? (
-                    <p className="text-xs text-muted">Loading…</p>
+                    <p className="text-xs text-ink-soft">Loading…</p>
                 ) : list.items.length === 0 ? (
                     <div className="py-8 text-center">
                         <p className="text-sm text-ink-soft">You’re not following anyone yet.</p>
@@ -575,11 +575,11 @@ function MostActiveView({
                 })}
             </div>
             {data === null ? (
-                <p className="text-xs text-muted">Loading…</p>
+                <p className="text-xs text-ink-soft">Loading…</p>
             ) : data.items.length === 0 ? (
                 <div className="py-8 text-center">
                     <p className="text-sm text-ink-soft">No activity in this period.</p>
-                    <p className="mt-1 text-xs text-muted">Try a longer time period.</p>
+                    <p className="mt-1 text-xs text-ink-soft">Try a longer time period.</p>
                 </div>
             ) : (
                 <ol className="divide-y divide-line">
@@ -644,7 +644,7 @@ function PersonList({
     onMenuUnfollow: (u: FollowUser) => void;
 }) {
     if (error) return <p className="text-xs text-danger">{error}</p>;
-    if (data === null) return <p className="text-xs text-muted">Loading…</p>;
+    if (data === null) return <p className="text-xs text-ink-soft">Loading…</p>;
     if (data.items.length === 0) {
         return (
             <p className="py-8 text-center text-sm text-ink-soft">
@@ -758,7 +758,7 @@ function SearchResults({
                 </button>
             </div>
             {loading && results === null ? (
-                <p className="text-xs text-muted">Searching…</p>
+                <p className="text-xs text-ink-soft">Searching…</p>
             ) : results && results.length === 0 ? (
                 <p className="py-8 text-center text-sm text-ink-soft">No people found.</p>
             ) : (

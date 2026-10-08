@@ -480,7 +480,7 @@ function SocialLinks({ profile }: { profile: PublicProfile }) {
                     </a>
                 )}
             </div>
-            <p className="mt-2 text-xs text-muted">
+            <p className="mt-2 text-xs text-ink-soft">
                 Links added by the user. Not verified by Movida.
             </p>
         </div>

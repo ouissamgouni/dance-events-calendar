@@ -1,0 +1,21 @@
+settings:
+  my_events_route_enabled: true
+  event_tickets_enabled: true
+  event_memories_enabled: true
+  ticket_prompt_enabled: true
+  memories_prompt_enabled: true
+  memories_prompt_local_hour: 0
+  review_prompt_enabled: true
+  # The social ended ~28h ago: inside [now-75h, now-3h].
+  review_prompt_delay_hours: 3
+  review_prompt_lookback_hours: 72
+  activity_digest_email_enabled: true
+  promo_codes_enabled: true
+  # Admin delivery channels: prompts email via the digest only.
+  ticket_prompt_email_instant: false
+  ticket_prompt_email_digest: true
+  memories_prompt_email_instant: false
+  memories_prompt_email_digest: true
+  review_prompt_email_instant: false
+  review_prompt_email_digest: true
+  memories_prompt_push_enabled: false

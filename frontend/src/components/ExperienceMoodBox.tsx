@@ -73,7 +73,7 @@ export default function ExperienceMoodBox({
                     <span className="font-semibold text-ink tabular-nums">{positivePct}%</span> rated it Great or Amazing
                 </span>
             </div>
-            <div className="text-xs text-muted">{subline}</div>
+            <div className="text-xs text-ink-soft">{subline}</div>
             {link && (
                 <Link
                     to={link.to}

@@ -185,12 +185,12 @@ export default function PreferencesSection() {
                 data-testid="preferences-toggle"
             >
                 <span className="flex items-center gap-2">
-                    <span className="text-muted text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+                    <span className="text-ink-soft text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
                     <h2 className="text-sm font-semibold text-ink">
                         {user ? 'Discovery Profiles' : 'Preferences'}
                     </h2>
                 </span>
-                <span className="text-xs text-muted" role="status" aria-live="polite">
+                <span className="text-xs text-ink-soft" role="status" aria-live="polite">
                     {saving ? 'Saving…' : savedToast ? 'Saved.' : hasSetPrefs ? 'Saved' : ''}
                 </span>
             </button>
@@ -210,7 +210,7 @@ export default function PreferencesSection() {
                             </p>
 
                             {loading ? (
-                                <p className="text-xs text-muted">Loading…</p>
+                                <p className="text-xs text-ink-soft">Loading…</p>
                             ) : (
                                 <ProfileEditor
                                     danceGroup={danceGroup}

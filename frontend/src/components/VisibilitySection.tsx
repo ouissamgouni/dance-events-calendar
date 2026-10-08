@@ -344,11 +344,11 @@ export function ProfileLinksEditor({ handle }: { handle: string | null }) {
     return (
         <div className="mt-3 border-t border-card-line pt-3">
             {!handle ? (
-                <p className="text-xs text-muted">Set a handle above to add social links.</p>
+                <p className="text-xs text-ink-soft">Set a handle above to add social links.</p>
             ) : loading ? (
-                <p className="text-xs text-muted">Loading…</p>
+                <p className="text-xs text-ink-soft">Loading…</p>
             ) : !profile ? (
-                <p className="text-xs text-muted">{error || 'Unavailable.'}</p>
+                <p className="text-xs text-ink-soft">{error || 'Unavailable.'}</p>
             ) : (
                 <SocialHandleRow
                     profile={profile}
@@ -490,7 +490,7 @@ function SocialChip({
                         type="button"
                         onClick={onCancel}
                         disabled={saving}
-                        className="text-xs text-muted hover:text-ink-soft shrink-0"
+                        className="text-xs text-ink-soft hover:text-ink shrink-0"
                     >
                         ✕
                     </button>

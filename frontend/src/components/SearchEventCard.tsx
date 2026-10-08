@@ -68,7 +68,7 @@ export default function SearchEventCard({
                     {showPastLabel && isPast && <span className="shrink-0 text-xs font-semibold text-ink-soft">Past</span>}
                 </span>
                 {date && <span className="mt-1 block text-xs text-ink-soft">{date}</span>}
-                {place && <span className="mt-0.5 block truncate text-xs text-muted">{place}</span>}
+                {place && <span className="mt-0.5 block truncate text-xs text-ink-soft">{place}</span>}
             </span>
         </button>
     );

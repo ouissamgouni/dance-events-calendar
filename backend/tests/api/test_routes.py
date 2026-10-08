@@ -210,6 +210,28 @@ class TestSettingsEndpoint:
         assert resp.status_code == 200
         assert resp.json()["explorer_view_control_labels_enabled"] is False
 
+    @pytest.mark.parametrize(
+        "key", ["explorer_card_title_top_enabled", "explorer_card_save_bottom_enabled"]
+    )
+    def test_admin_can_update_explorer_card_layout_flags(self, sqlite_client, key):
+        client, engine = sqlite_client
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()[key] is False
+
+        resp = client.put("/api/settings", json={key: True})
+        assert resp.status_code == 200
+        assert resp.json()[key] is True
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, key)
+            assert row is not None
+            assert row.value == "true"
+
+        resp = client.get("/api/settings")
+        assert resp.json()[key] is True
+
     def test_admin_can_update_my_events_nav_enabled_flag(self, sqlite_client):
         """Verify admin can explicitly disable My Events nav and it persists."""
         client, engine = sqlite_client
@@ -507,6 +529,59 @@ class TestSettingsEndpoint:
             ).status_code
             == 422
         )
+
+    def test_notification_channels_defaults(self, sqlite_client):
+        client, _engine = sqlite_client
+        channels = client.get("/api/settings").json()["notification_channels"]
+        assert channels["friends_going"] == {
+            "push": True,
+            "email_instant": False,
+            "email_digest": True,
+        }
+        assert channels["ticket_prompt"] == {
+            "push": True,
+            "email_instant": True,
+            "email_digest": False,
+        }
+        assert channels["event_reminders"]["email_digest"] is False
+        assert len(channels) == 15
+
+    def test_admin_updates_notification_channels(self, sqlite_client):
+        client, engine = sqlite_client
+        r = client.put(
+            "/api/settings",
+            json={
+                "notification_channels": {
+                    "ticket_prompt": {"email_instant": False, "email_digest": True},
+                    "review_prompt": {"push": False},
+                    # Instant-only features never get a digest route.
+                    "event_reminders": {"email_digest": True},
+                }
+            },
+        )
+        assert r.status_code == 200, r.text
+        channels = r.json()["notification_channels"]
+        assert channels["ticket_prompt"] == {
+            "push": True,
+            "email_instant": False,
+            "email_digest": True,
+        }
+        assert channels["review_prompt"]["push"] is False
+        assert channels["review_prompt"]["email_instant"] is True
+        assert channels["event_reminders"]["email_digest"] is False
+        with Session(engine) as session:
+            assert (
+                session.get(SiteSetting, "review_prompt_push_enabled").value == "false"
+            )
+            assert session.get(SiteSetting, "event_reminders_email_digest") is None
+
+    def test_admin_cannot_set_unknown_notification_channel(self, sqlite_client):
+        client, _engine = sqlite_client
+        r = client.put(
+            "/api/settings",
+            json={"notification_channels": {"bogus": {"push": False}}},
+        )
+        assert r.status_code == 422
 
     def test_admin_cannot_set_invalid_reminder_lead_hours(self, sqlite_client):
         client, _engine = sqlite_client

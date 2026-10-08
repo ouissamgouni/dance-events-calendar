@@ -186,7 +186,7 @@ export default function EventAssetsSection({ event, isPast }: Props) {
         : null;
 
     const ticketSection = ticketPrompt === 'dismissed' ? (
-        <section id="ticket" aria-label="My ticket" className="text-xs text-muted">
+        <section id="ticket" aria-label="My ticket" className="text-xs text-ink-soft">
             🎟 No ticket needed ·{' '}
             <button type="button" onClick={() => toggleNotNeeded(false)} className="font-medium text-action hover:underline">
                 Undo
@@ -234,7 +234,7 @@ export default function EventAssetsSection({ event, isPast }: Props) {
                                             type="button"
                                             onClick={() => setPendingDelete(asset)}
                                             aria-label="Delete ticket"
-                                            className="absolute top-0 right-0 flex h-7 w-7 items-center justify-center text-xs text-muted hover:text-danger"
+                                            className="absolute top-0 right-0 flex h-7 w-7 items-center justify-center text-xs text-ink-soft hover:text-danger"
                                         >
                                             ✕
                                         </button>

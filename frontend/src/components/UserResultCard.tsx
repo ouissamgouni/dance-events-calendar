@@ -56,14 +56,16 @@ export default function UserResultCard({
 }: UserResultCardProps) {
     const isRich = variant === 'rich';
     const baseCls =
-        'flex items-center gap-2 px-3 py-2 text-sm hover:bg-canvas w-full text-left ' +
+        (isRich
+            ? 'flex min-h-14 items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-canvas active:bg-canvas w-full text-left '
+            : 'flex items-center gap-2 px-3 py-2 text-sm hover:bg-canvas w-full text-left ') +
         (active ? 'bg-canvas' : '');
 
     const body = (
         <>
-            <Avatar url={user.avatar_url} name={user.display_name || user.handle} />
+            <Avatar url={user.avatar_url} name={user.display_name || user.handle} size={isRich ? 'lg' : 'sm'} />
             <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 text-ink truncate">
+                <div className={'flex items-center gap-1 text-ink truncate' + (isRich ? ' font-medium' : '')}>
                     <span className="truncate">
                         {user.display_name || `@${user.handle}`}
                     </span>
@@ -86,12 +88,12 @@ export default function UserResultCard({
                         />
                     )}
                     {isRich && user.is_friend && (
-                        <span className="ml-1 px-1 text-xs bg-blue-50 text-action border border-blue-200">
+                        <span className="ml-1 shrink-0 rounded-field bg-blue-50 px-1.5 py-0.5 text-2xs font-semibold text-action">
                             Friend
                         </span>
                     )}
                     {isRich && !user.is_friend && user.is_followed_by_viewer && (
-                        <span className="ml-1 px-1 text-xs bg-slate-100 text-ink-soft border border-line">
+                        <span className="ml-1 shrink-0 rounded-field bg-canvas px-1.5 py-0.5 text-2xs font-semibold text-ink-soft">
                             Following
                         </span>
                     )}
@@ -148,21 +150,22 @@ export default function UserResultCard({
     );
 }
 
-function Avatar({ url, name }: { url: string | null; name: string }) {
+function Avatar({ url, name, size }: { url: string | null; name: string; size: 'sm' | 'lg' }) {
+    const dim = size === 'lg' ? 'w-10 h-10' : 'w-7 h-7';
     if (url) {
         return (
             <img
                 src={url}
                 alt=""
                 // eslint-disable-next-line no-restricted-syntax -- avatar (allowed exception per ui-conventions)
-                className="w-7 h-7 rounded-full object-cover bg-slate-100 shrink-0"
+                className={`${dim} rounded-full object-cover bg-slate-100 shrink-0`}
             />
         );
     }
     const initial = (name || '?').trim().charAt(0).toUpperCase();
     return (
         // eslint-disable-next-line no-restricted-syntax -- avatar
-        <div className="w-7 h-7 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-xs font-semibold shrink-0">
+        <div className={`${dim} rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-xs font-semibold shrink-0`}>
             {initial}
         </div>
     );

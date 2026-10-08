@@ -85,4 +85,6 @@ test_plan:
       description: "Account → Notifications."
       expected: >
         A "Ticket reminders" row with Email/Push switches. Turning email off
-        and re-seeding then triggering sends in-app rows only.
+        and re-seeding then triggering sends in-app rows only. Admins can
+        route this email to the digest or hide a channel in the Ticket
+        prompt card under Admin → Notifications (see notif-prompts-digest).

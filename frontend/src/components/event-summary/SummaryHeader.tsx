@@ -57,7 +57,7 @@ export default function SummaryHeader({ event, variant }: Props) {
                         <span className="min-w-0 truncate">{timeLine}</span>
                     </p>
                     {viewerHint && event.timezone ? (
-                        <p className="pl-5 text-xs text-muted" data-testid="event-viewer-time">
+                        <p className="pl-5 text-xs text-ink-soft" data-testid="event-viewer-time">
                             {timeZoneLabel(event.timezone, start)} · {viewerHint}
                         </p>
                     ) : null}

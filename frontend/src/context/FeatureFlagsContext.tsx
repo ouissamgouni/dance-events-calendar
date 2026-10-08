@@ -74,6 +74,10 @@ export interface FeatureFlags {
     eventCardShowTimeLocationIconsEnabled: boolean;
     /** When true, the explorer list renders the shared My Events card style. */
     explorerEventCardCardStyleEnabled: boolean;
+    /** Explorer cards: title in its own row above the picture. */
+    explorerCardTitleTopEnabled: boolean;
+    /** Explorer cards: Save in the bottom row next to Going. */
+    explorerCardSaveBottomEnabled: boolean;
     /** Show floating Explorer control labels below desktop widths. */
     explorerViewControlLabelsEnabled: boolean;
     /** Allow the shared Explorer and Calendar filter bar to use a second row. */
@@ -88,6 +92,8 @@ export interface FeatureFlags {
     eventMemoriesEnabled: boolean;
     eventAssetsMaxTicketMb: number;
     eventAssetsMaxMemoryMb: number;
+    /** Admin delivery matrix per notification feature; missing = channel allowed. */
+    notificationChannels: Record<string, { push: boolean; email: boolean }>;
 }
 
 const defaultFlags: FeatureFlags = {
@@ -129,6 +135,8 @@ const defaultFlags: FeatureFlags = {
     eventCardShowPeopleIconEnabled: false,
     eventCardShowTimeLocationIconsEnabled: false,
     explorerEventCardCardStyleEnabled: true,
+    explorerCardTitleTopEnabled: false,
+    explorerCardSaveBottomEnabled: false,
     explorerViewControlLabelsEnabled: true,
     summaryTwoLineEnabled: false,
     eventImagesEnabled: true,
@@ -137,6 +145,7 @@ const defaultFlags: FeatureFlags = {
     eventMemoriesEnabled: false,
     eventAssetsMaxTicketMb: 5,
     eventAssetsMaxMemoryMb: 10,
+    notificationChannels: {},
 };
 
 const FeatureFlagsContext = createContext<{
@@ -200,6 +209,8 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     eventCardShowPeopleIconEnabled: s.event_card_show_people_icon_enabled ?? false,
                     eventCardShowTimeLocationIconsEnabled: s.event_card_show_time_location_icons_enabled ?? false,
                     explorerEventCardCardStyleEnabled: s.explorer_event_card_card_style_enabled ?? false,
+                    explorerCardTitleTopEnabled: s.explorer_card_title_top_enabled ?? false,
+                    explorerCardSaveBottomEnabled: s.explorer_card_save_bottom_enabled ?? false,
                     explorerViewControlLabelsEnabled: s.explorer_view_control_labels_enabled ?? true,
                     summaryTwoLineEnabled: s.summary_two_line_enabled ?? false,
                     eventImagesEnabled: s.event_images_enabled ?? true,
@@ -208,6 +219,12 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     eventMemoriesEnabled: s.event_memories_enabled ?? false,
                     eventAssetsMaxTicketMb: s.event_assets_max_ticket_mb ?? 5,
                     eventAssetsMaxMemoryMb: s.event_assets_max_memory_mb ?? 10,
+                    notificationChannels: Object.fromEntries(
+                        Object.entries(s.notification_channels ?? {}).map(([feature, c]) => [
+                            feature,
+                            { push: c.push, email: c.email_instant || c.email_digest },
+                        ]),
+                    ),
                 });
             })
             .catch(() => {

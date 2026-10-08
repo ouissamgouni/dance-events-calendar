@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import {
     updateNotificationPreferences,
     type UpdateNotificationPreferencesPayload,
@@ -212,6 +213,13 @@ export default function NotificationSettings() {
     const [savedToast, setSavedToast] = useState(false);
     const toastTimer = useRef<number | null>(null);
     const pushCapable = isWebPushCapable();
+    const { notificationChannels } = useOptionalFeatureFlags();
+    // Channels an admin switched off for a feature are hidden, not disabled.
+    const adminAllows = (channel: Channel, feature: FeatureKey): boolean =>
+        notificationChannels[feature]?.[channel] ?? true;
+    const visibleFeatures = FEATURES.filter(
+        (f) => adminAllows('email', f.key) || (pushCapable && adminAllows('push', f.key)),
+    );
 
     const detectedTz = (() => {
         try {
@@ -301,7 +309,7 @@ export default function NotificationSettings() {
                     Notifications &amp; email
                 </h2>
                 <span
-                    className="text-xs text-muted"
+                    className="text-xs text-ink-soft"
                     role="status"
                     aria-live="polite"
                 >
@@ -327,7 +335,7 @@ export default function NotificationSettings() {
                         </tr>
                     </thead>
                     <tbody>
-                        {FEATURES.map((f) => (
+                        {visibleFeatures.map((f) => (
                             <tr
                                 key={f.key}
                                 id={f.anchor}
@@ -342,25 +350,29 @@ export default function NotificationSettings() {
                                     </div>
                                 </td>
                                 <td className="px-3 py-3 text-center">
-                                    <CellSwitch
-                                        checked={flagValue('email', f.key)}
-                                        busy={saving === flagKey('email', f.key)}
-                                        ariaLabel={`${f.label} — email`}
-                                        onChange={(v) =>
-                                            patchOne(flagKey('email', f.key), v)
-                                        }
-                                    />
+                                    {adminAllows('email', f.key) && (
+                                        <CellSwitch
+                                            checked={flagValue('email', f.key)}
+                                            busy={saving === flagKey('email', f.key)}
+                                            ariaLabel={`${f.label} — email`}
+                                            onChange={(v) =>
+                                                patchOne(flagKey('email', f.key), v)
+                                            }
+                                        />
+                                    )}
                                 </td>
                                 {pushCapable && (
                                     <td className="px-3 py-3 text-center">
-                                        <CellSwitch
-                                            checked={flagValue('push', f.key)}
-                                            busy={saving === flagKey('push', f.key)}
-                                            ariaLabel={`${f.label} — push`}
-                                            onChange={(v) =>
-                                                patchOne(flagKey('push', f.key), v)
-                                            }
-                                        />
+                                        {adminAllows('push', f.key) && (
+                                            <CellSwitch
+                                                checked={flagValue('push', f.key)}
+                                                busy={saving === flagKey('push', f.key)}
+                                                ariaLabel={`${f.label} — push`}
+                                                onChange={(v) =>
+                                                    patchOne(flagKey('push', f.key), v)
+                                                }
+                                            />
+                                        )}
                                     </td>
                                 )}
                             </tr>

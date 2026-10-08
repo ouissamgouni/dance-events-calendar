@@ -239,7 +239,7 @@ export default function NotificationRow({
         ? 'text-sm leading-snug text-ink'
         : 'text-[15px] leading-snug text-ink';
     const timeClass = isPanel
-        ? 'text-xs text-muted mt-0.5'
+        ? 'text-xs text-ink-soft mt-0.5'
         : 'text-[13px] text-muted mt-0.5';
     const specialTitle = mainCls;
     const subLabelSize = isPanel ? 'text-xs' : 'text-[13px]';

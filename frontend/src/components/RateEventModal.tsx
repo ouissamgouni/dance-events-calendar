@@ -697,7 +697,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                         <div>
                                             <label className="block text-sm font-semibold text-ink mb-2">
                                                 {'What stood out — good or bad?'}{' '}
-                                                <span className="text-xs font-normal text-muted">(optional — pick what shaped it)</span>
+                                                <span className="text-xs font-normal text-ink-soft">(optional — pick what shaped it)</span>
                                             </label>
                                             <div className="flex flex-wrap gap-2.5">
                                                 {offeredAspects.map((g) => {
@@ -838,7 +838,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                         placeholder="Tell others about the event…"
                                         className="w-full rounded-card border border-line px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-300"
                                     />
-                                    <div className="mt-0.5 text-right text-xs text-muted tabular-nums">
+                                    <div className="mt-0.5 text-right text-xs text-ink-soft tabular-nums">
                                         {comment.length}/{MAX_COMMENT}
                                     </div>
                                 </div>

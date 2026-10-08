@@ -64,7 +64,7 @@ interface CardCallbacks {
 
 function MessageActions({ msg, cb }: { msg: EventMessage; cb: CardCallbacks }) {
     return (
-        <div className="flex items-center gap-2 text-xs text-muted">
+        <div className="flex items-center gap-2 text-xs text-ink-soft">
             {cb.signedIn && !cb.isPast ? (
                 <button
                     type="button"
@@ -123,7 +123,7 @@ function MessageCard({ msg, isReply, cb }: { msg: EventMessage; isReply?: boolea
                             {meta.emoji} {meta.label}
                         </span>
                     )}
-                    <span className="text-xs text-muted">· {timeAgo(msg.created_at)}</span>
+                    <span className="text-xs text-ink-soft">· {timeAgo(msg.created_at)}</span>
                 </div>
                 <p className="text-xs text-ink whitespace-pre-wrap break-words">
                     {mention && <span className="font-semibold text-action">@{mention} </span>}
@@ -481,7 +481,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                                 className="w-full border border-line px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400"
                             />
                             <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted">{composeBody.length}/2000</span>
+                                <span className="text-xs text-ink-soft">{composeBody.length}/2000</span>
                                 <button
                                     type="button"
                                     disabled={posting || !composeBody.trim()}

@@ -230,7 +230,7 @@ export default function Login() {
                                                 className="border border-line bg-surface px-4 py-2 text-left text-sm font-medium text-ink shadow-sm transition hover:bg-canvas"
                                             >
                                                 Sign in as {u.name}
-                                                <span className="ml-2 text-xs text-muted">{u.email}</span>
+                                                <span className="ml-2 text-xs text-ink-soft">{u.email}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -263,7 +263,7 @@ export default function Login() {
                             <div ref={buttonRef} className="flex justify-center" />
                         )}
 
-                        <div className="flex items-center gap-3 text-xs text-muted">
+                        <div className="flex items-center gap-3 text-xs text-ink-soft">
                             <span className="h-px flex-1 bg-slate-200" />
                             or
                             <span className="h-px flex-1 bg-slate-200" />

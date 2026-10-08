@@ -184,7 +184,7 @@ export default function ProfileEditor({
                     markers={previewMarkers}
                     controlsStart={areaNameControl}
                 />
-                {saving && <p className="mt-1 text-xs text-muted">Saving…</p>}
+                {saving && <p className="mt-1 text-xs text-ink-soft">Saving…</p>}
             </section>
 
             {showGuardrailHint && (
@@ -198,7 +198,7 @@ export default function ProfileEditor({
                     In your area
                 </span>
                 {previewEvents === null ? (
-                    danceIds.length > 0 ? <p className="text-xs text-muted">Finding events…</p> : null
+                    danceIds.length > 0 ? <p className="text-xs text-ink-soft">Finding events…</p> : null
                 ) : areaTrail.length === 0 ? (
                     <p className="border border-line bg-canvas px-3 py-4 text-xs text-ink-soft">
                         No upcoming events in this area yet — turn on alerts below and we'll email you the moment one appears.

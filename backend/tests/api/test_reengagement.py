@@ -602,6 +602,180 @@ def test_review_prompt_no_backfill_once_rated(session, monkeypatch):
     assert sent == []
 
 
+def _set(session: Session, **settings: str) -> None:
+    for key, value in settings.items():
+        session.add(SiteSetting(key=key, value=value))
+    session.commit()
+
+
+def _capture_digest(monkeypatch) -> list:
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda recipient, sections, **_: (
+            calls.append(
+                {
+                    s["feature"]: [e["primary_html"] for e in s["entries"]]
+                    for s in sections
+                }
+            )
+            or True
+        ),
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+    return calls
+
+
+def test_review_prompt_digest_mode_moves_email_to_digest(session, monkeypatch):
+    sent: list = []
+    monkeypatch.setattr(
+        review_prompt_service,
+        "send_event_review_prompt_email",
+        lambda u, e, **_: sent.append(e.event_id) or True,
+    )
+    pushed: list = []
+    monkeypatch.setattr(
+        review_prompt_service, "send_push", lambda uid, **k: pushed.append(uid) or 1
+    )
+    digests = _capture_digest(monkeypatch)
+    _set(
+        session, review_prompt_email_instant="false", review_prompt_email_digest="true"
+    )
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(
+        session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6)
+    )
+    _going(session, alice, "ev-past")
+
+    assert review_prompt_service.run_once() == {"prompts": 1, "emailed": 0, "pushed": 1}
+    assert sent == [] and pushed == [alice.id]
+    # Email is no longer pending for the prompt service.
+    assert review_prompt_service.run_once() == {"prompts": 0}
+
+    assert activity_email.run_once(force=True)["digests"] == 1
+    assert list(digests[0]) == ["review_prompt"]
+    assert "/event/ev-past/review" in digests[0]["review_prompt"][0]
+    notif = session.exec(
+        select(Notification).where(Notification.kind == "event_review_prompt")
+    ).one()
+    session.refresh(notif)
+    assert notif.emailed_at is not None
+    assert activity_email.run_once(force=True)["digests"] == 0
+
+
+def test_review_prompt_digest_drops_rated_event(session, monkeypatch):
+    digests = _capture_digest(monkeypatch)
+    _set(
+        session, review_prompt_email_instant="false", review_prompt_email_digest="true"
+    )
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(
+        session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6)
+    )
+    n = _notif(
+        session,
+        recipient=alice,
+        actor=alice,
+        kind="event_review_prompt",
+        event_id="ev-past",
+    )
+    session.add(
+        EventRating(event_id="ev-past", user_id=alice.id, stars=5, status="approved")
+    )
+    session.commit()
+
+    assert activity_email.run_once(force=True)["digests"] == 0
+    assert digests == []
+    session.refresh(n)
+    assert n.emailed_at is not None
+
+
+def test_review_prompt_instant_mode_never_digested(session, monkeypatch):
+    digests = _capture_digest(monkeypatch)
+    alice = _make_user(
+        session, "alice@example.com", "alice", email_review_prompt_enabled=False
+    )
+    _make_event(
+        session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6)
+    )
+    _notif(
+        session,
+        recipient=alice,
+        actor=alice,
+        kind="event_review_prompt",
+        event_id="ev-past",
+    )
+    # Even with digest also ticked, instant owns the email route.
+    _set(session, review_prompt_email_digest="true")
+
+    activity_email.run_once(force=True)
+    assert digests == []
+
+
+def test_review_prompt_admin_push_off(session, monkeypatch):
+    sent: list = []
+    monkeypatch.setattr(
+        review_prompt_service,
+        "send_event_review_prompt_email",
+        lambda u, e, **_: sent.append(e.event_id) or True,
+    )
+    pushed: list = []
+    monkeypatch.setattr(
+        review_prompt_service, "send_push", lambda uid, **k: pushed.append(uid) or 1
+    )
+    _set(session, review_prompt_push_enabled="false")
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(
+        session, "ev-past", start=datetime.now(timezone.utc) - timedelta(hours=6)
+    )
+    _going(session, alice, "ev-past")
+
+    assert review_prompt_service.run_once()["pushed"] == 0
+    assert pushed == [] and sent == ["ev-past"]
+    assert review_prompt_service.run_once() == {"prompts": 0}
+
+
+def test_reminder_respects_admin_channels(session, monkeypatch):
+    sent: list = []
+    monkeypatch.setattr(
+        reminder_service,
+        "send_event_reminder_email",
+        lambda u, e, w, **k: sent.append(e.event_id) or True,
+    )
+    pushed: list = []
+    monkeypatch.setattr(
+        reminder_service, "send_push", lambda uid, **k: pushed.append(uid) or 1
+    )
+    _set(session, event_reminders_email_instant="false")
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(
+        session, "ev-soon", start=datetime.now(timezone.utc) + timedelta(hours=3)
+    )
+    _going(session, alice, "ev-soon")
+
+    stats = reminder_service.run_once()
+    assert stats == {"reminders": 1, "emailed": 0, "pushed": 1}
+    assert sent == []
+
+
+def test_activity_push_respects_admin_feature_switch(session, monkeypatch):
+    monkeypatch.setattr(
+        activity_email, "send_activity_digest_v2_email", lambda *a, **k: True
+    )
+    pushed: list = []
+    monkeypatch.setattr(
+        activity_email, "send_push", lambda uid, **k: pushed.append(uid) or 1
+    )
+    _set(session, social_activity_push_enabled="false")
+    bob = _make_user(session, "bob@example.com", "bob")
+    amy = _make_user(session, "amy@example.com", "amy")
+    _notif(session, recipient=bob, actor=amy, kind="new_follower")
+
+    assert activity_email.run_once()["pushed"] == 0
+    assert pushed == []
+
+
 def test_review_prompt_excludes_too_recent_hidden_and_deleted(session, monkeypatch):
     monkeypatch.setattr(
         review_prompt_service, "send_event_review_prompt_email", lambda *a, **k: True

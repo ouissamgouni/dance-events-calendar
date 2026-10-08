@@ -193,7 +193,7 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
 
                     {/* Preview cards */}
                     {loading ? (
-                        <p className="text-xs text-muted">Loading…</p>
+                        <p className="text-xs text-ink-soft">Loading…</p>
                     ) : items.length === 0 ? (
                         <p className="text-xs text-ink-soft">
                             {filter === 'all'
@@ -244,11 +244,11 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
                                                         </span>
                                                     )}
                                                     <span className="text-xs font-semibold text-ink truncate">{name}</span>
-                                                    <span className="text-xs text-muted">· {timeAgo(m.created_at)}</span>
+                                                    <span className="text-xs text-ink-soft">· {timeAgo(m.created_at)}</span>
                                                 </div>
                                                 <p className="mt-1 text-sm text-ink line-clamp-2 break-words">{m.body}</p>
                                                 {m.reply_count > 0 && (
-                                                    <span className="mt-1 inline-block text-xs text-muted">
+                                                    <span className="mt-1 inline-block text-xs text-ink-soft">
                                                         {m.reply_count} repl{m.reply_count === 1 ? 'y' : 'ies'}
                                                     </span>
                                                 )}

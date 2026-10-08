@@ -76,6 +76,13 @@ function summary(change: AdminChange): string {
     return change.group_size > 1 ? `${fields} · on ${change.group_size} dates` : fields;
 }
 
+type ChangeWhen = 'upcoming' | 'past' | 'all';
+const WHEN_OPTIONS: { value: ChangeWhen; label: string }[] = [
+    { value: 'upcoming', label: 'Upcoming' },
+    { value: 'past', label: 'Past' },
+    { value: 'all', label: 'All' },
+];
+
 function Pills({ label, options, selected, onToggle, kinds = false }: {
     label: string;
     options: FilterOption[];
@@ -360,6 +367,7 @@ function ChangeDetail({ change, onDecided, onOpenEvent, onClose }: {
 /** One queue for every change waiting on an admin: new events, go-public requests, edits, cancellations, removals. */
 export default function ReviewPanel({ isOpen, onClose }: Props) {
     const [state, setState] = useState<'open' | 'decided'>('open');
+    const [when, setWhen] = useState<ChangeWhen>('upcoming');
     const [kinds, setKinds] = useState<EventRevisionKind[]>([]);
     const [sources, setSources] = useState<EventRevisionSource[]>([]);
     const [page, setPage] = useState(0);
@@ -384,7 +392,7 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
         try {
             const limit = isMobile ? (fresh ? PAGE_SIZE : Math.min(Math.max(loadedRef.current, PAGE_SIZE), 100)) : PAGE_SIZE;
             const offset = isMobile ? 0 : page * PAGE_SIZE;
-            const res = await fetchAdminChanges({ kind: kinds, source: sources, state, limit, offset });
+            const res = await fetchAdminChanges({ kind: kinds, source: sources, state, when, limit, offset });
             setItems(res.items);
             loadedRef.current = res.items.length;
             setTotal(res.total);
@@ -395,12 +403,12 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
         } finally {
             setLoading(false);
         }
-    }, [kinds, sources, state, page, isMobile]);
+    }, [kinds, sources, state, when, page, isMobile]);
 
     const loadMore = async () => {
         setLoading(true);
         try {
-            const res = await fetchAdminChanges({ kind: kinds, source: sources, state, limit: PAGE_SIZE, offset: loadedRef.current });
+            const res = await fetchAdminChanges({ kind: kinds, source: sources, state, when, limit: PAGE_SIZE, offset: loadedRef.current });
             const seen = new Set(items.map((c) => c.id));
             const next = [...items, ...res.items.filter((c) => !seen.has(c.id))];
             setItems(next);
@@ -428,6 +436,8 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
     useBackToClose(() => setSelected(null), isOpen && isMobile && selected !== null);
 
     const totalPages = Math.ceil(total / PAGE_SIZE);
+    const changeWhen = (value: ChangeWhen) => { setWhen(value); setPage(0); setSelected(null); };
+    const activeFilterCount = kinds.length + sources.length + (when === 'upcoming' ? 0 : 1);
 
     return (
         <>
@@ -481,14 +491,28 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                                 >
                                     <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
                                     Filters
-                                    {kinds.length + sources.length > 0 && (
-                                        <span className="inline-flex h-5 min-w-5 items-center justify-center bg-action px-1 text-[11px] font-semibold text-white">{kinds.length + sources.length}</span>
+                                    {activeFilterCount > 0 && (
+                                        <span className="inline-flex h-5 min-w-5 items-center justify-center bg-action px-1 text-[11px] font-semibold text-white">{activeFilterCount}</span>
                                     )}
                                 </button>
                             )}
                         </div>
                         {!isMobile && (
                             <div className="flex flex-wrap items-start gap-3">
+                                <div role="group" aria-label="Event" className="flex flex-wrap items-center gap-1">
+                                    <span className="text-[10px] uppercase tracking-wide text-muted">Event</span>
+                                    {WHEN_OPTIONS.map((o) => (
+                                        <button
+                                            key={o.value}
+                                            type="button"
+                                            aria-pressed={when === o.value}
+                                            onClick={() => changeWhen(o.value)}
+                                            className={`border px-2 py-0.5 text-[10px] font-medium transition ${when === o.value ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:bg-canvas'}`}
+                                        >
+                                            {o.label}
+                                        </button>
+                                    ))}
+                                </div>
                                 <Pills
                                     label="Kind"
                                     kinds
@@ -600,8 +624,8 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                 <BottomSheet
                     title="Filters"
                     onClose={() => setFiltersOpen(false)}
-                    headerAction={kinds.length + sources.length > 0 ? (
-                        <button type="button" onClick={() => { setKinds([]); setSources([]); setPage(0); }} className="min-h-11 px-2 text-sm font-medium text-action">Reset</button>
+                    headerAction={activeFilterCount > 0 ? (
+                        <button type="button" onClick={() => { setKinds([]); setSources([]); changeWhen('upcoming'); }} className="min-h-11 px-2 text-sm font-medium text-action">Reset</button>
                     ) : undefined}
                     footer={
                         <button type="button" onClick={() => setFiltersOpen(false)} className="min-h-11 w-full bg-action text-sm font-semibold text-white hover:opacity-90">
@@ -610,6 +634,22 @@ export default function ReviewPanel({ isOpen, onClose }: Props) {
                     }
                 >
                     <div className="space-y-5 pb-2">
+                        <section className="space-y-2">
+                            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">Event</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {WHEN_OPTIONS.map((o) => (
+                                    <button
+                                        key={o.value}
+                                        type="button"
+                                        aria-pressed={when === o.value}
+                                        onClick={() => changeWhen(o.value)}
+                                        className={`inline-flex min-h-10 items-center border px-3 text-sm transition ${when === o.value ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:border-action hover:text-action'}`}
+                                    >
+                                        {o.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
                         {([
                             ['Kind', kindOptions, kinds as string[], (v: string) => setKinds((prev) => toggled(prev, v as EventRevisionKind))],
                             ['Source', sourceOptions, sources as string[], (v: string) => setSources((prev) => toggled(prev, v as EventRevisionSource))],

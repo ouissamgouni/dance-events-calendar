@@ -1092,6 +1092,9 @@ _CARD_KIND_EMOJI = {
     "milestone_unlocked": "\U0001f3c5",
     "interest_event": "\U0001f50e",
     "event_reminder": "\u23f0",
+    "event_ticket_prompt": "\U0001f39f\ufe0f",
+    "event_memories_prompt": "\U0001f4f8",
+    "event_review_prompt": "\u2b50",
 }
 
 # (heading, CTA path) per feature section. A ``None`` path renders no CTA.
@@ -1108,6 +1111,9 @@ _SECTION_META: dict[str, tuple[str, str, str | None]] = {
     "friend_milestones": ("🏅", "Milestones from people you follow", "/notifications"),
     "suggested_events": ("💡", "Suggested events", "/notifications"),
     "event_messages": ("💬", "Event conversations", "/notifications"),
+    "ticket_prompt": ("🎟️", "Tickets to add", "/my-events"),
+    "review_prompt": ("⭐", "How were your events?", "/notifications"),
+    "memories_prompt": ("📸", "Share your memories", "/notifications"),
 }
 
 _SECTION_ORDER = (
@@ -1119,6 +1125,9 @@ _SECTION_ORDER = (
     "friend_milestones",
     "suggested_events",
     "event_messages",
+    "ticket_prompt",
+    "review_prompt",
+    "memories_prompt",
 )
 
 

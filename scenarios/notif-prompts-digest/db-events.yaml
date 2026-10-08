@@ -1,0 +1,33 @@
+# Two ticket-likely events ~6 days out (ticket prompt) and one social that
+# ended ~28h ago (memories + review prompts).
+base_week: 0
+events:
+  - id: evt-pd-gala
+    calendar_id: prompts-digest-cal
+    title: Paris International Salsa Gala
+    location: Studio Harmonic, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: now+144h
+    end: now+149h
+    tags: [dance-style:salsa, format:social, reach:international]
+
+  - id: evt-pd-congress
+    calendar_id: prompts-digest-cal
+    title: Madrid Bachata Congress
+    location: Sala Equis, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: now+144h
+    end: now+149h
+    tags: [dance-style:bachata, format:social, reach:international]
+
+  - id: evt-pd-social
+    calendar_id: prompts-digest-cal
+    title: Rooftop Salsa Social
+    location: Skybar, Lisbon, Portugal
+    latitude: 38.7139
+    longitude: -9.1394
+    start: now-32h
+    end: now-28h
+    tags: [dance-style:salsa, format:social, reach:local]

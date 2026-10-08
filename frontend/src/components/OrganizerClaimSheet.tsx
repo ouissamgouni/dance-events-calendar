@@ -357,7 +357,7 @@ function EventPicker({
                     {requested.map((r) => (
                         <li key={r.event_id} className="flex min-h-9 items-center gap-1.5 rounded-field border border-line bg-canvas px-3 text-sm text-ink-soft">
                             <span className="max-w-[14rem] truncate">{r.event_title ?? r.event_id}</span>
-                            <span className="text-xs text-muted">· in review</span>
+                            <span className="text-xs text-ink-soft">· in review</span>
                         </li>
                     ))}
                     {newPicks.map((p) => (
@@ -402,7 +402,7 @@ function EventPicker({
                                             {[formatDate(r.start), r.city].filter(Boolean).join(' · ')}
                                         </span>
                                     </span>
-                                    <span className="shrink-0 text-xs text-muted">
+                                    <span className="shrink-0 text-xs text-ink-soft">
                                         {taken ? 'Has an organizer' : added ? 'Added' : 'Add'}
                                     </span>
                                 </button>

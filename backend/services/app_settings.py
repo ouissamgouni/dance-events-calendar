@@ -318,10 +318,22 @@ EMAIL_MODE_FEATURES = (
 )
 
 
+# Self-service nudges that email instantly by default but may be digested.
+DIGEST_PROMPT_FEATURES = ("ticket_prompt", "memories_prompt", "review_prompt")
+# Time-sensitive features: push + instant email only, never digested.
+INSTANT_ONLY_FEATURES = ("event_reminders", "schedule_updates", "promo_codes")
+# Every user-facing notification feature the admin delivery matrix covers.
+NOTIFICATION_FEATURES = (
+    EMAIL_MODE_FEATURES + DIGEST_PROMPT_FEATURES + INSTANT_ONLY_FEATURES
+)
+_INSTANT_BY_DEFAULT = frozenset(DIGEST_PROMPT_FEATURES + INSTANT_ONLY_FEATURES)
+
+
 def get_feature_email_instant(feature: str, session: Optional[Session] = None) -> bool:
     """Admin route toggle: send ``feature`` emails immediately (non-batched)?
 
-    Defaults to False so features stay digest-only unless an admin opts in.
+    Activity features default to digest-only; prompts and time-sensitive
+    features default to instant.
     """
     s, opened = _open_session(session)
     try:
@@ -329,18 +341,45 @@ def get_feature_email_instant(feature: str, session: Optional[Session] = None) -
     finally:
         if opened:
             s.close()
-    return override if override is not None else False
+    return override if override is not None else feature in _INSTANT_BY_DEFAULT
 
 
 def get_feature_email_digest(feature: str, session: Optional[Session] = None) -> bool:
-    """Admin route toggle: include ``feature`` in the batched digest email?
-
-    Defaults to True (current behaviour for every activity feature).
-    """
+    """Admin route toggle: include ``feature`` in the batched digest email?"""
+    if feature in INSTANT_ONLY_FEATURES:
+        return False
     s, opened = _open_session(session)
     try:
         override = _get_bool_row(s, f"{feature}_email_digest")
     finally:
         if opened:
             s.close()
+    return override if override is not None else feature not in _INSTANT_BY_DEFAULT
+
+
+def get_feature_push_enabled(feature: str, session: Optional[Session] = None) -> bool:
+    """Admin per-feature push switch (``<feature>_push_enabled``, default on)."""
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, f"{feature}_push_enabled")
+    finally:
+        if opened:
+            s.close()
     return override if override is not None else True
+
+
+def get_notification_channels(session: Optional[Session] = None) -> dict[str, dict]:
+    """Effective admin delivery matrix: ``{feature: {push, email_instant, email_digest}}``."""
+    s, opened = _open_session(session)
+    try:
+        return {
+            feature: {
+                "push": get_feature_push_enabled(feature, s),
+                "email_instant": get_feature_email_instant(feature, s),
+                "email_digest": get_feature_email_digest(feature, s),
+            }
+            for feature in NOTIFICATION_FEATURES
+        }
+    finally:
+        if opened:
+            s.close()

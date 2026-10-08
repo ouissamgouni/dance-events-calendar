@@ -173,7 +173,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                                                 {promo.description}
                                             </div>
                                         )}
-                                        <div className="mt-0.5 text-xs text-muted">
+                                        <div className="mt-0.5 text-xs text-ink-soft">
                                             {formatExpiry(promo.expires_at)}
                                         </div>
                                     </div>

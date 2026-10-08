@@ -4447,6 +4447,7 @@ def list_admin_changes(
         default=None, pattern=rf"^({_SOURCE_ALT})(,({_SOURCE_ALT}))*$"
     ),
     state: str = Query(default="open", pattern="^(open|decided)$"),
+    when: str = Query(default="all", pattern="^(upcoming|past|all)$"),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
@@ -4463,6 +4464,29 @@ def list_admin_changes(
             col(EventRevision.status).not_in(event_revisions.OPEN_STATUSES)
         )
         order = col(EventRevision.decided_at).desc()
+    if when != "all":
+        from datetime import datetime as _dt
+
+        # Series-level changes are linked through every date of the submission.
+        linked = or_(
+            CachedEvent.event_id == EventRevision.event_id,
+            and_(
+                col(EventRevision.suggestion_id).is_not(None),
+                CachedEvent.suggestion_id == EventRevision.suggestion_id,
+            ),
+        )
+        has_event = select(CachedEvent.event_id).where(linked).exists()
+        has_upcoming = (
+            select(CachedEvent.event_id)
+            .where(linked, CachedEvent.end > _dt.utcnow())
+            .exists()
+        )
+        # Changes without an event stay in Upcoming so they are never hidden by default.
+        base = base.where(
+            or_(has_upcoming, ~has_event)
+            if when == "upcoming"
+            else and_(has_event, ~has_upcoming)
+        )
     if state == "open":
         from sqlalchemy import String, case, cast, literal
 

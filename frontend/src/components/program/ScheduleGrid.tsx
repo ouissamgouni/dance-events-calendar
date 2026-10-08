@@ -92,6 +92,7 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                 }}
             >
                 <div className="sticky left-0 top-0 z-30 border-b border-r border-line bg-surface" />
+                <div aria-hidden="true" className="sticky left-0 z-20 border-r border-line bg-surface" style={{ gridColumn: 1, gridRow: `2 / ${rowCount + 2}` }} />
                 {rooms.length ? rooms.map((room, index) => (
                     <RoomHeader key={room.id} room={room} column={index + 2} />
                 )) : (
@@ -109,7 +110,7 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                             <button
                                 type="button"
                                 onClick={() => onTimeClick(minute)}
-                                className="sticky left-0 z-10 border-r border-t border-line bg-surface pr-2 pt-1 text-right text-xs font-medium text-ink-soft"
+                                className="sticky left-0 z-20 border-r border-t border-line bg-surface pr-2 pt-1 text-right text-xs font-medium text-ink-soft"
                                 style={{ gridColumn: 1, gridRow: row }}
                             >
                                 {label}

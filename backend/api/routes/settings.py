@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
 from backend.api.deps import require_admin
@@ -314,6 +314,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
             "milestone_unlocked", session
         ),
         review_prompt_enabled=app_settings.get_review_prompt_enabled(session),
+        notification_channels=app_settings.get_notification_channels(session),
         event_review_size_step_enabled=app_settings.get_event_review_size_step_enabled(
             session
         ),
@@ -354,6 +355,12 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         ),
         explorer_event_card_card_style_enabled=_get_bool_setting(
             session, "explorer_event_card_card_style_enabled"
+        ),
+        explorer_card_title_top_enabled=_get_bool_setting(
+            session, "explorer_card_title_top_enabled"
+        ),
+        explorer_card_save_bottom_enabled=_get_bool_setting(
+            session, "explorer_card_save_bottom_enabled"
         ),
         explorer_view_control_labels_enabled=_get_bool_setting(
             session, "explorer_view_control_labels_enabled", default=True
@@ -633,6 +640,20 @@ def update_settings(
             body.explorer_event_card_card_style_enabled,
         )
 
+    if body.explorer_card_title_top_enabled is not None:
+        _set_bool_setting(
+            session,
+            "explorer_card_title_top_enabled",
+            body.explorer_card_title_top_enabled,
+        )
+
+    if body.explorer_card_save_bottom_enabled is not None:
+        _set_bool_setting(
+            session,
+            "explorer_card_save_bottom_enabled",
+            body.explorer_card_save_bottom_enabled,
+        )
+
     if body.explorer_view_control_labels_enabled is not None:
         _set_bool_setting(
             session,
@@ -797,6 +818,29 @@ def update_settings(
         _digest = getattr(body, f"{_feature}_email_digest")
         if _digest is not None:
             _set_bool_setting(session, f"{_feature}_email_digest", _digest)
+    if body.notification_channels:
+        unknown = set(body.notification_channels) - set(
+            app_settings.NOTIFICATION_FEATURES
+        )
+        if unknown:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown notification feature(s): {', '.join(sorted(unknown))}",
+            )
+        for _feature, _channels in body.notification_channels.items():
+            if _channels.push is not None:
+                _set_bool_setting(session, f"{_feature}_push_enabled", _channels.push)
+            if _channels.email_instant is not None:
+                _set_bool_setting(
+                    session, f"{_feature}_email_instant", _channels.email_instant
+                )
+            if (
+                _channels.email_digest is not None
+                and _feature not in app_settings.INSTANT_ONLY_FEATURES
+            ):
+                _set_bool_setting(
+                    session, f"{_feature}_email_digest", _channels.email_digest
+                )
     if body.reminder_lead_hours is not None:
         row = session.get(SiteSetting, "reminder_lead_hours")
         if row:

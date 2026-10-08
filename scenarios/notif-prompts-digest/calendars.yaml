@@ -1,0 +1,4 @@
+calendars:
+  - id: "prompts-digest-cal"
+    name: "Salsa"
+    color: "#e11d48"

@@ -62,7 +62,7 @@ export default function TrendingEventsBanner({
                     <img src="/trending-0.png" alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
                     Trending <span className="text-xs font-normal text-ink-soft">for this search</span>
                 </span>
-                <span aria-hidden="true" className="text-xs text-muted">{collapsed ? '+' : '-'}</span>
+                <span aria-hidden="true" className="text-xs text-ink-soft">{collapsed ? '+' : '-'}</span>
             </button>
             {!collapsed && (
                 <section className={`mb-3 rounded-card border border-rose-100 bg-red-50 py-2 ${className}`} data-testid="trending-events-banner">

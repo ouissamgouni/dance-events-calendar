@@ -15,7 +15,7 @@ import {
     previewInterestMatches, fetchNotificationToggleCounts,
     sendReviewPromptNow, searchEvents, fetchReviewPromptCandidates,
 } from '../api';
-import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse, EventSearchResult, ReviewPromptCandidate, AssetPromptKind } from '../api';
+import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse, EventSearchResult, ReviewPromptCandidate, AssetPromptKind, NotificationChannelSettings } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useUpdateFeatureFlag } from '../context/FeatureFlagsContext';
 import SyncProgressCard from '../components/SyncProgressCard';
@@ -37,6 +37,7 @@ import AdminUsersTab from '../components/AdminUsersTab';
 import AdminNotificationsTab from '../components/AdminNotificationsTab';
 import AdminUserMultiPicker from '../components/AdminUserMultiPicker';
 import AdminAssetPromptSendNow from '../components/AdminAssetPromptSendNow';
+import FeatureDeliveryChannels, { type DeliveryChannel } from '../components/AdminDeliveryChannels';
 import CalendarCurationRulesPanel from '../components/CalendarCurationRulesPanel';
 import { ConfirmDialog } from '../components/AppDialog';
 import BottomSheet from '../components/BottomSheet';
@@ -106,26 +107,24 @@ function AdminInfoTooltip({ label }: { label: string }) {
 const TRENDING_TOOLTIP = 'Final score = (5 x going + 1 x saved + 0.05 x views) / (hours since event row update + 24)^0.4. Going, saved, and views count only inside the trending window; ended events and events below the Going floor score 0. Example: 8 going, 2 saved, 4 views has raw 42.2, then time decay can reduce it to about 3.8.';
 const TRENDING_TOP_PERCENT_TOOLTIP = 'Relative cap for how many eligible visible events get Trending decoration. Effective count = min(Trending top N, ceil(eligible visible events x top % / 100)). Example: with 40 eligible events, top N 5, and top % 10, only min(5, ceil(4)) = 4 events are decorated.';
 
-// Per-feature activity-email card: Instant/Digest delivery toggles plus a
-// scoped "Send now" that replays only this feature's pending notifications.
+// Per-feature activity card with a scoped "Send now" that replays only this
+// feature's pending notifications.
 function FeatureEmailCard({
     feature,
     label,
     description,
-    emailModes,
-    onEmailModeChange,
     onMessage,
     headerRight,
     subline,
+    delivery,
 }: {
     feature?: string;
     label: string;
     description: string;
-    emailModes: Record<string, boolean>;
-    onEmailModeChange: (field: string, value: boolean) => void;
     onMessage: (msg: string) => void;
     headerRight?: ReactNode;
     subline?: ReactNode;
+    delivery?: ReactNode;
 }) {
     const [users, setUsers] = useState<AdminUserRow[]>([]);
     const [maxPerUser, setMaxPerUser] = useState<number | undefined>(undefined);
@@ -165,29 +164,7 @@ function FeatureEmailCard({
             )}
             <p className="text-[10px] text-muted">{description}</p>
             {subline}
-            {feature && (
-                <div className="flex items-center gap-4 border-t border-card-line pt-2.5">
-                    <span className="text-[11px] font-medium text-ink">Email delivery</span>
-                    <label className="flex items-center gap-1 text-[10px] text-ink-soft">
-                        <input
-                            type="checkbox"
-                            aria-label={`${label} instant email`}
-                            checked={!!emailModes[`${feature}_email_instant`]}
-                            onChange={(e) => onEmailModeChange(`${feature}_email_instant`, e.target.checked)}
-                        />
-                        Instant
-                    </label>
-                    <label className="flex items-center gap-1 text-[10px] text-ink-soft">
-                        <input
-                            type="checkbox"
-                            aria-label={`${label} digest email`}
-                            checked={!!emailModes[`${feature}_email_digest`]}
-                            onChange={(e) => onEmailModeChange(`${feature}_email_digest`, e.target.checked)}
-                        />
-                        Digest
-                    </label>
-                </div>
-            )}
+            {delivery}
             <div className="border-t border-card-line pt-2.5 space-y-1.5">
                 <div>
                     <span className="text-[11px] font-medium text-ink">Send now</span>
@@ -333,6 +310,8 @@ export default function Admin() {
     const [eventCardShowPeopleIconEnabled, setEventCardShowPeopleIconEnabled] = useState(false);
     const [eventCardShowTimeLocationIconsEnabled, setEventCardShowTimeLocationIconsEnabled] = useState(false);
     const [explorerEventCardCardStyleEnabled, setExplorerEventCardCardStyleEnabled] = useState(false);
+    const [explorerCardTitleTopEnabled, setExplorerCardTitleTopEnabled] = useState(false);
+    const [explorerCardSaveBottomEnabled, setExplorerCardSaveBottomEnabled] = useState(false);
     const [explorerViewControlLabelsEnabled, setExplorerViewControlLabelsEnabled] = useState(true);
     const [summaryTwoLineEnabled, setSummaryTwoLineEnabled] = useState(false);
     const [eventImagesEnabled, setEventImagesEnabled] = useState(false);
@@ -385,9 +364,8 @@ export default function Admin() {
     // Max matched events shown inline in an interest-match digest email
     // before the rest collapse behind a "Discover more" link to "For you".
     const [interestMatchMaxEventsPerEmail, setInterestMatchMaxEventsPerEmail] = useState(10);
-    // Per-feature email delivery routing (instant email / batched digest).
-    // Keyed by SiteSetting field name (``<feature>_email_{instant,digest}``).
-    const [emailModes, setEmailModes] = useState<Record<string, boolean>>({});
+    // Per-feature delivery matrix (push / instant email / digest email).
+    const [notificationChannels, setNotificationChannels] = useState<Record<string, NotificationChannelSettings>>({});
     // Count of users with each per-feature notification channel toggle on,
     // shown next to the corresponding global gate below.
     const [toggleCounts, setToggleCounts] = useState<NotificationToggleCounts | null>(null);
@@ -533,6 +511,8 @@ export default function Admin() {
             setEventCardShowPeopleIconEnabled(s.event_card_show_people_icon_enabled ?? false);
             setEventCardShowTimeLocationIconsEnabled(s.event_card_show_time_location_icons_enabled ?? false);
             setExplorerEventCardCardStyleEnabled(s.explorer_event_card_card_style_enabled ?? false);
+            setExplorerCardTitleTopEnabled(s.explorer_card_title_top_enabled ?? false);
+            setExplorerCardSaveBottomEnabled(s.explorer_card_save_bottom_enabled ?? false);
             setExplorerViewControlLabelsEnabled(s.explorer_view_control_labels_enabled ?? true);
             setSummaryTwoLineEnabled(s.summary_two_line_enabled ?? false);
             setEventImagesEnabled(s.event_images_enabled ?? true);
@@ -564,26 +544,7 @@ export default function Admin() {
             setForYouReviewWindowDays(s.for_you_review_window_days ?? 180);
             setReviewMoodMinReviews(s.review_mood_headline_min_reviews ?? 3);
             setInterestMatchMaxEventsPerEmail(s.interest_match_max_events_per_email ?? 10);
-            setEmailModes({
-                friends_going_email_instant: s.friends_going_email_instant ?? false,
-                friends_going_email_digest: s.friends_going_email_digest ?? true,
-                plan_activity_email_instant: s.plan_activity_email_instant ?? false,
-                plan_activity_email_digest: s.plan_activity_email_digest ?? true,
-                social_activity_email_instant: s.social_activity_email_instant ?? false,
-                social_activity_email_digest: s.social_activity_email_digest ?? true,
-                friend_reviews_email_instant: s.friend_reviews_email_instant ?? false,
-                friend_reviews_email_digest: s.friend_reviews_email_digest ?? true,
-                friend_milestones_email_instant: s.friend_milestones_email_instant ?? false,
-                friend_milestones_email_digest: s.friend_milestones_email_digest ?? true,
-                interest_matches_email_instant: s.interest_matches_email_instant ?? false,
-                interest_matches_email_digest: s.interest_matches_email_digest ?? true,
-                event_messages_email_instant: s.event_messages_email_instant ?? false,
-                event_messages_email_digest: s.event_messages_email_digest ?? true,
-                suggested_events_email_instant: s.suggested_events_email_instant ?? false,
-                suggested_events_email_digest: s.suggested_events_email_digest ?? true,
-                milestone_unlocked_email_instant: s.milestone_unlocked_email_instant ?? false,
-                milestone_unlocked_email_digest: s.milestone_unlocked_email_digest ?? true,
-            });
+            setNotificationChannels(s.notification_channels ?? {});
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
             setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
             setDefaultExplorerPeriod(s.default_explorer_period ?? DEFAULT_EXPLORER_PERIOD);
@@ -1064,6 +1025,30 @@ export default function Admin() {
         }
     };
 
+    const handleToggleExplorerCardTitleTop = async () => {
+        const newVal = !explorerCardTitleTopEnabled;
+        setExplorerCardTitleTopEnabled(newVal);
+        try {
+            await updateSettings({ explorer_card_title_top_enabled: newVal });
+            setMessage(`Explorer title above picture ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setExplorerCardTitleTopEnabled(!newVal);
+            setMessage('Failed to update explorer title placement toggle.');
+        }
+    };
+
+    const handleToggleExplorerCardSaveBottom = async () => {
+        const newVal = !explorerCardSaveBottomEnabled;
+        setExplorerCardSaveBottomEnabled(newVal);
+        try {
+            await updateSettings({ explorer_card_save_bottom_enabled: newVal });
+            setMessage(`Explorer Save next to Going ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setExplorerCardSaveBottomEnabled(!newVal);
+            setMessage('Failed to update explorer Save placement toggle.');
+        }
+    };
+
     const handleToggleExplorerViewControlLabels = async () => {
         const newVal = !explorerViewControlLabelsEnabled;
         setExplorerViewControlLabelsEnabled(newVal);
@@ -1471,16 +1456,26 @@ export default function Admin() {
         }
     };
 
-    const handleEmailModeChange = async (field: string, value: boolean) => {
-        const prev = emailModes[field];
-        setEmailModes((m) => ({ ...m, [field]: value }));
+    const handleChannelChange = async (feature: string, channel: DeliveryChannel, value: boolean) => {
+        const prev = notificationChannels;
+        const updated = { ...prev[feature], [channel]: value };
+        setNotificationChannels({ ...prev, [feature]: updated });
         try {
-            await updateSettings({ [field]: value } as Record<string, boolean>);
+            await updateSettings({ notification_channels: { [feature]: updated } });
         } catch {
-            setEmailModes((m) => ({ ...m, [field]: prev }));
-            setMessage('Failed to update email delivery mode.');
+            setNotificationChannels(prev);
+            setMessage('Failed to update delivery channels.');
         }
     };
+
+    const deliveryChannels = (feature: string, label: string) => (
+        <FeatureDeliveryChannels
+            feature={feature}
+            label={label}
+            config={notificationChannels[feature]}
+            onChange={handleChannelChange}
+        />
+    );
 
     const handleToggleReviewPrompt = async () => {
         const newVal = !reviewPromptEnabled;
@@ -1699,14 +1694,19 @@ export default function Admin() {
         { key: 'ungeolocated', label: 'Ungeolocated', icon: MapPinOff, onOpen: () => openEventsPanel('ungeolocated'), badges: [{ count: ungeolocatedCount, cls: 'bg-orange-500' }] },
     ];
     const dataHubGroups: { label: string; rows: HubRow[] }[] = [
-        { label: 'Queues', rows: queueRows },
         {
             label: 'Sync', rows: [{
                 key: 'sync', label: 'Calendar sync', icon: RefreshCw, onOpen: () => setSyncPanelOpen(true), badges: [],
                 detail: busy === 'sync' ? 'Syncing…' : `${enabledCount}/${calendars.length} on · Auto ${autoSyncEnabled ? 'on' : 'off'}`,
             }],
         },
-        { label: 'Browse', rows: [{ key: 'events', label: 'All events', icon: CalendarDays, onOpen: () => openEventsPanel('all'), badges: [] }] },
+        {
+            label: 'Browse', rows: [{
+                key: 'events', label: 'All events', icon: CalendarDays, onOpen: () => openEventsPanel('all'),
+                badges: [{ count: adminCounters.newEvents, cls: CHANGE_KIND_META.create.badge, title: 'New' }],
+            }],
+        },
+        { label: 'Queues', rows: queueRows },
     ];
     const dataBadgeTotal = adminCounters.reviewNew + adminCounters.reviewEdits + tagSuggestionCount
         + duplicatesPendingCount + seriesPendingCount + feedbackPendingCount + promoCodesPendingCount
@@ -2678,6 +2678,36 @@ export default function Admin() {
                                     </button>
                                 </div>
 
+                                {/* Explorer card: title above picture */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Explorer: title above picture</span>
+                                        <p className="text-[10px] text-muted">Give the explorer card title its own full-width row above the picture</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleExplorerCardTitleTop}
+                                        aria-label="Toggle explorer title above picture"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${explorerCardTitleTopEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${explorerCardTitleTopEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Explorer card: Save next to Going */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Explorer: Save next to Going</span>
+                                        <p className="text-[10px] text-muted">Move Save from the top-right corner to the bottom row of explorer cards</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleExplorerCardSaveBottom}
+                                        aria-label="Toggle explorer Save next to Going"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${explorerCardSaveBottomEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${explorerCardSaveBottomEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
                                 {/* Explorer: floating control labels */}
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -2984,6 +3014,7 @@ export default function Admin() {
                                             {' '}(of {toggleCounts.total_users} users)
                                         </p>
                                     )}
+                                    {deliveryChannels('interest_matches', 'Interest matches')}
                                     <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
                                             <span className="text-[11px] font-medium text-ink">Max events per email</span>
@@ -3016,27 +3047,6 @@ export default function Admin() {
                                             className="w-full text-[11px] font-mono border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             aria-label="Interest push schedule"
                                         />
-                                    </div>
-                                    <div className="flex items-center gap-4 border-t border-card-line pt-2.5">
-                                        <span className="text-[11px] font-medium text-ink">Email delivery</span>
-                                        <label className="flex items-center gap-1 text-[10px] text-ink-soft">
-                                            <input
-                                                type="checkbox"
-                                                aria-label="Interest matches instant email"
-                                                checked={!!emailModes['interest_matches_email_instant']}
-                                                onChange={(e) => handleEmailModeChange('interest_matches_email_instant', e.target.checked)}
-                                            />
-                                            Instant
-                                        </label>
-                                        <label className="flex items-center gap-1 text-[10px] text-ink-soft">
-                                            <input
-                                                type="checkbox"
-                                                aria-label="Interest matches digest email"
-                                                checked={!!emailModes['interest_matches_email_digest']}
-                                                onChange={(e) => handleEmailModeChange('interest_matches_email_digest', e.target.checked)}
-                                            />
-                                            Digest
-                                        </label>
                                     </div>
                                     <div className="border-t border-card-line pt-2.5 space-y-1.5">
                                         <div>
@@ -3119,6 +3129,7 @@ export default function Admin() {
                                             {' '}(of {toggleCounts.total_users} users)
                                         </p>
                                     )}
+                                    {deliveryChannels('event_reminders', 'Event reminders')}
                                     <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
                                             <span className="text-[11px] font-medium text-ink">Reminder lead time (hours)</span>
@@ -3155,6 +3166,13 @@ export default function Admin() {
                                     </div>
                                 </div>
 
+                                {/* Schedule updates */}
+                                <div className="border border-card-line p-3 space-y-3">
+                                    <span className="text-[11px] font-semibold text-ink uppercase tracking-wide">Schedule updates</span>
+                                    <p className="text-[10px] text-muted">An event you saved or are going to changes its schedule</p>
+                                    {deliveryChannels('schedule_updates', 'Schedule updates')}
+                                </div>
+
                                 {/* Review prompt */}
                                 <div className="border border-card-line p-3 space-y-3">
                                     <div className="flex items-center justify-between">
@@ -3187,6 +3205,7 @@ export default function Admin() {
                                             {' '}(of {toggleCounts.total_users} users)
                                         </p>
                                     )}
+                                    {deliveryChannels('review_prompt', 'Review prompt')}
                                     <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
                                             <span className="text-[11px] font-medium text-ink">Delay after event ends (hours)</span>
@@ -3425,6 +3444,7 @@ export default function Admin() {
                                                         {' '}(of {toggleCounts.total_users} users)
                                                     </p>
                                                 )}
+                                                {deliveryChannels(prompt.kind === 'ticket' ? 'ticket_prompt' : 'memories_prompt', prompt.label)}
                                                 {EVENT_ASSET_LIMITS.filter((limit) => limit.prompt === prompt.kind).map((limit) => (
                                                     <div key={limit.key} className="flex items-center justify-between border-t border-card-line pt-2.5">
                                                         <div>
@@ -3451,6 +3471,22 @@ export default function Admin() {
                                         </div>
                                     );
                                 })}
+                                {/* Promo codes: notifications only; the feature itself is toggled under Feature flags */}
+                                <div className="border border-card-line p-3 space-y-3">
+                                    <span className={`text-[11px] font-semibold uppercase tracking-wide ${promoCodesEnabled ? 'text-ink' : 'text-muted'}`}>Promo codes</span>
+                                    <p className="text-[10px] text-muted">A promo code is approved for an event you saved</p>
+                                    {!promoCodesEnabled && (
+                                        <div className="flex items-center justify-between gap-2 text-[10px] text-ink-soft bg-canvas border border-line p-2">
+                                            <span>Requires the Promo codes feature flag.</span>
+                                            <button type="button" onClick={() => setActiveConfigTab('feature-flags')} className="text-action hover:underline whitespace-nowrap">
+                                                Open feature flags
+                                            </button>
+                                        </div>
+                                    )}
+                                    <fieldset disabled={!promoCodesEnabled} className={promoCodesEnabled ? '' : 'opacity-50'}>
+                                        {deliveryChannels('promo_codes', 'Promo codes')}
+                                    </fieldset>
+                                </div>
 
                                 {/* Activity digest */}
                                 <div className="border border-card-line p-3 space-y-3">
@@ -3488,9 +3524,8 @@ export default function Admin() {
                                         />
                                     </div>
                                     <p className="text-[10px] text-muted border-t border-card-line pt-2.5">
-                                        Each activity feature has its own card below with an Instant/Digest
-                                        email toggle and a scoped "Send now". In-app and push are always
-                                        immediate.
+                                        Each feature's card sets its own push and email routing and
+                                        has a scoped "Send now".
                                     </p>
                                     <div className="border-t border-card-line pt-2.5 space-y-2">
                                         <div className="flex items-center justify-between">
@@ -3539,69 +3574,66 @@ export default function Admin() {
                                     <FeatureEmailCard
                                         label="Send digest now"
                                         description="Replay every eligible feature's pending activity as a digest for the selected users, bypassing the schedule and once-per-day dedup gate. Uses the combined card or legacy per-feature list format depending on the Combined digest toggle above."
-                                        emailModes={emailModes}
-                                        onEmailModeChange={handleEmailModeChange}
                                         onMessage={setMessage}
                                     />
                                 </div>
 
-                                {/* Per-feature activity email delivery + scoped Send now */}
+                                {/* Per-feature scoped Send now */}
                                 <FeatureEmailCard
                                     feature="friends_going"
                                     label="Friends going"
                                     description="A friend or follow marks Going to an event."
-                                    emailModes={emailModes}
-                                    onEmailModeChange={handleEmailModeChange}
                                     onMessage={setMessage}
+                                    delivery={deliveryChannels('friends_going', 'Friends going')}
+                                />
+                                <FeatureEmailCard
+                                    feature="plan_activity"
+                                    label="Plan activity"
+                                    description="Someone you follow plans sessions at an event you're attending."
+                                    onMessage={setMessage}
+                                    delivery={deliveryChannels('plan_activity', 'Plan activity')}
                                 />
                                 <FeatureEmailCard
                                     feature="social_activity"
                                     label="Friends & social"
                                     description="New followers and friend requests."
-                                    emailModes={emailModes}
-                                    onEmailModeChange={handleEmailModeChange}
                                     onMessage={setMessage}
+                                    delivery={deliveryChannels('social_activity', 'Friends & social')}
                                 />
                                 <FeatureEmailCard
                                     feature="friend_reviews"
                                     label="Friend reviews"
                                     description="A friend or follow shares a review of an event."
-                                    emailModes={emailModes}
-                                    onEmailModeChange={handleEmailModeChange}
                                     onMessage={setMessage}
+                                    delivery={deliveryChannels('friend_reviews', 'Friend reviews')}
                                 />
                                 <FeatureEmailCard
                                     feature="friend_milestones"
                                     label="Friend milestones"
                                     description="A friend or follow reaches a dance-passport milestone."
-                                    emailModes={emailModes}
-                                    onEmailModeChange={handleEmailModeChange}
                                     onMessage={setMessage}
+                                    delivery={deliveryChannels('friend_milestones', 'Friend milestones')}
                                 />
                                 <FeatureEmailCard
                                     feature="event_messages"
                                     label="Event messages"
                                     description="A question or request is posted (or replied to) on an event you saved or are going to."
-                                    emailModes={emailModes}
-                                    onEmailModeChange={handleEmailModeChange}
                                     onMessage={setMessage}
+                                    delivery={deliveryChannels('event_messages', 'Event messages')}
                                 />
                                 <FeatureEmailCard
                                     feature="suggested_events"
                                     label="Suggested events"
                                     description="A suggested event you submitted is approved and fanned out to your followers."
-                                    emailModes={emailModes}
-                                    onEmailModeChange={handleEmailModeChange}
                                     onMessage={setMessage}
+                                    delivery={deliveryChannels('suggested_events', 'Suggested events')}
                                 />
 
                                 {/* Milestones (personal passport unlocks) — master toggle merged into the card */}
                                 <FeatureEmailCard
                                     feature="milestone_unlocked"
                                     label="Milestones"
-                                    description="You unlock a Dance Passport milestone. Instant sends the rich per-milestone email immediately; Digest folds the unlock into the batched activity digest. In-app and push are always immediate."
-                                    emailModes={emailModes}
-                                    onEmailModeChange={handleEmailModeChange}
+                                    description="You unlock a Dance Passport milestone. Instant email sends the rich per-milestone email immediately; digest email folds the unlock into the batched activity digest."
                                     onMessage={setMessage}
                                     headerRight={(
                                         <button
@@ -3618,6 +3650,7 @@ export default function Admin() {
                                             {' '}(of {toggleCounts.total_users} users)
                                         </p>
                                     )}
+                                    delivery={deliveryChannels('milestone_unlocked', 'Milestones')}
                                 />
 
                                 {/* Web push */}

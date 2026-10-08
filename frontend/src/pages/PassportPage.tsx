@@ -857,7 +857,7 @@ function DancingSinceControl({
                 </div>
             )}
             {firstEventDate && (
-                <p className="mt-0.5 text-muted text-xs">
+                <p className="mt-0.5 text-ink-soft text-xs">
                     First event on Movida {formatJourneyDate(firstEventDate)}
                 </p>
             )}

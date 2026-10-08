@@ -223,9 +223,9 @@ export function FollowingPersonSearch({
             {/* max-h caps the list at ~5 rows; the rest scrolls. */}
             <div className="mt-2 flex max-h-48 flex-col overflow-y-auto">
                 {loading ? (
-                    <p className="px-1 py-2 text-xs text-muted">Loading…</p>
+                    <p className="px-1 py-2 text-xs text-ink-soft">Loading…</p>
                 ) : filtered.length === 0 ? (
-                    <p className="px-1 py-2 text-xs text-muted">No people found.</p>
+                    <p className="px-1 py-2 text-xs text-ink-soft">No people found.</p>
                 ) : (
                     filtered.map(({ user, count }) => {
                         const checked = selectedHandles.includes(user.handle);
@@ -269,7 +269,7 @@ export function FollowingPersonSearch({
                                         <path d="M4 10.5l4 4 8-8" />
                                     </svg>
                                 )}
-                                <span className="shrink-0 text-xs text-muted">({count})</span>
+                                <span className="shrink-0 text-xs text-ink-soft">({count})</span>
                             </button>
                         );
                     })

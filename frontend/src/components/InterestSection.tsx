@@ -222,7 +222,7 @@ function FollowChipButton({
             <span
                 title={`Follow request pending for @${handle}`}
                 aria-label={`Follow request pending for @${handle}`}
-                className="inline-flex items-center justify-center h-5 w-5 text-xs leading-none text-muted border border-line bg-surface"
+                className="inline-flex items-center justify-center h-5 w-5 text-xs leading-none text-ink-soft border border-line bg-surface"
             >
                 ·
             </span>
@@ -438,7 +438,7 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
 
     if (summaryLoading && !summary) {
         return (
-            <div className="border-t border-card-line pt-3 text-xs text-muted">
+            <div className="border-t border-card-line pt-3 text-xs text-ink-soft">
                 Loading interest…
             </div>
         );
@@ -823,7 +823,7 @@ function ModalSection({
                 {label} ({count})
             </div>
             {count === 0 ? (
-                <div className="px-3 py-2 text-xs text-muted">
+                <div className="px-3 py-2 text-xs text-ink-soft">
                     {emptyCopy}
                 </div>
             ) : (
@@ -861,7 +861,7 @@ function ModalRow({
                         display_name={display_name}
                     />
                     {handle && (
-                        <span className="text-xs text-muted ml-1">
+                        <span className="text-xs text-ink-soft ml-1">
                             @{handle}
                         </span>
                     )}

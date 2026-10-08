@@ -103,7 +103,7 @@ function PersonCard({ attendee, showRelationship }: { attendee: Attendee; showRe
             <Avatar attendee={attendee} size={36} />
             <span className="w-full truncate text-xs font-medium text-ink">{name}</span>
             {showRelationship && mutuals > 0 && (
-                <span className="w-full truncate text-xs text-muted">
+                <span className="w-full truncate text-xs text-ink-soft">
                     {mutuals} mutual friend{mutuals === 1 ? '' : 's'}
                 </span>
             )}
@@ -173,7 +173,7 @@ export default function PeopleTab({ eventId }: Props) {
         return () => { alive = false; };
     }, [eventId]);
 
-    if (loading) return <p className="text-xs text-muted">Loading…</p>;
+    if (loading) return <p className="text-xs text-ink-soft">Loading…</p>;
 
     if (unauthorized || !user) {
         return (

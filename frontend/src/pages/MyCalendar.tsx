@@ -578,7 +578,7 @@ function LegacyCalendar() {
                                                 >
                                                     {event.title}
                                                 </button>
-                                                <span className="shrink-0 text-xs text-muted">
+                                                <span className="shrink-0 text-xs text-ink-soft">
                                                     {formatRelativeWhen(event.start)}
                                                 </span>
                                             </li>
@@ -608,7 +608,7 @@ function LegacyCalendar() {
                                 />
                             </div>
                             {subsLoading && subsEvents.length > 0 && (
-                                <span className="mt-1 shrink-0 text-xs text-muted">Updating…</span>
+                                <span className="mt-1 shrink-0 text-xs text-ink-soft">Updating…</span>
                             )}
                         </div>
                     </div>
@@ -810,7 +810,7 @@ function LegacyCalendar() {
                                         📆 Add to Google Calendar
                                     </a>
                                 </div>
-                                <p className="text-xs text-muted">
+                                <p className="text-xs text-ink-soft">
                                     Anyone with this link can see these events. Keep it private.
                                 </p>
                             </div>

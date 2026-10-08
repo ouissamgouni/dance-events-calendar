@@ -32,6 +32,10 @@ from backend.db.models import (
     UserEventAttendance,
 )
 from backend.services import event_assets
+from backend.services.app_settings import (
+    get_feature_email_instant,
+    get_feature_push_enabled,
+)
 from backend.services.email import (
     send_event_memories_prompt_email,
     send_event_ticket_prompt_email,
@@ -44,6 +48,10 @@ logger = logging.getLogger(__name__)
 
 EVENT_TICKET_PROMPT = "event_ticket_prompt"
 EVENT_MEMORIES_PROMPT = "event_memories_prompt"
+_FEATURE_BY_KIND = {
+    EVENT_TICKET_PROMPT: "ticket_prompt",
+    EVENT_MEMORIES_PROMPT: "memories_prompt",
+}
 
 TICKET_LOOKBACK_HOURS = 72
 MEMORIES_MIN_HOURS_AFTER_END = 6
@@ -110,6 +118,9 @@ def _with_existing(
     """Attach existing notification rows; drop pairs with nothing left to send."""
     if not pairs:
         return []
+    feature = _FEATURE_BY_KIND[kind]
+    email_on = get_feature_email_instant(feature, session)
+    push_on = get_feature_push_enabled(feature, session)
     existing = {
         (n.recipient_user_id, n.event_id): n
         for n in session.exec(
@@ -124,8 +135,8 @@ def _with_existing(
         notif = existing.get((user.id, event.event_id))
         if notif is None:
             due.append((user, event, None))
-        elif (getattr(user, email_flag) and notif.emailed_at is None) or (
-            getattr(user, push_flag) and notif.pushed_at is None
+        elif (email_on and getattr(user, email_flag) and notif.emailed_at is None) or (
+            push_on and getattr(user, push_flag) and notif.pushed_at is None
         ):
             due.append((user, event, notif))
     return due
@@ -242,6 +253,8 @@ def _deliver(
         due = find_due(session, now)
         if not due:
             return {"prompts": 0}
+        email_on = get_feature_email_instant(_FEATURE_BY_KIND[kind], session)
+        push_on = get_feature_push_enabled(_FEATURE_BY_KIND[kind], session)
         for user, event, existing in due:
             if existing is None:
                 notif = Notification(
@@ -256,9 +269,9 @@ def _deliver(
                 created += 1
             else:
                 notif = existing
-            if getattr(user, email_flag) and notif.emailed_at is None:
+            if email_on and getattr(user, email_flag) and notif.emailed_at is None:
                 to_email.append((user, event, notif.id))
-            if getattr(user, push_flag) and notif.pushed_at is None:
+            if push_on and getattr(user, push_flag) and notif.pushed_at is None:
                 to_push.append((user, event, notif.id))
         session.commit()
 

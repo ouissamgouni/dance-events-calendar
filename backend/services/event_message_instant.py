@@ -19,7 +19,10 @@ from sqlmodel import Session, or_, select
 
 from backend.db.models import CachedEvent, Notification, User
 from backend.services.activity_email import _MAX_AGE
-from backend.services.app_settings import get_feature_email_instant
+from backend.services.app_settings import (
+    get_feature_email_instant,
+    get_feature_push_enabled,
+)
 from backend.services.email import (
     event_message_action_phrase,
     send_event_message_instant_email,
@@ -98,7 +101,7 @@ def deliver_for_recipient(session: Session, recipient_id, source: str = "job") -
     user_facing = {
         eid: event_is_user_facing(session, event) for eid, event in events.items()
     }
-    push_ok = webpush_configured()
+    push_ok = webpush_configured() and get_feature_push_enabled(FEATURE, session)
 
     for n in notifs:
         event = events.get(n.event_id) if n.event_id else None
