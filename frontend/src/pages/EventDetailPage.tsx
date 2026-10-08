@@ -16,6 +16,7 @@ import ShareButton from '../components/ShareButton';
 import EventSummary, { type EventDetailTab } from '../components/EventSummary';
 import EventDetailTabsBar from '../components/EventDetailTabsBar';
 import SummaryHeader from '../components/event-summary/SummaryHeader';
+import PastEventBanner from '../components/event-summary/PastEventBanner';
 import EventActionDock from '../components/EventActionDock';
 import EventMemoriesTab from '../components/EventMemoriesTab';
 import TicketAction from '../components/TicketAction';
@@ -431,6 +432,7 @@ export default function EventDetailPage() {
                     ) : (
                         <>
                             <SummaryHeader event={event} variant="page" />
+                            {isPast && <div className="mt-3"><PastEventBanner event={event} /></div>}
                             {event.owner_preview ? (
                                 <div className="mt-3 rounded-card border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-ink">
                                     Only you can see this event — it isn't shared in discovery, feeds or notifications.
@@ -473,6 +475,7 @@ export default function EventDetailPage() {
                                             onSelect={(t) => goToTab(t)}
                                             showProgram={hasProgram && !isMobile}
                                             showMemories={showMemoriesTab}
+                                            isPast={isPast}
                                         />
                                     </div>
 

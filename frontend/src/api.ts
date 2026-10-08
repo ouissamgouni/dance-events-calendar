@@ -687,6 +687,8 @@ export interface SiteSettings {
     /** When true, floating Explorer controls show labels below desktop widths.
      * Desktop controls are always labeled. Client default: true. */
     explorer_view_control_labels_enabled?: boolean;
+    /** How map marker cards open on mouse devices. Touch always uses click. */
+    map_popup_trigger?: 'click' | 'hover';
     /** Allow the shared Explorer and Calendar filter bar to use a second row
      * before lower-priority filters collapse into the overflow count. */
     summary_two_line_enabled?: boolean;

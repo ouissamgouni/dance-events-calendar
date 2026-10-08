@@ -10,7 +10,7 @@ export default function DesktopNav({ className = '' }: { className?: string }) {
     const navDestinations = useNavDestinations();
 
     return (
-        <nav aria-label="Primary" className={`hidden md:flex items-center gap-1 ${className}`}>
+        <nav aria-label="Primary" className={`hidden xl:flex shrink-0 items-center gap-1 ${className}`}>
             {navDestinations.map((dest) => {
                 const active = dest.isActive(pathname);
                 return (
@@ -18,7 +18,7 @@ export default function DesktopNav({ className = '' }: { className?: string }) {
                         key={dest.id}
                         to={dest.path}
                         aria-current={active ? 'page' : undefined}
-                        className={`relative inline-flex items-center gap-1.5 px-2.5 py-1 text-sm transition ${active ? 'text-action font-semibold' : 'text-ink-soft hover:text-ink'
+                        className={`relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 py-1 text-sm transition ${active ? 'text-action font-semibold' : 'text-ink-soft hover:text-ink'
                             }`}
                     >
                         <img src={dest.icon} alt="" aria-hidden="true" className="h-4 w-4" />

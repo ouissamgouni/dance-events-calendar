@@ -30,7 +30,7 @@ export type SectionKey = keyof typeof SECTION_CONFIG;
 
 const SECTION_GATE: Record<SectionKey, { title: string; body: string }> = {
     tribe: {
-        title: 'Your Tribe',
+        title: 'My Tribe',
         body: 'Sign in to connect with friends, discover people you may know, and follow their calendars.',
     },
     mine: {
@@ -52,7 +52,7 @@ function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: st
     return (
         <nav
             aria-label="Section"
-            className="flex items-center gap-1 overflow-x-auto border-b border-line px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="grid grid-flow-col auto-cols-fr overflow-x-auto md:flex md:gap-1 md:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
             {tabs.map((t) => {
                 // The hub tab (e.g. /mine) matches its own path exactly so it
@@ -65,12 +65,13 @@ function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: st
                         key={t.path}
                         to={t.path}
                         aria-current={active ? 'page' : undefined}
-                        className={`shrink-0 -mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition ${active
-                            ? 'border-action text-action'
-                            : 'border-transparent text-ink-soft hover:text-ink'
+                        className={`relative shrink-0 py-4 text-center text-sm font-medium transition md:px-3 ${active
+                            ? 'text-action'
+                            : 'text-ink hover:text-action'
                             }`}
                     >
                         {t.label}
+                        {active && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-action" />}
                     </Link>
                 );
             })}
@@ -86,9 +87,11 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
     const { pathname } = useLocation();
     const { user, loading } = useAuth();
     const { hub, tabs } = SECTION_CONFIG[section];
-    const title = section === 'tribe' ? 'Your Tribe' : null;
+    const title = section === 'tribe' ? 'My Tribe' : null;
     const minePageTitle = section === 'mine' ? getTitleForMinePath(pathname) : null;
     const isMyEvents = pathname === '/mine/calendar';
+    // Tribe > Calendars renders the wide explorer; the header must share its left edge.
+    const headerWidth = pathname === '/tribe/calendars' ? 'max-w-7xl' : 'max-w-3xl';
 
     // Whole-section login gate (soft in-page callout). Every /tribe/* and
     // /mine/* route is signed-in only.
@@ -115,9 +118,11 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
     return (
         <div className={isMyEvents ? 'flex h-full min-h-0 flex-col overflow-hidden bg-canvas' : 'min-h-full bg-[#f8fafc]'}>
             {section !== 'mine' && (
-                <div className="bg-surface px-4 pt-1">
-                    {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-ink">{title}</h1>}
-                    <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
+                <div className="border-b border-line bg-surface">
+                    <div className={`mx-auto ${headerWidth}`}>
+                        {title && <h1 className="px-4 py-3 text-2xl font-bold text-ink">{title}</h1>}
+                        <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
+                    </div>
                 </div>
             )}
             {section === 'mine' && pathname !== hub && minePageTitle && !isMyEvents && (

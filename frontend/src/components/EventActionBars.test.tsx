@@ -32,7 +32,7 @@ describe.each([
     it('shows Share inline for upcoming events', () => {
         renderActionBar(renderActions(false));
 
-        expect(screen.getAllByRole('button', { name: /share|copy link/i })[0]).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: /^(share|copy link)$/i })[0]).toBeInTheDocument();
     });
 });
 
@@ -40,9 +40,9 @@ describe('modal actions overflow', () => {
     it('moves Share into More for past events', async () => {
         const { user } = renderActionBar(<EventActions {...commonProps} isPast canReviewInline />);
 
-        expect(screen.queryByRole('button', { name: /share|copy link/i })).toBeNull();
+        expect(screen.queryByRole('button', { name: /^(share|copy link)$/i })).toBeNull();
         await user.click(screen.getByRole('button', { name: 'More actions' }));
-        expect(screen.getByRole('button', { name: /share|copy link/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /^(share|copy link)$/i })).toBeInTheDocument();
     });
 });
 
@@ -50,13 +50,13 @@ describe('page action dock overflow', () => {
     it('lists every secondary action on desktop and keeps More mobile-only', async () => {
         const { user } = renderActionBar(<EventActionDock {...commonProps} isPast />);
 
-        const desktopShare = screen.getByRole('button', { name: /share|copy link/i });
+        const desktopShare = screen.getByRole('button', { name: /^(share|copy link)$/i });
         expect(desktopShare).toHaveClass('hidden', 'lg:flex');
         expect(screen.getByRole('button', { name: 'Start discussion' })).toHaveClass('hidden', 'lg:flex');
         expect(screen.getByRole('button', { name: 'More actions' }).parentElement).toHaveClass('lg:hidden');
 
         await user.click(screen.getByRole('button', { name: 'More actions' }));
-        expect(screen.getAllByRole('button', { name: /share|copy link/i })).toHaveLength(2);
+        expect(screen.getAllByRole('button', { name: /^(share|copy link)$/i })).toHaveLength(2);
     });
 });
 
@@ -85,6 +85,27 @@ describe('upcoming edition review', () => {
         const inMenu = screen.getAllByRole('button', { name: /earlier edition/i })
             .filter((el) => screen.getByRole('menu').contains(el));
         expect(inMenu).toHaveLength(1);
+    });
+});
+
+describe('past event actions', () => {
+    const past = { ...EVENT, start: '2020-01-01T20:00:00Z', end: '2020-01-02T01:00:00Z' } as CalendarEvent;
+    const withRatings = (element: React.ReactElement) => renderWithProviders(
+        <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, showRatings: true }, updateFlag: vi.fn() }}>
+            {element}
+        </FeatureFlagsContext.Provider>,
+    );
+
+    it.each([
+        ['modal actions', <EventActions {...commonProps} event={past} isPast canReviewInline />],
+        ['page action dock', <EventActionDock {...commonProps} event={past} isPast />],
+    ])('%s: drops Save and offers an empty-star Review CTA', (_name, element) => {
+        withRatings(element);
+
+        expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
+        const review = screen.getByRole('button', { name: 'Review this event' });
+        expect(review).toHaveTextContent('Review');
+        expect(review.querySelector('svg')).toHaveAttribute('fill', 'none');
     });
 });
 

@@ -10,6 +10,8 @@ interface Options {
     /** Sizing and spacing shared by the picture and its placeholder. */
     className?: string;
     imageTestId?: string;
+    /** Past events: render the artwork greyed out. */
+    past?: boolean;
 }
 
 interface Result {
@@ -25,7 +27,8 @@ interface Result {
  * out, or when the placeholder style is ``none``.
  */
 export function useEventCardImage(event: CalendarEvent, options: Options = {}): Result {
-    const { show = true, className = '', imageTestId = 'event-card-image' } = options;
+    const { show = true, className: baseClassName = '', imageTestId = 'event-card-image', past = false } = options;
+    const className = past ? `${baseClassName} grayscale opacity-80` : baseClassName;
     const { eventImagesEnabled, eventCardPlaceholderStyle } = useFeatureFlags();
     const [imageFailed, setImageFailed] = useState(false);
 

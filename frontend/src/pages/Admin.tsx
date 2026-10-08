@@ -313,6 +313,7 @@ export default function Admin() {
     const [explorerCardTitleTopEnabled, setExplorerCardTitleTopEnabled] = useState(false);
     const [explorerCardSaveBottomEnabled, setExplorerCardSaveBottomEnabled] = useState(false);
     const [explorerViewControlLabelsEnabled, setExplorerViewControlLabelsEnabled] = useState(true);
+    const [mapPopupHover, setMapPopupHover] = useState(false);
     const [summaryTwoLineEnabled, setSummaryTwoLineEnabled] = useState(false);
     const [eventImagesEnabled, setEventImagesEnabled] = useState(false);
     const [eventCardPlaceholderStyle, setEventCardPlaceholderStyle] = useState<'gradient' | 'initial' | 'none'>('gradient');
@@ -514,6 +515,7 @@ export default function Admin() {
             setExplorerCardTitleTopEnabled(s.explorer_card_title_top_enabled ?? false);
             setExplorerCardSaveBottomEnabled(s.explorer_card_save_bottom_enabled ?? false);
             setExplorerViewControlLabelsEnabled(s.explorer_view_control_labels_enabled ?? true);
+            setMapPopupHover(s.map_popup_trigger === 'hover');
             setSummaryTwoLineEnabled(s.summary_two_line_enabled ?? false);
             setEventImagesEnabled(s.event_images_enabled ?? true);
             setEventCardPlaceholderStyle(s.event_card_placeholder_style ?? 'none');
@@ -1058,6 +1060,18 @@ export default function Admin() {
         } catch {
             setExplorerViewControlLabelsEnabled(!newVal);
             setMessage('Failed to update Explorer control labels toggle.');
+        }
+    };
+
+    const handleToggleMapPopupHover = async () => {
+        const newVal = !mapPopupHover;
+        setMapPopupHover(newVal);
+        try {
+            await updateSettings({ map_popup_trigger: newVal ? 'hover' : 'click' });
+            setMessage(`Map cards now open on ${newVal ? 'hover' : 'click'}.`);
+        } catch {
+            setMapPopupHover(!newVal);
+            setMessage('Failed to update map card trigger.');
         }
     };
 
@@ -2720,6 +2734,21 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${explorerViewControlLabelsEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${explorerViewControlLabelsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Map: marker card on hover */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Map cards on hover</span>
+                                        <p className="text-[10px] text-muted">Open the event card when hovering a map pin (mouse only). Off = click</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleMapPopupHover}
+                                        aria-label="Toggle map cards on hover"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${mapPopupHover ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${mapPopupHover ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

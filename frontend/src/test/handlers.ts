@@ -228,6 +228,7 @@ export const handlers = [
             explorer_card_title_top_enabled: false,
             explorer_card_save_bottom_enabled: false,
             explorer_view_control_labels_enabled: true,
+            map_popup_trigger: 'click',
             event_reminders_enabled: true,
             activity_digest_email_enabled: true,
             interest_match_notifications_enabled: true,

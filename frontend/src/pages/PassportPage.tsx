@@ -1290,72 +1290,74 @@ export default function PassportPage() {
     }
 
     return (
-        <div className="mx-auto max-w-4xl space-y-6 p-4">
-            {error && (
-                <div className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-danger">
-                    {error}
-                </div>
-            )}
+        <div className="mx-auto max-w-3xl p-4">
+            <div className="space-y-6">
+                {error && (
+                    <div className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-danger">
+                        {error}
+                    </div>
+                )}
 
-            {loading || !data ? (
-                <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
-                    Loading your passport…
-                </div>
-            ) : (
-                <>
-                    <PassportView
+                {loading || !data ? (
+                    <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
+                        Loading your passport…
+                    </div>
+                ) : (
+                    <>
+                        <PassportView
+                            data={data}
+                            displayName={(user?.name || '').trim().split(/\s+/)[0] || user?.handle || 'Dancer'}
+                            handle={user?.handle ?? null}
+                            avatarUrl={user?.avatar_url ?? null}
+                            headerActions={
+                                <div className="flex items-center gap-2">
+                                    <AddPastEventControl onAdded={handlePastEventAdded} onOpenSubmitEvent={openSuggest} />
+                                    {user?.handle && (
+                                        <SharePassportMenu
+                                            handle={user.handle}
+                                            displayName={(user.name || '').trim().split(/\s+/)[0] || user.handle}
+                                            shareCode={user.share_code ?? null}
+                                            data={data}
+                                            mapEvents={mapEvents}
+                                        />
+                                    )}
+                                </div>
+                            }
+                            dancingSinceSlot={
+                                <DancingSinceControl
+                                    dancingSince={data.stats.dancing_since}
+                                    memberSince={data.stats.member_since}
+                                    firstEventDate={data.stats.first_event_date}
+                                    onSaved={(iso) =>
+                                        setData((d) =>
+                                            d ? { ...d, stats: { ...d.stats, dancing_since: iso } } : d,
+                                        )
+                                    }
+                                />
+                            }
+                            initialTab={initialTab}
+                            onTabChange={(tab) => navigate({ pathname: location.pathname, search: `?tab=${tab}` }, { replace: true })}
+                            milestonesLead={<div className="px-4"><MilestoneCarousel milestones={nextMilestones} onSelectCategory={setMilestoneCategory} /></div>}
+                            timelineItems={items}
+                            timelineMarkers={markers}
+                            timelineHasMore={hasMore}
+                            onLoadMoreTimeline={loadMore}
+                            loadingMoreTimeline={loadingMore}
+                            mapEvents={mapEvents}
+                            onNeedMapEvents={loadMapEvents}
+                            onTimelineSearch={searchTimeline}
+                            showTimelineMemories={eventMemoriesEnabled}
+                        />
+                    </>
+                )}
+                {data && milestoneCategory && (
+                    <MilestoneCategorySheetFor
                         data={data}
-                        displayName={(user?.name || '').trim().split(/\s+/)[0] || user?.handle || 'Dancer'}
-                        handle={user?.handle ?? null}
-                        avatarUrl={user?.avatar_url ?? null}
-                        headerActions={
-                            <div className="flex items-center gap-2">
-                                <AddPastEventControl onAdded={handlePastEventAdded} onOpenSubmitEvent={openSuggest} />
-                                {user?.handle && (
-                                    <SharePassportMenu
-                                        handle={user.handle}
-                                        displayName={(user.name || '').trim().split(/\s+/)[0] || user.handle}
-                                        shareCode={user.share_code ?? null}
-                                        data={data}
-                                        mapEvents={mapEvents}
-                                    />
-                                )}
-                            </div>
-                        }
-                        dancingSinceSlot={
-                            <DancingSinceControl
-                                dancingSince={data.stats.dancing_since}
-                                memberSince={data.stats.member_since}
-                                firstEventDate={data.stats.first_event_date}
-                                onSaved={(iso) =>
-                                    setData((d) =>
-                                        d ? { ...d, stats: { ...d.stats, dancing_since: iso } } : d,
-                                    )
-                                }
-                            />
-                        }
-                        initialTab={initialTab}
-                        onTabChange={(tab) => navigate({ pathname: location.pathname, search: `?tab=${tab}` }, { replace: true })}
-                        milestonesLead={<div className="px-4"><MilestoneCarousel milestones={nextMilestones} onSelectCategory={setMilestoneCategory} /></div>}
-                        timelineItems={items}
-                        timelineMarkers={markers}
-                        timelineHasMore={hasMore}
-                        onLoadMoreTimeline={loadMore}
-                        loadingMoreTimeline={loadingMore}
-                        mapEvents={mapEvents}
-                        onNeedMapEvents={loadMapEvents}
-                        onTimelineSearch={searchTimeline}
-                        showTimelineMemories={eventMemoriesEnabled}
+                        categoryKey={milestoneCategory}
+                        onClose={() => setMilestoneCategory(null)}
                     />
-                </>
-            )}
-            {data && milestoneCategory && (
-                <MilestoneCategorySheetFor
-                    data={data}
-                    categoryKey={milestoneCategory}
-                    onClose={() => setMilestoneCategory(null)}
-                />
-            )}
+                )}
+            </div>
         </div>
     );
 }

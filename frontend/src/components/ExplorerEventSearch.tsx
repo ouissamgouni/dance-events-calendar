@@ -7,6 +7,7 @@ import type { CalendarEvent } from '../types';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import useBackToClose from '../hooks/useBackToClose';
 import SearchEventCard, { type SearchEventCardPurpose } from './SearchEventCard';
+import { searchResultGroups } from '../utils/eventTiming';
 
 interface ExplorerEventSearchProps {
     onSelectEvent: (eventId: string) => void;
@@ -157,13 +158,15 @@ export default function ExplorerEventSearch({
 
     const term = q.trim();
 
-    const visibleResults = useMemo(
+    const resultGroups = useMemo(
         () => {
             const attendanceFiltered = excludeAttended ? results.filter((result) => !isAttending(result.event_id)) : results;
-            return resultFilter ? attendanceFiltered.filter(resultFilter) : attendanceFiltered;
+            const filtered = resultFilter ? attendanceFiltered.filter(resultFilter) : attendanceFiltered;
+            return searchResultGroups(filtered, (result) => result.end, effectiveDateScope === 'all');
         },
-        [results, excludeAttended, isAttending, resultFilter],
+        [results, excludeAttended, isAttending, resultFilter, effectiveDateScope],
     );
+    const visibleResults = useMemo(() => resultGroups.flatMap((group) => group.items), [resultGroups]);
 
     const reset = () => {
         if (!embedded) setOpen(false);
@@ -248,19 +251,25 @@ export default function ExplorerEventSearch({
                     )}
                 </div>
             )}
-            {visibleResults.map((row, index) => (
-                <div key={row.event_id} className="mb-1.5 last:mb-0">
-                    <SearchEventCard
-                        result={row}
-                        event={eventsById.get(row.event_id)}
-                        onOpen={() => selectEvent(row)}
-                        purpose={resultPurpose}
-                        showPastLabel={effectiveDateScope === 'all'}
-                        highlighted={index === activeIdx}
-                        testId={`explorer-event-search-result-${index}`}
-                    />
-                </div>
-            ))}
+            {visibleResults.map((row, index) => {
+                const group = resultGroups.find((g) => g.items[0] === row);
+                return (
+                    <div key={row.event_id} className="mb-1.5 last:mb-0">
+                        {group?.title && (
+                            <p className="bg-surface px-1 pb-1 pt-2 text-xs font-semibold text-ink-soft">{group.title}</p>
+                        )}
+                        <SearchEventCard
+                            result={row}
+                            event={eventsById.get(row.event_id)}
+                            onOpen={() => selectEvent(row)}
+                            purpose={resultPurpose}
+                            showPastLabel={effectiveDateScope === 'all'}
+                            highlighted={index === activeIdx}
+                            testId={`explorer-event-search-result-${index}`}
+                        />
+                    </div>
+                );
+            })}
         </>
     );
 
@@ -283,7 +292,7 @@ export default function ExplorerEventSearch({
         <div ref={containerRef} className={`relative ${className}`}>
             {/* Desktop inline: show input directly */}
             {isDesktopInline && (
-                <div className="hidden sm:flex items-center gap-2 border border-line bg-canvas px-2 py-1">
+                <div className="hidden w-full sm:flex items-center gap-2 border border-line bg-canvas px-2 py-1">
                     <svg
                         viewBox="0 0 20 20"
                         fill="currentColor"
@@ -305,10 +314,10 @@ export default function ExplorerEventSearch({
                         onFocus={() => setOpen(true)}
                         placeholder="Search events, places, or tags…"
                         aria-label={triggerLabel}
-                        className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none"
+                        className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
                     />
                     {headerInline && pastToggle && (
-                        <label className="flex items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
+                        <label className="flex shrink-0 items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
                             <input
                                 type="checkbox"
                                 checked={pastChecked}
@@ -398,7 +407,7 @@ export default function ExplorerEventSearch({
                     role="dialog"
                     aria-modal="true"
                     aria-label={triggerLabel}
-                    className="fixed inset-x-0 top-[calc(64px+env(safe-area-inset-top))] bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] md:bottom-0 z-[8500] flex flex-col bg-canvas"
+                    className="fixed inset-x-0 top-[calc(64px+env(safe-area-inset-top))] bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] xl:bottom-0 z-[8500] flex flex-col bg-canvas"
                     data-testid="explorer-event-search-overlay"
                 >
                     <div className="shrink-0 border-b border-line bg-surface">

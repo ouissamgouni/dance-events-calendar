@@ -18,7 +18,7 @@ import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel from '../components/EventListPanel';
 import MyEventsMapPreview from '../components/MyEventsMapPreview';
 import SummaryBar from '../components/SummaryBar';
-import ViewSwitcher, { VIEW_SWITCHER_BAND_PX } from '../components/ViewSwitcher';
+import ViewSwitcher, { VIEW_SWITCHER_BAND_PX, ViewSegmentedControl } from '../components/ViewSwitcher';
 import type { ExploreView } from '../components/ViewSwitcher';
 import FilterSheet from '../components/FilterSheet';
 import type { FilterSheetSection } from '../components/FilterSheet';
@@ -1914,10 +1914,11 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 {error && (
                     <p className="text-center text-danger">Error: {error}</p>
                 )}
-                {(!loading || initialLoadDone.current) && !error && (
+                {(!loading || initialLoadDone.current) && !error && !mapFullscreen && (
                     <>
-                        <div ref={summaryBarRef} className="sticky top-0 z-40 bg-canvas">
-                            {renderFilterSummaryBar({ singleLine: viewMode === 'calendar' })}
+                        <div ref={summaryBarRef} className="sticky top-0 z-40 flex items-center gap-3 bg-canvas">
+                            {renderFilterSummaryBar({ singleLine: viewMode === 'calendar', className: 'flex-1 min-w-0' })}
+                            {isDesktop && <ViewSegmentedControl currentView={activeView} onSelect={handleSelectView} />}
                         </div>
                     </>
                 )}
@@ -1967,15 +1968,16 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                     <div
                                         className={
                                             mapFullscreen
-                                                ? 'explorer-map-shell fixed inset-x-0 bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] transition-[bottom] md:bottom-0 top-[calc(64px+env(safe-area-inset-top))] z-[8000] bg-surface overflow-hidden flex flex-col'
+                                                ? 'explorer-map-shell fixed inset-x-0 bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] transition-[bottom] xl:bottom-0 top-[calc(64px+env(safe-area-inset-top))] z-[8000] bg-surface overflow-hidden flex flex-col'
                                                 : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden flex flex-col'
                                         }
                                         data-testid="explorer-map-shell"
                                         data-fullscreen={mapFullscreen ? 'true' : 'false'}
                                     >
-                                        {mapFullscreen && !isDesktop && (
-                                            <div className="relative z-[702] flex shrink-0 items-center border-b border-line bg-surface" data-testid="map-fullscreen-header">
+                                        {mapFullscreen && (
+                                            <div className="relative z-[702] flex shrink-0 items-center gap-3 border-b border-line bg-surface lg:px-4 lg:py-1" data-testid="map-fullscreen-header">
                                                 {renderFilterSummaryBar({ className: 'flex-1 min-w-0', singleLine: true })}
+                                                {isDesktop && <ViewSegmentedControl currentView={activeView} onSelect={handleSelectView} />}
                                             </div>
                                         )}
                                         <div className="relative flex min-h-0 flex-1">
@@ -2019,21 +2021,6 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                     data-testid="map-search-this-area"
                                                 >
                                                     Search this area
-                                                </button>
-                                            )}
-                                            {/* Fullscreen toggle — desktop only. On
-                                    mobile the miniature opens the map and the
-                                    header / View-list controls exit it. */}
-                                            {isDesktop && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleSelectView(mapFullscreen ? 'list' : 'map')}
-                                                    aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
-                                                    title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
-                                                    className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas shadow-sm transition"
-                                                    data-testid="map-fullscreen-toggle"
-                                                >
-                                                    {mapFullscreen ? '×' : '⤢'}
                                                 </button>
                                             )}
                                         </div>

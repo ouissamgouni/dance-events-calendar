@@ -44,7 +44,7 @@ export default function CardActionCluster({
     const goingCount = summary?.total_going ?? 0;
     return (
         <>
-            {include.includes('save') && (
+            {include.includes('save') && !isPast && (
                 <span className="inline-flex items-center">
                     <SaveEventButton
                         eventId={eventId}

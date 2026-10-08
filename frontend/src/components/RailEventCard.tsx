@@ -7,6 +7,7 @@ import AttendeeAvatarStack from './AttendeeAvatarStack';
 import EventDateRail from './EventDateRail';
 import { shortLocation } from '../utils/locationShort';
 import { eventDisplayZone, formatCardTime } from '../utils/eventDates';
+import { isEventPast } from '../utils/eventTiming';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useEventCardImage } from '../hooks/useEventCardImage';
 
@@ -102,7 +103,7 @@ export default function RailEventCard({
 }: RailEventCardProps) {
     const { tagsPerCard } = useFeatureFlags();
     const { node: imageSlot } = useEventCardImage(event, {
-        show: !pastPresentation,
+        past: pastPresentation,
         className: 'my-3 ml-3 aspect-video w-32 shrink-0 rounded-card',
         imageTestId: 'my-events-row-image',
     });
@@ -185,8 +186,8 @@ export default function RailEventCard({
                     data-testid={actionsTestId}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation disabled={event.is_cancelled} />
-                    <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation isPast={new Date(event.end).getTime() < Date.now()} cancelled={event.is_cancelled} />
+                    {!isEventPast(event) && <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation disabled={event.is_cancelled} />}
+                    <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation isPast={isEventPast(event)} cancelled={event.is_cancelled} />
                 </div>
             )}
             <button

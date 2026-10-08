@@ -58,6 +58,35 @@ function ViewIcon({ view }: { view: ExploreView }) {
     );
 }
 
+/** Desktop inline List | Map | Calendar switch (the floating bar is mobile/tablet only). */
+export function ViewSegmentedControl({ currentView, onSelect, views = ['list', 'map', 'calendar'], className = '' }: {
+    currentView: ExploreView;
+    onSelect: (view: ExploreView) => void;
+    views?: ExploreView[];
+    className?: string;
+}) {
+    return (
+        <div role="group" aria-label="Change event view" className={`inline-flex shrink-0 items-center border border-line bg-surface ${className}`} data-testid="view-segmented-control">
+            {views.map((view, index) => {
+                const active = view === currentView;
+                return (
+                    <button
+                        key={view}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => { if (!active) onSelect(view); }}
+                        className={`inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium transition [&_svg]:h-4 [&_svg]:w-4 ${index > 0 ? 'border-l border-line' : ''} ${active ? 'bg-action text-white' : 'text-ink-soft hover:bg-canvas hover:text-ink'}`}
+                        data-testid={`view-segment-${view}`}
+                    >
+                        <ViewIcon view={view} />
+                        {labels[view]}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible, previewOffsetPx, onCreate, createExpanded, mobileLabelsEnabled = true }: ViewSwitcherProps) {
     // Float just above the map preview card, or near the map's bottom edge.
     // The map ends above the mobile bottom nav (64px + safe-area) but reaches
@@ -77,7 +106,7 @@ export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible,
     return (
         <nav
             aria-label="Change event view"
-            className={`pointer-events-none fixed inset-x-4 z-[8000] flex items-center justify-between transition-[bottom] bottom-[calc(var(--bottom-nav-offset,64px)+env(safe-area-inset-bottom)+var(--map-preview-offset))] md:bottom-[var(--map-preview-offset)]`}
+            className={`pointer-events-none fixed inset-x-4 z-[8000] flex items-center justify-between transition-[bottom] bottom-[calc(var(--bottom-nav-offset,64px)+env(safe-area-inset-bottom)+var(--map-preview-offset))] xl:bottom-[var(--map-preview-offset)] lg:hidden`}
             style={{ '--map-preview-offset': `${offsetPx}px` } as CSSProperties}
             data-testid="view-switcher"
         >

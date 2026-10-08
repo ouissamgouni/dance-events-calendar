@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { Features } from 'lightningcss'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -76,7 +77,18 @@ export default defineConfig(({ mode }) => {
     define: {
       __VITE_API_URL__: JSON.stringify(viteApiUrl || ''),
     },
+    // Tailwind only lowers nesting/range media queries in build; do it in dev too so iOS 16 Safari renders correctly.
+    css: {
+      transformer: 'lightningcss',
+      lightningcss: {
+        targets: { safari: 16 << 16, ios_saf: 16 << 16 },
+        include: Features.Nesting | Features.MediaQueries,
+      },
+    },
     build: {
+      // Lightning CSS lowers Tailwind v4 `@media (width >= …)` to min-width for Safari < 16.4.
+      cssMinify: 'lightningcss',
+      cssTarget: ['chrome107', 'edge107', 'firefox104', 'safari15', 'ios15'],
       rollupOptions: {
         output: {
           // Split large, rarely-changing vendor libraries into their own

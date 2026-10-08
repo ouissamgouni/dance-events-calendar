@@ -14,7 +14,7 @@ describe('UserSearchBox', () => {
         vi.useRealTimers();
     });
 
-    it('renders the desktop input and opens a below-header compact search panel', async () => {
+    it('folds into an icon and opens a below-header search panel', async () => {
         vi.useFakeTimers();
         vi.mocked(searchUsers).mockResolvedValue({
             items: [
@@ -36,14 +36,9 @@ describe('UserSearchBox', () => {
             </MemoryRouter>,
         );
 
-        const desktopInput = screen.getByRole('combobox', { name: 'Search users' });
-        expect(desktopInput.parentElement).toHaveClass('lg:flex');
-        const trigger = screen.getByRole('button', { name: 'Search users' });
-        expect(trigger).toHaveClass('lg:hidden');
-
-        fireEvent.click(trigger);
-        const inputs = screen.getAllByRole('combobox', { name: 'Search users' });
-        const compactInput = inputs[1];
+        expect(screen.queryByRole('combobox', { name: 'Search users' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Search users' }));
+        const compactInput = screen.getByRole('combobox', { name: 'Search users' });
         const compactPanel = compactInput.closest('[style]');
         expect(compactPanel).toHaveStyle({
             top: 'calc(64px + env(safe-area-inset-top) + 6px)',
@@ -52,9 +47,8 @@ describe('UserSearchBox', () => {
         fireEvent.change(compactInput, { target: { value: 'mari' } });
         await act(async () => vi.advanceTimersByTimeAsync(251));
 
-        expect(screen.getAllByRole('option', { name: /Marisol Vega/ })).toHaveLength(2);
+        expect(screen.getAllByRole('option', { name: /Marisol Vega/ })).toHaveLength(1);
         expect(document.querySelector('#people-search-compact-option-0')).toBeInTheDocument();
-        expect(document.querySelector('#people-search-desktop-option-0')).toBeInTheDocument();
         expect(searchUsers).toHaveBeenCalledWith('mari', { limit: 8 });
     });
 });

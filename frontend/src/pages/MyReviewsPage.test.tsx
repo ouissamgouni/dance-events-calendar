@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchAspectTagGroups, fetchAudienceTagGroups, fetchEventsByIds, fetchMyPendingReviews, fetchMyRatings } from '../api';
+import { fetchAspectTagGroups, fetchAudienceTagGroups, fetchEventsByIds, fetchFollowingReviews, fetchMyPendingReviews, fetchMyRatings } from '../api';
 import MyReviewsPage from './MyReviewsPage';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 
@@ -10,6 +10,7 @@ vi.mock('../api', () => ({
     fetchAspectTagGroups: vi.fn(),
     fetchAudienceTagGroups: vi.fn(),
     fetchEventsByIds: vi.fn(),
+    fetchFollowingReviews: vi.fn(),
     fetchMyPendingReviews: vi.fn(),
     fetchMyRatings: vi.fn(),
 }));
@@ -71,5 +72,23 @@ describe('MyReviewsPage', () => {
         expect(screen.getByText('A lovely weekend.')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /Berlin Salsa Week/ })).toBeInTheDocument();
         expect(screen.queryByTestId('reviewed-event-card')).not.toBeInTheDocument();
+    });
+
+    it('shows reviews from people you follow in the Tribe tab', async () => {
+        const user = userEvent.setup();
+        vi.mocked(fetchFollowingReviews).mockResolvedValue({
+            items: [{
+                id: 'tribe-1', event_id: 'event-9', event_title: 'Lisbon Kizomba Fest', event_start: '2026-07-01T18:00:00Z', overall_sentiment: 'great', comment: 'Amazing DJs.', aspect_tags: [], audience_tags: [], reviewer_label: 'Laura M', created_at: '2026-07-03T12:00:00Z',
+            }],
+            total: 1,
+        });
+
+        render(<MemoryRouter><FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}><MyReviewsPage /></FeatureFlagsContext.Provider></MemoryRouter>);
+
+        expect(fetchFollowingReviews).not.toHaveBeenCalled();
+        await user.click(screen.getByRole('tab', { name: 'My Tribe' }));
+        expect(await screen.findByText('Amazing DJs.')).toBeInTheDocument();
+        expect(screen.getByText('Laura M')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /Lisbon Kizomba Fest/ })).toHaveAttribute('href', '/event/event-9');
     });
 });

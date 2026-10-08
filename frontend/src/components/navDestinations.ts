@@ -36,7 +36,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
     },
     {
         id: 'tribe',
-        label: 'Tribe',
+        label: 'My Tribe',
         path: '/tribe',
         icon: '/people-2.png',
         isActive: (p) => p === '/tribe' || p.startsWith('/tribe/'),

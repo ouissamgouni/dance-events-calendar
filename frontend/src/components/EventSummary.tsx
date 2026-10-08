@@ -12,6 +12,7 @@ import ReviewOverviewCard from './event-summary/ReviewOverviewCard';
 import LinksRow from './event-summary/LinksRow';
 import SummaryMiniMap from './event-summary/SummaryMiniMap';
 import SeriesRow from './event-summary/SeriesRow';
+import PastEventBanner from './event-summary/PastEventBanner';
 import EventActions from './event-summary/EventActions';
 import ExpandableDescription from './ExpandableDescription';
 import { cleanEventDescription } from '../utils/eventDescription';
@@ -80,14 +81,26 @@ export default function EventSummary({
         return () => { cancelled = true; };
     }, [event.event_id]);
 
-    const priceVisible = isPriceSectionVisible(event, showPrices);
+    const priceVisible = !isPast && isPriceSectionVisible(event, showPrices);
     const price = priceVisible ? formatEventPrice(event) : null;
-    const hasPromo = event.has_active_promo_codes;
+    const hasPromo = !isPast && event.has_active_promo_codes;
     const description = cleanEventDescription(event.description ?? '');
+
+    const reviewOverview = (
+        <ReviewOverviewCard
+            aggregate={aggregate}
+            crossEdition={crossEdition}
+            onOpen={() => onOpenTab('reviews')}
+        />
+    );
 
     return (
         <div className="space-y-5">
             {!omitHeader && <SummaryHeader event={event} variant={variant} />}
+            {!omitHeader && isPast && <PastEventBanner event={event} series={series} onNavigate={onSeriesNavigate} />}
+
+            {/* Past events lead with how it went. */}
+            {isPast && reviewOverview}
 
             {/* Tags — single line, neutral grey; overflow collapses to a
                 clickable "+x" that opens the About tag list. */}
@@ -109,11 +122,7 @@ export default function EventSummary({
             />
 
             {/* Review overview */}
-            <ReviewOverviewCard
-                aggregate={aggregate}
-                crossEdition={crossEdition}
-                onOpen={() => onOpenTab('reviews')}
-            />
+            {!isPast && reviewOverview}
 
             {/* Price + discount — one line under the review section */}
             {(price || hasPromo) && (

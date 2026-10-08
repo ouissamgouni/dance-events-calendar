@@ -204,121 +204,123 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
     );
 
     return (
-        <div className="max-w-2xl mx-auto px-4 py-6">
-            {!socialOnly && (
-                <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-2xl font-bold text-ink">
-                        Activity
-                        {unreadCount > 0 && (
-                            <span className="ml-2 text-xs text-ink-soft font-normal">
-                                ({unreadCount} unread)
-                            </span>
-                        )}
-                    </h1>
-                    <button
-                        type="button"
-                        onClick={handleMarkAll}
-                        disabled={busyAll || unreadCount === 0}
-                        className="text-xs text-action hover:text-action disabled:text-muted disabled:cursor-not-allowed"
-                    >
-                        {busyAll ? 'Marking…' : 'Mark all read'}
-                    </button>
-                </div>
-            )}
-
-            <div className="flex items-center gap-2 mb-3 overflow-x-auto">
-                {kindFilter && (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            const next = new URLSearchParams(searchParams);
-                            next.delete('kind');
-                            setSearchParams(next, { replace: true });
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-2 border border-action bg-action text-white whitespace-nowrap shrink-0"
-                        aria-label="Show all notifications"
-                    >
-                        <span className="text-sm font-medium">Filtered</span>
-                        <X size={16} strokeWidth={2} aria-hidden="true" />
-                    </button>
-                )}
-                {CATEGORY_PILLS.filter((p) => !socialOnly || SOCIAL_PILLS.has(p.key)).map((p) => (
-                    <CategoryPill
-                        key={p.key}
-                        label={p.label}
-                        Icon={p.Icon}
-                        active={filterCategory === p.key}
-                        onClick={() => handleSelectCategory(p.key)}
-                    />
-                ))}
-            </div>
-
-            {filterCategory === 'matches' && !socialOnly && (
-                <div className="flex items-center justify-between gap-2 mb-3">
-                    {dayParam ? (
+        <div className="mx-auto max-w-3xl px-4 py-6">
+            <div>
+                {!socialOnly && (
+                    <div className="flex items-center justify-between mb-4">
+                        <h1 className="text-2xl font-bold text-ink">
+                            Activity
+                            {unreadCount > 0 && (
+                                <span className="ml-2 text-xs text-ink-soft font-normal">
+                                    ({unreadCount} unread)
+                                </span>
+                            )}
+                        </h1>
                         <button
                             type="button"
-                            onClick={clearDay}
-                            className="flex items-center gap-1.5 px-3 py-1.5 border border-action bg-action text-white whitespace-nowrap"
-                            aria-label="Show all matches"
+                            onClick={handleMarkAll}
+                            disabled={busyAll || unreadCount === 0}
+                            className="text-xs text-action hover:text-action disabled:text-muted disabled:cursor-not-allowed"
                         >
-                            <span className="text-sm font-medium">
-                                {new Date(`${dayParam}T00:00:00`).toLocaleDateString([], {
-                                    weekday: 'short',
-                                    day: 'numeric',
-                                    month: 'short',
-                                })}
-                                {items !== null && ` · ${total} ${total === 1 ? 'match' : 'matches'}`}
-                            </span>
+                            {busyAll ? 'Marking…' : 'Mark all read'}
+                        </button>
+                    </div>
+                )}
+
+                <div className="flex items-center gap-2 mb-3 overflow-x-auto">
+                    {kindFilter && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const next = new URLSearchParams(searchParams);
+                                next.delete('kind');
+                                setSearchParams(next, { replace: true });
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-2 border border-action bg-action text-white whitespace-nowrap shrink-0"
+                            aria-label="Show all notifications"
+                        >
+                            <span className="text-sm font-medium">Filtered</span>
                             <X size={16} strokeWidth={2} aria-hidden="true" />
                         </button>
-                    ) : (
-                        <span />
                     )}
-                    <Link to="/saved-searches" className="text-sm text-action hover:underline">
-                        Manage alerts
-                    </Link>
-                </div>
-            )}
-
-            {error && (
-                <div className="mb-3 border border-red-200 bg-red-50 px-3 py-2 text-sm text-danger">
-                    {error}
-                </div>
-            )}
-
-            {items === null ? (
-                <p className="text-sm text-muted">Loading…</p>
-            ) : visibleItems.length === 0 ? (
-                <p className="text-sm text-ink-soft">
-                    No notifications yet.
-                </p>
-            ) : (
-                <ul className="divide-y divide-slate-100 border border-line bg-surface">
-                    {visibleItems.map((n) => (
-                        <NotificationRow
-                            key={n.id}
-                            item={n}
-                            variant="page"
-                            busy={busyId === n.id}
-                            onMarkRead={() => handleMarkOne(n.id)}
+                    {CATEGORY_PILLS.filter((p) => !socialOnly || SOCIAL_PILLS.has(p.key)).map((p) => (
+                        <CategoryPill
+                            key={p.key}
+                            label={p.label}
+                            Icon={p.Icon}
+                            active={filterCategory === p.key}
+                            onClick={() => handleSelectCategory(p.key)}
                         />
                     ))}
-                </ul>
-            )}
-
-            {items !== null && items.length < total && (
-                <div className="mt-4 flex justify-center">
-                    <button
-                        type="button"
-                        onClick={handleLoadMore}
-                        disabled={loadingMore}
-                        className="px-4 py-2 text-sm border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {loadingMore ? 'Loading…' : 'Load more'}
-                    </button>
                 </div>
-            )}
+
+                {filterCategory === 'matches' && !socialOnly && (
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                        {dayParam ? (
+                            <button
+                                type="button"
+                                onClick={clearDay}
+                                className="flex items-center gap-1.5 px-3 py-1.5 border border-action bg-action text-white whitespace-nowrap"
+                                aria-label="Show all matches"
+                            >
+                                <span className="text-sm font-medium">
+                                    {new Date(`${dayParam}T00:00:00`).toLocaleDateString([], {
+                                        weekday: 'short',
+                                        day: 'numeric',
+                                        month: 'short',
+                                    })}
+                                    {items !== null && ` · ${total} ${total === 1 ? 'match' : 'matches'}`}
+                                </span>
+                                <X size={16} strokeWidth={2} aria-hidden="true" />
+                            </button>
+                        ) : (
+                            <span />
+                        )}
+                        <Link to="/saved-searches" className="text-sm text-action hover:underline">
+                            Manage alerts
+                        </Link>
+                    </div>
+                )}
+
+                {error && (
+                    <div className="mb-3 border border-red-200 bg-red-50 px-3 py-2 text-sm text-danger">
+                        {error}
+                    </div>
+                )}
+
+                {items === null ? (
+                    <p className="text-sm text-muted">Loading…</p>
+                ) : visibleItems.length === 0 ? (
+                    <p className="text-sm text-ink-soft">
+                        No notifications yet.
+                    </p>
+                ) : (
+                    <ul className="divide-y divide-slate-100 border border-line bg-surface">
+                        {visibleItems.map((n) => (
+                            <NotificationRow
+                                key={n.id}
+                                item={n}
+                                variant="page"
+                                busy={busyId === n.id}
+                                onMarkRead={() => handleMarkOne(n.id)}
+                            />
+                        ))}
+                    </ul>
+                )}
+
+                {items !== null && items.length < total && (
+                    <div className="mt-4 flex justify-center">
+                        <button
+                            type="button"
+                            onClick={handleLoadMore}
+                            disabled={loadingMore}
+                            className="px-4 py-2 text-sm border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loadingMore ? 'Loading…' : 'Load more'}
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

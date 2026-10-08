@@ -62,7 +62,7 @@ export default function EventActions({
 
     return (
         <div className="flex w-full min-w-0 flex-nowrap items-center gap-1">
-            <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" disabled={cancelled} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
+            {!isPast && <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" disabled={cancelled} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />}
             <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} ticketLikely={event.ticket_likely} cancelled={cancelled} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
             {!isPast && (
                 <ShareButton

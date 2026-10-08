@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchFollowingReviews } from '../api';
 import type { EventReviewPublic } from '../types';
-import { useAuth } from '../context/AuthContext';
 import { SENTIMENT_META } from '../utils/reviewSentiment';
 
 function ReviewCard({ review }: { review: EventReviewPublic }) {
@@ -18,7 +17,7 @@ function ReviewCard({ review }: { review: EventReviewPublic }) {
         ...review.audience_tags.map((t) => ({ key: `u-${t.id}`, label: t.label, cls: 'bg-slate-100 text-ink-soft' })),
     ];
     return (
-        <li className="border border-line bg-surface p-3">
+        <li className="rounded-card border border-card-line bg-surface p-3">
             <div className="flex items-center gap-2 min-w-0">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-ink-soft">
                     {initials}
@@ -44,7 +43,7 @@ function ReviewCard({ review }: { review: EventReviewPublic }) {
             )}
             <Link
                 to={`/event/${review.event_id}`}
-                className="mt-2 inline-block text-xs font-medium text-sky-600 hover:text-sky-700"
+                className="mt-2 inline-block text-xs font-medium text-action hover:underline"
             >
                 {review.event_title || 'View event'} →
             </Link>
@@ -52,46 +51,39 @@ function ReviewCard({ review }: { review: EventReviewPublic }) {
     );
 }
 
-/** /tribe/reviews — "Following Reviews": reviews written by people the viewer
- * follows, newest-first. */
-export default function FollowingReviewsPage() {
-    const { user } = useAuth();
+/** Reviews written by people the viewer follows, newest-first. Rendered as the
+ * "My Tribe" tab of /reviews and Tribe > Reviews; the caller handles the signed-out state. */
+export function FollowingReviewsList() {
     const [items, setItems] = useState<EventReviewPublic[] | null>(null);
 
     useEffect(() => {
-        if (!user) {
-            setItems([]);
-            return;
-        }
         let cancelled = false;
         fetchFollowingReviews({ limit: 50 })
             .then((res) => { if (!cancelled) setItems(res.items); })
             .catch(() => { if (!cancelled) setItems([]); });
         return () => { cancelled = true; };
-    }, [user]);
+    }, []);
 
-    if (!user) {
+    if (items === null) return <p className="py-8 text-sm text-muted">Loading…</p>;
+    if (items.length === 0) {
         return (
-            <div className="mx-auto max-w-xl px-4 py-6 text-xs text-ink-soft">
-                <Link to="/login" className="text-action hover:underline">Sign in</Link> to see reviews from people you follow.
-            </div>
+            <p className="py-8 text-sm text-ink-soft">
+                No reviews yet. When people you follow review events, they'll show up here.
+            </p>
         );
     }
-
     return (
-        <div className="mx-auto max-w-xl px-4 py-4">
-            <h1 className="mb-3 text-sm font-semibold text-ink">Reviews from people you follow</h1>
-            {items === null ? (
-                <p className="text-sm text-muted">Loading…</p>
-            ) : items.length === 0 ? (
-                <p className="text-sm text-ink-soft">
-                    No reviews yet. When people you follow review events, they'll show up here.
-                </p>
-            ) : (
-                <ul className="space-y-2">
-                    {items.map((r) => <ReviewCard key={r.id} review={r} />)}
-                </ul>
-            )}
+        <ul className="mt-3 space-y-3">
+            {items.map((r) => <ReviewCard key={r.id} review={r} />)}
+        </ul>
+    );
+}
+
+/** /tribe/reviews — the Tribe section's Reviews tab. */
+export default function FollowingReviewsPage() {
+    return (
+        <div className="mx-auto max-w-3xl px-4 py-4">
+            <FollowingReviewsList />
         </div>
     );
 }
