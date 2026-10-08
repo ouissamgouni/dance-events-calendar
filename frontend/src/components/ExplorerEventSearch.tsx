@@ -292,7 +292,7 @@ export default function ExplorerEventSearch({
         <div ref={containerRef} className={`relative ${className}`}>
             {/* Desktop inline: show input directly */}
             {isDesktopInline && (
-                <div className="hidden sm:flex items-center gap-2 border border-line bg-canvas px-2 py-1">
+                <div className="hidden w-full sm:flex items-center gap-2 border border-line bg-canvas px-2 py-1">
                     <svg
                         viewBox="0 0 20 20"
                         fill="currentColor"
@@ -314,10 +314,10 @@ export default function ExplorerEventSearch({
                         onFocus={() => setOpen(true)}
                         placeholder="Search events, places, or tags…"
                         aria-label={triggerLabel}
-                        className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none"
+                        className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
                     />
                     {headerInline && pastToggle && (
-                        <label className="flex items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
+                        <label className="flex shrink-0 items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
                             <input
                                 type="checkbox"
                                 checked={pastChecked}
@@ -407,7 +407,7 @@ export default function ExplorerEventSearch({
                     role="dialog"
                     aria-modal="true"
                     aria-label={triggerLabel}
-                    className="fixed inset-x-0 top-[calc(64px+env(safe-area-inset-top))] bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] md:bottom-0 z-[8500] flex flex-col bg-canvas"
+                    className="fixed inset-x-0 top-[calc(64px+env(safe-area-inset-top))] bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] xl:bottom-0 z-[8500] flex flex-col bg-canvas"
                     data-testid="explorer-event-search-overlay"
                 >
                     <div className="shrink-0 border-b border-line bg-surface">

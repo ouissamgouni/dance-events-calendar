@@ -49,7 +49,7 @@ export default function BottomNav() {
     if (navHidden) {
         return (
             <div
-                className="md:hidden shrink-0 bg-surface z-[8001]"
+                className="xl:hidden shrink-0 bg-surface z-[8001]"
                 style={{ height: 'calc(16px + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
                 <button
@@ -76,7 +76,7 @@ export default function BottomNav() {
         <nav
             ref={navRef}
             aria-label="Primary"
-            className={`md:hidden shrink-0 flex items-stretch border-t border-line bg-surface z-[8001] ${collapsible ? 'animate-slide-up' : ''}`}
+            className={`xl:hidden shrink-0 flex items-stretch border-t border-line bg-surface z-[8001] ${collapsible ? 'animate-slide-up' : ''}`}
             style={{ height: 'calc(64px + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}
             onPointerDown={collapsible ? (event) => { pointerStartY.current = event.clientY; } : undefined}
             onPointerUp={collapsible ? (event) => {

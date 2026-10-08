@@ -1968,7 +1968,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                     <div
                                         className={
                                             mapFullscreen
-                                                ? 'explorer-map-shell fixed inset-x-0 bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] transition-[bottom] md:bottom-0 top-[calc(64px+env(safe-area-inset-top))] z-[8000] bg-surface overflow-hidden flex flex-col'
+                                                ? 'explorer-map-shell fixed inset-x-0 bottom-[calc(var(--bottom-nav-offset,16px)+env(safe-area-inset-bottom))] transition-[bottom] xl:bottom-0 top-[calc(64px+env(safe-area-inset-top))] z-[8000] bg-surface overflow-hidden flex flex-col'
                                                 : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden flex flex-col'
                                         }
                                         data-testid="explorer-map-shell"

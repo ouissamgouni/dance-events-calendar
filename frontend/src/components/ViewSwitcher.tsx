@@ -106,7 +106,7 @@ export default function ViewSwitcher({ currentView, onSelect, mapPreviewVisible,
     return (
         <nav
             aria-label="Change event view"
-            className={`pointer-events-none fixed inset-x-4 z-[8000] flex items-center justify-between transition-[bottom] bottom-[calc(var(--bottom-nav-offset,64px)+env(safe-area-inset-bottom)+var(--map-preview-offset))] md:bottom-[var(--map-preview-offset)] lg:hidden`}
+            className={`pointer-events-none fixed inset-x-4 z-[8000] flex items-center justify-between transition-[bottom] bottom-[calc(var(--bottom-nav-offset,64px)+env(safe-area-inset-bottom)+var(--map-preview-offset))] xl:bottom-[var(--map-preview-offset)] lg:hidden`}
             style={{ '--map-preview-offset': `${offsetPx}px` } as CSSProperties}
             data-testid="view-switcher"
         >
