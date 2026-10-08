@@ -160,6 +160,8 @@ def test_ticket_likely(reach, hours, override, expected):
 
 
 def test_ticket_prompt_targets_likely_events_only(session, sent):
+    session.add(SiteSetting(key="ticket_prompt_email_instant", value="true"))
+    session.commit()
     mia = _user(session, "mia")
     start = NOW + timedelta(days=6)
     _event(session, "intl", start, reach="international")
@@ -209,6 +211,8 @@ def test_ticket_prompt_skips_by_timing_and_state(session, sent):
 
 
 def test_ticket_prompt_backfills_channel_turned_on_later(session, sent):
+    session.add(SiteSetting(key="ticket_prompt_email_instant", value="true"))
+    session.commit()
     mia = _user(session, "mia", email_ticket_prompt_enabled=False)
     _event(session, "intl", NOW + timedelta(days=6), reach="international")
     _going(session, mia, "intl")
@@ -354,6 +358,7 @@ def test_memories_prompt_digest_drops_row_once_memory_added(session, sent, diges
 
 
 def test_prompt_admin_push_switch(session, sent):
+    session.add(SiteSetting(key="ticket_prompt_email_instant", value="true"))
     session.add(SiteSetting(key="ticket_prompt_push_enabled", value="false"))
     session.commit()
     mia = _user(session, "mia")

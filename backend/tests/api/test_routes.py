@@ -553,8 +553,8 @@ class TestSettingsEndpoint:
         }
         assert channels["ticket_prompt"] == {
             "push": True,
-            "email_instant": True,
-            "email_digest": False,
+            "email_instant": False,
+            "email_digest": True,
         }
         assert channels["event_reminders"]["email_digest"] is False
         assert len(channels) == 15

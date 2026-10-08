@@ -33,15 +33,24 @@ users:
     push_suggested_events_enabled: true
     avatar: avatar-000.jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Elena%20Moreau
+  - email: olivia.bennett@joinmovida.com
+    name: Olivia Bennett
+    handle: olivia-bennett
+    bio: New to the local dance community and looking for welcoming socials.
+    account_visibility: public
+    onboarded_at: null
+    share_attendance_default: true
+    share_attendance_default_audience: friends
+    avatar: avatar-010.jpg
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Olivia%20Bennett
   - email: amira.haddad@joinmovida.com
     name: Amira Haddad
     handle: amira-haddad
     account_visibility: public
     bio: New to the local dance community and looking for welcoming socials.
-    onboarded_at: null
     share_attendance_default: true
     share_attendance_default_audience: public
-    avatar: avatar-010.jpg
+    avatar: avatar-034.jpg
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Amira%20Haddad
   - email: picks@joinmovida.com
     name: Movida Picks

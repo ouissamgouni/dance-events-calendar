@@ -276,6 +276,30 @@ def test_render_card_shows_one_clickable_alert_header():
     assert all(f">Event {index}</a>" in html for index in range(3))
 
 
+def test_render_card_shows_each_interest_event_thumbnail():
+    html = email_service._render_card(
+        {
+            "entries": [
+                {
+                    "kind": "interest_event",
+                    "group_header_html": "Alert",
+                    "group_item_html": f"Event {index}",
+                    "primary_html": f"Event {index}",
+                    "event_image_url": f"https://cdn.test/{index}.webp"
+                    if index < 2
+                    else None,
+                }
+                for index in range(3)
+            ]
+        }
+    )
+
+    assert 'src="https://cdn.test/0.webp"' in html
+    assert 'src="https://cdn.test/1.webp"' in html
+    assert html.count("linear-gradient(135deg") == 1
+    assert html.count("Alert") == 1
+
+
 def test_digest_renders_icon_headings_in_relevance_order(monkeypatch):
     captured: list[str] = []
     monkeypatch.setattr(
