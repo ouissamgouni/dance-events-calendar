@@ -56,6 +56,7 @@ const InstallPage = lazy(() => import('./pages/InstallPage'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
 const NetworkPage = lazy(() => import('./pages/NetworkPage'));
 const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
+const FollowingReviewsPage = lazy(() => import('./pages/FollowingReviewsPage'));
 const MySubmissionsPage = lazy(() => import('./pages/MySubmissionsPage'));
 const HostingPage = lazy(() => import('./pages/HostingPage'));
 const DiscoveryProfilesPage = lazy(() => import('./pages/DiscoveryProfilesPage'));
@@ -64,6 +65,7 @@ const SectionLayout = lazy(() => import('./components/SectionTabs'));
 const SuggestEventWizard = lazy(() => import('./components/suggest/SuggestEventWizard'));
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
+import ExplorerEventSearch from './components/ExplorerEventSearch';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
 import { hasBrowseFilterParams, readBrowseSession } from './utils/browseSession';
@@ -208,7 +210,7 @@ function AppShell() {
               <button
                 type="button"
                 onClick={() => navigate('/suggest', { state: { backgroundLocation: backgroundLocation ?? location } })}
-                className="hidden h-9 items-center gap-1.5 bg-action px-3 text-sm font-semibold text-white transition hover:opacity-90 lg:inline-flex"
+                className="hidden h-9 items-center gap-1 bg-blue-400 px-3 text-xs font-semibold text-white transition hover:opacity-90 lg:inline-flex"
                 data-testid="header-add-event"
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
@@ -219,10 +221,16 @@ function AppShell() {
                 onClick={() => navigate('/search', { state: { returnTo: `${location.pathname}${location.search}` } })}
                 aria-label="Search events"
                 title="Search events"
-                className="inline-flex h-11 w-11 items-center justify-center text-ink-soft transition hover:text-ink"
+                className="inline-flex h-11 w-11 items-center justify-center text-ink-soft transition hover:text-ink lg:hidden"
               >
                 <img src="/search.png" alt="" aria-hidden="true" className="h-6 w-6" />
               </button>
+              <ExplorerEventSearch
+                headerInline
+                pastToggle
+                className="hidden w-72 lg:block"
+                onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
+              />
               <UserSearchBox />
               <NotificationBell />
               <HeaderUserMenu />
@@ -269,7 +277,7 @@ function AppShell() {
                   />
                   <Route path="discover" element={<Navigate to="/tribe/network" replace />} />
                   <Route path="network" element={<NetworkPage />} />
-                  <Route path="reviews" element={<Navigate to="/reviews?tab=tribe" replace />} />
+                  <Route path="reviews" element={<FollowingReviewsPage />} />
                 </Route>
                 <Route path="/my-events" element={<MyCalendar />} />
                 <Route path="/passport" element={<ProtectedRoute><PassportPage /></ProtectedRoute>} />

@@ -138,7 +138,7 @@ export default function MyReviewsPage() {
             <div role="tablist" className="mt-3 grid grid-cols-3 border-b border-line md:flex md:gap-2">
                 <button type="button" role="tab" aria-selected={activeTab === 'pending'} onClick={() => setParams({ tab: 'pending' }, { replace: true })} className={tabClass('pending')}>Pending {pending ? `(${pending.length})` : ''}</button>
                 <button type="button" role="tab" aria-selected={activeTab === 'reviewed'} onClick={() => setParams({ tab: 'reviewed' }, { replace: true })} className={tabClass('reviewed')}>Reviewed {reviewed ? `(${reviewed.length})` : ''}</button>
-                <button type="button" role="tab" aria-selected={activeTab === 'tribe'} onClick={() => setParams({ tab: 'tribe' }, { replace: true })} className={tabClass('tribe')}>Tribe</button>
+                <button type="button" role="tab" aria-selected={activeTab === 'tribe'} onClick={() => setParams({ tab: 'tribe' }, { replace: true })} className={tabClass('tribe')}>My Tribe</button>
             </div>
             <div>
                 {activeTab === 'tribe' ? <FollowingReviewsList /> : rows === null ? <p className="py-8 text-sm text-muted">Loading...</p> : activeTab === 'pending' ? (

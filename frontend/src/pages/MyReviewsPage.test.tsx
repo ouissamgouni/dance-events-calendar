@@ -86,7 +86,7 @@ describe('MyReviewsPage', () => {
         render(<MemoryRouter><FeatureFlagsContext.Provider value={{ flags: defaultFlags, updateFlag: vi.fn() }}><MyReviewsPage /></FeatureFlagsContext.Provider></MemoryRouter>);
 
         expect(fetchFollowingReviews).not.toHaveBeenCalled();
-        await user.click(screen.getByRole('tab', { name: 'Tribe' }));
+        await user.click(screen.getByRole('tab', { name: 'My Tribe' }));
         expect(await screen.findByText('Amazing DJs.')).toBeInTheDocument();
         expect(screen.getByText('Laura M')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /Lisbon Kizomba Fest/ })).toHaveAttribute('href', '/event/event-9');

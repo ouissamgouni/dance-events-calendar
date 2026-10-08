@@ -52,7 +52,7 @@ function ReviewCard({ review }: { review: EventReviewPublic }) {
 }
 
 /** Reviews written by people the viewer follows, newest-first. Rendered as the
- * "Tribe" tab of /reviews; the caller handles the signed-out state. */
+ * "My Tribe" tab of /reviews and Tribe > Reviews; the caller handles the signed-out state. */
 export function FollowingReviewsList() {
     const [items, setItems] = useState<EventReviewPublic[] | null>(null);
 
@@ -76,5 +76,14 @@ export function FollowingReviewsList() {
         <ul className="mt-3 space-y-3">
             {items.map((r) => <ReviewCard key={r.id} review={r} />)}
         </ul>
+    );
+}
+
+/** /tribe/reviews — the Tribe section's Reviews tab. */
+export default function FollowingReviewsPage() {
+    return (
+        <div className="mx-auto max-w-3xl px-4 py-4">
+            <FollowingReviewsList />
+        </div>
     );
 }

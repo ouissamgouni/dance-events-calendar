@@ -140,7 +140,7 @@ export default function UserSearchBox() {
         setMobileExpanded(false);
     };
 
-    // Below lg, the icon opens a fixed panel beneath the header.
+    // The icon opens a fixed panel beneath the header (right-aligned on lg+).
     const [mobileExpanded, setMobileExpanded] = useState(false);
     useBackToClose(() => { setOpen(false); setMobileExpanded(false); }, mobileExpanded);
     const mobileInputRef = useRef<HTMLInputElement>(null);
@@ -238,16 +238,6 @@ export default function UserSearchBox() {
 
     return (
         <div ref={containerRef} className="relative">
-            <div className="hidden w-64 items-center gap-2 border border-line bg-canvas px-2 py-1 lg:flex">
-                <img src="/find-user.png" alt="" aria-hidden="true" className="h-4 w-4 shrink-0" />
-                <input
-                    {...inputCommonProps}
-                    aria-controls="people-search-desktop-listbox"
-                    aria-activedescendant={activeIdx >= 0 ? `people-search-desktop-option-${activeIdx}` : undefined}
-                    className="min-w-0 flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none"
-                />
-            </div>
-
             {!mobileExpanded && (
                 <button
                     type="button"
@@ -257,7 +247,7 @@ export default function UserSearchBox() {
                     }}
                     aria-label="Search users"
                     title="Search users"
-                    className="inline-flex h-11 w-11 items-center justify-center text-ink-soft transition hover:text-ink lg:hidden"
+                    className="inline-flex h-11 w-11 items-center justify-center text-ink-soft transition hover:text-ink"
                 >
                     <img
                         src="/find-user.png"
@@ -270,7 +260,7 @@ export default function UserSearchBox() {
 
             {mobileExpanded && (
                 <div
-                    className="fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg lg:hidden"
+                    className="fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg lg:left-auto lg:right-4 lg:w-80"
                     style={{ top: 'calc(64px + env(safe-area-inset-top) + 6px)' }}
                 >
                     <div className="flex items-center gap-2 border-b border-line p-2">
@@ -294,12 +284,6 @@ export default function UserSearchBox() {
                         </button>
                     </div>
                     {showDropdown && <div className="max-h-80 overflow-auto">{renderDropdownContent('people-search-compact')}</div>}
-                </div>
-            )}
-
-            {showDropdown && (
-                <div className="absolute right-0 z-[8600] mt-1 hidden max-h-80 w-64 overflow-auto border border-line bg-surface shadow-lg lg:block">
-                    {renderDropdownContent('people-search-desktop')}
                 </div>
             )}
         </div>
