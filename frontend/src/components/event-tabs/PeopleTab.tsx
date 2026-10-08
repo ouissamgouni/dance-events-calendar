@@ -45,21 +45,21 @@ function FollowPill({ attendee }: { attendee: Attendee }) {
 
     if (attendee.is_friend) {
         return (
-            <span className="relative z-10 inline-flex items-center border border-line bg-surface px-2 py-0.5 text-[11px] leading-none text-ink-soft">
+            <span className="relative z-10 inline-flex items-center border border-line bg-surface px-2 py-0.5 text-xs leading-none text-ink-soft">
                 Friend
             </span>
         );
     }
     if (state === 'followed') {
         return (
-            <span className="relative z-10 inline-flex items-center border border-line bg-surface px-2 py-0.5 text-[11px] leading-none text-ink-soft">
+            <span className="relative z-10 inline-flex items-center border border-line bg-surface px-2 py-0.5 text-xs leading-none text-ink-soft">
                 Following
             </span>
         );
     }
     if (isPending) {
         return (
-            <span className="relative z-10 inline-flex items-center border border-line bg-surface px-2 py-0.5 text-[11px] leading-none text-ink-soft">
+            <span className="relative z-10 inline-flex items-center border border-line bg-surface px-2 py-0.5 text-xs leading-none text-ink-soft">
                 Requested
             </span>
         );
@@ -85,7 +85,7 @@ function FollowPill({ attendee }: { attendee: Attendee }) {
             type="button"
             onClick={onClick}
             disabled={state === 'busy'}
-            className="relative z-10 inline-flex items-center bg-action px-2 py-0.5 text-[11px] leading-none text-white transition hover:opacity-90 disabled:opacity-50"
+            className="relative z-10 inline-flex items-center bg-action px-2 py-0.5 text-xs leading-none text-white transition hover:opacity-90 disabled:opacity-50"
         >
             {state === 'busy' ? 'Following…' : state === 'error' ? 'Retry' : 'Follow'}
         </button>
@@ -103,7 +103,7 @@ function PersonCard({ attendee, showRelationship }: { attendee: Attendee; showRe
             <Avatar attendee={attendee} size={36} />
             <span className="w-full truncate text-xs font-medium text-ink">{name}</span>
             {showRelationship && mutuals > 0 && (
-                <span className="w-full truncate text-[10px] text-muted">
+                <span className="w-full truncate text-xs text-ink-soft">
                     {mutuals} mutual friend{mutuals === 1 ? '' : 's'}
                 </span>
             )}
@@ -173,7 +173,7 @@ export default function PeopleTab({ eventId }: Props) {
         return () => { alive = false; };
     }, [eventId]);
 
-    if (loading) return <p className="text-xs text-muted">Loading…</p>;
+    if (loading) return <p className="text-xs text-ink-soft">Loading…</p>;
 
     if (unauthorized || !user) {
         return (

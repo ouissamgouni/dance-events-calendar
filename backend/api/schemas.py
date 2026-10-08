@@ -1395,6 +1395,18 @@ DefaultExplorerPeriod = Literal[
 GoingButtonIconVariant = Literal["hand", "person"]
 
 
+class NotificationChannelSettings(BaseModel):
+    push: bool = True
+    email_instant: bool = False
+    email_digest: bool = True
+
+
+class NotificationChannelUpdate(BaseModel):
+    push: Optional[bool] = None
+    email_instant: Optional[bool] = None
+    email_digest: Optional[bool] = None
+
+
 class SiteSettingsResponse(BaseModel):
     since_date: str
     sync_since_date: str
@@ -1521,6 +1533,8 @@ class SiteSettingsResponse(BaseModel):
     milestone_notifications_enabled: bool = True
     milestone_unlocked_email_instant: bool = False
     milestone_unlocked_email_digest: bool = True
+    # Admin delivery matrix per notification feature (in-app is always on).
+    notification_channels: dict[str, NotificationChannelSettings] = {}
     # Master switch for post-event "how was it?" review-prompt notifications
     # (Event Quality Layer Phase 3).
     review_prompt_enabled: bool = True
@@ -1566,6 +1580,10 @@ class SiteSettingsResponse(BaseModel):
     event_card_show_time_location_icons_enabled: bool = False
     # When True, the explorer list renders the shared My Events card style.
     explorer_event_card_card_style_enabled: bool = False
+    # When True, explorer cards put the title in its own row above the picture.
+    explorer_card_title_top_enabled: bool = False
+    # When True, explorer cards move Save into the bottom row next to Going.
+    explorer_card_save_bottom_enabled: bool = False
     # When True, floating Explorer controls show labels below desktop widths.
     # Desktop controls are always labeled.
     explorer_view_control_labels_enabled: bool = True
@@ -1892,6 +1910,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     milestone_notifications_enabled: Optional[bool] = None
     milestone_unlocked_email_instant: Optional[bool] = None
     milestone_unlocked_email_digest: Optional[bool] = None
+    notification_channels: Optional[dict[str, NotificationChannelUpdate]] = None
     review_prompt_enabled: Optional[bool] = None
     event_review_size_step_enabled: Optional[bool] = None
     rsvp_remember_visibility_enabled: Optional[bool] = None
@@ -1908,6 +1927,8 @@ class SiteSettingsUpdateRequest(BaseModel):
     event_card_show_people_icon_enabled: Optional[bool] = None
     event_card_show_time_location_icons_enabled: Optional[bool] = None
     explorer_event_card_card_style_enabled: Optional[bool] = None
+    explorer_card_title_top_enabled: Optional[bool] = None
+    explorer_card_save_bottom_enabled: Optional[bool] = None
     explorer_view_control_labels_enabled: Optional[bool] = None
     summary_two_line_enabled: Optional[bool] = None
     event_images_enabled: Optional[bool] = None

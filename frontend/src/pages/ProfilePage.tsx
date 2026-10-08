@@ -480,7 +480,7 @@ function SocialLinks({ profile }: { profile: PublicProfile }) {
                     </a>
                 )}
             </div>
-            <p className="mt-2 text-xs text-muted">
+            <p className="mt-2 text-xs text-ink-soft">
                 Links added by the user. Not verified by Movida.
             </p>
         </div>
@@ -793,13 +793,13 @@ function ProfileCalendarRow({ item }: { item: ProfileCalendarItem }) {
                 <div className="flex items-center gap-1 shrink-0">
                     {item.curated && (
                         <span
-                            className="px-2 py-0.5 text-[10px] font-medium bg-indigo-50 text-indigo-700"
+                            className="px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-700"
                             title="Curated by the editorial team"
                         >
                             Curated
                         </span>
                     )}
-                    <span className={`px-2 py-0.5 text-[10px] font-medium ${badge.cls}`}>
+                    <span className={`px-2 py-0.5 text-xs font-medium ${badge.cls}`}>
                         {badge.label}
                     </span>
                 </div>

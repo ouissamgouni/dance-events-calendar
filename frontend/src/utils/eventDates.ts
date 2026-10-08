@@ -107,6 +107,17 @@ export function formatEventTime(date: Date, timeZone?: string | null): string {
     return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: timeZone || undefined });
 }
 
+/** Card time: `8 PM` on the hour, `8:30 PM` otherwise (minutes read in `timeZone`). */
+export function formatCardTime(date: Date, timeZone?: string | null): string {
+    const tz = timeZone || undefined;
+    const minute = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric', timeZone: tz })
+        .formatToParts(date)
+        .find((p) => p.type === 'minute')?.value;
+    return Number(minute) === 0
+        ? date.toLocaleTimeString(undefined, { hour: 'numeric', timeZone: tz })
+        : date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: tz });
+}
+
 /** Last day an all-day event covers (its end is exclusive). */
 export function allDayLastDay(event: EventTimes): Date {
     const start = new Date(event.start);

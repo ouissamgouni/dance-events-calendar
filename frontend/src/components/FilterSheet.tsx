@@ -243,7 +243,7 @@ export default function FilterSheet({
                     {section.icon && <span className="shrink-0 text-ink-soft">{section.icon}</span>}
                     <span className="shrink-0 text-[15px] font-medium text-ink">{section.label}</span>
                     {section.badge ? (
-                        <span className="shrink-0 inline-flex h-5 min-w-5 items-center justify-center bg-blue-100 px-1 text-[11px] font-semibold text-blue-700">
+                        <span className="shrink-0 inline-flex h-5 min-w-5 items-center justify-center bg-blue-100 px-1 text-2xs font-semibold text-blue-700">
                             {section.badge}
                         </span>
                     ) : null}

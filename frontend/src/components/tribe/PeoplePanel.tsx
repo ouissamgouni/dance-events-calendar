@@ -28,6 +28,8 @@ import {
     type UserSearchResult,
 } from '../../api';
 import UserResultCard, { type UserCardModel } from '../UserResultCard';
+import useBackToClose from '../../hooks/useBackToClose';
+import { firstNameOf } from '../../utils/displayName';
 
 type Mode = 'build' | 'select';
 type Tab = 'network' | 'discover';
@@ -101,27 +103,64 @@ const peopleIllustration = (
 
 function BackIcon() {
     return (
-        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 4l-6 6 6 6" />
         </svg>
     );
 }
 
-function CheckBox({ checked }: { checked: boolean }) {
+/** Shared header for the stacked People surfaces (picker, find, invite). */
+export function OverlayHeader({ title, onBack, action }: { title: string; onBack?: () => void; action?: ReactNode }) {
+    return (
+        <div className="flex min-h-14 shrink-0 items-center gap-1 border-b border-line bg-surface px-1">
+            <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-ink transition-colors hover:text-action active:opacity-60"
+                aria-label="Back"
+            >
+                <BackIcon />
+            </button>
+            <h3 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{title}</h3>
+            {action}
+        </div>
+    );
+}
+
+function CheckCircle({ checked }: { checked: boolean }) {
     return (
         <span
             aria-hidden="true"
             className={
-                'inline-flex h-5 w-5 shrink-0 items-center justify-center border ' +
+                // eslint-disable-next-line no-restricted-syntax -- circular selection indicator (mobile list convention)
+                'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ' +
                 (checked ? 'border-action bg-action text-white' : 'border-line bg-surface')
             }
         >
             {checked && (
-                <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 10.5l4 4 8-8" />
                 </svg>
             )}
         </span>
+    );
+}
+
+function SkeletonRows() {
+    return (
+        <div aria-busy="true">
+            <span className="sr-only">Loading…</span>
+            {[0, 1, 2].map((i) => (
+                <div key={i} className="flex min-h-14 items-center gap-3 px-4 py-2.5 motion-safe:animate-pulse">
+                    {/* eslint-disable-next-line no-restricted-syntax -- avatar placeholder */}
+                    <span className="h-10 w-10 shrink-0 rounded-full bg-line" />
+                    <span className="flex flex-1 flex-col gap-1.5">
+                        <span className="h-3 w-1/2 rounded-field bg-line" />
+                        <span className="h-2.5 w-1/3 rounded-field bg-line" />
+                    </span>
+                </div>
+            ))}
+        </div>
     );
 }
 
@@ -162,6 +201,10 @@ export default function PeoplePanel({
 
     const [query, setQuery] = useState('');
     const [debounced, setDebounced] = useState('');
+    // The sticky CTA yields to the on-screen keyboard while searching.
+    const [searchFocused, setSearchFocused] = useState(false);
+
+    useBackToClose(onBack ?? (() => undefined), variant === 'overlay' && !!onBack);
 
     const [followees, setFollowees] = useState<Row[]>([]);
     const [loadingFollowees, setLoadingFollowees] = useState(true);
@@ -311,9 +354,9 @@ export default function PeoplePanel({
         const followed = isFollowed(r);
         let trailing: ReactNode;
         if (mode === 'select') {
-            trailing = <CheckBox checked={selected.includes(r.card.handle)} />;
+            trailing = <CheckCircle checked={selected.includes(r.card.handle)} />;
         } else if (tab === 'network') {
-            trailing = <span className="text-[11px] text-ink-soft">Following</span>;
+            trailing = null;
         } else {
             trailing = (
                 <button
@@ -323,10 +366,10 @@ export default function PeoplePanel({
                     aria-label={followed ? `Following ${r.card.handle}` : `Follow ${r.card.handle}`}
                     aria-pressed={followed}
                     className={
-                        'shrink-0 border px-3 py-1 text-xs font-medium transition ' +
+                        'inline-flex min-h-9 shrink-0 items-center rounded-field px-4 text-sm font-semibold transition ' +
                         (followed
-                            ? 'border-line bg-surface text-ink-soft'
-                            : 'border-action bg-action text-white hover:opacity-90')
+                            ? 'bg-canvas text-ink-soft'
+                            : 'bg-action text-white hover:opacity-90 active:opacity-80')
                     }
                 >
                     {followed ? 'Following' : 'Follow'}
@@ -345,135 +388,174 @@ export default function PeoplePanel({
         );
     };
 
+    const isInline = variant === 'inline';
+    const listCls = isInline
+        ? 'divide-y divide-line overflow-hidden rounded-card bg-surface shadow-sm'
+        : 'divide-y divide-line';
+    const eyebrowCls = 'text-2xs font-semibold uppercase tracking-wide text-ink-soft';
+
     const header = variant === 'overlay' && (
-        <div className="flex items-center justify-between border-b border-line px-2 py-2">
-            <button
-                type="button"
-                onClick={onBack}
-                className="inline-flex items-center gap-1 text-sm font-medium text-ink-soft hover:text-ink"
-                aria-label="Back"
-            >
-                <BackIcon />
-                Back
-            </button>
-            <span className="text-sm font-semibold text-ink">
-                {mode === 'select' ? 'Select people' : 'Find people'}
-            </span>
-            {mode === 'select' ? (
-                <button
-                    type="button"
-                    onClick={() => onDone?.(selected)}
-                    className="text-sm font-semibold text-action hover:opacity-80"
-                    data-testid="specific-people-done"
-                >
-                    Done
-                </button>
-            ) : (
-                <span className="w-12" />
-            )}
-        </div>
+        <OverlayHeader
+            title={mode === 'select' ? 'Select people' : 'Find people'}
+            onBack={onBack}
+            action={
+                mode === 'select' && selected.length > 0 ? (
+                    <button
+                        type="button"
+                        onClick={() => selected.forEach((h) => onToggleSelect?.(h))}
+                        className="inline-flex min-h-11 shrink-0 items-center px-3 text-sm font-medium text-action hover:opacity-80 active:opacity-60"
+                        data-testid="specific-people-clear"
+                    >
+                        Clear
+                    </button>
+                ) : undefined
+            }
+        />
     );
 
     const tabBar = showTabs && (
-        <div className="flex border-b border-line" role="tablist">
-            {(['network', 'discover'] as Tab[]).map((t) => (
-                <button
-                    key={t}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === t}
-                    onClick={() => {
-                        setTab(t);
-                        setQuery('');
-                    }}
-                    data-testid={`people-tab-${t}`}
-                    className={
-                        'flex-1 px-3 py-2 text-sm font-medium transition ' +
-                        (tab === t
-                            ? 'border-b-2 border-action text-action'
-                            : 'text-ink-soft hover:text-ink')
-                    }
-                >
-                    {t === 'network' ? `My network${followees.length ? ` (${followees.length})` : ''}` : 'Discover'}
-                </button>
-            ))}
-        </div>
-    );
-
-    const searchBox = (
-        <div className="px-3 pt-3">
-            <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={tab === 'network' ? 'Search your network…' : 'Find people…'}
-                aria-label={tab === 'network' ? 'Search your network' : 'Find people'}
-                className="w-full border border-line px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-action focus:outline-none"
-            />
-        </div>
-    );
-
-    const selectedChips = mode === 'select' && selectedRows.length > 0 && (
-        <div className="border-b border-line px-3 py-2">
-            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                Selected ({selectedRows.length})
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-                {selectedRows.map((r) => {
-                    const label = r.card.display_name || `@${r.card.handle}`;
-                    return (
-                        <button
-                            type="button"
-                            key={r.card.handle}
-                            onClick={() => onToggleSelect?.(r.card.handle)}
-                            className="inline-flex items-center gap-1.5 border border-blue-200 bg-blue-50 py-0.5 px-2 text-xs text-action"
-                            aria-label={`Remove ${label}`}
-                        >
-                            <span className="max-w-[8rem] truncate">{label}</span>
-                            <span aria-hidden="true">×</span>
-                        </button>
-                    );
-                })}
+        <div className="shrink-0 px-4 pt-3">
+            <div className="flex gap-1 rounded-field bg-canvas p-1" role="tablist">
+                {(['network', 'discover'] as Tab[]).map((t) => (
+                    <button
+                        key={t}
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === t}
+                        onClick={() => {
+                            setTab(t);
+                            setQuery('');
+                        }}
+                        data-testid={`people-tab-${t}`}
+                        className={
+                            'inline-flex min-h-10 flex-1 items-center justify-center rounded-field px-3 text-sm font-semibold transition-colors ' +
+                            (tab === t
+                                ? 'bg-surface text-ink shadow-sm'
+                                : 'text-ink-soft hover:text-ink active:opacity-70')
+                        }
+                    >
+                        {t === 'network' ? `My network${followees.length ? ` (${followees.length})` : ''}` : 'Discover'}
+                    </button>
+                ))}
             </div>
         </div>
     );
 
+    const searchBox = (
+        <div className={'shrink-0 ' + (isInline ? 'pt-4' : 'px-4 pt-3 pb-2')}>
+            <div className="relative">
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="9" cy="9" r="5.5" />
+                    <path d="M13.5 13.5L17 17" />
+                </svg>
+                <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onFocus={() => setSearchFocused(true)}
+                    onBlur={() => setSearchFocused(false)}
+                    enterKeyHint="search"
+                    autoComplete="off"
+                    placeholder={tab === 'network' ? 'Search your network…' : 'Find people…'}
+                    aria-label={tab === 'network' ? 'Search your network' : 'Find people'}
+                    className={
+                        'min-h-11 w-full rounded-field border border-transparent pl-10 pr-11 text-sm text-ink placeholder:text-muted focus:border-action focus:bg-surface focus:outline-none [&::-webkit-search-cancel-button]:hidden ' +
+                        (isInline ? 'bg-surface' : 'bg-canvas')
+                    }
+                />
+                {query && (
+                    <button
+                        type="button"
+                        onClick={() => setQuery('')}
+                        className="absolute right-0 top-0 inline-flex h-11 w-11 items-center justify-center text-ink-soft hover:text-ink"
+                        aria-label="Clear search"
+                    >
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M5 5l10 10M15 5L5 15" />
+                        </svg>
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+
+    const selectedChips = mode === 'select' && selectedRows.length > 0 && (
+        <div className="shrink-0 border-b border-line pb-2">
+            <p className={'px-4 pt-3 ' + eyebrowCls}>Selected · {selectedRows.length}</p>
+            <ul className="flex snap-x gap-3 overflow-x-auto overscroll-x-contain px-4 pt-2 [scrollbar-width:none]">
+                {selectedRows.map((r) => {
+                    const label = r.card.display_name || `@${r.card.handle}`;
+                    const first = firstNameOf(r.card.display_name, r.card.handle);
+                    return (
+                        <li key={r.card.handle} className="shrink-0 snap-start">
+                            <button
+                                type="button"
+                                onClick={() => onToggleSelect?.(r.card.handle)}
+                                className="flex w-14 flex-col items-center gap-1 active:opacity-60"
+                                aria-label={`Remove ${label}`}
+                            >
+                                <span className="relative">
+                                    {r.card.avatar_url ? (
+                                        // eslint-disable-next-line no-restricted-syntax -- avatar
+                                        <img src={r.card.avatar_url} alt="" className="h-12 w-12 rounded-full bg-canvas object-cover" />
+                                    ) : (
+                                        // eslint-disable-next-line no-restricted-syntax -- avatar
+                                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-ink-soft">
+                                            {first.replace(/^@/, '').slice(0, 1).toUpperCase()}
+                                        </span>
+                                    )}
+                                    {/* eslint-disable-next-line no-restricted-syntax -- circular remove badge */}
+                                    <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-ink text-white">
+                                        <svg viewBox="0 0 20 20" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                                            <path d="M5 5l10 10M15 5L5 15" />
+                                        </svg>
+                                    </span>
+                                </span>
+                                <span className="w-full truncate text-center text-xs text-ink">{first}</span>
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+        </div>
+    );
+
+    const emptyCls = 'px-4 py-8 text-center text-sm text-ink-soft';
+
     const networkPane = (
         <div>
             {loadingFollowees ? (
-                <p className="py-4 text-center text-sm text-ink-soft">Loading…</p>
+                <SkeletonRows />
             ) : networkList.length === 0 ? (
-                <p className="py-4 text-center text-sm text-ink-soft">
+                <p className={emptyCls}>
                     {debounced ? `No one in your network matches “${debounced}”.` : "You're not following anyone yet."}
                 </p>
             ) : (
-                <ul className="divide-y divide-line">{networkList.map(renderRow)}</ul>
+                <ul className={listCls}>{networkList.map(renderRow)}</ul>
             )}
         </div>
     );
 
     const discoverPane = (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
             {searching ? (
                 <div data-testid="tribe-search-results">
                     {results.length === 0 ? (
-                        <p className="py-4 text-center text-sm text-ink-soft">No people match “{debounced}”.</p>
+                        <p className={emptyCls}>No people match “{debounced}”.</p>
                     ) : (
-                        <ul className="divide-y divide-line">{results.map(renderRow)}</ul>
+                        <ul className={listCls}>{results.map(renderRow)}</ul>
                     )}
                 </div>
             ) : (
                 <div>
                     {(loadingSuggestions || (orderedSuggestions && orderedSuggestions.length > 0)) && (
-                        <div className="flex items-center justify-between px-1 pb-1 pt-3">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                                Suggestions for you
-                            </span>
+                        <div className={'flex min-h-11 items-center justify-between ' + (isInline ? 'px-1' : 'px-4')}>
+                            <span className={eyebrowCls}>Suggestions for you</span>
                             {orderedSuggestions && orderedSuggestions.length > 0 && (
                                 <button
                                     type="button"
                                     onClick={() => setShuffleSeed((s) => s + 1)}
-                                    className="text-xs font-medium text-action hover:opacity-80"
+                                    className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-action hover:opacity-80 active:opacity-60"
                                 >
                                     Shuffle
                                 </button>
@@ -481,12 +563,12 @@ export default function PeoplePanel({
                         </div>
                     )}
                     {loadingSuggestions ? (
-                        <p className="py-4 text-center text-sm text-ink-soft">Loading…</p>
+                        <SkeletonRows />
                     ) : orderedSuggestions && orderedSuggestions.length > 0 ? (
-                        <ul className="divide-y divide-line">{orderedSuggestions.map(renderRow)}</ul>
+                        <ul className={listCls}>{orderedSuggestions.map(renderRow)}</ul>
                     ) : (
-                        <div className="py-4 text-center" data-testid="tribe-no-suggestions">
-                            <p className="text-sm font-medium text-ink">No suggestions right now</p>
+                        <div className="px-4 py-8 text-center" data-testid="tribe-no-suggestions">
+                            <p className="text-sm font-semibold text-ink">No suggestions right now</p>
                             <p className="mt-1 text-sm text-ink-soft">
                                 Try searching for someone, or invite a friend to get started.
                             </p>
@@ -495,31 +577,51 @@ export default function PeoplePanel({
                 </div>
             )}
 
-            <div className="border-t border-line pt-3">
-                <button
-                    type="button"
-                    onClick={onOpenInvite}
-                    className="text-sm font-medium text-action hover:opacity-80"
-                >
-                    Can't find them? Invite a friend →
-                </button>
-            </div>
+            {onOpenInvite && (
+                <div className={isInline ? '' : 'px-4'}>
+                    <button
+                        type="button"
+                        onClick={onOpenInvite}
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-field border border-line bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:bg-canvas active:bg-canvas"
+                    >
+                        Can't find them? Invite a friend
+                    </button>
+                </div>
+            )}
         </div>
     );
 
     const body = (
-        <div className="flex-1 overflow-y-auto px-3 pb-3">
+        <div className={'min-h-0 flex-1 overflow-y-auto overscroll-contain ' + (isInline ? 'pt-3 pb-4' : 'pb-4')}>
             {tab === 'network' ? networkPane : discoverPane}
         </div>
     );
 
-    const inlineFooter = variant === 'inline' && (
-        <div className="border-t border-line px-3 py-2">
+    const footerCls = 'shrink-0 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]';
+    const primaryCta = 'inline-flex min-h-12 w-full items-center justify-center rounded-field bg-action px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 active:opacity-80';
+
+    const selectFooter = mode === 'select' && !searchFocused && (
+        <div className={footerCls}>
+            <button
+                type="button"
+                onClick={() => onDone?.(selected)}
+                className={primaryCta}
+                data-testid="specific-people-done"
+            >
+                {selected.length > 0
+                    ? `Apply · ${selected.length} ${selected.length === 1 ? 'person' : 'people'}`
+                    : 'Done'}
+            </button>
+        </div>
+    );
+
+    const inlineFooter = isInline && (
+        <div className="shrink-0 pt-3">
             {followedHandles.size > 0 ? (
                 <button
                     type="button"
                     onClick={() => onDone?.([])}
-                    className="w-full bg-action px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+                    className={primaryCta}
                     data-testid="build-tribe-done"
                 >
                     Done
@@ -529,7 +631,7 @@ export default function PeoplePanel({
                     <button
                         type="button"
                         onClick={onExploreAll}
-                        className="inline-flex w-full items-center justify-center border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink hover:bg-canvas"
+                        className="inline-flex min-h-12 w-full items-center justify-center rounded-field border border-line bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:bg-canvas active:bg-canvas"
                     >
                         Explore all events
                     </button>
@@ -539,15 +641,16 @@ export default function PeoplePanel({
     );
 
     // --- Inline empty-network acquisition ---------------------------------
-    if (variant === 'inline') {
+    if (isInline) {
         return (
             <div className="flex h-full flex-col" data-testid="build-your-tribe">
-                <div className="flex flex-col items-center gap-2 px-3 pt-3 text-center">
-                    {peopleIllustration}
-                    <h3 className="text-base font-semibold text-ink">Build your tribe</h3>
+                <div className="flex flex-col items-center gap-2 pt-2 text-center">
+                    <span className="inline-flex h-16 w-16 items-center justify-center rounded-card bg-blue-50">
+                        {peopleIllustration}
+                    </span>
+                    <h3 className="text-lg font-bold text-ink">Build your tribe</h3>
                     <p className="max-w-xs text-sm text-ink-soft">
-                        Follow people you know — or discover new ones — to find events they're going to and
-                        interested in.
+                        Follow people you know to see the events they're going to.
                     </p>
                 </div>
                 {searchBox}
@@ -559,12 +662,13 @@ export default function PeoplePanel({
 
     // --- Overlay (avatar-stack landing / Specific-people picker) ----------
     return (
-        <div className="flex h-full flex-col" data-testid={mode === 'select' ? 'specific-people-picker' : 'find-people-panel'}>
+        <div className="flex h-full flex-col bg-surface" data-testid={mode === 'select' ? 'specific-people-picker' : 'find-people-panel'}>
             {header}
             {tabBar}
-            {selectedChips}
             {searchBox}
+            {selectedChips}
             {body}
+            {selectFooter}
         </div>
     );
 }

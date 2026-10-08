@@ -42,7 +42,7 @@ function FriendAvatar({ friend, index }: { friend: FriendMini; index: number }) 
 
     return (
         <span
-            className={`${className} flex items-center justify-center bg-blue-50 text-[9px] font-semibold text-action`}
+            className={`${className} flex items-center justify-center bg-blue-50 text-2xs font-semibold text-action`}
             title={name}
             aria-label={name}
         >

@@ -680,6 +680,10 @@ export interface SiteSettings {
     /** When true, the explorer list renders the shared My Events card style.
      * Client default: false. */
     explorer_event_card_card_style_enabled?: boolean;
+    /** When true, explorer cards put the title in its own row above the picture. Client default: false. */
+    explorer_card_title_top_enabled?: boolean;
+    /** When true, explorer cards move Save into the bottom row next to Going. Client default: false. */
+    explorer_card_save_bottom_enabled?: boolean;
     /** When true, floating Explorer controls show labels below desktop widths.
      * Desktop controls are always labeled. Client default: true. */
     explorer_view_control_labels_enabled?: boolean;
@@ -785,6 +789,14 @@ export interface SiteSettings {
     memories_prompt_local_hour?: number;
     ticket_prompt_enabled?: boolean;
     memories_prompt_enabled?: boolean;
+    /** Admin delivery matrix per notification feature; in-app is always on. */
+    notification_channels?: Record<string, NotificationChannelSettings>;
+}
+
+export interface NotificationChannelSettings {
+    push: boolean;
+    email_instant: boolean;
+    email_digest: boolean;
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -3965,6 +3977,7 @@ export async function fetchAdminChanges(params: {
     kind?: EventRevisionKind[];
     source?: EventRevisionSource[];
     state?: 'open' | 'decided';
+    when?: 'upcoming' | 'past' | 'all';
     limit?: number;
     offset?: number;
 } = {}): Promise<AdminChangesResponse> {
@@ -3972,6 +3985,7 @@ export async function fetchAdminChanges(params: {
     if (params.kind?.length) qs.set('kind', params.kind.join(','));
     if (params.source?.length) qs.set('source', params.source.join(','));
     if (params.state) qs.set('state', params.state);
+    if (params.when) qs.set('when', params.when);
     if (params.limit != null) qs.set('limit', String(params.limit));
     if (params.offset != null) qs.set('offset', String(params.offset));
     const res = await fetch(`${BASE}/admin/changes?${qs}`, { credentials: 'include', cache: 'no-store' });

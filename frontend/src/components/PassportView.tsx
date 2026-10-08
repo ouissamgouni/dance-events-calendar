@@ -137,7 +137,7 @@ function StatCell({ value, label, icon }: { value: number | string; label: strin
                 {icon}
                 <span className="text-xl font-semibold text-ink tabular-nums">{value}</span>
             </div>
-            <div className="mt-1 text-[11px] font-medium leading-tight text-ink-soft">{label}</div>
+            <div className="mt-1 text-xs font-medium leading-tight text-ink-soft">{label}</div>
         </div>
     );
 }
@@ -280,7 +280,7 @@ function MilestoneStateIcons({ cards, wrap }: { cards: MilestoneCardModel[]; wra
                     {card.icon}
                 </span>
             ))}
-            {cards.length === 0 && <span className="text-[11px] text-muted">No milestones yet</span>}
+            {cards.length === 0 && <span className="text-xs text-ink-soft">No milestones yet</span>}
         </span>
     );
 }
@@ -298,7 +298,7 @@ function MilestoneCategoryRow({ category, onOpen }: { category: MilestoneCategor
             </span>
             <span className="flex min-w-0 flex-col">
                 <span className="block truncate text-sm font-semibold text-ink">{category.label}</span>
-                <span className="block text-[11px] tabular-nums text-ink-soft">
+                <span className="block text-xs tabular-nums text-ink-soft">
                     {category.unlockedCount} / {category.cards.length} unlocked
                 </span>
                 <div className="mt-1">
@@ -349,7 +349,7 @@ function MilestoneDetailCard({ card, category }: { card: MilestoneCardModel; cat
             {card.state === 'locked' && <LockKeyhole className="absolute right-2 top-2 h-4 w-4 text-muted" aria-label="Locked" />}
             <div className={card.state === 'locked' ? 'text-2xl opacity-60 grayscale' : 'text-2xl'}>{card.icon}</div>
             <h3 className={card.state === 'locked' ? 'mt-2 text-xs font-semibold text-muted' : 'mt-2 text-xs font-semibold text-ink'}>{card.name}</h3>
-            <p className={card.state === 'locked' ? 'mt-1 text-[11px] leading-4 text-muted' : 'mt-1 text-[11px] leading-4 text-ink-soft'}>{card.description}</p>
+            <p className={card.state === 'locked' ? 'mt-1 text-xs leading-4 text-muted' : 'mt-1 text-xs leading-4 text-ink-soft'}>{card.description}</p>
             {card.progress && (
                 <div className="mt-2 w-full">
                     <div
@@ -365,7 +365,7 @@ function MilestoneDetailCard({ card, category }: { card: MilestoneCardModel; cat
                     <p className={`mt-1 text-xs font-semibold tabular-nums ${MILESTONE_CATEGORY_META[category].iconClass}`}>{card.progress}</p>
                 </div>
             )}
-            {card.date && <p className="mt-2 text-[10px] text-ink-soft">{card.date}</p>}
+            {card.date && <p className="mt-2 text-xs text-ink-soft">{card.date}</p>}
         </article>
     );
 }
@@ -542,8 +542,8 @@ function JourneyEntryRow({ entry, anchorMonth, highlighted, showMemories, friend
     return (
         <li className="relative grid grid-cols-[3rem_1.25rem_minmax(0,1fr)] gap-x-2 pb-5 last:pb-1" data-month-anchor={anchorMonth ?? undefined} data-testid="journey-entry">
             <div className="pt-0.5 text-center leading-none">
-                <div className="text-[10px] font-semibold text-brand">{date.weekday}</div>
-                <div className="mt-1 text-[10px] font-medium text-ink-soft">{date.month}</div>
+                <div className="text-xs font-semibold text-brand">{date.weekday}</div>
+                <div className="mt-1 text-xs font-medium text-ink-soft">{date.month}</div>
                 <div className="mt-1 text-lg font-semibold text-ink">{date.day}</div>
             </div>
             <div className="relative flex justify-center">

@@ -84,7 +84,7 @@ export default function SignUpBanner() {
             <div className="flex items-center gap-2 shrink-0">
                 <Link
                     to="/login"
-                    className="bg-action px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-action transition"
+                    className="min-h-8 bg-action px-3 text-sm font-semibold text-white hover:bg-action transition"
                 >
                     Sign in
                 </Link>

@@ -286,3 +286,38 @@ def test_digest_schedule_default_when_row_blank(session):
         app_settings.get_activity_digest_schedule(session)
         == app_settings.DEFAULT_DIGEST_SCHEDULE
     )
+
+
+# --- per-feature delivery channels -------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "feature,instant,digest",
+    [
+        ("friends_going", False, True),
+        ("milestone_unlocked", False, True),
+        ("ticket_prompt", True, False),
+        ("review_prompt", True, False),
+        ("event_reminders", True, False),
+    ],
+)
+def test_feature_email_route_defaults(session, feature, instant, digest):
+    assert app_settings.get_feature_email_instant(feature, session) is instant
+    assert app_settings.get_feature_email_digest(feature, session) is digest
+    assert app_settings.get_feature_push_enabled(feature, session) is True
+
+
+def test_feature_channel_rows_override_defaults(session):
+    _put(session, "memories_prompt_email_instant", "false")
+    _put(session, "memories_prompt_email_digest", "true")
+    _put(session, "memories_prompt_push_enabled", "false")
+    assert app_settings.get_notification_channels(session)["memories_prompt"] == {
+        "push": False,
+        "email_instant": False,
+        "email_digest": True,
+    }
+
+
+def test_instant_only_feature_ignores_digest_row(session):
+    _put(session, "schedule_updates_email_digest", "true")
+    assert app_settings.get_feature_email_digest("schedule_updates", session) is False

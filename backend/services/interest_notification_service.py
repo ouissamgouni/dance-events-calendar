@@ -44,6 +44,7 @@ from backend.services.app_settings import (
     get_activity_digest_email_enabled,
     get_feature_email_digest,
     get_feature_email_instant,
+    get_feature_push_enabled,
     get_interest_match_notifications_enabled,
     get_web_push_enabled,
 )
@@ -510,8 +511,10 @@ def interest_reach_for_events(
         email_instant or email_digest
     )
     vapid = get_vapid_config()
-    push_on = get_web_push_enabled(session) and bool(
-        vapid.get("private_key") and vapid.get("public_key")
+    push_on = (
+        get_web_push_enabled(session)
+        and get_feature_push_enabled("interest_matches", session)
+        and bool(vapid.get("private_key") and vapid.get("public_key"))
     )
 
     for (user_id, event_id), labels in matches.items():

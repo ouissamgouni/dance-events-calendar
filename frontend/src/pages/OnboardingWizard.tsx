@@ -580,7 +580,7 @@ export function LegacyOnboardingWizard() {
                         </button>
                     )}
                     <h1 className="flex-1 text-base font-semibold text-ink">{stepTitle[step]}</h1>
-                    <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted">
+                    <span className="shrink-0 text-2xs uppercase tracking-wide text-ink-soft">
                         Step {stepIndex + 1} of {STEPS.length}
                     </span>
                 </div>
@@ -597,7 +597,7 @@ export function LegacyOnboardingWizard() {
                     {step === 'styles' && (
                         <>
                             <section>
-                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                                <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-ink-soft">
                                     Dance styles
                                 </label>
                                 {tagsLoading ? (
@@ -616,7 +616,7 @@ export function LegacyOnboardingWizard() {
                                 )}
                             </section>
                             <section>
-                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                                <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-ink-soft">
                                     Event reach
                                 </label>
                                 {tagsLoading ? (
@@ -666,7 +666,7 @@ export function LegacyOnboardingWizard() {
                                         {selectedProfileTags.length > 0 ? (
                                             <TagChips tags={selectedProfileTags} />
                                         ) : (
-                                            <span className="text-xs text-muted">No styles yet — tap to choose</span>
+                                            <span className="text-xs text-ink-soft">No styles yet — tap to choose</span>
                                         )}
                                     </div>
                                     <span className="shrink-0 text-xs font-medium text-action">Edit</span>
@@ -674,7 +674,7 @@ export function LegacyOnboardingWizard() {
                             )}
                             areaNameControl={(
                                 <div className="flex shrink-0 items-center gap-1.5">
-                                    <label htmlFor="onboarding-area-name" className="text-[10px] font-medium uppercase tracking-wide text-ink-soft">
+                                    <label htmlFor="onboarding-area-name" className="text-2xs font-medium uppercase tracking-wide text-ink-soft">
                                         Name
                                     </label>
                                     <input
@@ -686,7 +686,7 @@ export function LegacyOnboardingWizard() {
                                         maxLength={120}
                                         placeholder="Area name"
                                         size={10}
-                                        className="w-24 border border-line bg-surface px-1.5 py-1 text-[11px] text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
+                                        className="w-24 border border-line bg-surface px-1.5 py-1 text-xs text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                                     />
                                 </div>
                             )}
@@ -734,7 +734,7 @@ export function LegacyOnboardingWizard() {
                                                                 <img src="/orga.png" alt="" title="Verified organizer" className="h-3.5 w-3.5 object-contain" />
                                                             )}
                                                         </div>
-                                                        <div className="truncate text-[11px] text-ink-soft">
+                                                        <div className="truncate text-xs text-ink-soft">
                                                             @{handle} · {u.subscribers_count} subscriber{u.subscribers_count === 1 ? '' : 's'}
                                                         </div>
                                                     </div>
@@ -782,7 +782,7 @@ export function LegacyOnboardingWizard() {
                                                                 <img src="/orga.png" alt="" title="Verified organizer" className="h-3.5 w-3.5 object-contain" />
                                                             )}
                                                         </div>
-                                                        <div className="truncate text-[11px] text-ink-soft">@{handle}</div>
+                                                        <div className="truncate text-xs text-ink-soft">@{handle}</div>
                                                     </div>
                                                     <button
                                                         type="button"
@@ -816,7 +816,7 @@ export function LegacyOnboardingWizard() {
                                 Optional — a separate “near home” profile with its own tighter radius.
                             </p>
                             <section>
-                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                                <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-ink-soft">
                                     Dance styles
                                 </label>
                                 {tagsLoading ? (
@@ -836,7 +836,7 @@ export function LegacyOnboardingWizard() {
                                 )}
                             </section>
                             <section>
-                                <label htmlFor="onboarding-local-city" className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                                <label htmlFor="onboarding-local-city" className="mb-1 block text-2xs font-medium uppercase tracking-wide text-ink-soft">
                                     City
                                 </label>
                                 {popularCities.length > 0 && (
@@ -892,7 +892,7 @@ export function LegacyOnboardingWizard() {
                                             </ul>
                                         )}
                                         {citySearching && (
-                                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-muted">…</span>
+                                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-ink-soft">…</span>
                                         )}
                                     </div>
                                     <button
@@ -920,7 +920,7 @@ export function LegacyOnboardingWizard() {
                                     </div>
                                     <section>
                                         <div className="mb-1 flex items-center justify-between gap-3">
-                                            <label htmlFor="onboarding-local-radius" className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                                            <label htmlFor="onboarding-local-radius" className="text-2xs font-medium uppercase tracking-wide text-ink-soft">
                                                 Radius
                                             </label>
                                             <span className="text-xs font-medium text-ink">{radiusKm} km</span>
@@ -995,7 +995,7 @@ export function LegacyOnboardingWizard() {
                                 <div className="flex items-center gap-2">
                                     <div className="min-w-0 flex-1">
                                         <AreaMiniMap area={prefs.area ?? DEFAULT_AREA_BBOX} />
-                                        <span className="mt-1 flex items-center gap-1 text-[11px] text-ink-soft">
+                                        <span className="mt-1 flex items-center gap-1 text-xs text-ink-soft">
                                             <IconPin className="h-3 w-3 shrink-0 text-muted" />
                                             <span className="truncate">{prefs.area?.label ?? DEFAULT_AREA_BBOX.label}</span>
                                         </span>
@@ -1023,7 +1023,7 @@ export function LegacyOnboardingWizard() {
                                         {followedUsers.map((u) => (
                                             <div key={u.handle ?? u.display_name} className="flex shrink-0 flex-col items-center gap-0.5" title={u.display_name || `@${u.handle ?? ''}`}>
                                                 <Avatar url={u.avatar_url} size={10} />
-                                                <span className="max-w-[64px] truncate text-[10px] text-ink-soft">
+                                                <span className="max-w-[64px] truncate text-xs text-ink-soft">
                                                     {u.display_name || `@${u.handle ?? ''}`}
                                                 </span>
                                             </div>
@@ -1142,7 +1142,7 @@ function TagChips({ tags }: { tags: Tag[] }) {
             {tags.map((t) => (
                 <span
                     key={t.id}
-                    className="shrink-0 whitespace-nowrap border border-line bg-canvas px-1.5 py-0.5 text-[11px] text-ink"
+                    className="shrink-0 whitespace-nowrap border border-line bg-canvas px-1.5 py-0.5 text-xs text-ink"
                 >
                     {t.label}
                 </span>
@@ -1155,7 +1155,7 @@ function RecapSection({ title, onEdit, children }: { title: string; onEdit: () =
     return (
         <div className="border border-line bg-surface px-3 py-2">
             <div className="mb-1.5 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">{title}</div>
+                <div className="text-2xs font-medium uppercase tracking-wide text-ink-soft">{title}</div>
                 <button
                     type="button"
                     onClick={onEdit}

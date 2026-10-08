@@ -202,7 +202,7 @@ export default function RepeatPages({ value, start, onChange, onClose }: Props) 
                     {dates.map((d, i) => (
                         <div key={i} className="rounded-field border border-line p-3">
                             <div className="mb-2 flex items-center justify-between">
-                                <span className="text-xs font-semibold text-muted">Date {i + 1}</span>
+                                <span className="text-xs font-semibold text-ink-soft">Date {i + 1}</span>
                                 <button
                                     type="button"
                                     aria-label={`Remove date ${i + 1}`}

@@ -20,7 +20,7 @@ function MyReviewCard({ review, name }: { review: MyRating; name: string }) {
             <div className="flex items-center gap-2 min-w-0">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-canvas text-xs font-semibold text-ink-soft">{initials}</span>
                 <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-ink">{name}{review.is_anonymous && <span className="ml-1 text-xs font-normal text-muted">· anonymous</span>}</div>
+                    <div className="truncate text-sm font-semibold text-ink">{name}{review.is_anonymous && <span className="ml-1 text-xs font-normal text-ink-soft">· anonymous</span>}</div>
                     <div className="flex items-center gap-1.5 text-xs text-ink-soft">
                         {meta && <span>{meta.emoji} {meta.label}</span>}
                         {meta && <span aria-hidden="true">·</span>}

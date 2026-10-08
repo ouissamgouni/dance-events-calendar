@@ -125,7 +125,7 @@ export default function ProfileEditor({
             {showTagPickers ? (
                 <>
                     <section>
-                        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-ink-soft">
                             Dance styles
                         </label>
                         {tagsLoading ? (
@@ -144,7 +144,7 @@ export default function ProfileEditor({
                         )}
                     </section>
                     <section>
-                        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                        <label className="mb-1 block text-2xs font-medium uppercase tracking-wide text-ink-soft">
                             Event reach
                         </label>
                         {tagsLoading ? (
@@ -184,7 +184,7 @@ export default function ProfileEditor({
                     markers={previewMarkers}
                     controlsStart={areaNameControl}
                 />
-                {saving && <p className="mt-1 text-[11px] text-muted">Saving…</p>}
+                {saving && <p className="mt-1 text-xs text-ink-soft">Saving…</p>}
             </section>
 
             {showGuardrailHint && (
@@ -194,11 +194,11 @@ export default function ProfileEditor({
             )}
 
             <section>
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                <span className="mb-1 block text-2xs font-medium uppercase tracking-wide text-ink-soft">
                     In your area
                 </span>
                 {previewEvents === null ? (
-                    danceIds.length > 0 ? <p className="text-xs text-muted">Finding events…</p> : null
+                    danceIds.length > 0 ? <p className="text-xs text-ink-soft">Finding events…</p> : null
                 ) : areaTrail.length === 0 ? (
                     <p className="border border-line bg-canvas px-3 py-4 text-xs text-ink-soft">
                         No upcoming events in this area yet — turn on alerts below and we'll email you the moment one appears.

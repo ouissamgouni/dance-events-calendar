@@ -222,6 +222,10 @@ def _deliver_promo_code_added(promo_id: str) -> None:
     session; skips channels already stamped so a re-run never re-sends.
     """
     from backend.db.database import get_engine
+    from backend.services.app_settings import (
+        get_feature_email_instant,
+        get_feature_push_enabled,
+    )
     from backend.services.push_service import send_push
     from sqlmodel import Session as SyncSession
 
@@ -229,6 +233,8 @@ def _deliver_promo_code_added(promo_id: str) -> None:
         promo = session.get(EventPromoCode, UUID(promo_id))
         if not promo or promo.status != "approved":
             return
+        email_on = get_feature_email_instant("promo_codes", session)
+        push_on = get_feature_push_enabled("promo_codes", session)
         event = session.get(CachedEvent, promo.event_id)
         notifs = session.exec(
             select(Notification)
@@ -253,13 +259,14 @@ def _deliver_promo_code_added(promo_id: str) -> None:
                 continue
             notif = notif_by_user[user.id]
             if (
-                notif.emailed_at is None
+                email_on
+                and notif.emailed_at is None
                 and user.email_promo_codes_enabled
                 and send_promo_code_added_email(user, event, promo)
             ):
                 notif.emailed_at = stamp_now
                 record_delivery(session, notif.id, "email", stamp_now, source="job")
-            if notif.pushed_at is None and user.push_promo_codes_enabled:
+            if push_on and notif.pushed_at is None and user.push_promo_codes_enabled:
                 delivered = send_push(
                     user.id,
                     title="New promo code",

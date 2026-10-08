@@ -46,7 +46,7 @@ export default function PassportActivityHeatmap({
                     {MONTH_INITIALS.map((initial, i) => (
                         <span
                             key={`h-${i}`}
-                            className="text-center text-[10px] font-medium leading-4 text-ink-soft"
+                            className="text-center text-xs font-medium leading-4 text-ink-soft"
                             aria-hidden
                         >
                             {initial}

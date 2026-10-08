@@ -1254,6 +1254,85 @@ class TestDatabaseSeeder:
         assert {n.event_id for n in rows} == expected
         assert len(rows) == len(expected)
 
+    def test_prompts_digest_scenario_routes_email_to_digest(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        from sqlalchemy.pool import StaticPool
+
+        from backend.db import database as database_module
+        from backend.db.models import EventUserAsset, Notification, User
+        from backend.db.seed import SCENARIOS_DIR
+        from backend.services import (
+            activity_email,
+            event_asset_prompts,
+            object_storage,
+            review_prompt_service,
+        )
+
+        monkeypatch.setattr(object_storage, "get_client", lambda: MagicMock())
+        monkeypatch.setattr(object_storage, "ensure_buckets", lambda client=None: [])
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+        instant: list = []
+        for module, name in (
+            (event_asset_prompts, "send_event_ticket_prompt_email"),
+            (event_asset_prompts, "send_event_memories_prompt_email"),
+            (review_prompt_service, "send_event_review_prompt_email"),
+        ):
+            monkeypatch.setattr(module, name, lambda *a, **k: instant.append(a) or True)
+        for module in (event_asset_prompts, review_prompt_service, activity_email):
+            monkeypatch.setattr(module, "send_push", lambda *a, **k: 0)
+        digests: list = []
+        monkeypatch.setattr(
+            activity_email,
+            "send_activity_digest_v2_email",
+            lambda user, sections, **_: (
+                digests.append({s["feature"]: len(s["entries"]) for s in sections})
+                or True
+            ),
+        )
+
+        engine = create_engine(
+            "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
+        SQLModel.metadata.create_all(engine)
+        monkeypatch.setattr(database_module, "_engine", engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(SCENARIOS_DIR / "notif-prompts-digest")
+
+        event_asset_prompts.run_ticket_prompts()
+        event_asset_prompts.run_memories_prompts()
+        review_prompt_service.run_once()
+        assert instant == []
+
+        with Session(engine) as session:
+            kinds = sorted(n.kind for n in session.exec(select(Notification)).all())
+            assert kinds == [
+                "event_memories_prompt",
+                "event_review_prompt",
+                "event_ticket_prompt",
+                "event_ticket_prompt",
+            ]
+            nora = session.exec(
+                select(User).where(User.email == "nora@example.com")
+            ).one()
+            session.add(
+                EventUserAsset(
+                    user_id=nora.id,
+                    event_id="evt-pd-congress",
+                    kind="ticket_link",
+                    url="https://example.com/t",
+                )
+            )
+            session.commit()
+
+        activity_email.run_once(force=True)
+
+        assert digests == [
+            {"ticket_prompt": 1, "review_prompt": 1, "memories_prompt": 1}
+        ]
+
     def test_db_event_assets_reference_existing_events_users_and_files(self):
         import yaml
 

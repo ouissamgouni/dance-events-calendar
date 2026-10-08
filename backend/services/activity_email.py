@@ -27,7 +27,7 @@ from datetime import datetime, timedelta, timezone
 from html import escape
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlmodel import Session, or_, select
+from sqlmodel import Session, col, or_, select
 
 from backend.services.app_settings import (
     get_activity_digest_schedule,
@@ -35,6 +35,7 @@ from backend.services.app_settings import (
     get_interest_match_max_events_per_email,
     get_feature_email_instant,
     get_feature_email_digest,
+    get_feature_push_enabled,
     get_digest_v2_enabled,
     get_digest_per_kind_cap,
     get_digest_max_items,
@@ -44,6 +45,8 @@ from backend.config.loader import get_public_app_url
 from backend.db.database import get_engine
 from backend.db.models import (
     CachedEvent,
+    EventRating,
+    EventUserAsset,
     Notification,
     Tag,
     TagGroup,
@@ -52,6 +55,7 @@ from backend.db.models import (
     UserInterestProfile,
     UserInterestProfileTag,
 )
+from backend.services import event_assets
 from backend.services.email import (
     event_message_action_phrase,
     send_activity_digest_email,
@@ -83,6 +87,9 @@ ACTIVITY_KINDS = (
     "event_message",
     "event_message_reply",
     "plan_session_added",
+    "event_ticket_prompt",
+    "event_memories_prompt",
+    "event_review_prompt",
 )
 
 # Kinds created during requests. Their instant email + push are sent by the
@@ -123,6 +130,9 @@ FEATURE_BY_KIND: dict[str, str] = {
     "event_message": "event_messages",
     "event_message_reply": "event_messages",
     "plan_session_added": "plan_activity",
+    "event_ticket_prompt": "ticket_prompt",
+    "event_memories_prompt": "memories_prompt",
+    "event_review_prompt": "review_prompt",
 }
 
 # Per-(channel, feature) User attribute that must be True for delivery.
@@ -136,6 +146,9 @@ CHANNEL_FLAG: dict[tuple[str, str], str] = {
     ("email", "milestone_unlocked"): "email_milestone_unlocked_enabled",
     ("email", "event_messages"): "email_event_messages_enabled",
     ("email", "suggested_events"): "email_suggested_events_enabled",
+    ("email", "ticket_prompt"): "email_ticket_prompt_enabled",
+    ("email", "memories_prompt"): "email_memories_prompt_enabled",
+    ("email", "review_prompt"): "email_review_prompt_enabled",
     ("push", "social_activity"): "push_social_activity_enabled",
     ("push", "friends_going"): "push_friends_going_enabled",
     ("push", "plan_activity"): "push_plan_activity_enabled",
@@ -145,6 +158,9 @@ CHANNEL_FLAG: dict[tuple[str, str], str] = {
     ("push", "milestone_unlocked"): "push_milestone_unlocked_enabled",
     ("push", "event_messages"): "push_event_messages_enabled",
     ("push", "suggested_events"): "push_suggested_events_enabled",
+    ("push", "ticket_prompt"): "push_ticket_prompt_enabled",
+    ("push", "memories_prompt"): "push_memories_prompt_enabled",
+    ("push", "review_prompt"): "push_review_prompt_enabled",
 }
 
 # Features whose instant email + push are owned by a dedicated service
@@ -152,7 +168,19 @@ CHANNEL_FLAG: dict[tuple[str, str], str] = {
 # and all milestone push). activity_email only provides their DIGEST email,
 # so it must skip these in the instant-email and push paths to avoid
 # double-sending.
-_DIGEST_ONLY_FEATURES = frozenset({"milestone_unlocked"})
+_PROMPT_FEATURES = frozenset({"ticket_prompt", "memories_prompt", "review_prompt"})
+# Digest line template + event sub-path for self-service prompt kinds.
+_PROMPT_LINES = {
+    "event_ticket_prompt": (
+        "Got your ticket for {title}? Keep it handy for the door",
+        "ticket",
+    ),
+    "event_memories_prompt": ("Share your photos from {title}", "memories"),
+    "event_review_prompt": ("How was {title}? Rate your experience", "review"),
+}
+_DIGEST_ONLY_FEATURES = frozenset({"milestone_unlocked"}) | _PROMPT_FEATURES
+# Digest drops ticket prompts this close to the start: the reminder carries a ticket line.
+TICKET_DIGEST_MIN_LEAD_HOURS = 24
 _MILESTONE_KINDS = frozenset({"milestone_unlocked", "subscription_milestone"})
 _ACTOR_GROUPED_FEATURES = frozenset(
     {
@@ -169,7 +197,14 @@ _ACTOR_GROUPED_FEATURES = frozenset(
 # digest past-event guard, mirroring ``skip_past_guard`` in notifications.py.
 # Event-less kinds (milestones, follows) are exempt automatically since they
 # resolve to no event.
-_PAST_GUARD_EXEMPT_KINDS = frozenset({"subscription_review", "subscription_memories"})
+_PAST_GUARD_EXEMPT_KINDS = frozenset(
+    {
+        "subscription_review",
+        "subscription_memories",
+        "event_review_prompt",
+        "event_memories_prompt",
+    }
+)
 _REACH_LABELS = {
     "any": "Any reach",
     "regional_plus": "Regional+",
@@ -366,6 +401,19 @@ def _render_line(
             title = title_text
     else:
         title = "an event"
+    prompt = _PROMPT_LINES.get(kind)
+    if prompt is not None:
+        template, path = prompt
+        if event and event.event_id:
+            prompt_href = tracked_url(
+                f"{app}/event/{event.event_id}/{path}", notification_id, "email"
+            )
+            title = (
+                f'<a href="{escape(prompt_href)}" '
+                'style="color:#1d4ed8;text-decoration:underline">'
+                f"{escape(event.title or 'your event')}</a>"
+            )
+        return template.format(title=title)
     if kind == "subscription_going":
         if also_going:
             return f"You and <strong>{who}</strong> are going to {title}"
@@ -529,6 +577,71 @@ def _push_tag_for(feature: str) -> str:
     return f"{feature.replace('_', '-')}-digest"
 
 
+def _stale_prompt_ids(
+    session: Session,
+    notifications: list[Notification],
+    events: dict[str, CachedEvent],
+    now: datetime,
+) -> set:
+    """Prompt rows no longer worth emailing: already acted on, not going, or too late."""
+    prompts = [n for n in notifications if n.kind in _PROMPT_LINES and n.event_id]
+    if not prompts:
+        return set()
+    user_ids = {n.recipient_user_id for n in prompts}
+    event_ids = {n.event_id for n in prompts}
+    attendance = {
+        (a.user_id, a.event_id): a
+        for a in session.exec(
+            select(UserEventAttendance)
+            .where(col(UserEventAttendance.user_id).in_(user_ids))
+            .where(col(UserEventAttendance.event_id).in_(event_ids))
+        ).all()
+    }
+    assets = session.exec(
+        select(EventUserAsset.user_id, EventUserAsset.event_id, EventUserAsset.kind)
+        .where(col(EventUserAsset.user_id).in_(user_ids))
+        .where(col(EventUserAsset.event_id).in_(event_ids))
+    ).all()
+    has_ticket = {(u, e) for u, e, k in assets if k in event_assets.TICKET_KINDS}
+    has_memory = {(u, e) for u, e, k in assets if k == event_assets.KIND_MEMORY}
+    rated = set(
+        session.exec(
+            select(EventRating.user_id, EventRating.event_id)
+            .where(col(EventRating.user_id).in_(user_ids))
+            .where(col(EventRating.event_id).in_(event_ids))
+            .where(EventRating.scope == "this_edition")
+        ).all()
+    )
+    ticket_cutoff = now + timedelta(hours=TICKET_DIGEST_MIN_LEAD_HOURS)
+    stale: set = set()
+    for n in prompts:
+        key = (n.recipient_user_id, n.event_id)
+        if n.kind == "event_review_prompt":
+            if key in rated:
+                stale.add(n.id)
+            continue
+        event = events.get(n.event_id)
+        going = attendance.get(key)
+        if event is None or going is None:
+            stale.add(n.id)
+        elif n.kind == "event_ticket_prompt":
+            start = event.start
+            if start is not None and start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            if (
+                key in has_ticket
+                or going.ticket_not_needed_at is not None
+                or start is None
+                or start <= ticket_cutoff
+            ):
+                stale.add(n.id)
+        elif key in has_memory or not event_assets.can_add_memory_now(
+            session, event, now
+        ):
+            stale.add(n.id)
+    return stale
+
+
 def _logical_groups(notifications: list[Notification]) -> list[list[Notification]]:
     groups: dict[tuple, list[Notification]] = {}
     for notification in notifications:
@@ -615,10 +728,14 @@ def run_once(
         # feature uses. Computed once per run (not per row).
         feat_instant: dict[str, bool] = {}
         feat_digest: dict[str, bool] = {}
+        feat_push: dict[str, bool] = {}
         for feature in set(FEATURE_BY_KIND.values()):
             feat_instant[feature] = get_feature_email_instant(feature, session)
             feat_digest[feature] = get_feature_email_digest(feature, session)
-        any_instant = any(feat_instant.values())
+            feat_push[feature] = get_feature_push_enabled(feature, session)
+        any_instant = any(
+            on for f, on in feat_instant.items() if f not in _DIGEST_ONLY_FEATURES
+        )
 
         stmt = (
             select(Notification)
@@ -719,8 +836,11 @@ def run_once(
         from backend.services.notifications import _event_is_past
 
         past_event_ids = {eid for eid in events if _event_is_past(session, eid)}
+        stale_prompt_ids = _stale_prompt_ids(session, pending, events, now)
 
         def _skip_past(n: Notification) -> bool:
+            if n.id in stale_prompt_ids:
+                return True
             return (
                 n.kind not in _PAST_GUARD_EXEMPT_KINDS
                 and n.event_id is not None
@@ -779,7 +899,9 @@ def run_once(
             # instant-disabled features still flow through here.
             instant_owned = (
                 feature is not None
-                and feature not in _DIGEST_ONLY_FEATURES
+                and (
+                    feature not in _DIGEST_ONLY_FEATURES or feature in _PROMPT_FEATURES
+                )
                 and bool(feat_instant.get(feature))
             )
             if (
@@ -813,7 +935,11 @@ def run_once(
             # row at all when ``resend=True``) is a candidate on every
             # call, regardless of ``force``. Digest-only features are
             # skipped: their push is owned by a dedicated service.
-            if (resend or n.pushed_at is None) and feature not in _DIGEST_ONLY_FEATURES:
+            if (
+                (resend or n.pushed_at is None)
+                and feature not in _DIGEST_ONLY_FEATURES
+                and feat_push.get(feature, True)
+            ):
                 if (
                     feature == "interest_matches"
                     and interest_push_sched is not None

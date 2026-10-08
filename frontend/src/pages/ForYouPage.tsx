@@ -173,7 +173,7 @@ export function LensTrail(props: LensTrailProps) {
                             type="button"
                             onClick={handleMore}
                             disabled={loading && !hasLocalMore}
-                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch bg-canvas text-center text-[11px] font-semibold text-action transition hover:bg-canvas hover:text-action focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
+                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch bg-canvas text-center text-xs font-semibold text-action transition hover:bg-canvas hover:text-action focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
                         >
                             {loading && !hasLocalMore ? 'Loading…' : '+ more'}
                         </button>

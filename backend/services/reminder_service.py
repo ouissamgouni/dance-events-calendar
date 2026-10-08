@@ -27,6 +27,8 @@ from backend.services.app_settings import (
     get_reminder_lead_hours,
     get_event_reminders_enabled,
     get_event_message_cta_min_going,
+    get_feature_email_instant,
+    get_feature_push_enabled,
 )
 from backend.db.database import get_engine
 from backend.db.models import CachedEvent, Notification, User, UserEventAttendance
@@ -123,6 +125,8 @@ def run_once() -> dict:
             ).all()
         )
         ticket_cta = ticket_cta_pairs(session, due)
+        email_on = get_feature_email_instant("event_reminders", session)
+        push_on = get_feature_push_enabled("event_reminders", session)
         for user, event in due:
             ask = going_counts.get(event.event_id, 0) >= ask_min
             ticket = (user.id, event.event_id) in ticket_cta
@@ -137,11 +141,11 @@ def run_once() -> dict:
             session.flush()
             notif_ids[(user.id, event.event_id)] = notif.id
             record_delivery(session, notif.id, "app")
-            if user.email_event_reminders_enabled:
+            if email_on and user.email_event_reminders_enabled:
                 to_email.append(
                     (user, event, ask, ticket and user.email_ticket_prompt_enabled)
                 )
-            if user.push_event_reminders_enabled:
+            if push_on and user.push_event_reminders_enabled:
                 to_push.append(
                     (
                         user.id,

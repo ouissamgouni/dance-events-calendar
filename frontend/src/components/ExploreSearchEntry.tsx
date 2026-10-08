@@ -45,7 +45,7 @@ export default function ExploreSearchEntry({ isSticky = false }: ExploreSearchEn
                 <button type="button" onClick={() => setExpanded(false)} aria-label="Collapse search" className="inline-flex h-11 w-11 items-center justify-center text-ink-soft hover:text-ink">
                     <X className="h-5 w-5" aria-hidden="true" />
                 </button>
-                <div className="col-start-1 py-2 text-center text-xs text-muted">or</div>
+                <div className="col-start-1 py-2 text-center text-xs text-ink-soft">or</div>
                 <button
                     type="button"
                     onClick={() => navigate('/search', { state: { returnTo: '/' } })}

@@ -35,7 +35,7 @@ describe('ExpandableDescription', () => {
 
         const readMore = screen.getByRole('button', { name: 'Read more' });
         expect(readMore).toHaveAttribute('aria-expanded', 'false');
-        expect(screen.getByText(/First line/)).toHaveClass('text-sm', 'leading-relaxed', 'whitespace-pre-line');
+        expect(screen.getByText(/First line/)).toHaveClass('text-body', 'leading-relaxed', 'whitespace-pre-line');
 
         fireEvent.click(readMore);
 

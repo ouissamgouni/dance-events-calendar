@@ -102,10 +102,10 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
             {/* Numeric mood breakdown — collapsed by default, directly under the headline */}
             {sentimentTotal > 0 && (
                 <details className="text-xs">
-                    <summary className="cursor-pointer text-sm font-semibold leading-5 text-[#526078] select-none">
+                    <summary className="cursor-pointer py-3 text-sm font-semibold leading-5 text-[#526078] select-none">
                         Show mood breakdown
                     </summary>
-                    <div className="space-y-1 mt-1.5">
+                    <div className="space-y-1.5 mt-0.5">
                         {SENTIMENTS.map((s) => {
                             const count = aggregate.sentiment_distribution[s.value] ?? 0;
                             const pct = sentimentTotal > 0 ? Math.round((count / sentimentTotal) * 100) : 0;
@@ -131,7 +131,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                     {appreciated.length > 0 && (
                         <ReviewRail title="People appreciated" itemCount={appreciated.length}>
                             {appreciated.map((t) => (
-                                <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-green-50 text-success px-2 py-0.5 text-[11px]">
+                                <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-green-50 text-success px-2 py-0.5 text-xs">
                                     {t.label} ({t.count})
                                 </span>
                             ))}
@@ -142,7 +142,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                             {mentioned.map(({ tag, negative }) => (
                                 <span
                                     key={tag.tag_id}
-                                    className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] ${negative ? 'bg-orange-50 text-orange-800' : 'bg-slate-100 text-ink-soft'}`}
+                                    className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${negative ? 'bg-orange-50 text-orange-800' : 'bg-slate-100 text-ink-soft'}`}
                                 >
                                     {tag.label} ({tag.count})
                                 </span>
@@ -152,7 +152,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                     {recommendedFor.length > 0 && (
                         <ReviewRail title="Best suited for" itemCount={recommendedFor.length}>
                             {recommendedFor.map((t) => (
-                                <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-ink-soft px-2 py-0.5 text-[11px]">
+                                <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-ink-soft px-2 py-0.5 text-xs">
                                     {t.label} ({t.count})
                                 </span>
                             ))}
@@ -171,7 +171,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                             return (
                                 <span
                                     key={a.aspect_slug}
-                                    className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-ink px-2 py-0.5 text-[11px]"
+                                    className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-ink px-2 py-0.5 text-xs"
                                 >
                                     {aspectLabel(a.aspect_slug)} {m.emoji} {m.label} ({a.count})
                                 </span>

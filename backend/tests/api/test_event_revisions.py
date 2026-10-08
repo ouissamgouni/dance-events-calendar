@@ -260,6 +260,37 @@ def test_review_queue_publishes_or_rejects_new_events(client, session, seeded):
     assert {c["status"] for c in decided["items"]} == {"accepted", "rejected"}
 
 
+def test_review_queue_filters_by_upcoming_or_past_events(client, session, seeded):
+    _new_event(session, "ev-upcoming")
+    past = START - timedelta(days=365 * 10)
+    session.add(
+        CachedEvent(
+            event_id="ev-past",
+            calendar_id="src",
+            title="ev-past",
+            start=past,
+            end=past + timedelta(hours=2),
+            review_status="pending",
+        )
+    )
+    session.add(
+        EventRevision(
+            kind="edit", source="admin", status="pending", changes={"title": {}}
+        )
+    )
+    session.commit()
+
+    def queue(when: str) -> tuple[set, int, int]:
+        body = client.get("/api/admin/changes", params={"when": when}).json()
+        kinds = {o["value"]: o["count"] for o in body["kinds"]}
+        events = {c["event"]["event_id"] if c["event"] else None for c in body["items"]}
+        return events, kinds["create"], kinds["edit"]
+
+    assert queue("upcoming") == ({"ev-upcoming", None}, 1, 1)
+    assert queue("past") == ({"ev-past"}, 1, 0)
+    assert queue("all") == ({"ev-upcoming", "ev-past", None}, 2, 1)
+
+
 def test_review_queue_applies_a_source_edit(client, session, seeded):
     _sync(session, location="Studio B")
     change = client.get("/api/admin/changes", params={"kind": "edit"}).json()["items"][

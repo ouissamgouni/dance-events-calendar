@@ -70,7 +70,7 @@ export default function AddressAutocomplete({ value, onChange, onSelect, searchF
                 className="w-full rounded-md border border-line px-3 py-2 text-sm placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
             />
             {loading && (
-                <span className="absolute right-2 top-2.5 text-xs text-muted">…</span>
+                <span className="absolute right-2 top-2.5 text-xs text-ink-soft">…</span>
             )}
             {open && suggestions.length > 0 && (
                 <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border border-line bg-surface shadow-lg">

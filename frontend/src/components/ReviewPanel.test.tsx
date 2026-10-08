@@ -94,6 +94,17 @@ describe('ReviewPanel', () => {
         expect(screen.getByRole('tab', { name: 'Closed' })).toBeInTheDocument()
     })
 
+    it('shows changes on upcoming events by default and can switch to past ones', async () => {
+        render(<MemoryRouter><ReviewPanel isOpen onClose={() => { }} /></MemoryRouter>)
+        await screen.findByText('Friday Salsa')
+        expect(api.fetchAdminChanges).toHaveBeenLastCalledWith(expect.objectContaining({ when: 'upcoming' }))
+        expect(screen.getByRole('button', { name: 'Upcoming' })).toHaveAttribute('aria-pressed', 'true')
+
+        await userEvent.click(screen.getByRole('button', { name: 'Past' }))
+
+        await waitFor(() => expect(api.fetchAdminChanges).toHaveBeenLastCalledWith(expect.objectContaining({ when: 'past' })))
+    })
+
     it('publishes a new event and makes a submission public in the chosen calendar', async () => {
         const user = userEvent.setup()
         render(<MemoryRouter><ReviewPanel isOpen onClose={() => { }} /></MemoryRouter>)

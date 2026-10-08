@@ -163,7 +163,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                                                 {promo.code}
                                             </span>
                                             {promo.status === 'pending' && (
-                                                <span className="bg-amber-50 px-1 py-0 text-[9px] uppercase text-amber-700">
+                                                <span className="bg-amber-50 px-1 py-0 text-2xs uppercase text-amber-700">
                                                     pending
                                                 </span>
                                             )}
@@ -173,7 +173,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                                                 {promo.description}
                                             </div>
                                         )}
-                                        <div className="mt-0.5 text-[11px] text-muted">
+                                        <div className="mt-0.5 text-xs text-ink-soft">
                                             {formatExpiry(promo.expires_at)}
                                         </div>
                                     </div>
@@ -241,11 +241,11 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                                 type="button"
                                 onClick={() => setOpenPromoId(promo.id)}
                                 title={promo.description ?? promo.code}
-                                className="inline-flex items-center gap-1 border border-line bg-surface px-2 py-0.5 font-mono text-[11px] text-ink hover:border-blue-400 hover:bg-blue-50"
+                                className="inline-flex items-center gap-1 border border-line bg-surface px-2 py-0.5 font-mono text-xs text-ink hover:border-blue-400 hover:bg-blue-50"
                             >
                                 {promo.code}
                                 {promo.status === 'pending' && (
-                                    <span className="text-[9px] uppercase tracking-wide text-amber-700 bg-amber-50 px-1 py-0">
+                                    <span className="text-2xs uppercase tracking-wide text-amber-700 bg-amber-50 px-1 py-0">
                                         pending
                                     </span>
                                 )}
@@ -255,7 +255,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                             <button
                                 type="button"
                                 onClick={() => setShowAddDialog(true)}
-                                className="border border-dashed border-line px-2 py-0.5 text-[11px] text-ink-soft hover:text-action hover:border-blue-400"
+                                className="border border-dashed border-line px-2 py-0.5 text-xs text-ink-soft hover:text-action hover:border-blue-400"
                             >
                                 + Add a promo code
                             </button>
@@ -293,10 +293,10 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                         {openPromo.description && (
                             <div className="mb-2">{openPromo.description}</div>
                         )}
-                        <div className="text-[11px] text-ink-soft">
+                        <div className="text-xs text-ink-soft">
                             {formatExpiry(openPromo.expires_at)}
                         </div>
-                        <div className="text-[11px] text-ink-soft">
+                        <div className="text-xs text-ink-soft">
                             Submitted by{' '}
                             {openPromo.submitter.handle
                                 ? `@${openPromo.submitter.handle}`
@@ -317,7 +317,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                             <button
                                 type="button"
                                 onClick={() => copy(openPromo.code)}
-                                className="text-[11px] bg-action text-white px-3 py-1 hover:bg-action"
+                                className="text-xs bg-action text-white px-3 py-1 hover:bg-action"
                             >
                                 Copy code
                             </button>
@@ -326,7 +326,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                                     <button
                                         type="button"
                                         onClick={() => openEdit(openPromo)}
-                                        className="text-[11px] border border-line bg-surface text-ink px-3 py-1 hover:bg-canvas"
+                                        className="text-xs border border-line bg-surface text-ink px-3 py-1 hover:bg-canvas"
                                     >
                                         Edit
                                     </button>
@@ -334,7 +334,7 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                                         type="button"
                                         disabled={submitting}
                                         onClick={() => remove(openPromo)}
-                                        className="text-[11px] bg-danger text-white px-3 py-1 hover:bg-danger/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="text-xs bg-danger text-white px-3 py-1 hover:bg-danger/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Delete
                                     </button>

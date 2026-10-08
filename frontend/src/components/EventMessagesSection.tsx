@@ -131,7 +131,7 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
 
             {!collapsed && (
                 <>
-                    <p className="text-[11px] text-ink-soft">
+                    <p className="text-xs text-ink-soft">
                         {isPast
                             ? 'Questions and requests from attendees.'
                             : 'Coordinate with other attendees — accommodation, rides, tickets, meetups, or any question.'}
@@ -165,7 +165,7 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
                         <button
                             type="button"
                             onClick={() => setFilter('all')}
-                            className={`px-2 py-0.5 text-[11px] font-medium border ${filter === 'all'
+                            className={`px-2 py-0.5 text-xs font-medium border ${filter === 'all'
                                 ? 'border-line bg-slate-100 text-ink'
                                 : 'border-line bg-surface text-ink-soft hover:border-line'
                                 }`}
@@ -180,7 +180,7 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
                                     key={c}
                                     type="button"
                                     onClick={() => setFilter(c)}
-                                    className={`px-2 py-0.5 text-[11px] font-medium border ${active
+                                    className={`px-2 py-0.5 text-xs font-medium border ${active
                                         ? 'border-line bg-slate-100 text-ink'
                                         : 'border-line bg-surface text-ink-soft hover:border-line'
                                         }`}
@@ -193,7 +193,7 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
 
                     {/* Preview cards */}
                     {loading ? (
-                        <p className="text-[11px] text-muted">Loading…</p>
+                        <p className="text-xs text-ink-soft">Loading…</p>
                     ) : items.length === 0 ? (
                         <p className="text-xs text-ink-soft">
                             {filter === 'all'
@@ -229,7 +229,7 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
                                                 className="w-full text-left border border-line px-3 py-2 hover:border-line hover:bg-canvas"
                                             >
                                                 <div className="flex flex-wrap items-center gap-1.5">
-                                                    <span className={`px-1.5 py-0.5 text-[10px] font-medium ${meta.badge}`}>
+                                                    <span className={`px-1.5 py-0.5 text-xs font-medium ${meta.badge}`}>
                                                         {meta.emoji} {meta.label}
                                                     </span>
                                                     {avatarUrl ? (
@@ -244,11 +244,11 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
                                                         </span>
                                                     )}
                                                     <span className="text-xs font-semibold text-ink truncate">{name}</span>
-                                                    <span className="text-[11px] text-muted">· {timeAgo(m.created_at)}</span>
+                                                    <span className="text-xs text-ink-soft">· {timeAgo(m.created_at)}</span>
                                                 </div>
                                                 <p className="mt-1 text-sm text-ink line-clamp-2 break-words">{m.body}</p>
                                                 {m.reply_count > 0 && (
-                                                    <span className="mt-1 inline-block text-[11px] text-muted">
+                                                    <span className="mt-1 inline-block text-xs text-ink-soft">
                                                         {m.reply_count} repl{m.reply_count === 1 ? 'y' : 'ies'}
                                                     </span>
                                                 )}

@@ -163,13 +163,13 @@ function SuggestionCard({
                     </div>
                 )}
                 <div className="mt-1 truncate text-xs font-medium text-ink">{name}</div>
-                <div className="truncate text-[11px] text-ink-soft">{reason}</div>
+                <div className="truncate text-xs text-ink-soft">{reason}</div>
             </Link>
             <button
                 type="button"
                 onClick={onFollow}
                 disabled={pending}
-                className="mt-1.5 w-full border border-line px-1 py-0.5 text-[11px] font-semibold text-action hover:bg-canvas disabled:opacity-50"
+                className="mt-1.5 w-full border border-line px-1 py-0.5 text-xs font-semibold text-action hover:bg-canvas disabled:opacity-50"
             >
                 {pending ? '…' : 'Follow'}
             </button>

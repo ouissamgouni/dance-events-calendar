@@ -27,7 +27,7 @@ export function FlagIcon({ flag, size = 14 }: { flag: string; size?: number }) {
     );
 }
 
-const LABELLED_CHIP = 'inline-flex shrink-0 items-center gap-1 bg-canvas px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide';
+const LABELLED_CHIP = 'inline-flex shrink-0 items-center gap-1 bg-canvas px-1.5 py-0.5 text-2xs font-medium uppercase tracking-wide';
 
 export function WantsPublicChip({ withLabel = false }: { withLabel?: boolean }) {
     return (

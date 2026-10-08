@@ -1,0 +1,81 @@
+test_plan:
+  name: "Admin delivery channels — prompts in the digest"
+  description: >
+    Admins choose, per notification feature, whether push is on and whether
+    email goes out instantly, in the batched digest, or not at all. Here the
+    ticket, memories and review prompts are routed to the digest
+    (settings.yaml): the prompt services create in-app rows but send no
+    email, and the next digest carries them in their own sections. Prompts
+    the user already acted on, or ticket prompts for events starting within
+    24h, are dropped from the digest. Memories prompt push is switched off
+    by the admin, so its push toggle is hidden in the user's settings.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - "`SCENARIO=notif-prompts-digest RESET=1 task start:scenario`"
+
+  cast:
+    - "Nora — Going to two international events ~6 days away (Paris, Madrid; no tickets saved, Going for 25h) and a social that ended ~28h ago (not rated, no photos)."
+    - "Admin (admin@example.com) — edits Delivery channels."
+
+  steps:
+    - id: 1
+      title: "Prompts fire in-app without email"
+      description: "`SCENARIO=notif-prompts-digest task notify:trigger:scenario`"
+      expected: >
+        Stats include `ticket_prompt: {"prompts": 2, "emailed": 0, ...}`,
+        `memories_prompt: {"prompts": 1, "emailed": 0, ...}` and
+        `review_prompt: {"prompts": 1, "emailed": 0, ...}`. Mailpit is empty.
+
+    - id: 2
+      title: "In-app rows"
+      description: "Sign in as nora@example.com, open Notifications."
+      expected: >
+        Two "Got your ticket?" rows (Paris, Madrid), one memories nudge and
+        one "How was it?" row for Rooftop Salsa Social.
+
+    - id: 3
+      title: "Act on one prompt before the digest"
+      description: "Open Madrid Bachata Congress → My ticket, add the link https://example.com/t."
+      expected: "The ticket section shows the saved link."
+
+    - id: 4
+      title: "Digest carries the remaining prompts"
+      description: "`SCENARIO=notif-prompts-digest task notify:trigger:scenario -- --immediate-emails`"
+      expected: >
+        Mailpit has ONE digest email for Nora with three sections:
+        "Tickets to add" (only Paris, linking to `/event/evt-pd-gala/ticket`),
+        "How were your events?" (Rooftop, linking to `/event/evt-pd-social/review`)
+        and "Share your memories" (Rooftop, linking to
+        `/event/evt-pd-social/memories`). Madrid is not listed.
+
+    - id: 5
+      title: "Idempotent"
+      description: "Run step 4's command again."
+      expected: 'No new email; prompt stats show `{"prompts": 0}`.'
+
+    - id: 6
+      title: "Admin delivery channels per feature card"
+      description: "Sign in as admin@example.com → Admin → Configuration → Notifications."
+      expected: >
+        Every feature card (including the Schedule updates, Promo codes and
+        Plan activity cards) has its own "Delivery channels" row with Push /
+        Email instant / Email digest; there is no shared table. Ticket,
+        Memories and Review prompt cards have Email digest ticked and Email
+        instant unticked; Memories prompt Push is unticked. Event reminders,
+        Schedule updates and Promo codes have a disabled Email digest box.
+        Untick both email boxes on Promo codes → an "Email off" label
+        appears; reload keeps it. Turn Promo codes off under Feature flags →
+        the Promo codes notification card greys out with "Requires the Promo
+        codes feature flag." and its boxes can't be clicked; turn it back on.
+
+    - id: 7
+      title: "User settings hide admin-disabled channels"
+      description: >
+        In a push-capable browser (Chrome on localhost), sign in as
+        nora@example.com → Account → Notifications.
+      expected: >
+        "Event memories" shows an Email switch but no Push switch. "Promo
+        codes" (both email boxes off in step 6, push still on) shows only a
+        Push switch. Other rows show both. The default instant routing is
+        covered by the myevent-ticket-prompt and event-review-prompt scenarios.

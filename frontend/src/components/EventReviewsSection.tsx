@@ -81,12 +81,12 @@ function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onC
                     </button>
                 </div>
                 {review.comment && (
-                    <p className="text-sm text-ink whitespace-pre-wrap break-words">{review.comment}</p>
+                    <p className="text-body text-ink whitespace-pre-wrap break-words">{review.comment}</p>
                 )}
                 {tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                         {tags.map((t) => (
-                            <span key={t.key} className={`rounded-full px-2 py-0.5 text-[11px] ${t.cls}`}>
+                            <span key={t.key} className={`rounded-full px-2 py-0.5 text-xs ${t.cls}`}>
                                 {t.label}
                             </span>
                         ))}
@@ -95,13 +95,13 @@ function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onC
                 <div className="flex items-center justify-between gap-3">
                     <Link
                         to={`/event/${review.event_id}`}
-                        className="inline-block text-[9px] font-medium text-sky-600 hover:text-sky-700"
+                        className="inline-block py-1 text-xs font-medium text-sky-700 hover:text-sky-800"
                     >
                         From {review.event_title} →
                     </Link>
                     <a
                         href={reportMailto('review', `${window.location.origin}/event/${review.event_id}`, `review ${review.id}`)}
-                        className="text-[11px] text-ink-soft hover:text-ink"
+                        className="text-xs text-ink-soft hover:text-ink"
                     >
                         Report
                     </a>
@@ -314,7 +314,7 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
             <section className="mt-4 border-t border-line px-1 pt-3 space-y-2">
                 {collapseChevron}
                 {!collapsed && (
-                    <p className="text-[11px] text-ink-soft">
+                    <p className="text-xs text-ink-soft">
                         <Link
                             to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}#community`)}`}
                             className="text-sky-600 hover:text-sky-700 font-medium"
@@ -336,7 +336,7 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                     <>
                         {typicalCard}
                         {started ? (
-                            <p className="text-[11px] text-ink-soft">
+                            <p className="text-xs text-ink-soft">
                                 No reviews for this edition yet.{' '}
                                 {onOpenReviewForm ? (
                                     <button
@@ -350,7 +350,7 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                                 )}
                             </p>
                         ) : (
-                            <p className="text-[11px] text-ink-soft">
+                            <p className="text-xs text-ink-soft">
                                 No reviews yet.{' '}
                                 {onOpenReviewForm ? (
                                     <button
@@ -385,12 +385,12 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                         moodHeadline={crossEdition ? typicalCard : undefined}
                     />
 
-                    <div className="flex items-center gap-2 text-[11px] border-t border-line pt-4">
+                    <div className="flex items-center gap-2 text-xs border-t border-line pt-4">
                         <label className="text-ink-soft">Sort:</label>
                         <select
                             value={sort}
                             onChange={(e) => setSort(e.target.value as 'recent' | 'positive' | 'critical')}
-                            className="border border-line px-1.5 py-0.5 text-[11px] bg-surface"
+                            className="border border-line px-1.5 py-0.5 text-xs bg-surface"
                         >
                             <option value="recent">Most recent</option>
                             <option value="positive">Most positive</option>
@@ -421,23 +421,23 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                                             </span>
                                             <span className="text-sm font-medium text-ink truncate">{r.reviewer_label}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-xs text-ink-soft">
+                                        <div className="flex items-center gap-1.5 text-meta text-ink-soft">
                                             {meta && <span title={meta.label}>{meta.emoji} {meta.label}</span>}
                                             {meta && <span className="text-slate-300">·</span>}
                                             <span>{new Date(r.created_at).toLocaleDateString()}</span>
                                         </div>
                                         {r.comment && (
-                                            <p className="text-xs text-ink whitespace-pre-wrap break-words">{r.comment}</p>
+                                            <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap break-words">{r.comment}</p>
                                         )}
                                         {r.scope === 'past_edition' && (
-                                            <span className="inline-block bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-ink-soft">
+                                            <span className="inline-block bg-slate-100 px-2 py-0.5 text-xs font-medium text-ink-soft">
                                                 Attended an earlier edition
                                             </span>
                                         )}
                                         {tags.length > 0 && (
                                             <div className="flex flex-wrap gap-1.5">
                                                 {shown.map((t) => (
-                                                    <span key={t.key} className={`rounded-full px-2 py-0.5 text-[11px] ${t.cls}`}>
+                                                    <span key={t.key} className={`rounded-full px-2 py-0.5 text-xs ${t.cls}`}>
                                                         {t.label}
                                                     </span>
                                                 ))}
@@ -445,7 +445,7 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                                                     <button
                                                         type="button"
                                                         onClick={() => setExpandedReview(r)}
-                                                        className="rounded-full bg-slate-100 text-ink-soft px-2 py-0.5 text-[11px] hover:bg-canvas"
+                                                        className="rounded-full bg-slate-100 text-ink-soft px-2 py-0.5 text-xs hover:bg-canvas"
                                                     >
                                                         +{extra} more
                                                     </button>
@@ -455,7 +455,7 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                                         {r.event_id !== eventId && (
                                             <Link
                                                 to={`/event/${r.event_id}`}
-                                                className="inline-block text-[9px] font-medium text-sky-600 hover:text-sky-700"
+                                                className="inline-block py-1 text-xs font-medium text-sky-700 hover:text-sky-800"
                                             >
                                                 From {r.event_title} →
                                             </Link>
@@ -463,7 +463,7 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                                         {r.comment && (
                                             <a
                                                 href={reportMailto('review', `${window.location.origin}/event/${r.event_id}`, `review ${r.id}`)}
-                                                className="block text-[11px] text-ink-soft hover:text-ink"
+                                                className="block text-xs text-ink-soft hover:text-ink"
                                             >
                                                 Report
                                             </a>
@@ -492,7 +492,7 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                         label="Reviews scroll position"
                     />
                     {earlierBlock}
-                    <p className="text-[11px] text-ink-soft">
+                    <p className="text-xs text-ink-soft">
                         Reviews are written by signed-in members who attended this or an earlier edition. Written comments are checked by our team before they appear; attendance isn’t verified.
                     </p>
 

@@ -5,7 +5,7 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useEventCardImage } from '../hooks/useEventCardImage';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
 import { shortLocation } from '../utils/locationShort';
-import { allDayLastDay, dayOfMonth, eventDisplayZone, isSameEventDay, isSameMonth } from '../utils/eventDates';
+import { allDayLastDay, dayOfMonth, eventDisplayZone, formatCardTime, isSameEventDay, isSameMonth } from '../utils/eventDates';
 import EventDateRail from './EventDateRail';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
 import TagBadges from './TagBadges';
@@ -28,6 +28,10 @@ export interface EventCardProps {
     /** Allow the title to wrap to two lines (line-clamp-2) instead of a
      * single truncated line. Used by the map previews. */
     twoLineTitle?: boolean;
+    /** Left-rail layout: title (and top actions) in a full-width row above the image. */
+    titleTop?: boolean;
+    /** Left-rail layout: Save sits in the bottom row (next to Going) instead of top-right. */
+    saveBottom?: boolean;
     /** Order-number badge shown inside the date rail (e.g. map journeys). */
     dateSequence?: number;
     /** Show the event image thumbnail when available. Default true. */
@@ -75,7 +79,7 @@ export interface EventCardProps {
     actionsTestId?: string;
 }
 
-const fmtTime = (d: Date, timeZone?: string) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
+const fmtTime = (d: Date, timeZone?: string) => formatCardTime(d, timeZone);
 const fmtDate = (d: Date, timeZone?: string) => d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone });
 // End date drops the month when it lands in the same month/year as the start.
 const fmtEndDate = (start: Date, end: Date, timeZone?: string) => end.toLocaleDateString(
@@ -99,6 +103,8 @@ export default function EventCard({
     dateHeaderRow = false,
     dateTopRow = false,
     twoLineTitle = true,
+    titleTop = false,
+    saveBottom = false,
     dateSequence,
     showImage = true,
     widthClass,
@@ -154,10 +160,16 @@ export default function EventCard({
     const actionList = actions ?? (['save', 'going'] as const);
     const wantsSave = showActions && actionList.includes('save');
     const wantsGoing = showActions && actionList.includes('going');
+    const defaultLayout = !dateHeaderRow && !dateTopRow;
+    const titleRow = titleTop && defaultLayout;
+    const bottomSave = wantsSave && saveBottom && defaultLayout;
     const topActions: Array<'save' | 'going'> = [];
-    if (wantsSave) topActions.push('save');
+    if (wantsSave && !bottomSave) topActions.push('save');
     if (wantsGoing && !eventCardImgoingLocationBottomEnabled) topActions.push('going');
     const bottomGoing = wantsGoing && eventCardImgoingLocationBottomEnabled;
+    const bottomActions: Array<'save' | 'going'> = [];
+    if (bottomSave) bottomActions.push('save');
+    if (bottomGoing) bottomActions.push('going');
     const priceVisible = showPrice && isPriceSectionVisible(event, showPrices);
     const priceContent = priceVisible && (event.price_is_free || event.price_min != null);
     const location = shortLocation(event.location) ?? event.location;
@@ -178,46 +190,48 @@ export default function EventCard({
     const width = widthClass ? `${widthClass} shrink-0` : 'w-full';
     const { imageVisible, node: imageSlot } = useEventCardImage(event, {
         show: showImage && !isPast,
-        className: `mr-3 aspect-video ${compact ? 'w-20' : 'w-28'} shrink-0 rounded-none`,
+        className: `mr-3 aspect-video ${titleRow ? (compact ? 'w-24' : 'w-32') : (compact ? 'w-20' : 'w-28')} shrink-0 rounded-none`,
     });
 
     // Shared building blocks so the two header layouts (left rail vs. two-row)
     // compose the same content without duplication.
     const scheduleLine = (
-        <p className="mt-1.5 flex items-center gap-1 text-xs text-ink-soft">
-            {eventCardShowTimeLocationIconsEnabled && <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />}
+        <p className="mt-1.5 flex items-center gap-1 text-meta text-ink-soft">
+            {eventCardShowTimeLocationIconsEnabled && <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
             <span className="truncate">{scheduleShowsTime ? timeText : dateText}</span>
         </p>
     );
     const locationLine = location ? (
-        <p className="mt-1 flex items-center gap-1 text-xs text-ink-soft">
-            {eventCardShowTimeLocationIconsEnabled && <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />}
+        <p className="mt-1 flex items-center gap-1 text-meta text-ink-soft">
+            {eventCardShowTimeLocationIconsEnabled && <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
             <span className="truncate" title={event.location ?? undefined}>{location}</span>
         </p>
     ) : null;
-    const priceLine = priceContent ? (
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-soft">
-            <PriceBadge event={event} />
+    const discountByPrice = titleRow || dateHeaderRow;
+    const priceLine = (priceContent || (discountByPrice && discountVisible)) ? (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-soft">
+            {priceContent && <PriceBadge event={event} />}
+            {discountByPrice && discountVisible && <DiscountBadge />}
         </p>
     ) : null;
     // Trending + Discount labels sit together, discount to the right of
     // trending, in both the rail and two-row layouts.
-    const popularityBadgesInner = (isTrending || discountVisible) ? (
+    const popularityBadgesInner = (isTrending || (discountVisible && !discountByPrice)) ? (
         <>
             {isTrending && (
                 <span
-                    className="inline-flex items-center bg-orange-50 px-1.5 py-px text-[11px] font-medium text-orange-400"
+                    className="inline-flex items-center bg-orange-50 px-1.5 py-px text-xs font-medium text-orange-400"
                     data-testid="trending-badge"
                     title="Trending"
                 >
                     Trending
                 </span>
             )}
-            {discountVisible && <DiscountBadge />}
+            {discountVisible && !discountByPrice && <DiscountBadge />}
         </>
     ) : null;
     const popularityBadges = popularityBadgesInner ? (
-        <div className="mt-1 flex items-center gap-1">{popularityBadgesInner}</div>
+        <div className={`${titleRow ? '' : 'mt-1 '}flex items-center gap-1`}>{popularityBadgesInner}</div>
     ) : null;
     const avatarsBlock = showAvatars ? (
         <div className={compact ? 'mt-1.5' : 'mt-2.5'}>
@@ -229,7 +243,7 @@ export default function EventCard({
             />
         </div>
     ) : null;
-    const tagsBlock = ((showTags && event.tags?.length > 0) || bottomGoing) ? (
+    const tagsBlock = ((showTags && event.tags?.length > 0) || bottomActions.length > 0) ? (
         <div className="mt-1.5 flex items-center gap-2">
             <div className="min-w-0 flex-1">
                 {showTags && event.tags?.length > 0 && (
@@ -241,7 +255,7 @@ export default function EventCard({
                     />
                 )}
             </div>
-            {bottomGoing && (
+            {bottomActions.length > 0 && (
                 <div
                     className="pointer-events-auto shrink-0"
                     onClick={(e) => e.stopPropagation()}
@@ -251,8 +265,10 @@ export default function EventCard({
                         cancelled={event.is_cancelled}
                         eventId={event.event_id}
                         eventTitle={event.title}
+                        isSavedFlag={isSavedFlag}
                         isPast={isPast}
-                        include={['going']}
+                        include={bottomActions}
+                        showSaveStats={eventCardSaveShowStatsEnabled}
                         showGoingStats={eventCardImgoingShowStatsEnabled}
                         goingIconVariant={goingIconVariant ?? 'hand'}
                     />
@@ -284,6 +300,14 @@ export default function EventCard({
     const cancelledTitle = event.is_cancelled
         ? <span className="text-ink-soft line-through">{event.title}</span>
         : event.title;
+    const titleContent = (
+        <>
+            {newDot}
+            {cancelledChip}
+            {cancelledTitle}
+            {showPastLabel && isPast && <span className="ml-2 text-xs font-semibold text-ink-soft">Past</span>}
+        </>
+    );
 
     return (
         <div
@@ -322,7 +346,7 @@ export default function EventCard({
                                 <span className={isPast ? 'text-sm font-semibold text-ink-soft' : 'event-card-rail-day'}>{dayOfMonth(start, tz)}</span>
                             </span>
                             <h3
-                                className="min-w-0 flex-1 line-clamp-2 text-sm font-semibold leading-snug text-ink group-hover:text-action"
+                                className="min-w-0 flex-1 line-clamp-2 text-body font-semibold leading-snug text-ink group-hover:text-action"
                                 title={event.title}
                             >
                                 {newDot}
@@ -362,16 +386,16 @@ export default function EventCard({
                                 {scheduleLine}
                                 {locationLine}
                                 {priceLine}
-                                {avatarsBlock}
                             </div>
                         </div>
+                        {avatarsBlock}
                         {tagsBlock}
                         {reviewsBlock}
                         {bottomSlotBlock}
                     </div>
                 </>
             ) : (
-                <div className={`pointer-events-none relative z-[1] flex min-w-0 flex-row ${borderless ? 'px-2' : 'px-4'} ${compact ? 'py-2' : 'py-3'}`}>
+                <div className={`pointer-events-none relative z-[1] flex min-w-0 flex-row ${borderless ? 'px-2' : showLeftRail ? 'pl-2 pr-4' : 'px-4'} ${compact ? 'py-2' : 'py-3'}`}>
                     {showLeftRail && (
                         <div className="flex shrink-0 self-stretch">
                             <EventDateRail
@@ -388,7 +412,7 @@ export default function EventCard({
                                 <span className="flex min-w-0 items-center gap-1.5 leading-tight" aria-hidden="true" data-testid="event-card-date-top-row">
                                     {dateSequence != null && (
                                         // eslint-disable-next-line no-restricted-syntax -- journey order badge is a circle by design
-                                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-action px-1 text-[11px] font-extrabold leading-none text-white shadow-sm" data-testid="event-date-sequence">
+                                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-action px-1 text-xs font-extrabold leading-none text-white shadow-sm" data-testid="event-date-sequence">
                                             {dateSequence}
                                         </span>
                                     )}
@@ -422,7 +446,7 @@ export default function EventCard({
                                 )}
                             </div>
                         )}
-                        {topActions.length > 0 && !inlineActions && (
+                        {topActions.length > 0 && !inlineActions && !titleRow && (
                             <div
                                 className="pointer-events-auto absolute top-0 right-0 z-[2] flex items-center gap-1"
                                 data-testid={actionsTestId}
@@ -442,22 +466,54 @@ export default function EventCard({
                                 />
                             </div>
                         )}
-                        {/* Top row: image + core details (title, time, location, price). */}
-                        <div className="flex min-w-0 flex-row">
-                            {imageSlot}
-                            <div className={`flex min-w-0 flex-1 flex-col ${imageSlot ? 'min-h-[5rem] justify-between' : ''}`}>
-                                <div className="min-w-0">
+                        {titleRow && (
+                            <>
+                                <div className="flex min-w-0 items-end gap-2">
                                     <h3
-                                        className={`min-w-0 ${twoLineTitle ? 'line-clamp-2' : 'truncate'} text-sm font-semibold leading-snug text-ink group-hover:text-action ${topActions.length > 0 && !inlineActions ? 'pr-14' : ''}`}
+                                        className={`min-w-0 flex-1 ${twoLineTitle ? 'line-clamp-2' : 'truncate'} text-body font-semibold leading-snug text-ink group-hover:text-action`}
                                         title={event.title}
                                     >
-                                        {newDot}
-                                        {cancelledChip}
-                                        {cancelledTitle}
-                                        {showPastLabel && isPast && <span className="ml-2 text-xs font-semibold text-ink-soft">Past</span>}
+                                        {titleContent}
                                     </h3>
-                                    {popularityBadges}
+                                    {topActions.length > 0 && (
+                                        <div
+                                            className="pointer-events-auto flex shrink-0 items-center gap-1"
+                                            data-testid={actionsTestId}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                        >
+                                            <CardActionCluster
+                                                cancelled={event.is_cancelled}
+                                                eventId={event.event_id}
+                                                eventTitle={event.title}
+                                                isSavedFlag={isSavedFlag}
+                                                isPast={isPast}
+                                                include={topActions}
+                                                showSaveStats={eventCardSaveShowStatsEnabled}
+                                                showGoingStats={eventCardImgoingShowStatsEnabled}
+                                                goingIconVariant={goingIconVariant}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
+                            </>
+                        )}
+                        {/* Top row: image + core details (title, time, location, price). */}
+                        <div className={`flex min-w-0 flex-row ${titleRow ? 'mt-2' : ''}`} data-testid="event-card-image-row">
+                            {imageSlot}
+                            <div className={`flex min-w-0 flex-1 flex-col ${imageSlot && !titleRow ? 'min-h-[5rem] justify-between' : ''}`}>
+                                {titleRow && popularityBadges}
+                                {!titleRow && (
+                                    <div className="min-w-0">
+                                        <h3
+                                            className={`min-w-0 ${twoLineTitle ? 'line-clamp-2' : 'truncate'} text-body font-semibold leading-snug text-ink group-hover:text-action ${topActions.length > 0 && !inlineActions ? 'pr-14' : ''}`}
+                                            title={event.title}
+                                        >
+                                            {titleContent}
+                                        </h3>
+                                        {popularityBadges}
+                                    </div>
+                                )}
                                 <div className="min-w-0">
                                     {scheduleLine}
                                     {locationLine}

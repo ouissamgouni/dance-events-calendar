@@ -156,7 +156,7 @@ function SubscriptionRow({
                     )}
                 </Link>
                 {!sub.can_view_calendar && (
-                    <div className="text-xs text-muted">
+                    <div className="text-xs text-ink-soft">
                         No longer available — visibility was tightened.
                     </div>
                 )}

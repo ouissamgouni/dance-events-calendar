@@ -5,6 +5,7 @@ import type { CalendarEvent } from '../types';
 import EventListPanel from './EventListPanel';
 
 const authState = vi.hoisted(() => ({ user: null as { id: string } | null }));
+const layoutFlags = vi.hoisted(() => ({ explorerCardTitleTopEnabled: false, explorerCardSaveBottomEnabled: false }));
 
 vi.mock('../context/FeatureFlagsContext', () => ({
     useFeatureFlags: () => ({
@@ -13,13 +14,16 @@ vi.mock('../context/FeatureFlagsContext', () => ({
         tagsPerCard: 3,
         trendingTopN: 3,
         trendingTopPercent: 100,
+        ...layoutFlags,
     }),
 }));
 vi.mock('../context/AuthContext', () => ({ useAuth: () => authState }));
 vi.mock('../context/SavedEventsContext', () => ({ useSavedEvents: () => ({ isSaved: () => false }) }));
 vi.mock('../hooks/useEventCardImage', () => ({ useEventCardImage: () => ({ node: null }) }));
 vi.mock('./EventCard', () => ({
-    default: ({ event }: { event: CalendarEvent }) => <div data-testid="event-card">{event.title}</div>,
+    default: ({ event, titleTop, saveBottom }: { event: CalendarEvent; titleTop?: boolean; saveBottom?: boolean }) => (
+        <div data-testid="event-card" data-title-top={String(titleTop)} data-save-bottom={String(saveBottom)}>{event.title}</div>
+    ),
 }));
 
 const makeEvents = (n: number): CalendarEvent[] =>
@@ -75,6 +79,23 @@ describe('EventListPanel page size', () => {
         renderPanel(true);
         expect(screen.getAllByTestId('event-card')).toHaveLength(5);
         expect(screen.getByTestId('event-list-more-events-gate')).toBeInTheDocument();
+    });
+});
+
+describe('EventListPanel card layout flags', () => {
+    it('passes the title-top and save-bottom flags to the card', () => {
+        authState.user = { id: 'u1' };
+        layoutFlags.explorerCardTitleTopEnabled = true;
+        layoutFlags.explorerCardSaveBottomEnabled = true;
+        try {
+            renderPanel();
+            const card = screen.getAllByTestId('event-card')[0];
+            expect(card).toHaveAttribute('data-title-top', 'true');
+            expect(card).toHaveAttribute('data-save-bottom', 'true');
+        } finally {
+            layoutFlags.explorerCardTitleTopEnabled = false;
+            layoutFlags.explorerCardSaveBottomEnabled = false;
+        }
     });
 });
 

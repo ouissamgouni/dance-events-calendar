@@ -112,7 +112,7 @@ export default function OrganizerClaimSection({ handle }: Props) {
                                     {pending.events.map((e) => (
                                         <li key={e.event_id} className="flex min-h-10 items-center gap-2 rounded-field bg-surface pl-3 text-sm text-ink">
                                             <span className="min-w-0 flex-1 truncate">{e.event_title ?? e.event_id}</span>
-                                            <span className="shrink-0 text-xs text-muted">{formatDate(e.event_start)}</span>
+                                            <span className="shrink-0 text-xs text-ink-soft">{formatDate(e.event_start)}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => removeEvent(pending.id, e.event_id)}

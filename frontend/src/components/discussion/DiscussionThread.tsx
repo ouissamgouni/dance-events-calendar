@@ -134,14 +134,14 @@ export default function DiscussionThread({ eventId, post, isPast, onBack, onChan
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                             <span className="truncate text-sm font-semibold text-ink">{authorName(post)}</span>
-                            <span className={`px-1.5 py-0.5 text-[10px] font-medium ${meta.badge}`}>{meta.emoji} {meta.label}</span>
+                            <span className={`px-1.5 py-0.5 text-xs font-medium ${meta.badge}`}>{meta.emoji} {meta.label}</span>
                         </div>
-                        <span className="text-[11px] text-muted">{timeAgo(post.created_at)}</span>
+                        <span className="text-xs text-ink-soft">{timeAgo(post.created_at)}</span>
                     </div>
                     <MessageMenu message={post} onDelete={() => removeMessage(post.id, true)} onReport={() => report(post.id)} />
                 </div>
                 <p className="whitespace-pre-wrap break-words text-sm text-ink">{post.body}</p>
-                <p className="text-[11px] text-muted">
+                <p className="text-xs text-ink-soft">
                     {replies.length} repl{replies.length === 1 ? 'y' : 'ies'}
                 </p>
             </article>
@@ -159,7 +159,7 @@ export default function DiscussionThread({ eventId, post, isPast, onBack, onChan
                                 </span>
                             )}
                             <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{authorName(r)}</span>
-                            <span className="text-[11px] text-muted">{timeAgo(r.created_at)}</span>
+                            <span className="text-xs text-ink-soft">{timeAgo(r.created_at)}</span>
                             <MessageMenu message={r} onDelete={() => removeMessage(r.id, false)} onReport={() => report(r.id)} />
                         </div>
                         <p className="whitespace-pre-wrap break-words pl-9 text-sm text-ink">

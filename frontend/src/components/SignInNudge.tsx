@@ -177,7 +177,7 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
             className="z-[12000] border border-line bg-surface p-3 shadow-xl text-left"
         >
             <p className="text-xs font-semibold text-ink">{HEADLINE[trigger]}</p>
-            <ul className="mt-1.5 space-y-0.5 text-[11px] text-ink-soft list-disc pl-4">
+            <ul className="mt-1.5 space-y-0.5 text-xs text-ink-soft list-disc pl-4">
                 <li>See who else is going</li>
                 <li>Save events to your calendar and share it with others</li>
                 <li>Rate events and read reviews</li>
@@ -187,14 +187,14 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onClose(); }}
-                    className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
+                    className="min-h-9 px-3 text-sm text-ink-soft hover:bg-canvas"
                 >
                     Not now
                 </button>
                 <Link
                     to={`/login?next=${next}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-xs px-3 py-1 bg-action text-white hover:bg-action"
+                    className="min-h-9 px-3 text-sm bg-action text-white hover:bg-action"
                 >
                     Sign in
                 </Link>

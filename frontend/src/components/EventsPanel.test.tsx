@@ -119,6 +119,22 @@ describe('EventsPanel on phones', () => {
         expect(screen.getByText('Friday Salsa')).toBeInTheDocument()
         expect(vi.mocked(api.fetchAdminEvents)).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 1, limit: 25 }))
     })
+
+    it('sorts and groups from a Sort & view sheet, apart from filters', async () => {
+        vi.mocked(api.fetchAdminEvents).mockResolvedValue({ items: [adminEvent('e1', 'Friday Salsa')], total: 1 } as never)
+        renderPanel()
+        await screen.findByText('Friday Salsa')
+        const lastParams = () => vi.mocked(api.fetchAdminEvents).mock.lastCall?.[0]
+
+        await userEvent.click(screen.getByRole('button', { name: /^Sort and view/ }))
+        const sheet = screen.getByRole('dialog', { name: 'Sort & view' })
+        await userEvent.click(within(sheet).getByRole('button', { name: 'Going' }))
+        await userEvent.click(within(sheet).getByRole('button', { name: 'Ascending ↑' }))
+        await userEvent.click(within(sheet).getByRole('switch', { name: 'Group by series' }))
+
+        await waitFor(() => expect(lastParams()).toEqual(expect.objectContaining({ sort: 'going', order: 'asc', group: 'series' })))
+        expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent(/^Filters$/)
+    })
 })
 
 describe('EventsPanel on desktop', () => {

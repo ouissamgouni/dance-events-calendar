@@ -53,7 +53,7 @@ export default function EventMessagesTeaser({ eventId, detailLinkSource }: Props
                 </Link>
             </h3>
             {latest && (
-                <p className="flex items-center gap-1.5 text-[11px] text-ink-soft min-w-0">
+                <p className="flex items-center gap-1.5 text-xs text-ink-soft min-w-0">
                     {avatarUrl ? (
                         <img
                             src={avatarUrl}

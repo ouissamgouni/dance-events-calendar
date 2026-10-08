@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import {
     updateNotificationPreferences,
     type UpdateNotificationPreferencesPayload,
@@ -212,6 +213,13 @@ export default function NotificationSettings() {
     const [savedToast, setSavedToast] = useState(false);
     const toastTimer = useRef<number | null>(null);
     const pushCapable = isWebPushCapable();
+    const { notificationChannels } = useOptionalFeatureFlags();
+    // Channels an admin switched off for a feature are hidden, not disabled.
+    const adminAllows = (channel: Channel, feature: FeatureKey): boolean =>
+        notificationChannels[feature]?.[channel] ?? true;
+    const visibleFeatures = FEATURES.filter(
+        (f) => adminAllows('email', f.key) || (pushCapable && adminAllows('push', f.key)),
+    );
 
     const detectedTz = (() => {
         try {
@@ -301,7 +309,7 @@ export default function NotificationSettings() {
                     Notifications &amp; email
                 </h2>
                 <span
-                    className="text-[11px] text-muted"
+                    className="text-xs text-ink-soft"
                     role="status"
                     aria-live="polite"
                 >
@@ -309,7 +317,7 @@ export default function NotificationSettings() {
                 </span>
             </div>
 
-            <p className="text-[11px] text-ink-soft mb-3">
+            <p className="text-xs text-ink-soft mb-3">
                 In-app notifications always appear. Toggle email or push per feature.
             </p>
 
@@ -327,7 +335,7 @@ export default function NotificationSettings() {
                         </tr>
                     </thead>
                     <tbody>
-                        {FEATURES.map((f) => (
+                        {visibleFeatures.map((f) => (
                             <tr
                                 key={f.key}
                                 id={f.anchor}
@@ -337,30 +345,34 @@ export default function NotificationSettings() {
                                     <div className="font-medium text-ink">
                                         {f.label}
                                     </div>
-                                    <div className="text-[11px] text-ink-soft">
+                                    <div className="text-xs text-ink-soft">
                                         {f.description}
                                     </div>
                                 </td>
                                 <td className="px-3 py-3 text-center">
-                                    <CellSwitch
-                                        checked={flagValue('email', f.key)}
-                                        busy={saving === flagKey('email', f.key)}
-                                        ariaLabel={`${f.label} — email`}
-                                        onChange={(v) =>
-                                            patchOne(flagKey('email', f.key), v)
-                                        }
-                                    />
+                                    {adminAllows('email', f.key) && (
+                                        <CellSwitch
+                                            checked={flagValue('email', f.key)}
+                                            busy={saving === flagKey('email', f.key)}
+                                            ariaLabel={`${f.label} — email`}
+                                            onChange={(v) =>
+                                                patchOne(flagKey('email', f.key), v)
+                                            }
+                                        />
+                                    )}
                                 </td>
                                 {pushCapable && (
                                     <td className="px-3 py-3 text-center">
-                                        <CellSwitch
-                                            checked={flagValue('push', f.key)}
-                                            busy={saving === flagKey('push', f.key)}
-                                            ariaLabel={`${f.label} — push`}
-                                            onChange={(v) =>
-                                                patchOne(flagKey('push', f.key), v)
-                                            }
-                                        />
+                                        {adminAllows('push', f.key) && (
+                                            <CellSwitch
+                                                checked={flagValue('push', f.key)}
+                                                busy={saving === flagKey('push', f.key)}
+                                                ariaLabel={`${f.label} — push`}
+                                                onChange={(v) =>
+                                                    patchOne(flagKey('push', f.key), v)
+                                                }
+                                            />
+                                        )}
                                     </td>
                                 )}
                             </tr>
@@ -386,7 +398,7 @@ export default function NotificationSettings() {
             >
                 <div>
                     <div className="font-medium text-ink text-xs">Email digest</div>
-                    <div className="text-[11px] text-ink-soft">
+                    <div className="text-xs text-ink-soft">
                         Master switch for the combined activity digest email. Off stops
                         the digest entirely, whatever the per-feature email toggles say.
                     </div>
@@ -404,7 +416,7 @@ export default function NotificationSettings() {
             </div>
 
             <div className="pt-3 mt-3 border-t border-card-line">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">
+                <div className="text-2xs font-semibold uppercase tracking-wide text-ink-soft mb-1.5">
                     Timezone
                 </div>
                 <p className="text-xs text-ink-soft">

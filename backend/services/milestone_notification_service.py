@@ -38,6 +38,7 @@ from backend.config.loader import get_milestone_sweep_lookback_days
 from backend.services import passport
 from backend.services.app_settings import (
     get_feature_email_instant,
+    get_feature_push_enabled,
     get_milestone_notifications_enabled,
 )
 from backend.db.database import get_engine
@@ -152,6 +153,7 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
     # left with ``emailed_at`` NULL so ``activity_email`` folds it into the
     # batched digest instead. Push is unaffected (always immediate).
     instant_email = get_feature_email_instant("milestone_unlocked", session)
+    push_on = get_feature_push_enabled("milestone_unlocked", session)
     existing = {
         n.subject_key: n
         for n in session.exec(
@@ -204,7 +206,7 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
             and notif.emailed_at is None
         ):
             to_email.append((user, notif.group_key, milestone))
-        if user.push_milestone_unlocked_enabled and notif.pushed_at is None:
+        if push_on and user.push_milestone_unlocked_enabled and notif.pushed_at is None:
             to_push.append((user.id, notif.group_key, milestone))
     created += _create_consistency_notifications(
         session, user, to_email, to_push, notif_ids, group_key
@@ -247,6 +249,7 @@ def _create_consistency_notifications(
     """
     passport.evaluate_and_persist_consistency(session, user)
     instant_email = get_feature_email_instant("milestone_unlocked", session)
+    push_on = get_feature_push_enabled("milestone_unlocked", session)
     # ``evaluate_and_persist_consistency`` returns only rows it just inserted;
     # a prior passport GET may have inserted them, so rebuild from the full set
     # of reaches lacking a notification instead of trusting that return value.
@@ -304,7 +307,7 @@ def _create_consistency_notifications(
             and notif.emailed_at is None
         ):
             to_email.append((user, notif.group_key, milestone))
-        if user.push_milestone_unlocked_enabled and notif.pushed_at is None:
+        if push_on and user.push_milestone_unlocked_enabled and notif.pushed_at is None:
             to_push.append((user.id, notif.group_key, milestone))
     return created
 

@@ -87,7 +87,7 @@ export default function EventDetailsPanel({
                             </button>
                             <button
                                 onClick={() => setConfirmRemove(false)}
-                                className="text-xs px-2 py-1 text-muted hover:text-ink-soft"
+                                className="text-xs px-2 py-1 text-ink-soft hover:text-ink"
                             >
                                 Cancel
                             </button>

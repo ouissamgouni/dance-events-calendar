@@ -124,7 +124,7 @@ export default function DiscussionTab({ eventId, isPast, openComposeToken, onCou
 
             {/* Feed */}
             {loading ? (
-                <p className="text-xs text-muted">Loading…</p>
+                <p className="text-xs text-ink-soft">Loading…</p>
             ) : items.length === 0 ? (
                 <div className="space-y-2 py-6 text-center">
                     <p className="text-sm font-semibold text-ink">
@@ -168,8 +168,8 @@ export default function DiscussionTab({ eventId, isPast, openComposeToken, onCou
                                     <div className="min-w-0 flex-1 space-y-1">
                                         <div className="flex items-center gap-1.5">
                                             <span className="truncate text-sm font-semibold text-ink">{name}</span>
-                                            <span className={`px-1.5 py-0.5 text-[10px] font-medium ${meta.badge}`}>{meta.emoji} {meta.label}</span>
-                                            <span className="ml-auto shrink-0 text-[11px] text-muted">{timeAgo(m.created_at)}</span>
+                                            <span className={`px-1.5 py-0.5 text-xs font-medium ${meta.badge}`}>{meta.emoji} {meta.label}</span>
+                                            <span className="ml-auto shrink-0 text-xs text-ink-soft">{timeAgo(m.created_at)}</span>
                                         </div>
                                         <p className="line-clamp-4 whitespace-pre-wrap break-words text-sm text-ink">{m.body}</p>
                                         {m.reply_count > 0 && (
@@ -185,7 +185,7 @@ export default function DiscussionTab({ eventId, isPast, openComposeToken, onCou
                                                         )
                                                     ))}
                                                 </div>
-                                                <span className="text-[11px] text-muted">
+                                                <span className="text-xs text-ink-soft">
                                                     {m.reply_count} repl{m.reply_count === 1 ? 'y' : 'ies'}
                                                 </span>
                                             </div>

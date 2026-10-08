@@ -64,7 +64,7 @@ interface CardCallbacks {
 
 function MessageActions({ msg, cb }: { msg: EventMessage; cb: CardCallbacks }) {
     return (
-        <div className="flex items-center gap-2 text-[11px] text-muted">
+        <div className="flex items-center gap-2 text-xs text-ink-soft">
             {cb.signedIn && !cb.isPast ? (
                 <button
                     type="button"
@@ -123,7 +123,7 @@ function MessageCard({ msg, isReply, cb }: { msg: EventMessage; isReply?: boolea
                             {meta.emoji} {meta.label}
                         </span>
                     )}
-                    <span className="text-xs text-muted">· {timeAgo(msg.created_at)}</span>
+                    <span className="text-xs text-ink-soft">· {timeAgo(msg.created_at)}</span>
                 </div>
                 <p className="text-xs text-ink whitespace-pre-wrap break-words">
                     {mention && <span className="font-semibold text-action">@{mention} </span>}
@@ -461,7 +461,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                                             key={c}
                                             type="button"
                                             onClick={() => setComposeCategory(c)}
-                                            className={`px-2 py-0.5 text-[11px] font-medium border ${active
+                                            className={`px-2 py-0.5 text-xs font-medium border ${active
                                                 ? 'border-blue-400 bg-blue-50 text-action'
                                                 : 'border-line bg-surface text-ink-soft hover:border-line'
                                                 }`}
@@ -481,7 +481,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                                 className="w-full border border-line px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400"
                             />
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] text-muted">{composeBody.length}/2000</span>
+                                <span className="text-xs text-ink-soft">{composeBody.length}/2000</span>
                                 <button
                                     type="button"
                                     disabled={posting || !composeBody.trim()}
@@ -500,7 +500,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                             to post a message or reply.
                         </p>
                     )}
-                    {error && <p className="mt-1 text-[11px] text-rose-600">{error}</p>}
+                    {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
                 </div>
 
                 {/* Category filter */}
@@ -508,7 +508,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                     <button
                         type="button"
                         onClick={() => setFilter('all')}
-                        className={`px-2 py-0.5 text-[11px] font-medium border ${filter === 'all'
+                        className={`px-2 py-0.5 text-xs font-medium border ${filter === 'all'
                             ? 'border-line bg-slate-100 text-ink'
                             : 'border-line bg-surface text-ink-soft hover:border-line'
                             }`}
@@ -523,7 +523,7 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                                 key={c}
                                 type="button"
                                 onClick={() => setFilter(c)}
-                                className={`px-2 py-0.5 text-[11px] font-medium border ${active
+                                className={`px-2 py-0.5 text-xs font-medium border ${active
                                     ? 'border-line bg-slate-100 text-ink'
                                     : 'border-line bg-surface text-ink-soft hover:border-line'
                                     }`}

@@ -225,6 +225,8 @@ export const handlers = [
             event_card_show_people_icon_enabled: false,
             event_card_show_time_location_icons_enabled: false,
             explorer_event_card_card_style_enabled: false,
+            explorer_card_title_top_enabled: false,
+            explorer_card_save_bottom_enabled: false,
             explorer_view_control_labels_enabled: true,
             event_reminders_enabled: true,
             activity_digest_email_enabled: true,

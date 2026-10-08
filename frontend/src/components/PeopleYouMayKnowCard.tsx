@@ -137,7 +137,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                                         )}
                                     </span>
                                 </Link>
-                                <span className="max-w-[120px] truncate text-[10px] text-ink-soft">
+                                <span className="max-w-[120px] truncate text-xs text-ink-soft">
                                     {previewHead ? (
                                         <>
                                             Followed by @{previewHead}
@@ -152,7 +152,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                                     onClick={() => void onFollow(it.handle)}
                                     disabled={pending === it.handle}
                                     aria-label={`Follow ${it.handle}`}
-                                    className="w-full bg-action px-2 py-1 text-[11px] font-medium text-white hover:bg-action disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-full bg-action px-2 py-1 text-xs font-medium text-white hover:bg-action disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {pending === it.handle ? '…' : 'Follow'}
                                 </button>

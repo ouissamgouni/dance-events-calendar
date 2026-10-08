@@ -869,6 +869,10 @@ def deliver_change_emails(revision_id: str) -> None:
     from sqlmodel import or_
 
     from backend.db.database import get_engine
+    from backend.services.app_settings import (
+        get_feature_email_instant,
+        get_feature_push_enabled,
+    )
     from backend.services.email import (
         send_event_cancelled_email,
         send_event_changed_email,
@@ -877,6 +881,8 @@ def deliver_change_emails(revision_id: str) -> None:
     from backend.services.push_service import PushTransientError, send_push
 
     with Session(get_engine()) as session:
+        email_on = get_feature_email_instant("schedule_updates", session)
+        push_on = get_feature_push_enabled("schedule_updates", session)
         notifications = session.exec(
             select(Notification)
             .where(col(Notification.kind).in_((EVENT_CHANGED, EVENT_CANCELLED)))
@@ -897,7 +903,8 @@ def deliver_change_emails(revision_id: str) -> None:
             now = datetime.now(timezone.utc)
             cancelled = notification.kind == EVENT_CANCELLED
             if (
-                notification.emailed_at is None
+                email_on
+                and notification.emailed_at is None
                 and user.email_schedule_updates_enabled
                 and (
                     send_event_cancelled_email(user, event)
@@ -909,7 +916,11 @@ def deliver_change_emails(revision_id: str) -> None:
             ):
                 notification.emailed_at = now
                 record_delivery(session, notification.id, "email", now, source="job")
-            if notification.pushed_at is None and user.push_schedule_updates_enabled:
+            if (
+                push_on
+                and notification.pushed_at is None
+                and user.push_schedule_updates_enabled
+            ):
                 tag = f"event-changed-{event.event_id}"
                 try:
                     delivered = send_push(
@@ -1003,11 +1014,17 @@ def enqueue_removed_notices(subject_key: str | None) -> None:
 def deliver_removed_notices(subject_key: str) -> None:
     """Job: email and push not-yet-delivered ``event_removed`` rows."""
     from backend.db.database import get_engine
+    from backend.services.app_settings import (
+        get_feature_email_instant,
+        get_feature_push_enabled,
+    )
     from backend.services.email import send_event_removed_email
     from backend.services.notification_delivery import tracked_url
     from backend.services.push_service import PushTransientError, send_push
 
     with Session(get_engine()) as session:
+        email_on = get_feature_email_instant("schedule_updates", session)
+        push_on = get_feature_push_enabled("schedule_updates", session)
         notifications = session.exec(
             select(Notification)
             .where(Notification.kind == EVENT_REMOVED)
@@ -1021,7 +1038,8 @@ def deliver_removed_notices(subject_key: str) -> None:
             path = f"/event/{notification.event_id}" if notification.event_id else "/"
             now = datetime.now(timezone.utc)
             if (
-                notification.emailed_at is None
+                email_on
+                and notification.emailed_at is None
                 and user.email_schedule_updates_enabled
                 and send_event_removed_email(
                     user, notification.context or "", notification.description, path
@@ -1029,7 +1047,11 @@ def deliver_removed_notices(subject_key: str) -> None:
             ):
                 notification.emailed_at = now
                 record_delivery(session, notification.id, "email", now, source="job")
-            if notification.pushed_at is None and user.push_schedule_updates_enabled:
+            if (
+                push_on
+                and notification.pushed_at is None
+                and user.push_schedule_updates_enabled
+            ):
                 try:
                     delivered = send_push(
                         user.id,

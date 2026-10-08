@@ -61,7 +61,7 @@ function ProfileCard({
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                         <span className="truncate text-sm font-semibold text-ink">{profile.label}</span>
-                        {profile.is_active && <span className="shrink-0 rounded border border-blue-200 bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-action">Default</span>}
+                        {profile.is_active && <span className="shrink-0 rounded border border-blue-200 bg-surface px-1.5 py-0.5 text-xs font-semibold text-action">Default</span>}
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-ink-soft">{profile.area_label}</span>
                     <span className="mt-1 block truncate text-xs text-ink-soft">
@@ -184,8 +184,8 @@ export default function InterestProfilesManager({ showHeader = true }: { showHea
 
             {profiles === null ? <p className="text-sm text-muted">Loading…</p> : (
                 <div className="space-y-5">
-                    {defaultProfile && <section><h2 className="mb-2 text-[11px] font-semibold uppercase text-ink-soft">Default profile</h2>{renderCard(defaultProfile)}</section>}
-                    {otherProfiles.length > 0 && <section><h2 className="mb-2 text-[11px] font-semibold uppercase text-ink-soft">Other profiles</h2><div className="space-y-3">{otherProfiles.map(renderCard)}</div></section>}
+                    {defaultProfile && <section><h2 className="mb-2 text-2xs font-semibold uppercase text-ink-soft">Default profile</h2>{renderCard(defaultProfile)}</section>}
+                    {otherProfiles.length > 0 && <section><h2 className="mb-2 text-2xs font-semibold uppercase text-ink-soft">Other profiles</h2><div className="space-y-3">{otherProfiles.map(renderCard)}</div></section>}
                 </div>
             )}
 

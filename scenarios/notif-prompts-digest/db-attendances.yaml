@@ -1,0 +1,20 @@
+# Nora marked Going 25h ago (past the 24h ticket-nudge delay).
+attendances:
+  - {
+      event_id: evt-pd-gala,
+      email: nora@example.com,
+      share_audience: public,
+      attending_since: now-25h,
+    }
+  - {
+      event_id: evt-pd-congress,
+      email: nora@example.com,
+      share_audience: public,
+      attending_since: now-25h,
+    }
+  - {
+      event_id: evt-pd-social,
+      email: nora@example.com,
+      share_audience: public,
+      attending_since: now-50h,
+    }

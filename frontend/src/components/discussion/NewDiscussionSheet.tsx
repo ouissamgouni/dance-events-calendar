@@ -98,7 +98,7 @@ export default function NewDiscussionSheet({ eventId, initialCategory, onPosted,
                 />
 
                 <div className="mt-2 flex items-center justify-end gap-3">
-                    <span className="text-[11px] tabular-nums text-muted">{trimmed.length}/{MAX}</span>
+                    <span className="text-xs tabular-nums text-ink-soft">{trimmed.length}/{MAX}</span>
                     <button
                         type="button"
                         onClick={submit}

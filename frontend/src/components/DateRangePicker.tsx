@@ -78,7 +78,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
     return (
         <div className="flex flex-col gap-5">
             <section>
-                <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-soft">Presets</h4>
+                <h4 className="mb-2 text-2xs font-bold uppercase tracking-wide text-ink-soft">Presets</h4>
                 <div className="grid grid-cols-2 gap-3">
                     {primaryOptions.map((o) => renderPreset(o))}
                     {moreOpen && extraOptions.map((o) => renderPreset(o))}
@@ -97,13 +97,13 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
             </section>
 
             <section>
-                <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-soft">Custom range</h4>
+                <h4 className="mb-2 text-2xs font-bold uppercase tracking-wide text-ink-soft">Custom range</h4>
                 <div className="flex flex-col gap-3">
                     <label
                         className="relative block rounded-card border border-line bg-surface px-4 py-3"
                         onClick={() => openPicker(fromInputRef.current)}
                     >
-                        <span className="block text-[11px] font-medium text-ink-soft">From</span>
+                        <span className="block text-xs font-medium text-ink-soft">From</span>
                         <span className="block text-sm font-semibold text-ink">{formatLong(startDate)}</span>
                         <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-ink-soft">
                             {calendarIcon}
@@ -124,7 +124,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
                         className="relative block rounded-card border border-line bg-surface px-4 py-3"
                         onClick={() => openPicker(toInputRef.current)}
                     >
-                        <span className="block text-[11px] font-medium text-ink-soft">To</span>
+                        <span className="block text-xs font-medium text-ink-soft">To</span>
                         <span className="block text-sm font-semibold text-ink">{formatLong(endDate)}</span>
                         <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-ink-soft">
                             {calendarIcon}

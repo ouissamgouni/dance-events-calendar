@@ -226,7 +226,7 @@ export default function ProfileDraftEditor({
     return (
         <div className="space-y-4" data-testid="profile-draft-summary">
             <div>
-                <label htmlFor="profile-draft-name" className="mb-1 block text-[11px] font-semibold uppercase text-ink-soft">Profile name</label>
+                <label htmlFor="profile-draft-name" className="mb-1 block text-2xs font-semibold uppercase text-ink-soft">Profile name</label>
                 <input
                     id="profile-draft-name"
                     value={name}

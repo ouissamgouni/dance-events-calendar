@@ -185,12 +185,12 @@ export default function PreferencesSection() {
                 data-testid="preferences-toggle"
             >
                 <span className="flex items-center gap-2">
-                    <span className="text-muted text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+                    <span className="text-ink-soft text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
                     <h2 className="text-sm font-semibold text-ink">
                         {user ? 'Discovery Profiles' : 'Preferences'}
                     </h2>
                 </span>
-                <span className="text-[11px] text-muted" role="status" aria-live="polite">
+                <span className="text-xs text-ink-soft" role="status" aria-live="polite">
                     {saving ? 'Saving…' : savedToast ? 'Saved.' : hasSetPrefs ? 'Saved' : ''}
                 </span>
             </button>
@@ -210,7 +210,7 @@ export default function PreferencesSection() {
                             </p>
 
                             {loading ? (
-                                <p className="text-xs text-muted">Loading…</p>
+                                <p className="text-xs text-ink-soft">Loading…</p>
                             ) : (
                                 <ProfileEditor
                                     danceGroup={danceGroup}
@@ -236,7 +236,7 @@ export default function PreferencesSection() {
                                     showMatchesToggle={false}
                                     areaNameControl={(
                                         <div className="flex shrink-0 items-center gap-2">
-                                            <label htmlFor="pref-area-name" className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                                            <label htmlFor="pref-area-name" className="text-2xs font-medium uppercase tracking-wide text-ink-soft">
                                                 Name
                                             </label>
                                             <input
@@ -259,7 +259,7 @@ export default function PreferencesSection() {
                                                 data-testid="preferences-area-name"
                                             />
                                             <span
-                                                className={`text-[11px] transition-opacity ${areaSavedFlash ? 'text-success opacity-100' : 'opacity-0'}`}
+                                                className={`text-xs transition-opacity ${areaSavedFlash ? 'text-success opacity-100' : 'opacity-0'}`}
                                                 role="status"
                                                 aria-live="polite"
                                             >

@@ -176,7 +176,7 @@ export function useAnchoredToast(anchorRef: RefObject<HTMLElement | null>) {
             onBlur={action ? resume : undefined}
             className={`z-[12000] w-max animate-fade-in transition-opacity duration-200 motion-reduce:animate-none ${action
                 ? 'pointer-events-auto flex items-center gap-1.5 rounded-field bg-surface py-0.5 pl-2.5 pr-0.5 text-xs font-medium text-ink shadow-lg ring-1 ring-line'
-                : 'pointer-events-none text-center text-[11px] font-medium leading-snug text-ink bg-surface/75 backdrop-blur-sm px-2.5 py-1 shadow-md ring-1 ring-slate-200/70'
+                : 'pointer-events-none text-center text-xs font-medium leading-snug text-ink bg-surface/75 backdrop-blur-sm px-2.5 py-1 shadow-md ring-1 ring-slate-200/70'
                 } ${fading ? 'opacity-0' : 'opacity-100'}`}
         >
             {action ? (

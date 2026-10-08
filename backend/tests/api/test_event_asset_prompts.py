@@ -25,7 +25,12 @@ from backend.db.models import (  # noqa: E402
     User,
     UserEventAttendance,
 )
-from backend.services import event_asset_prompts, event_assets, reminder_service  # noqa: E402
+from backend.services import (  # noqa: E402
+    activity_email,
+    event_asset_prompts,
+    event_assets,
+    reminder_service,
+)
 
 NOW = datetime.now(timezone.utc)
 
@@ -232,6 +237,134 @@ def test_prompts_follow_their_own_feature_flag(session, sent):
     session.commit()
     assert event_asset_prompts.run_memories_prompts() == {"skipped": "feature_disabled"}
     assert "skipped" not in event_asset_prompts.run_ticket_prompts()
+
+
+# --- admin delivery channels -------------------------------------------------
+
+
+@pytest.fixture
+def digests(monkeypatch):
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda recipient, sections, **_: (
+            calls.append(
+                {
+                    s["feature"]: [e["primary_html"] for e in s["entries"]]
+                    for s in sections
+                }
+            )
+            or True
+        ),
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+    return calls
+
+
+def _digest_mode(session, feature):
+    session.add(SiteSetting(key=f"{feature}_email_instant", value="false"))
+    session.add(SiteSetting(key=f"{feature}_email_digest", value="true"))
+    session.commit()
+
+
+def test_ticket_prompt_digest_mode(session, sent, digests):
+    _digest_mode(session, "ticket_prompt")
+    mia = _user(session, "mia")
+    _event(session, "intl", NOW + timedelta(days=6), reach="international")
+    _going(session, mia, "intl")
+
+    stats = event_asset_prompts.run_ticket_prompts()
+
+    assert stats == {"prompts": 1, "emailed": 0, "pushed": 1}
+    assert sent["email"] == []
+    assert event_asset_prompts.run_ticket_prompts() == {"prompts": 0}
+    assert activity_email.run_once(force=True)["digests"] == 1
+    assert list(digests[0]) == ["ticket_prompt"]
+    assert "/event/intl/ticket" in digests[0]["ticket_prompt"][0]
+    notif = session.exec(
+        select(Notification).where(Notification.kind == "event_ticket_prompt")
+    ).one()
+    session.refresh(notif)
+    assert notif.emailed_at is not None
+
+
+def test_ticket_prompt_digest_drops_stale_rows(session, sent, digests):
+    _digest_mode(session, "ticket_prompt")
+    mia = _user(session, "mia")
+    for event_id, start in (
+        ("soon", NOW + timedelta(hours=20)),
+        ("has-ticket", NOW + timedelta(days=6)),
+        ("dismissed", NOW + timedelta(days=6)),
+        ("not-going", NOW + timedelta(days=6)),
+        ("fine", NOW + timedelta(days=6)),
+    ):
+        _event(session, event_id, start, reach="international")
+        session.add(
+            Notification(
+                recipient_user_id=mia.id,
+                actor_user_id=mia.id,
+                kind="event_ticket_prompt",
+                event_id=event_id,
+            )
+        )
+    session.commit()
+    _going(session, mia, "soon")
+    _going(session, mia, "has-ticket")
+    _going(session, mia, "dismissed", ticket_not_needed_at=NOW)
+    _going(session, mia, "fine")
+    session.add(
+        EventUserAsset(
+            user_id=mia.id, event_id="has-ticket", kind="ticket_link", url="https://t"
+        )
+    )
+    session.commit()
+
+    activity_email.run_once(force=True)
+
+    assert len(digests) == 1
+    assert len(digests[0]["ticket_prompt"]) == 1
+    assert "/event/fine/ticket" in digests[0]["ticket_prompt"][0]
+    rows = session.exec(
+        select(Notification).where(Notification.kind == "event_ticket_prompt")
+    ).all()
+    assert all(r.emailed_at is not None for r in rows)
+
+
+def test_memories_prompt_digest_drops_row_once_memory_added(session, sent, digests):
+    _digest_mode(session, "memories_prompt")
+    mia = _user(session, "mia")
+    ana = _user(session, "ana")
+    _event(session, "last-night", NOW - timedelta(hours=30))
+    for user in (mia, ana):
+        _going(session, user, "last-night")
+        session.add(
+            Notification(
+                recipient_user_id=user.id,
+                actor_user_id=user.id,
+                kind="event_memories_prompt",
+                event_id="last-night",
+            )
+        )
+    session.add(EventUserAsset(user_id=ana.id, event_id="last-night", kind="memory"))
+    session.commit()
+
+    assert activity_email.run_once(force=True)["digests"] == 1
+    assert "/event/last-night/memories" in digests[0]["memories_prompt"][0]
+
+
+def test_prompt_admin_push_switch(session, sent):
+    session.add(SiteSetting(key="ticket_prompt_push_enabled", value="false"))
+    session.commit()
+    mia = _user(session, "mia")
+    _event(session, "intl", NOW + timedelta(days=6), reach="international")
+    _going(session, mia, "intl")
+
+    stats = event_asset_prompts.run_ticket_prompts()
+
+    assert stats == {"prompts": 1, "emailed": 1, "pushed": 0}
+    assert sent["push"] == []
+    assert event_asset_prompts.run_ticket_prompts() == {"prompts": 0}
 
 
 # --- memories prompt ---------------------------------------------------------

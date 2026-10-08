@@ -18,7 +18,7 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
 import { BASEMAP_CONFIG } from '../constants/basemap';
 import { buildJourneyLegs } from '../utils/myEvents';
-import { allDayLastDay, eventDisplayZone, isSameEventDay } from '../utils/eventDates';
+import { allDayLastDay, eventDisplayZone, formatCardTime, isSameEventDay } from '../utils/eventDates';
 import { isPlainClick } from '../utils/plainClick';
 
 export interface MapBounds {
@@ -365,7 +365,7 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                         e.preventDefault();
                         onOpenDetails(event);
                     } : undefined}
-                    className="text-[10px] font-medium text-action hover:text-action"
+                    className="text-xs font-medium text-action hover:text-action"
                 >
                     Details →
                 </Link>
@@ -1287,11 +1287,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
             day: 'numeric',
             timeZone,
         });
-        const timeStr = (d: Date) => d.toLocaleTimeString(undefined, {
-            hour: 'numeric',
-            minute: '2-digit',
-            timeZone,
-        });
+        const timeStr = (d: Date) => formatCardTime(d, timeZone);
         // Multi-day events show the end date so the span reads correctly.
         const sameDay = isSameEventDay(e);
         if (e.all_day) {

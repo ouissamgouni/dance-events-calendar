@@ -38,7 +38,7 @@ export default function CommunityExperienceSummary({ eventId, isPast }: Props) {
                         · {count} review{count === 1 ? '' : 's'}
                     </span>
                 </h3>
-                <p className="text-[11px] text-ink-soft">
+                <p className="text-xs text-ink-soft">
                     <Link
                         to={`/login?next=${encodeURIComponent(`/event/${eventId}#community`)}`}
                         className="font-medium text-sky-600 hover:text-sky-700"

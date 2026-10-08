@@ -176,7 +176,7 @@ export default function EventDetailContent({
 
     // Small pencil hint shown on hover when editable
     const EditHint = () => (
-        <span className="opacity-0 group-hover:opacity-40 absolute top-0.5 right-0 text-muted text-[10px] pointer-events-none select-none">
+        <span className="opacity-0 group-hover:opacity-40 absolute top-0.5 right-0 text-ink-soft text-xs pointer-events-none select-none">
             ✏
         </span>
     );
@@ -211,14 +211,14 @@ export default function EventDetailContent({
                                 All day
                             </label>
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] text-muted uppercase tracking-wide">Start</label>
+                                <label className="text-2xs text-ink-soft uppercase tracking-wide">Start</label>
                                 <input
                                     type={editTimes.allDay ? 'date' : 'datetime-local'}
                                     value={editTimes.start}
                                     onChange={(e) => setEditTimes((t) => ({ ...t, start: e.target.value }))}
                                     className="border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                 />
-                                <label className="text-[10px] text-muted uppercase tracking-wide">{editTimes.allDay ? 'Last day' : 'End'}</label>
+                                <label className="text-2xs text-ink-soft uppercase tracking-wide">{editTimes.allDay ? 'Last day' : 'End'}</label>
                                 <input
                                     type={editTimes.allDay ? 'date' : 'datetime-local'}
                                     value={editTimes.end}
@@ -226,7 +226,7 @@ export default function EventDetailContent({
                                     className="border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                 />
                             </div>
-                            {saveError && <p className="text-[10px] text-danger">{saveError}</p>}
+                            {saveError && <p className="text-xs text-danger">{saveError}</p>}
                             <div className="flex gap-2 pt-1">
                                 <button
                                     disabled={saving}
@@ -238,11 +238,11 @@ export default function EventDetailContent({
                                         }
                                         saveField(result.changes);
                                     }}
-                                    className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
+                                    className="text-xs font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
                                 >
                                     {saving ? 'Saving…' : 'Save'}
                                 </button>
-                                <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">
+                                <button onClick={cancelEdit} className="text-xs text-ink-soft hover:text-ink px-2">
                                     Cancel
                                 </button>
                             </div>
@@ -256,7 +256,7 @@ export default function EventDetailContent({
                                 🗓 {whenText}
                             </p>
                             {viewerHint && event.timezone ? (
-                                <p className="text-xs text-muted">
+                                <p className="text-xs text-ink-soft">
                                     {timeZoneLabel(event.timezone, new Date(event.start))} · {viewerHint}
                                 </p>
                             ) : null}
@@ -280,7 +280,7 @@ export default function EventDetailContent({
                         <div className="mt-1">
                             <a
                                 href={event.organizer.handle ? `/u/${event.organizer.handle}` : '#'}
-                                className="inline-flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 text-[11px] text-ink hover:bg-canvas transition"
+                                className="inline-flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 text-xs text-ink hover:bg-canvas transition"
                                 onClick={(e) => {
                                     if (!event.organizer?.handle) e.preventDefault();
                                 }}
@@ -345,7 +345,7 @@ export default function EventDetailContent({
                     {/* Price inline edit form */}
                     {editable && !hasVisibleBadge && editingField !== 'price' && (
                         <div
-                            className="mt-2 cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded px-3 py-1.5 transition w-fit"
+                            className="mt-2 cursor-pointer text-xs text-ink-soft hover:text-ink border border-dashed border-line rounded px-3 py-1.5 transition w-fit"
                             onClick={startPriceEdit}
                         >
                             + Add price info
@@ -371,7 +371,7 @@ export default function EventDetailContent({
                                         onChange={(e) => setEditPriceMin(e.target.value)}
                                         className="w-20 border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                     />
-                                    <span className="text-xs text-muted">–</span>
+                                    <span className="text-xs text-ink-soft">–</span>
                                     <input
                                         type="number"
                                         placeholder="Max"
@@ -388,7 +388,7 @@ export default function EventDetailContent({
                                     />
                                 </div>
                             )}
-                            {saveError && <p className="text-[10px] text-danger">{saveError}</p>}
+                            {saveError && <p className="text-xs text-danger">{saveError}</p>}
                             <div className="flex gap-2 pt-1">
                                 <button
                                     disabled={saving}
@@ -404,11 +404,11 @@ export default function EventDetailContent({
                                             });
                                         }
                                     }}
-                                    className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
+                                    className="text-xs font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
                                 >
                                     {saving ? 'Saving…' : 'Save'}
                                 </button>
-                                <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">
+                                <button onClick={cancelEdit} className="text-xs text-ink-soft hover:text-ink px-2">
                                     Cancel
                                 </button>
                             </div>
@@ -429,7 +429,7 @@ export default function EventDetailContent({
                                 setEditLocationDirty(false);
                             }}
                         />
-                        {saveError && <p className="text-[10px] text-danger mt-1">{saveError}</p>}
+                        {saveError && <p className="text-xs text-danger mt-1">{saveError}</p>}
                         <div className="flex gap-2">
                             <button
                                 disabled={saving}
@@ -441,11 +441,11 @@ export default function EventDetailContent({
                                     }
                                     saveField(changes);
                                 }}
-                                className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
+                                className="text-xs font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
                             >
                                 {saving ? 'Saving…' : 'Save'}
                             </button>
-                            <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">
+                            <button onClick={cancelEdit} className="text-xs text-ink-soft hover:text-ink px-2">
                                 Cancel
                             </button>
                         </div>
@@ -487,7 +487,7 @@ export default function EventDetailContent({
                                     }}
                                     disabled={retryingGeo}
                                     title="Retry geocoding"
-                                    className="shrink-0 self-start text-[10px] font-medium px-1.5 py-0.5 border border-line bg-surface text-ink-soft hover:bg-canvas disabled:opacity-50 transition"
+                                    className="shrink-0 self-start text-xs font-medium px-1.5 py-0.5 border border-line bg-surface text-ink-soft hover:bg-canvas disabled:opacity-50 transition"
                                 >
                                     {retryingGeo ? '…' : retryGeoMsg ?? '↻ Retry'}
                                 </button>
@@ -497,7 +497,7 @@ export default function EventDetailContent({
                     </div>
                 ) : editable ? (
                     <div
-                        className="cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded-lg px-3 py-2 transition"
+                        className="cursor-pointer text-xs text-ink-soft hover:text-ink border border-dashed border-line rounded-lg px-3 py-2 transition"
                         onClick={startLocationEdit}
                     >
                         + Add location
@@ -517,7 +517,7 @@ export default function EventDetailContent({
                         <div className="border-t border-line px-3 py-2 bg-surface">
                             <button
                                 onClick={cancelEdit}
-                                className="text-[11px] text-ink-soft hover:text-ink"
+                                className="text-xs text-ink-soft hover:text-ink"
                             >Cancel</button>
                         </div>
                     </div>
@@ -531,7 +531,7 @@ export default function EventDetailContent({
                     </div>
                 ) : editable ? (
                     <div
-                        className="cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded px-3 py-1.5 transition w-fit"
+                        className="cursor-pointer text-xs text-ink-soft hover:text-ink border border-dashed border-line rounded px-3 py-1.5 transition w-fit"
                         onClick={() => setEditingField('tags')}
                     >+ Add tags</div>
                 ) : null}
@@ -550,8 +550,8 @@ export default function EventDetailContent({
                             rows={6}
                             className={`w-full border border-line rounded p-2 leading-relaxed text-ink-soft resize-y focus:outline-none focus:ring-1 focus:ring-rose-300 ${compact ? 'text-xs' : 'text-sm'}`}
                         />
-                        {saving && <p className="text-[10px] text-muted mt-1">Saving…</p>}
-                        {saveError && <p className="text-[10px] text-danger mt-1">{saveError}</p>}
+                        {saving && <p className="text-xs text-ink-soft mt-1">Saving…</p>}
+                        {saveError && <p className="text-xs text-danger mt-1">{saveError}</p>}
                     </div>
                 ) : event.description ? (
                     <div
@@ -563,7 +563,7 @@ export default function EventDetailContent({
                     </div>
                 ) : editable ? (
                     <div
-                        className="cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded p-2 transition"
+                        className="cursor-pointer text-xs text-ink-soft hover:text-ink border border-dashed border-line rounded p-2 transition"
                         onClick={() => startEdit('description', '')}
                     >
                         + Add description
@@ -579,7 +579,7 @@ export default function EventDetailContent({
                 {/* Links */}
                 {editable && editingField === 'links' ? (
                     <div className="space-y-2 border-t border-card-line pt-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Links</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Links</p>
                         <div className="rounded-lg bg-canvas p-3 border border-line space-y-2">
                             {editLinks.map((link, i) => (
                                 <div key={i} className="flex gap-1.5">
@@ -608,10 +608,10 @@ export default function EventDetailContent({
                                 <button
                                     type="button"
                                     onClick={() => setEditLinks((prev) => [...prev, { url: '', label: '' }])}
-                                    className="text-[11px] text-ink-soft hover:text-ink"
+                                    className="text-xs text-ink-soft hover:text-ink"
                                 >+ Add link</button>
                             )}
-                            {saveError && <p className="text-[10px] text-danger">{saveError}</p>}
+                            {saveError && <p className="text-xs text-danger">{saveError}</p>}
                             <div className="flex gap-2 pt-1">
                                 <button
                                     disabled={saving}
@@ -621,9 +621,9 @@ export default function EventDetailContent({
                                             .map((l) => ({ url: l.url.trim(), label: l.label.trim() || null }));
                                         saveField({ links } as Partial<CalendarEvent>);
                                     }}
-                                    className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
+                                    className="text-xs font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
                                 >{saving ? 'Saving…' : 'Save'}</button>
-                                <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">Cancel</button>
+                                <button onClick={cancelEdit} className="text-xs text-ink-soft hover:text-ink px-2">Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -632,7 +632,7 @@ export default function EventDetailContent({
                         className={`space-y-1.5 border-t border-card-line pt-3 ${editable ? 'group relative cursor-pointer hover:bg-canvas -mx-2 px-2 rounded transition' : ''}`}
                         onClick={editable ? () => { setEditLinks(structuredLinks.map((l) => ({ url: l.url, label: l.label ?? '' }))); setEditingField('links'); } : undefined}
                     >
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Links</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Links</p>
                         <div className="flex flex-wrap gap-1.5">
                             {structuredLinks.map((link, i) => (
                                 <a
@@ -651,7 +651,7 @@ export default function EventDetailContent({
                     </div>
                 ) : fallbackLinks.length > 0 ? (
                     <div className="space-y-1.5 border-t border-card-line pt-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Links</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Links</p>
                         {fallbackLinks.map((url) => (
                             <a
                                 key={url}
@@ -665,7 +665,7 @@ export default function EventDetailContent({
                     </div>
                 ) : editable ? (
                     <div
-                        className="cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded px-3 py-1.5 transition w-fit"
+                        className="cursor-pointer text-xs text-ink-soft hover:text-ink border border-dashed border-line rounded px-3 py-1.5 transition w-fit"
                         onClick={() => { setEditLinks([]); setEditingField('links'); }}
                     >+ Add links</div>
                 ) : null}
