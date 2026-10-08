@@ -202,10 +202,10 @@ export function EventListCard({
 }: EventListCardProps) {
     const { tagsPerCard, eventCardImgoingLocationBottomEnabled, eventCardImgoingShowStatsEnabled, eventCardSaveShowStatsEnabled, explorerEventCardCardStyleEnabled, explorerCardTitleTopEnabled, explorerCardSaveBottomEnabled, eventScheduleEnabled } = useFeatureFlags();
     const { node: imageSlot } = useEventCardImage(event, {
-        show: !isPast,
+        past: isPast,
         className: 'event-card-image',
     });
-    const priceVisible = isPriceSectionVisible(event, showPrices);
+    const priceVisible = !isPast && isPriceSectionVisible(event, showPrices);
     const start = new Date(event.start);
     const end = new Date(event.end);
     const tz = eventDisplayZone(event);
@@ -317,8 +317,9 @@ export function EventListCard({
                             />
                         )}
                         {event.title}
+                        {isPast && <span className="ml-2 text-xs font-semibold text-ink-soft">Past</span>}
                     </h4>
-                    {showPopularity && (
+                    {showPopularity && !isPast && (
                         <div className="mt-0.5">
                             <PopularityBadge
                                 score={event.popularity_score ?? 0}
@@ -350,10 +351,10 @@ export function EventListCard({
                             </span>
                         )
                     )}
-                    {(priceVisible || event.has_active_promo_codes) && (
+                    {(priceVisible || (!isPast && event.has_active_promo_codes)) && (
                         <p className="event-card-location gap-1.5">
                             {priceVisible && <PriceBadge event={event} />}
-                            {event.has_active_promo_codes && <DiscountBadge />}
+                            {!isPast && event.has_active_promo_codes && <DiscountBadge />}
                         </p>
                     )}
                     {!tribeLayout && (

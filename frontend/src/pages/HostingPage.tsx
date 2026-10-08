@@ -51,13 +51,13 @@ export default function HostingPage() {
 
     if (!user) {
         return (
-            <div className="mx-auto max-w-xl px-4 py-6 text-sm text-ink-soft">
+            <div className="mx-auto max-w-3xl px-4 py-6 text-sm text-ink-soft">
                 <Link to="/login?next=/hosting" className="font-semibold text-action hover:underline">Sign in</Link> to manage the events you host.
             </div>
         );
     }
     if (!organizerClaimsEnabled) {
-        return <div className="mx-auto max-w-xl px-4 py-6 text-sm text-ink-soft">Hosting isn&apos;t available yet.</div>;
+        return <div className="mx-auto max-w-3xl px-4 py-6 text-sm text-ink-soft">Hosting isn&apos;t available yet.</div>;
     }
 
     const items = data?.items ?? [];
@@ -68,7 +68,7 @@ export default function HostingPage() {
     const counts: Partial<Record<Tab, number>> = { upcoming: upcoming.length, past: past.length };
 
     return (
-        <div className="mx-auto max-w-xl px-4 py-4">
+        <div className="mx-auto max-w-3xl px-4 py-4">
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-bold text-ink">Hosting</h1>

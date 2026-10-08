@@ -6,6 +6,7 @@ import type { CalendarEvent } from '../types';
 import SearchEventCard from '../components/SearchEventCard';
 import EventModal from '../components/EventModal';
 import { trackView } from '../utils/tracking';
+import { searchResultGroups } from '../utils/eventTiming';
 
 const PREVIEW_LIMIT = 3;
 const PAGE_SIZE = 20;
@@ -125,6 +126,8 @@ export default function TextSearchPage() {
     const fullResultsParams = new URLSearchParams({ q: query });
     if (includePast) fullResultsParams.set('scope', 'all');
 
+    const resultGroups = searchResultGroups(results, (result) => result.end, includePast);
+
     return (
         <div className="min-h-full bg-canvas">
             <div className="mx-auto max-w-2xl">
@@ -153,16 +156,21 @@ export default function TextSearchPage() {
                     {results.length > 0 && (
                         <>
                             <p className="mb-2 text-xs font-semibold text-ink-soft">{total} matching event{total === 1 ? '' : 's'}</p>
-                            <div className="space-y-2">{results.map((result) => (
-                                <SearchEventCard
-                                    key={result.event_id}
-                                    result={result}
-                                    event={eventsById.get(result.event_id)}
-                                    onOpen={() => openResult(result.event_id)}
-                                    showPastLabel={includePast}
-                                    testId="text-search-event-card"
-                                />
-                            ))}</div>
+                            {resultGroups.map((group) => (
+                                <section key={group.key} className="mb-4 last:mb-0">
+                                    {group.title && <h2 className="mb-2 text-sm font-semibold text-ink">{group.title}</h2>}
+                                    <div className="space-y-2">{group.items.map((result) => (
+                                        <SearchEventCard
+                                            key={result.event_id}
+                                            result={result}
+                                            event={eventsById.get(result.event_id)}
+                                            onOpen={() => openResult(result.event_id)}
+                                            showPastLabel={includePast}
+                                            testId="text-search-event-card"
+                                        />
+                                    ))}</div>
+                                </section>
+                            ))}
                             {!fullResults && hasMore && <Link replace to={`/search/results?${fullResultsParams.toString()}`} state={{ returnTo }} className="mt-3 flex min-h-11 w-full items-center justify-center rounded-field bg-action px-4 text-sm font-semibold text-white">Show all {total} matching events</Link>}
                             {fullResults && hasMore && <button type="button" onClick={loadMore} disabled={loading} className="mt-3 min-h-11 w-full rounded-field border border-line bg-surface text-sm font-semibold text-action disabled:opacity-50">{loading ? 'Loading...' : 'Show more'}</button>}
                         </>

@@ -1587,6 +1587,8 @@ class SiteSettingsResponse(BaseModel):
     # When True, floating Explorer controls show labels below desktop widths.
     # Desktop controls are always labeled.
     explorer_view_control_labels_enabled: bool = True
+    # How map marker cards open on mouse devices: "click" | "hover".
+    map_popup_trigger: str = "click"
     # When True, the shared Explorer and Calendar filter bar may use two rows.
     summary_two_line_enabled: bool = False
     # When True, event pictures render on cards and detail pages. Admin upload
@@ -1930,6 +1932,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     explorer_card_title_top_enabled: Optional[bool] = None
     explorer_card_save_bottom_enabled: Optional[bool] = None
     explorer_view_control_labels_enabled: Optional[bool] = None
+    map_popup_trigger: Optional[str] = Field(default=None, pattern="^(click|hover)$")
     summary_two_line_enabled: Optional[bool] = None
     event_images_enabled: Optional[bool] = None
     event_card_placeholder_style: Optional[str] = Field(

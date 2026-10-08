@@ -88,6 +88,27 @@ describe('upcoming edition review', () => {
     });
 });
 
+describe('past event actions', () => {
+    const past = { ...EVENT, start: '2020-01-01T20:00:00Z', end: '2020-01-02T01:00:00Z' } as CalendarEvent;
+    const withRatings = (element: React.ReactElement) => renderWithProviders(
+        <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, showRatings: true }, updateFlag: vi.fn() }}>
+            {element}
+        </FeatureFlagsContext.Provider>,
+    );
+
+    it.each([
+        ['modal actions', <EventActions {...commonProps} event={past} isPast canReviewInline />],
+        ['page action dock', <EventActionDock {...commonProps} event={past} isPast />],
+    ])('%s: drops Save and offers an empty-star Review CTA', (_name, element) => {
+        withRatings(element);
+
+        expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
+        const review = screen.getByRole('button', { name: 'Review this event' });
+        expect(review).toHaveTextContent('Review');
+        expect(review.querySelector('svg')).toHaveAttribute('fill', 'none');
+    });
+});
+
 describe('organizer claim action', () => {
     const renderWithClaims = (event: CalendarEvent) => renderWithProviders(
         <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, organizerClaimsEnabled: true }, updateFlag: vi.fn() }}>

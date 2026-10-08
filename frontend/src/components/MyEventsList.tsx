@@ -7,6 +7,7 @@ import { showMemoriesRow } from '../utils/eventAssets';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useMyRating, useMyRatingsLoaded } from '../context/MyRatingsContext';
+import { useUnsaveWithUndo } from '../hooks/useUnsaveWithUndo';
 import EventCard from './EventCard';
 import EventReviewCard from './EventReviewCard';
 import MemoriesStrip from './MemoriesStrip';
@@ -20,16 +21,32 @@ interface Props {
     showMonthHeadings?: boolean;
 }
 
-function MyEventRow({ event, tab, onEventClick, reviewTagLabels, assetSummary }: { event: CalendarEvent; tab: MyEventsTab; onEventClick: (event: CalendarEvent) => void; reviewTagLabels: Map<number, string>; assetSummary?: EventAssetSummary }) {
-    const { showRatings } = useFeatureFlags();
+function MyEventRow({ event, tab, onEventClick, reviewTagLabels, assetSummary, onUnsave }: { event: CalendarEvent; tab: MyEventsTab; onEventClick: (event: CalendarEvent) => void; reviewTagLabels: Map<number, string>; assetSummary?: EventAssetSummary; onUnsave: (eventId: string) => void }) {
+    const { showRatings, explorerCardTitleTopEnabled, eventScheduleEnabled } = useFeatureFlags();
     const myRating = useMyRating(event.event_id);
     const ratingsLoaded = useMyRatingsLoaded();
     const isPast = tab === 'past';
     const isUpcoming = tab === 'upcoming';
-    const isSaved = tab === 'saved';
-    // Base My Events card keeps picture, title, time and location only.
-    // Upcoming adds the avatars stack; Saved adds the "I'm going" button;
-    // Past uses the shared pending/reviewed event card.
+    // Upcoming: base card + avatars. Saved: full explorer card with × instead
+    // of Save. Past: the shared pending/reviewed event card.
+    if (tab === 'saved') {
+        return (
+            <EventCard
+                event={event}
+                onOpen={onEventClick}
+                titleTop={explorerCardTitleTopEnabled}
+                followingBadgeEnabled
+                showRatings={showRatings}
+                tagsFitWidth
+                actions={['going']}
+                goingIconVariant="hand"
+                onDismiss={() => onUnsave(event.event_id)}
+                dismissLabel="Remove from saved"
+                bottomSlot={eventScheduleEnabled && event.schedule_published ? <ProgramAction event={event} /> : undefined}
+                testId="my-events-row"
+            />
+        );
+    }
     if (isPast) {
         return (
             <EventReviewCard
@@ -55,8 +72,7 @@ function MyEventRow({ event, tab, onEventClick, reviewTagLabels, assetSummary }:
             showTags={false}
             showReviews={false}
             showPrice={false}
-            showActions={isSaved}
-            actions={isSaved ? ['going'] : undefined}
+            showActions={false}
             hideAvatarsIfOnlyCurrentUser={isUpcoming}
             goingIconVariant="hand"
             bottomSlot={isUpcoming ? (
@@ -77,6 +93,7 @@ function labelsByTagId(groups: TagGroup[]): Map<number, string> {
 export default function MyEventsList({ events, tab, onEventClick, showMonthHeadings = true }: Props) {
     const [reviewTagLabels, setReviewTagLabels] = useState<Map<number, string>>(new Map());
     const [assetSummaries, setAssetSummaries] = useState<Record<string, EventAssetSummary>>({});
+    const unsave = useUnsaveWithUndo();
     const { user } = useAuth();
     const { eventTicketsEnabled, eventMemoriesEnabled } = useFeatureFlags();
     const assetEventIds = tab === 'saved' ? '' : events.slice(0, 200).map((e) => e.event_id).join(',');
@@ -131,7 +148,7 @@ export default function MyEventsList({ events, tab, onEventClick, showMonthHeadi
                     )}
                     <div className="space-y-2">
                         {group.events.map((event) => (
-                            <MyEventRow key={event.event_id} event={event} tab={tab} onEventClick={onEventClick} reviewTagLabels={reviewTagLabels} assetSummary={assetsActive ? assetSummaries[event.event_id] : undefined} />
+                            <MyEventRow key={event.event_id} event={event} tab={tab} onEventClick={onEventClick} reviewTagLabels={reviewTagLabels} assetSummary={assetsActive ? assetSummaries[event.event_id] : undefined} onUnsave={unsave} />
                         ))}
                     </div>
                 </section>

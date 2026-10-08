@@ -7,6 +7,7 @@ import type { CalendarEvent } from '../types';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import useBackToClose from '../hooks/useBackToClose';
 import SearchEventCard, { type SearchEventCardPurpose } from './SearchEventCard';
+import { searchResultGroups } from '../utils/eventTiming';
 
 interface ExplorerEventSearchProps {
     onSelectEvent: (eventId: string) => void;
@@ -157,13 +158,15 @@ export default function ExplorerEventSearch({
 
     const term = q.trim();
 
-    const visibleResults = useMemo(
+    const resultGroups = useMemo(
         () => {
             const attendanceFiltered = excludeAttended ? results.filter((result) => !isAttending(result.event_id)) : results;
-            return resultFilter ? attendanceFiltered.filter(resultFilter) : attendanceFiltered;
+            const filtered = resultFilter ? attendanceFiltered.filter(resultFilter) : attendanceFiltered;
+            return searchResultGroups(filtered, (result) => result.end, effectiveDateScope === 'all');
         },
-        [results, excludeAttended, isAttending, resultFilter],
+        [results, excludeAttended, isAttending, resultFilter, effectiveDateScope],
     );
+    const visibleResults = useMemo(() => resultGroups.flatMap((group) => group.items), [resultGroups]);
 
     const reset = () => {
         if (!embedded) setOpen(false);
@@ -248,19 +251,25 @@ export default function ExplorerEventSearch({
                     )}
                 </div>
             )}
-            {visibleResults.map((row, index) => (
-                <div key={row.event_id} className="mb-1.5 last:mb-0">
-                    <SearchEventCard
-                        result={row}
-                        event={eventsById.get(row.event_id)}
-                        onOpen={() => selectEvent(row)}
-                        purpose={resultPurpose}
-                        showPastLabel={effectiveDateScope === 'all'}
-                        highlighted={index === activeIdx}
-                        testId={`explorer-event-search-result-${index}`}
-                    />
-                </div>
-            ))}
+            {visibleResults.map((row, index) => {
+                const group = resultGroups.find((g) => g.items[0] === row);
+                return (
+                    <div key={row.event_id} className="mb-1.5 last:mb-0">
+                        {group?.title && (
+                            <p className="bg-surface px-1 pb-1 pt-2 text-xs font-semibold text-ink-soft">{group.title}</p>
+                        )}
+                        <SearchEventCard
+                            result={row}
+                            event={eventsById.get(row.event_id)}
+                            onOpen={() => selectEvent(row)}
+                            purpose={resultPurpose}
+                            showPastLabel={effectiveDateScope === 'all'}
+                            highlighted={index === activeIdx}
+                            testId={`explorer-event-search-result-${index}`}
+                        />
+                    </div>
+                );
+            })}
         </>
     );
 

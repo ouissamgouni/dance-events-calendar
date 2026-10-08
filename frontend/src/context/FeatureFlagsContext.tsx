@@ -80,6 +80,8 @@ export interface FeatureFlags {
     explorerCardSaveBottomEnabled: boolean;
     /** Show floating Explorer control labels below desktop widths. */
     explorerViewControlLabelsEnabled: boolean;
+    /** How map marker cards open on mouse devices. Touch always uses click. */
+    mapPopupTrigger: 'click' | 'hover';
     /** Allow the shared Explorer and Calendar filter bar to use a second row. */
     summaryTwoLineEnabled: boolean;
     /** When true, event pictures are displayed. Admin picture management is
@@ -138,6 +140,7 @@ const defaultFlags: FeatureFlags = {
     explorerCardTitleTopEnabled: false,
     explorerCardSaveBottomEnabled: false,
     explorerViewControlLabelsEnabled: true,
+    mapPopupTrigger: 'click',
     summaryTwoLineEnabled: false,
     eventImagesEnabled: true,
     eventCardPlaceholderStyle: 'none',
@@ -212,6 +215,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     explorerCardTitleTopEnabled: s.explorer_card_title_top_enabled ?? false,
                     explorerCardSaveBottomEnabled: s.explorer_card_save_bottom_enabled ?? false,
                     explorerViewControlLabelsEnabled: s.explorer_view_control_labels_enabled ?? true,
+                    mapPopupTrigger: s.map_popup_trigger === 'hover' ? 'hover' : 'click',
                     summaryTwoLineEnabled: s.summary_two_line_enabled ?? false,
                     eventImagesEnabled: s.event_images_enabled ?? true,
                     eventCardPlaceholderStyle: s.event_card_placeholder_style ?? 'none',

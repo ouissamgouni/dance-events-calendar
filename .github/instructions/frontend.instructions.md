@@ -53,4 +53,4 @@ Semantic Tailwind v4 tokens live in [frontend/src/index.css](frontend/src/index.
 - Add/update **only major or critical** tests for behavior changes — not for pure styling/copy tweaks.
 - A **new branch in business logic** (e.g. a new prop-driven visibility/permission rule, a new pure helper in `src/utils/`) needs a test; a new component's key interaction (render + one user action) needs a test.
 - Prefer updating an existing test file over creating a new one; for a new pure helper with no existing test file, add a co-located `*.test.ts`/`*.test.tsx` (see `src/utils/sectionVisibility.test.ts` for the pattern).
-- After any behavior change, run `task test:unit:frontend` (type-check + vitest + build) before reporting done.
+- Once you think you're done with the request and your changes touches behavior, run `task test:unit:frontend` (type-check + vitest + build) before reporting done.

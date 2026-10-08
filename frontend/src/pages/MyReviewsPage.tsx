@@ -8,9 +8,10 @@ import { useInvalidateRatingAggregate } from '../context/RatingAggregatesContext
 import RateEventModal from '../components/RateEventModal';
 import EventReviewCard from '../components/EventReviewCard';
 import EventModal from '../components/EventModal';
+import { FollowingReviewsList } from './FollowingReviewsPage';
 import { SENTIMENT_META } from '../utils/reviewSentiment';
 
-type ReviewsTab = 'pending' | 'reviewed';
+type ReviewsTab = 'pending' | 'reviewed' | 'tribe';
 
 function MyReviewCard({ review, name }: { review: MyRating; name: string }) {
     const meta = review.overall_sentiment ? SENTIMENT_META[review.overall_sentiment] : null;
@@ -59,7 +60,8 @@ function PendingReviewFallback({ review, onWrite }: { review: PendingReview; onW
 export default function MyReviewsPage() {
     const { user } = useAuth();
     const [params, setParams] = useSearchParams();
-    const activeTab: ReviewsTab = params.get('tab') === 'reviewed' ? 'reviewed' : 'pending';
+    const tabParam = params.get('tab');
+    const activeTab: ReviewsTab = tabParam === 'reviewed' || tabParam === 'tribe' ? tabParam : 'pending';
     const [pending, setPending] = useState<PendingReview[] | null>(null);
     const [eventsById, setEventsById] = useState<Map<string, CalendarEvent>>(new Map());
     const [reviewed, setReviewed] = useState<MyRating[] | null>(null);
@@ -104,7 +106,7 @@ export default function MyReviewsPage() {
         return () => { cancelled = true; };
     }, []);
 
-    if (!user) return <div className="mx-auto max-w-xl px-4 py-6 text-sm text-ink-soft"><Link to="/login?next=/reviews" className="text-action hover:underline">Sign in</Link> to manage your reviews.</div>;
+    if (!user) return <div className="mx-auto max-w-3xl px-4 py-6 text-sm text-ink-soft"><Link to="/login?next=/reviews" className="text-action hover:underline">Sign in</Link> to manage your reviews.</div>;
 
     const handleSubmitted = (rating: EventRating) => {
         if (!reviewing) return;
@@ -127,47 +129,51 @@ export default function MyReviewsPage() {
         }
         fetchMyRatings().then(setReviewed).catch(() => { });
     };
-    const rows = activeTab === 'pending' ? pending : reviewed;
+    const rows = activeTab === 'pending' ? pending : activeTab === 'reviewed' ? reviewed : [];
+    const tabClass = (tab: ReviewsTab) => `border-b-2 py-3 text-sm font-medium md:px-4 ${activeTab === tab ? 'border-action text-action' : 'border-transparent text-ink-soft hover:text-ink'}`;
 
     return (
-        <div className="mx-auto max-w-xl px-4 py-4">
+        <div className="mx-auto max-w-3xl px-4 py-4">
             <h1 className="text-2xl font-bold text-ink">Reviews</h1>
-            <div role="tablist" className="mt-3 grid grid-cols-2 border-b border-line">
-                <button type="button" role="tab" aria-selected={activeTab === 'pending'} onClick={() => setParams({ tab: 'pending' }, { replace: true })} className={`border-b-2 py-3 text-sm font-medium ${activeTab === 'pending' ? 'border-action text-action' : 'border-transparent text-ink-soft'}`}>Pending {pending ? `(${pending.length})` : ''}</button>
-                <button type="button" role="tab" aria-selected={activeTab === 'reviewed'} onClick={() => setParams({ tab: 'reviewed' }, { replace: true })} className={`border-b-2 py-3 text-sm font-medium ${activeTab === 'reviewed' ? 'border-action text-action' : 'border-transparent text-ink-soft'}`}>Reviewed {reviewed ? `(${reviewed.length})` : ''}</button>
+            <div role="tablist" className="mt-3 grid grid-cols-3 border-b border-line md:flex md:gap-2">
+                <button type="button" role="tab" aria-selected={activeTab === 'pending'} onClick={() => setParams({ tab: 'pending' }, { replace: true })} className={tabClass('pending')}>Pending {pending ? `(${pending.length})` : ''}</button>
+                <button type="button" role="tab" aria-selected={activeTab === 'reviewed'} onClick={() => setParams({ tab: 'reviewed' }, { replace: true })} className={tabClass('reviewed')}>Reviewed {reviewed ? `(${reviewed.length})` : ''}</button>
+                <button type="button" role="tab" aria-selected={activeTab === 'tribe'} onClick={() => setParams({ tab: 'tribe' }, { replace: true })} className={tabClass('tribe')}>Tribe</button>
             </div>
-            {rows === null ? <p className="py-8 text-sm text-muted">Loading...</p> : activeTab === 'pending' ? (
-                pending!.length === 0 ? <p className="py-8 text-sm text-ink-soft">You are all caught up.</p> : <ul className="mt-3 space-y-3">{pending!.map((review) => {
+            <div>
+                {activeTab === 'tribe' ? <FollowingReviewsList /> : rows === null ? <p className="py-8 text-sm text-muted">Loading...</p> : activeTab === 'pending' ? (
+                    pending!.length === 0 ? <p className="py-8 text-sm text-ink-soft">You are all caught up.</p> : <ul className="mt-3 space-y-3">{pending!.map((review) => {
+                        const event = eventsById.get(review.event_id);
+                        return event ? (
+                            <li key={review.event_id}>
+                                <EventReviewCard
+                                    event={event}
+                                    variant="pending"
+                                    onOpen={setModalEvent}
+                                    friendProof={review.friend_proof}
+                                    onRatingChanged={(rating) => handlePendingRatingChanged(review, rating)}
+                                    testId="pending-review-card"
+                                />
+                            </li>
+                        ) : <PendingReviewFallback key={review.event_id} review={review} onWrite={() => setReviewing(review)} />;
+                    })}</ul>
+                ) : reviewed!.length === 0 ? <p className="py-8 text-sm text-ink-soft">You haven't reviewed any events yet.</p> : <ul className="mt-3 space-y-3">{reviewed!.map((review) => {
                     const event = eventsById.get(review.event_id);
                     return event ? (
-                        <li key={review.event_id}>
+                        <li key={review.id}>
                             <EventReviewCard
                                 event={event}
-                                variant="pending"
+                                variant="reviewed"
                                 onOpen={setModalEvent}
-                                friendProof={review.friend_proof}
-                                onRatingChanged={(rating) => handlePendingRatingChanged(review, rating)}
-                                testId="pending-review-card"
+                                initialRating={review}
+                                reviewTagLabels={reviewTagLabels}
+                                onRatingChanged={(rating) => handleReviewedRatingChanged(review, rating)}
+                                testId="reviewed-event-card"
                             />
                         </li>
-                    ) : <PendingReviewFallback key={review.event_id} review={review} onWrite={() => setReviewing(review)} />;
-                })}</ul>
-            ) : reviewed!.length === 0 ? <p className="py-8 text-sm text-ink-soft">You haven't reviewed any events yet.</p> : <ul className="mt-3 space-y-3">{reviewed!.map((review) => {
-                const event = eventsById.get(review.event_id);
-                return event ? (
-                    <li key={review.id}>
-                        <EventReviewCard
-                            event={event}
-                            variant="reviewed"
-                            onOpen={setModalEvent}
-                            initialRating={review}
-                            reviewTagLabels={reviewTagLabels}
-                            onRatingChanged={(rating) => handleReviewedRatingChanged(review, rating)}
-                            testId="reviewed-event-card"
-                        />
-                    </li>
-                ) : <MyReviewCard key={review.id} review={review} name={user.name ?? 'You'} />;
-            })}</ul>}
+                    ) : <MyReviewCard key={review.id} review={review} name={user.name ?? 'You'} />;
+                })}</ul>}
+            </div>
             {reviewing && <RateEventModal eventId={reviewing.event_id} initialRating={null} onClose={() => setReviewing(null)} onSubmitted={handleSubmitted} />}
             {modalEvent && <EventModal event={modalEvent} onClose={closeModal} source="my-reviews" />}
         </div>

@@ -55,7 +55,6 @@ const TextSearchPage = lazy(() => import('./pages/TextSearchPage'));
 const InstallPage = lazy(() => import('./pages/InstallPage'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
 const NetworkPage = lazy(() => import('./pages/NetworkPage'));
-const FollowingReviewsPage = lazy(() => import('./pages/FollowingReviewsPage'));
 const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
 const MySubmissionsPage = lazy(() => import('./pages/MySubmissionsPage'));
 const HostingPage = lazy(() => import('./pages/HostingPage'));
@@ -208,6 +207,15 @@ function AppShell() {
             <div className="flex items-center gap-1 sm:gap-2">
               <button
                 type="button"
+                onClick={() => navigate('/suggest', { state: { backgroundLocation: backgroundLocation ?? location } })}
+                className="hidden h-9 items-center gap-1.5 bg-action px-3 text-sm font-semibold text-white transition hover:opacity-90 lg:inline-flex"
+                data-testid="header-add-event"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                Add event
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate('/search', { state: { returnTo: `${location.pathname}${location.search}` } })}
                 aria-label="Search events"
                 title="Search events"
@@ -261,7 +269,7 @@ function AppShell() {
                   />
                   <Route path="discover" element={<Navigate to="/tribe/network" replace />} />
                   <Route path="network" element={<NetworkPage />} />
-                  <Route path="reviews" element={<FollowingReviewsPage />} />
+                  <Route path="reviews" element={<Navigate to="/reviews?tab=tribe" replace />} />
                 </Route>
                 <Route path="/my-events" element={<MyCalendar />} />
                 <Route path="/passport" element={<ProtectedRoute><PassportPage /></ProtectedRoute>} />

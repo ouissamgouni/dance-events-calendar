@@ -67,7 +67,7 @@ export default function EventActionDock({
     return (
         <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-offset,0px)+env(safe-area-inset-bottom))] transition-[bottom] md:bottom-0 z-30 border-t border-blue-100 bg-blue-50 shadow-[0_-2px_10px_rgba(15,23,42,0.06)] lg:sticky lg:inset-auto lg:top-6 lg:z-10 lg:w-fit lg:rounded-card lg:border lg:p-4 lg:shadow-sm">
             <div className="mx-auto flex max-w-[480px] flex-nowrap items-center gap-2 px-3 pt-3 pb-3 md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:mx-0 lg:w-max lg:flex-col lg:items-stretch lg:px-0 lg:py-0 lg:pb-0">
-                <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" disabled={cancelled} className="shrink-0 border border-line lg:w-full" labelClassName="hidden min-[375px]:inline" />
+                {!isPast && <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" disabled={cancelled} className="shrink-0 border border-line lg:w-full" labelClassName="hidden min-[375px]:inline" />}
                 <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} ticketLikely={event.ticket_likely} cancelled={cancelled} className="shrink-0 border border-line lg:w-full" labelClassName="hidden min-[375px]:inline" />
                 {reviewInline && (
                     <RateEventButton

@@ -1,13 +1,15 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { FeatureFlagsContext, defaultFlags } from '../context/FeatureFlagsContext';
 import { MyRatingsProvider } from '../context/MyRatingsContext';
+import { useSavedEvents } from '../context/SavedEventsContext';
 import { renderWithProviders } from '../test/render';
 import { makeUser } from '../test/handlers';
 import { server } from '../test/server';
 import type { CalendarEvent, MyRating, TagGroup } from '../types';
 import MyEventsList from './MyEventsList';
+import { ToastProvider } from './Toast';
 
 function event(id: string, imageUrl: string | null): CalendarEvent {
     return {
@@ -47,6 +49,11 @@ function renderList(tab: 'upcoming' | 'saved' | 'past', events: CalendarEvent[],
         </FeatureFlagsContext.Provider>,
         { routerEntries: ['/mine/calendar'] },
     );
+}
+
+function SavedProbe({ eventId }: { eventId: string }) {
+    const { isSaved } = useSavedEvents();
+    return <span data-testid="saved-probe">{isSaved(eventId) ? 'saved' : 'unsaved'}</span>;
 }
 
 function rating(overrides: Partial<MyRating> = {}): MyRating {
@@ -117,18 +124,49 @@ describe('MyEventsList', () => {
 
         renderList('saved', [plannedEvent], vi.fn(), true);
         expect(screen.queryByRole('link', { name: 'My Plan' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('link', { name: 'Program' })).not.toBeInTheDocument();
     });
 
-    it('removes a failed image and shows only the I\'m going button on Saved', () => {
+    it('removes a failed image and swaps Save for a discreet remove button on Saved', () => {
         renderList('saved', [event('saved', '/broken.jpg')]);
 
         fireEvent.error(screen.getByTestId('event-card-image'));
         expect(screen.queryByTestId('event-card-image')).not.toBeInTheDocument();
-        // Saved adds the I'm going button to the base card, but not Save.
         expect(screen.queryByRole('button', { name: 'Save event' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Remove from saved' })).toBeInTheDocument();
         const going = screen.getByRole('button', { name: "I'm going" });
         expect(going.querySelector('[data-icon-family="hand"]')).toBeInTheDocument();
+    });
+
+    it('unsaves from the Saved card and restores it with Undo', async () => {
+        const writes: string[] = [];
+        server.use(
+            http.get('*/api/auth/saved-events', () => HttpResponse.json({ events: [{ event_id: 'saved', audience: 'private' }] })),
+            http.post('*/api/track/event-save', async ({ request }) => {
+                const body = await request.json() as { action: string };
+                writes.push(body.action);
+                return new HttpResponse(null, { status: 204 });
+            }),
+        );
+        const flags = { ...defaultFlags, eventImagesEnabled: true };
+        const { user } = renderWithProviders(
+            <ToastProvider>
+                <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
+                    <MyRatingsProvider>
+                        <SavedProbe eventId="saved" />
+                        <MyEventsList events={[event('saved', null)]} tab="saved" onEventClick={vi.fn()} />
+                    </MyRatingsProvider>
+                </FeatureFlagsContext.Provider>
+            </ToastProvider>,
+            { routerEntries: ['/mine/calendar'] },
+        );
+
+        await waitFor(() => expect(screen.getByTestId('saved-probe')).toHaveTextContent(/^saved$/));
+        await user.click(screen.getByRole('button', { name: 'Remove from saved' }));
+        expect(await screen.findByText('Removed from saved')).toBeInTheDocument();
+        expect(screen.getByTestId('saved-probe')).toHaveTextContent('unsaved');
+        await user.click(screen.getByRole('button', { name: 'Undo' }));
+        await waitFor(() => expect(writes).toEqual(['unsave', 'save']));
+        expect(screen.getByTestId('saved-probe')).toHaveTextContent(/^saved$/);
     });
 
     it('shows a compact reviewed Past card with capped review tags and separate interactions', async () => {
@@ -148,7 +186,7 @@ describe('MyEventsList', () => {
         expect(await screen.findByText('Friendly crowd')).toBeInTheDocument();
         expect(screen.getByText('Great DJs')).toBeInTheDocument();
         expect(screen.getByText('+1')).toBeInTheDocument();
-        expect(screen.queryByTestId('event-card-image')).not.toBeInTheDocument();
+        expect(screen.getByTestId('event-card-image')).toHaveClass('grayscale');
         expect(screen.queryByTestId('attendee-avatar-stack')).not.toBeInTheDocument();
         expect(screen.getByText('SEP')).toHaveClass('text-ink-soft');
 

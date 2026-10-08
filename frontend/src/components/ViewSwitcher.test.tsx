@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import ViewSwitcher, { type ExploreView } from './ViewSwitcher';
+import ViewSwitcher, { ViewSegmentedControl, type ExploreView } from './ViewSwitcher';
 
 describe('ViewSwitcher', () => {
     it.each<[ExploreView, ExploreView[]]>([
@@ -68,5 +68,25 @@ describe('ViewSwitcher', () => {
         expect(createButton).toHaveTextContent('Close');
         expect(createButton).toHaveAttribute('aria-expanded', 'true');
         expect(createButton.querySelector('svg')).toHaveClass('rotate-45');
+    });
+
+    it('is hidden on desktop, where the inline segmented control takes over', () => {
+        render(<ViewSwitcher currentView="list" onSelect={vi.fn()} />);
+        expect(screen.getByTestId('view-switcher')).toHaveClass('lg:hidden');
+    });
+});
+
+describe('ViewSegmentedControl', () => {
+    it('marks the current view and reports other selections only', async () => {
+        const onSelect = vi.fn();
+        render(<ViewSegmentedControl currentView="map" onSelect={onSelect} />);
+
+        expect(screen.getByTestId('view-segment-map')).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByTestId('view-segment-list')).toHaveAttribute('aria-pressed', 'false');
+
+        await userEvent.click(screen.getByTestId('view-segment-map'));
+        expect(onSelect).not.toHaveBeenCalled();
+        await userEvent.click(screen.getByRole('button', { name: 'Calendar' }));
+        expect(onSelect).toHaveBeenCalledWith('calendar');
     });
 });

@@ -9,10 +9,11 @@ import MyEventsAddSearch from '../components/MyEventsAddSearch';
 import MyEventsList from '../components/MyEventsList';
 import MyEventsMapPreview from '../components/MyEventsMapPreview';
 import MyEventsUtilityMenu from '../components/MyEventsUtilityMenu';
-import ViewSwitcher, { VIEW_SWITCHER_BAND_PX } from '../components/ViewSwitcher';
+import ViewSwitcher, { VIEW_SWITCHER_BAND_PX, ViewSegmentedControl } from '../components/ViewSwitcher';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
+import { useUnsaveWithUndo } from '../hooks/useUnsaveWithUndo';
 import type { CalendarEvent } from '../types';
 import {
     eventsForMyEventsTab,
@@ -32,7 +33,8 @@ const initialModes: Record<MyEventsTab, CalendarViewMode> = { upcoming: '3week',
 const initialRoutes: Record<MyEventsTab, boolean> = { upcoming: true, saved: false, past: true };
 
 export default function MyEventsExperience() {
-    const { myEventsRouteEnabled } = useFeatureFlags();
+    const { myEventsRouteEnabled, showRatings } = useFeatureFlags();
+    const unsave = useUnsaveWithUndo();
     const { savedEventIds, isSaved } = useSavedEvents();
     const { attendingEventIds, isAttending, loading: attendanceLoading } = useAttendingEvents();
     const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -114,25 +116,42 @@ export default function MyEventsExperience() {
 
     return (
         <div ref={rootRef} className="relative flex min-h-0 flex-1 flex-col bg-canvas">
-            <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 bg-surface border-b border-line">
-                <h1 className="text-2xl font-bold text-ink">My Events</h1>
-                <MyEventsUtilityMenu activeTab={activeTab} eventIds={activeTabEventIds} />
+            <div className="shrink-0 bg-surface">
+                <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
+                    <h1 className="text-2xl font-bold text-ink">My Events</h1>
+                    <MyEventsUtilityMenu activeTab={activeTab} eventIds={activeTabEventIds} />
+                </div>
             </div>
-            <div className="sticky top-0 z-[7600] shrink-0 bg-surface">
-                <nav aria-label="My Events" className="grid grid-cols-3 border-b border-line bg-surface">
-                    {tabs.map((tab) => {
-                        const active = activeTab === tab.id;
-                        const count = tabCounts[tab.id];
-                        return (
-                            <button key={tab.id} type="button" role="tab" aria-selected={active} onClick={() => { setActiveTab(tab.id); setSearchOpen(false); setPreviewCollapsed(false); setCenteredEventId(null); }} className={`relative py-4 text-sm font-medium transition ${active ? 'text-action' : 'text-ink hover:text-action'}`}>
-                                {tab.label}{count > 0 && ` (${count})`}
-                                {active && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-action" />}
-                            </button>
-                        );
-                    })}
-                </nav>
+            <div className="sticky top-0 z-[7600] shrink-0 border-b border-line bg-surface">
+                <div className="mx-auto flex max-w-3xl items-center md:px-4">
+                    <nav aria-label="My Events" className="grid flex-1 grid-cols-3 md:flex md:flex-none md:gap-1">
+                        {tabs.map((tab) => {
+                            const active = activeTab === tab.id;
+                            const count = tabCounts[tab.id];
+                            return (
+                                <button key={tab.id} type="button" role="tab" aria-selected={active} onClick={() => { setActiveTab(tab.id); setSearchOpen(false); setPreviewCollapsed(false); setCenteredEventId(null); }} className={`relative py-4 text-sm font-medium transition md:px-3 ${active ? 'text-action' : 'text-ink hover:text-action'}`}>
+                                    {tab.label}{count > 0 && ` (${count})`}
+                                    {active && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-action" />}
+                                </button>
+                            );
+                        })}
+                    </nav>
+                    <div className="ml-auto hidden items-center gap-2 lg:flex">
+                        <ViewSegmentedControl currentView={view} onSelect={changeView} />
+                        <button
+                            type="button"
+                            onClick={() => setSearchOpen((open) => !open)}
+                            aria-expanded={searchOpen}
+                            title={searchOpen ? 'Close event search' : 'Add an event to My Events'}
+                            className="inline-flex h-9 items-center gap-1.5 bg-action px-3 text-sm font-semibold text-white transition hover:opacity-90"
+                            data-testid="my-events-add-desktop"
+                        >
+                            {searchOpen ? 'Close' : '+ Add'}
+                        </button>
+                    </div>
+                </div>
                 {activeTab === 'past' && (
-                    <div className="border-b border-line px-4 py-2 text-right">
+                    <div className="mx-auto max-w-3xl border-t border-line px-4 py-2 text-right">
                         <Link to="/passport?tab=journey" className="text-xs font-medium text-action hover:underline">
                             View your full dance journey
                         </Link>
@@ -203,11 +222,17 @@ export default function MyEventsExperience() {
                             count={sequence.length}
                             onSelectIndex={selectIndex}
                             onOpen={() => setModalEvent(selected.event)}
-                            showAvatars={activeTab === 'upcoming'}
+                            showAvatars={activeTab !== 'past'}
+                            showTags={activeTab === 'saved'}
+                            showReviews={activeTab === 'saved'}
+                            showPrice={activeTab === 'saved'}
                             showActions={activeTab === 'saved'}
-                            showPrice={false}
                             actions={activeTab === 'saved' ? ['going'] : undefined}
-                            showProgramAction={activeTab === 'upcoming'}
+                            showRatings={activeTab === 'saved' && showRatings}
+                            followingBadgeEnabled={activeTab === 'saved'}
+                            showProgramAction={activeTab !== 'past'}
+                            onDismiss={activeTab === 'saved' ? () => unsave(selected.event.event_id) : undefined}
+                            dismissLabel="Remove from saved"
                             onHeightChange={setMapPreviewHeight}
                             onCollapse={() => {
                                 setPreviewCollapsed(true);

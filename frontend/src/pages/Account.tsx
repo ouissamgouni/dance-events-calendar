@@ -153,7 +153,7 @@ export default function Account() {
         // Anonymous users still get the Settings page. Profile / sign-out /
         // activity sections are replaced by a single sign-in CTA.
         return (
-            <div className="mx-auto max-w-xl px-4 py-3 text-xs">
+            <div className="mx-auto max-w-3xl px-4 py-3 text-xs">
                 <h1 className="text-lg font-bold text-ink mb-3">Settings</h1>
                 <PushNotificationSettings />
                 <InstallAppSection />
@@ -197,7 +197,7 @@ export default function Account() {
     };
 
     return (
-        <div className="mx-auto max-w-xl px-4 py-3 text-xs">
+        <div className="mx-auto max-w-3xl px-4 py-3 text-xs">
             <h1 className="text-lg font-bold text-ink mb-2">Settings</h1>
 
             <nav className="mb-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" aria-label="Settings sections">

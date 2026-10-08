@@ -210,6 +210,19 @@ class TestSettingsEndpoint:
         assert resp.status_code == 200
         assert resp.json()["explorer_view_control_labels_enabled"] is False
 
+    def test_admin_can_update_map_popup_trigger(self, sqlite_client):
+        client, _engine = sqlite_client
+
+        assert client.get("/api/settings").json()["map_popup_trigger"] == "click"
+
+        resp = client.put("/api/settings", json={"map_popup_trigger": "hover"})
+        assert resp.status_code == 200
+        assert resp.json()["map_popup_trigger"] == "hover"
+        assert client.get("/api/settings").json()["map_popup_trigger"] == "hover"
+
+        resp = client.put("/api/settings", json={"map_popup_trigger": "wiggle"})
+        assert resp.status_code == 422
+
     @pytest.mark.parametrize(
         "key", ["explorer_card_title_top_enabled", "explorer_card_save_bottom_enabled"]
     )

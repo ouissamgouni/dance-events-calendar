@@ -37,6 +37,9 @@ interface Props {
     onHeightChange?: (height: number) => void;
     /** Hides the preview (× button or swipe down). */
     onCollapse?: () => void;
+    /** Card-level × (e.g. remove from saved). */
+    onDismiss?: () => void;
+    dismissLabel?: string;
 }
 
 /**
@@ -68,6 +71,8 @@ export default function MyEventsMapPreview({
     showProgramAction = false,
     onHeightChange,
     onCollapse,
+    onDismiss,
+    dismissLabel,
 }: Props) {
     const pointerStart = useRef<{ x: number; y: number } | null>(null);
     const sheetRef = useRef<HTMLDivElement | null>(null);
@@ -159,6 +164,8 @@ export default function MyEventsMapPreview({
                             showActions={showActions}
                             actions={actions}
                             showRatings={showRatings}
+                            onDismiss={onDismiss}
+                            dismissLabel={dismissLabel}
                             followingBadgeEnabled={followingBadgeEnabled}
                             goingIconVariant="hand"
                             bottomSlot={showProgramAction ? <ProgramAction event={event} /> : undefined}

@@ -12,12 +12,14 @@ import {
     Globe2,
     LockKeyhole,
     MapPin,
+    Maximize2,
     MessageSquareText,
     Search,
     Trophy,
     X,
 } from 'lucide-react';
 import EventMap from './EventMap';
+import MyEventsMapPreview from './MyEventsMapPreview';
 import EventModal, { EventIdModal } from './EventModal';
 import MemoriesStrip from './MemoriesStrip';
 import { isPlainClick } from '../utils/plainClick';
@@ -574,6 +576,74 @@ function JourneyEntryRow({ entry, anchorMonth, highlighted, showMemories, friend
 
 type FilterEntry = { key: string | null; label: string; count: number };
 
+function PassportFullscreenMap({ events, onOpenEvent, onClose }: {
+    events: PassportMapEvent[];
+    onOpenEvent: (event: CalendarEvent) => void;
+    onClose: () => void;
+}) {
+    useBackToClose(onClose);
+    const ordered = useMemo(
+        () => [...events].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
+        [events],
+    );
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [centeredId, setCenteredId] = useState<string | null>(null);
+    const [fitAllToken, setFitAllToken] = useState(0);
+    const index = ordered.findIndex((event) => event.event_id === selectedId);
+    const selected = index >= 0 ? ordered[index] : null;
+    const select = (next: number) => {
+        const event = ordered[next];
+        if (!event) return;
+        setSelectedId(event.event_id);
+        setCenteredId(event.event_id);
+    };
+    return (
+        <div className="fixed inset-0 z-[9500] flex flex-col bg-canvas" role="dialog" aria-modal="true" aria-label="Passport map" data-testid="passport-map-fullscreen">
+            <div className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-2" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+                <h2 className="px-2 text-base font-semibold text-ink">Places map</h2>
+                <button type="button" onClick={onClose} aria-label="Close full-screen map" className="inline-flex h-11 w-11 items-center justify-center text-ink-soft hover:text-ink">
+                    <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+            </div>
+            <div className="relative min-h-0 flex-1">
+                <EventMap
+                    events={ordered}
+                    minimalPopup
+                    disablePopups
+                    onMarkerSelect={(event) => { setSelectedId(event.event_id); setCenteredId(event.event_id); }}
+                    hoveredEventId={selectedId}
+                    selectedEventId={centeredId}
+                    fitAllToken={fitAllToken}
+                    fitMarkersControl
+                    showFollowingBadgeOverlay={false}
+                    showTrendingOverlay={false}
+                    clustering={false}
+                />
+            </div>
+            {selected && (
+                <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} className="shrink-0 bg-surface">
+                    <MyEventsMapPreview
+                        event={selected}
+                        hasPrevious={index > 0}
+                        hasNext={index < ordered.length - 1}
+                        onPrevious={() => select(index - 1)}
+                        onNext={() => select(index + 1)}
+                        index={index}
+                        count={ordered.length}
+                        onSelectIndex={select}
+                        onOpen={() => onOpenEvent(selected)}
+                        onCollapse={() => {
+                            setSelectedId(null);
+                            setCenteredId(null);
+                            setFitAllToken((n) => n + 1);
+                        }}
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
+
 function FilterableEventMap({
     events,
     entries,
@@ -619,9 +689,10 @@ function FilterableEventMap({
     const optionClass = (active: boolean) => active
         ? 'flex h-12 w-full items-center justify-between gap-4 bg-action/5 px-4 text-left text-action'
         : 'flex h-12 w-full items-center justify-between gap-4 px-4 text-left text-ink hover:bg-canvas';
+    const [expanded, setExpanded] = useState(false);
     return (
         <div>
-            <div className="h-60 w-full overflow-hidden bg-surface sm:h-[360px]">
+            <div className="relative h-72 w-full overflow-hidden bg-surface sm:h-[360px]">
                 <EventMap
                     events={filtered}
                     minimalPopup
@@ -635,7 +706,20 @@ function FilterableEventMap({
                     cooperativeGestures
                     clustering={false}
                 />
+                {filtered.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => setExpanded(true)}
+                        aria-label="Open full-screen map"
+                        title="Full-screen map"
+                        className="absolute right-3 top-3 z-[800] inline-flex h-11 w-11 items-center justify-center border border-line bg-surface text-ink shadow-md transition hover:bg-canvas"
+                        data-testid="passport-map-expand"
+                    >
+                        <Maximize2 className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                )}
             </div>
+            {expanded && <PassportFullscreenMap events={filtered} onOpenEvent={onOpenEvent} onClose={() => setExpanded(false)} />}
             <div className="bg-surface">
                 <ul ref={listRef} className="relative h-60 divide-y divide-line overflow-y-auto overscroll-contain">
                     {entries.map((entry) => (

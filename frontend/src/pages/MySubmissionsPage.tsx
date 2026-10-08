@@ -167,14 +167,14 @@ export default function MySubmissionsPage() {
     const { organizerClaimsEnabled } = useFeatureFlags();
 
     if (!user) {
-        return <div className="mx-auto max-w-xl px-4 py-6 text-sm text-ink-soft"><Link to="/login?next=/me/submissions" className="text-action hover:underline">Sign in</Link> to manage your submissions.</div>;
+        return <div className="mx-auto max-w-3xl px-4 py-6 text-sm text-ink-soft"><Link to="/login?next=/me/submissions" className="text-action hover:underline">Sign in</Link> to manage your submissions.</div>;
     }
     if (user.is_verified_organizer && organizerClaimsEnabled) {
         return <Navigate to="/hosting?tab=added" replace />;
     }
 
     return (
-        <div className="mx-auto max-w-xl px-4 py-4">
+        <div className="mx-auto max-w-3xl px-4 py-4">
             <h1 className="text-2xl font-bold text-ink">Events I added</h1>
             <p className="mt-1 text-sm text-ink-soft">Events you added. They stay yours; ask to make one public and a curator will review it.</p>
             <MySubmissionsSection />

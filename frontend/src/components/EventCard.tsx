@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Clock, MapPin } from 'lucide-react';
+import { Clock, MapPin, X } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useEventCardImage } from '../hooks/useEventCardImage';
@@ -53,6 +53,9 @@ export interface EventCardProps {
     actions?: ReadonlyArray<'save' | 'going'>;
     /** Icon style for the going button in the action cluster. */
     goingIconVariant?: 'hand' | 'person';
+    /** Renders a discreet × in the top-right corner (e.g. remove from saved). */
+    onDismiss?: () => void;
+    dismissLabel?: string;
     // Context
     isPast?: boolean;
     /** Show an explicit marker when past and current events share one result list. */
@@ -118,6 +121,8 @@ export default function EventCard({
     showActions = true,
     actions,
     goingIconVariant,
+    onDismiss,
+    dismissLabel = 'Dismiss',
     isPast = false,
     showPastLabel = false,
     isNew = false,
@@ -158,7 +163,7 @@ export default function EventCard({
     // "I'm going" sits bottom-right by the tags when the flag is on;
     // otherwise it joins Save in the top-right cluster.
     const actionList = actions ?? (['save', 'going'] as const);
-    const wantsSave = showActions && actionList.includes('save');
+    const wantsSave = showActions && actionList.includes('save') && !isPast;
     const wantsGoing = showActions && actionList.includes('going');
     const defaultLayout = !dateHeaderRow && !dateTopRow;
     const titleRow = titleTop && defaultLayout;
@@ -170,12 +175,13 @@ export default function EventCard({
     const bottomActions: Array<'save' | 'going'> = [];
     if (bottomSave) bottomActions.push('save');
     if (bottomGoing) bottomActions.push('going');
-    const priceVisible = showPrice && isPriceSectionVisible(event, showPrices);
+    const priceVisible = showPrice && !isPast && isPriceSectionVisible(event, showPrices);
     const priceContent = priceVisible && (event.price_is_free || event.price_min != null);
     const location = shortLocation(event.location) ?? event.location;
 
     // Discount + trending badges render as labels inside the card body.
-    const discountVisible = showPrice && !!event.has_active_promo_codes;
+    const discountVisible = showPrice && !isPast && !!event.has_active_promo_codes;
+    const trendingVisible = isTrending && !isPast;
 
     // The two-row header layout replaces the left date rail with an inline
     // date + title + Save top row; the schedule line then shows time only.
@@ -189,7 +195,8 @@ export default function EventCard({
     const rounding = 'rounded-card';
     const width = widthClass ? `${widthClass} shrink-0` : 'w-full';
     const { imageVisible, node: imageSlot } = useEventCardImage(event, {
-        show: showImage && !isPast,
+        show: showImage,
+        past: isPast,
         className: `mr-3 aspect-video ${titleRow ? (compact ? 'w-24' : 'w-32') : (compact ? 'w-20' : 'w-28')} shrink-0 rounded-none`,
     });
 
@@ -216,9 +223,9 @@ export default function EventCard({
     ) : null;
     // Trending + Discount labels sit together, discount to the right of
     // trending, in both the rail and two-row layouts.
-    const popularityBadgesInner = (isTrending || (discountVisible && !discountByPrice)) ? (
+    const popularityBadgesInner = (trendingVisible || (discountVisible && !discountByPrice)) ? (
         <>
-            {isTrending && (
+            {trendingVisible && (
                 <span
                     className="inline-flex items-center bg-orange-50 px-1.5 py-px text-xs font-medium text-orange-400"
                     data-testid="trending-badge"
@@ -322,6 +329,18 @@ export default function EventCard({
                 onClick={() => onOpen(event)}
                 className="absolute inset-0 z-0 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-action/30"
             />
+            {onDismiss && (
+                <button
+                    type="button"
+                    aria-label={dismissLabel}
+                    title={dismissLabel}
+                    onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+                    className="absolute right-0 top-0 z-[3] flex h-8 w-8 items-center justify-center text-muted transition hover:text-ink-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-action/30"
+                    data-testid="event-card-dismiss"
+                >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+            )}
             {headerSlot && (
                 <div
                     className="pointer-events-auto relative z-[1] px-4 pt-3"
@@ -334,7 +353,7 @@ export default function EventCard({
             {dateHeaderRow ? (
                 <>
                     {/* Two-row header: date + title + Save on top, rest below full-width. */}
-                    <div className="pointer-events-none relative z-[1] flex min-w-0 flex-col px-4 py-3">
+                    <div className={`pointer-events-none relative z-[1] flex min-w-0 flex-col px-4 py-3 ${onDismiss ? 'pr-9' : ''}`}>
                         <div className="flex items-start gap-2.5">
                             <span className="flex shrink-0 flex-col items-center text-center leading-tight" aria-hidden="true">
                                 <span className={isPast ? 'text-xs font-semibold text-ink-soft' : 'event-card-rail-weekday'}>
@@ -406,7 +425,7 @@ export default function EventCard({
                             />
                         </div>
                     )}
-                    <div className={`relative z-[1] flex min-w-0 flex-1 flex-col ${showLeftRail ? 'pl-3' : ''}`}>
+                    <div className={`relative z-[1] flex min-w-0 flex-1 flex-col ${showLeftRail ? 'pl-3' : ''} ${onDismiss ? 'mr-6' : ''}`}>
                         {dateTopRow && (
                             <div className="mb-1 flex min-h-6 items-center justify-between gap-2">
                                 <span className="flex min-w-0 items-center gap-1.5 leading-tight" aria-hidden="true" data-testid="event-card-date-top-row">

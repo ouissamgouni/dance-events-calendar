@@ -365,6 +365,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         explorer_view_control_labels_enabled=_get_bool_setting(
             session, "explorer_view_control_labels_enabled", default=True
         ),
+        map_popup_trigger=_get_str_setting(session, "map_popup_trigger", "click"),
         summary_two_line_enabled=_get_bool_setting(session, "summary_two_line_enabled"),
         event_images_enabled=_get_bool_setting(
             session, "event_images_enabled", default=True
@@ -660,6 +661,14 @@ def update_settings(
             "explorer_view_control_labels_enabled",
             body.explorer_view_control_labels_enabled,
         )
+
+    if body.map_popup_trigger is not None:
+        row = session.get(SiteSetting, "map_popup_trigger")
+        if row:
+            row.value = body.map_popup_trigger
+        else:
+            row = SiteSetting(key="map_popup_trigger", value=body.map_popup_trigger)
+        session.add(row)
 
     if body.summary_two_line_enabled is not None:
         _set_bool_setting(

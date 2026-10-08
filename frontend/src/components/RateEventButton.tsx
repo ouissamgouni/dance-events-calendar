@@ -133,7 +133,7 @@ export default function RateEventButton({
             : 'bg-sky-500'
         : '';
 
-    // Read-only "count" appearance (event cards / map popups): just a comment
+    // Read-only "count" appearance (event cards / map popups): just a star
     // icon + review count, no CTA affordance. Nothing to show without reviews.
     if (appearance === 'count' && !hasAggregate) return null;
 
@@ -168,31 +168,42 @@ export default function RateEventButton({
     const fillColor = hasAggregate || hasRated ? '#0ea5e9' : 'none';
     const strokeColor = hasAggregate || hasRated ? '#0284c7' : 'currentColor';
 
-    const ReviewIcon = appearance === 'menuItem' ? (
+    const isCta = appearance === 'pill' || appearance === 'menuItem';
+    const ReviewIcon = isCta ? (
         <Star
-            className={`${iconSizeClass} shrink-0 ${hasAggregate || hasRated ? '' : 'text-ink-soft'}`}
-            fill={fillColor}
-            stroke={strokeColor}
+            className={`${iconSizeClass} shrink-0 text-ink-soft`}
+            fill="none"
             aria-hidden="true"
             style={{ pointerEvents: 'none' }}
         />
     ) : (
-        <svg viewBox="0 0 20 20" className={iconSizeClass} fill={fillColor} stroke={strokeColor} strokeWidth={1.5} style={{ pointerEvents: 'none' }}>
-            <path d="M3 4.5h14v9H8.5L5 16.5V13.5H3z" strokeLinejoin="round" />
-        </svg>
+        <Star
+            className={`${iconSizeClass} shrink-0`}
+            fill={fillColor}
+            stroke={strokeColor}
+            strokeWidth={1.5}
+            aria-hidden="true"
+            style={{ pointerEvents: 'none' }}
+        />
     );
 
     const tooltip = appearance === 'write'
         ? 'Write a review'
-        : hasAggregate
+        : isCta
             ? hasRated
-                ? `${aggCount} review${aggCount !== 1 ? 's' : ''} — edit your review`
-                : `${aggCount} review${aggCount !== 1 ? 's' : ''} — add yours`
-            : hasRated
                 ? 'Edit your review'
                 : isEarlierEdition
-                    ? 'Been to an earlier edition? Review it'
-                    : 'Be the first to review';
+                    ? 'Been to an earlier edition? Share how it was'
+                    : 'Review this event'
+            : hasAggregate
+                ? hasRated
+                    ? `${aggCount} review${aggCount !== 1 ? 's' : ''} — edit your review`
+                    : `${aggCount} review${aggCount !== 1 ? 's' : ''} — add yours`
+                : hasRated
+                    ? 'Edit your review'
+                    : isEarlierEdition
+                        ? 'Been to an earlier edition? Share how it was'
+                        : 'Be the first to review';
 
     const countText = showCount && hasAggregate ? String(aggCount) : null;
 
@@ -240,33 +251,17 @@ export default function RateEventButton({
     }
 
     // Common content for both button and link
-    const buttonContent = appearance === 'write' ? 'Write a review' : appearance === 'preview' ? previewContent : appearance === 'pill' || appearance === 'menuItem' ? (
+    const buttonContent = appearance === 'write' ? 'Write a review' : appearance === 'preview' ? previewContent : isCta ? (
         <>
-            <span className="relative inline-flex">
-                {ReviewIcon}
-                {dotColor && <span className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 ${dotColor}`} />}
-            </span>
+            {ReviewIcon}
             <span className={labelClassName}>
-                {countText
-                    ? (
-                        <span className="tabular-nums">
-                            Reviews <span className="text-muted">({countText})</span>
-                            {hasRated && commentStatus === 'pending' && (
-                                <span className="ml-1.5 pl-1.5 border-l border-amber-300 text-xs text-amber-700">
-                                    Your comment pending
-                                </span>
-                            )}
-                        </span>
-                    )
-                    : hasRated
-                        ? (commentStatus === 'pending' ? 'Comment pending' : 'Your review')
-                        : isEarlierEdition ? 'Review past edition' : 'Review'}
+                {hasRated ? 'Your review' : isEarlierEdition ? 'Review past edition' : 'Review'}
             </span>
         </>
     ) : appearance === 'count' ? (
         <>
             <span className={`tabular-nums font-medium text-ink-soft ${size === 'sm' ? 'text-xs' : 'text-xs'}`}>{aggCount}</span>
-            <img src="/message.png" alt="" aria-hidden="true" className={iconSizeClass} />
+            <img src="/star.png" alt="" aria-hidden="true" className={`${iconSizeClass} object-contain`} />
         </>
     ) : (
         <>
@@ -287,7 +282,7 @@ export default function RateEventButton({
                 : appearance === 'pill'
                     ? actionStyle
                         ? `flex h-10 shrink-0 items-center gap-2 rounded-field border border-line bg-surface px-2 text-sm text-ink transition hover:bg-canvas ${className}`.trim()
-                        : `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-ink-soft bg-surface border-line hover:bg-canvas'} ${className}`.trim()
+                        : `text-xs px-3 py-1 transition flex items-center gap-1.5 border text-ink-soft bg-surface border-line hover:bg-canvas ${className}`.trim()
                     : appearance === 'count'
                         ? `inline-flex items-center gap-1 text-ink-soft hover:text-ink ${className}`.trim()
                         : `transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-sky-600 hover:text-sky-700' : 'text-slate-300 hover:text-ink-soft'} ${className}`.trim();

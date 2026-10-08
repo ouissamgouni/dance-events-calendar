@@ -2,24 +2,19 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { MapContainer, Polygon, Polyline, Rectangle, TileLayer, useMap } from 'react-leaflet';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet-gesture-handling';
 import 'leaflet-gesture-handling/dist/leaflet-gesture-handling.css';
 import type { CalendarEvent } from '../types';
-import SaveEventButton from './SaveEventButton';
-import GoingButton from './GoingButton';
-import { aspectMood } from './ExperienceBreakdown';
-import { useCommunityExperience } from '../hooks/useCommunityExperience';
-import TagBadges from './TagBadges';
-import AttendeeAvatarStack, { PEOPLE_ICON_PATH } from './AttendeeAvatarStack';
+import EventCard from './EventCard';
+import { PEOPLE_ICON_PATH } from './AttendeeAvatarStack';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
 import { BASEMAP_CONFIG } from '../constants/basemap';
 import { buildJourneyLegs } from '../utils/myEvents';
-import { allDayLastDay, eventDisplayZone, formatCardTime, isSameEventDay } from '../utils/eventDates';
-import { isPlainClick } from '../utils/plainClick';
+import { createHoverPopupController, type HoverPopupController } from '../utils/hoverPopupController';
 
 export interface MapBounds {
     north: number;
@@ -292,84 +287,51 @@ interface PopupPortal {
     key: string;
     host: HTMLDivElement;
     event: CalendarEvent;
-    followingCount: number;
     showFollowingOverlay: boolean;
 }
 
-function EventPopupContent({ event, followingCount, showFollowingOverlay, showRatings, detailLinkSource, onOpenDetails, formatDate, onEventClick, onMarkSeen, active, minimalPopup }: {
+function EventPopupContent({ event, showFollowingOverlay, showRatings, detailLinkSource, onOpenDetails, onEventClick, onMarkSeen, active, minimalPopup }: {
     event: CalendarEvent;
-    followingCount: number;
     showFollowingOverlay: boolean;
     showRatings: boolean;
     detailLinkSource?: string;
     onOpenDetails?: (event: CalendarEvent) => void;
-    formatDate: (event: CalendarEvent) => string;
     onEventClick?: (event: CalendarEvent) => void;
     onMarkSeen?: (eventId: string) => void;
     active: boolean;
     minimalPopup?: boolean;
 }) {
-    // Every marker mounts its popup eagerly, so only fetch the experience for
-    // the popup that's actually open (``active``) to avoid a request per pin.
+    const navigate = useNavigate();
+    // Every marker owns a popup host; only the open one renders (and fetches).
+    if (!active) return null;
     const isPast = new Date(event.end).getTime() < Date.now();
-    const { crossEdition, aggregate } = useCommunityExperience(event.event_id, isPast, !minimalPopup && showRatings && active);
-    const hasReviews = !!aggregate && aggregate.count > 0 && aggregate.display_state !== 'none';
+    const open = (target: CalendarEvent) => {
+        onMarkSeen?.(target.event_id);
+        const handler = onOpenDetails ?? onEventClick;
+        if (handler) handler(target);
+        else navigate(`/event/${target.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`);
+    };
 
     return (
-        <div className="space-y-1.5 text-xs min-w-[180px]">
-            <p
-                className="font-semibold text-sm cursor-pointer hover:text-ink-soft"
-                onClick={() => { onMarkSeen?.(event.event_id); onEventClick?.(event); }}
-            >
-                {event.title}
-            </p>
-            <p className="text-ink-soft">{formatDate(event)}</p>
-            {event.location && (
-                <p className="text-ink-soft">📍 {event.location}</p>
-            )}
-            {!minimalPopup && followingCount > 0 && (
-                <AttendeeAvatarStack
-                    eventId={event.event_id}
-                    goingFriendsPreview={showFollowingOverlay ? event.friends_going_preview : undefined}
-                />
-            )}
-            {!minimalPopup && event.tags?.length > 0 && (
-                <TagBadges tags={event.tags} maxVisible={3} />
-            )}
-            {!minimalPopup && showRatings && hasReviews && (
-                <div className="text-ink">
-                    {aggregate.display_state === 'full' && aggregate.mood_label ? (
-                        <span>
-                            {aspectMood(aggregate.average_mood).emoji}{' '}
-                            {crossEdition ? `Usually ${aggregate.mood_label.toLowerCase()}` : aggregate.mood_label}{' '}
-                            ({aggregate.count})
-                        </span>
-                    ) : (
-                        <span className="text-ink-soft">Early feedback ({aggregate.count})</span>
-                    )}
-                </div>
-            )}
-            <div className="flex items-center justify-between pt-1 border-t border-card-line">
-                {minimalPopup ? (
-                    <span />
-                ) : (
-                    <div className="flex items-center gap-1">
-                        <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation disabled={event.is_cancelled} />
-                        <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation isPast={isPast} cancelled={event.is_cancelled} />
-                    </div>
-                )}
-                <Link
-                    to={`/event/${event.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
-                    onClick={onOpenDetails ? (e) => {
-                        if (!isPlainClick(e)) return;
-                        e.preventDefault();
-                        onOpenDetails(event);
-                    } : undefined}
-                    className="text-xs font-medium text-action hover:text-action"
-                >
-                    Details →
-                </Link>
-            </div>
+        <div className="w-[300px]">
+            <EventCard
+                event={event}
+                onOpen={open}
+                borderless
+                compact
+                twoLineTitle
+                showTags={false}
+                showPrice={false}
+                showAvatars={!minimalPopup}
+                showActions={!minimalPopup}
+                showReviews={!minimalPopup && showRatings}
+                showRatings={showRatings}
+                // Passport pins are all past; keep the picture, which past cards hide.
+                isPast={minimalPopup ? false : isPast}
+                showPastLabel={!minimalPopup}
+                followingBadgeEnabled={showFollowingOverlay}
+                testId="map-event-card"
+            />
         </div>
     );
 }
@@ -1002,13 +964,13 @@ function MarkerClusterLayer({
     clusterGroupRef,
     detailLinkSource,
     onOpenDetails,
-    formatDate,
     onEventClick,
     onEventHover,
     onMarkerSelect,
     onMarkSeen,
     disablePopups,
     minimalPopup,
+    hoverPopups,
     journeySequence,
     journeySelectedEventId,
     pinnedEventId,
@@ -1030,13 +992,14 @@ function MarkerClusterLayer({
     clusterGroupRef: MutableRefObject<L.MarkerClusterGroup | null>;
     detailLinkSource?: string;
     onOpenDetails?: (event: CalendarEvent) => void;
-    formatDate: (event: CalendarEvent) => string;
     onEventClick?: (event: CalendarEvent) => void;
     onEventHover?: (eventId: string | null) => void;
     onMarkerSelect?: (event: CalendarEvent) => void;
     onMarkSeen?: (eventId: string) => void;
     disablePopups?: boolean;
     minimalPopup?: boolean;
+    /** Open marker cards on hover (mouse devices); click pins them. */
+    hoverPopups: boolean;
     journeySequence?: Record<string, number>;
     journeySelectedEventId?: string | null;
     /** Drawn outside the cluster group so it stays visible at any zoom. */
@@ -1047,6 +1010,7 @@ function MarkerClusterLayer({
     const map = useMap();
     const [popupPortals, setPopupPortals] = useState<PopupPortal[]>([]);
     const [openEventId, setOpenEventId] = useState<string | null>(null);
+    const hoverPinnedIdRef = useRef<string | null>(null);
     const pinnedIdRef = useRef(pinnedEventId);
     const journeySelectedIdRef = useRef(journeySelectedEventId);
     const pinnedMarkerRef = useRef<L.Marker | null>(null);
@@ -1091,6 +1055,7 @@ function MarkerClusterLayer({
         markerRefs.current.clear();
 
         const nextPortals: PopupPortal[] = [];
+        const hoverCtrls: HoverPopupController[] = [];
 
         events.forEach((event) => {
             const showFollowingOverlay = followingBadgeEnabled && showFollowingBadgeOverlay;
@@ -1114,15 +1079,62 @@ function MarkerClusterLayer({
                     : makeColoredIcon(eventColorBarColor, decorations),
             });
             let popupHost: HTMLDivElement | null = null;
+            let hover: HoverPopupController | null = null;
+            let resizeObserver: ResizeObserver | null = null;
             if (!disablePopups) {
-                popupHost = document.createElement('div');
-                marker.bindPopup(popupHost);
+                const host = document.createElement('div');
+                popupHost = host;
+                marker.bindPopup(host, {
+                    className: 'event-map-popup',
+                    minWidth: 300,
+                    maxWidth: 300,
+                    closeButton: !!minimalPopup,
+                    autoPanPadding: [16, 16],
+                });
+                marker.on('popupopen', () => {
+                    // Avatars/reviews load after open; keep the popup anchored to the real height.
+                    resizeObserver = new ResizeObserver(() => marker.getPopup()?.update());
+                    resizeObserver.observe(host);
+                });
+                marker.on('popupclose', () => {
+                    resizeObserver?.disconnect();
+                    resizeObserver = null;
+                });
+                if (hoverPopups) {
+                    const ctrl = createHoverPopupController({
+                        open: () => {
+                            const other = hoverPinnedIdRef.current;
+                            if (other && other !== event.event_id) return;
+                            if (!marker.isPopupOpen()) marker.openPopup();
+                        },
+                        close: () => marker.closePopup(),
+                    });
+                    hover = ctrl;
+                    host.addEventListener('mouseenter', ctrl.cancelClose);
+                    host.addEventListener('mouseleave', ctrl.leave);
+                    marker.on('mouseover', ctrl.enter);
+                    marker.on('mouseout', ctrl.leave);
+                    marker.on('popupclose', () => {
+                        ctrl.reset();
+                        if (hoverPinnedIdRef.current === event.event_id) hoverPinnedIdRef.current = null;
+                    });
+                }
             }
+            const hoverCtrl = hover;
+            let wasPinned = false;
+            if (hoverCtrl) marker.on('mousedown', () => { wasPinned = hoverCtrl.isPinned(); });
             marker.on('mouseover', () => onEventHover?.(event.event_id));
             marker.on('mouseout', () => onEventHover?.(null));
             marker.on('popupopen', () => setOpenEventId(event.event_id));
             marker.on('popupclose', () => setOpenEventId((id) => (id === event.event_id ? null : id)));
             marker.on('click', () => {
+                // Leaflet's own click handler (bound first) has already toggled the popup;
+                // in hover mode a click pins the card, and a second click unpins/closes it.
+                if (hoverCtrl && !wasPinned) {
+                    if (!marker.isPopupOpen()) marker.openPopup();
+                    hoverCtrl.pin();
+                    hoverPinnedIdRef.current = event.event_id;
+                }
                 onMarkSeen?.(event.event_id);
                 onMarkerSelect?.(event);
             });
@@ -1140,15 +1152,17 @@ function MarkerClusterLayer({
                     key: event.event_id,
                     host: popupHost,
                     event,
-                    followingCount,
                     showFollowingOverlay,
                 });
             }
+            if (hoverCtrl) hoverCtrls.push(hoverCtrl);
         });
 
         setPopupPortals(nextPortals);
 
         return () => {
+            hoverCtrls.forEach((ctrl) => ctrl.reset());
+            hoverPinnedIdRef.current = null;
             layerGroup.clearLayers();
             if (pinnedMarkerRef.current) {
                 map.removeLayer(pinnedMarkerRef.current);
@@ -1157,7 +1171,7 @@ function MarkerClusterLayer({
             markerRefs.current.clear();
             setPopupPortals([]);
         };
-    }, [layerGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, journeySequence, map, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+    }, [layerGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, hoverPopups, journeySequence, map, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
 
     useEffect(() => {
         const layerGroup = layerGroupRef.current;
@@ -1217,12 +1231,10 @@ function MarkerClusterLayer({
             {popupPortals.map((portal) => createPortal(
                 <EventPopupContent
                     event={portal.event}
-                    followingCount={portal.followingCount}
                     showFollowingOverlay={portal.showFollowingOverlay}
                     showRatings={showRatings}
                     detailLinkSource={detailLinkSource}
                     onOpenDetails={onOpenDetails}
-                    formatDate={formatDate}
                     onEventClick={onEventClick}
                     onMarkSeen={onMarkSeen}
                     active={openEventId === portal.event.event_id}
@@ -1236,7 +1248,7 @@ function MarkerClusterLayer({
 }
 
 export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, onOpenDetails, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null, selectedEventId = null, fitAllToken, obscuredInsets, clustering = true }: Props) {
-    const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
+    const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent, mapPopupTrigger } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
     const geoEvents = useMemo(
@@ -1276,26 +1288,9 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
         insetsRef.current = obscuredInsets;
     }, [obscuredInsets]);
     const cooperativeGestureOptions = cooperativeGestures ? { gestureHandling: true } : {};
-
-    const formatDate = useCallback((e: CalendarEvent) => {
-        const start = new Date(e.start);
-        const end = new Date(e.end);
-        const timeZone = eventDisplayZone(e);
-        const dateStr = (d: Date) => d.toLocaleDateString(undefined, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            timeZone,
-        });
-        const timeStr = (d: Date) => formatCardTime(d, timeZone);
-        // Multi-day events show the end date so the span reads correctly.
-        const sameDay = isSameEventDay(e);
-        if (e.all_day) {
-            return sameDay ? dateStr(start) : `${dateStr(start)} – ${dateStr(allDayLastDay(e))}`;
-        }
-        const base = `${dateStr(start)} · ${timeStr(start)}`;
-        return sameDay ? base : `${base} – ${dateStr(end)}, ${timeStr(end)}`;
-    }, []);
+    const hoverPopups = mapPopupTrigger === 'hover'
+        && typeof window !== 'undefined'
+        && !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
 
     return (
         <MapContainer
@@ -1402,13 +1397,13 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 clusterGroupRef={clusterGroupRef}
                 detailLinkSource={detailLinkSource}
                 onOpenDetails={onOpenDetails}
-                formatDate={formatDate}
                 onEventClick={onEventClick}
                 onEventHover={onEventHover}
                 onMarkerSelect={onMarkerSelect}
                 onMarkSeen={onMarkSeen}
                 disablePopups={disablePopups}
                 minimalPopup={minimalPopup}
+                hoverPopups={hoverPopups}
                 journeySequence={journeySequence}
                 journeySelectedEventId={journeySelectedEventId}
                 pinnedEventId={selectedEventId}

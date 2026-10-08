@@ -143,14 +143,14 @@ describe('EventCard pictures', () => {
         )
     })
 
-    it('shows neither picture nor placeholder for past events', () => {
+    it('shows a greyed-out picture for past events', () => {
         renderCard(
             makeEvent({ image_thumb_url: 'https://cdn.test/thumb.webp' }),
             { eventImagesEnabled: true },
             { isPast: true },
         )
 
-        expect(screen.queryByTestId('event-card-image')).not.toBeInTheDocument()
-        expect(screen.queryByTestId('event-card-placeholder')).not.toBeInTheDocument()
+        const image = screen.getByTestId('event-card-image')
+        expect(image).toHaveClass('grayscale', 'opacity-80')
     })
 })
