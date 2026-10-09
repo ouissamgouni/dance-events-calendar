@@ -5837,25 +5837,6 @@ ratings:
       - audience:performance-lovers
     comment_status: approved
     status: approved
-  - event_id: barcelona-salsa-beach-party
-    email: elena.moreau@joinmovida.com
-    overall_sentiment: great
-    comment:
-      Great sunset atmosphere, varied music, and plenty of room to dance by the
-      sea.
-    aspect_scores:
-      organization: 5
-      music: 5
-      atmosphere: 5
-    aspect_tags:
-      - organization:well-organized
-      - music:good-variety
-      - atmosphere:high-energy
-    audience_tags:
-      - audience:travelers
-      - audience:late-night-dancers
-    comment_status: approved
-    status: approved
   - event_id: alfama-thursday-salsa-summer
     email: rita.petrov@joinmovida.com
     overall_sentiment: okay
@@ -6290,20 +6271,6 @@ ratings:
     comment_status: approved
     status: approved
   - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
-    email: elena.moreau@joinmovida.com
-    overall_sentiment: great
-    comment: Last year's edition had stunning views and well run beach socials.
-    aspect_scores:
-      venue-quality: 5
-      organization: 4
-    aspect_tags:
-      - venue-quality:beautiful-venue
-      - organization:well-organized
-    audience_tags:
-      - audience:travelers
-    comment_status: approved
-    status: approved
-  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
     email: mateo.vega@joinmovida.com
     overall_sentiment: okay
     comment: Gorgeous location, but getting between venues took a while.
@@ -6641,22 +6608,6 @@ ratings:
     comment_status: approved
     status: approved
   - event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
-    email: elena.moreau@joinmovida.com
-    overall_sentiment: amazing
-    comment:
-      Having workshops, socials and rooms all in one hotel makes it so easy to
-      enjoy.
-    aspect_scores:
-      organization: 5
-      venue-quality: 5
-    aspect_tags:
-      - organization:well-organized
-      - venue-quality:easy-access
-    audience_tags:
-      - audience:travelers
-    comment_status: approved
-    status: approved
-  - event_id: cdj3cc3164rm4bb36gq3cb9k69h30bb268sj0bb56oo3gc1lc9j30cph74
     email: noah.kim@joinmovida.com
     overall_sentiment: great
     comment: Amazing artist lineup and great DJs across every room.
@@ -6921,20 +6872,6 @@ ratings:
       - atmosphere:easy-find-partners
     audience_tags:
       - audience:meet-new-people
-    comment_status: approved
-    status: approved
-  - event_id: milan-bachata-weekender
-    email: elena.moreau@joinmovida.com
-    overall_sentiment: amazing
-    comment: World class instructors and a beautiful loft with a perfect wooden floor.
-    aspect_scores:
-      workshop: 5
-      venue-quality: 5
-    aspect_tags:
-      - workshop:great-instructor
-      - venue-quality:great-dance-floor
-    audience_tags:
-      - audience:workshop-lovers
     comment_status: approved
     status: approved
   - event_id: milan-bachata-weekender
@@ -7250,21 +7187,6 @@ ratings:
       - venue-quality:crowded
     audience_tags:
       - audience:relaxed-dancing
-    comment_status: approved
-    status: approved
-  - event_id: milan-bachata-weekender-previous
-    email: elena.moreau@joinmovida.com
-    overall_sentiment: amazing
-    comment: Top instructors and a perfect wooden floor, I left with pages of
-      notes.
-    aspect_scores:
-      workshop: 5
-      venue-quality: 5
-    aspect_tags:
-      - workshop:great-instructor
-      - venue-quality:great-dance-floor
-    audience_tags:
-      - audience:workshop-lovers
     comment_status: approved
     status: approved
   - event_id: milan-bachata-weekender-previous
