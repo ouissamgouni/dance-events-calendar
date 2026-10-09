@@ -709,6 +709,1527 @@ events:
       - dance-style:bachata
       - venue:rooftop
       - reach:international
+  - id: toronto-latin-fever-festival
+    calendar_id: movida-community-events
+    title: Toronto Latin Fever Festival
+    description: Three days of salsa, bachata, and kizomba workshops with lakeside views and socials in three rooms until sunrise.
+    image: 13_toronto_latin_fever_festival.png
+    location: Harbourfront Ballroom, Toronto, Canada
+    city: Toronto
+    country: Canada
+    country_code: CA
+    latitude: 43.6387
+    longitude: -79.3817
+    start: w2 Fri 19:00
+    end: w2 Sun 23:00
+    price_min: 189
+    price_currency: CAD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: toronto-latin-fever-festival-previous
+    calendar_id: movida-community-events
+    title: Toronto Latin Fever Festival
+    description: Three days of salsa, bachata, and kizomba workshops with lakeside views and socials in three rooms until sunrise.
+    image: 13_toronto_latin_fever_festival.png
+    location: Harbourfront Ballroom, Toronto, Canada
+    city: Toronto
+    country: Canada
+    country_code: CA
+    latitude: 43.6387
+    longitude: -79.3817
+    start: w-50 Fri 19:00
+    end: w-50 Sun 23:00
+    price_min: 175
+    price_currency: CAD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: toronto-latin-fever-festival-previous-2
+    calendar_id: movida-community-events
+    title: Toronto Latin Fever Festival
+    description: Three days of salsa, bachata, and kizomba workshops with lakeside views and socials in three rooms until sunrise.
+    image: 13_toronto_latin_fever_festival.png
+    location: Harbourfront Ballroom, Toronto, Canada
+    city: Toronto
+    country: Canada
+    country_code: CA
+    latitude: 43.6387
+    longitude: -79.3817
+    start: w-102 Fri 19:00
+    end: w-102 Sun 23:00
+    price_min: 160
+    price_currency: CAD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: bosphorus-latin-festival
+    calendar_id: movida-community-events
+    title: Bosphorus Latin Festival
+    description: Workshops in Galata by day and Latin socials overlooking the Bosphorus by night, with a sunset boat party on Saturday.
+    image: 14_bosphorus_latin_festival.png
+    location: Galata Dance Hall, Istanbul, Türkiye
+    city: Istanbul
+    country: Türkiye
+    country_code: TR
+    latitude: 41.0256
+    longitude: 28.9744
+    start: w3 Thu 20:00
+    end: w3 Sun 23:00
+    price_min: 140
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: bosphorus-latin-festival-previous
+    calendar_id: movida-community-events
+    title: Bosphorus Latin Festival
+    description: Workshops in Galata by day and Latin socials overlooking the Bosphorus by night, with a sunset boat party on Saturday.
+    image: 14_bosphorus_latin_festival.png
+    location: Galata Dance Hall, Istanbul, Türkiye
+    city: Istanbul
+    country: Türkiye
+    country_code: TR
+    latitude: 41.0256
+    longitude: 28.9744
+    start: w-49 Thu 20:00
+    end: w-49 Sun 23:00
+    price_min: 130
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: bosphorus-latin-festival-previous-2
+    calendar_id: movida-community-events
+    title: Bosphorus Latin Festival
+    description: Workshops in Galata by day and Latin socials overlooking the Bosphorus by night, with a sunset boat party on Saturday.
+    image: 14_bosphorus_latin_festival.png
+    location: Galata Dance Hall, Istanbul, Türkiye
+    city: Istanbul
+    country: Türkiye
+    country_code: TR
+    latitude: 41.0256
+    longitude: 28.9744
+    start: w-101 Thu 20:00
+    end: w-101 Sun 23:00
+    price_min: 120
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: marrakech-latin-oasis-festival
+    calendar_id: movida-community-events
+    title: Marrakech Latin Oasis Festival
+    description: A Latin dance escape in the Palmeraie with poolside workshops, riad dinners, and socials under the desert stars.
+    image: 15_marrakech_latin_oasis_festival.png
+    location: Palmeraie Riad Resort, Marrakech, Morocco
+    city: Marrakech
+    country: Morocco
+    country_code: MA
+    latitude: 31.6695
+    longitude: -7.9811
+    start: w4 Thu 20:00
+    end: w4 Sun 23:00
+    price_min: 220
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: marrakech-latin-oasis-festival-previous
+    calendar_id: movida-community-events
+    title: Marrakech Latin Oasis Festival
+    description: A Latin dance escape in the Palmeraie with poolside workshops, riad dinners, and socials under the desert stars.
+    image: 15_marrakech_latin_oasis_festival.png
+    location: Palmeraie Riad Resort, Marrakech, Morocco
+    city: Marrakech
+    country: Morocco
+    country_code: MA
+    latitude: 31.6695
+    longitude: -7.9811
+    start: w-48 Thu 20:00
+    end: w-48 Sun 23:00
+    price_min: 200
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: marrakech-latin-oasis-festival-previous-2
+    calendar_id: movida-community-events
+    title: Marrakech Latin Oasis Festival
+    description: A Latin dance escape in the Palmeraie with poolside workshops, riad dinners, and socials under the desert stars.
+    image: 15_marrakech_latin_oasis_festival.png
+    location: Palmeraie Riad Resort, Marrakech, Morocco
+    city: Marrakech
+    country: Morocco
+    country_code: MA
+    latitude: 31.6695
+    longitude: -7.9811
+    start: w-100 Thu 20:00
+    end: w-100 Sun 23:00
+    price_min: 185
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: big-apple-bachata-festival
+    calendar_id: movida-community-events
+    title: Big Apple Bachata Festival
+    description: New York's bachata family reunion with Dominican and sensual tracks, live bachata on Saturday, and socials until 5am.
+    image: 21_big_apple_bachata_festival.png
+    location: Manhattan Center Ballroom, New York, United States
+    city: New York
+    country: United States
+    country_code: US
+    latitude: 40.7505
+    longitude: -73.9934
+    start: w5 Fri 19:00
+    end: w5 Sun 23:00
+    price_min: 175
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:bachata
+      - reach:international
+  - id: big-apple-bachata-festival-previous
+    calendar_id: movida-community-events
+    title: Big Apple Bachata Festival
+    description: New York's bachata family reunion with Dominican and sensual tracks, live bachata on Saturday, and socials until 5am.
+    image: 21_big_apple_bachata_festival.png
+    location: Manhattan Center Ballroom, New York, United States
+    city: New York
+    country: United States
+    country_code: US
+    latitude: 40.7505
+    longitude: -73.9934
+    start: w-47 Fri 19:00
+    end: w-47 Sun 23:00
+    price_min: 160
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:bachata
+      - reach:international
+  - id: big-apple-bachata-festival-previous-2
+    calendar_id: movida-community-events
+    title: Big Apple Bachata Festival
+    description: New York's bachata family reunion with Dominican and sensual tracks, live bachata on Saturday, and socials until 5am.
+    image: 21_big_apple_bachata_festival.png
+    location: Manhattan Center Ballroom, New York, United States
+    city: New York
+    country: United States
+    country_code: US
+    latitude: 40.7505
+    longitude: -73.9934
+    start: w-99 Fri 19:00
+    end: w-99 Sun 23:00
+    price_min: 150
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:bachata
+      - reach:international
+  - id: dubai-latin-mirage-festival
+    calendar_id: movida-community-events
+    title: Dubai Latin Mirage Festival
+    description: World-class salsa, bachata, and kizomba artists in a Dubai Marina ballroom, with a desert sunset social on Saturday.
+    image: 16_dubai_latin_mirage_festival.png
+    location: Marina Grand Ballroom, Dubai, United Arab Emirates
+    city: Dubai
+    country: United Arab Emirates
+    country_code: AE
+    latitude: 25.0805
+    longitude: 55.1403
+    start: w6 Thu 20:00
+    end: w6 Sat 23:00
+    price_min: 650
+    price_currency: AED
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: dubai-latin-mirage-festival-previous
+    calendar_id: movida-community-events
+    title: Dubai Latin Mirage Festival
+    description: World-class salsa, bachata, and kizomba artists in a Dubai Marina ballroom, with a desert sunset social on Saturday.
+    image: 16_dubai_latin_mirage_festival.png
+    location: Marina Grand Ballroom, Dubai, United Arab Emirates
+    city: Dubai
+    country: United Arab Emirates
+    country_code: AE
+    latitude: 25.0805
+    longitude: 55.1403
+    start: w-46 Thu 20:00
+    end: w-46 Sat 23:00
+    price_min: 600
+    price_currency: AED
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: dubai-latin-mirage-festival-previous-2
+    calendar_id: movida-community-events
+    title: Dubai Latin Mirage Festival
+    description: World-class salsa, bachata, and kizomba artists in a Dubai Marina ballroom, with a desert sunset social on Saturday.
+    image: 16_dubai_latin_mirage_festival.png
+    location: Marina Grand Ballroom, Dubai, United Arab Emirates
+    city: Dubai
+    country: United Arab Emirates
+    country_code: AE
+    latitude: 25.0805
+    longitude: 55.1403
+    start: w-98 Thu 20:00
+    end: w-98 Sat 23:00
+    price_min: 550
+    price_currency: AED
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: red-sea-latin-festival
+    calendar_id: movida-community-events
+    title: Red Sea Latin Festival
+    description: Winter sun in Sharm El Sheikh with morning workshops, snorkelling breaks, and beachfront Latin socials every night.
+    image: 17_red_sea_latin_festival.png
+    location: Naama Bay Beach Resort, Sharm El Sheikh, Egypt
+    city: Sharm El Sheikh
+    country: Egypt
+    country_code: EG
+    latitude: 27.9158
+    longitude: 34.3299
+    start: w7 Thu 20:00
+    end: w7 Sun 23:00
+    price_min: 160
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: red-sea-latin-festival-previous
+    calendar_id: movida-community-events
+    title: Red Sea Latin Festival
+    description: Winter sun in Sharm El Sheikh with morning workshops, snorkelling breaks, and beachfront Latin socials every night.
+    image: 17_red_sea_latin_festival.png
+    location: Naama Bay Beach Resort, Sharm El Sheikh, Egypt
+    city: Sharm El Sheikh
+    country: Egypt
+    country_code: EG
+    latitude: 27.9158
+    longitude: 34.3299
+    start: w-45 Thu 20:00
+    end: w-45 Sun 23:00
+    price_min: 150
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: red-sea-latin-festival-previous-2
+    calendar_id: movida-community-events
+    title: Red Sea Latin Festival
+    description: Winter sun in Sharm El Sheikh with morning workshops, snorkelling breaks, and beachfront Latin socials every night.
+    image: 17_red_sea_latin_festival.png
+    location: Naama Bay Beach Resort, Sharm El Sheikh, Egypt
+    city: Sharm El Sheikh
+    country: Egypt
+    country_code: EG
+    latitude: 27.9158
+    longitude: 34.3299
+    start: w-97 Thu 20:00
+    end: w-97 Sun 23:00
+    price_min: 140
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: lion-city-latin-festival
+    calendar_id: movida-community-events
+    title: Lion City Latin Festival
+    description: Southeast Asia's Latin dance meeting point, with workshops by Marina Bay, a hawker-food social, and rooftop parties.
+    image: 18_lion_city_latin_festival.png
+    location: Marina Bay Ballroom, Singapore
+    city: Singapore
+    country: Singapore
+    country_code: SG
+    latitude: 1.2834
+    longitude: 103.8607
+    start: w8 Fri 19:00
+    end: w8 Sun 23:00
+    price_min: 260
+    price_currency: SGD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: lion-city-latin-festival-previous
+    calendar_id: movida-community-events
+    title: Lion City Latin Festival
+    description: Southeast Asia's Latin dance meeting point, with workshops by Marina Bay, a hawker-food social, and rooftop parties.
+    image: 18_lion_city_latin_festival.png
+    location: Marina Bay Ballroom, Singapore
+    city: Singapore
+    country: Singapore
+    country_code: SG
+    latitude: 1.2834
+    longitude: 103.8607
+    start: w-44 Fri 19:00
+    end: w-44 Sun 23:00
+    price_min: 240
+    price_currency: SGD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: lion-city-latin-festival-previous-2
+    calendar_id: movida-community-events
+    title: Lion City Latin Festival
+    description: Southeast Asia's Latin dance meeting point, with workshops by Marina Bay, a hawker-food social, and rooftop parties.
+    image: 18_lion_city_latin_festival.png
+    location: Marina Bay Ballroom, Singapore
+    city: Singapore
+    country: Singapore
+    country_code: SG
+    latitude: 1.2834
+    longitude: 103.8607
+    start: w-96 Fri 19:00
+    end: w-96 Sun 23:00
+    price_min: 220
+    price_currency: SGD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: busan-latin-festival
+    calendar_id: movida-community-events
+    title: Busan Latin Festival
+    description: Salsa and bachata by the sea in Haeundae, with international instructors, beach socials, and a night view of Gwangan Bridge.
+    image: 19_busan_latin_festival.png
+    location: Haeundae Grand Hall, Busan, South Korea
+    city: Busan
+    country: South Korea
+    country_code: KR
+    latitude: 35.1587
+    longitude: 129.1604
+    start: w9 Fri 19:00
+    end: w9 Sun 23:00
+    price_min: 150
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:international
+  - id: busan-latin-festival-previous
+    calendar_id: movida-community-events
+    title: Busan Latin Festival
+    description: Salsa and bachata by the sea in Haeundae, with international instructors, beach socials, and a night view of Gwangan Bridge.
+    image: 19_busan_latin_festival.png
+    location: Haeundae Grand Hall, Busan, South Korea
+    city: Busan
+    country: South Korea
+    country_code: KR
+    latitude: 35.1587
+    longitude: 129.1604
+    start: w-43 Fri 19:00
+    end: w-43 Sun 23:00
+    price_min: 140
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:international
+  - id: busan-latin-festival-previous-2
+    calendar_id: movida-community-events
+    title: Busan Latin Festival
+    description: Salsa and bachata by the sea in Haeundae, with international instructors, beach socials, and a night view of Gwangan Bridge.
+    image: 19_busan_latin_festival.png
+    location: Haeundae Grand Hall, Busan, South Korea
+    city: Busan
+    country: South Korea
+    country_code: KR
+    latitude: 35.1587
+    longitude: 129.1604
+    start: w-95 Fri 19:00
+    end: w-95 Sun 23:00
+    price_min: 130
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:international
+  - id: sydney-harbour-kizomba-festival
+    calendar_id: movida-community-events
+    title: Sydney Harbour Kizomba Festival
+    description: Kizomba, semba, and urban kiz workshops with summer socials facing the Opera House and a harbour cruise on Sunday.
+    image: 22_sydney_harbour_kizomba_festival.png
+    location: Harbour Pavilion, Sydney, Australia
+    city: Sydney
+    country: Australia
+    country_code: AU
+    latitude: -33.8568
+    longitude: 151.2153
+    start: w10 Fri 19:00
+    end: w10 Sun 23:00
+    price_min: 230
+    price_currency: AUD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:kizomba
+      - dance-style:semba
+      - reach:international
+  - id: sydney-harbour-kizomba-festival-previous
+    calendar_id: movida-community-events
+    title: Sydney Harbour Kizomba Festival
+    description: Kizomba, semba, and urban kiz workshops with summer socials facing the Opera House and a harbour cruise on Sunday.
+    image: 22_sydney_harbour_kizomba_festival.png
+    location: Harbour Pavilion, Sydney, Australia
+    city: Sydney
+    country: Australia
+    country_code: AU
+    latitude: -33.8568
+    longitude: 151.2153
+    start: w-42 Fri 19:00
+    end: w-42 Sun 23:00
+    price_min: 210
+    price_currency: AUD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:kizomba
+      - dance-style:semba
+      - reach:international
+  - id: sydney-harbour-kizomba-festival-previous-2
+    calendar_id: movida-community-events
+    title: Sydney Harbour Kizomba Festival
+    description: Kizomba, semba, and urban kiz workshops with summer socials facing the Opera House and a harbour cruise on Sunday.
+    image: 22_sydney_harbour_kizomba_festival.png
+    location: Harbour Pavilion, Sydney, Australia
+    city: Sydney
+    country: Australia
+    country_code: AU
+    latitude: -33.8568
+    longitude: 151.2153
+    start: w-94 Fri 19:00
+    end: w-94 Sun 23:00
+    price_min: 195
+    price_currency: AUD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:kizomba
+      - dance-style:semba
+      - reach:international
+  - id: cali-salsa-capital-festival
+    calendar_id: movida-community-events
+    title: Cali Salsa Capital Festival
+    description: Year-end salsa caleña in the world's salsa capital, with footwork bootcamps, live orquestas, and the Salsódromo parade.
+    image: 20_cali_salsa_capital_festival.png
+    location: Teatro Salsódromo, Cali, Colombia
+    city: Cali
+    country: Colombia
+    country_code: CO
+    latitude: 3.4516
+    longitude: -76.532
+    start: w12 Mon 18:00
+    end: w12 Wed 23:00
+    price_min: 120
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - reach:international
+  - id: cali-salsa-capital-festival-previous
+    calendar_id: movida-community-events
+    title: Cali Salsa Capital Festival
+    description: Year-end salsa caleña in the world's salsa capital, with footwork bootcamps, live orquestas, and the Salsódromo parade.
+    image: 20_cali_salsa_capital_festival.png
+    location: Teatro Salsódromo, Cali, Colombia
+    city: Cali
+    country: Colombia
+    country_code: CO
+    latitude: 3.4516
+    longitude: -76.532
+    start: w-40 Mon 18:00
+    end: w-40 Wed 23:00
+    price_min: 110
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - reach:international
+  - id: cali-salsa-capital-festival-previous-2
+    calendar_id: movida-community-events
+    title: Cali Salsa Capital Festival
+    description: Year-end salsa caleña in the world's salsa capital, with footwork bootcamps, live orquestas, and the Salsódromo parade.
+    image: 20_cali_salsa_capital_festival.png
+    location: Teatro Salsódromo, Cali, Colombia
+    city: Cali
+    country: Colombia
+    country_code: CO
+    latitude: 3.4516
+    longitude: -76.532
+    start: w-92 Mon 18:00
+    end: w-92 Wed 23:00
+    price_min: 100
+    price_currency: USD
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - reach:international
+  - id: paris-latin-lumiere-festival-previous-2
+    calendar_id: movida-community-events
+    title: Paris Latin Lumière Festival
+    description: Three nights of salsa, bachata, and kizomba under the lights of Paris, with world-class workshops by day and three social rooms until sunrise.
+    image: 23_paris_latin_lumiere_festival.png
+    location: Pavillon Villette, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8916
+    longitude: 2.3906
+    start: "w-93 Fri 19:00"
+    end: "w-93 Sun 23:00"
+    price_min: 120
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: paris-latin-lumiere-festival-previous
+    calendar_id: movida-community-events
+    title: Paris Latin Lumière Festival
+    description: Three nights of salsa, bachata, and kizomba under the lights of Paris, with world-class workshops by day and three social rooms until sunrise.
+    image: 23_paris_latin_lumiere_festival.png
+    location: Pavillon Villette, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8916
+    longitude: 2.3906
+    start: "w-41 Fri 19:00"
+    end: "w-41 Sun 23:00"
+    price_min: 135
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: paris-latin-lumiere-festival
+    calendar_id: movida-community-events
+    title: Paris Latin Lumière Festival
+    description: Three nights of salsa, bachata, and kizomba under the lights of Paris, with world-class workshops by day and three social rooms until sunrise.
+    image: 23_paris_latin_lumiere_festival.png
+    location: Pavillon Villette, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8916
+    longitude: 2.3906
+    start: "w11 Fri 19:00"
+    end: "w11 Sun 23:00"
+    price_min: 149
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:festival
+      - format:social
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: seville-salsa-weekender-previous-2
+    calendar_id: movida-community-events
+    title: Seville Salsa Weekender
+    description: Cuban salsa and rueda workshops by day, patio socials with live son and timba by night in Triana.
+    image: 01_seville_salsa_weekender.png
+    location: Casa Triana, Seville, Spain
+    city: Seville
+    country: Spain
+    country_code: ES
+    latitude: 37.3826
+    longitude: -6.0026
+    start: "w-71 Fri 19:00"
+    end: "w-71 Sun 22:00"
+    price_min: 90
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:salsa
+      - dance-style:cuban
+      - dance-style:rueda
+      - misc:live-band
+      - reach:international
+  - id: milan-bachata-weekender-previous-2
+    calendar_id: movida-community-events
+    title: Milan Bachata Weekender
+    description: Sensual and Dominican bachata tracks with international instructors and late-night socials by the Navigli canals.
+    image: 02_milan_bachata_weekender.png
+    location: Navigli Dance Loft, Milan, Italy
+    city: Milan
+    country: Italy
+    country_code: IT
+    latitude: 45.4519
+    longitude: 9.1755
+    start: "w-67 Fri 20:00"
+    end: "w-67 Sun 23:00"
+    price_min: 95
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:bachata
+      - reach:international
+  - id: budapest-salsa-weekender-previous-2
+    calendar_id: movida-community-events
+    title: Budapest Salsa Weekender
+    description: On1 and On2 salsa workshops, a Danube boat party on Saturday, and a thermal bath recovery social on Sunday.
+    image: 03_budapest_salsa_weekender.png
+    location: Danube Ballroom, Budapest, Hungary
+    city: Budapest
+    country: Hungary
+    country_code: HU
+    latitude: 47.4979
+    longitude: 19.0402
+    start: "w-63 Fri 20:00"
+    end: "w-63 Sun 23:00"
+    price_min: 70
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:international
+  - id: brussels-latin-weekender-previous-2
+    calendar_id: movida-community-events
+    title: Brussels Latin Weekender
+    description: Salsa, bachata, and kizomba rooms all weekend in the heart of Brussels, with shows on Saturday night.
+    image: 04_brussels_latin_weekender.png
+    location: Atelier Sablon, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8403
+    longitude: 4.3555
+    start: "w-59 Fri 20:00"
+    end: "w-59 Sun 22:00"
+    price_min: 60
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+  - id: athens-bachata-weekender-previous-2
+    calendar_id: movida-community-events
+    title: Athens Bachata Weekender
+    description: A warm bachata escape with workshops in Gazi and a rooftop social facing the Acropolis.
+    image: 06_athens_bachata_weekender.png
+    location: Gazi Arts Hall, Athens, Greece
+    city: Athens
+    country: Greece
+    country_code: GR
+    latitude: 37.9784
+    longitude: 23.7128
+    start: "w-56 Fri 20:00"
+    end: "w-56 Sun 23:00"
+    price_min: 75
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:weekender
+      - dance-style:bachata
+      - venue:rooftop
+      - reach:international
+  - id: canal-salsa-tuesdays-past-4
+    calendar_id: movida-community-events
+    title: Canal Saint-Martin Salsa Tuesdays
+    description: "Weekly salsa night by the canal: a beginner taster at 20:30, then Cuban and LA-style salsa until 1am."
+    location: Le Comptoir du Canal, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8722
+    longitude: 2.365
+    start: "w-4 Tue 20:30"
+    end: "w-4 Wed 01:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: canal-salsa-tuesdays-past-3
+    calendar_id: movida-community-events
+    title: Canal Saint-Martin Salsa Tuesdays
+    description: "Weekly salsa night by the canal: a beginner taster at 20:30, then Cuban and LA-style salsa until 1am."
+    location: Le Comptoir du Canal, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8722
+    longitude: 2.365
+    start: "w-3 Tue 20:30"
+    end: "w-3 Wed 01:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: canal-salsa-tuesdays-past-2
+    calendar_id: movida-community-events
+    title: Canal Saint-Martin Salsa Tuesdays
+    description: "Weekly salsa night by the canal: a beginner taster at 20:30, then Cuban and LA-style salsa until 1am."
+    location: Le Comptoir du Canal, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8722
+    longitude: 2.365
+    start: "w-2 Tue 20:30"
+    end: "w-2 Wed 01:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: canal-salsa-tuesdays-past-1
+    calendar_id: movida-community-events
+    title: Canal Saint-Martin Salsa Tuesdays
+    description: "Weekly salsa night by the canal: a beginner taster at 20:30, then Cuban and LA-style salsa until 1am."
+    location: Le Comptoir du Canal, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8722
+    longitude: 2.365
+    start: "w-1 Tue 20:30"
+    end: "w-1 Wed 01:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: canal-salsa-tuesdays-next-1
+    calendar_id: movida-community-events
+    title: Canal Saint-Martin Salsa Tuesdays
+    description: "Weekly salsa night by the canal: a beginner taster at 20:30, then Cuban and LA-style salsa until 1am."
+    location: Le Comptoir du Canal, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8722
+    longitude: 2.365
+    start: "w1 Tue 20:30"
+    end: "w1 Wed 01:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: canal-salsa-tuesdays-next-2
+    calendar_id: movida-community-events
+    title: Canal Saint-Martin Salsa Tuesdays
+    description: "Weekly salsa night by the canal: a beginner taster at 20:30, then Cuban and LA-style salsa until 1am."
+    location: Le Comptoir du Canal, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8722
+    longitude: 2.365
+    start: "w2 Tue 20:30"
+    end: "w2 Wed 01:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: canal-salsa-tuesdays-next-3
+    calendar_id: movida-community-events
+    title: Canal Saint-Martin Salsa Tuesdays
+    description: "Weekly salsa night by the canal: a beginner taster at 20:30, then Cuban and LA-style salsa until 1am."
+    location: Le Comptoir du Canal, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8722
+    longitude: 2.365
+    start: "w3 Tue 20:30"
+    end: "w3 Wed 01:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: pigalle-bachata-wednesdays-past-4
+    calendar_id: movida-community-events
+    title: Pigalle Bachata Wednesdays
+    description: Sensual and Dominican bachata every Wednesday in a cosy Pigalle club, with a short class before the social.
+    location: Studio Pigalle, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8822
+    longitude: 2.3376
+    start: "w-4 Wed 20:30"
+    end: "w-4 Thu 01:00"
+    price_min: 12
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+  - id: pigalle-bachata-wednesdays-past-3
+    calendar_id: movida-community-events
+    title: Pigalle Bachata Wednesdays
+    description: Sensual and Dominican bachata every Wednesday in a cosy Pigalle club, with a short class before the social.
+    location: Studio Pigalle, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8822
+    longitude: 2.3376
+    start: "w-3 Wed 20:30"
+    end: "w-3 Thu 01:00"
+    price_min: 12
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+  - id: pigalle-bachata-wednesdays-past-2
+    calendar_id: movida-community-events
+    title: Pigalle Bachata Wednesdays
+    description: Sensual and Dominican bachata every Wednesday in a cosy Pigalle club, with a short class before the social.
+    location: Studio Pigalle, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8822
+    longitude: 2.3376
+    start: "w-2 Wed 20:30"
+    end: "w-2 Thu 01:00"
+    price_min: 12
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+  - id: pigalle-bachata-wednesdays-past-1
+    calendar_id: movida-community-events
+    title: Pigalle Bachata Wednesdays
+    description: Sensual and Dominican bachata every Wednesday in a cosy Pigalle club, with a short class before the social.
+    location: Studio Pigalle, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8822
+    longitude: 2.3376
+    start: "w-1 Wed 20:30"
+    end: "w-1 Thu 01:00"
+    price_min: 12
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+  - id: pigalle-bachata-wednesdays-next-1
+    calendar_id: movida-community-events
+    title: Pigalle Bachata Wednesdays
+    description: Sensual and Dominican bachata every Wednesday in a cosy Pigalle club, with a short class before the social.
+    location: Studio Pigalle, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8822
+    longitude: 2.3376
+    start: "w1 Wed 20:30"
+    end: "w1 Thu 01:00"
+    price_min: 12
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+  - id: pigalle-bachata-wednesdays-next-2
+    calendar_id: movida-community-events
+    title: Pigalle Bachata Wednesdays
+    description: Sensual and Dominican bachata every Wednesday in a cosy Pigalle club, with a short class before the social.
+    location: Studio Pigalle, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8822
+    longitude: 2.3376
+    start: "w2 Wed 20:30"
+    end: "w2 Thu 01:00"
+    price_min: 12
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+  - id: pigalle-bachata-wednesdays-next-3
+    calendar_id: movida-community-events
+    title: Pigalle Bachata Wednesdays
+    description: Sensual and Dominican bachata every Wednesday in a cosy Pigalle club, with a short class before the social.
+    location: Studio Pigalle, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8822
+    longitude: 2.3376
+    start: "w3 Wed 20:30"
+    end: "w3 Thu 01:00"
+    price_min: 12
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+  - id: peniche-latina-sundays-past-4
+    calendar_id: movida-community-events
+    title: Péniche Latina Sundays
+    description: Salsa and bachata on a riverboat moored on the Seine, from sunset until late.
+    location: Péniche Latina, Quai de la Rapée, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8443
+    longitude: 2.37
+    start: "w-4 Sun 18:00"
+    end: "w-4 Sun 23:30"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: peniche-latina-sundays-past-3
+    calendar_id: movida-community-events
+    title: Péniche Latina Sundays
+    description: Salsa and bachata on a riverboat moored on the Seine, from sunset until late.
+    location: Péniche Latina, Quai de la Rapée, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8443
+    longitude: 2.37
+    start: "w-3 Sun 18:00"
+    end: "w-3 Sun 23:30"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: peniche-latina-sundays-past-2
+    calendar_id: movida-community-events
+    title: Péniche Latina Sundays
+    description: Salsa and bachata on a riverboat moored on the Seine, from sunset until late.
+    location: Péniche Latina, Quai de la Rapée, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8443
+    longitude: 2.37
+    start: "w-2 Sun 18:00"
+    end: "w-2 Sun 23:30"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: peniche-latina-sundays-past-1
+    calendar_id: movida-community-events
+    title: Péniche Latina Sundays
+    description: Salsa and bachata on a riverboat moored on the Seine, from sunset until late.
+    location: Péniche Latina, Quai de la Rapée, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8443
+    longitude: 2.37
+    start: "w-1 Sun 18:00"
+    end: "w-1 Sun 23:30"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: peniche-latina-sundays-next-1
+    calendar_id: movida-community-events
+    title: Péniche Latina Sundays
+    description: Salsa and bachata on a riverboat moored on the Seine, from sunset until late.
+    location: Péniche Latina, Quai de la Rapée, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8443
+    longitude: 2.37
+    start: "w1 Sun 18:00"
+    end: "w1 Sun 23:30"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: peniche-latina-sundays-next-2
+    calendar_id: movida-community-events
+    title: Péniche Latina Sundays
+    description: Salsa and bachata on a riverboat moored on the Seine, from sunset until late.
+    location: Péniche Latina, Quai de la Rapée, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8443
+    longitude: 2.37
+    start: "w2 Sun 18:00"
+    end: "w2 Sun 23:30"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: peniche-latina-sundays-next-3
+    calendar_id: movida-community-events
+    title: Péniche Latina Sundays
+    description: Salsa and bachata on a riverboat moored on the Seine, from sunset until late.
+    location: Péniche Latina, Quai de la Rapée, Paris, France
+    city: Paris
+    country: France
+    country_code: FR
+    latitude: 48.8443
+    longitude: 2.37
+    start: "w3 Sun 18:00"
+    end: "w3 Sun 23:30"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: ixelles-salsa-thursdays-past-3
+    calendar_id: movida-community-events
+    title: Ixelles Salsa Thursdays
+    description: "Brussels' favourite midweek salsa social near Place Flagey, with resident DJs and a friendly crowd."
+    location: Café Flagey, Ixelles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8275
+    longitude: 4.3721
+    start: "w-3 Thu 20:30"
+    end: "w-3 Fri 01:00"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: ixelles-salsa-thursdays-past-2
+    calendar_id: movida-community-events
+    title: Ixelles Salsa Thursdays
+    description: "Brussels' favourite midweek salsa social near Place Flagey, with resident DJs and a friendly crowd."
+    location: Café Flagey, Ixelles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8275
+    longitude: 4.3721
+    start: "w-2 Thu 20:30"
+    end: "w-2 Fri 01:00"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: ixelles-salsa-thursdays-past-1
+    calendar_id: movida-community-events
+    title: Ixelles Salsa Thursdays
+    description: "Brussels' favourite midweek salsa social near Place Flagey, with resident DJs and a friendly crowd."
+    location: Café Flagey, Ixelles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8275
+    longitude: 4.3721
+    start: "w-1 Thu 20:30"
+    end: "w-1 Fri 01:00"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: ixelles-salsa-thursdays-next-1
+    calendar_id: movida-community-events
+    title: Ixelles Salsa Thursdays
+    description: "Brussels' favourite midweek salsa social near Place Flagey, with resident DJs and a friendly crowd."
+    location: Café Flagey, Ixelles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8275
+    longitude: 4.3721
+    start: "w1 Thu 20:30"
+    end: "w1 Fri 01:00"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: ixelles-salsa-thursdays-next-2
+    calendar_id: movida-community-events
+    title: Ixelles Salsa Thursdays
+    description: "Brussels' favourite midweek salsa social near Place Flagey, with resident DJs and a friendly crowd."
+    location: Café Flagey, Ixelles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8275
+    longitude: 4.3721
+    start: "w2 Thu 20:30"
+    end: "w2 Fri 01:00"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: ixelles-salsa-thursdays-next-3
+    calendar_id: movida-community-events
+    title: Ixelles Salsa Thursdays
+    description: "Brussels' favourite midweek salsa social near Place Flagey, with resident DJs and a friendly crowd."
+    location: Café Flagey, Ixelles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8275
+    longitude: 4.3721
+    start: "w3 Thu 20:30"
+    end: "w3 Fri 01:00"
+    price_min: 8
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: saint-gilles-latin-saturdays-past-3
+    calendar_id: movida-community-events
+    title: "Saint-Gilles Salsa & Bachata Saturdays"
+    description: A late Saturday party alternating salsa and bachata sets in a former printing house in Saint-Gilles.
+    location: La Maison des Rythmes, Saint-Gilles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8302
+    longitude: 4.3456
+    start: "w-3 Sat 21:00"
+    end: "w-3 Sun 02:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: saint-gilles-latin-saturdays-past-2
+    calendar_id: movida-community-events
+    title: "Saint-Gilles Salsa & Bachata Saturdays"
+    description: A late Saturday party alternating salsa and bachata sets in a former printing house in Saint-Gilles.
+    location: La Maison des Rythmes, Saint-Gilles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8302
+    longitude: 4.3456
+    start: "w-2 Sat 21:00"
+    end: "w-2 Sun 02:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: saint-gilles-latin-saturdays-past-1
+    calendar_id: movida-community-events
+    title: "Saint-Gilles Salsa & Bachata Saturdays"
+    description: A late Saturday party alternating salsa and bachata sets in a former printing house in Saint-Gilles.
+    location: La Maison des Rythmes, Saint-Gilles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8302
+    longitude: 4.3456
+    start: "w-1 Sat 21:00"
+    end: "w-1 Sun 02:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: saint-gilles-latin-saturdays-next-1
+    calendar_id: movida-community-events
+    title: "Saint-Gilles Salsa & Bachata Saturdays"
+    description: A late Saturday party alternating salsa and bachata sets in a former printing house in Saint-Gilles.
+    location: La Maison des Rythmes, Saint-Gilles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8302
+    longitude: 4.3456
+    start: "w1 Sat 21:00"
+    end: "w1 Sun 02:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: saint-gilles-latin-saturdays-next-2
+    calendar_id: movida-community-events
+    title: "Saint-Gilles Salsa & Bachata Saturdays"
+    description: A late Saturday party alternating salsa and bachata sets in a former printing house in Saint-Gilles.
+    location: La Maison des Rythmes, Saint-Gilles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8302
+    longitude: 4.3456
+    start: "w2 Sat 21:00"
+    end: "w2 Sun 02:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+  - id: saint-gilles-latin-saturdays-next-3
+    calendar_id: movida-community-events
+    title: "Saint-Gilles Salsa & Bachata Saturdays"
+    description: A late Saturday party alternating salsa and bachata sets in a former printing house in Saint-Gilles.
+    location: La Maison des Rythmes, Saint-Gilles, Brussels, Belgium
+    city: Brussels
+    country: Belgium
+    country_code: BE
+    latitude: 50.8302
+    longitude: 4.3456
+    start: "w3 Sat 21:00"
+    end: "w3 Sun 02:00"
+    price_min: 10
+    price_currency: EUR
+    price_is_free: false
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
 event_series:
   - canonical_title: Alfama Thursday Salsa
     status: resolved
@@ -721,30 +2242,35 @@ event_series:
     status: resolved
     source: manual
     members:
+      - seville-salsa-weekender-previous-2
       - seville-salsa-weekender-previous
       - seville-salsa-weekender
   - canonical_title: Milan Bachata Weekender
     status: resolved
     source: manual
     members:
+      - milan-bachata-weekender-previous-2
       - milan-bachata-weekender-previous
       - milan-bachata-weekender
   - canonical_title: Budapest Salsa Weekender
     status: resolved
     source: manual
     members:
+      - budapest-salsa-weekender-previous-2
       - budapest-salsa-weekender-previous
       - budapest-salsa-weekender
   - canonical_title: Brussels Latin Weekender
     status: resolved
     source: manual
     members:
+      - brussels-latin-weekender-previous-2
       - brussels-latin-weekender-previous
       - brussels-latin-weekender
   - canonical_title: Athens Bachata Weekender
     status: resolved
     source: manual
     members:
+      - athens-bachata-weekender-previous-2
       - athens-bachata-weekender-previous
       - athens-bachata-weekender
   - canonical_title: Costa Brava Salsa Summer Festival
@@ -753,6 +2279,136 @@ event_series:
     members:
       - costa-brava-salsa-summer-festival-previous
       - 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+  - canonical_title: Toronto Latin Fever Festival
+    status: resolved
+    source: manual
+    members:
+      - toronto-latin-fever-festival-previous-2
+      - toronto-latin-fever-festival-previous
+      - toronto-latin-fever-festival
+  - canonical_title: Bosphorus Latin Festival
+    status: resolved
+    source: manual
+    members:
+      - bosphorus-latin-festival-previous-2
+      - bosphorus-latin-festival-previous
+      - bosphorus-latin-festival
+  - canonical_title: Marrakech Latin Oasis Festival
+    status: resolved
+    source: manual
+    members:
+      - marrakech-latin-oasis-festival-previous-2
+      - marrakech-latin-oasis-festival-previous
+      - marrakech-latin-oasis-festival
+  - canonical_title: Big Apple Bachata Festival
+    status: resolved
+    source: manual
+    members:
+      - big-apple-bachata-festival-previous-2
+      - big-apple-bachata-festival-previous
+      - big-apple-bachata-festival
+  - canonical_title: Dubai Latin Mirage Festival
+    status: resolved
+    source: manual
+    members:
+      - dubai-latin-mirage-festival-previous-2
+      - dubai-latin-mirage-festival-previous
+      - dubai-latin-mirage-festival
+  - canonical_title: Red Sea Latin Festival
+    status: resolved
+    source: manual
+    members:
+      - red-sea-latin-festival-previous-2
+      - red-sea-latin-festival-previous
+      - red-sea-latin-festival
+  - canonical_title: Lion City Latin Festival
+    status: resolved
+    source: manual
+    members:
+      - lion-city-latin-festival-previous-2
+      - lion-city-latin-festival-previous
+      - lion-city-latin-festival
+  - canonical_title: Busan Latin Festival
+    status: resolved
+    source: manual
+    members:
+      - busan-latin-festival-previous-2
+      - busan-latin-festival-previous
+      - busan-latin-festival
+  - canonical_title: Sydney Harbour Kizomba Festival
+    status: resolved
+    source: manual
+    members:
+      - sydney-harbour-kizomba-festival-previous-2
+      - sydney-harbour-kizomba-festival-previous
+      - sydney-harbour-kizomba-festival
+  - canonical_title: Cali Salsa Capital Festival
+    status: resolved
+    source: manual
+    members:
+      - cali-salsa-capital-festival-previous-2
+      - cali-salsa-capital-festival-previous
+      - cali-salsa-capital-festival
+  - canonical_title: Paris Latin Lumière Festival
+    status: resolved
+    source: manual
+    members:
+      - paris-latin-lumiere-festival-previous-2
+      - paris-latin-lumiere-festival-previous
+      - paris-latin-lumiere-festival
+  - canonical_title: Canal Saint-Martin Salsa Tuesdays
+    status: resolved
+    source: manual
+    members:
+      - canal-salsa-tuesdays-past-4
+      - canal-salsa-tuesdays-past-3
+      - canal-salsa-tuesdays-past-2
+      - canal-salsa-tuesdays-past-1
+      - canal-salsa-tuesdays-next-1
+      - canal-salsa-tuesdays-next-2
+      - canal-salsa-tuesdays-next-3
+  - canonical_title: Pigalle Bachata Wednesdays
+    status: resolved
+    source: manual
+    members:
+      - pigalle-bachata-wednesdays-past-4
+      - pigalle-bachata-wednesdays-past-3
+      - pigalle-bachata-wednesdays-past-2
+      - pigalle-bachata-wednesdays-past-1
+      - pigalle-bachata-wednesdays-next-1
+      - pigalle-bachata-wednesdays-next-2
+      - pigalle-bachata-wednesdays-next-3
+  - canonical_title: Péniche Latina Sundays
+    status: resolved
+    source: manual
+    members:
+      - peniche-latina-sundays-past-4
+      - peniche-latina-sundays-past-3
+      - peniche-latina-sundays-past-2
+      - peniche-latina-sundays-past-1
+      - peniche-latina-sundays-next-1
+      - peniche-latina-sundays-next-2
+      - peniche-latina-sundays-next-3
+  - canonical_title: Ixelles Salsa Thursdays
+    status: resolved
+    source: manual
+    members:
+      - ixelles-salsa-thursdays-past-3
+      - ixelles-salsa-thursdays-past-2
+      - ixelles-salsa-thursdays-past-1
+      - ixelles-salsa-thursdays-next-1
+      - ixelles-salsa-thursdays-next-2
+      - ixelles-salsa-thursdays-next-3
+  - canonical_title: "Saint-Gilles Salsa & Bachata Saturdays"
+    status: resolved
+    source: manual
+    members:
+      - saint-gilles-latin-saturdays-past-3
+      - saint-gilles-latin-saturdays-past-2
+      - saint-gilles-latin-saturdays-past-1
+      - saint-gilles-latin-saturdays-next-1
+      - saint-gilles-latin-saturdays-next-2
+      - saint-gilles-latin-saturdays-next-3
 
 ratings:
   - event_id: alfama-thursday-salsa-summer
@@ -2046,6 +3702,856 @@ ratings:
       - audience:late-night-dancers
     comment_status: approved
     status: approved
+  - event_id: toronto-latin-fever-festival-previous
+    email: noah.kim@joinmovida.com
+    overall_sentiment: amazing
+    comment: Three rooms of top DJs and a crowd from all over North America. The kizomba room was magic.
+    aspect_scores: { music: 5, atmosphere: 5 }
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:international-crowd
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: toronto-latin-fever-festival-previous
+    email: clara.dubois@joinmovida.com
+    overall_sentiment: great
+    comment: Well levelled workshops and a smooth check-in even on the busy Saturday.
+    aspect_scores: { workshop: 5, organization: 4 }
+    aspect_tags:
+      - workshop:good-level
+      - organization:smooth-check-in
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: toronto-latin-fever-festival-previous
+    email: ivo.diallo@joinmovida.com
+    overall_sentiment: okay
+    comment: Great teachers, but the bachata room was overcrowded on Saturday night.
+    aspect_scores: { workshop: 4, venue-quality: 2 }
+    aspect_tags:
+      - workshop:great-instructor
+      - venue-quality:crowded
+    audience_tags:
+      - audience:relaxed-dancing
+    comment_status: approved
+    status: approved
+  - event_id: toronto-latin-fever-festival-previous-2
+    email: bruno.santos@joinmovida.com
+    overall_sentiment: great
+    comment: Big wooden floor, lake views from the ballroom, and a really friendly crowd.
+    aspect_scores: { venue-quality: 5, atmosphere: 4 }
+    aspect_tags:
+      - venue-quality:great-dance-floor
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: toronto-latin-fever-festival-previous-2
+    email: leila.bauer@joinmovida.com
+    overall_sentiment: great
+    comment: My first North American festival and I danced every single song.
+    aspect_scores: { atmosphere: 5, music: 4 }
+    aspect_tags:
+      - atmosphere:easy-find-partners
+      - music:good-variety
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: bosphorus-latin-festival-previous
+    email: milan.horvat@joinmovida.com
+    overall_sentiment: amazing
+    comment: The sunset boat party on the Bosphorus is a once-in-a-lifetime social.
+    aspect_scores: { atmosphere: 5, venue-quality: 5 }
+    aspect_tags:
+      - atmosphere:great-atmosphere
+      - venue-quality:beautiful-venue
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: bosphorus-latin-festival-previous
+    email: zara.benali@joinmovida.com
+    overall_sentiment: great
+    comment: Warm Turkish hospitality and a great mix of local and international dancers.
+    aspect_scores: { atmosphere: 5, organization: 4 }
+    aspect_tags:
+      - atmosphere:good-mix-of-dancers
+      - organization:friendly-staff
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: bosphorus-latin-festival-previous
+    email: theo.novak@joinmovida.com
+    overall_sentiment: okay
+    comment: Lovely socials, but the Friday program started almost an hour late.
+    aspect_scores: { music: 4, organization: 2 }
+    aspect_tags:
+      - music:great-playlist
+      - organization:started-late
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: bosphorus-latin-festival-previous-2
+    email: samir.ivanov@joinmovida.com
+    overall_sentiment: great
+    comment: Excellent kizomba track and a cosy Galata venue a short walk from everything.
+    aspect_scores: { workshop: 5, venue-quality: 4 }
+    aspect_tags:
+      - workshop:clear-explanations
+      - venue-quality:easy-access
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: bosphorus-latin-festival-previous-2
+    email: rita.petrov@joinmovida.com
+    overall_sentiment: great
+    comment: Great value pass, and baklava breaks between workshops are a festival highlight.
+    aspect_scores: { value: 5, atmosphere: 4 }
+    aspect_tags:
+      - value:worth-it
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:foodies
+    comment_status: approved
+    status: approved
+  - event_id: marrakech-latin-oasis-festival-previous
+    email: omar.costa@joinmovida.com
+    overall_sentiment: amazing
+    comment: Dancing under the stars in the Palmeraie felt unreal. Best festival of my year.
+    aspect_scores: { atmosphere: 5, venue-quality: 5 }
+    aspect_tags:
+      - atmosphere:great-atmosphere
+      - venue-quality:beautiful-venue
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: marrakech-latin-oasis-festival-previous
+    email: ines.lopez@joinmovida.com
+    overall_sentiment: great
+    comment: The all-inclusive package made it so easy, and the poolside workshops were great.
+    aspect_scores: { value: 5, workshop: 4 }
+    aspect_tags:
+      - value:great-package
+      - workshop:good-pacing
+    audience_tags:
+      - audience:relaxed-dancing
+    comment_status: approved
+    status: approved
+  - event_id: marrakech-latin-oasis-festival-previous
+    email: jonas.meyer@joinmovida.com
+    overall_sentiment: okay
+    comment: Beautiful resort, but the outdoor floor was slippery after the evening dew.
+    aspect_scores: { venue-quality: 2, music: 4 }
+    aspect_tags:
+      - venue-quality:slippery-floor
+      - music:great-dj
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: marrakech-latin-oasis-festival-previous-2
+    email: mateo.vega@joinmovida.com
+    overall_sentiment: great
+    comment: Riad dinners with the whole festival family, then salsa until 4am.
+    aspect_scores: { atmosphere: 5, organization: 4 }
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - organization:well-organized
+    audience_tags:
+      - audience:foodies
+    comment_status: approved
+    status: approved
+  - event_id: marrakech-latin-oasis-festival-previous-2
+    email: nadia.fischer@joinmovida.com
+    overall_sentiment: amazing
+    comment: Inspiring artists and the Saturday shows by the pool gave me goosebumps.
+    aspect_scores: { shows: 5, workshop: 5 }
+    aspect_tags:
+      - shows:inspiring
+      - workshop:great-instructor
+    audience_tags:
+      - audience:performance-lovers
+    comment_status: approved
+    status: approved
+  - event_id: big-apple-bachata-festival-previous
+    email: pablo.rossi@joinmovida.com
+    overall_sentiment: amazing
+    comment: Live bachata band on Saturday and the best Dominican footwork classes I have taken.
+    aspect_scores: { music: 5, workshop: 5 }
+    aspect_tags:
+      - music:live-band
+      - workshop:great-instructor
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+  - event_id: big-apple-bachata-festival-previous
+    email: nina.khan@joinmovida.com
+    overall_sentiment: great
+    comment: Huge energy, amazing dancers, and socials that really went until 5am.
+    aspect_scores: { atmosphere: 5, music: 4 }
+    aspect_tags:
+      - atmosphere:high-energy
+      - music:great-energy
+    audience_tags:
+      - audience:high-energy-dancing
+    comment_status: approved
+    status: approved
+  - event_id: big-apple-bachata-festival-previous
+    email: sofia.torres@joinmovida.com
+    overall_sentiment: okay
+    comment: Great vibe, but the coat check queue was endless and the ballroom got very hot.
+    aspect_scores: { organization: 2, venue-quality: 3 }
+    aspect_tags:
+      - organization:long-queue
+      - venue-quality:too-hot
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: big-apple-bachata-festival-previous-2
+    email: leo.martin@joinmovida.com
+    overall_sentiment: great
+    comment: Clear split between sensual and Dominican tracks, easy to choose my level.
+    aspect_scores: { workshop: 5, organization: 4 }
+    aspect_tags:
+      - workshop:good-level
+      - organization:good-schedule
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: big-apple-bachata-festival-previous-2
+    email: camille.laurent@joinmovida.com
+    overall_sentiment: great
+    comment: Incredible show night and dancers from every corner of the world.
+    aspect_scores: { shows: 5, atmosphere: 4 }
+    aspect_tags:
+      - shows:great-performances
+      - atmosphere:international-crowd
+    audience_tags:
+      - audience:performance-lovers
+    comment_status: approved
+    status: approved
+  - event_id: dubai-latin-mirage-festival-previous
+    email: maya.rivera@joinmovida.com
+    overall_sentiment: amazing
+    comment: Luxurious ballroom, world-class line-up, and the desert sunset social was breathtaking.
+    aspect_scores: { venue-quality: 5, shows: 5 }
+    aspect_tags:
+      - venue-quality:beautiful-venue
+      - shows:great-performances
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: dubai-latin-mirage-festival-previous
+    email: samir.ivanov@joinmovida.com
+    overall_sentiment: great
+    comment: Everything ran on time, from workshops to the shuttle out to the desert.
+    aspect_scores: { organization: 5, atmosphere: 4 }
+    aspect_tags:
+      - organization:started-on-time
+      - atmosphere:international-crowd
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: dubai-latin-mirage-festival-previous
+    email: victor.schmidt@joinmovida.com
+    overall_sentiment: okay
+    comment: Excellent artists, but drinks and extras made it pricier than expected.
+    aspect_scores: { workshop: 4, value: 2 }
+    aspect_tags:
+      - workshop:great-instructor
+      - value:hidden-costs
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: dubai-latin-mirage-festival-previous-2
+    email: ana.garcia@joinmovida.com
+    overall_sentiment: great
+    comment: Spacious floor, great sound system, and kizomba sets that kept me up all night.
+    aspect_scores: { venue-quality: 5, music: 4 }
+    aspect_tags:
+      - venue-quality:spacious
+      - music:good-sound
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: dubai-latin-mirage-festival-previous-2
+    email: ivo.diallo@joinmovida.com
+    overall_sentiment: great
+    comment: A welcoming community and very easy to find partners at every level.
+    aspect_scores: { atmosphere: 5 }
+    aspect_tags:
+      - atmosphere:welcoming-inclusive
+      - atmosphere:easy-find-partners
+    audience_tags:
+      - audience:first-social
+    comment_status: approved
+    status: approved
+  - event_id: red-sea-latin-festival-previous
+    email: leila.bauer@joinmovida.com
+    overall_sentiment: amazing
+    comment: Snorkelling in the morning, workshops in the afternoon, and beach socials every night.
+    aspect_scores: { atmosphere: 5, value: 5 }
+    aspect_tags:
+      - atmosphere:great-atmosphere
+      - value:great-package
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: red-sea-latin-festival-previous
+    email: mateo.vega@joinmovida.com
+    overall_sentiment: great
+    comment: Relaxed winter-sun festival with a really respectful and friendly crowd.
+    aspect_scores: { atmosphere: 4, organization: 4 }
+    aspect_tags:
+      - atmosphere:respectful-dancers
+      - organization:good-communication
+    audience_tags:
+      - audience:relaxed-dancing
+    comment_status: approved
+    status: approved
+  - event_id: red-sea-latin-festival-previous
+    email: rita.petrov@joinmovida.com
+    overall_sentiment: okay
+    comment: Fun beach parties, but the music on the sand was too quiet away from the speakers.
+    aspect_scores: { music: 2, atmosphere: 4 }
+    aspect_tags:
+      - music:too-quiet
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:relaxed-dancing
+    comment_status: approved
+    status: approved
+  - event_id: red-sea-latin-festival-previous-2
+    email: zara.benali@joinmovida.com
+    overall_sentiment: great
+    comment: Great teachers and a gorgeous beachfront ballroom with sea views.
+    aspect_scores: { workshop: 4, venue-quality: 5 }
+    aspect_tags:
+      - workshop:great-instructor
+      - venue-quality:beautiful-venue
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: red-sea-latin-festival-previous-2
+    email: omar.costa@joinmovida.com
+    overall_sentiment: great
+    comment: Excellent value for a full week of sun and dancing.
+    aspect_scores: { value: 5, music: 4 }
+    aspect_tags:
+      - value:worth-it
+      - music:great-playlist
+    audience_tags:
+      - audience:budget-friendly
+    comment_status: approved
+    status: approved
+  - event_id: lion-city-latin-festival-previous
+    email: noah.kim@joinmovida.com
+    overall_sentiment: amazing
+    comment: The rooftop party over Marina Bay is one of the best socials in Asia.
+    aspect_scores: { atmosphere: 5, venue-quality: 5 }
+    aspect_tags:
+      - atmosphere:high-energy
+      - venue-quality:beautiful-venue
+    audience_tags:
+      - audience:high-energy-dancing
+    comment_status: approved
+    status: approved
+  - event_id: lion-city-latin-festival-previous
+    email: mina.silva@joinmovida.com
+    overall_sentiment: great
+    comment: Very well organized, and the hawker-food social was such a fun idea.
+    aspect_scores: { organization: 5, atmosphere: 4 }
+    aspect_tags:
+      - organization:well-organized
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:foodies
+    comment_status: approved
+    status: approved
+  - event_id: lion-city-latin-festival-previous
+    email: bruno.santos@joinmovida.com
+    overall_sentiment: okay
+    comment: Good festival, though the air conditioning struggled in the main room.
+    aspect_scores: { venue-quality: 2, music: 4 }
+    aspect_tags:
+      - venue-quality:poor-ventilation
+      - music:great-dj
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: lion-city-latin-festival-previous-2
+    email: nina.khan@joinmovida.com
+    overall_sentiment: great
+    comment: Dancers from all over Asia and Europe, and smooth DJ transitions all night.
+    aspect_scores: { atmosphere: 5, music: 4 }
+    aspect_tags:
+      - atmosphere:international-crowd
+      - music:smooth-transitions
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: lion-city-latin-festival-previous-2
+    email: theo.novak@joinmovida.com
+    overall_sentiment: great
+    comment: Clear explanations in every workshop, perfect for improvers like me.
+    aspect_scores: { workshop: 5 }
+    aspect_tags:
+      - workshop:clear-explanations
+      - workshop:good-pacing
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: busan-latin-festival-previous
+    email: ines.lopez@joinmovida.com
+    overall_sentiment: amazing
+    comment: Beach socials in Haeundae with Gwangan Bridge lit up behind us. Unforgettable.
+    aspect_scores: { atmosphere: 5, venue-quality: 5 }
+    aspect_tags:
+      - atmosphere:great-atmosphere
+      - venue-quality:beautiful-venue
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: busan-latin-festival-previous
+    email: leo.martin@joinmovida.com
+    overall_sentiment: great
+    comment: The Korean salsa scene is so welcoming, and the level of dancing is very high.
+    aspect_scores: { atmosphere: 5, workshop: 4 }
+    aspect_tags:
+      - atmosphere:welcoming-inclusive
+      - workshop:useful-material
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: busan-latin-festival-previous
+    email: milan.horvat@joinmovida.com
+    overall_sentiment: okay
+    comment: Good music, but the schedule changed a few times without much notice.
+    aspect_scores: { music: 4, organization: 2 }
+    aspect_tags:
+      - music:great-playlist
+      - organization:confusing-schedule
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+  - event_id: busan-latin-festival-previous-2
+    email: clara.dubois@joinmovida.com
+    overall_sentiment: great
+    comment: Great partner rotation in the workshops and a comfortable, airy hall.
+    aspect_scores: { workshop: 5, venue-quality: 4 }
+    aspect_tags:
+      - workshop:good-partner-rotation
+      - venue-quality:comfortable
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: busan-latin-festival-previous-2
+    email: victor.schmidt@joinmovida.com
+    overall_sentiment: great
+    comment: High energy socials and Korean barbecue with the whole crew after.
+    aspect_scores: { atmosphere: 5, music: 4 }
+    aspect_tags:
+      - atmosphere:high-energy
+      - music:great-energy
+    audience_tags:
+      - audience:foodies
+    comment_status: approved
+    status: approved
+  - event_id: sydney-harbour-kizomba-festival-previous
+    email: nadia.fischer@joinmovida.com
+    overall_sentiment: amazing
+    comment: Kizomba facing the Opera House on a summer night. Pure connection on the floor.
+    aspect_scores: { atmosphere: 5, music: 5 }
+    aspect_tags:
+      - atmosphere:respectful-dancers
+      - music:great-dj
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+  - event_id: sydney-harbour-kizomba-festival-previous
+    email: camille.laurent@joinmovida.com
+    overall_sentiment: great
+    comment: Semba workshops were brilliant, and the harbour cruise on Sunday was so relaxing.
+    aspect_scores: { workshop: 5, atmosphere: 4 }
+    aspect_tags:
+      - workshop:great-instructor
+      - atmosphere:great-atmosphere
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: sydney-harbour-kizomba-festival-previous
+    email: jonas.meyer@joinmovida.com
+    overall_sentiment: okay
+    comment: Great dancers, but the pavilion was hard to find the first night.
+    aspect_scores: { atmosphere: 4, venue-quality: 3 }
+    aspect_tags:
+      - atmosphere:respectful-dancers
+      - venue-quality:hard-to-find
+    audience_tags:
+      - audience:relaxed-dancing
+    comment_status: approved
+    status: approved
+  - event_id: sydney-harbour-kizomba-festival-previous-2
+    email: sofia.torres@joinmovida.com
+    overall_sentiment: great
+    comment: Smooth kizomba sets all night and a lovely, welcoming crowd.
+    aspect_scores: { music: 5, atmosphere: 4 }
+    aspect_tags:
+      - music:smooth-transitions
+      - atmosphere:welcoming-inclusive
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+  - event_id: sydney-harbour-kizomba-festival-previous-2
+    email: maya.rivera@joinmovida.com
+    overall_sentiment: great
+    comment: Worth the long flight. Great organization and a beautiful setting.
+    aspect_scores: { organization: 5, venue-quality: 4 }
+    aspect_tags:
+      - organization:well-organized
+      - venue-quality:beautiful-venue
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: cali-salsa-capital-festival-previous
+    email: ana.garcia@joinmovida.com
+    overall_sentiment: amazing
+    comment: Salsa caleña in Cali at year end is a dream. The Salsódromo parade was incredible.
+    aspect_scores: { shows: 5, atmosphere: 5 }
+    aspect_tags:
+      - shows:great-performances
+      - atmosphere:high-energy
+    audience_tags:
+      - audience:performance-lovers
+    comment_status: approved
+    status: approved
+  - event_id: cali-salsa-capital-festival-previous
+    email: pablo.rossi@joinmovida.com
+    overall_sentiment: great
+    comment: Footwork bootcamps were intense and the live orquestas made every social special.
+    aspect_scores: { workshop: 5, music: 5 }
+    aspect_tags:
+      - workshop:useful-material
+      - music:live-band
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: cali-salsa-capital-festival-previous
+    email: mina.silva@joinmovida.com
+    overall_sentiment: okay
+    comment: Amazing dancing, but check-in on the first night took over an hour.
+    aspect_scores: { atmosphere: 4, organization: 2 }
+    aspect_tags:
+      - atmosphere:great-atmosphere
+      - organization:difficult-check-in
+    audience_tags:
+      - audience:high-energy-dancing
+    comment_status: approved
+    status: approved
+  - event_id: cali-salsa-capital-festival-previous-2
+    email: bruno.santos@joinmovida.com
+    overall_sentiment: amazing
+    comment: Nobody dances salsa like Cali. Fast feet, live music, and pure joy.
+    aspect_scores: { music: 5, atmosphere: 5 }
+    aspect_tags:
+      - music:live-band
+      - atmosphere:great-atmosphere
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+  - event_id: cali-salsa-capital-festival-previous-2
+    email: leila.bauer@joinmovida.com
+    overall_sentiment: great
+    comment: Affordable pass, friendly locals, and the best salsa bars I have ever visited.
+    aspect_scores: { value: 5, atmosphere: 4 }
+    aspect_tags:
+      - value:worth-it
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:budget-friendly
+    comment_status: approved
+    status: approved
+  - event_id: canal-salsa-tuesdays-past-4
+    email: sofia.torres@joinmovida.com
+    overall_sentiment: great
+    comment: Relaxed crowd, a solid DJ, and the taster class made it easy to bring a friend.
+    aspect_scores: { music: 4, atmosphere: 5 }
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:first-social
+    comment_status: approved
+    status: approved
+    minutes_ago: 14400
+  - event_id: pigalle-bachata-wednesdays-past-4
+    email: sofia.torres@joinmovida.com
+    overall_sentiment: amazing
+    comment: My favourite midweek night out. Great playlist and lots of new faces every week.
+    aspect_scores: { music: 5, atmosphere: 5 }
+    aspect_tags:
+      - music:great-playlist
+      - atmosphere:welcoming-inclusive
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+    minutes_ago: 14400
+  - event_id: peniche-latina-sundays-past-4
+    email: noah.kim@joinmovida.com
+    overall_sentiment: great
+    comment: Cosy room and a lovely floor, it gets busy after 22h so come early.
+    aspect_scores: { venue-quality: 4, atmosphere: 4 }
+    aspect_tags:
+      - venue-quality:great-dance-floor
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+    minutes_ago: 14400
+  - event_id: ixelles-salsa-thursdays-past-3
+    email: ivo.diallo@joinmovida.com
+    overall_sentiment: okay
+    comment: Good music but the room got crowded and warm later in the evening.
+    aspect_scores: { music: 4, venue-quality: 2 }
+    aspect_tags:
+      - music:great-playlist
+      - venue-quality:crowded
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+    minutes_ago: 14400
+  - event_id: saint-gilles-latin-saturdays-past-3
+    email: camille.laurent@joinmovida.com
+    overall_sentiment: amazing
+    comment: Best way to end the week. The salsa and bachata mix kept the floor full all night.
+    aspect_scores: { music: 5, atmosphere: 5 }
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:high-energy
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+    minutes_ago: 14400
+  - event_id: paris-latin-lumiere-festival-previous
+    email: camille.laurent@joinmovida.com
+    overall_sentiment: amazing
+    comment: "Paris at its best: stellar teachers, three rooms, and a sunrise social I will never forget."
+    aspect_scores: { workshop: 5, atmosphere: 5 }
+    aspect_tags:
+      - workshop:useful-material
+      - atmosphere:great-atmosphere
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: paris-latin-lumiere-festival-previous
+    email: leo.martin@joinmovida.com
+    overall_sentiment: great
+    comment: Superb line-up and DJs. Queues at the cloakroom were long on Saturday night.
+    aspect_scores: { music: 5, organization: 3 }
+    aspect_tags:
+      - music:great-dj
+      - organization:well-organized
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+  - event_id: paris-latin-lumiere-festival-previous
+    email: zara.benali@joinmovida.com
+    overall_sentiment: amazing
+    comment: Dancers from everywhere and a beautiful venue. Worth the trip.
+    aspect_scores: { atmosphere: 5, venue-quality: 5 }
+    aspect_tags:
+      - atmosphere:international-crowd
+      - venue-quality:great-dance-floor
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: paris-latin-lumiere-festival-previous-2
+    email: clara.dubois@joinmovida.com
+    overall_sentiment: great
+    comment: A promising first edition with great teachers and a lovely Saturday show night.
+    aspect_scores: { workshop: 4, shows: 5 }
+    aspect_tags:
+      - workshop:useful-material
+      - shows:great-performances
+    audience_tags:
+      - audience:performance-lovers
+    comment_status: approved
+    status: approved
+  - event_id: paris-latin-lumiere-festival-previous-2
+    email: sofia.torres@joinmovida.com
+    overall_sentiment: great
+    comment: Friendly crowd and good value for a full pass in Paris.
+    aspect_scores: { value: 5, atmosphere: 4 }
+    aspect_tags:
+      - value:worth-it
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:budget-friendly
+    comment_status: approved
+    status: approved
+  - event_id: seville-salsa-weekender-previous-2
+    email: mateo.vega@joinmovida.com
+    overall_sentiment: amazing
+    comment: The patio social with a live son band was pure magic.
+    aspect_scores: { music: 5, atmosphere: 5 }
+    aspect_tags:
+      - music:live-band
+      - atmosphere:great-atmosphere
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+  - event_id: milan-bachata-weekender-previous-2
+    email: pablo.rossi@joinmovida.com
+    overall_sentiment: great
+    comment: Clear sensual technique classes and fun socials by the canals.
+    aspect_scores: { workshop: 5, atmosphere: 4 }
+    aspect_tags:
+      - workshop:useful-material
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+  - event_id: budapest-salsa-weekender-previous-2
+    email: milan.horvat@joinmovida.com
+    overall_sentiment: great
+    comment: Boat party was the highlight, the bath social a close second.
+    aspect_scores: { atmosphere: 5, value: 4 }
+    aspect_tags:
+      - atmosphere:high-energy
+      - value:worth-it
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: brussels-latin-weekender-previous-2
+    email: leila.bauer@joinmovida.com
+    overall_sentiment: great
+    comment: Three styles, three rooms, and a very welcoming Brussels crowd.
+    aspect_scores: { atmosphere: 5, organization: 4 }
+    aspect_tags:
+      - atmosphere:welcoming-inclusive
+      - organization:well-organized
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: athens-bachata-weekender-previous-2
+    email: zara.benali@joinmovida.com
+    overall_sentiment: amazing
+    comment: Rooftop dancing facing the Acropolis, unforgettable.
+    aspect_scores: { venue-quality: 5, atmosphere: 5 }
+    aspect_tags:
+      - venue-quality:great-dance-floor
+      - atmosphere:great-atmosphere
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+  - event_id: athens-bachata-weekender-previous
+    email: elena.moreau@joinmovida.com
+    overall_sentiment: amazing
+    comment: Rooftop social at sunset with the Acropolis lit up behind us. Clear workshops and such a warm crowd.
+    aspect_scores: { atmosphere: 5, venue-quality: 5 }
+    aspect_tags:
+      - atmosphere:great-atmosphere
+      - venue-quality:great-dance-floor
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+    minutes_ago: 24480
+  - event_id: brussels-latin-weekender-previous
+    email: elena.moreau@joinmovida.com
+    overall_sentiment: great
+    comment: Three rooms and never a dull moment. Saturday shows were a highlight, the kizomba room got a bit crowded.
+    aspect_scores: { music: 5, venue-quality: 3 }
+    aspect_tags:
+      - music:great-dj
+      - venue-quality:crowded
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+    minutes_ago: 27360
+  - event_id: milan-bachata-weekender-previous
+    email: elena.moreau@joinmovida.com
+    overall_sentiment: amazing
+    comment: Loved switching between the sensual and Dominican tracks. The late socials by the Navigli were magical.
+    aspect_scores: { workshop: 5, atmosphere: 5 }
+    aspect_tags:
+      - workshop:useful-material
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+    minutes_ago: 30240
+  - event_id: seville-salsa-weekender-previous
+    email: elena.moreau@joinmovida.com
+    overall_sentiment: great
+    comment: Live son on the patio and a rueda that took over the whole courtyard. Pure Seville.
+    aspect_scores: { music: 5, value: 4 }
+    aspect_tags:
+      - music:live-band
+      - value:worth-it
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+    minutes_ago: 33120
+  - event_id: paris-latin-lumiere-festival-previous
+    email: elena.moreau@joinmovida.com
+    overall_sentiment: amazing
+    comment: My home festival and it keeps getting better. Great teachers, three rooms, and sunrise socials.
+    aspect_scores: { organization: 5, atmosphere: 5 }
+    aspect_tags:
+      - organization:well-organized
+      - atmosphere:international-crowd
+    audience_tags:
+      - audience:travelers
+    comment_status: approved
+    status: approved
+    minutes_ago: 36000
 
 emit_suggested:
   - event_id: london-salsa-sessions
@@ -2072,10 +4578,6 @@ assets:
     email: elena.moreau@joinmovida.com
     kind: ticket
     dir: tickets/elena/seville-salsa-weekender
-  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    email: elena.moreau@joinmovida.com
-    kind: ticket
-    dir: tickets/elena/71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
   - event_id: brussels-latin-weekender
     email: elena.moreau@joinmovida.com
     kind: ticket

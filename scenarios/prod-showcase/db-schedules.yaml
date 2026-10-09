@@ -689,7 +689,7 @@ schedules:
         level: Intermediate
         activity_type: Workshop
       - id: "31000000-0000-4000-8000-000000000210"
-        title: Live Son Showcase
+        title: Live Son Concert
         contributors:
           - display_name: Son de Triana Band
             role: performer
@@ -699,7 +699,7 @@ schedules:
         venue: Casa Triana
         activity_type: Show
       - id: "31000000-0000-4000-8000-000000000211"
-        title: Sunset Rueda Showcase
+        title: Sunset Rueda Performance
         contributors:
           - display_name: Yoel and Dayana
             role: performer

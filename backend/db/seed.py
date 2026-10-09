@@ -2561,6 +2561,7 @@ class DatabaseSeeder:
                 category: accommodation   # question|accommodation|ride|tickets|meetup|lost_found|other
                 body: "Looking for a roommate for the weekend."
                 is_hidden: false          # optional (admin-hidden)
+                minutes_ago: 120          # optional, backdates created_at
               - reply_to: m1              # flat reply; inherits parent category
                 event_id: ev-upcoming
                 email: carol@example.com
@@ -2653,6 +2654,9 @@ class DatabaseSeeder:
                     )
                     category = "other"
 
+            created_at = datetime.now(timezone.utc) - timedelta(
+                minutes=int(entry.get("minutes_ago") or 0)
+            )
             msg = EventMessage(
                 event_id=event_id,
                 author_user_id=author_id,
@@ -2660,6 +2664,8 @@ class DatabaseSeeder:
                 category=category,
                 body=body,
                 is_hidden=bool(entry.get("is_hidden", False)),
+                created_at=created_at,
+                updated_at=created_at,
             )
             self.session.add(msg)
             self.session.flush()
@@ -2887,6 +2893,7 @@ class DatabaseSeeder:
           - is_anonymous: bool
           - admin_notes: str (optional)
           - scope: this_edition | past_edition (default this_edition)
+          - minutes_ago: int (optional, backdates created_at; default 0)
         Idempotent: skips if a row already exists for the same (event_id, user_id, scope).
         """
         if not path.exists():
@@ -2965,7 +2972,9 @@ class DatabaseSeeder:
             )
 
             status = entry.get("status") or "approved"
-            now = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc) - timedelta(
+                minutes=int(entry.get("minutes_ago") or 0)
+            )
             rating = EventRating(
                 id=uuid4(),
                 event_id=event_id,

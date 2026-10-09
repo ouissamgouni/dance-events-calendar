@@ -27,7 +27,7 @@ test_plan:
       description: |
         Sign in as Elena Moreau and open Home.
       expected: |
-        Your next event shows Back 2 Mambo 2026. You might like reflects Elena's
+        Your next event shows Seville Salsa Weekender. You might like reflects Elena's
         Salsa and Bachata profile, Friends are going uses her network, Build
         your tribe suggests relevant organizers, and New contains unseen events.
       verification: "All populated sections render independently and card actions work."
@@ -155,8 +155,9 @@ test_plan:
         Open Elena's Dance Passport, then visit @maya-rivera and @noah-kim and
         open their Dance Passport and Timeline views.
       expected: |
-        Elena's passport includes past events in Europe, the United States, and
-        Asia. Maya and Noah also show past history across cities and countries.
+        Elena's passport includes past festivals in Europe, the Americas,
+        Africa, Asia, and Oceania. Maya and Noah also show past history across
+        cities and countries.
       verification: "Passport totals and maps exclude future events."
 
     - id: 15
@@ -227,13 +228,12 @@ test_plan:
     - id: 20
       title: "Open tickets and memories"
       description: |
-        As Elena, open My Events, then Seville Salsa Weekender, Back 2 Mambo
-        2026, Brussels Latin Weekender, Athens Bachata Weekender, and London
-        Salsa Sessions. Then open the previous Milan, Brussels, and Athens
+        As Elena, open My Events, then Seville Salsa Weekender, Brussels Latin
+        Weekender, Athens Bachata Weekender, and London Salsa Sessions. Then open the previous Milan, Brussels, and Athens
         weekender editions. Finally
         sign in as one of Elena's friends and open the same past weekenders.
       expected: |
-        The five upcoming events show a Ticket chip and Elena's saved passes
-        (two for Back 2 Mambo). Each past weekender shows five of Elena's
+        The four upcoming events show a Ticket chip and Elena's saved passes.
+        Each past weekender shows five of Elena's
         photos in Memories. Her friends see the photos; strangers do not.
       verification: "Ticket PDFs and images open in the viewer and memories respect friends visibility."
