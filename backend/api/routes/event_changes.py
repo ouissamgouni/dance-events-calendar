@@ -17,7 +17,7 @@ from backend.api.rate_limit import client_ip
 from backend.api.schemas import EventChangeCreate, OwnEventChangeResponse
 from backend.db.database import get_session
 from backend.db.models import BlockedEvent, CachedEvent, EventRevision, User
-from backend.services import event_revisions
+from backend.services import event_revisions, places
 from backend.services.event_visibility import event_is_user_facing
 from backend.services.recurrence import normalize_all_day
 
@@ -26,13 +26,18 @@ router = APIRouter(tags=["event-changes"])
 limiter = Limiter(key_func=client_ip)
 
 MAX_OPEN_CHANGES = 10
-USER_FIELDS = event_revisions.REVISABLE_FIELDS + ("latitude", "longitude")
+USER_FIELDS = (
+    event_revisions.REVISABLE_FIELDS
+    + ("latitude", "longitude")
+    + event_revisions.PICKED_PLACE_FIELDS
+)
 
 
 def _changes(
     session: Session, event: CachedEvent, body: EventChangeCreate, *, organizer: bool
 ) -> dict:
     data = body.model_dump(exclude_unset=True)
+    places.clear_stale_place(data, event.location)
     tag_ids = data.pop("tag_ids", None)
     data.pop("suggested_new_tags", None)
     if not organizer and set(event_revisions.CANCEL_FIELDS) & data.keys():

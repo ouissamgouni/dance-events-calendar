@@ -286,6 +286,12 @@ def get_rsvp_remember_visibility_enabled() -> bool:
     return True if parsed is None else parsed
 
 
+def get_geoapify_enabled() -> bool:
+    """Use Geoapify for place autocomplete (else Photon). Default False."""
+    parsed = _parse_bool(os.getenv("GEOAPIFY_ENABLED"))
+    return False if parsed is None else parsed
+
+
 def get_review_prompt_delay_hours() -> int:
     """Hours after an event's end to send the review prompt. Default 3."""
     raw = os.getenv("REVIEW_PROMPT_DELAY_HOURS", "3")

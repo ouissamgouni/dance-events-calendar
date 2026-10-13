@@ -246,6 +246,41 @@ def test_owner_can_edit_a_single_day_all_day_event(client, session):
     assert row.end - row.start == timedelta(days=1)
 
 
+def test_picked_place_reaches_events_and_typed_location_clears_it(client, session):
+    _make_user(session, "olivia@example.com", "olivia")
+    _login(client, "olivia@example.com")
+    suggestion_id = _submit(
+        client,
+        location="Havana Club, Main Street 12, Berlin",
+        latitude=52.52,
+        longitude=13.4,
+        venue_name="Havana Club",
+        street_address="Main Street 12",
+        city="Berlin",
+        country="Germany",
+        country_code="DE",
+        place_id="geo-123",
+        place_provider="geoapify",
+    )
+
+    [row] = _rows(session, suggestion_id)
+    assert (row.venue_name, row.place_id, row.city, row.country_code) == (
+        "Havana Club",
+        "geo-123",
+        "Berlin",
+        "DE",
+    )
+
+    r = client.patch(
+        f"/api/me/suggestions/{suggestion_id}", json={"location": "Studio B"}
+    )
+
+    assert r.status_code == 200, r.text
+    assert r.json()["venue_name"] is None and r.json()["place_id"] is None
+    [row] = _rows(session, suggestion_id)
+    assert (row.location, row.venue_name, row.place_id) == ("Studio B", None, None)
+
+
 def test_submission_takes_the_venue_time_zone_over_the_browser(client, session):
     _make_user(session, "olivia@example.com", "olivia")
     _login(client, "olivia@example.com")

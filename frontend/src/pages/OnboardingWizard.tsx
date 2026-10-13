@@ -35,6 +35,7 @@ import {
     type UserSearchResult,
 } from '../api';
 import ProfileEditor from '../components/ProfileEditor';
+import PlaceAttribution from '../components/PlaceAttribution';
 import TagsPicker, { type TagsPickerValue } from '../components/TagsPicker';
 import { clampArea, DEFAULT_AREA_BBOX } from '../constants/area';
 import { BASEMAP_CONFIG } from '../constants/basemap';
@@ -341,7 +342,7 @@ export function LegacyOnboardingWizard() {
             }
             setCitySearching(true);
             try {
-                const results = await searchSuggestionAddress(q);
+                const results = await searchSuggestionAddress(q, { kind: 'city' });
                 if (reqId !== citySearchReqRef.current) return;
                 setCitySuggestions(results.slice(0, 6));
                 setCitySuggestOpen(true);
@@ -889,6 +890,7 @@ export function LegacyOnboardingWizard() {
                                                         </button>
                                                     </li>
                                                 ))}
+                                                <li className="px-2 pb-1"><PlaceAttribution results={citySuggestions} /></li>
                                             </ul>
                                         )}
                                         {citySearching && (

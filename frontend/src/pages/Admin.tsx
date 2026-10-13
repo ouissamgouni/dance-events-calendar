@@ -307,6 +307,7 @@ export default function Admin() {
     const [eventCardSaveShowStatsEnabled, setEventCardSaveShowStatsEnabled] = useState(false);
     const [eventCardImgoingShowStatsEnabled, setEventCardImgoingShowStatsEnabled] = useState(false);
     const [rsvpRememberVisibilityEnabled, setRsvpRememberVisibilityEnabled] = useState(true);
+    const [geoapifyEnabled, setGeoapifyEnabled] = useState(false);
     const [eventCardImgoingLocationBottomEnabled, setEventCardImgoingLocationBottomEnabled] = useState(true);
     const [eventCardShowPeopleIconEnabled, setEventCardShowPeopleIconEnabled] = useState(false);
     const [eventCardShowTimeLocationIconsEnabled, setEventCardShowTimeLocationIconsEnabled] = useState(false);
@@ -510,6 +511,7 @@ export default function Admin() {
             setEventCardSaveShowStatsEnabled(s.event_card_save_show_stats_enabled ?? false);
             setEventCardImgoingShowStatsEnabled(s.event_card_imgoing_show_stats_enabled ?? false);
             setRsvpRememberVisibilityEnabled(s.rsvp_remember_visibility_enabled ?? true);
+            setGeoapifyEnabled(s.geoapify_enabled ?? false);
             setEventCardImgoingLocationBottomEnabled(s.event_card_imgoing_location_bottom_enabled ?? true);
             setEventCardShowPeopleIconEnabled(s.event_card_show_people_icon_enabled ?? false);
             setEventCardShowTimeLocationIconsEnabled(s.event_card_show_time_location_icons_enabled ?? false);
@@ -990,6 +992,18 @@ export default function Admin() {
         } catch {
             setRsvpRememberVisibilityEnabled(!newVal);
             setMessage('Failed to update remember visibility toggle.');
+        }
+    };
+
+    const handleToggleGeoapify = async () => {
+        const newVal = !geoapifyEnabled;
+        setGeoapifyEnabled(newVal);
+        try {
+            await updateSettings({ geoapify_enabled: newVal });
+            setMessage(`Geoapify place search ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setGeoapifyEnabled(!newVal);
+            setMessage('Failed to update Geoapify toggle.');
         }
     };
 
@@ -2655,6 +2669,21 @@ export default function Admin() {
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${rsvpRememberVisibilityEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
                                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${rsvpRememberVisibilityEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Place autocomplete provider */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Geoapify place search</span>
+                                        <p className="text-[10px] text-muted">Location autocomplete via Geoapify (needs GEOAPIFY_API_KEY). Off: free Photon fallback</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleGeoapify}
+                                        aria-label="Toggle Geoapify place search"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${geoapifyEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${geoapifyEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 

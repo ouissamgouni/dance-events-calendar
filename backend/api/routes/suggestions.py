@@ -73,6 +73,7 @@ from backend.services.event_visibility import (
 )
 from backend.services.image_processing import ImageValidationError
 from backend.services.geocoding import geocode_location
+from backend.services import places
 from backend.services.reach import sync_event_reach
 from backend.services.recurrence import expand_occurrences, normalize_all_day
 from backend.services.timezones import resolve_event_timezone, valid_timezone
@@ -272,6 +273,11 @@ def _upsert_occurrences_from_suggestion(
                 cached_event.review_status = review_status
             cached_event.is_hidden = False
             cached_event.deleted_at = None
+        for field in places.PLACE_FIELDS:
+            setattr(cached_event, field, getattr(suggestion, field))
+        if suggestion.country:
+            for field in places.GEO_FIELDS:
+                setattr(cached_event, field, getattr(suggestion, field))
         cached_event.occurrence_key = start
         cached_event.suggestion_id = suggestion.id
         cached_event.visibility = visibility
@@ -561,6 +567,7 @@ def submit_suggestion(
         links=[link.model_dump() for link in body.links] if body.links else None,
         latitude=body.latitude,
         longitude=body.longitude,
+        **{field: getattr(body, field) for field in places.SUGGESTION_PLACE_FIELDS},
         start=start,
         end=end,
         all_day=body.all_day,
@@ -725,42 +732,26 @@ def similar_events(
 
 
 @router.get("/api/suggestions/geocode", response_model=list[GeocodeSuggestion])
-@limiter.limit("10/minute")
+@limiter.limit("60/minute")
 def suggestion_geocode(
     request: Request,
     q: str = Query(..., min_length=3, max_length=200),
+    kind: places.Kind = Query(default="any"),
+    lat: float | None = Query(default=None, ge=-90, le=90),
+    lng: float | None = Query(default=None, ge=-180, le=180),
+    session: Session = Depends(get_session),
 ):
-    """Public geocode search for the suggestion form address autocomplete."""
-    from geopy.exc import GeocoderServiceError, GeocoderTimedOut
-    from geopy.geocoders import Nominatim
-    from backend.services.geocoding import (
-        _language_preference_from_header,
-        nominatim_suggestion,
+    """Place autocomplete for location inputs; ``kind=venue`` adds known venues."""
+    near = (lat, lng) if lat is not None and lng is not None else None
+    found = places.autocomplete(
+        session,
+        q,
+        kind=kind,
+        lang=places.primary_language(request.headers.get("accept-language")),
+        near=near,
     )
-
-    geocoder = Nominatim(user_agent="movida", timeout=5)
-    accept_language = request.headers.get("accept-language")
-    language_pref = _language_preference_from_header(accept_language)
-    try:
-        results = geocoder.geocode(
-            q,
-            exactly_one=False,
-            limit=5,
-            language=language_pref,
-            addressdetails=True,
-            namedetails=True,
-        )
-    except (GeocoderTimedOut, GeocoderServiceError) as e:
-        logger.warning("Geocode search failed: %s", e)
-        return []
-    except Exception:
-        logger.exception("Unexpected geocode search error")
-        return []
-
-    if not results:
-        return []
-
-    return [GeocodeSuggestion(**nominatim_suggestion(result)) for result in results]
+    known = places.known_venues(session, q) if kind == "venue" else []
+    return [GeocodeSuggestion(**s) for s in places.merge_suggestions(known, found)]
 
 
 # --- Submitter endpoints ---
@@ -931,6 +922,9 @@ def update_own_suggestion(
     for required in ("title", "start", "end", "all_day"):
         if required in update_data and update_data[required] is None:
             raise HTTPException(status_code=422, detail=f"{required} is required")
+    places.clear_stale_place(
+        update_data, suggestion.location, places.SUGGESTION_PLACE_FIELDS
+    )
     if "event_timezone" in update_data:
         update_data["timezone"] = (
             valid_timezone(update_data.pop("event_timezone")) or suggestion.timezone

@@ -175,8 +175,8 @@ from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.geocoding import (
     geocode_location,
     reverse_geocode,
-    search_locations,
 )
+from backend.services import places
 from backend.services.reach import assign_event_tag, sync_event_reach
 from backend.services.sync_job_service import SyncJobStatus, get_sync_job_service
 from backend.services.sync_service import SyncService
@@ -2491,6 +2491,7 @@ def update_event(
     location_changed = (
         "location" in update_data and update_data["location"] != event.location
     )
+    places.clear_stale_place(update_data, event.location)
     coords_provided = "latitude" in update_data or "longitude" in update_data
     title_or_start_changed = (
         "title" in update_data and update_data["title"] != event.title
@@ -2510,7 +2511,10 @@ def update_event(
     # Coordinates moved (re-geocoded or explicit) — refresh the structured place
     # so the Dance Passport city/country stats don't go stale. Clear it when
     # reverse geocoding yields nothing so a later backfill can repopulate.
-    if (event.latitude, event.longitude) != old_coords:
+    # A picked place already brought its city/country along.
+    if (event.latitude, event.longitude) != old_coords and not update_data.get(
+        "country"
+    ):
         if event.latitude is not None and event.longitude is not None:
             place = reverse_geocode(event.latitude, event.longitude)
             if place:
@@ -2671,22 +2675,19 @@ def remove_event_image(
 def geocode_search(
     request: Request,
     q: str = Query(..., min_length=3, max_length=200),
+    kind: places.Kind = Query(default="any"),
+    session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Search for address suggestions. Uses Google Geocoding API if configured, else Nominatim."""
-    from backend.services.geocoding import _language_preference_from_header
-
-    accept_language = request.headers.get("accept-language")
-    language_pref = _language_preference_from_header(accept_language)
-    results = search_locations(q, limit=5, language=language_pref)
-    return [
-        GeocodeSuggestion(
-            display_name=r["display_name"],
-            latitude=r["latitude"],
-            longitude=r["longitude"],
-        )
-        for r in results
-    ]
+    """Place autocomplete for the admin location editor."""
+    found = places.autocomplete(
+        session,
+        q,
+        kind=kind,
+        lang=places.primary_language(request.headers.get("accept-language")),
+    )
+    known = places.known_venues(session, q) if kind == "venue" else []
+    return [GeocodeSuggestion(**s) for s in places.merge_suggestions(known, found)]
 
 
 @router.get("/events/filter-options", response_model=EventFilterOptionsResponse)
@@ -4027,6 +4028,11 @@ def _apply_changes(
         )
     if "location" in revision.changes and "latitude" not in revision.changes:
         _refresh_event_geo(event, old_coords)
+    if "location" in revision.changes and not any(
+        revision.changes.get(field, {}).get("new") for field in places.PLACE_FIELDS
+    ):
+        for field in places.PLACE_FIELDS:
+            setattr(event, field, None)
     session.add(event)
     event_revisions.mark_decided(revision, event_revisions.STATUS_ACCEPTED, admin_email)
     session.add(revision)

@@ -324,6 +324,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         rsvp_remember_visibility_enabled=app_settings.get_rsvp_remember_visibility_enabled(
             session
         ),
+        geoapify_enabled=app_settings.get_geoapify_enabled(session),
         review_prompt_delay_hours=app_settings.get_review_prompt_delay_hours(session),
         review_prompt_lookback_hours=app_settings.get_review_prompt_lookback_hours(
             session
@@ -917,6 +918,9 @@ def update_settings(
             "rsvp_remember_visibility_enabled",
             body.rsvp_remember_visibility_enabled,
         )
+
+    if body.geoapify_enabled is not None:
+        _set_bool_setting(session, "geoapify_enabled", body.geoapify_enabled)
 
     if body.review_prompt_delay_hours is not None:
         row = session.get(SiteSetting, "review_prompt_delay_hours")

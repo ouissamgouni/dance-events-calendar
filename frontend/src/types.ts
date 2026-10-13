@@ -799,7 +799,18 @@ export interface TestPlan {
     steps: TestStep[];
 }
 
-export interface EventSuggestionCreate {
+/** Structured place picked from location autocomplete. */
+export interface PlaceFields {
+    venue_name?: string | null;
+    street_address?: string | null;
+    city?: string | null;
+    country?: string | null;
+    country_code?: string | null;
+    place_id?: string | null;
+    place_provider?: string | null;
+}
+
+export interface EventSuggestionCreate extends PlaceFields {
     title: string;
     description?: string;
     location?: string;
@@ -888,7 +899,7 @@ export interface EventSuggestion {
 export type SuggestionStatus = 'private' | 'pending' | 'approved' | 'declined' | 'blocked' | 'withdrawn';
 
 /** The signed-in submitter's view of their own suggestion. */
-export interface OwnSuggestion {
+export interface OwnSuggestion extends PlaceFields {
     id: string;
     status: SuggestionStatus;
     edit_locked: boolean;
@@ -946,7 +957,7 @@ export interface OwnEventChange {
     decided_at: string | null;
 }
 
-export interface EventChangeCreate {
+export interface EventChangeCreate extends PlaceFields {
     title?: string;
     description?: string | null;
     location?: string | null;
@@ -1058,7 +1069,7 @@ export interface AdminEventModeration {
     history: EventRevision[];
 }
 
-export interface OwnSuggestionUpdate {
+export interface OwnSuggestionUpdate extends PlaceFields {
     title?: string;
     description?: string | null;
     location?: string | null;

@@ -116,8 +116,8 @@ export default function Step1Event({ state, patch, error, onSubPageChange, allow
         return (
             <LocationPage
                 value={state.location}
-                onSelect={(location, latitude, longitude, timezone) =>
-                    patch({ location, latitude, longitude, ...(timezone ? { timezone } : {}) })
+                onSelect={(location, latitude, longitude, timezone, place) =>
+                    patch({ location, latitude, longitude, place, ...(timezone ? { timezone } : {}) })
                 }
                 onClose={close}
             />

@@ -761,6 +761,8 @@ export interface SiteSettings {
     event_review_size_step_enabled?: boolean;
     /** Show the 'remember my choice' checkbox in RSVP/save visibility sheets. */
     rsvp_remember_visibility_enabled?: boolean;
+    /** Place autocomplete via Geoapify (off: Photon). */
+    geoapify_enabled?: boolean;
     /** Hours after an event's end before the review prompt fires. 1-720,
      * client default 3. */
     review_prompt_delay_hours?: number;
@@ -3834,11 +3836,32 @@ export interface GeocodeSuggestion {
     } | null;
     /** IANA zone at the coordinates. */
     timezone?: string | null;
+    place_id?: string | null;
+    /** 'geoapify' | 'photon' for provider hits; drives the attribution line. */
+    provider?: string | null;
+    /** 'known': a venue other events already use. */
+    source?: 'known' | 'provider';
+    street_address?: string | null;
+    city?: string | null;
+    country_code?: string | null;
 }
 
-export async function searchAddress(query: string): Promise<GeocodeSuggestion[]> {
-    const res = await fetch(`${BASE}/admin/geocode?q=${encodeURIComponent(query)}`, {
+export interface PlaceSearchOptions {
+    /** 'venue' adds known venues; 'city' limits results to cities. */
+    kind?: 'any' | 'venue' | 'city';
+    signal?: AbortSignal;
+}
+
+function placeSearchQuery(query: string, { kind }: PlaceSearchOptions): string {
+    const qs = new URLSearchParams({ q: query });
+    if (kind) qs.set('kind', kind);
+    return qs.toString();
+}
+
+export async function searchAddress(query: string, options: PlaceSearchOptions = {}): Promise<GeocodeSuggestion[]> {
+    const res = await fetch(`${BASE}/admin/geocode?${placeSearchQuery(query, options)}`, {
         credentials: 'include',
+        signal: options.signal,
     });
     if (!res.ok) return [];
     return res.json();
@@ -4124,8 +4147,10 @@ export async function fetchSimilarEvents(title: string, start: string, end: stri
     return res.json();
 }
 
-export async function searchSuggestionAddress(query: string): Promise<GeocodeSuggestion[]> {
-    const res = await fetch(`${BASE}/suggestions/geocode?q=${encodeURIComponent(query)}`);
+export async function searchSuggestionAddress(query: string, options: PlaceSearchOptions = {}): Promise<GeocodeSuggestion[]> {
+    const res = await fetch(`${BASE}/suggestions/geocode?${placeSearchQuery(query, options)}`, {
+        signal: options.signal,
+    });
     if (!res.ok) return [];
     return res.json();
 }
