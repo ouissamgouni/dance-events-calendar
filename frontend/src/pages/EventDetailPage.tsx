@@ -28,6 +28,8 @@ import LocationTab from '../components/event-tabs/LocationTab';
 import PeopleTab from '../components/event-tabs/PeopleTab';
 import ReviewsTab from '../components/event-tabs/ReviewsTab';
 import DiscussionTab from '../components/event-tabs/DiscussionTab';
+import { EventPromoCodes } from '../components/EventPromoCodes';
+import { isPromoSectionVisible } from '../utils/sectionVisibility';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useEventAssetSummary } from '../context/EventAssetSummaryContext';
 import { useMyPlanCount } from '../context/MyPlanCountContext';
@@ -42,7 +44,7 @@ export default function EventDetailPage() {
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
     const { user, loading: authLoading } = useAuth();
-    const { eventScheduleEnabled, showRatings, eventTicketsEnabled, eventMemoriesEnabled } = useFeatureFlags();
+    const { eventScheduleEnabled, showRatings, eventTicketsEnabled, eventMemoriesEnabled, promoCodesEnabled } = useFeatureFlags();
     const [nowMs] = useState(() => Date.now());
     const assetSummary = useEventAssetSummary(user && eventMemoriesEnabled && eventId ? eventId : null);
     const isMobile = useMediaQuery('(max-width: 639px)');
@@ -75,7 +77,8 @@ export default function EventDetailPage() {
     // to an in-tab anchor (e.g. `#series`/`#discounts`) once the tab renders.
     const initialTab = ((): EventDetailTab => {
         const t = searchParams.get('tab');
-        if (t === 'overview' || t === 'about' || t === 'location' || t === 'people' || t === 'reviews' || t === 'discussion' || t === 'memories') return t;
+        if (t === 'overview' || t === 'about' || t === 'location' || t === 'deals' || t === 'people' || t === 'reviews' || t === 'discussion' || t === 'memories') return t;
+        if (location.hash === '#discounts') return 'deals';
         if (location.hash === '#community') return 'reviews';
         if (location.hash === '#messages') return 'discussion';
         if (location.hash === '#memories') return 'memories';
@@ -83,6 +86,9 @@ export default function EventDetailPage() {
     })();
     const [activeTab, setActiveTab] = useState<EventDetailTab>(initialTab);
     const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+    // Keeps Deals visible right after the viewer adds a (still pending) code.
+    const [dealsAdded, setDealsAdded] = useState(initialTab === 'deals');
+    const [promoRefreshToken, setPromoRefreshToken] = useState(0);
 
     const goToTab = (tab: EventDetailTab, opts?: { anchor?: string; plan?: boolean }) => {
         if (tab === 'program') {
@@ -316,7 +322,8 @@ export default function EventDetailPage() {
     const showMemoriesTab = Boolean(user) && eventMemoriesEnabled && start.getTime() <= nowMs;
     const hasProgram = eventScheduleEnabled && Boolean(event.schedule_published);
     const requestedTab: EventDetailTab = location.hash === '#memories' ? 'memories' : activeTab;
-    const tab: EventDetailTab = requestedTab === 'memories' && !showMemoriesTab ? 'overview' : requestedTab;
+    const showDeals = !isPast && isPromoSectionVisible(event, promoCodesEnabled) && (event.has_active_promo_codes || dealsAdded);
+    const tab: EventDetailTab = (requestedTab === 'memories' && !showMemoriesTab) || (requestedTab === 'deals' && !showDeals) ? 'overview' : requestedTab;
     const memoryCount = assetSummary?.memory_count ?? 0;
 
     const pageTitle = `${event.title} — ${formatDate(start)}`;
@@ -475,6 +482,7 @@ export default function EventDetailPage() {
                                             onSelect={(t) => goToTab(t)}
                                             showProgram={hasProgram && !isMobile}
                                             showMemories={showMemoriesTab}
+                                            showDeals={showDeals}
                                             isPast={isPast}
                                         />
                                     </div>
@@ -494,6 +502,11 @@ export default function EventDetailPage() {
                                         {tab === 'memories' && <EventMemoriesTab event={event} />}
                                         {tab === 'about' && <AboutTab event={event} />}
                                         {tab === 'location' && <LocationTab event={event} />}
+                                        {tab === 'deals' && (
+                                            <div className="mx-1 sm:mx-0">
+                                                <EventPromoCodes event={event} variant="rows" refreshToken={promoRefreshToken} />
+                                            </div>
+                                        )}
                                         {tab === 'people' && <PeopleTab eventId={event.event_id} />}
                                         {tab === 'reviews' && (
                                             showRatings ? (
@@ -538,6 +551,11 @@ export default function EventDetailPage() {
                                         }
                                         suggestEditLabel={user && event.organizer?.user_id === user.user_id ? 'Edit event' : undefined}
                                         onAdminEdit={user?.is_admin ? () => setAdminEditorEventId(event.event_id) : undefined}
+                                        onPromoAdded={() => {
+                                            setDealsAdded(true);
+                                            setPromoRefreshToken((t) => t + 1);
+                                            goToTab('deals');
+                                        }}
                                     />
                                 </aside>
                             </div>

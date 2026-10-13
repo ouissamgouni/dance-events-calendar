@@ -196,6 +196,10 @@ scenarios/<name>/
 ├── config.env            # Optional: per-scenario env, e.g. CALENDAR_SERVICE=mock
 ├── calendars.yaml        # Optional: calendar settings and defaults
 ├── db-events.yaml        # Optional: events pre-seeded directly into DB
+├── db-event-series.yaml  # Optional: event series
+├── db-ratings.yaml       # Optional: event reviews/ratings
+├── db-emit-suggested.yaml # Optional: suggested-event notification fan-out
+├── db-event-assets.yaml  # Optional: event assets
 ├── mock-sync-events.yaml # Optional: mock calendar events ingested by sync
 ├── generated-events.yaml # Optional: deterministic bulk event fixture
 ├── mock-users.yaml       # Optional: scenario users

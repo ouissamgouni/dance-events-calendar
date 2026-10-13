@@ -7,10 +7,13 @@ import SaveEventButton from '../SaveEventButton';
 import ShareButton from '../ShareButton';
 import RateEventButton from '../RateEventButton';
 import TicketSheet from '../TicketSheet';
+import EventPromoCodeDialog from '../EventPromoCodeDialog';
 import { useFeatureFlags } from '../../context/FeatureFlagsContext';
+import { useAuth } from '../../context/AuthContext';
 import { useTicketAction } from '../../hooks/useTicketAction';
 import useOrganizerClaimAction from '../../hooks/useOrganizerClaimAction';
 import { reportMailto } from '../../utils/report';
+import { isPromoSectionVisible } from '../../utils/sectionVisibility';
 
 interface Props {
     event: CalendarEvent;
@@ -28,6 +31,8 @@ interface Props {
     onSuggestEdit?: () => void;
     /** Optional admin-only event editor affordance. */
     onAdminEdit?: () => void;
+    /** Called after the viewer submits a promo code from the ••• menu. */
+    onPromoAdded?: () => void;
 }
 
 /**
@@ -47,16 +52,20 @@ export default function EventActions({
     onPostMessage,
     onSuggestEdit,
     onAdminEdit,
+    onPromoAdded,
 }: Props) {
-    const { showRatings } = useFeatureFlags();
+    const { showRatings, promoCodesEnabled } = useFeatureFlags();
+    const { user } = useAuth();
     const ticket = useTicketAction(event);
     const organizerClaim = useOrganizerClaimAction(event);
     const [ticketOpen, setTicketOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [promoOpen, setPromoOpen] = useState(false);
 
     const reviewInline = showRatings && canReviewInline;
     const hasStarted = new Date(event.start).getTime() <= Date.now();
     const cancelled = Boolean(event.is_cancelled);
+    const canAddPromo = Boolean(user) && !isPast && !cancelled && isPromoSectionVisible(event, promoCodesEnabled);
     const menuItem = 'flex min-h-12 w-full items-center gap-3 px-2 text-left text-base text-ink transition hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent';
     const menuIcon = 'h-5 w-5 shrink-0 text-ink-soft';
 
@@ -149,6 +158,17 @@ export default function EventActions({
                                 <MessageSquare className={menuIcon} aria-hidden="true" />
                                 Post a message
                             </button>
+                            {canAddPromo && (
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => { setMenuOpen(false); setPromoOpen(true); }}
+                                    className={menuItem}
+                                >
+                                    <img src="/promo-code.png" alt="" aria-hidden="true" className="h-5 w-5 shrink-0 object-contain" />
+                                    Add promo code
+                                </button>
+                            )}
                             {onSuggestEdit && (
                                 <button
                                     type="button"
@@ -197,6 +217,13 @@ export default function EventActions({
                 )}
             </div>
             {ticketOpen && <TicketSheet event={event} onClose={() => setTicketOpen(false)} />}
+            {promoOpen && (
+                <EventPromoCodeDialog
+                    eventId={event.event_id}
+                    onClose={() => setPromoOpen(false)}
+                    onSubmitted={() => onPromoAdded?.()}
+                />
+            )}
             {organizerClaim.sheet}
         </div>
     );

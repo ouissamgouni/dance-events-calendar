@@ -5,17 +5,15 @@ import { formatEventPrice } from '../../utils/eventPrice';
 import TagBadges from '../TagBadges';
 import ExpandableDescription from '../ExpandableDescription';
 import EventSeriesLink from '../EventSeriesLink';
-import { EventPromoCodes } from '../EventPromoCodes';
 import LinksRow from '../event-summary/LinksRow';
 import { cleanEventDescription, collectEventLinks } from '../../utils/eventDescription';
 
 interface Props {
     event: CalendarEvent;
-    promoRefreshToken?: number;
 }
 
-/** Details tab: description, tags, links, series, price & promo codes. */
-export default function AboutTab({ event, promoRefreshToken }: Props) {
+/** Details tab: description, tags, links, series, price. */
+export default function AboutTab({ event }: Props) {
     const { showPrices } = useFeatureFlags();
     const price = isPriceSectionVisible(event, showPrices) ? formatEventPrice(event) : null;
     const description = cleanEventDescription(event.description ?? '');
@@ -60,10 +58,6 @@ export default function AboutTab({ event, promoRefreshToken }: Props) {
                     </dl>
                 </section>
             )}
-
-            <div id="discounts" className="scroll-mt-24">
-                <EventPromoCodes event={event} variant="rows" refreshToken={promoRefreshToken} />
-            </div>
         </div>
     );
 }

@@ -11,6 +11,7 @@ const TABS: TabDef[] = [
     { id: 'program', label: 'Program' },
     { id: 'about', label: 'Details' },
     { id: 'location', label: 'Location' },
+    { id: 'deals', label: 'Deals' },
     { id: 'people', label: 'People' },
     { id: 'reviews', label: 'Reviews' },
     { id: 'discussion', label: 'Discussion' },
@@ -25,6 +26,7 @@ interface Props {
     variant?: 'entry' | 'section';
     showProgram?: boolean;
     showMemories?: boolean;
+    showDeals?: boolean;
     /** Past events surface Reviews and Memories right after Overview. */
     isPast?: boolean;
 }
@@ -37,7 +39,7 @@ const PAST_PRIORITY: EventDetailTab[] = ['overview', 'reviews', 'memories'];
  * tabs. Stickiness is owned by the caller so it can pin the section header and
  * tabs together.
  */
-export default function EventDetailTabsBar({ active, onSelect, variant = 'section', showProgram = false, showMemories = false, isPast = false }: Props) {
+export default function EventDetailTabsBar({ active, onSelect, variant = 'section', showProgram = false, showMemories = false, showDeals = false, isPast = false }: Props) {
     const listRef = useRef<HTMLDivElement>(null);
     const rank = (tab: TabDef) => {
         const i = PAST_PRIORITY.indexOf(tab.id);
@@ -54,7 +56,7 @@ export default function EventDetailTabsBar({ active, onSelect, variant = 'sectio
         const right = left + btn.offsetWidth;
         if (left < list.scrollLeft) list.scrollTo({ left });
         else if (right > list.scrollLeft + list.clientWidth) list.scrollTo({ left: right - list.clientWidth });
-    }, [active, showProgram, showMemories, isPast]);
+    }, [active, showProgram, showMemories, showDeals, isPast]);
 
     return (
         <div className={`bg-surface ${variant === 'entry' ? 'border-y border-line' : 'border-b border-line'}`}>
@@ -64,7 +66,7 @@ export default function EventDetailTabsBar({ active, onSelect, variant = 'sectio
                 aria-label="Event details"
                 className="flex flex-nowrap gap-1 overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-                {tabs.filter((tab) => (tab.id !== 'program' || showProgram) && (tab.id !== 'memories' || showMemories)).map((tab) => {
+                {tabs.filter((tab) => (tab.id !== 'program' || showProgram) && (tab.id !== 'memories' || showMemories) && (tab.id !== 'deals' || showDeals)).map((tab) => {
                     const isActive = tab.id === active;
                     return (
                         <button

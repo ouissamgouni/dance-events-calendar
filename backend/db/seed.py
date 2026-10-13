@@ -233,6 +233,7 @@ class DatabaseSeeder:
         self._seed_event_tags(scenario_dir / "db-events.yaml")
         self._seed_tag_suggestions(scenario_dir / "db-events.yaml")
         self._seed_event_series(scenario_dir / "db-events.yaml")
+        self._seed_event_series(scenario_dir / "db-event-series.yaml")
         self._seed_tracking(scenario_dir / "db-tracking.yaml")
         self._seed_users(scenario_file_with_default(scenario_dir, "mock-users.yaml"))
         # Suggestions need their submitter (users) and must exist before the
@@ -250,11 +251,13 @@ class DatabaseSeeder:
         self._seed_user_saved_events(scenario_dir / "db-saves.yaml")
         self._seed_event_schedules(scenario_dir / "db-schedules.yaml")
         self._seed_ratings(scenario_dir / "db-events.yaml")
+        self._seed_ratings(scenario_dir / "db-ratings.yaml")
         # Event message board: must come AFTER users + events (FKs on both).
         self._seed_event_messages(scenario_dir / "db-events.yaml")
         self._seed_event_messages(scenario_dir / "db-messages.yaml")
         # Suggested-event fan-out: must come AFTER follows + events.
         self._seed_suggested_notifications(scenario_dir / "db-events.yaml")
+        self._seed_suggested_notifications(scenario_dir / "db-emit-suggested.yaml")
         self._seed_promo_codes(scenario_dir / "db-promo-codes.yaml")
         self._seed_organizer_claims(scenario_dir / "db-organizer-claims.yaml")
         self._seed_event_revisions(scenario_dir / "db-revisions.yaml")

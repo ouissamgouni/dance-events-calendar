@@ -1,6 +1,8 @@
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
+import yaml
 from sqlmodel import Session, SQLModel, create_engine
 
 from backend.db.models import (
@@ -21,6 +23,7 @@ from backend.scripts.refresh_showcase import (
     merge_synthetic_overlay,
     validate_showcase_fixtures,
     validate_overlays,
+    write_snapshot,
 )
 
 
@@ -345,6 +348,45 @@ def test_merge_synthetic_overlay_rejects_dangling_review(tmp_path):
 
     with pytest.raises(ValueError, match="missing-event"):
         merge_synthetic_overlay(tmp_path, {"calendars": []}, {"events": []})
+
+
+@pytest.mark.unit
+def test_write_snapshot_writes_event_sections_to_own_files(tmp_path):
+    output_dir = tmp_path / "showcase"
+    output_dir.mkdir()
+    (output_dir / "overlay-events.yaml").write_text(
+        "ratings:\n  - event_id: production-event\n    overall_sentiment: great\n",
+        encoding="utf-8",
+    )
+
+    write_snapshot(
+        output_dir,
+        {"calendars": []},
+        {"tag_groups": []},
+        {
+            "events": [{"id": "production-event"}],
+            "event_series": [
+                {
+                    "canonical_title": "Production Series",
+                    "members": ["production-event"],
+                }
+            ],
+        },
+        {"generated_at": "2026-01-01T00:00:00Z"},
+    )
+
+    def load(filename: str):
+        return yaml.safe_load((output_dir / filename).read_text(encoding="utf-8"))
+
+    assert load("db-events.yaml") == {"events": [{"id": "production-event"}]}
+    assert load("db-event-series.yaml")["event_series"][0]["members"] == [
+        "production-event"
+    ]
+    assert load("db-ratings.yaml")["ratings"][0]["event_id"] == "production-event"
+    assert load("db-emit-suggested.yaml") == {"emit_suggested": []}
+    assert load("db-event-assets.yaml") == {"assets": []}
+    manifest = json.loads((output_dir / "showcase-manifest.json").read_text())
+    assert manifest["content_sha256"]
 
 
 @pytest.mark.unit

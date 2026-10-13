@@ -299,6 +299,11 @@ events:
     price_min: 90
     price_currency: USD
     price_is_free: false
+    links:
+      - url: https://seoul-bachata-weekender.example/
+        label: Official website
+      - url: https://seoul-bachata-weekender.example/tickets
+        label: Tickets
     tags:
       - format:weekender
       - dance-style:bachata
@@ -427,6 +432,11 @@ events:
     price_min: 95
     price_currency: EUR
     price_is_free: false
+    links:
+      - url: https://porto-kizomba-weekender.example/
+        label: Official website
+      - url: https://porto-kizomba-weekender.example/tickets
+        label: Tickets
     tags:
       - format:weekender
       - dance-style:kizomba
@@ -448,6 +458,11 @@ events:
     price_min: 110
     price_currency: EUR
     price_is_free: false
+    links:
+      - url: https://seville-salsa-weekender.example/
+        label: Official website
+      - url: https://seville-salsa-weekender.example/tickets
+        label: Tickets
     tags:
       - format:weekender
       - dance-style:salsa
@@ -471,6 +486,11 @@ events:
     price_min: 120
     price_currency: EUR
     price_is_free: false
+    links:
+      - url: https://milan-bachata-weekender.example/
+        label: Official website
+      - url: https://milan-bachata-weekender.example/tickets
+        label: Tickets
     tags:
       - format:weekender
       - dance-style:bachata
@@ -491,6 +511,11 @@ events:
     price_min: 85
     price_currency: EUR
     price_is_free: false
+    links:
+      - url: https://budapest-salsa-weekender.example/
+        label: Official website
+      - url: https://budapest-salsa-weekender.example/tickets
+        label: Tickets
     tags:
       - format:weekender
       - dance-style:salsa
@@ -512,6 +537,11 @@ events:
     price_min: 75
     price_currency: EUR
     price_is_free: false
+    links:
+      - url: https://brussels-latin-weekender.example/
+        label: Official website
+      - url: https://brussels-latin-weekender.example/tickets
+        label: Tickets
     tags:
       - format:weekender
       - dance-style:salsa
@@ -534,6 +564,11 @@ events:
     price_min: 950
     price_currency: DKK
     price_is_free: false
+    links:
+      - url: https://copenhagen-zouk-weekender.example/
+        label: Official website
+      - url: https://copenhagen-zouk-weekender.example/tickets
+        label: Tickets
     tags:
       - format:weekender
       - dance-style:zouk
@@ -554,6 +589,11 @@ events:
     price_min: 90
     price_currency: EUR
     price_is_free: false
+    links:
+      - url: https://athens-bachata-weekender.example/
+        label: Official website
+      - url: https://athens-bachata-weekender.example/tickets
+        label: Tickets
     tags:
       - format:weekender
       - dance-style:bachata
@@ -575,6 +615,11 @@ events:
     price_min: 80
     price_currency: EUR
     price_is_free: false
+    links:
+      - url: https://dublin-salsa-christmas-weekender.example/
+        label: Official website
+      - url: https://dublin-salsa-christmas-weekender.example/tickets
+        label: Tickets
     tags:
       - format:weekender
       - dance-style:salsa
@@ -636,8 +681,8 @@ events:
     country_code: IT
     latitude: 45.4519
     longitude: 9.1755
-    start: w-15 Fri 20:00
-    end: w-15 Sun 23:00
+    start: w-1 Sat 18:00
+    end: w-1 Sun 23:00
     price_min: 110
     price_currency: EUR
     price_is_free: false
@@ -677,8 +722,8 @@ events:
     country_code: BE
     latitude: 50.8403
     longitude: 4.3555
-    start: w-7 Fri 20:00
-    end: w-7 Sun 22:00
+    start: w-1 Sat 20:00
+    end: w-1 Sun 22:00
     price_min: 70
     price_currency: EUR
     price_is_free: false
@@ -699,8 +744,8 @@ events:
     country_code: GR
     latitude: 37.9784
     longitude: 23.7128
-    start: w-4 Fri 20:00
-    end: w-4 Sun 23:00
+    start: w-1 Fri 20:00
+    end: w-1 Sun 23:00
     price_min: 85
     price_currency: EUR
     price_is_free: false
@@ -888,8 +933,8 @@ events:
     country_code: MA
     latitude: 31.6695
     longitude: -7.9811
-    start: w-48 Thu 20:00
-    end: w-48 Sun 23:00
+    start: w-1 Thu 20:00
+    end: w-1 Sun 23:00
     price_min: 200
     price_currency: EUR
     price_is_free: false
@@ -4499,7 +4544,7 @@ ratings:
       - audience:travelers
     comment_status: approved
     status: approved
-    minutes_ago: 24480
+    minutes_ago: 0
   - event_id: brussels-latin-weekender-previous
     email: elena.moreau@joinmovida.com
     overall_sentiment: great
@@ -4512,7 +4557,7 @@ ratings:
       - audience:music-lovers
     comment_status: approved
     status: approved
-    minutes_ago: 27360
+    minutes_ago: 0
   - event_id: milan-bachata-weekender-previous
     email: elena.moreau@joinmovida.com
     overall_sentiment: amazing
@@ -4525,7 +4570,7 @@ ratings:
       - audience:workshop-lovers
     comment_status: approved
     status: approved
-    minutes_ago: 30240
+    minutes_ago: 0
   - event_id: seville-salsa-weekender-previous
     email: elena.moreau@joinmovida.com
     overall_sentiment: great

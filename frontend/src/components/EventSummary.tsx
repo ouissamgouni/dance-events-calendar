@@ -19,7 +19,7 @@ import { cleanEventDescription } from '../utils/eventDescription';
 import { formatEventPrice } from '../utils/eventPrice';
 
 /** Detail tabs the summary can deep-link into. */
-export type EventDetailTab = 'overview' | 'program' | 'about' | 'location' | 'people' | 'reviews' | 'discussion' | 'memories';
+export type EventDetailTab = 'overview' | 'program' | 'about' | 'location' | 'deals' | 'people' | 'reviews' | 'discussion' | 'memories';
 
 interface Props {
     event: CalendarEvent;
@@ -113,6 +113,17 @@ export default function EventSummary({
                 onOverflowClick={() => onOpenTab('about')}
             />
 
+            {hasPromo && (
+                <button
+                    type="button"
+                    onClick={() => onOpenTab('deals')}
+                    aria-label="View discounts"
+                    className={`block ${event.tags?.length ? '-mt-3' : ''}`}
+                >
+                    <DiscountBadge />
+                </button>
+            )}
+
             {/* People / social proof */}
             <PeopleProofRow
                 event={event}
@@ -124,19 +135,10 @@ export default function EventSummary({
             {/* Review overview */}
             {!isPast && reviewOverview}
 
-            {/* Price + discount — one line under the review section */}
-            {(price || hasPromo) && (
-                <div className="flex items-center gap-2 text-sm">
-                    {price && <span className="font-semibold text-ink">{price}</span>}
-                    {hasPromo && (
-                        <button
-                            type="button"
-                            onClick={() => onOpenTab('about', { anchor: 'discounts' })}
-                            aria-label="View discounts"
-                        >
-                            <DiscountBadge />
-                        </button>
-                    )}
+            {/* Price — one line under the review section */}
+            {price && (
+                <div className="text-sm">
+                    <span className="font-semibold text-ink">{price}</span>
                 </div>
             )}
 
@@ -180,6 +182,7 @@ export default function EventSummary({
                     eventHasReviews={eventHasReviews}
                     onPostMessage={onPostMessage}
                     onSuggestEdit={onSuggestEdit}
+                    onPromoAdded={() => onOpenTab('deals')}
                 />
             )}
         </div>

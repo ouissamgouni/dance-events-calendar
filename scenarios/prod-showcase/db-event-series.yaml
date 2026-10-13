@@ -1,0 +1,179 @@
+event_series:
+  - canonical_title: Alfama Thursday Salsa
+    status: resolved
+    source: manual
+    members:
+      - alfama-thursday-salsa-summer
+      - alfama-thursday-salsa-autumn
+      - alfama-thursday-salsa-next
+  - canonical_title: Seville Salsa Weekender
+    status: resolved
+    source: manual
+    members:
+      - seville-salsa-weekender-previous-2
+      - seville-salsa-weekender-previous
+      - seville-salsa-weekender
+  - canonical_title: Milan Bachata Weekender
+    status: resolved
+    source: manual
+    members:
+      - milan-bachata-weekender-previous-2
+      - milan-bachata-weekender-previous
+      - milan-bachata-weekender
+  - canonical_title: Budapest Salsa Weekender
+    status: resolved
+    source: manual
+    members:
+      - budapest-salsa-weekender-previous-2
+      - budapest-salsa-weekender-previous
+      - budapest-salsa-weekender
+  - canonical_title: Brussels Latin Weekender
+    status: resolved
+    source: manual
+    members:
+      - brussels-latin-weekender-previous-2
+      - brussels-latin-weekender-previous
+      - brussels-latin-weekender
+  - canonical_title: Athens Bachata Weekender
+    status: resolved
+    source: manual
+    members:
+      - athens-bachata-weekender-previous-2
+      - athens-bachata-weekender-previous
+      - athens-bachata-weekender
+  - canonical_title: Costa Brava Salsa Summer Festival
+    status: resolved
+    source: manual
+    members:
+      - costa-brava-salsa-summer-festival-previous
+      - 6iqkicg5c0o4cdd3d1sm6d1m8et5gdd28il5id1r8lo80q3r8nql4eqk8u
+  - canonical_title: Toronto Latin Fever Festival
+    status: resolved
+    source: manual
+    members:
+      - toronto-latin-fever-festival-previous-2
+      - toronto-latin-fever-festival-previous
+      - toronto-latin-fever-festival
+  - canonical_title: Bosphorus Latin Festival
+    status: resolved
+    source: manual
+    members:
+      - bosphorus-latin-festival-previous-2
+      - bosphorus-latin-festival-previous
+      - bosphorus-latin-festival
+  - canonical_title: Marrakech Latin Oasis Festival
+    status: resolved
+    source: manual
+    members:
+      - marrakech-latin-oasis-festival-previous-2
+      - marrakech-latin-oasis-festival-previous
+      - marrakech-latin-oasis-festival
+  - canonical_title: Big Apple Bachata Festival
+    status: resolved
+    source: manual
+    members:
+      - big-apple-bachata-festival-previous-2
+      - big-apple-bachata-festival-previous
+      - big-apple-bachata-festival
+  - canonical_title: Dubai Latin Mirage Festival
+    status: resolved
+    source: manual
+    members:
+      - dubai-latin-mirage-festival-previous-2
+      - dubai-latin-mirage-festival-previous
+      - dubai-latin-mirage-festival
+  - canonical_title: Red Sea Latin Festival
+    status: resolved
+    source: manual
+    members:
+      - red-sea-latin-festival-previous-2
+      - red-sea-latin-festival-previous
+      - red-sea-latin-festival
+  - canonical_title: Lion City Latin Festival
+    status: resolved
+    source: manual
+    members:
+      - lion-city-latin-festival-previous-2
+      - lion-city-latin-festival-previous
+      - lion-city-latin-festival
+  - canonical_title: Busan Latin Festival
+    status: resolved
+    source: manual
+    members:
+      - busan-latin-festival-previous-2
+      - busan-latin-festival-previous
+      - busan-latin-festival
+  - canonical_title: Sydney Harbour Kizomba Festival
+    status: resolved
+    source: manual
+    members:
+      - sydney-harbour-kizomba-festival-previous-2
+      - sydney-harbour-kizomba-festival-previous
+      - sydney-harbour-kizomba-festival
+  - canonical_title: Cali Salsa Capital Festival
+    status: resolved
+    source: manual
+    members:
+      - cali-salsa-capital-festival-previous-2
+      - cali-salsa-capital-festival-previous
+      - cali-salsa-capital-festival
+  - canonical_title: Paris Latin Lumière Festival
+    status: resolved
+    source: manual
+    members:
+      - paris-latin-lumiere-festival-previous-2
+      - paris-latin-lumiere-festival-previous
+      - paris-latin-lumiere-festival
+  - canonical_title: Canal Saint-Martin Salsa Tuesdays
+    status: resolved
+    source: manual
+    members:
+      - canal-salsa-tuesdays-past-4
+      - canal-salsa-tuesdays-past-3
+      - canal-salsa-tuesdays-past-2
+      - canal-salsa-tuesdays-past-1
+      - canal-salsa-tuesdays-next-1
+      - canal-salsa-tuesdays-next-2
+      - canal-salsa-tuesdays-next-3
+  - canonical_title: Pigalle Bachata Wednesdays
+    status: resolved
+    source: manual
+    members:
+      - pigalle-bachata-wednesdays-past-4
+      - pigalle-bachata-wednesdays-past-3
+      - pigalle-bachata-wednesdays-past-2
+      - pigalle-bachata-wednesdays-past-1
+      - pigalle-bachata-wednesdays-next-1
+      - pigalle-bachata-wednesdays-next-2
+      - pigalle-bachata-wednesdays-next-3
+  - canonical_title: Péniche Latina Sundays
+    status: resolved
+    source: manual
+    members:
+      - peniche-latina-sundays-past-4
+      - peniche-latina-sundays-past-3
+      - peniche-latina-sundays-past-2
+      - peniche-latina-sundays-past-1
+      - peniche-latina-sundays-next-1
+      - peniche-latina-sundays-next-2
+      - peniche-latina-sundays-next-3
+  - canonical_title: Ixelles Salsa Thursdays
+    status: resolved
+    source: manual
+    members:
+      - ixelles-salsa-thursdays-past-3
+      - ixelles-salsa-thursdays-past-2
+      - ixelles-salsa-thursdays-past-1
+      - ixelles-salsa-thursdays-next-1
+      - ixelles-salsa-thursdays-next-2
+      - ixelles-salsa-thursdays-next-3
+  - canonical_title: Saint-Gilles Salsa & Bachata Saturdays
+    status: resolved
+    source: manual
+    members:
+      - saint-gilles-latin-saturdays-past-3
+      - saint-gilles-latin-saturdays-past-2
+      - saint-gilles-latin-saturdays-past-1
+      - saint-gilles-latin-saturdays-next-1
+      - saint-gilles-latin-saturdays-next-2
+      - saint-gilles-latin-saturdays-next-3

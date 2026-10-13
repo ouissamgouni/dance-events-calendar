@@ -12,6 +12,8 @@ import { useTicketAction } from '../hooks/useTicketAction';
 import useOrganizerClaimAction from '../hooks/useOrganizerClaimAction';
 import { useAuth } from '../context/AuthContext';
 import CancelEventSheet from './CancelEventSheet';
+import EventPromoCodeDialog from './EventPromoCodeDialog';
+import { isPromoSectionVisible } from '../utils/sectionVisibility';
 
 interface Props {
     event: CalendarEvent;
@@ -28,6 +30,8 @@ interface Props {
     suggestEditLabel?: string;
     /** Optional admin-only event editor affordance. */
     onAdminEdit?: () => void;
+    /** Called after the viewer submits a promo code. */
+    onPromoAdded?: () => void;
 }
 
 /**
@@ -46,8 +50,9 @@ export default function EventActionDock({
     onSuggestEdit,
     suggestEditLabel = 'Suggest an edit',
     onAdminEdit,
+    onPromoAdded,
 }: Props) {
-    const { showRatings } = useFeatureFlags();
+    const { showRatings, promoCodesEnabled } = useFeatureFlags();
     const ticket = useTicketAction(event);
     const organizerClaim = useOrganizerClaimAction(event);
     const { user } = useAuth();
@@ -56,10 +61,12 @@ export default function EventActionDock({
     const [cancelOpen, setCancelOpen] = useState(false);
     const [ticketOpen, setTicketOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [promoOpen, setPromoOpen] = useState(false);
 
     const reviewInline = showRatings && isPast;
     const hasStarted = new Date(event.start).getTime() <= Date.now();
     const cancelled = Boolean(event.is_cancelled);
+    const canAddPromo = Boolean(user) && !isPast && !cancelled && isPromoSectionVisible(event, promoCodesEnabled);
     const desktopButton = 'hidden h-10 w-full items-center gap-2 rounded-field border border-line bg-surface px-3 text-sm text-ink transition hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface lg:flex';
     const menuItem = 'flex min-h-12 w-full items-center gap-3 px-2 text-left text-base text-ink transition hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent';
     const menuIcon = 'h-5 w-5 shrink-0 text-ink-soft';
@@ -134,6 +141,12 @@ export default function EventActionDock({
                     <MessageSquare className="h-4 w-4" aria-hidden="true" />
                     Start discussion
                 </button>
+                {canAddPromo && (
+                    <button type="button" onClick={() => setPromoOpen(true)} className={desktopButton}>
+                        <img src="/promo-code.png" alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
+                        Add promo code
+                    </button>
+                )}
                 {onSuggestEdit && (
                     <button type="button" onClick={onSuggestEdit} disabled={cancelled} className={desktopButton}>
                         <PencilLine className="h-4 w-4" aria-hidden="true" />
@@ -217,6 +230,17 @@ export default function EventActionDock({
                                     <MessageSquare className={menuIcon} aria-hidden="true" />
                                     Start discussion
                                 </button>
+                                {canAddPromo && (
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => { setMenuOpen(false); setPromoOpen(true); }}
+                                        className={menuItem}
+                                    >
+                                        <img src="/promo-code.png" alt="" aria-hidden="true" className="h-5 w-5 shrink-0 object-contain" />
+                                        Add promo code
+                                    </button>
+                                )}
                                 {onSuggestEdit && (
                                     <button
                                         type="button"
@@ -268,6 +292,13 @@ export default function EventActionDock({
                 </div>
             </div>
             {ticketOpen && <TicketSheet event={event} onClose={() => setTicketOpen(false)} />}
+            {promoOpen && (
+                <EventPromoCodeDialog
+                    eventId={event.event_id}
+                    onClose={() => setPromoOpen(false)}
+                    onSubmitted={() => onPromoAdded?.()}
+                />
+            )}
             {organizerClaim.sheet}
             {cancelOpen && (
                 <CancelEventSheet

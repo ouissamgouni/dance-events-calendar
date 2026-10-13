@@ -23,10 +23,6 @@ vi.mock('../EventSeriesLink', () => ({
     default: () => <div data-testid="event-series" />,
 }));
 
-vi.mock('../EventPromoCodes', () => ({
-    EventPromoCodes: () => <div data-testid="promo-codes" />,
-}));
-
 function detailEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     return {
         event_id: 'event-1',
@@ -51,7 +47,6 @@ describe('AboutTab', () => {
             screen.getByTestId('event-links'),
             screen.getByTestId('event-series'),
             screen.getByRole('heading', { name: 'Price' }),
-            screen.getByTestId('promo-codes'),
         ];
 
         content.slice(0, -1).forEach((element, index) => {
