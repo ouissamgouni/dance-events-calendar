@@ -3193,12 +3193,8 @@ def list_admin_event_map_points(
 ):
     """Geolocated events matching the admin filters, for the events map."""
     base = _apply_admin_event_filters(select(CachedEvent), filters)
-    geolocated = base.where(
-        CachedEvent.latitude != None, CachedEvent.longitude != None
-    )
-    total = session.exec(
-        select(func.count()).select_from(geolocated.subquery())
-    ).one()
+    geolocated = base.where(CachedEvent.latitude != None, CachedEvent.longitude != None)
+    total = session.exec(select(func.count()).select_from(geolocated.subquery())).one()
     ungeolocated = session.exec(
         select(func.count()).select_from(
             _apply_admin_geo_filter(base, "ungeolocated").subquery()

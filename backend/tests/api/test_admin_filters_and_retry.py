@@ -260,9 +260,7 @@ class TestEventMapPoints:
             )
             s.commit()
 
-    def test_returns_geolocated_matches_with_ungeolocated_count(
-        self, client, engine
-    ):
+    def test_returns_geolocated_matches_with_ungeolocated_count(self, client, engine):
         self._seed(engine)
 
         resp = client.get("/api/admin/events/map-points", params={"search": "mapped"})
