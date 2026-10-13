@@ -3,6 +3,8 @@ import type FullCalendar from '@fullcalendar/react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import type { CalendarViewMode } from './Calendar';
+import CalendarDaySheet from './CalendarDaySheet';
+import { eventsOnDay } from '../utils/eventDates';
 
 const Calendar = lazy(() => import('./Calendar'));
 
@@ -22,6 +24,8 @@ interface Props {
     layout?: 'page' | 'fill' | 'remaining-map';
     /** When set, the date/range toolbar sticks at this top offset (px). */
     stickyToolbarTop?: number;
+    /** Days after this instant render as locked (signed-out horizon). */
+    lockedAfter?: Date | null;
 }
 
 const MIN_REMAINING_MAP_HEIGHT = 200;
@@ -63,6 +67,7 @@ export default function CalendarMapWorkspace({
     offMapEventIds,
     layout = 'page',
     stickyToolbarTop,
+    lockedAfter,
 }: Props) {
     const calendarRef = useRef<FullCalendar>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -107,6 +112,12 @@ export default function CalendarMapWorkspace({
         setTitle(rangeTitle(start, end));
         onDatesChange?.(start, end);
     }, [onDatesChange]);
+
+    const [openDay, setOpenDay] = useState<Date | null>(null);
+    const handleDayOpen = useCallback((date: Date) => {
+        if (eventsOnDay(events, date).length > 0) setOpenDay(date);
+    }, [events]);
+    const closeDaySheet = useCallback(() => setOpenDay(null), []);
 
     const rangeControls = rangeSelector !== 'hidden' && onViewModeChange ? (
         <div className={`flex shrink-0 gap-1 bg-canvas p-1 ${rangeSelector === 'mobile' ? 'sm:hidden' : ''}`} aria-label="Calendar range">
@@ -185,6 +196,8 @@ export default function CalendarMapWorkspace({
                                 onEventHover={onEventHover}
                                 offMapEventIds={offMapEventIds}
                                 viewMode={viewMode}
+                                onDayOpen={handleDayOpen}
+                                lockedAfter={lockedAfter}
                             />
                         </Suspense>
                     </div>
@@ -198,6 +211,18 @@ export default function CalendarMapWorkspace({
                     </div>
                 )}
             </div>
+            {openDay && (
+                <CalendarDaySheet
+                    day={openDay}
+                    events={events}
+                    onDayChange={setOpenDay}
+                    onClose={closeDaySheet}
+                    onEventClick={(event) => {
+                        setOpenDay(null);
+                        onEventClick(event);
+                    }}
+                />
+            )}
         </section>
     );
 }

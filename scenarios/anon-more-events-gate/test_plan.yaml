@@ -1,11 +1,12 @@
 test_plan:
-  name: "Anonymous explorer more-events gate"
+  name: "Anonymous 30-day horizon gate"
   description: >
-    Verify the anonymous explorer growth gate that shows only the first
-    10 events in the current list and replaces deeper pagination with a
-    persistent sign-in boundary. The date picker and event API remain
-    unchanged: anonymous visitors can still change the timeframe, but they
-    cannot reveal more than 10 results from any one list without signing in.
+    Verify the signed-out time-horizon gate: anonymous visitors only see
+    events starting within the next N days (admin setting "Signed-out
+    horizon (days)", default 30) across the explorer list, explorer map and
+    calendar. Later events are replaced by a sign-in lock. The event API is
+    unchanged (frontend-only rule). Event discussions are readable only when
+    signed in.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=anon-more-events-gate BROWSER=isolated RESET_BROWSER=1"
@@ -13,69 +14,87 @@ test_plan:
       Use a fresh isolated browser profile and stay signed out until the step
       explicitly says to sign in.
     - >
-      Seed data contains 13 public events inside the default explorer window
-      (evt-gate-001..013) and 5 more events in weeks 6–11
-      (evt-gate-014..018) so later presets still expose different results.
+      Seed data contains 13 public events in weeks 1–4 (evt-gate-001..013,
+      inside the 30-day horizon) and 5 more events in weeks 6–11
+      (evt-gate-014..018, past the horizon).
 
   steps:
     - id: 1
-      title: "Anonymous landing keeps the normal date picker and shows a locked boundary after 10 events"
+      title: "Anonymous list shows every in-horizon event, then the lock"
       description: >
-        Open / on a desktop viewport as an anonymous visitor. Do not change any
-        filters.
+        Open / on a desktop viewport as an anonymous visitor. Keep the default
+        "Next 3 months" period. Page through the list with "+ N more".
       expected: >
-        • The date picker keeps the normal explorer behavior and still offers
-          the usual long presets such as "Next 3 months" and "Next 6 months".
-        • The event list renders exactly 10 cards, then a blue locked panel
-          (data-testid="event-list-more-events-gate") appears instead of a
-          "Show more" button.
-        • The lock copy says more events are available and the CTA reads
-          "Sign in to see more".
+        • All 13 in-horizon events (evt-gate-001..013) can be reached via the
+          normal "+ N more" pagination.
+        • After the last one, a blue lock panel
+          (data-testid="event-list-more-events-gate") reads "Sign in to unlock
+          5 more events after <date 30 days from today>." with a "Sign in to
+          see more" button.
+        • No "Search later dates" button is shown.
 
     - id: 2
-      title: "Anonymous can change the timeframe, but each list still stops at 10"
+      title: "Explorer map hides events past the horizon"
       description: >
-        Choose the "Next 3 months" preset or load a later range directly from
-        the URL.
+        Look at the desktop map (or open the full-screen map on mobile).
       expected: >
-        • The date picker accepts the wider range normally.
-        • The result set changes, and later fixtures such as
-          "Prague Salsa Marathon Preview" (evt-gate-014) can enter the list.
-        • Even on the wider range, the list still renders only 10 cards before
-          the locked panel appears.
+        • Only markers for evt-gate-001..013 are shown; none for
+          evt-gate-014..018.
+        • A chip (data-testid="explorer-map-horizon-lock") reads "5 more events
+          after <date> Sign in"; clicking it opens the sign-in sheet with the
+          headline "See every upcoming event".
 
     - id: 3
-      title: "Anonymous API responses stay unchanged"
+      title: "Changing filters or dates does not bypass the horizon"
       description: >
-        In the same anonymous browser session, inspect the network call for
-        GET /api/events on the wider range from step 2.
+        Switch to a wider preset such as "Next 6 months", or toggle a tag
+        filter.
       expected: >
-        • The response still returns the full matching dataset for that range,
-          including later fixtures such as evt-gate-014..018.
-        • The 10-event limit is a list-surface rule, not an API truncation.
+        • Events past the horizon still never appear in the list or on the map.
+        • The lock count updates to match the current filters.
 
     - id: 4
-      title: "Sign in from the locked boundary returns to the same explorer state"
+      title: "Calendar locks days past the horizon"
       description: >
-        Click "Sign in to see more" from the locked panel and use the dev-auth
-        button for "Gate Viewer".
+        Switch to the Calendar view and navigate forward with the "next"
+        arrow until you pass the horizon date.
       expected: >
-        • After sign-in, the app returns to the same explorer route and query
-          string.
-        • The locked boundary is gone.
-        • The list now shows the standard secondary CTA for deeper pagination
-          within the current window.
+        • Day cells after the horizon are hatched/muted and contain no events.
+        • A lock card (data-testid="calendar-horizon-lock") above the calendar
+          shows how many matching events in the visible range are locked.
+        • The calendar map shows no markers for locked events.
 
     - id: 5
-      title: "Signed-in viewer can page past 10 items in the same list"
+      title: "Event discussion is locked for anonymous visitors"
       description: >
-        Still signed in as Gate Viewer, continue paging through the current
-        list and, if needed, switch to a wider preset such as "Next 3 months".
+        Open any event detail page that has discussion posts and switch to the
+        Discussion tab.
       expected: >
-        • The list uses the normal signed-in pagination flow, not the locked
-          boundary.
-        • After paging, later fixtures appear: "Prague Salsa Marathon Preview"
+        • The tab shows the post count and a "Sign in to read" panel
+          (data-testid="discussion-signin-lock"), with no post bodies, author
+          names or avatars.
+        • GET /api/events/<id>/messages returns items: [] with the real total.
+
+    - id: 6
+      title: "Signing in unlocks everything in place"
+      description: >
+        Click "Sign in to see more" from the list lock and use the dev-auth
+        button for "Gate Viewer".
+      expected: >
+        • The app stays on the same explorer route and query string.
+        • The lock panel, map chip and calendar hatching are gone.
+        • Later fixtures appear: "Prague Salsa Marathon Preview"
           (evt-gate-014), "Vienna Bachata Exchange" (evt-gate-015),
           "Zurich Sunday Social" (evt-gate-016), "Copenhagen Salsa Boat Party"
           (evt-gate-017), and "Dublin Bachata Weekender Kickoff"
           (evt-gate-018).
+
+    - id: 7
+      title: "Admin can change or disable the horizon"
+      description: >
+        As an admin, open Admin → settings and set "Signed-out horizon (days)"
+        to 7, then 0. Re-check / signed out after each change.
+      expected: >
+        • With 7, only events in the next 7 days are visible to signed-out
+          visitors and the lock date moves accordingly.
+        • With 0, signed-out visitors see every event and no lock is shown.

@@ -488,6 +488,15 @@ body {
   box-shadow: inset 0 -2px 0 rgba(37, 99, 235, 0.55);
 }
 
+/* ── Days past the signed-out horizon ───────────────────── */
+.fc .fc-daygrid-day.fc-day-locked {
+  background: repeating-linear-gradient(135deg, var(--color-canvas), var(--color-canvas) 6px, var(--color-line) 6px, var(--color-line) 7px);
+}
+
+.fc .fc-daygrid-day.fc-day-locked .fc-daygrid-day-number {
+  color: var(--color-muted);
+}
+
 /* ── Highlighted event (cross-component hover) ───────────── */
 .fc .fc-event-highlighted {
   box-shadow: 0 0 0 2px #6366f1;
@@ -509,6 +518,53 @@ body {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-accent);
+}
+
+/* ── "+N more" popover (desktop; mobile uses CalendarDaySheet) ── */
+.fc .fc-popover {
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.18);
+  overflow: hidden;
+  max-width: min(320px, calc(100vw - 16px));
+}
+
+.fc .fc-popover-header {
+  background: var(--color-surface);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-line);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.fc .fc-more-popover .fc-popover-body {
+  max-height: 60vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.fc .fc-more-popover .fc-daygrid-event-harness {
+  margin-bottom: 4px;
+}
+
+.fc .fc-more-popover .fc-daygrid-event {
+  margin: 0;
+}
+
+.fc .fc-more-popover .fc-event-title-text {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+@media (max-width: 639px) {
+  .fc .fc-more-popover {
+    display: none;
+  }
 }
 
 /* ── Scrollbar inside event modal ──────────────────── */

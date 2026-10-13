@@ -632,6 +632,7 @@ export interface SiteSettings {
     trending_top_n?: number;
     trending_top_percent?: number;
     explorer_list_page_size?: number;
+    anon_horizon_days?: number;
     event_color_bar_color: string;
     tag_sort_mode: 'group' | 'event_count';
     default_explorer_period?: DateRangePresetKey;
@@ -4929,6 +4930,59 @@ export async function fetchAdminEventIds(params: EventFilterParams = {}): Promis
     const res = await fetch(`${BASE}/admin/events/ids?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch event IDs');
     return res.json();
+}
+
+export interface AdminEventMapPoint {
+    event_id: string;
+    calendar_id: string;
+    title: string;
+    start: string;
+    end: string;
+    all_day: boolean;
+    timezone: string | null;
+    location: string | null;
+    city: string | null;
+    latitude: number;
+    longitude: number;
+    image_url: string | null;
+    image_thumb_url: string | null;
+    status: AdminEventStatus;
+    review_status: string;
+    visibility_state: EventVisibilityState;
+}
+
+export interface AdminEventMapResult {
+    events: CalendarEvent[];
+    /** Geolocated matches, including any beyond the server cap. */
+    total: number;
+    /** Matches with an address but no coordinates. */
+    ungeolocated: number;
+    truncated: boolean;
+}
+
+export async function fetchAdminEventMapPoints(params: EventFilterParams = {}): Promise<AdminEventMapResult> {
+    const qs = new URLSearchParams();
+    setFilterParams(qs, params);
+    const res = await fetch(`${BASE}/admin/events/map-points?${qs}`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch event map points');
+    const body: { items: AdminEventMapPoint[]; total: number; ungeolocated: number; truncated: boolean } = await res.json();
+    return {
+        events: body.items.map((point) => ({
+            ...point,
+            description: null,
+            color: null,
+            view_count: 0,
+            price_min: null,
+            price_max: null,
+            price_currency: null,
+            price_is_free: null,
+            links: null,
+            tags: [],
+        })),
+        total: body.total,
+        ungeolocated: body.ungeolocated,
+        truncated: body.truncated,
+    };
 }
 
 // --- Calendar Default Tags ---

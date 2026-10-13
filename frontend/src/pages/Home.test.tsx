@@ -70,8 +70,18 @@ vi.mock('../components/EventMap', () => ({
 
 // Mock all the other components to avoid rendering the full page
 vi.mock('../components/EventListPanel', () => ({
-    default: ({ onExtendPeriod, nextPeriodEventCount }: { onExtendPeriod?: () => void; nextPeriodEventCount?: number }) => (
-        nextPeriodEventCount ? <button type="button" onClick={onExtendPeriod}>Search next dates</button> : <div />
+    default: ({ onExtendPeriod, nextPeriodEventCount, events, reachHiddenCount, onRevealReach }: {
+        onExtendPeriod?: () => void;
+        nextPeriodEventCount?: number;
+        events?: unknown[];
+        reachHiddenCount?: number;
+        onRevealReach?: () => void;
+    }) => (
+        <>
+            {nextPeriodEventCount ? <button type="button" onClick={onExtendPeriod}>Search next dates</button> : <div />}
+            <output data-testid="list-count">{events?.length ?? 0}</output>
+            {reachHiddenCount ? <button type="button" onClick={onRevealReach}>{`Reveal ${reachHiddenCount}`}</button> : null}
+        </>
     ),
 }));
 vi.mock('../components/FilterSheet', () => ({ default: () => <div /> }));
@@ -354,5 +364,31 @@ describe('Home — mobile map mount with applied area', () => {
         );
         await screen.findAllByRole('button', { name: 'Clear area' });
         expect(readBrowseSession()).toBeNull();
+    });
+
+    it('reveals reach-hidden local events for the session without changing the URL reach', async () => {
+        const user = userEvent.setup();
+        type Evt = Awaited<ReturnType<typeof fetchEvents>>[number];
+        vi.mocked(fetchEvents).mockResolvedValue([
+            { event_id: 'intl', title: 'Congress', latitude: null, longitude: null, tags: [{ group_slug: 'reach', slug: 'international' }] } as unknown as Evt,
+            { event_id: 'local', title: 'Local social', latitude: null, longitude: null, tags: [{ group_slug: 'reach', slug: 'local' }] } as unknown as Evt,
+        ]);
+        render(
+            <TestProviders initialEntries={['/?reach=international']}>
+                <Home />
+                <LocationProbe />
+            </TestProviders>,
+        );
+
+        const [clearArea] = await screen.findAllByRole('button', { name: 'Clear area' });
+        await user.click(clearArea);
+        await waitFor(() => expect(screen.getAllByTestId('list-count')[0]).toHaveTextContent('1'));
+
+        const [reveal] = await screen.findAllByRole('button', { name: 'Reveal 1' });
+        await user.click(reveal);
+
+        await waitFor(() => expect(screen.getAllByTestId('list-count')[0]).toHaveTextContent('2'));
+        const location = screen.getByTestId('location-probe').textContent ?? '';
+        expect(new URLSearchParams(location.split('?')[1]).get('reach')).toBe('international');
     });
 });

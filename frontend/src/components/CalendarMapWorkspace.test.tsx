@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import CalendarMapWorkspace from './CalendarMapWorkspace';
+import type { CalendarEvent } from '../types';
 
 const calendarApi = vi.hoisted(() => ({
     prev: vi.fn(),
@@ -10,16 +11,24 @@ const calendarApi = vi.hoisted(() => ({
     today: vi.fn(),
 }));
 
+vi.mock('../utils/tracking', () => ({ trackView: vi.fn() }));
+
 vi.mock('./Calendar', () => ({
-    default: forwardRef(function CalendarMock({ viewMode, onDatesChange }: {
+    default: forwardRef(function CalendarMock({ viewMode, onDatesChange, onDayOpen }: {
         viewMode: string;
         onDatesChange?: (start: Date, end: Date) => void;
+        onDayOpen?: (date: Date) => void;
     }, ref) {
         useImperativeHandle(ref, () => ({ getApi: () => calendarApi }));
         useEffect(() => {
             onDatesChange?.(new Date('2026-09-01T00:00:00Z'), new Date('2026-09-22T00:00:00Z'));
         }, [onDatesChange]);
-        return <div data-testid="calendar" data-view-mode={viewMode} />;
+        return (
+            <div data-testid="calendar" data-view-mode={viewMode}>
+                <button type="button" onClick={() => onDayOpen?.(new Date(2026, 8, 5))}>open busy day</button>
+                <button type="button" onClick={() => onDayOpen?.(new Date(2026, 8, 6))}>open empty day</button>
+            </div>
+        );
     }),
 }));
 
@@ -73,6 +82,34 @@ describe('CalendarMapWorkspace', () => {
         expect(await screen.findByTestId('calendar')).toBeInTheDocument();
         expect(screen.queryByTestId('map')).not.toBeInTheDocument();
         expect(screen.queryByTestId('calendar-map-toggle')).not.toBeInTheDocument();
+    });
+
+    it('opens a day sheet for days with events and opens the tapped event', async () => {
+        const user = userEvent.setup();
+        const onEventClick = vi.fn();
+        const event = {
+            event_id: 'e1',
+            title: 'Salsa Night',
+            start: new Date(2026, 8, 5, 20).toISOString(),
+            end: new Date(2026, 8, 5, 23).toISOString(),
+            all_day: false,
+            city: 'Rabat',
+            country: 'Morocco',
+            tags: [],
+        } as unknown as CalendarEvent;
+
+        render(
+            <CalendarMapWorkspace events={[event]} viewMode="3week" onEventClick={onEventClick} />,
+        );
+
+        await user.click(await screen.findByRole('button', { name: 'open empty day' }));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: 'open busy day' }));
+        expect(screen.getByRole('dialog')).toHaveTextContent('1 event');
+        await user.click(screen.getByRole('button', { name: /Salsa Night/ }));
+        expect(onEventClick).toHaveBeenCalledWith(event);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     it.each([

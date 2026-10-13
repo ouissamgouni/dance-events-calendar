@@ -48,7 +48,7 @@ const makeEvents = (n: number): CalendarEvent[] =>
         tags: [],
     }));
 
-const renderPanel = (gate = false) =>
+const renderPanel = (horizon?: { end: Date; locked: number }) =>
     render(
         <MemoryRouter>
             <EventListPanel
@@ -59,7 +59,8 @@ const renderPanel = (gate = false) =>
                 showPopularity={false}
                 sortBy="date"
                 onSortChange={() => { }}
-                gateMoreEventsForAnonymous={gate}
+                anonHorizonEnd={horizon?.end ?? null}
+                anonLockedCount={horizon?.locked ?? 0}
             />
         </MemoryRouter>,
     );
@@ -74,11 +75,40 @@ describe('EventListPanel page size', () => {
         expect(screen.getByTestId('event-list-show-more')).toHaveTextContent('+ 2 more');
     });
 
-    it('gates anonymous viewers after the configured page size', () => {
+    it('lets signed-out viewers page through the horizon, then shows the lock', () => {
         authState.user = null;
-        renderPanel(true);
-        expect(screen.getAllByTestId('event-card')).toHaveLength(5);
-        expect(screen.getByTestId('event-list-more-events-gate')).toBeInTheDocument();
+        renderPanel({ end: new Date(2030, 0, 12, 23, 59), locked: 4 });
+        expect(screen.queryByTestId('event-list-more-events-gate')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('event-list-show-more'));
+        fireEvent.click(screen.getByTestId('event-list-show-more'));
+        expect(screen.getAllByTestId('event-card')).toHaveLength(12);
+        expect(screen.getByTestId('event-list-more-events-gate')).toHaveTextContent('Sign in to unlock 4 more events');
+    });
+});
+
+describe('EventListPanel empty state', () => {
+    it('offers to reveal events hidden by the reach filter', () => {
+        authState.user = { id: 'u1' };
+        const onRevealReach = vi.fn();
+        render(
+            <MemoryRouter>
+                <EventListPanel
+                    events={[]}
+                    mapBounds={null}
+                    onEventClick={() => { }}
+                    showPrices={false}
+                    showPopularity={false}
+                    sortBy="date"
+                    onSortChange={() => { }}
+                    reachHiddenCount={3}
+                    onRevealReach={onRevealReach}
+                />
+            </MemoryRouter>,
+        );
+        const cta = screen.getByTestId('event-list-empty-reveal-reach');
+        expect(cta).toHaveTextContent('Show 3 local events');
+        fireEvent.click(cta);
+        expect(onRevealReach).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -296,6 +296,8 @@ interface Props {
     clustering?: boolean;
     /** Collapse the dates of one recurring event (same series_key and venue) onto one pin. */
     groupSeries?: boolean;
+    /** Per-event pin fill; overrides the site-wide event colour. */
+    pinColorOf?: (event: CalendarEvent) => string | null;
 }
 
 interface PopupPortal {
@@ -1025,6 +1027,7 @@ function MarkerClusterLayer({
     pinnedEventId,
     clustering,
     groupSeries,
+    pinColorOf,
 }: {
     events: CalendarEvent[];
     hoveredEventId?: string | null;
@@ -1057,6 +1060,7 @@ function MarkerClusterLayer({
     /** Enable marker clustering. Defaults to true. */
     clustering?: boolean;
     groupSeries?: boolean;
+    pinColorOf?: (event: CalendarEvent) => string | null;
 }) {
     const map = useMap();
     const navigate = useNavigate();
@@ -1167,7 +1171,7 @@ function MarkerClusterLayer({
             const marker = L.marker([event.latitude!, event.longitude!], {
                 icon: journeyNumber
                     ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelectedIdRef.current === event.event_id)
-                    : makeColoredIcon(eventColorBarColor, decorations),
+                    : makeColoredIcon(pinColorOf ? pinColorOf(event) : eventColorBarColor, decorations),
             });
             let popupHost: HTMLDivElement | null = null;
             let hover: HoverPopupController | null = null;
@@ -1264,7 +1268,7 @@ function MarkerClusterLayer({
             markerRefs.current.clear();
             setPopupPortals([]);
         };
-    }, [layerGroupRef, detailLinkSource, disablePopups, eventColorBarColor, groups, followingBadgeEnabled, hoverPopups, journeySequence, map, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+    }, [layerGroupRef, detailLinkSource, disablePopups, eventColorBarColor, pinColorOf, groups, followingBadgeEnabled, hoverPopups, journeySequence, map, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
 
     useEffect(() => {
         const layerGroup = layerGroupRef.current;
@@ -1311,12 +1315,13 @@ function MarkerClusterLayer({
             const journeyNumber = journeySequence?.[event.event_id];
             const journeyLabel = event.city || event.location?.split(',')[0]?.trim() || event.title;
             const journeySelected = journeySelectedEventId === event.event_id;
+            const pinColor = pinColorOf ? pinColorOf(event) : eventColorBarColor;
             marker.setIcon(journeyNumber
                 ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelected || isHovered)
-                : isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations));
+                : isHovered ? makeHighlightedIcon(pinColor, decorations) : makeColoredIcon(pinColor, decorations));
             marker.setZIndexOffset(isHovered || journeySelected || isPinned ? PINNED_Z_OFFSET : 0);
         });
-    }, [hoveredEventId, groups, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs, journeySelectedEventId, journeySequence, pinnedEventId]);
+    }, [hoveredEventId, groups, eventColorBarColor, pinColorOf, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs, journeySelectedEventId, journeySequence, pinnedEventId]);
 
     const selectListedEvent = useCallback((event: CalendarEvent) => {
         map.closePopup();
@@ -1356,7 +1361,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, onOpenDetails, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null, selectedEventId = null, fitAllToken, obscuredInsets, clustering = true, groupSeries = false }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, onOpenDetails, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null, selectedEventId = null, fitAllToken, obscuredInsets, clustering = true, groupSeries = false, pinColorOf }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent, mapPopupTrigger } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -1518,6 +1523,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 pinnedEventId={selectedEventId}
                 clustering={clustering}
                 groupSeries={groupSeries}
+                pinColorOf={pinColorOf}
             />
         </MapContainer>
     );

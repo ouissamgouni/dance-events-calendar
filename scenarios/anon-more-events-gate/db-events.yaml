@@ -1,10 +1,9 @@
 # Seed for the anonymous more-events gate scenario.
 #
 # Layout:
-# - 13 events in weeks 1-4 so anonymous users hit the 10-card list cap and the
-#   locked "see more" boundary inside the enforced 30-day window.
-# - 5 more events in weeks 6-11 so signed-in users can verify that the longer
-#   range presets unlock genuinely new inventory beyond the anonymous cap.
+# - 13 events in weeks 1-4, inside the 30-day signed-out horizon.
+# - 5 more events in weeks 6-11, past the horizon, so anonymous users hit the
+#   sign-in lock and signed-in users can verify they unlock.
 base_week: 0
 events:
   - id: evt-gate-001

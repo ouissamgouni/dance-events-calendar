@@ -1,7 +1,5 @@
 import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
-import { useAuth } from '../context/AuthContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
@@ -16,6 +14,7 @@ import CardReviewsLine from './CardReviewsLine';
 import EventCard from './EventCard';
 import { useEventCardImage } from '../hooks/useEventCardImage';
 import ProgramAction from './ProgramAction';
+import AnonHorizonLock from './AnonHorizonLock';
 
 interface MapBounds {
     north: number;
@@ -65,8 +64,10 @@ interface EventListPanelProps {
     scopeTotalCount?: number;
     /** Count for the next available future batch, if already known by the parent. */
     nextPeriodEventCount?: number | null;
-    /** When true, anonymous viewers hit a persistent lock before deeper pagination. */
-    gateMoreEventsForAnonymous?: boolean;
+    /** Signed-out horizon: events past this date are locked behind sign-in. */
+    anonHorizonEnd?: Date | null;
+    /** Matching events hidden by ``anonHorizonEnd``. */
+    anonLockedCount?: number;
     /** When true, render tags as light-grey badges (max 4) instead of the
      * default plain-text/flag-driven look. Used by the Explorer list. */
     tagsAsBadge?: boolean;
@@ -91,6 +92,9 @@ interface EventListPanelProps {
     headerSlot?: React.ReactNode;
     /** When this value changes, the list scroller jumps back to the top. */
     scrollResetKey?: string;
+    /** Events hidden only by the reach filter; surfaces a reveal CTA in the empty state. */
+    reachHiddenCount?: number;
+    onRevealReach?: () => void;
 }
 
 export interface EventListCardProps {
@@ -437,18 +441,19 @@ export default function EventListPanel({
     extendingPeriod = false,
     scopeTotalCount,
     nextPeriodEventCount,
-    gateMoreEventsForAnonymous = false,
+    anonHorizonEnd = null,
+    anonLockedCount = 0,
     onMarkSeen,
     tagsAsBadge = false,
     orderByFollows = false,
+    reachHiddenCount = 0,
+    onRevealReach,
     tribeCard = false,
     headerSlot,
     scrollResetKey,
 }: EventListPanelProps) {
-    const { user } = useAuth();
     const { isSaved } = useSavedEvents();
     const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerListPageSize: pageSize } = useFeatureFlags();
-    const location = useLocation();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
     // Touch-device auto-mark-seen: fires 500ms after a card has been
@@ -631,15 +636,7 @@ export default function EventListPanel({
     const remainingInPeriod = Math.max(0, totalCount - cappedVisible);
     const periodExhausted = remainingInPeriod === 0;
     const futureLookupPending = !!onExtendPeriod && nextPeriodEventCount == null;
-    const canRevealFutureEvents = !!onExtendPeriod && (nextPeriodEventCount ?? 0) > 0;
-    const showAnonymousMoreEventsGate = gateMoreEventsForAnonymous
-        && !user
-        && cappedVisible >= Math.min(pageSize, totalCount)
-        && (remainingInPeriod > 0 || canRevealFutureEvents);
-    const hiddenEventCount = remainingInPeriod > 0
-        ? remainingInPeriod
-        : Math.max(nextPeriodEventCount ?? 0, 0);
-    const next = encodeURIComponent(location.pathname + location.search);
+    const showAnonymousMoreEventsGate = !!anonHorizonEnd && anonLockedCount > 0 && periodExhausted;
 
     const allViewCounts = renderedEvents.map((e) => e.popularity_score ?? 0);
 
@@ -692,7 +689,7 @@ export default function EventListPanel({
 
             <div className="event-list-scroll-wrapper">
                 <div className="event-list-scroll" ref={scrollRef} onScroll={updateFade}>
-                    {totalCount === 0 ? (
+                    {totalCount === 0 && !showAnonymousMoreEventsGate ? (
                         <div
                             className="event-list-empty bg-blue-50 border border-blue-100 p-4 m-3 text-center"
                             data-testid="event-list-empty"
@@ -704,6 +701,16 @@ export default function EventListPanel({
                                 Try finding the next matching events or clearing filters.
                             </p>
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                                {onRevealReach && reachHiddenCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={onRevealReach}
+                                        className="inline-flex items-center bg-action text-white text-xs font-semibold px-3 py-1.5 shadow-sm transition hover:opacity-90"
+                                        data-testid="event-list-empty-reveal-reach"
+                                    >
+                                        {`Show ${reachHiddenCount} local ${reachHiddenCount === 1 ? 'event' : 'events'}`}
+                                    </button>
+                                )}
                                 {onExtendPeriod && (
                                     <button
                                         type="button"
@@ -793,31 +800,13 @@ export default function EventListPanel({
                                 (handled by the parent). Both buttons are
                                 square and use the secondary chrome from
                                 .github/instructions/frontend.instructions.md. */}
-                            {showAnonymousMoreEventsGate && (
-                                <div className="m-3 border border-blue-100 bg-blue-50 p-4" data-testid="event-list-more-events-gate">
-                                    <p className="text-2xs font-semibold uppercase tracking-wide text-action">
-                                        More events available
-                                    </p>
-                                    <p className="mt-1 text-sm font-medium text-ink">
-                                        Sign in to unlock {hiddenEventCount} more {hiddenEventCount === 1 ? 'event' : 'events'}.
-                                    </p>
-                                    <p className="mt-1 text-xs text-ink-soft">
-                                        You are viewing the anonymous preview. Sign in to keep exploring from this point.
-                                    </p>
-                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        <Link
-                                            to={`/login?next=${next}`}
-                                            className="inline-flex items-center justify-center bg-action px-3 py-2 text-xs font-semibold text-white transition hover:bg-action"
-                                        >
-                                            Sign in to see more
-                                        </Link>
-                                        <span className="text-xs text-ink-soft">
-                                            {remainingInPeriod > 0
-                                                ? `${remainingInPeriod} more in this view`
-                                                : `${hiddenEventCount} more in the next available window`}
-                                        </span>
-                                    </div>
-                                </div>
+                            {showAnonymousMoreEventsGate && anonHorizonEnd && (
+                                <AnonHorizonLock
+                                    lockedCount={anonLockedCount}
+                                    horizonEnd={anonHorizonEnd}
+                                    className="m-3"
+                                    data-testid="event-list-more-events-gate"
+                                />
                             )}
                             {!showAnonymousMoreEventsGate && !periodExhausted && (
                                 <div className="px-3 py-3 text-center">

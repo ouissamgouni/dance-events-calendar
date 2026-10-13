@@ -30,7 +30,11 @@ import { usePreferences } from '../context/PreferencesContext';
 import { useActiveProfile } from '../hooks/useActiveProfile';
 import { useInterestProfiles } from '../hooks/useInterestProfiles';
 import { matchSearchProfile } from '../utils/searchProfiles';
-import { eventMatchesReach, REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS } from '../utils/reach';
+import { countHiddenByReach, eventInBounds, eventMatchesReach, isCityScaleBounds, REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS } from '../utils/reach';
+import ReachHiddenHint from '../components/ReachHiddenHint';
+import AnonHorizonLock from '../components/AnonHorizonLock';
+import { anonHorizonEnd, isBeyondHorizon, splitByHorizon } from '../utils/anonHorizon';
+import { useToast } from '../components/Toast';
 import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummariesContext';
 
 import { AREA_PRESETS, DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL } from '../constants/area';
@@ -245,7 +249,7 @@ function writeExplorerStateToSearchParams(
 
 export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerViewConfig }) {
     const { user, loading: authLoading } = useAuth();
-    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTrailCollapsedDefault, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerViewControlLabelsEnabled, summaryTwoLineEnabled, promoCodesEnabled } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTrailCollapsedDefault, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerViewControlLabelsEnabled, summaryTwoLineEnabled, promoCodesEnabled, anonHorizonDays } = useFeatureFlags();
     const mapFollowingBadgeOverlay = true;
     const mapTrendingOverlay = true;
     const location = useLocation();
@@ -301,6 +305,14 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             : 'any',
     );
     const userTouchedReachRef = useRef(searchParams.has('reach'));
+    // Session-only reveal of events hidden by the reach filter, keyed by the
+    // filter value it relaxes so any reach change implicitly resets it.
+    const [reachRelaxedFor, setReachRelaxedFor] = useState<ReachFilter | null>(null);
+    const [zoomRelaxOptOutFor, setZoomRelaxOptOutFor] = useState<ReachFilter | null>(null);
+    const [reachHintDismissedFor, setReachHintDismissedFor] = useState<ReachFilter | null>(null);
+    const reachRelaxed = reachFilter !== 'any' && reachRelaxedFor === reachFilter;
+    const effectiveReachFilter: ReachFilter = reachRelaxed ? 'any' : reachFilter;
+    const toast = useToast();
     const [discountOnly, setDiscountOnly] = useState(() => searchParams.get('discount') === '1');
     const discountFilterActive = discountOnly && promoCodesEnabled;
     // Tracks whether the user has manually toggled a tag in this session.
@@ -315,6 +327,9 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     // "Save as my defaults" callback can capture the current viewport even
     // though the corresponding ``handleBoundsChange`` lives further down.
     const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
+    // Explorer map viewport while zoomed to city scale (null otherwise);
+    // drives the zoom-aware reach relaxation.
+    const [cityScaleBounds, setCityScaleBounds] = useState<MapBounds | null>(null);
     // Bounds the user has explicitly panned/zoomed to (vs the bounds
     // produced by a programmatic fitBounds when the parent calls
     // ``flyToArea``). Drives the events query: while null, the configured
@@ -502,6 +517,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         });
         userTouchedReachRef.current = true;
         setReachFilter(profile.reach_filter);
+        setReachRelaxedFor(null);
         const area = searchAreaFromProfile(profile);
         if (profile.is_active) {
             // The default profile — clear the session override so it reads as
@@ -994,12 +1010,15 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         userTouchedTagsRef.current = true;
         setPreserveViewportAfterSearch(false);
         setActiveTagIds(new Set());
+        userTouchedReachRef.current = true;
+        setReachFilter('any');
         setDiscountOnly(false);
         setInterestSource(config.peopleFilterMinimum ? 'follows' : null);
         setInterestKind(config.peopleFilterMinimum ? config.defaultInterestKind : 'any');
         setInterestUserHandles([]);
+        setAreaSessionOverride(config.areaMode === 'show-all' ? { kind: 'show-all' } : null);
         bumpAutoFit();
-    }, [bumpAutoFit, config.defaultInterestKind, config.peopleFilterMinimum]);
+    }, [bumpAutoFit, config.areaMode, config.defaultInterestKind, config.peopleFilterMinimum]);
 
     // Clear area filter and show events from all areas worldwide.
     const handleClearAreaOverride = useCallback(() => {
@@ -1020,6 +1039,8 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         setActiveTagIds(new Set(prefs.tagIds));
         userTouchedReachRef.current = true;
         setReachFilter(activeProfile?.reach_filter ?? 'any');
+        setReachRelaxedFor(null);
+        setZoomRelaxOptOutFor(null);
         setDiscountOnly(false);
         setInterestSource(config.peopleFilterMinimum ? 'follows' : null);
         setInterestKind(config.defaultInterestKind);
@@ -1105,6 +1126,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     const calendarActiveFilterCount = activeTagIds.size
         + (interestSource ? 1 : 0)
         + (interestUserHandles.length ? 1 : 0)
+        + (areaSessionOverride ? 1 : 0)
         + (discountFilterActive ? 1 : 0);
 
     // Map fullscreen toggle (mobile only — desktop layout already gives the
@@ -1163,23 +1185,37 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     }, [flyToArea]);
 
     const areaScopedEvents = useMemo(() => {
-        if (viewMode !== 'explorer' || !effectiveArea) return events;
+        if (!effectiveArea) return events;
         return events.filter((event) =>
             searchAreaContainsCoordinates(effectiveArea, event.latitude, event.longitude),
         );
-    }, [events, effectiveArea, viewMode]);
+    }, [events, effectiveArea]);
 
-    const filteredEvents = useMemo(
-        () => filterEventsByTags(events, activeTagIds, tagGroups)
-            .filter((event) => eventMatchesReach(event, reachFilter))
+    // Every calendar filter except reach, so reach-hidden events can be counted.
+    const calendarReachCandidates = useMemo(
+        () => filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups)
             .filter((event) => !discountFilterActive || !!event.has_active_promo_codes),
-        [events, activeTagIds, reachFilter, tagGroups, discountFilterActive],
+        [areaScopedEvents, activeTagIds, tagGroups, discountFilterActive],
     );
 
-    const explorerMatchingEvents = useMemo(
+    const calendarMatchingAllEvents = useMemo(
+        () => calendarReachCandidates.filter((event) => eventMatchesReach(event, effectiveReachFilter)),
+        [calendarReachCandidates, effectiveReachFilter],
+    );
+
+    // Signed-out visitors only see events up to this date; later ones are locked behind sign-in.
+    const horizonEnd = useMemo(
+        () => (authLoading || user ? null : anonHorizonEnd(anonHorizonDays)),
+        [authLoading, user, anonHorizonDays],
+    );
+    const filteredEvents = useMemo(
+        () => splitByHorizon(calendarMatchingAllEvents, horizonEnd).visible,
+        [calendarMatchingAllEvents, horizonEnd],
+    );
+
+    const explorerReachCandidates = useMemo(
         () => {
             const tagFiltered = filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups)
-                .filter((event) => eventMatchesReach(event, reachFilter))
                 .filter((event) => !discountFilterActive || !!event.has_active_promo_codes);
             // Hide events whose end time is already in the past — the
             // backend's ``startDate`` filter can still return an event
@@ -1190,8 +1226,52 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             const now = Date.now();
             return tagFiltered.filter((e) => !e.end || new Date(e.end).getTime() >= now);
         },
-        [areaScopedEvents, activeTagIds, reachFilter, tagGroups, discountFilterActive],
+        [areaScopedEvents, activeTagIds, tagGroups, discountFilterActive],
     );
+
+    // Zoomed into a city on a visible explorer map: also show lower-reach
+    // events inside that viewport (map level-of-detail style).
+    const zoomRelaxBounds = viewMode === 'explorer'
+        && (isDesktop || mapFullscreen)
+        && reachFilter !== 'any'
+        && !reachRelaxed
+        && zoomRelaxOptOutFor !== reachFilter
+        ? cityScaleBounds
+        : null;
+    // Keyed by revealed ids so panning without changing the set keeps list/map identity stable.
+    const zoomRevealKey = useMemo(() => {
+        if (!zoomRelaxBounds) return '';
+        return explorerReachCandidates
+            .filter((e) => !eventMatchesReach(e, reachFilter) && eventInBounds(e, zoomRelaxBounds))
+            .map((e) => e.event_id)
+            .join('\n');
+    }, [explorerReachCandidates, reachFilter, zoomRelaxBounds]);
+    const zoomRelaxActive = zoomRevealKey !== '';
+
+    const explorerMatchingAllEvents = useMemo(
+        () => {
+            const revealed = new Set(zoomRevealKey ? zoomRevealKey.split('\n') : []);
+            return explorerReachCandidates.filter((event) =>
+                eventMatchesReach(event, effectiveReachFilter) || revealed.has(event.event_id));
+        },
+        [explorerReachCandidates, effectiveReachFilter, zoomRevealKey],
+    );
+    const explorerHorizonSplit = useMemo(
+        () => splitByHorizon(explorerMatchingAllEvents, horizonEnd),
+        [explorerMatchingAllEvents, horizonEnd],
+    );
+    const explorerMatchingEvents = explorerHorizonSplit.visible;
+    // Anon range already reaches the horizon: later batches are all locked, so no extend CTA.
+    const explorerExtendLocked = !!horizonEnd && (!endDate || new Date(endDate) >= horizonEnd);
+    const explorerLockedCount = explorerHorizonSplit.lockedCount
+        + (explorerExtendLocked ? nextAvailableEventBatch?.matchingCount ?? 0 : 0);
+
+    const explorerReachHiddenCount = explorerReachCandidates.filter((e) => !isBeyondHorizon(e, horizonEnd)).length - explorerMatchingEvents.length;
+    const mapReachHiddenCount = useMemo(() => {
+        if (!mapBounds || reachRelaxed) return 0;
+        const shown = new Set(explorerMatchingEvents);
+        return explorerReachCandidates.filter((e) => !shown.has(e) && eventInBounds(e, mapBounds) && !isBeyondHorizon(e, horizonEnd)).length;
+    }, [explorerReachCandidates, explorerMatchingEvents, mapBounds, reachRelaxed, horizonEnd]);
 
     // Keep the mobile map miniature always framed on the current results.
     useEffect(() => {
@@ -1233,7 +1313,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                     )
                     : evts;
                 const matching = filterEventsByTags(areaFiltered, activeTagIds, tagGroups)
-                    .filter((event) => eventMatchesReach(event, reachFilter))
+                    .filter((event) => eventMatchesReach(event, effectiveReachFilter))
                     .filter((event) => !discountFilterActive || !!event.has_active_promo_codes);
                 if (matching.length > 0) {
                     setNextAvailableEventBatch({
@@ -1253,7 +1333,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         return () => {
             cancelled = true;
         };
-    }, [viewMode, endDate, interestSource, interestKind, interestUserHandles, interestMatch, effectiveArea, matchedSearchProfile, activeTagIds, reachFilter, tagGroups, discountFilterActive]);
+    }, [viewMode, endDate, interestSource, interestKind, interestUserHandles, interestMatch, effectiveArea, matchedSearchProfile, activeTagIds, effectiveReachFilter, tagGroups, discountFilterActive]);
 
     const selectedExplorerMapEvent = useMemo(
         () => explorerMatchingEvents.find((event) => event.event_id === selectedExplorerMapEventId) ?? null,
@@ -1359,7 +1439,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             else activeByGroup.set(slug, [id]);
         }
 
-        const countSourceEvents = (viewMode === 'explorer' ? areaScopedEvents : events)
+        const countSourceEvents = areaScopedEvents
             .filter((e) => !discountFilterActive || !!e.has_active_promo_codes);
         const eventTagSets = countSourceEvents.map((e) => new Set((e.tags ?? []).map((t) => t.id)));
 
@@ -1385,17 +1465,16 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             }
         }
         return map;
-    }, [events, areaScopedEvents, viewMode, tagGroups, activeTagIds, discountFilterActive]);
+    }, [areaScopedEvents, tagGroups, activeTagIds, discountFilterActive]);
 
     const discountMatchCount = useMemo(() => {
-        const source = viewMode === 'explorer' ? areaScopedEvents : events;
         // eslint-disable-next-line react-hooks/purity -- render-time clock snapshot for past-event filter
         const now = Date.now();
-        return filterEventsByTags(source, activeTagIds, tagGroups)
-            .filter((e) => eventMatchesReach(e, reachFilter) && !!e.has_active_promo_codes)
+        return filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups)
+            .filter((e) => eventMatchesReach(e, effectiveReachFilter) && !!e.has_active_promo_codes)
             .filter((e) => viewMode !== 'explorer' || !e.end || new Date(e.end).getTime() >= now)
             .length;
-    }, [events, areaScopedEvents, viewMode, tagGroups, activeTagIds, reachFilter]);
+    }, [areaScopedEvents, viewMode, tagGroups, activeTagIds, effectiveReachFilter]);
 
     const handleDatesChange = useCallback((start: Date, end: Date) => {
         setVisibleRange((prev) => {
@@ -1414,6 +1493,44 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             return eventEnd >= visibleRange.start && eventStart < visibleRange.end;
         });
     }, [filteredEvents, visibleRange]);
+
+    const calendarLockedCount = useMemo(() => {
+        if (!horizonEnd) return 0;
+        return calendarMatchingAllEvents.filter((e) => isBeyondHorizon(e, horizonEnd)
+            && (!visibleRange || (new Date(e.end || e.start) >= visibleRange.start && new Date(e.start) < visibleRange.end))).length;
+    }, [calendarMatchingAllEvents, horizonEnd, visibleRange]);
+
+    const calendarReachHiddenCount = useMemo(() => {
+        if (viewMode !== 'calendar' || reachRelaxed) return 0;
+        const inRange = (visibleRange
+            ? calendarReachCandidates.filter((e) =>
+                new Date(e.end || e.start) >= visibleRange.start && new Date(e.start) < visibleRange.end)
+            : calendarReachCandidates).filter((e) => !isBeyondHorizon(e, horizonEnd));
+        return countHiddenByReach(inRange, reachFilter);
+    }, [calendarReachCandidates, reachFilter, reachRelaxed, viewMode, visibleRange, horizonEnd]);
+
+    const handleRevealHiddenReach = useCallback(() => {
+        setReachRelaxedFor(reachFilter);
+        toast.push({
+            title: 'Showing local events',
+            message: 'For this session only. Your saved profile is unchanged.',
+            action: { label: 'Undo', onClick: () => setReachRelaxedFor(null) },
+        });
+    }, [reachFilter, toast]);
+
+    const handleToggleReachRelax = useCallback(() => {
+        if (reachRelaxed) {
+            setReachRelaxedFor(null);
+        } else if (zoomRelaxActive) {
+            setZoomRelaxOptOutFor(reachFilter);
+        } else {
+            handleRevealHiddenReach();
+        }
+    }, [handleRevealHiddenReach, reachFilter, reachRelaxed, zoomRelaxActive]);
+
+    const reachRelaxation: 'none' | 'manual' | 'zoom' = reachRelaxed ? 'manual' : zoomRelaxActive ? 'zoom' : 'none';
+    const reachHintVisible = reachFilter !== 'any' && reachRelaxation === 'none' && reachHintDismissedFor !== reachFilter;
+    const dismissReachHint = useCallback(() => setReachHintDismissedFor(reachFilter), [reachFilter]);
 
     const calendarSummaryRange = useMemo(() => {
         if (!visibleRange) return { startDate, endDate };
@@ -1499,6 +1616,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
 
     const handleBoundsChange = useCallback((bounds: MapBounds, userDriven: boolean) => {
         setMapBounds(bounds);
+        setCityScaleBounds((prev) => (isCityScaleBounds(bounds, prev !== null) ? bounds : null));
         if (userDriven) setUserMapBounds(bounds);
     }, []);
 
@@ -1756,7 +1874,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                     profileAreas={signedIn ? searchProfiles : null}
                     onUseArea={handleApplyAreaFromSheet}
                     onExploreMap={handleExploreAreaFromSheet}
-                    eventCount={explorerMatchingEvents.length}
+                    eventCount={viewMode === 'calendar' ? calendarVisibleEvents.length : explorerMatchingEvents.length}
                 />
             ),
         },
@@ -1844,13 +1962,13 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         }] : []),
     ];
 
-    const renderFilterSummaryBar = (opts?: { className?: string; singleLine?: boolean }) => {
+    const renderFilterSummaryBar = (opts?: { className?: string }) => {
         const isCal = viewMode === 'calendar';
         const count = isCal ? calendarVisibleEvents.length : explorerMatchingEvents.length;
         return (
             <SummaryBar
                 className={opts?.className}
-                twoLine={summaryTwoLineEnabled && !opts?.singleLine}
+                twoLine={summaryTwoLineEnabled}
                 totalCount={count}
                 visibleCount={count}
                 startDate={isCal ? calendarSummaryRange.startDate : startDate}
@@ -1872,6 +1990,9 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 reachGroup={reachGroup}
                 reachFilter={reachFilter}
                 onEditReach={() => openFilterSheet('reach')}
+                reachHiddenCount={isCal ? calendarReachHiddenCount : explorerReachHiddenCount}
+                reachRelaxation={reachRelaxation}
+                onToggleReachRelax={handleToggleReachRelax}
                 interestSource={interestSource}
                 interestKind={interestKind}
                 interestUserHandles={interestUserHandles}
@@ -1903,6 +2024,19 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         />
     ) : undefined;
 
+    // The empty state carries its own reveal CTA, so the hint only shows above results.
+    const reachListHint = reachHintVisible && explorerMatchingEvents.length > 0 && explorerReachHiddenCount > 0 ? (
+        <ReachHiddenHint
+            count={explorerReachHiddenCount}
+            onShow={handleRevealHiddenReach}
+            onDismiss={dismissReachHint}
+            className="mb-2"
+        />
+    ) : null;
+    const explorerListHeader = reachListHint || trendingBanner
+        ? <>{reachListHint}{trendingBanner}</>
+        : undefined;
+
     return (
         <div ref={rootRef} className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
@@ -1918,7 +2052,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 {(!loading || initialLoadDone.current) && !error && !mapFullscreen && (
                     <>
                         <div ref={summaryBarRef} className="sticky top-0 z-40 flex items-center gap-3 bg-canvas">
-                            {renderFilterSummaryBar({ singleLine: viewMode === 'calendar', className: 'flex-1 min-w-0' })}
+                            {renderFilterSummaryBar({ className: 'flex-1 min-w-0' })}
                             {isDesktop && <ViewSegmentedControl currentView={activeView} onSelect={handleSelectView} />}
                         </div>
                     </>
@@ -1948,16 +2082,19 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                             onSuggestEvent={openSuggest}
                                             newEnabled={unseenStateEnabled}
                                             newEventIds={newEventIds}
-                                            onExtendPeriod={handleExtendPeriod}
+                                            onExtendPeriod={explorerExtendLocked ? undefined : handleExtendPeriod}
                                             onClearFilters={handleClearAllFilters}
                                             extendingPeriod={extendingPeriod}
                                             scopeTotalCount={explorerMatchingEvents.length}
                                             nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
-                                            gateMoreEventsForAnonymous
+                                            anonHorizonEnd={horizonEnd}
+                                            anonLockedCount={explorerLockedCount}
                                             tagsAsBadge
                                             tribeCard={config.cardVariant === 'tribe'}
-                                            headerSlot={trendingBanner}
+                                            headerSlot={explorerListHeader}
                                             scrollResetKey={String(scrollResetToken)}
+                                            reachHiddenCount={reachRelaxed ? 0 : explorerReachHiddenCount}
+                                            onRevealReach={handleRevealHiddenReach}
                                         />
                                     </div>
                                 </div>
@@ -1977,7 +2114,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                     >
                                         {mapFullscreen && (
                                             <div className="relative z-[702] flex shrink-0 items-center gap-3 border-b border-line bg-surface lg:px-4 lg:py-1" data-testid="map-fullscreen-header">
-                                                {renderFilterSummaryBar({ className: 'flex-1 min-w-0', singleLine: true })}
+                                                {renderFilterSummaryBar({ className: 'flex-1 min-w-0' })}
                                                 {isDesktop && <ViewSegmentedControl currentView={activeView} onSelect={handleSelectView} />}
                                             </div>
                                         )}
@@ -2024,6 +2161,30 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                 >
                                                     Search this area
                                                 </button>
+                                            )}
+                                            {horizonEnd && explorerLockedCount > 0 && (
+                                                <div
+                                                    className="pointer-events-none absolute inset-x-0 z-[703] flex justify-center px-2"
+                                                    style={{ top: userMapBounds ? 48 : 8 }}
+                                                >
+                                                    <AnonHorizonLock
+                                                        variant="chip"
+                                                        lockedCount={explorerLockedCount}
+                                                        horizonEnd={horizonEnd}
+                                                        className="pointer-events-auto"
+                                                        data-testid="explorer-map-horizon-lock"
+                                                    />
+                                                </div>
+                                            )}
+                                            {reachHintVisible && !cityScaleBounds && (
+                                                <ReachHiddenHint
+                                                    variant="map"
+                                                    count={mapReachHiddenCount}
+                                                    onShow={handleRevealHiddenReach}
+                                                    onDismiss={dismissReachHint}
+                                                    className="absolute left-1/2 -translate-x-1/2 z-[703]"
+                                                    style={{ bottom: mapFullscreen && !isDesktop ? VIEW_SWITCHER_BAND_PX + 12 : isDesktop ? 40 : 12 }}
+                                                />
                                             )}
                                         </div>
                                         {mapFullscreen && !isDesktop && explorerPreviewEvent && (
@@ -2143,52 +2304,74 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                     newEnabled={unseenStateEnabled}
                                     newEventIds={newEventIds}
                                     scrollHighlightedIntoView={false}
-                                    onExtendPeriod={handleExtendPeriod}
+                                    onExtendPeriod={explorerExtendLocked ? undefined : handleExtendPeriod}
                                     onClearFilters={handleClearAllFilters}
                                     extendingPeriod={extendingPeriod}
                                     scopeTotalCount={explorerMatchingEvents.length}
                                     nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
-                                    gateMoreEventsForAnonymous
+                                    anonHorizonEnd={horizonEnd}
+                                    anonLockedCount={explorerLockedCount}
                                     tagsAsBadge
                                     tribeCard={config.cardVariant === 'tribe'}
-                                    headerSlot={trendingBanner}
+                                    headerSlot={explorerListHeader}
                                     scrollResetKey={String(scrollResetToken)}
+                                    reachHiddenCount={reachRelaxed ? 0 : explorerReachHiddenCount}
+                                    onRevealReach={handleRevealHiddenReach}
                                 />
                             </div>
                         </div>
                     </div>
                 )}
                 {(!loading || initialLoadDone.current) && !error && viewMode === 'calendar' && (
-                    <CalendarMapWorkspace
-                        events={filteredEvents}
-                        viewMode={calendarViewMode}
-                        onViewModeChange={setMobileCalendarView}
-                        rangeSelector="mobile"
-                        stickyToolbarTop={summaryBarHeight}
-                        sinceDate={sinceDate ?? undefined}
-                        onDatesChange={handleDatesChange}
-                        onEventClick={handleEventClick}
-                        hoveredEventId={hoveredEventId}
-                        onEventHover={handleEventHover}
-                        offMapEventIds={offMapEventIds}
-                        map={(calendarVisible) => (
-                            <EventMap
-                                key={String(calendarVisible)}
-                                events={calendarVisibleEvents}
-                                focusedEvent={selectedEvent}
-                                onEventClick={handleCalMapEventClick}
-                                onBoundsChange={handleCalBoundsChange}
-                                hoveredEventId={hoveredEventId}
-                                onEventHover={handleEventHover}
-                                detailLinkSource="calendar-map"
-                                newEventIds={newEventIds}
-                                popularityThreshold={popularityThreshold}
-                                onMarkSeen={markSeen}
-                                cooperativeGestures={!isDesktop}
-                                groupSeries
+                    <>
+                        {reachHintVisible && calendarReachHiddenCount > 0 && (
+                            <ReachHiddenHint
+                                count={calendarReachHiddenCount}
+                                onShow={handleRevealHiddenReach}
+                                onDismiss={dismissReachHint}
+                                className="mt-2"
                             />
                         )}
-                    />
+                        {horizonEnd && calendarLockedCount > 0 && (
+                            <AnonHorizonLock
+                                lockedCount={calendarLockedCount}
+                                horizonEnd={horizonEnd}
+                                className="mt-2"
+                                data-testid="calendar-horizon-lock"
+                            />
+                        )}
+                        <CalendarMapWorkspace
+                            events={filteredEvents}
+                            viewMode={calendarViewMode}
+                            onViewModeChange={setMobileCalendarView}
+                            rangeSelector="mobile"
+                            stickyToolbarTop={summaryBarHeight}
+                            sinceDate={sinceDate ?? undefined}
+                            lockedAfter={horizonEnd}
+                            onDatesChange={handleDatesChange}
+                            onEventClick={handleEventClick}
+                            hoveredEventId={hoveredEventId}
+                            onEventHover={handleEventHover}
+                            offMapEventIds={offMapEventIds}
+                            map={(calendarVisible) => (
+                                <EventMap
+                                    key={String(calendarVisible)}
+                                    events={calendarVisibleEvents}
+                                    focusedEvent={selectedEvent}
+                                    onEventClick={handleCalMapEventClick}
+                                    onBoundsChange={handleCalBoundsChange}
+                                    hoveredEventId={hoveredEventId}
+                                    onEventHover={handleEventHover}
+                                    detailLinkSource="calendar-map"
+                                    newEventIds={newEventIds}
+                                    popularityThreshold={popularityThreshold}
+                                    onMarkSeen={markSeen}
+                                    cooperativeGestures={!isDesktop}
+                                    groupSeries
+                                />
+                            )}
+                        />
+                    </>
                 )}
             </main>
 

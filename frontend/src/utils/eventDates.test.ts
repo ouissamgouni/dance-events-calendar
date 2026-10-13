@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     eventDurationLabel,
+    eventsOnDay,
     formatCompactDateRange,
     formatEventWhen,
     fromEditFields,
@@ -77,5 +78,20 @@ describe('eventDates', () => {
         const theirs = new Date(timed.start).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Tokyo' });
         expect(viewerTimeHint(tokyo)).toEqual(mine === theirs ? '' : expect.stringContaining(`${mine} your time`));
         expect(viewerTimeHint(timed)).toBe('');
+    });
+
+    it('lists the events covering a local day, multi-day first', () => {
+        const local = (d: number, h: number) => new Date(2026, 9, d, h).toISOString();
+        const late = { id: 'late', start: local(10, 22), end: local(11, 2), all_day: false };
+        const evening = { id: 'evening', start: local(11, 19), end: local(11, 23), all_day: false };
+        const endsAtMidnight = { id: 'midnight', start: local(10, 20), end: local(11, 0), all_day: false };
+        const festival = { id: 'festival', ...allDay };
+
+        const oct11 = eventsOnDay([evening, late, endsAtMidnight, festival], new Date(2026, 9, 11));
+        expect(oct11.map((e) => [e.event.id, e.dayNumber, e.dayCount])).toEqual([['late', 2, 2], ['evening', 1, 1]]);
+
+        const oct6 = eventsOnDay([festival, evening], new Date(2026, 9, 6));
+        expect(oct6.map((e) => [e.event.id, e.dayNumber, e.dayCount])).toEqual([['festival', 2, 3]]);
+        expect(eventsOnDay([festival], new Date(2026, 9, 8))).toEqual([]);
     });
 });

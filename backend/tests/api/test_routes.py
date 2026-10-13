@@ -389,6 +389,19 @@ class TestSettingsEndpoint:
             resp = client.put("/api/settings", json={"explorer_list_page_size": bad})
             assert resp.status_code == 422
 
+    def test_anon_horizon_days_default_and_update(self, sqlite_client):
+        client, _engine = sqlite_client
+
+        assert client.get("/api/settings").json()["anon_horizon_days"] == 30
+
+        resp = client.put("/api/settings", json={"anon_horizon_days": 0})
+        assert resp.status_code == 200
+        assert client.get("/api/settings").json()["anon_horizon_days"] == 0
+
+        for bad in (-1, 366):
+            resp = client.put("/api/settings", json={"anon_horizon_days": bad})
+            assert resp.status_code == 422
+
     def test_admin_can_update_going_button_icon_variant(self, sqlite_client):
         client, engine = sqlite_client
 
