@@ -932,8 +932,12 @@ class TestPublicGeocodeEndpoint:
                     return_value=[known],
                 ) as known_venues,
             ):
-                venue = TestClient(app).get("/api/suggestions/geocode?q=havana&kind=venue")
-                city = TestClient(app).get("/api/suggestions/geocode?q=havana&kind=city")
+                venue = TestClient(app).get(
+                    "/api/suggestions/geocode?q=havana&kind=venue"
+                )
+                city = TestClient(app).get(
+                    "/api/suggestions/geocode?q=havana&kind=city"
+                )
         finally:
             app.dependency_overrides.clear()
 

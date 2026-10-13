@@ -181,9 +181,7 @@ def test_known_venues_ranks_by_use_and_hides_private_events(session):
     session.add(_event("a"))
     session.add(_event("b"))
     session.add(_event("c", location="Havana Bar, Berlin", latitude=52.5))
-    session.add(
-        _event("d", location="Havana Secret Loft", visibility="private")
-    )
+    session.add(_event("d", location="Havana Secret Loft", visibility="private"))
     session.commit()
 
     venues = places.known_venues(session, "havana")
