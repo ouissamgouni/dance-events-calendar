@@ -15,6 +15,8 @@ import { DEFAULT_AREA_BBOX } from '../constants/area';
 import { BASEMAP_CONFIG } from '../constants/basemap';
 import { buildJourneyLegs } from '../utils/myEvents';
 import { createHoverPopupController, type HoverPopupController } from '../utils/hoverPopupController';
+import { groupSeriesForMap, type MapEventGroup } from '../utils/mapSeriesGroups';
+import { formatEventWhen } from '../utils/eventDates';
 
 export interface MapBounds {
     north: number;
@@ -73,6 +75,8 @@ interface PinDecorations {
      * top-left so the pin conveys "how many attendees" even when there are
      * no mutual friends. */
     totalGoing?: number;
+    /** Dates of a recurring event collapsed onto this pin; draws a "×N" chip at bottom-left. */
+    occurrenceCount?: number;
 }
 
 function imageChipIcon(src: string, alt: string): string {
@@ -113,12 +117,18 @@ function totalGoingChip(count: number): string {
     return `<span style="position:absolute;left:-6px;top:-6px;display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;background:#475569;color:white;font-size:9px;font-weight:700;line-height:14px;border:1.5px solid white;box-sizing:content-box;font-family:system-ui,sans-serif;">${icon}${label}</span>`;
 }
 
+function occurrenceChip(count: number): string {
+    const label = count >= 100 ? '×99+' : `×${count}`;
+    return `<span style="position:absolute;left:-6px;bottom:-6px;display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;background:white;color:#172033;font-size:9px;font-weight:700;line-height:14px;border:1.5px solid #475569;box-sizing:content-box;font-family:system-ui,sans-serif;">${label}</span>`;
+}
+
 function makeColoredIcon(color: string | null, dec?: PinDecorations): L.DivIcon {
     const fill = color || '#3b82f6';
     const trendBadge = dec?.trending ? trendingBadge(28) : '';
     const followBadge = dec?.followingCount && dec.followingCount > 0 ? followingChip(dec.followingCount) : '';
     const newBadge = dec?.newEvent ? newEventDot() : '';
     const totalBadge = dec?.totalGoing && dec.totalGoing > 0 ? totalGoingChip(dec.totalGoing) : '';
+    const occurrenceBadge = dec?.occurrenceCount && dec.occurrenceCount > 1 ? occurrenceChip(dec.occurrenceCount) : '';
     return L.divIcon({
         className: '',
         iconSize: [28, 28],
@@ -127,7 +137,7 @@ function makeColoredIcon(color: string | null, dec?: PinDecorations): L.DivIcon 
         html: `<div style="position:relative;width:28px;height:28px;"><svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
             <circle cx="14" cy="14" r="11" fill="${fill}" stroke="white" stroke-width="2.5" />
             <circle cx="14" cy="14" r="4" fill="white" opacity="0.9" />
-        </svg>${totalBadge}${newBadge}${trendBadge}${followBadge}</div>`,
+        </svg>${totalBadge}${newBadge}${trendBadge}${followBadge}${occurrenceBadge}</div>`,
     });
 }
 
@@ -137,6 +147,7 @@ function makeHighlightedIcon(color: string | null, dec?: PinDecorations): L.DivI
     const followBadge = dec?.followingCount && dec.followingCount > 0 ? followingChip(dec.followingCount) : '';
     const newBadge = dec?.newEvent ? newEventDot() : '';
     const totalBadge = dec?.totalGoing && dec.totalGoing > 0 ? totalGoingChip(dec.totalGoing) : '';
+    const occurrenceBadge = dec?.occurrenceCount && dec.occurrenceCount > 1 ? occurrenceChip(dec.occurrenceCount) : '';
     return L.divIcon({
         className: '',
         iconSize: [40, 40],
@@ -147,11 +158,13 @@ function makeHighlightedIcon(color: string | null, dec?: PinDecorations): L.DivI
             <circle cx="20" cy="20" r="14" fill="${fill}" stroke="#172033" stroke-width="5" />
             <circle cx="20" cy="20" r="13" fill="none" stroke="white" stroke-width="2.5" />
             <circle cx="20" cy="20" r="5" fill="white" />
-        </svg>${totalBadge}${newBadge}${trendBadge}${followBadge}</div>`,
+        </svg>${totalBadge}${newBadge}${trendBadge}${followBadge}${occurrenceBadge}</div>`,
     });
 }
 
 const PINNED_Z_OFFSET = 1000;
+/** Larger stacks at one spot open a list instead of an unreadable spider ring. */
+const SPIDERFY_MAX = 8;
 
 function makeClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
     const count = cluster.getChildCount();
@@ -281,6 +294,8 @@ interface Props {
     /** Enable marker clustering. When false, all markers render individually (overlapping).
      * Defaults to true. Used by Passport map to show every pin. */
     clustering?: boolean;
+    /** Collapse the dates of one recurring event (same series_key and venue) onto one pin. */
+    groupSeries?: boolean;
 }
 
 interface PopupPortal {
@@ -288,10 +303,12 @@ interface PopupPortal {
     host: HTMLDivElement;
     event: CalendarEvent;
     showFollowingOverlay: boolean;
+    moreDates: number;
 }
 
-function EventPopupContent({ event, showFollowingOverlay, showRatings, detailLinkSource, onOpenDetails, onEventClick, onMarkSeen, active, minimalPopup }: {
+function EventPopupContent({ event, moreDates, showFollowingOverlay, showRatings, detailLinkSource, onOpenDetails, onEventClick, onMarkSeen, active, minimalPopup }: {
     event: CalendarEvent;
+    moreDates: number;
     showFollowingOverlay: boolean;
     showRatings: boolean;
     detailLinkSource?: string;
@@ -332,6 +349,38 @@ function EventPopupContent({ event, showFollowingOverlay, showRatings, detailLin
                 followingBadgeEnabled={showFollowingOverlay}
                 testId="map-event-card"
             />
+            {moreDates > 0 && (
+                <button
+                    type="button"
+                    onClick={() => open(event)}
+                    className="px-3 pb-3 text-sm font-medium text-action hover:underline"
+                    data-testid="map-event-more-dates"
+                >
+                    +{moreDates} more {moreDates === 1 ? 'date' : 'dates'}
+                </button>
+            )}
+        </div>
+    );
+}
+
+function ClusterEventList({ events, onSelect }: { events: CalendarEvent[]; onSelect: (event: CalendarEvent) => void }) {
+    return (
+        <div className="w-[300px]" data-testid="map-cluster-list">
+            <p className="px-3 pb-2 pt-3 text-xs font-medium text-ink-soft">{events.length} events here</p>
+            <ul className="max-h-80 overflow-y-auto pb-2">
+                {events.map((event) => (
+                    <li key={event.event_id}>
+                        <button
+                            type="button"
+                            onClick={() => onSelect(event)}
+                            className="block w-full px-3 py-2 text-left hover:bg-canvas"
+                        >
+                            <span className="block truncate text-sm font-semibold text-ink">{event.title}</span>
+                            <span className="block text-xs text-ink-soft">{formatEventWhen(event)}</span>
+                        </button>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }
@@ -975,6 +1024,7 @@ function MarkerClusterLayer({
     journeySelectedEventId,
     pinnedEventId,
     clustering,
+    groupSeries,
 }: {
     events: CalendarEvent[];
     hoveredEventId?: string | null;
@@ -1006,15 +1056,23 @@ function MarkerClusterLayer({
     pinnedEventId?: string | null;
     /** Enable marker clustering. Defaults to true. */
     clustering?: boolean;
+    groupSeries?: boolean;
 }) {
     const map = useMap();
+    const navigate = useNavigate();
     const [popupPortals, setPopupPortals] = useState<PopupPortal[]>([]);
     const [openEventId, setOpenEventId] = useState<string | null>(null);
+    const [clusterList, setClusterList] = useState<{ host: HTMLDivElement; events: CalendarEvent[] } | null>(null);
     const hoverPinnedIdRef = useRef<string | null>(null);
     const pinnedIdRef = useRef(pinnedEventId);
     const journeySelectedIdRef = useRef(journeySelectedEventId);
     const pinnedMarkerRef = useRef<L.Marker | null>(null);
     const layerGroupRef = useRef<L.FeatureGroup | L.MarkerClusterGroup | null>(null);
+    const markerEventsRef = useRef(new Map<L.Marker, CalendarEvent>());
+    const groups = useMemo<MapEventGroup[]>(
+        () => (groupSeries ? groupSeriesForMap(events) : events.map((event) => ({ event, members: [event] }))),
+        [events, groupSeries],
+    );
     useEffect(() => {
         pinnedIdRef.current = pinnedEventId;
         journeySelectedIdRef.current = journeySelectedEventId;
@@ -1029,10 +1087,42 @@ function MarkerClusterLayer({
                 iconCreateFunction: makeClusterIcon,
                 maxClusterRadius: 30,
                 showCoverageOnHover: false,
-                spiderfyOnMaxZoom: true,
-                zoomToBoundsOnClick: true,
+                // Clicks are handled below so big same-spot stacks open a list.
+                spiderfyOnMaxZoom: false,
+                zoomToBoundsOnClick: false,
             });
             clusterGroupRef.current = layerGroup as L.MarkerClusterGroup;
+            layerGroup.on('clusterclick clusterkeypress', (e) => {
+                const cluster: L.MarkerCluster = e.layer;
+                if (e.type === 'clusterkeypress' && (e as L.LeafletKeyboardEvent).originalEvent?.key !== 'Enter') return;
+                const markers = cluster.getAllChildMarkers();
+                const first = markers[0].getLatLng();
+                const stacked = map.getZoom() >= map.getMaxZoom()
+                    || markers.every((m) => m.getLatLng().equals(first));
+                if (!stacked) {
+                    cluster.zoomToBounds({ padding: [40, 40] });
+                } else if (markers.length <= SPIDERFY_MAX) {
+                    cluster.spiderfy();
+                } else {
+                    const host = document.createElement('div');
+                    const listed = markers
+                        .map((m) => markerEventsRef.current.get(m))
+                        .filter((event): event is CalendarEvent => !!event)
+                        .sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+                    L.popup({
+                        className: 'event-map-popup',
+                        minWidth: 300,
+                        maxWidth: 300,
+                        closeButton: false,
+                        autoPanPadding: [16, 16],
+                    })
+                        .setLatLng(cluster.getLatLng())
+                        .setContent(host)
+                        .on('remove', () => setClusterList((current) => (current?.host === host ? null : current)))
+                        .openOn(map);
+                    setClusterList({ host, events: listed });
+                }
+            });
         } else {
             layerGroup = L.featureGroup();
             clusterGroupRef.current = null;
@@ -1053,11 +1143,12 @@ function MarkerClusterLayer({
 
         layerGroup.clearLayers();
         markerRefs.current.clear();
+        markerEventsRef.current.clear();
 
         const nextPortals: PopupPortal[] = [];
         const hoverCtrls: HoverPopupController[] = [];
 
-        events.forEach((event) => {
+        groups.forEach(({ event, members }) => {
             const showFollowingOverlay = followingBadgeEnabled && showFollowingBadgeOverlay;
             const followingCount = showFollowingOverlay ? (event.following_friend_count ?? 0) : 0;
             const newEvent = unseenStateEnabled && !!newEventIds?.has(event.event_id);
@@ -1070,7 +1161,7 @@ function MarkerClusterLayer({
             // minimalPopup (Dance Passport) renders plain discs with no signal badges.
             const decorations: PinDecorations = minimalPopup
                 ? {}
-                : { trending, followingCount, newEvent, totalGoing };
+                : { trending, followingCount, newEvent, totalGoing, occurrenceCount: members.length };
             const journeyNumber = journeySequence?.[event.event_id];
             const journeyLabel = event.city || event.location?.split(',')[0]?.trim() || event.title;
             const marker = L.marker([event.latitude!, event.longitude!], {
@@ -1139,8 +1230,9 @@ function MarkerClusterLayer({
                 onMarkerSelect?.(event);
             });
 
-            markerRefs.current.set(event.event_id, marker);
-            if (event.event_id === pinnedIdRef.current) {
+            members.forEach((member) => markerRefs.current.set(member.event_id, marker));
+            markerEventsRef.current.set(marker, event);
+            if (members.some((member) => member.event_id === pinnedIdRef.current)) {
                 marker.setZIndexOffset(PINNED_Z_OFFSET);
                 map.addLayer(marker);
                 pinnedMarkerRef.current = marker;
@@ -1153,6 +1245,7 @@ function MarkerClusterLayer({
                     host: popupHost,
                     event,
                     showFollowingOverlay,
+                    moreDates: members.length - 1,
                 });
             }
             if (hoverCtrl) hoverCtrls.push(hoverCtrl);
@@ -1171,7 +1264,7 @@ function MarkerClusterLayer({
             markerRefs.current.clear();
             setPopupPortals([]);
         };
-    }, [layerGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, hoverPopups, journeySequence, map, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+    }, [layerGroupRef, detailLinkSource, disablePopups, eventColorBarColor, groups, followingBadgeEnabled, hoverPopups, journeySequence, map, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
 
     useEffect(() => {
         const layerGroup = layerGroupRef.current;
@@ -1198,7 +1291,7 @@ function MarkerClusterLayer({
     // and recreated every marker — including the one whose popup was open —
     // which made popups disappear as soon as the mouse moved off the pin.
     useEffect(() => {
-        events.forEach((event) => {
+        groups.forEach(({ event, members }) => {
             const marker = markerRefs.current.get(event.event_id);
             if (!marker) return;
             const showFollowingOverlay = followingBadgeEnabled && showFollowingBadgeOverlay;
@@ -1212,25 +1305,41 @@ function MarkerClusterLayer({
             const totalGoing = event.going_count ?? 0;
             const decorations: PinDecorations = minimalPopup
                 ? {}
-                : { trending, followingCount, newEvent, totalGoing };
-            const isHovered = hoveredEventId === event.event_id;
+                : { trending, followingCount, newEvent, totalGoing, occurrenceCount: members.length };
+            const isHovered = members.some((member) => member.event_id === hoveredEventId);
+            const isPinned = members.some((member) => member.event_id === pinnedEventId);
             const journeyNumber = journeySequence?.[event.event_id];
             const journeyLabel = event.city || event.location?.split(',')[0]?.trim() || event.title;
             const journeySelected = journeySelectedEventId === event.event_id;
             marker.setIcon(journeyNumber
                 ? makeJourneyIcon(journeyNumber, journeyLabel, journeySelected || isHovered)
                 : isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations));
-            marker.setZIndexOffset(isHovered || journeySelected || pinnedEventId === event.event_id ? PINNED_Z_OFFSET : 0);
+            marker.setZIndexOffset(isHovered || journeySelected || isPinned ? PINNED_Z_OFFSET : 0);
         });
-    }, [hoveredEventId, events, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs, journeySelectedEventId, journeySequence, pinnedEventId]);
+    }, [hoveredEventId, groups, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs, journeySelectedEventId, journeySequence, pinnedEventId]);
 
-
+    const selectListedEvent = useCallback((event: CalendarEvent) => {
+        map.closePopup();
+        onMarkSeen?.(event.event_id);
+        if (disablePopups) {
+            onMarkerSelect?.(event);
+            return;
+        }
+        const handler = onOpenDetails ?? onEventClick;
+        if (handler) handler(event);
+        else navigate(`/event/${event.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`);
+    }, [detailLinkSource, disablePopups, map, navigate, onEventClick, onMarkSeen, onMarkerSelect, onOpenDetails]);
 
     return (
         <>
+            {clusterList && createPortal(
+                <ClusterEventList events={clusterList.events} onSelect={selectListedEvent} />,
+                clusterList.host,
+            )}
             {popupPortals.map((portal) => createPortal(
                 <EventPopupContent
                     event={portal.event}
+                    moreDates={portal.moreDates}
                     showFollowingOverlay={portal.showFollowingOverlay}
                     showRatings={showRatings}
                     detailLinkSource={detailLinkSource}
@@ -1247,7 +1356,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, onOpenDetails, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null, selectedEventId = null, fitAllToken, obscuredInsets, clustering = true }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, onOpenDetails, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false, cooperativeGestures = false, fitMarkersControl = false, journeySequence, journeyRouteOn = false, onJourneyRouteToggle, journeySelectedEventId = null, selectedEventId = null, fitAllToken, obscuredInsets, clustering = true, groupSeries = false }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent, mapPopupTrigger } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -1408,6 +1517,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 journeySelectedEventId={journeySelectedEventId}
                 pinnedEventId={selectedEventId}
                 clustering={clustering}
+                groupSeries={groupSeries}
             />
         </MapContainer>
     );

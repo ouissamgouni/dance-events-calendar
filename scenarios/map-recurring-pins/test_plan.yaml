@@ -1,0 +1,91 @@
+test_plan:
+  name: "Map — Recurring Events Collapse to One Pin, Big Stacks Open a List"
+  description: >
+    The dates of one recurring event (approved recurring submission or
+    resolved series) used to render as one marker each at the same spot, and
+    the cluster fanned out into a huge spider ring. Now each recurring event
+    is one pin with a "×N" badge, its popup offers "+N more dates", and
+    clicking a same-spot stack of more than 8 distinct events opens a
+    scrollable list. Data is in Morocco (inside the default "Europe & nearby"
+    area). N counts only the dates loaded for the current period/filters.
+  setup: >
+    SCENARIO=map-recurring-pins task start:scenario. Open the Explorer with the
+    default area, reach = Any, no tags. Extend the period if needed so several
+    weeks are loaded.
+  steps:
+    - id: 1
+      title: "Weekly submission is a single ×N pin"
+      description: >
+        Desktop Explorer map. Zoom to Casablanca and look at "Casa Salsa
+        Saturdays" (Le Cabestan).
+      expected: >
+        One pin with a "×N" chip at its bottom-left (N = Saturdays loaded in
+        the period), not a spider ring. The list on the left still shows
+        every Saturday as its own row.
+
+    - id: 2
+      title: "Grouped popup shows next date + more-dates link"
+      description: Click the Casa Salsa Saturdays pin.
+      expected: >
+        Popup card shows the NEXT upcoming Saturday, followed by
+        "+N-1 more dates". Clicking the link opens that date's detail page.
+
+    - id: 3
+      title: "List hover highlights the shared pin"
+      description: >
+        Hover a later Casa Salsa Saturdays row (not the first) in the
+        Explorer list.
+      expected: The single Casa Salsa Saturdays pin enlarges/highlights.
+
+    - id: 4
+      title: "Biweekly submission and resolved series also collapse"
+      description: >
+        Check "Rabat Bachata Fortnightly" (Rabat) and "Marrakech Kizomba
+        Tuesdays" (Café Clock, a resolved admin series).
+      expected: Each is a single pin with its own "×N" chip.
+
+    - id: 5
+      title: "Unconfirmed series is NOT grouped; small stack spiderfies"
+      description: >
+        Click the Fez cluster ("Fez Salsa Sundays", pending series, 3 dates
+        at one venue).
+      expected: >
+        No ×N chip. The cluster shows 3 and fans out into 3 separate pins
+        (≤ 8 so spiderfy still applies).
+
+    - id: 6
+      title: "More than 8 distinct events at one spot opens a list"
+      description: Click the Tangier cluster (12 events at Gran Teatro Cervantes).
+      expected: >
+        No spider ring. A popup lists "12 events here", sorted by date, each
+        row with title and date/time, scrollable. Clicking a row opens that
+        event's details (desktop). Clicking the map closes the list.
+
+    - id: 7
+      title: "Nearby-but-distinct venues still zoom in"
+      description: >
+        Zoomed out so Casa Salsa Saturdays and "Anfa Bachata Social" (a few
+        hundred metres apart) form one cluster, click that cluster.
+      expected: The map zooms in until the two pins separate (no list, no spider).
+
+    - id: 8
+      title: "Mobile fullscreen map"
+      description: >
+        Phone width, open the fullscreen map. Tap the Casa Salsa Saturdays pin,
+        then tap the Tangier cluster and pick a row.
+      expected: >
+        The pin shows the ×N chip and the bottom preview opens on the next
+        date. The Tangier list popup opens; tapping a row closes it and shows
+        that event in the bottom preview.
+
+    - id: 9
+      title: "Calendar map groups too"
+      description: Switch to the Calendar view with the map visible.
+      expected: >
+        Casa Salsa Saturdays / Rabat / Marrakech are each one ×N pin on the
+        calendar map; the calendar grid still shows every date.
+
+    - id: 10
+      title: "Agadir control pin"
+      description: Look at "Agadir Beach Salsa".
+      expected: Normal single pin, no ×N chip, no "+more dates" in its popup.

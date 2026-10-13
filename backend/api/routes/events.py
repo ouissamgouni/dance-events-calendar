@@ -29,6 +29,8 @@ from backend.db.models import (
     CachedEvent,
     CalendarSetting,
     EventPromoCode,
+    EventSeries,
+    EventSeriesMember,
     EventTag,
     EventView,
     Tag,
@@ -503,6 +505,27 @@ def _interest_filtered_event_ids(
     return list(eligible_event_ids(session, union))
 
 
+def _series_keys(session: Session, events: list) -> dict[str, str]:
+    """Key shared by the dates of one recurring submission or resolved series."""
+    keys = {
+        e.event_id: f"submission:{e.suggestion_id}"
+        for e in events
+        if e.suggestion_id is not None
+    }
+    rest = [e.event_id for e in events if e.event_id not in keys]
+    if rest:
+        rows = session.exec(
+            select(EventSeriesMember.event_id, EventSeriesMember.series_id)
+            .join(EventSeries, EventSeries.id == EventSeriesMember.series_id)
+            .where(
+                EventSeries.status == "resolved",
+                col(EventSeriesMember.event_id).in_(rest),
+            )
+        ).all()
+        keys.update({event_id: f"series:{series_id}" for event_id, series_id in rows})
+    return keys
+
+
 @router.get("/calendars", response_model=list[CalendarSettingResponse])
 @limiter.limit("300/minute")
 def get_calendars(
@@ -913,6 +936,7 @@ def get_events(
     ticket_hours = event_assets.clamp_int_setting(
         "ticket_likely_min_hours", feature_settings.get("ticket_likely_min_hours")
     )
+    series_keys = _series_keys(session, events)
     data = [
         EventResponse(
             event_id=e.event_id,
@@ -930,6 +954,7 @@ def get_events(
             latitude=e.latitude,
             longitude=e.longitude,
             color=color_map.get(e.calendar_id),
+            series_key=series_keys.get(e.event_id),
             view_count=view_counts.get(e.event_id, 0),
             going_count=going_counts.get(e.event_id, 0),
             saved_count=saved_counts.get(e.event_id, 0),
