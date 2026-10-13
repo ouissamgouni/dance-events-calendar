@@ -105,6 +105,8 @@ export interface CalendarEvent {
     /** IANA zone the event happens in; null = unknown (shown in the viewer's zone). */
     timezone?: string | null;
     color: string | null;
+    /** Shared by the dates of one recurring submission or resolved series. */
+    series_key?: string | null;
     view_count: number;
     going_count?: number;
     /** Distinct savers (UserSavedEvent rows). 0 when not surfaced by the endpoint. */

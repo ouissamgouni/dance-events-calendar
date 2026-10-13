@@ -65,6 +65,8 @@ class EventResponse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     color: Optional[str] = None
+    # Shared by the dates of one recurring submission or resolved series.
+    series_key: Optional[str] = None
     view_count: int = 0
     going_count: int = 0
     # Number of distinct users/devices who saved the event (UserSavedEvent

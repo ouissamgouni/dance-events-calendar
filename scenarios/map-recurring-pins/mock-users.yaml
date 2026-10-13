@@ -1,0 +1,13 @@
+# map-recurring-pins cast.
+#   Admin    — can inspect the series/submissions in the admin panel.
+#   Dev User — submitted the two approved weekly events (Casablanca, Rabat).
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: dev-user@example.com
+    name: Dev User
+    handle: dev-user
+    account_visibility: public

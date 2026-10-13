@@ -2007,6 +2007,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                                 obscuredInsets={mapFullscreen && !isDesktop
                                                     ? { top: 0, bottom: VIEW_SWITCHER_BAND_PX }
                                                     : undefined}
+                                                groupSeries
                                             />
                                             {/* Search-this-area pill. Appears when
                                     the user has panned/zoomed away from the
@@ -2184,6 +2185,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                                 popularityThreshold={popularityThreshold}
                                 onMarkSeen={markSeen}
                                 cooperativeGestures={!isDesktop}
+                                groupSeries
                             />
                         )}
                     />

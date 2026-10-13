@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 import pytest
 
@@ -16,6 +17,8 @@ from backend.db.models import (
     BlockedEvent,
     CachedEvent,
     CalendarSetting,
+    EventSeries,
+    EventSeriesMember,
     EventTag,
     EventPromoCode,
     SiteSetting,
@@ -1090,6 +1093,64 @@ class TestEventsEndpoint:
         assert [row["event_id"] for row in data] == ["evt-2"]
         assert resp.headers["x-has-more"] == "false"
         assert resp.headers["x-total-count"] == "3"
+
+    def test_get_events_series_key_groups_recurring_dates(self, sqlite_client):
+        client, engine = sqlite_client
+        now = datetime.now(UTC)
+        suggestion_id = uuid4()
+
+        def event(event_id, day, **kwargs):
+            return CachedEvent(
+                event_id=event_id,
+                calendar_id="cal-1",
+                title=event_id,
+                start=now + timedelta(days=day),
+                end=now + timedelta(days=day, hours=3),
+                all_day=False,
+                is_hidden=False,
+                review_status="reviewed",
+                **kwargs,
+            )
+
+        with Session(engine) as session:
+            session.add(
+                CalendarSetting(calendar_id="cal-1", name="Cal", enabled=True)
+            )
+            session.add_all(
+                [
+                    event("sub-a", 1, suggestion_id=suggestion_id),
+                    event("sub-b", 8, suggestion_id=suggestion_id),
+                    event("res-a", 2),
+                    event("res-b", 9),
+                    event("pending-a", 3),
+                    event("plain", 4),
+                ]
+            )
+            resolved = EventSeries(status="resolved")
+            pending = EventSeries(status="pending")
+            session.add_all([resolved, pending])
+            session.flush()
+            session.add_all(
+                [
+                    EventSeriesMember(series_id=resolved.id, event_id="res-a"),
+                    EventSeriesMember(series_id=resolved.id, event_id="res-b"),
+                    EventSeriesMember(series_id=pending.id, event_id="pending-a"),
+                ]
+            )
+            resolved_id = resolved.id
+            session.commit()
+
+        resp = client.get("/api/events")
+        assert resp.status_code == 200
+        keys = {row["event_id"]: row["series_key"] for row in resp.json()}
+        assert keys == {
+            "sub-a": f"submission:{suggestion_id}",
+            "sub-b": f"submission:{suggestion_id}",
+            "res-a": f"series:{resolved_id}",
+            "res-b": f"series:{resolved_id}",
+            "pending-a": None,
+            "plain": None,
+        }
 
     def test_get_events_promo_override_unlocks_badge_when_flag_off(self, sqlite_client):
         client, engine = sqlite_client

@@ -1,0 +1,33 @@
+# Approved recurring submissions, seeded through the real approve helpers so
+# every date is its own suggestion-{id}[-n] event sharing one series_key.
+base_week: 0
+suggestions:
+  # Weekly, 20 dates at one venue: the case from the prod screenshot.
+  - id: 5e0d0000-0000-4000-8000-0000000000c1
+    submitter_email: dev-user@example.com
+    status: approved
+    calendar_id: movida-salsa
+    title: Casa Salsa Saturdays
+    description: Weekly salsa social by the corniche.
+    location: Le Cabestan, Boulevard de la Corniche, Casablanca, Morocco
+    latitude: 33.5951
+    longitude: -7.6787
+    start: w1 Sat 21:00
+    end: w1 Sat 23:59
+    recurrence_rule: RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=SA;COUNT=20
+    tags: ["dance-style:salsa", "format:social", "reach:local"]
+
+  # Every other week, 6 dates.
+  - id: 5e0d0000-0000-4000-8000-0000000000c2
+    submitter_email: dev-user@example.com
+    status: approved
+    calendar_id: movida-salsa
+    title: Rabat Bachata Fortnightly
+    description: Bachata social every other Friday.
+    location: Villa Mandarine, Rue Ouled Bousbaa, Rabat, Morocco
+    latitude: 34.0012
+    longitude: -6.8498
+    start: w1 Fri 20:30
+    end: w1 Fri 23:30
+    recurrence_rule: RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=FR;COUNT=6
+    tags: ["dance-style:bachata", "format:social", "reach:local"]

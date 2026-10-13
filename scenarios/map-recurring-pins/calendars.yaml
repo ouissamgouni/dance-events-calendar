@@ -1,0 +1,7 @@
+calendars:
+  - id: "movida-salsa"
+    name: "Movida Salsa"
+    color: "#a22e43"
+  - id: "morocco-socials"
+    name: "Morocco Socials"
+    color: "#2563eb"
