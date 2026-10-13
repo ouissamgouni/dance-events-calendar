@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-off: enhance review tags in scenarios/{prod,staging,default}/tags.yaml.
+"""One-off: enhance review tags in the shared scenarios/tags.yaml.
 
 Text-based edits (not a YAML round-trip) so the extensive taxonomy comments and
 existing formatting are preserved. Idempotent: re-running is a no-op once applied.
@@ -16,9 +16,7 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-FILES = [
-    REPO_ROOT / "scenarios" / s / "tags.yaml" for s in ("prod", "staging", "default")
-]
+FILES = [REPO_ROOT / "scenarios" / "tags.yaml"]
 
 # 1. Disabled venue tag to strip (present only in prod + staging).
 VENUE_LIVE_BAND_OLD = """      - slug: rooftop

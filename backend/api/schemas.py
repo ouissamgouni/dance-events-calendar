@@ -1430,6 +1430,7 @@ class SiteSettingsResponse(BaseModel):
     # (going + saved + tiny view term, decayed by event age).
     trending_enabled: bool = True
     trending_banner_enabled: bool = True
+    trending_trail_collapsed_default: bool = False
     # Trending-only knobs. ``trending_window_days`` is how far back the
     # going/saved/view counts are aggregated. ``trending_floor_going``
     # is the absolute floor of going RSVPs an event must clear to even
@@ -1843,6 +1844,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     unseen_state_enabled: Optional[bool] = None
     trending_enabled: Optional[bool] = None
     trending_banner_enabled: Optional[bool] = None
+    trending_trail_collapsed_default: Optional[bool] = None
     trending_window_days: Optional[int] = Field(default=None, ge=1, le=365)
     trending_floor_going: Optional[int] = Field(default=None, ge=0, le=1000)
     trending_top_n: Optional[int] = Field(default=None, ge=1, le=50)

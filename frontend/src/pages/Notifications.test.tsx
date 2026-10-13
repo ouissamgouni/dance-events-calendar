@@ -395,10 +395,10 @@ describe('NotificationsPage (redesigned rows)', () => {
                     items: [
                         notif({
                             id: 6,
-                            actor: actor({ handle: 'ann', display_name: 'Ann' }),
+                            actor: actor({ handle: 'ann', display_name: 'Ann Lee' }),
                             actors: [
-                                actor({ handle: 'ann', display_name: 'Ann' }),
-                                actor({ handle: 'ben', display_name: 'Ben' }),
+                                actor({ handle: 'ann', display_name: 'Ann Lee' }),
+                                actor({ handle: 'ben', display_name: 'Ben Ortiz' }),
                                 actor({ handle: 'cara', display_name: 'Cara' }),
                             ],
                             actor_count: 3,

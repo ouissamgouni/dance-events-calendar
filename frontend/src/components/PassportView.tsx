@@ -856,6 +856,7 @@ export interface PassportViewProps {
     showTimelineMemories?: boolean;
     /** Friend's profile: handle whose shared memories to show (server-filtered). */
     timelineMemoriesOwner?: string | null;
+    stickyTabs?: boolean;
 }
 
 export default function PassportView({
@@ -881,6 +882,7 @@ export default function PassportView({
     onTimelineSearch,
     showTimelineMemories = false,
     timelineMemoriesOwner = null,
+    stickyTabs = false,
 }: PassportViewProps) {
     const [tab, setTab] = useState<PassportTab>(initialTab);
     const [selectedCategory, setSelectedCategory] = useState<MilestoneCategoryKey | null>(null);
@@ -908,11 +910,26 @@ export default function PassportView({
     }, [friendMemoryKey, friendMemoryIds, timelineMemoriesOwner]);
     const friendMemories = friendMemoryState && friendMemoryState.key === friendMemoryKey ? friendMemoryState.rows : undefined;
 
+    const tabsSectionRef = useRef<HTMLElement>(null);
+    const tablistRef = useRef<HTMLDivElement>(null);
+    const snapToTabsRef = useRef(false);
     const selectTab = useCallback((next: PassportTab) => {
+        const section = tabsSectionRef.current;
+        const tablist = tablistRef.current;
+        // Section top above the bar's top means the bar is currently stuck.
+        if (stickyTabs && section && tablist && section.getBoundingClientRect().top < tablist.getBoundingClientRect().top) {
+            snapToTabsRef.current = true;
+        }
         setSelectedCategory(null);
         setTab(next);
         onTabChange?.(next);
-    }, [onTabChange]);
+    }, [onTabChange, stickyTabs]);
+
+    useEffect(() => {
+        if (!snapToTabsRef.current) return;
+        snapToTabsRef.current = false;
+        tabsSectionRef.current?.scrollIntoView({ block: 'start' });
+    }, [tab]);
 
     useEffect(() => {
         if (tab !== 'places' || (!hasCities && !hasCountries) || mapEvents !== null) return;
@@ -1004,7 +1021,7 @@ export default function PassportView({
 
     return (
         <>
-            <div className="overflow-hidden bg-canvas sm:rounded-card">
+            <div className="overflow-clip bg-canvas sm:rounded-card">
                 <SummaryHeader
                     data={data}
                     displayName={displayName ?? title}
@@ -1013,8 +1030,14 @@ export default function PassportView({
                     actions={headerActions}
                     dancingSinceSlot={dancingSinceSlot}
                 />
-                <section>
-                    <div role="tablist" className="flex border-b border-line bg-surface">
+                <section ref={tabsSectionRef}>
+                    <div
+                        ref={tablistRef}
+                        role="tablist"
+                        className={stickyTabs
+                            ? 'sticky top-0 z-20 flex border-b border-line bg-surface'
+                            : 'flex border-b border-line bg-surface'}
+                    >
                         <TabButton active={tab === 'milestones'} onClick={() => selectTab('milestones')}>Milestones</TabButton>
                         <TabButton active={tab === 'journey'} onClick={() => selectTab('journey')}>Journey</TabButton>
                         <TabButton active={tab === 'places'} onClick={() => selectTab('places')}>Places</TabButton>

@@ -3,7 +3,7 @@
 # Get calendar IDs from Google Calendar settings → "Calendar ID" field.
 #
 # default_tags use "group_slug:tag_slug" format.
-# Available tags are defined in scenarios/staging/tags.yaml.
+# Available tags are defined in scenarios/tags.yaml.
 
 calendars:
   - id: "your-google-calendar-id-1@group.calendar.google.com"

@@ -10,9 +10,9 @@ const CARD_BG_COLORS = [
     'bg-indigo-50', 'bg-lime-50', 'bg-cyan-50', 'bg-fuchsia-50',
 ];
 
-function moveGroup(groups: AdminTagGroup[], fromIndex: number, toIndex: number): AdminTagGroup[] {
-    if (fromIndex === toIndex) return groups;
-    const next = [...groups];
+function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+    if (fromIndex === toIndex) return items;
+    const next = [...items];
     const [moved] = next.splice(fromIndex, 1);
     next.splice(toIndex, 0, moved);
     return next;
@@ -35,6 +35,7 @@ export default function AdminTagCategories() {
     const [synonymsOpenTagId, setSynonymsOpenTagId] = useState<number | null>(null);
     const [draggingTagId, setDraggingTagId] = useState<number | null>(null);
     const [tagDropTargetGroupId, setTagDropTargetGroupId] = useState<number | null>(null);
+    const [tagDropTargetTagId, setTagDropTargetTagId] = useState<number | null>(null);
     const [tagActionError, setTagActionError] = useState<string | null>(null);
     const [deleteTagTarget, setDeleteTagTarget] = useState<AdminTag | null>(null);
 
@@ -216,6 +217,26 @@ export default function AdminTagCategories() {
         }
     };
 
+    const handleReorderTag = async (groupId: number, tagId: number, targetTagId: number) => {
+        const group = groups.find((g) => g.id === groupId);
+        if (!group || tagId === targetTagId) return;
+        const fromIndex = group.tags.findIndex((t) => t.id === tagId);
+        const toIndex = group.tags.findIndex((t) => t.id === targetTagId);
+        if (fromIndex < 0 || toIndex < 0) return;
+        const reordered = moveItem(group.tags, fromIndex, toIndex).map((t, index) => ({ ...t, ordinal: index }));
+        const previousOrdinals = new Map(group.tags.map((t) => [t.id, t.ordinal]));
+        const changed = reordered.filter((t) => previousOrdinals.get(t.id) !== t.ordinal);
+        setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, tags: reordered } : g)));
+        if (!changed.length) return;
+        try {
+            setTagActionError(null);
+            await Promise.all(changed.map((t) => updateTag(t.id, { ordinal: t.ordinal })));
+        } catch (e) {
+            setTagActionError((e as Error).message || 'Failed to save tag order');
+            load();
+        }
+    };
+
     const handleDeleteTag = async (tag: AdminTag) => {
         setDeleteTagTarget(tag);
     };
@@ -249,7 +270,7 @@ export default function AdminTagCategories() {
             const toIndex = previous.findIndex((g) => g.id === targetGroupId);
             if (fromIndex < 0 || toIndex < 0) return previous;
 
-            const moved = moveGroup(previous, fromIndex, toIndex);
+            const moved = moveItem(previous, fromIndex, toIndex);
             const reOrdinaled = moved.map((group, index) => ({
                 ...group,
                 ordinal: index,
@@ -465,10 +486,30 @@ export default function AdminTagCategories() {
                                                         e.stopPropagation();
                                                         setDraggingTagId(null);
                                                         setTagDropTargetGroupId(null);
+                                                        setTagDropTargetTagId(null);
                                                     }}
-                                                    className={`relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${!tag.enabled ? 'opacity-40 line-through' : ''} ${draggingTagId === tag.id ? 'opacity-50' : ''} ${editingTagId === tag.id ? '' : 'cursor-grab active:cursor-grabbing'}`}
+                                                    onDragOver={(e) => {
+                                                        if (draggingTagId == null || !group.tags.some((t) => t.id === draggingTagId)) return;
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        if (tagDropTargetTagId !== tag.id) setTagDropTargetTagId(tag.id);
+                                                        if (tagDropTargetGroupId != null) setTagDropTargetGroupId(null);
+                                                    }}
+                                                    onDragLeave={() => {
+                                                        if (tagDropTargetTagId === tag.id) setTagDropTargetTagId(null);
+                                                    }}
+                                                    onDrop={(e) => {
+                                                        if (draggingTagId == null || !group.tags.some((t) => t.id === draggingTagId)) return;
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        const movingTagId = draggingTagId;
+                                                        setDraggingTagId(null);
+                                                        setTagDropTargetTagId(null);
+                                                        void handleReorderTag(group.id, movingTagId, tag.id);
+                                                    }}
+                                                    className={`relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${!tag.enabled ? 'opacity-40 line-through' : ''} ${draggingTagId === tag.id ? 'opacity-50' : ''} ${tagDropTargetTagId === tag.id && draggingTagId !== tag.id ? 'ring-2 ring-blue-400 ring-offset-1' : ''} ${editingTagId === tag.id ? '' : 'cursor-grab active:cursor-grabbing'}`}
                                                     style={{ backgroundColor: groupColor }}
-                                                    title={editingTagId === tag.id ? undefined : 'Drag to another category to move'}
+                                                    title={editingTagId === tag.id ? undefined : 'Drag onto a tag to reorder, or to another category to move'}
                                                 >
                                                     {editingTagId === tag.id ? (
                                                         <input

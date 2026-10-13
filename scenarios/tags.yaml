@@ -35,12 +35,20 @@ tag_groups:
             "rueda de casino",
             "timba",
           ]
-      - slug: son
-        label: Son
-        synonyms: ["son cubano"]
-      - slug: rueda
-        label: Rueda
-        synonyms: ["rueda de casino"]
+      - slug: bachata
+        label: Bachata
+        is_hero_filter: true
+        hero_ordinal: 2
+        synonyms:
+          [
+            "bachata sensual",
+            "bachata moderna",
+            "bachata dominicana",
+            "dominicana",
+          ]
+      - slug: kizomba
+        label: Kizomba
+        synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
       - slug: afro-cuban
         label: Afro-Cuban
         synonyms:
@@ -56,21 +64,13 @@ tag_groups:
           ]
       - slug: cha-cha
         label: Cha-Cha
-        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
-      - slug: bachata
-        label: Bachata
-        is_hero_filter: true
-        hero_ordinal: 2
-        synonyms:
-          [
-            "bachata sensual",
-            "bachata moderna",
-            "bachata dominicana",
-            "dominicana",
-          ]
-      - slug: kizomba
-        label: Kizomba
-        synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
+        synonyms: ["chacha", "chachacha", "cha cha cha", "cha-cha-cha"]
+      - slug: son
+        label: Son
+        synonyms: ["son cubano"]
+      - slug: rueda
+        label: Rueda
+        synonyms: ["rueda de casino"]
       - slug: semba
         label: Semba
       - slug: konpa
@@ -132,12 +132,8 @@ tag_groups:
       - slug: festival
         label: Festival
         # NOTE: a dance "marathon" is its own format — keep it out of festival.
-        synonyms: ["encuentro"]
-      # NOTE: default keeps `congress` as its own format tag (dev scenarios
-      # reference format:congress); prod merges it into festival synonyms.
-      - slug: congress
-        label: Congress
-        synonyms: ["congreso"]
+        # Congress merged into festival (2026-05): treat congress/congreso as synonyms.
+        synonyms: ["congress", "congreso", "encuentro"]
       - slug: marathon
         label: Marathon
         ordinal: 6
@@ -154,11 +150,6 @@ tag_groups:
         label: Practice
         ordinal: 9
         synonyms: ["practica", "práctica", "training", "drill", "drills"]
-      # Scenario-only: db-events.yaml references format:pool-party.
-      - slug: pool-party
-        label: Pool party
-        ordinal: 12
-        synonyms: ["pool"]
 
   - slug: reach
     label: Event reach
@@ -181,10 +172,6 @@ tag_groups:
     allow_multiple: true
     color: "#f422b8"
     tags:
-      - slug: ogouni-going
-        label: OGoing !
-        is_hero_filter: true
-        hero_ordinal: 0
       - slug: live-band
         label: Live band
         ordinal: 1
@@ -286,25 +273,6 @@ tag_groups:
   #     the venue group above.
   # Keeping subjective qualities out of the event taxonomy prevents
   # organisers from self-claiming them (Google/Yelp/Airbnb pattern).
-  # Default still keeps `vibe` as a dev-only group for scenarios that reference vibe:* tags.
-  - slug: vibe
-    label: Vibe
-    ordinal: 70
-    allow_multiple: true
-    color: "#e879f9"
-    tags:
-      - slug: good-music
-        label: Good Music
-      - slug: crowded
-        label: Crowded
-      - slug: spacious
-        label: Spacious
-      - slug: high-level-dancers
-        label: High-Level Dancers
-      - slug: social-atmosphere
-        label: Social Atmosphere
-      - slug: live-band
-        label: Live Band
 
   # ─────────────────────────────────────────────────────────────────────
   # Review aspects (scope: aspect). Each group is one aspect surfaced in the
@@ -405,7 +373,6 @@ tag_groups:
       - { slug: international-crowd, label: International crowd }
       - { slug: mostly-locals, label: Mostly locals }
       - { slug: small-event, label: Small event, enabled: false }
-      - { slug: large-event, label: Large event, enabled: false }
       - {
           slug: good-gender-balance,
           label: Good lead/follow balance,
@@ -454,18 +421,6 @@ tag_groups:
       - { slug: poor-lighting, label: Poor lighting, polarity: negative }
       - { slug: poor-parking, label: Hard to park, polarity: negative }
       - { slug: hard-to-find, label: Hard to find, polarity: negative }
-      - {
-          slug: poor-food,
-          label: Poor food,
-          polarity: negative,
-          enabled: false,
-        }
-      - {
-          slug: poor-drinks,
-          label: Poor drinks,
-          polarity: negative,
-          enabled: false,
-        }
       - { slug: dirty-bathrooms, label: Dirty facilities, polarity: negative }
 
   - slug: organization

@@ -41,7 +41,7 @@
 #
 # evt-fsi-010..012 are catalog-only filler events with NO attendance —
 # they never surface under any follows/friends scope. They exist purely
-# to give every tag in every group (see scenarios/default/tags.yaml) a
+# to give every tag in every group (see scenarios/tags.yaml + default/tags.override.yaml) a
 # non-zero event_count, so the TagFilterPills per-group row has enough
 # distinct pills to require horizontal scrolling when manually testing
 # that UI (not tied to any test_plan.yaml assertion).

@@ -135,7 +135,10 @@ export function EventPromoCodes({ event, variant = 'compact', refreshToken = 0 }
                 data-testid="promo-codes-section"
             >
                 <div className="flex min-h-10 items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold text-ink">Promo codes</h3>
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                        <img src="/promo-code.png" alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
+                        Promo codes
+                    </h3>
                     {isAuthed && (
                         <button
                             type="button"

@@ -1,4 +1,4 @@
-"""Compare tag_groups + tags in the DB against a scenario's tags.yaml.
+"""Compare tag_groups + tags in the DB against a scenario's resolved taxonomy.
 
 Reports rows present in DB but missing from YAML (extras) and rows present
 in YAML but missing from DB (missing). Useful after deploys to spot
@@ -18,21 +18,18 @@ import logging
 import sys
 from pathlib import Path
 
-import yaml
 from sqlmodel import Session, select
 
 from backend.db.database import get_engine
 from backend.db.models import Tag, TagGroup
-from backend.db.seed import SCENARIOS_DIR
+from backend.db.seed import SCENARIOS_DIR, load_scenario_tags
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
-def _load_yaml_tags(tags_yaml: Path) -> dict[str, set[str]]:
-    """Return {group_slug: {tag_slug, ...}} from a scenarios/*/tags.yaml file."""
-    with open(tags_yaml, encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
+def _load_yaml_tags(data: dict) -> dict[str, set[str]]:
+    """Return {group_slug: {tag_slug, ...}} from a resolved tags document."""
     groups = data.get("tag_groups") or []
     result: dict[str, set[str]] = {}
     for g in groups:
@@ -68,12 +65,11 @@ def main() -> int:
     else:
         scenario_dir = SCENARIOS_DIR / args.scenario
 
-    tags_yaml = scenario_dir / "tags.yaml"
-    if not tags_yaml.exists():
-        logger.error("❌ tags.yaml not found: %s", tags_yaml)
+    if not scenario_dir.is_dir():
+        logger.error("❌ scenario not found: %s", scenario_dir)
         return 2
 
-    yaml_groups = _load_yaml_tags(tags_yaml)
+    yaml_groups = _load_yaml_tags(load_scenario_tags(scenario_dir))
 
     engine = get_engine()
     with Session(engine) as session:
@@ -130,7 +126,7 @@ def main() -> int:
         print("Note: seed is upsert-only — extras in the DB will NOT be removed.")
         return 1
 
-    print("✅ No drift — DB matches scenarios/{}/ tags.yaml".format(args.scenario))
+    print("✅ No drift — DB matches the resolved {} taxonomy".format(args.scenario))
     return 0
 
 

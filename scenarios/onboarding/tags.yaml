@@ -22,14 +22,14 @@ tag_groups:
     tags:
       - slug: salsa
         label: Salsa
+      - slug: mambo
+        label: Mambo
       - slug: bachata
         label: Bachata
       - slug: kizomba
         label: Kizomba
       - slug: zouk
         label: Zouk
-      - slug: mambo
-        label: Mambo
 
   - slug: reach
     label: Event reach

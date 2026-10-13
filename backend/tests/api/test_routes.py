@@ -331,7 +331,23 @@ class TestSettingsEndpoint:
         assert resp.status_code == 200
         assert resp.json()["trending_banner_enabled"] is True
 
-    def test_admin_can_update_default_explorer_period(self, sqlite_client):
+    def test_admin_can_update_trending_trail_collapsed_default(self, sqlite_client):
+        client, engine = sqlite_client
+
+        resp = client.get("/api/settings")
+        assert resp.json()["trending_trail_collapsed_default"] is False
+
+        resp = client.put(
+            "/api/settings", json={"trending_trail_collapsed_default": True}
+        )
+        assert resp.status_code == 200
+        assert resp.json()["trending_trail_collapsed_default"] is True
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "trending_trail_collapsed_default")
+            assert row is not None
+            assert row.value == "true"
+
         client, engine = sqlite_client
 
         resp = client.put(

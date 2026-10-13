@@ -28,6 +28,7 @@ import {
     type NotificationActor,
     type NotificationItem,
 } from '../api';
+import { firstNameOf } from '../utils/displayName';
 import {
     formatRelative,
     getNotificationVerb,
@@ -103,8 +104,10 @@ const displayNameOf = (a: NotificationActor): string =>
     a.display_name || (a.handle ? `@${a.handle}` : 'Someone');
 
 /** "Emma", "Emma and Samir", or "Emma, Samir +9 others". */
-function formatActorNames(actors: NotificationActor[], total: number): string {
-    const names = actors.map(displayNameOf);
+function formatActorNames(actors: NotificationActor[], total: number, firstNames = false): string {
+    const names = actors.map((a) =>
+        (firstNames ? firstNameOf(a.display_name, a.handle) : '') || displayNameOf(a),
+    );
     if (total <= 1) return names[0] ?? 'Someone';
     if (total === 2) return `${names[0]} and ${names[1]}`;
     const shown = names.slice(0, 2);
@@ -632,7 +635,7 @@ export default function NotificationRow({
         );
     } else {
         const nameText = isMulti
-            ? formatActorNames(actorsList, actorCount)
+            ? formatActorNames(actorsList, actorCount, item.kind === 'subscription_going')
             : item.kind === 'subscription_going' && item.also_going
                 ? `You and ${actorName}`
                 : actorName;

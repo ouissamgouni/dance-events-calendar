@@ -53,3 +53,14 @@ promo_codes:
     description: Early bird special - 20% off festival passes.
     expires_at: "2030-06-30T00:00:00"
     status: approved
+
+  - event_id: budapest-salsa-weekender
+    submitter_email: penny.valdez@joinmovida.com
+    code: BUDAPEST10
+    description: 10% off for the Budapest Salsa Weekender.
+    status: approved
+  - event_id: budapest-salsa-weekender
+    submitter_email: marta.novak@joinmovida.com
+    code: BUDAPEST15
+    description: 15% off for the Budapest Salsa Weekender.
+    status: approved

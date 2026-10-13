@@ -257,3 +257,1230 @@ saves:
   - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
     email: omar.costa@joinmovida.com
     audience: public
+  - event_id: seville-salsa-weekender
+    email: olivia.bennett@joinmovida.com
+    audience: public
+  - event_id: seville-salsa-weekender
+    email: amira.haddad@joinmovida.com
+    audience: public
+  - event_id: seville-salsa-weekender
+    email: sea.sun.salsa@joinmovida.com
+    audience: friends
+  - event_id: seville-salsa-weekender
+    email: rave.republic@joinmovida.com
+    audience: public
+  - event_id: seville-salsa-weekender
+    email: penny.valdez@joinmovida.com
+    audience: public
+  - event_id: seville-salsa-weekender
+    email: maya.rivera@joinmovida.com
+    audience: friends
+  - event_id: seville-salsa-weekender
+    email: leo.martin@joinmovida.com
+    audience: public
+  - event_id: seville-salsa-weekender
+    email: ines.lopez@joinmovida.com
+    audience: public
+  - event_id: seville-salsa-weekender
+    email: noah.kim@joinmovida.com
+    audience: friends
+  - event_id: seville-salsa-weekender
+    email: zara.benali@joinmovida.com
+    audience: public
+  - event_id: seville-salsa-weekender
+    email: omar.costa@joinmovida.com
+    audience: public
+  - event_id: seville-salsa-weekender
+    email: clara.dubois@joinmovida.com
+    audience: friends
+  - event_id: porto-kizomba-weekender
+    email: maya.rivera@joinmovida.com
+    audience: public
+  - event_id: porto-kizomba-weekender
+    email: leo.martin@joinmovida.com
+    audience: public
+  - event_id: porto-kizomba-weekender
+    email: ines.lopez@joinmovida.com
+    audience: friends
+  - event_id: porto-kizomba-weekender
+    email: noah.kim@joinmovida.com
+    audience: public
+  - event_id: porto-kizomba-weekender
+    email: zara.benali@joinmovida.com
+    audience: public
+  - event_id: porto-kizomba-weekender
+    email: omar.costa@joinmovida.com
+    audience: friends
+  - event_id: porto-kizomba-weekender
+    email: clara.dubois@joinmovida.com
+    audience: public
+  - event_id: porto-kizomba-weekender
+    email: jonas.meyer@joinmovida.com
+    audience: public
+  - event_id: porto-kizomba-weekender
+    email: mina.silva@joinmovida.com
+    audience: friends
+  - event_id: porto-kizomba-weekender
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: milan-bachata-weekender
+    email: omar.costa@joinmovida.com
+    audience: public
+  - event_id: milan-bachata-weekender
+    email: clara.dubois@joinmovida.com
+    audience: public
+  - event_id: milan-bachata-weekender
+    email: jonas.meyer@joinmovida.com
+    audience: friends
+  - event_id: milan-bachata-weekender
+    email: mina.silva@joinmovida.com
+    audience: public
+  - event_id: milan-bachata-weekender
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: milan-bachata-weekender
+    email: ana.garcia@joinmovida.com
+    audience: friends
+  - event_id: milan-bachata-weekender
+    email: pablo.rossi@joinmovida.com
+    audience: public
+  - event_id: milan-bachata-weekender
+    email: nina.khan@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: ana.garcia@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: pablo.rossi@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: nina.khan@joinmovida.com
+    audience: friends
+  - event_id: budapest-salsa-weekender
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: victor.schmidt@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: sofia.torres@joinmovida.com
+    audience: friends
+  - event_id: budapest-salsa-weekender
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: rita.petrov@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: ivo.diallo@joinmovida.com
+    audience: friends
+  - event_id: budapest-salsa-weekender
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: bruno.santos@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: camille.laurent@joinmovida.com
+    audience: friends
+  - event_id: budapest-salsa-weekender
+    email: mateo.vega@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: leila.bauer@joinmovida.com
+    audience: public
+  - event_id: budapest-salsa-weekender
+    email: alex.navarro@joinmovida.com
+    audience: friends
+  - event_id: brussels-latin-weekender
+    email: sofia.torres@joinmovida.com
+    audience: public
+  - event_id: brussels-latin-weekender
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: brussels-latin-weekender
+    email: rita.petrov@joinmovida.com
+    audience: friends
+  - event_id: brussels-latin-weekender
+    email: ivo.diallo@joinmovida.com
+    audience: public
+  - event_id: brussels-latin-weekender
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: brussels-latin-weekender
+    email: bruno.santos@joinmovida.com
+    audience: friends
+  - event_id: copenhagen-zouk-weekender
+    email: bruno.santos@joinmovida.com
+    audience: public
+  - event_id: copenhagen-zouk-weekender
+    email: camille.laurent@joinmovida.com
+    audience: public
+  - event_id: copenhagen-zouk-weekender
+    email: mateo.vega@joinmovida.com
+    audience: friends
+  - event_id: copenhagen-zouk-weekender
+    email: leila.bauer@joinmovida.com
+    audience: public
+  - event_id: copenhagen-zouk-weekender
+    email: alex.navarro@joinmovida.com
+    audience: public
+  - event_id: copenhagen-zouk-weekender
+    email: olivia.bennett@joinmovida.com
+    audience: friends
+  - event_id: copenhagen-zouk-weekender
+    email: amira.haddad@joinmovida.com
+    audience: public
+  - event_id: copenhagen-zouk-weekender
+    email: sea.sun.salsa@joinmovida.com
+    audience: public
+  - event_id: copenhagen-zouk-weekender
+    email: rave.republic@joinmovida.com
+    audience: friends
+  - event_id: athens-bachata-weekender
+    email: olivia.bennett@joinmovida.com
+    audience: public
+  - event_id: athens-bachata-weekender
+    email: amira.haddad@joinmovida.com
+    audience: public
+  - event_id: athens-bachata-weekender
+    email: sea.sun.salsa@joinmovida.com
+    audience: friends
+  - event_id: athens-bachata-weekender
+    email: rave.republic@joinmovida.com
+    audience: public
+  - event_id: athens-bachata-weekender
+    email: penny.valdez@joinmovida.com
+    audience: public
+  - event_id: athens-bachata-weekender
+    email: maya.rivera@joinmovida.com
+    audience: friends
+  - event_id: athens-bachata-weekender
+    email: leo.martin@joinmovida.com
+    audience: public
+  - event_id: athens-bachata-weekender
+    email: ines.lopez@joinmovida.com
+    audience: public
+  - event_id: athens-bachata-weekender
+    email: noah.kim@joinmovida.com
+    audience: friends
+  - event_id: athens-bachata-weekender
+    email: zara.benali@joinmovida.com
+    audience: public
+  - event_id: athens-bachata-weekender
+    email: omar.costa@joinmovida.com
+    audience: public
+  - event_id: athens-bachata-weekender
+    email: clara.dubois@joinmovida.com
+    audience: friends
+  - event_id: athens-bachata-weekender
+    email: jonas.meyer@joinmovida.com
+    audience: public
+  - event_id: dublin-salsa-christmas-weekender
+    email: maya.rivera@joinmovida.com
+    audience: public
+  - event_id: dublin-salsa-christmas-weekender
+    email: leo.martin@joinmovida.com
+    audience: public
+  - event_id: dublin-salsa-christmas-weekender
+    email: ines.lopez@joinmovida.com
+    audience: friends
+  - event_id: dublin-salsa-christmas-weekender
+    email: noah.kim@joinmovida.com
+    audience: public
+  - event_id: dublin-salsa-christmas-weekender
+    email: zara.benali@joinmovida.com
+    audience: public
+  - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
+    email: omar.costa@joinmovida.com
+    audience: public
+  - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
+    email: clara.dubois@joinmovida.com
+    audience: public
+  - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
+    email: jonas.meyer@joinmovida.com
+    audience: friends
+  - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
+    email: mina.silva@joinmovida.com
+    audience: public
+  - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
+    email: ana.garcia@joinmovida.com
+    audience: friends
+  - event_id: 6dhj8d9hclh32bb4chh62b9kckpj6b9pcdi38b9gchi38e9nc5i3acpgco
+    email: pablo.rossi@joinmovida.com
+    audience: public
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: ana.garcia@joinmovida.com
+    audience: public
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: pablo.rossi@joinmovida.com
+    audience: public
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: nina.khan@joinmovida.com
+    audience: friends
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: victor.schmidt@joinmovida.com
+    audience: public
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: sofia.torres@joinmovida.com
+    audience: friends
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: rita.petrov@joinmovida.com
+    audience: public
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: ivo.diallo@joinmovida.com
+    audience: friends
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: c5h3ieb16so66bb56tgjab9kc4sjib9p6grjcb9p6gom8d9icgojeor564
+    email: bruno.santos@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: sofia.torres@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: rita.petrov@joinmovida.com
+    audience: friends
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: ivo.diallo@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: bruno.santos@joinmovida.com
+    audience: friends
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: camille.laurent@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: mateo.vega@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: leila.bauer@joinmovida.com
+    audience: friends
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: alex.navarro@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: olivia.bennett@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: amira.haddad@joinmovida.com
+    audience: friends
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: sea.sun.salsa@joinmovida.com
+    audience: public
+  - event_id: c8oj6e1mc8pj6b9p6hi32b9kcpgm8b9o6gs6cbb465i3cdpgcph6cdr674
+    email: rave.republic@joinmovida.com
+    audience: public
+  - event_id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
+    email: bruno.santos@joinmovida.com
+    audience: public
+  - event_id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
+    email: camille.laurent@joinmovida.com
+    audience: public
+  - event_id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
+    email: mateo.vega@joinmovida.com
+    audience: friends
+  - event_id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
+    email: leila.bauer@joinmovida.com
+    audience: public
+  - event_id: ccomcp9o6dj3abb3coo3gb9k6lh3abb16sojab9hcoq38c9m6co3icj5ck
+    email: alex.navarro@joinmovida.com
+    audience: public
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: olivia.bennett@joinmovida.com
+    audience: public
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: amira.haddad@joinmovida.com
+    audience: public
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: sea.sun.salsa@joinmovida.com
+    audience: friends
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: rave.republic@joinmovida.com
+    audience: public
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: penny.valdez@joinmovida.com
+    audience: public
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: maya.rivera@joinmovida.com
+    audience: friends
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: leo.martin@joinmovida.com
+    audience: public
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: ines.lopez@joinmovida.com
+    audience: public
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: noah.kim@joinmovida.com
+    audience: friends
+  - event_id: 6opm8p9m6csjcbb674p6ab9kclj3eb9pchj32bb4cdj68e1h6sr6cchnc4
+    email: zara.benali@joinmovida.com
+    audience: public
+  - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
+    email: maya.rivera@joinmovida.com
+    audience: public
+  - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
+    email: leo.martin@joinmovida.com
+    audience: public
+  - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
+    email: ines.lopez@joinmovida.com
+    audience: friends
+  - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
+    email: noah.kim@joinmovida.com
+    audience: public
+  - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
+    email: zara.benali@joinmovida.com
+    audience: public
+  - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
+    email: omar.costa@joinmovida.com
+    audience: friends
+  - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
+    email: clara.dubois@joinmovida.com
+    audience: public
+  - event_id: 70q3aohj6grjab9ocli6ab9kckq64bb16krjgbb169gj6d32ckoj2dj2c4
+    email: jonas.meyer@joinmovida.com
+    audience: public
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: omar.costa@joinmovida.com
+    audience: public
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: clara.dubois@joinmovida.com
+    audience: public
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: jonas.meyer@joinmovida.com
+    audience: friends
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: mina.silva@joinmovida.com
+    audience: public
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: ana.garcia@joinmovida.com
+    audience: friends
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: pablo.rossi@joinmovida.com
+    audience: public
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: nina.khan@joinmovida.com
+    audience: public
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: samir.ivanov@joinmovida.com
+    audience: friends
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: victor.schmidt@joinmovida.com
+    audience: public
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: sofia.torres@joinmovida.com
+    audience: public
+  - event_id: chj38chi6pim4bb46koj6b9k68sjab9ocli3cbb4cor66dpn75gm2opi6k
+    email: milan.horvat@joinmovida.com
+    audience: friends
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: ana.garcia@joinmovida.com
+    audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: pablo.rossi@joinmovida.com
+    audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: nina.khan@joinmovida.com
+    audience: friends
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: victor.schmidt@joinmovida.com
+    audience: public
+  - event_id: 6gpjae3j68smabb1c9qm4b9k6cr3ebb16gj3gb9p6jm68o1p6loj2cpi6s
+    email: sofia.torres@joinmovida.com
+    audience: friends
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: sofia.torres@joinmovida.com
+    audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: rita.petrov@joinmovida.com
+    audience: friends
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: ivo.diallo@joinmovida.com
+    audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: bruno.santos@joinmovida.com
+    audience: friends
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: camille.laurent@joinmovida.com
+    audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: mateo.vega@joinmovida.com
+    audience: public
+  - event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    email: leila.bauer@joinmovida.com
+    audience: friends
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: bruno.santos@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: camille.laurent@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: mateo.vega@joinmovida.com
+    audience: friends
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: leila.bauer@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: alex.navarro@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: olivia.bennett@joinmovida.com
+    audience: friends
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: amira.haddad@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: sea.sun.salsa@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: rave.republic@joinmovida.com
+    audience: friends
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: penny.valdez@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: maya.rivera@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: leo.martin@joinmovida.com
+    audience: friends
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: ines.lopez@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: noah.kim@joinmovida.com
+    audience: public
+  - event_id: 6jqljdh6d1p5dee4e2tn7e2n9fu6hee39jm6je2s9mp91r4s9osl5frl9v
+    email: zara.benali@joinmovida.com
+    audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: olivia.bennett@joinmovida.com
+    audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: amira.haddad@joinmovida.com
+    audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: sea.sun.salsa@joinmovida.com
+    audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: rave.republic@joinmovida.com
+    audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: penny.valdez@joinmovida.com
+    audience: public
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: maya.rivera@joinmovida.com
+    audience: friends
+  - event_id: 6krlmeh7e2q6eff5f3uo8f3o0gv7iff40kn7kf3t0nq02s5t0ptml6gsm0w
+    email: leo.martin@joinmovida.com
+    audience: public
+  - event_id: toronto-latin-fever-festival
+    email: clara.dubois@joinmovida.com
+    audience: public
+  - event_id: toronto-latin-fever-festival
+    email: jonas.meyer@joinmovida.com
+    audience: private
+  - event_id: toronto-latin-fever-festival
+    email: mina.silva@joinmovida.com
+    audience: friends
+  - event_id: toronto-latin-fever-festival
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: toronto-latin-fever-festival
+    email: ana.garcia@joinmovida.com
+    audience: private
+  - event_id: toronto-latin-fever-festival
+    email: pablo.rossi@joinmovida.com
+    audience: friends
+  - event_id: toronto-latin-fever-festival
+    email: nina.khan@joinmovida.com
+    audience: public
+  - event_id: toronto-latin-fever-festival
+    email: samir.ivanov@joinmovida.com
+    audience: private
+  - event_id: toronto-latin-fever-festival
+    email: victor.schmidt@joinmovida.com
+    audience: friends
+  - event_id: toronto-latin-fever-festival
+    email: sofia.torres@joinmovida.com
+    audience: public
+  - event_id: toronto-latin-fever-festival
+    email: milan.horvat@joinmovida.com
+    audience: private
+  - event_id: toronto-latin-fever-festival
+    email: rita.petrov@joinmovida.com
+    audience: friends
+  - event_id: bosphorus-latin-festival
+    email: nina.khan@joinmovida.com
+    audience: friends
+  - event_id: bosphorus-latin-festival
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: bosphorus-latin-festival
+    email: victor.schmidt@joinmovida.com
+    audience: private
+  - event_id: bosphorus-latin-festival
+    email: sofia.torres@joinmovida.com
+    audience: friends
+  - event_id: bosphorus-latin-festival
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: bosphorus-latin-festival
+    email: rita.petrov@joinmovida.com
+    audience: private
+  - event_id: bosphorus-latin-festival
+    email: ivo.diallo@joinmovida.com
+    audience: friends
+  - event_id: bosphorus-latin-festival
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: bosphorus-latin-festival
+    email: bruno.santos@joinmovida.com
+    audience: private
+  - event_id: bosphorus-latin-festival
+    email: camille.laurent@joinmovida.com
+    audience: friends
+  - event_id: bosphorus-latin-festival
+    email: mateo.vega@joinmovida.com
+    audience: public
+  - event_id: bosphorus-latin-festival
+    email: leila.bauer@joinmovida.com
+    audience: private
+  - event_id: bosphorus-latin-festival
+    email: maya.rivera@joinmovida.com
+    audience: friends
+  - event_id: bosphorus-latin-festival
+    email: leo.martin@joinmovida.com
+    audience: public
+  - event_id: bosphorus-latin-festival
+    email: ines.lopez@joinmovida.com
+    audience: private
+  - event_id: bosphorus-latin-festival
+    email: noah.kim@joinmovida.com
+    audience: friends
+  - event_id: bosphorus-latin-festival
+    email: zara.benali@joinmovida.com
+    audience: public
+  - event_id: bosphorus-latin-festival
+    email: picks@joinmovida.com
+    audience: private
+  - event_id: marrakech-latin-oasis-festival
+    email: sofia.torres@joinmovida.com
+    audience: private
+  - event_id: marrakech-latin-oasis-festival
+    email: milan.horvat@joinmovida.com
+    audience: friends
+  - event_id: marrakech-latin-oasis-festival
+    email: rita.petrov@joinmovida.com
+    audience: public
+  - event_id: marrakech-latin-oasis-festival
+    email: ivo.diallo@joinmovida.com
+    audience: private
+  - event_id: marrakech-latin-oasis-festival
+    email: nadia.fischer@joinmovida.com
+    audience: friends
+  - event_id: marrakech-latin-oasis-festival
+    email: bruno.santos@joinmovida.com
+    audience: public
+  - event_id: marrakech-latin-oasis-festival
+    email: camille.laurent@joinmovida.com
+    audience: private
+  - event_id: marrakech-latin-oasis-festival
+    email: mateo.vega@joinmovida.com
+    audience: friends
+  - event_id: marrakech-latin-oasis-festival
+    email: leila.bauer@joinmovida.com
+    audience: public
+  - event_id: marrakech-latin-oasis-festival
+    email: maya.rivera@joinmovida.com
+    audience: private
+  - event_id: big-apple-bachata-festival
+    email: camille.laurent@joinmovida.com
+    audience: public
+  - event_id: big-apple-bachata-festival
+    email: mateo.vega@joinmovida.com
+    audience: private
+  - event_id: big-apple-bachata-festival
+    email: leila.bauer@joinmovida.com
+    audience: friends
+  - event_id: big-apple-bachata-festival
+    email: maya.rivera@joinmovida.com
+    audience: public
+  - event_id: big-apple-bachata-festival
+    email: leo.martin@joinmovida.com
+    audience: private
+  - event_id: big-apple-bachata-festival
+    email: ines.lopez@joinmovida.com
+    audience: friends
+  - event_id: big-apple-bachata-festival
+    email: noah.kim@joinmovida.com
+    audience: public
+  - event_id: big-apple-bachata-festival
+    email: zara.benali@joinmovida.com
+    audience: private
+  - event_id: big-apple-bachata-festival
+    email: omar.costa@joinmovida.com
+    audience: friends
+  - event_id: big-apple-bachata-festival
+    email: clara.dubois@joinmovida.com
+    audience: public
+  - event_id: big-apple-bachata-festival
+    email: jonas.meyer@joinmovida.com
+    audience: private
+  - event_id: big-apple-bachata-festival
+    email: mina.silva@joinmovida.com
+    audience: friends
+  - event_id: big-apple-bachata-festival
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: big-apple-bachata-festival
+    email: ana.garcia@joinmovida.com
+    audience: private
+  - event_id: big-apple-bachata-festival
+    email: pablo.rossi@joinmovida.com
+    audience: friends
+  - event_id: big-apple-bachata-festival
+    email: nina.khan@joinmovida.com
+    audience: public
+  - event_id: big-apple-bachata-festival
+    email: samir.ivanov@joinmovida.com
+    audience: private
+  - event_id: big-apple-bachata-festival
+    email: victor.schmidt@joinmovida.com
+    audience: friends
+  - event_id: big-apple-bachata-festival
+    email: picks@joinmovida.com
+    audience: public
+  - event_id: big-apple-bachata-festival
+    email: sea.sun.salsa@joinmovida.com
+    audience: private
+  - event_id: big-apple-bachata-festival
+    email: rave.republic@joinmovida.com
+    audience: friends
+  - event_id: dubai-latin-mirage-festival
+    email: ines.lopez@joinmovida.com
+    audience: friends
+  - event_id: dubai-latin-mirage-festival
+    email: noah.kim@joinmovida.com
+    audience: public
+  - event_id: dubai-latin-mirage-festival
+    email: zara.benali@joinmovida.com
+    audience: private
+  - event_id: dubai-latin-mirage-festival
+    email: omar.costa@joinmovida.com
+    audience: friends
+  - event_id: dubai-latin-mirage-festival
+    email: clara.dubois@joinmovida.com
+    audience: public
+  - event_id: dubai-latin-mirage-festival
+    email: jonas.meyer@joinmovida.com
+    audience: private
+  - event_id: dubai-latin-mirage-festival
+    email: mina.silva@joinmovida.com
+    audience: friends
+  - event_id: dubai-latin-mirage-festival
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: dubai-latin-mirage-festival
+    email: ana.garcia@joinmovida.com
+    audience: private
+  - event_id: dubai-latin-mirage-festival
+    email: pablo.rossi@joinmovida.com
+    audience: friends
+  - event_id: dubai-latin-mirage-festival
+    email: nina.khan@joinmovida.com
+    audience: public
+  - event_id: dubai-latin-mirage-festival
+    email: samir.ivanov@joinmovida.com
+    audience: private
+  - event_id: dubai-latin-mirage-festival
+    email: victor.schmidt@joinmovida.com
+    audience: friends
+  - event_id: dubai-latin-mirage-festival
+    email: sofia.torres@joinmovida.com
+    audience: public
+  - event_id: red-sea-latin-festival
+    email: mina.silva@joinmovida.com
+    audience: private
+  - event_id: red-sea-latin-festival
+    email: theo.novak@joinmovida.com
+    audience: friends
+  - event_id: red-sea-latin-festival
+    email: ana.garcia@joinmovida.com
+    audience: public
+  - event_id: red-sea-latin-festival
+    email: pablo.rossi@joinmovida.com
+    audience: private
+  - event_id: red-sea-latin-festival
+    email: nina.khan@joinmovida.com
+    audience: friends
+  - event_id: red-sea-latin-festival
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: red-sea-latin-festival
+    email: victor.schmidt@joinmovida.com
+    audience: private
+  - event_id: red-sea-latin-festival
+    email: sofia.torres@joinmovida.com
+    audience: friends
+  - event_id: red-sea-latin-festival
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: red-sea-latin-festival
+    email: rita.petrov@joinmovida.com
+    audience: private
+  - event_id: red-sea-latin-festival
+    email: ivo.diallo@joinmovida.com
+    audience: friends
+  - event_id: red-sea-latin-festival
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: red-sea-latin-festival
+    email: bruno.santos@joinmovida.com
+    audience: private
+  - event_id: red-sea-latin-festival
+    email: camille.laurent@joinmovida.com
+    audience: friends
+  - event_id: red-sea-latin-festival
+    email: mateo.vega@joinmovida.com
+    audience: public
+  - event_id: red-sea-latin-festival
+    email: leila.bauer@joinmovida.com
+    audience: private
+  - event_id: lion-city-latin-festival
+    email: pablo.rossi@joinmovida.com
+    audience: public
+  - event_id: lion-city-latin-festival
+    email: nina.khan@joinmovida.com
+    audience: private
+  - event_id: lion-city-latin-festival
+    email: samir.ivanov@joinmovida.com
+    audience: friends
+  - event_id: lion-city-latin-festival
+    email: victor.schmidt@joinmovida.com
+    audience: public
+  - event_id: lion-city-latin-festival
+    email: sofia.torres@joinmovida.com
+    audience: private
+  - event_id: lion-city-latin-festival
+    email: milan.horvat@joinmovida.com
+    audience: friends
+  - event_id: lion-city-latin-festival
+    email: rita.petrov@joinmovida.com
+    audience: public
+  - event_id: lion-city-latin-festival
+    email: ivo.diallo@joinmovida.com
+    audience: private
+  - event_id: lion-city-latin-festival
+    email: nadia.fischer@joinmovida.com
+    audience: friends
+  - event_id: lion-city-latin-festival
+    email: bruno.santos@joinmovida.com
+    audience: public
+  - event_id: lion-city-latin-festival
+    email: camille.laurent@joinmovida.com
+    audience: private
+  - event_id: busan-latin-festival
+    email: nadia.fischer@joinmovida.com
+    audience: friends
+  - event_id: busan-latin-festival
+    email: bruno.santos@joinmovida.com
+    audience: public
+  - event_id: busan-latin-festival
+    email: camille.laurent@joinmovida.com
+    audience: private
+  - event_id: busan-latin-festival
+    email: mateo.vega@joinmovida.com
+    audience: friends
+  - event_id: busan-latin-festival
+    email: leila.bauer@joinmovida.com
+    audience: public
+  - event_id: busan-latin-festival
+    email: maya.rivera@joinmovida.com
+    audience: private
+  - event_id: busan-latin-festival
+    email: leo.martin@joinmovida.com
+    audience: friends
+  - event_id: busan-latin-festival
+    email: ines.lopez@joinmovida.com
+    audience: public
+  - event_id: busan-latin-festival
+    email: noah.kim@joinmovida.com
+    audience: private
+  - event_id: busan-latin-festival
+    email: zara.benali@joinmovida.com
+    audience: friends
+  - event_id: busan-latin-festival
+    email: omar.costa@joinmovida.com
+    audience: public
+  - event_id: busan-latin-festival
+    email: clara.dubois@joinmovida.com
+    audience: private
+  - event_id: busan-latin-festival
+    email: jonas.meyer@joinmovida.com
+    audience: friends
+  - event_id: sydney-harbour-kizomba-festival
+    email: mateo.vega@joinmovida.com
+    audience: private
+  - event_id: sydney-harbour-kizomba-festival
+    email: leila.bauer@joinmovida.com
+    audience: friends
+  - event_id: sydney-harbour-kizomba-festival
+    email: maya.rivera@joinmovida.com
+    audience: public
+  - event_id: sydney-harbour-kizomba-festival
+    email: leo.martin@joinmovida.com
+    audience: private
+  - event_id: sydney-harbour-kizomba-festival
+    email: ines.lopez@joinmovida.com
+    audience: friends
+  - event_id: sydney-harbour-kizomba-festival
+    email: noah.kim@joinmovida.com
+    audience: public
+  - event_id: sydney-harbour-kizomba-festival
+    email: zara.benali@joinmovida.com
+    audience: private
+  - event_id: sydney-harbour-kizomba-festival
+    email: omar.costa@joinmovida.com
+    audience: friends
+  - event_id: sydney-harbour-kizomba-festival
+    email: clara.dubois@joinmovida.com
+    audience: public
+  - event_id: sydney-harbour-kizomba-festival
+    email: jonas.meyer@joinmovida.com
+    audience: private
+  - event_id: sydney-harbour-kizomba-festival
+    email: mina.silva@joinmovida.com
+    audience: friends
+  - event_id: sydney-harbour-kizomba-festival
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: sydney-harbour-kizomba-festival
+    email: ana.garcia@joinmovida.com
+    audience: private
+  - event_id: sydney-harbour-kizomba-festival
+    email: pablo.rossi@joinmovida.com
+    audience: friends
+  - event_id: sydney-harbour-kizomba-festival
+    email: nina.khan@joinmovida.com
+    audience: public
+  - event_id: cali-salsa-capital-festival
+    email: zara.benali@joinmovida.com
+    audience: public
+  - event_id: cali-salsa-capital-festival
+    email: omar.costa@joinmovida.com
+    audience: private
+  - event_id: cali-salsa-capital-festival
+    email: clara.dubois@joinmovida.com
+    audience: friends
+  - event_id: cali-salsa-capital-festival
+    email: jonas.meyer@joinmovida.com
+    audience: public
+  - event_id: cali-salsa-capital-festival
+    email: mina.silva@joinmovida.com
+    audience: private
+  - event_id: cali-salsa-capital-festival
+    email: theo.novak@joinmovida.com
+    audience: friends
+  - event_id: cali-salsa-capital-festival
+    email: ana.garcia@joinmovida.com
+    audience: public
+  - event_id: cali-salsa-capital-festival
+    email: pablo.rossi@joinmovida.com
+    audience: private
+  - event_id: cali-salsa-capital-festival
+    email: nina.khan@joinmovida.com
+    audience: friends
+  - event_id: cali-salsa-capital-festival
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: cali-salsa-capital-festival
+    email: victor.schmidt@joinmovida.com
+    audience: private
+  - event_id: cali-salsa-capital-festival
+    email: sofia.torres@joinmovida.com
+    audience: friends
+  - event_id: cali-salsa-capital-festival
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: cali-salsa-capital-festival
+    email: rita.petrov@joinmovida.com
+    audience: private
+  - event_id: cali-salsa-capital-festival
+    email: ivo.diallo@joinmovida.com
+    audience: friends
+  - event_id: cali-salsa-capital-festival
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: cali-salsa-capital-festival
+    email: bruno.santos@joinmovida.com
+    audience: private
+  - event_id: cali-salsa-capital-festival
+    email: picks@joinmovida.com
+    audience: friends
+  - event_id: cali-salsa-capital-festival
+    email: sea.sun.salsa@joinmovida.com
+    audience: public
+  - event_id: canal-salsa-tuesdays-next-1
+    email: samir.ivanov@joinmovida.com
+    audience: friends
+  - event_id: canal-salsa-tuesdays-next-1
+    email: omar.costa@joinmovida.com
+    audience: friends
+  - event_id: canal-salsa-tuesdays-next-1
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: canal-salsa-tuesdays-next-1
+    email: rita.petrov@joinmovida.com
+    audience: friends
+  - event_id: canal-salsa-tuesdays-next-1
+    email: jonas.meyer@joinmovida.com
+    audience: public
+  - event_id: canal-salsa-tuesdays-next-2
+    email: milan.horvat@joinmovida.com
+    audience: friends
+  - event_id: canal-salsa-tuesdays-next-2
+    email: ivo.diallo@joinmovida.com
+    audience: public
+  - event_id: canal-salsa-tuesdays-next-2
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: canal-salsa-tuesdays-next-3
+    email: nina.khan@joinmovida.com
+    audience: public
+  - event_id: canal-salsa-tuesdays-next-3
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-1
+    email: penny.valdez@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-1
+    email: maya.rivera@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-1
+    email: nina.khan@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-1
+    email: alex.navarro@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-2
+    email: omar.costa@joinmovida.com
+    audience: friends
+  - event_id: pigalle-bachata-wednesdays-next-2
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-2
+    email: ana.garcia@joinmovida.com
+    audience: friends
+  - event_id: pigalle-bachata-wednesdays-next-2
+    email: maya.rivera@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-2
+    email: ines.lopez@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-2
+    email: amira.haddad@joinmovida.com
+    audience: friends
+  - event_id: pigalle-bachata-wednesdays-next-3
+    email: sofia.torres@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-3
+    email: nadia.fischer@joinmovida.com
+    audience: friends
+  - event_id: pigalle-bachata-wednesdays-next-3
+    email: alex.navarro@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-3
+    email: noah.kim@joinmovida.com
+    audience: public
+  - event_id: pigalle-bachata-wednesdays-next-3
+    email: rita.petrov@joinmovida.com
+    audience: friends
+  - event_id: pigalle-bachata-wednesdays-next-3
+    email: leila.bauer@joinmovida.com
+    audience: friends
+  - event_id: peniche-latina-sundays-next-1
+    email: mina.silva@joinmovida.com
+    audience: friends
+  - event_id: peniche-latina-sundays-next-1
+    email: ivo.diallo@joinmovida.com
+    audience: public
+  - event_id: peniche-latina-sundays-next-1
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: peniche-latina-sundays-next-2
+    email: ana.garcia@joinmovida.com
+    audience: friends
+  - event_id: peniche-latina-sundays-next-2
+    email: ivo.diallo@joinmovida.com
+    audience: friends
+  - event_id: peniche-latina-sundays-next-2
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: peniche-latina-sundays-next-3
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: peniche-latina-sundays-next-3
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: peniche-latina-sundays-next-3
+    email: rita.petrov@joinmovida.com
+    audience: public
+  - event_id: peniche-latina-sundays-next-3
+    email: nina.khan@joinmovida.com
+    audience: public
+  - event_id: peniche-latina-sundays-next-3
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: peniche-latina-sundays-next-3
+    email: mina.silva@joinmovida.com
+    audience: public
+  - event_id: ixelles-salsa-thursdays-next-1
+    email: omar.costa@joinmovida.com
+    audience: public
+  - event_id: ixelles-salsa-thursdays-next-1
+    email: theo.novak@joinmovida.com
+    audience: public
+  - event_id: ixelles-salsa-thursdays-next-1
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: ixelles-salsa-thursdays-next-2
+    email: maya.rivera@joinmovida.com
+    audience: public
+  - event_id: ixelles-salsa-thursdays-next-2
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: ixelles-salsa-thursdays-next-2
+    email: olivia.bennett@joinmovida.com
+    audience: friends
+  - event_id: ixelles-salsa-thursdays-next-2
+    email: leo.martin@joinmovida.com
+    audience: public
+  - event_id: ixelles-salsa-thursdays-next-2
+    email: mina.silva@joinmovida.com
+    audience: public
+  - event_id: ixelles-salsa-thursdays-next-2
+    email: clara.dubois@joinmovida.com
+    audience: friends
+  - event_id: ixelles-salsa-thursdays-next-3
+    email: pablo.rossi@joinmovida.com
+    audience: friends
+  - event_id: ixelles-salsa-thursdays-next-3
+    email: alex.navarro@joinmovida.com
+    audience: friends
+  - event_id: ixelles-salsa-thursdays-next-3
+    email: jonas.meyer@joinmovida.com
+    audience: public
+  - event_id: ixelles-salsa-thursdays-next-3
+    email: zara.benali@joinmovida.com
+    audience: public
+  - event_id: saint-gilles-latin-saturdays-next-1
+    email: zara.benali@joinmovida.com
+    audience: friends
+  - event_id: saint-gilles-latin-saturdays-next-1
+    email: pablo.rossi@joinmovida.com
+    audience: public
+  - event_id: saint-gilles-latin-saturdays-next-2
+    email: ines.lopez@joinmovida.com
+    audience: friends
+  - event_id: saint-gilles-latin-saturdays-next-2
+    email: nadia.fischer@joinmovida.com
+    audience: public
+  - event_id: saint-gilles-latin-saturdays-next-2
+    email: ana.garcia@joinmovida.com
+    audience: public
+  - event_id: saint-gilles-latin-saturdays-next-3
+    email: pablo.rossi@joinmovida.com
+    audience: friends
+  - event_id: saint-gilles-latin-saturdays-next-3
+    email: mina.silva@joinmovida.com
+    audience: friends
+  - event_id: saint-gilles-latin-saturdays-next-3
+    email: olivia.bennett@joinmovida.com
+    audience: public
+  - event_id: saint-gilles-latin-saturdays-next-3
+    email: samir.ivanov@joinmovida.com
+    audience: public
+  - event_id: saint-gilles-latin-saturdays-next-3
+    email: sofia.torres@joinmovida.com
+    audience: public
+  - event_id: saint-gilles-latin-saturdays-next-3
+    email: ana.garcia@joinmovida.com
+    audience: friends
+  - event_id: paris-latin-lumiere-festival
+    email: milan.horvat@joinmovida.com
+    audience: public
+  - event_id: paris-latin-lumiere-festival
+    email: omar.costa@joinmovida.com
+    audience: friends
+  - event_id: paris-latin-lumiere-festival
+    email: clara.dubois@joinmovida.com
+    audience: friends
+  - event_id: paris-latin-lumiere-festival
+    email: pablo.rossi@joinmovida.com
+    audience: friends
+  - event_id: paris-latin-lumiere-festival
+    email: penny.valdez@joinmovida.com
+    audience: friends
+  - event_id: paris-latin-lumiere-festival
+    email: ines.lopez@joinmovida.com
+    audience: public
+  - event_id: paris-latin-lumiere-festival
+    email: zara.benali@joinmovida.com
+    audience: friends
+  - event_id: paris-latin-lumiere-festival
+    email: mina.silva@joinmovida.com
+    audience: private
+  - event_id: paris-latin-lumiere-festival
+    email: rita.petrov@joinmovida.com
+    audience: public
+  - event_id: paris-latin-lumiere-festival
+    email: nina.khan@joinmovida.com
+    audience: private
+  - event_id: paris-latin-lumiere-festival
+    email: olivia.bennett@joinmovida.com
+    audience: private
+  - event_id: paris-latin-lumiere-festival
+    email: alex.navarro@joinmovida.com
+    audience: private
+  - event_id: paris-latin-lumiere-festival
+    email: victor.schmidt@joinmovida.com
+    audience: private
+  - event_id: paris-latin-lumiere-festival
+    email: bruno.santos@joinmovida.com
+    audience: public
+  - event_id: paris-latin-lumiere-festival
+    email: sofia.torres@joinmovida.com
+    audience: public
+  - event_id: paris-latin-lumiere-festival
+    email: noah.kim@joinmovida.com
+    audience: public

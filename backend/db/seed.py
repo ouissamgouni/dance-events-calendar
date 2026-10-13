@@ -1,3 +1,4 @@
+import copy
 import json
 import hashlib
 import logging
@@ -127,6 +128,69 @@ def scenario_file_with_default(scenario_dir: Path, filename: str) -> Path:
     return path
 
 
+SHARED_TAGS_FILENAME = "tags.yaml"
+TAG_OVERRIDES_FILENAME = "tags.override.yaml"
+
+
+def _load_yaml_dict(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    with open(path) as f:
+        return yaml.safe_load(f) or {}
+
+
+def _merge_tag_entry(target: dict, override: dict) -> None:
+    target.update({k: copy.deepcopy(v) for k, v in override.items() if k != "tags"})
+    tags = target.setdefault("tags", [])
+    for tag_override in override.get("tags") or []:
+        slug = tag_override.get("slug")
+        if tag_override.get("remove"):
+            tags[:] = [t for t in tags if t.get("slug") != slug]
+            continue
+        existing = next((t for t in tags if t.get("slug") == slug), None)
+        if existing is None:
+            tags.append(copy.deepcopy(tag_override))
+        else:
+            existing.update(copy.deepcopy(tag_override))
+
+
+def merge_tag_overrides(base: dict, overrides: dict) -> dict:
+    """Layer a tags.override.yaml document onto the shared taxonomy.
+
+    Groups match by slug, tags by slug within their group; given fields replace
+    base values, unknown slugs are appended, and ``remove: true`` drops the entry.
+    """
+    groups = copy.deepcopy(base.get("tag_groups") or [])
+    for group_override in overrides.get("tag_groups") or []:
+        slug = group_override.get("slug")
+        if group_override.get("remove"):
+            groups = [g for g in groups if g.get("slug") != slug]
+            continue
+        target = next((g for g in groups if g.get("slug") == slug), None)
+        if target is None:
+            target = {}
+            groups.append(target)
+        _merge_tag_entry(target, group_override)
+    return {**base, "tag_groups": groups}
+
+
+def load_scenario_tags(scenario_dir: Path) -> dict:
+    """Resolve a scenario's taxonomy.
+
+    A scenario ``tags.yaml`` fully replaces the shared ``scenarios/tags.yaml``;
+    otherwise the shared file is used, layered with the scenario's (or default's)
+    ``tags.override.yaml``.
+    """
+    own = scenario_dir / "tags.yaml"
+    if own.exists():
+        return _load_yaml_dict(own)
+    data = _load_yaml_dict(SCENARIOS_DIR / SHARED_TAGS_FILENAME)
+    overrides_path = scenario_file_with_default(scenario_dir, TAG_OVERRIDES_FILENAME)
+    if overrides_path.exists():
+        data = merge_tag_overrides(data, _load_yaml_dict(overrides_path))
+    return data
+
+
 class DatabaseSeeder:
     def __init__(self, session: Session):
         self.session = session
@@ -143,7 +207,9 @@ class DatabaseSeeder:
 
         uses_mock_calendar = get_calendar_service_type() == "mock"
 
-        self._seed_tags(scenario_file_with_default(scenario_dir, "tags.yaml"))
+        self._seed_tag_document(
+            load_scenario_tags(scenario_dir), f"{scenario_dir.name} taxonomy"
+        )
         self._ensure_system_tag_groups()
         self._seed_tag_synonyms_defaults()
         self._seed_calendars(scenario_dir / "calendars.yaml")
@@ -167,6 +233,7 @@ class DatabaseSeeder:
         self._seed_event_tags(scenario_dir / "db-events.yaml")
         self._seed_tag_suggestions(scenario_dir / "db-events.yaml")
         self._seed_event_series(scenario_dir / "db-events.yaml")
+        self._seed_event_series(scenario_dir / "db-event-series.yaml")
         self._seed_tracking(scenario_dir / "db-tracking.yaml")
         self._seed_users(scenario_file_with_default(scenario_dir, "mock-users.yaml"))
         # Suggestions need their submitter (users) and must exist before the
@@ -184,11 +251,13 @@ class DatabaseSeeder:
         self._seed_user_saved_events(scenario_dir / "db-saves.yaml")
         self._seed_event_schedules(scenario_dir / "db-schedules.yaml")
         self._seed_ratings(scenario_dir / "db-events.yaml")
+        self._seed_ratings(scenario_dir / "db-ratings.yaml")
         # Event message board: must come AFTER users + events (FKs on both).
         self._seed_event_messages(scenario_dir / "db-events.yaml")
         self._seed_event_messages(scenario_dir / "db-messages.yaml")
         # Suggested-event fan-out: must come AFTER follows + events.
         self._seed_suggested_notifications(scenario_dir / "db-events.yaml")
+        self._seed_suggested_notifications(scenario_dir / "db-emit-suggested.yaml")
         self._seed_promo_codes(scenario_dir / "db-promo-codes.yaml")
         self._seed_organizer_claims(scenario_dir / "db-organizer-claims.yaml")
         self._seed_event_revisions(scenario_dir / "db-revisions.yaml")
@@ -469,13 +538,13 @@ class DatabaseSeeder:
             logger.info("No tags.yaml found at %s", path)
             return
 
-        with open(path) as f:
-            data = yaml.safe_load(f) or {}
+        self._seed_tag_document(_load_yaml_dict(path), str(path))
 
+    def _seed_tag_document(self, data: dict, source: str):
         groups_data = data.get("tag_groups", [])
         if not isinstance(groups_data, list):
             logger.warning(
-                "Invalid tags.yaml format at %s: tag_groups must be a list", path
+                "Invalid tags.yaml format at %s: tag_groups must be a list", source
             )
             return
 
@@ -679,11 +748,11 @@ class DatabaseSeeder:
                         ),
                     ),
                     ("kizomba", dict(label="Kizomba", ordinal=2)),
-                    ("semba", dict(label="Semba", ordinal=3)),
-                    ("zouk", dict(label="Zouk", ordinal=4)),
+                    ("cha-cha", dict(label="Cha-Cha", ordinal=3)),
+                    ("son", dict(label="Son", ordinal=4)),
                     ("rueda", dict(label="Rueda", ordinal=5)),
-                    ("cha-cha", dict(label="Cha-Cha", ordinal=6)),
-                    ("son", dict(label="Son", ordinal=7)),
+                    ("semba", dict(label="Semba", ordinal=6)),
+                    ("zouk", dict(label="Zouk", ordinal=7)),
                 ],
             ),
         ]
@@ -2495,6 +2564,7 @@ class DatabaseSeeder:
                 category: accommodation   # question|accommodation|ride|tickets|meetup|lost_found|other
                 body: "Looking for a roommate for the weekend."
                 is_hidden: false          # optional (admin-hidden)
+                minutes_ago: 120          # optional, backdates created_at
               - reply_to: m1              # flat reply; inherits parent category
                 event_id: ev-upcoming
                 email: carol@example.com
@@ -2587,6 +2657,9 @@ class DatabaseSeeder:
                     )
                     category = "other"
 
+            created_at = datetime.now(timezone.utc) - timedelta(
+                minutes=int(entry.get("minutes_ago") or 0)
+            )
             msg = EventMessage(
                 event_id=event_id,
                 author_user_id=author_id,
@@ -2594,6 +2667,8 @@ class DatabaseSeeder:
                 category=category,
                 body=body,
                 is_hidden=bool(entry.get("is_hidden", False)),
+                created_at=created_at,
+                updated_at=created_at,
             )
             self.session.add(msg)
             self.session.flush()
@@ -2821,6 +2896,7 @@ class DatabaseSeeder:
           - is_anonymous: bool
           - admin_notes: str (optional)
           - scope: this_edition | past_edition (default this_edition)
+          - minutes_ago: int (optional, backdates created_at; default 0)
         Idempotent: skips if a row already exists for the same (event_id, user_id, scope).
         """
         if not path.exists():
@@ -2899,7 +2975,9 @@ class DatabaseSeeder:
             )
 
             status = entry.get("status") or "approved"
-            now = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc) - timedelta(
+                minutes=int(entry.get("minutes_ago") or 0)
+            )
             rating = EventRating(
                 id=uuid4(),
                 event_id=event_id,

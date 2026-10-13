@@ -35,7 +35,19 @@ logger = logging.getLogger(__name__)
 ROOT_DIR = Path(__file__).parents[2]
 DEFAULT_OUTPUT_DIR = ROOT_DIR / "scenarios" / "prod-showcase"
 DEFAULT_IMAGE_BASE_URL = "https://cdn.joinmovida.com"
-GENERATED_FILES = ("calendars.yaml", "tags.yaml", "db-events.yaml")
+# Event-document sections written to their own YAML files instead of db-events.yaml.
+SPLIT_SECTIONS = {
+    "event_series": "db-event-series.yaml",
+    "ratings": "db-ratings.yaml",
+    "emit_suggested": "db-emit-suggested.yaml",
+    "assets": "db-event-assets.yaml",
+}
+GENERATED_FILES = (
+    "calendars.yaml",
+    "tags.yaml",
+    "db-events.yaml",
+    *SPLIT_SECTIONS.values(),
+)
 SHOWCASE_CONFIG = "showcase.yaml"
 OVERLAY_FILES = (
     "overlay-events.yaml",
@@ -610,7 +622,12 @@ def write_snapshot(
         temp_dir = Path(temp_name)
         _write_yaml(temp_dir / "calendars.yaml", calendar_doc)
         _write_yaml(temp_dir / "tags.yaml", tag_doc)
-        _write_yaml(temp_dir / "db-events.yaml", event_doc)
+        for section, filename in SPLIT_SECTIONS.items():
+            _write_yaml(temp_dir / filename, {section: event_doc.get(section) or []})
+        events_only_doc = {
+            key: value for key, value in event_doc.items() if key not in SPLIT_SECTIONS
+        }
+        _write_yaml(temp_dir / "db-events.yaml", events_only_doc)
         digest = hashlib.sha256()
         for filename in GENERATED_FILES:
             digest.update((temp_dir / filename).read_bytes())

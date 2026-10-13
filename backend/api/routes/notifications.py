@@ -39,6 +39,7 @@ from backend.db.models import (
     UserEventAttendance,
 )
 from backend.services.user_avatars import resolve_user_avatar
+from backend.services.event_images import resolve_event_image
 from backend.services.event_visibility import (
     apply_event_visibility,
     event_is_user_facing,
@@ -50,6 +51,13 @@ from backend.services.notifications import (
 
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+
+
+def _event_thumb(event: Optional[CachedEvent]) -> Optional[str]:
+    if event is None:
+        return None
+    full, thumb = resolve_event_image(event)
+    return thumb or full
 
 
 VALID_KINDS = {
@@ -342,7 +350,7 @@ def _hydrate(
                         event_id=m.event_id,
                         title=me.title if me else None,
                         start=_as_utc(me.start if me else None),
-                        image_url=me.image_url if me else None,
+                        image_url=_event_thumb(me),
                     )
                 )
             labels = [
@@ -359,7 +367,7 @@ def _hydrate(
                 event_id=rep.event_id,
                 event_title=e.title if e else None,
                 event_start=_as_utc(e.start if e else None),
-                event_image_url=(e.image_url if e else None),
+                event_image_url=_event_thumb(e),
                 actor=preview[0],
                 actors=preview,
                 actor_count=len(g["actor_ids"]),

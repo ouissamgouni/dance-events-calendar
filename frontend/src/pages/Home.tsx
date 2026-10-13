@@ -245,7 +245,7 @@ function writeExplorerStateToSearchParams(
 
 export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerViewConfig }) {
     const { user, loading: authLoading } = useAuth();
-    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerViewControlLabelsEnabled, summaryTwoLineEnabled, promoCodesEnabled } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTrailCollapsedDefault, trendingTopN, trendingTopPercent, followingBadgeEnabled, explorerViewControlLabelsEnabled, summaryTwoLineEnabled, promoCodesEnabled } = useFeatureFlags();
     const mapFollowingBadgeOverlay = true;
     const mapTrendingOverlay = true;
     const location = useLocation();
@@ -1899,6 +1899,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
             hoveredEventId={railHoveredEventId}
             onEventHover={handleRailEventHover}
             followingBadgeEnabled={followingBadgeEnabled}
+            defaultCollapsed={trendingTrailCollapsedDefault}
         />
     ) : undefined;
 

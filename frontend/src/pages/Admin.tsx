@@ -286,6 +286,7 @@ export default function Admin() {
     const [unseenStateEnabled, setUnseenStateEnabled] = useState(false);
     const [trendingEnabled, setTrendingEnabled] = useState(false);
     const [trendingBannerEnabled, setTrendingBannerEnabled] = useState(false);
+    const [trendingTrailCollapsedDefault, setTrendingTrailCollapsedDefault] = useState(false);
     const [trendingWindowDays, setTrendingWindowDays] = useState(30);
     const [trendingFloorGoing, setTrendingFloorGoing] = useState(3);
     const [trendingTopN, setTrendingTopN] = useState(3);
@@ -488,6 +489,7 @@ export default function Admin() {
             setUnseenStateEnabled(s.unseen_state_enabled ?? false);
             setTrendingEnabled(s.trending_enabled ?? false);
             setTrendingBannerEnabled(s.trending_banner_enabled ?? false);
+            setTrendingTrailCollapsedDefault(s.trending_trail_collapsed_default ?? false);
             setTrendingWindowDays(s.trending_window_days ?? 30);
             setTrendingFloorGoing(s.trending_floor_going ?? 3);
             setTrendingTopN(s.trending_top_n ?? 3);
@@ -851,6 +853,18 @@ export default function Admin() {
         } catch {
             setTrendingBannerEnabled(!newVal);
             setMessage('Failed to update trending banner toggle.');
+        }
+    };
+
+    const handleToggleTrendingTrailCollapsedDefault = async () => {
+        const newVal = !trendingTrailCollapsedDefault;
+        setTrendingTrailCollapsedDefault(newVal);
+        try {
+            await updateSettings({ trending_trail_collapsed_default: newVal });
+            setMessage(`Trending trail collapsed by default ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setTrendingTrailCollapsedDefault(!newVal);
+            setMessage('Failed to update trending trail collapsed default.');
         }
     };
 
@@ -2459,6 +2473,18 @@ export default function Admin() {
                                                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingBannerEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                                 >
                                                     <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${trendingBannerEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1 pl-1">
+                                                <div>
+                                                    <span className="text-[11px] font-medium text-ink-soft">Trending trail collapsed by default</span>
+                                                    <p className="text-[10px] text-muted">Trending trail starts collapsed. Users can still expand it.</p>
+                                                </div>
+                                                <button
+                                                    onClick={handleToggleTrendingTrailCollapsedDefault}
+                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingTrailCollapsedDefault ? 'bg-success' : 'bg-gray-300'}`}
+                                                >
+                                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${trendingTrailCollapsedDefault ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                                 </button>
                                             </div>
                                             <div className="flex items-center justify-between mt-1 pl-1">

@@ -934,6 +934,27 @@ def test_list_includes_event_image_url(client, session):
     assert r.json()["items"][0]["event_image_url"] == "/cover.jpg"
 
 
+def test_list_event_image_prefers_managed_picture(client, session, monkeypatch):
+    monkeypatch.setenv("OBJECT_STORAGE_PUBLIC_BASE_URL", "https://cdn.test")
+    _make_calendar(session)
+    e = _make_event(session, "ev-1")
+    e.image_url = "/cover.jpg"
+    e.image_key = "events/ev-1/abc"
+    session.add(e)
+    session.commit()
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _seed_one_notif(session, bob, alice, kind="event_cancelled", event_id="ev-1")
+
+    _login(client, "bob@example.com")
+    r = client.get("/api/notifications")
+    assert r.status_code == 200
+    assert (
+        r.json()["items"][0]["event_image_url"]
+        == "https://cdn.test/events/ev-1/abc/thumb.webp"
+    )
+
+
 def test_mark_read_clears_aggregated_group(client, session):
     _make_calendar(session)
     _make_event(session, "ev-1")

@@ -66,16 +66,17 @@ tag_groups:
         hero_ordinal: 2
       - slug: kizomba
         label: Kizomba
+      - slug: cha-cha
+        label: Cha-Cha
+        synonyms: ["chacha", "chachacha", "cha cha cha", "cha-cha-cha"]
+      - slug: son
+        label: Son
+      - slug: rueda
+        label: Rueda
       - slug: semba
         label: Semba
       - slug: zouk
         label: Zouk
-      - slug: rueda
-        label: Rueda
-      - slug: cha-cha
-        label: Cha-Cha
-      - slug: son
-        label: Son
 
   - slug: level
     label: Level

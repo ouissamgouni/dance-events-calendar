@@ -120,19 +120,19 @@ export default function ReferralCard({ compact = false }: ReferralCardProps) {
                             value={data.url}
                             onFocus={(e) => e.currentTarget.select()}
                             aria-label="Referral URL"
-                            className="flex-1 border border-line bg-canvas px-2 py-1 text-xs text-ink"
+                            className="min-w-0 flex-1 border border-line bg-canvas px-2 py-1 text-xs text-ink"
                         />
                         <button
                             type="button"
                             onClick={() => void copy()}
-                            className="border border-line bg-surface px-3 py-1 text-xs font-medium text-ink hover:bg-canvas"
+                            className="shrink-0 border border-line bg-surface px-3 py-1 text-xs font-medium text-ink hover:bg-canvas"
                         >
                             {copied ? 'Copied!' : 'Copy'}
                         </button>
                         <button
                             type="button"
                             onClick={() => void share()}
-                            className="bg-action px-3 py-1 text-xs font-medium text-white hover:bg-action"
+                            className="shrink-0 bg-action px-3 py-1 text-xs font-medium text-white hover:bg-action"
                         >
                             Share
                         </button>

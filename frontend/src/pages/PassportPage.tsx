@@ -3,9 +3,9 @@
  * fetching + owner controls (share, milestone-ack toast) and renders the
  * shared read-only PassportView.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Image, Link2, Pencil, Share2, X } from 'lucide-react';
+import { Image, Link2, Maximize2, Pencil, Share2, X } from 'lucide-react';
 import {
     ackPassportMilestones,
     createPassportShare,
@@ -468,6 +468,69 @@ function SharePassportMenu({
 
 const CARD_PREVIEW_SCALE = 0.55;
 
+function fullscreenCardScale(): number {
+    const pad = 32;
+    return Math.min((window.innerWidth - pad) / CARD_WIDTH, (window.innerHeight - pad) / CARD_HEIGHT);
+}
+
+function FullscreenCardPreview({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+    useBackToClose(onClose);
+    const [scale, setScale] = useState(fullscreenCardScale);
+    useEffect(() => {
+        const onResize = () => setScale(fullscreenCardScale());
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('resize', onResize);
+        window.addEventListener('keydown', onKey);
+        return () => {
+            window.removeEventListener('resize', onResize);
+            window.removeEventListener('keydown', onKey);
+        };
+    }, [onClose]);
+
+    return (
+        <div
+            className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/90"
+            onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Card preview"
+        >
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                }}
+                aria-label="Exit full screen"
+                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+            >
+                <X className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <div
+                className="overflow-hidden"
+                style={{ width: CARD_WIDTH * scale, height: CARD_HEIGHT * scale }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div
+                    style={{
+                        width: CARD_WIDTH,
+                        height: CARD_HEIGHT,
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'top left',
+                    }}
+                >
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /**
  * Dedicated "Share as card" dialog: a live preview of the branded Story card
  * plus explicit Share (native sheet) and Download actions. Kept separate from
@@ -604,6 +667,21 @@ function SharePassportCardModal({
     }, [generate, filename, toast]);
 
     const ready = scoped != null && profileUrl != null;
+    const [fullscreen, setFullscreen] = useState(false);
+    const cardNode = ready ? (
+        <PassportShareCard
+            displayName={displayName}
+            handle={handle}
+            scoped={scoped}
+            memberSince={data.stats.member_since}
+            dancingSince={data.stats.dancing_since}
+            profileUrl={profileUrl}
+            showBadges={sections.badges}
+            showMap={sections.map}
+            showDancingSince={sections.dancingSince}
+            showActivity={sections.activity}
+        />
+    ) : null;
 
     return (
         <div
@@ -613,6 +691,9 @@ function SharePassportCardModal({
             aria-modal="true"
             aria-label="Share your Dance Passport as a card"
         >
+            {fullscreen && cardNode && (
+                <FullscreenCardPreview onClose={() => setFullscreen(false)}>{cardNode}</FullscreenCardPreview>
+            )}
             <div
                 className="max-h-[92dvh] w-full max-w-sm overflow-y-auto rounded-t-card bg-surface shadow-xl sm:rounded-card sm:border sm:border-line"
                 onClick={(e) => e.stopPropagation()}
@@ -686,7 +767,7 @@ function SharePassportCardModal({
 
                     {ready ? (
                         <div
-                            className="mx-auto overflow-hidden border border-line"
+                            className="relative mx-auto overflow-hidden border border-line"
                             style={{
                                 width: CARD_WIDTH * CARD_PREVIEW_SCALE,
                                 height: CARD_HEIGHT * CARD_PREVIEW_SCALE,
@@ -700,21 +781,16 @@ function SharePassportCardModal({
                                     transformOrigin: 'top left',
                                 }}
                             >
-                                <div ref={cardRef}>
-                                    <PassportShareCard
-                                        displayName={displayName}
-                                        handle={handle}
-                                        scoped={scoped}
-                                        memberSince={data.stats.member_since}
-                                        dancingSince={data.stats.dancing_since}
-                                        profileUrl={profileUrl}
-                                        showBadges={sections.badges}
-                                        showMap={sections.map}
-                                        showDancingSince={sections.dancingSince}
-                                        showActivity={sections.activity}
-                                    />
-                                </div>
+                                <div ref={cardRef}>{cardNode}</div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => setFullscreen(true)}
+                                aria-label="View card full screen"
+                                className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70"
+                            >
+                                <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                            </button>
                         </div>
                     ) : (
                         <div
@@ -1347,6 +1423,7 @@ export default function PassportPage() {
                             onNeedMapEvents={loadMapEvents}
                             onTimelineSearch={searchTimeline}
                             showTimelineMemories={eventMemoriesEnabled}
+                            stickyTabs
                         />
                     </>
                 )}

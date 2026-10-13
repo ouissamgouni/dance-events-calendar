@@ -1,7 +1,7 @@
 import type { CalendarEvent } from '../../types';
 import { useAttendanceSummary } from '../../context/AttendanceSummariesContext';
 import { useAttendingEvents } from '../../context/AttendingEventsContext';
-import AttendeeAvatarStack, { goingSentence } from '../AttendeeAvatarStack';
+import AttendeeAvatarStack from '../AttendeeAvatarStack';
 
 interface Props {
     event: CalendarEvent;
@@ -27,11 +27,13 @@ export default function PeopleProofRow({ event, postsCount, onOpenPeople, onOpen
 
     if (totalGoing === 0 && totalSaved === 0 && postsCount === 0) return null;
 
+    const others = viewerGoing ? Math.max(totalGoing - 1, 0) : 0;
+    // The "People going" heading already says "going", so the count line stays short.
     const goingText = friendsGoing > 0 && otherGoing > 0
-        ? `${friendsGoing} friend${friendsGoing === 1 ? '' : 's'} + ${otherGoing} more are going`
-        : totalGoing > 0
-            ? goingSentence(viewerGoing, totalGoing)
-            : '';
+        ? `${friendsGoing} friend${friendsGoing === 1 ? '' : 's'} + ${otherGoing} more`
+        : viewerGoing
+            ? (others > 0 ? `You + ${others} more` : 'You')
+            : `${totalGoing} ${totalGoing === 1 ? 'person' : 'people'}`;
 
     return (
         <div className="flex items-end gap-2">
@@ -42,17 +44,19 @@ export default function PeopleProofRow({ event, postsCount, onOpenPeople, onOpen
                     className="min-w-0 flex-1 space-y-2 text-left hover:text-action"
                 >
                     <span className="block text-sm font-semibold leading-5 text-ink">People going</span>
-                    <span className="flex items-center gap-2 text-xs text-ink-soft">
-                        <AttendeeAvatarStack
-                            eventId={event.event_id}
-                            max={3}
-                            goingFriendsPreview={event.friends_going_preview}
-                            size="lg"
-                            layout="faces"
-                        />
-                        <span className="min-w-0 truncate">
-                            {goingText}
-                            {totalSaved > 0 && ` · ${totalSaved} saved`}
+                    <span className="flex items-center gap-3 text-xs text-ink-soft">
+                        <span className="shrink-0">
+                            <AttendeeAvatarStack
+                                eventId={event.event_id}
+                                max={3}
+                                goingFriendsPreview={event.friends_going_preview}
+                                size="lg"
+                                layout="faces"
+                            />
+                        </span>
+                        <span className="flex min-w-0 flex-col">
+                            <span className="truncate">{goingText}</span>
+                            {totalSaved > 0 && <span className="truncate">{totalSaved} saved</span>}
                         </span>
                     </span>
                 </button>

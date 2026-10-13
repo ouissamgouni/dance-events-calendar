@@ -10,30 +10,39 @@ notifications:
   # Tier 1: plans changed
   - recipient: alex.navarro@joinmovida.com
     actor: operations@joinmovida.com
-    kind: event_cancelled
-    event_id: lisbon-rooftop-salsa-social
-    context: Lisbon Rooftop Salsa Social
-    description: "Cancelled: The rooftop venue closed for renovation. Ticket holders are refunded automatically."
-    minutes_ago: 5
-  - recipient: alex.navarro@joinmovida.com
-    actor: operations@joinmovida.com
-    kind: event_changed
-    event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
-    context: Lisboa Beach Bachata Social 2027
-    description: "Venue: Cascais, Lisbon Coast, Portugal → Praia de Carcavelos, Cascais, Portugal"
-    minutes_ago: 10
-  - recipient: alex.navarro@joinmovida.com
-    actor: operations@joinmovida.com
     kind: planned_session_changed
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    event_id: brussels-latin-weekender
     subject_key: "publication:2"
     group_key: 30000000-0000-4000-8000-000000001606
     context: Secrets to Social Dancing
     description: "Secrets to Social Dancing: has a new time."
-    minutes_ago: 15
+    minutes_ago: 10
   - recipient: alex.navarro@joinmovida.com
     kind: event_reminder
     event_id: alfama-thursday-salsa-next
+    minutes_ago: 15
+  # Tier 4: friends' activity
+  - recipient: alex.navarro@joinmovida.com
+    actor: sofia.torres@joinmovida.com
+    kind: subscription_going
+    event_id: budapest-salsa-weekender
+    minutes_ago: 17
+  - recipient: alex.navarro@joinmovida.com
+    actor: camille.laurent@joinmovida.com
+    kind: subscription_going
+    event_id: budapest-salsa-weekender
+    minutes_ago: 17
+  - recipient: alex.navarro@joinmovida.com
+    actor: penny.valdez@joinmovida.com
+    kind: subscription_going
+    event_id: budapest-salsa-weekender
+    minutes_ago: 17
+  - recipient: alex.navarro@joinmovida.com
+    actor: operations@joinmovida.com
+    kind: event_cancelled
+    event_id: lisbon-rooftop-salsa-social
+    context: Lisbon Rooftop Salsa Social
+    description: "Cancelled: The rooftop venue closed for renovation. Ticket holders are refunded automatically."
     minutes_ago: 20
   # Tier 2: needs action
   - recipient: alex.navarro@joinmovida.com
@@ -60,22 +69,6 @@ notifications:
     actor: samir.ivanov@joinmovida.com
     kind: new_follower
     minutes_ago: 90
-  # Tier 4: friends' activity
-  - recipient: alex.navarro@joinmovida.com
-    actor: sofia.torres@joinmovida.com
-    kind: subscription_going
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    minutes_ago: 100
-  - recipient: alex.navarro@joinmovida.com
-    actor: camille.laurent@joinmovida.com
-    kind: subscription_going
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    minutes_ago: 105
-  - recipient: alex.navarro@joinmovida.com
-    actor: penny.valdez@joinmovida.com
-    kind: subscription_going
-    event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
-    minutes_ago: 110
   - recipient: alex.navarro@joinmovida.com
     actor: sofia.torres@joinmovida.com
     kind: plan_session_added
@@ -84,6 +77,13 @@ notifications:
     context: Mambo Partnerwork Lab
     description: 3 sessions planned
     minutes_ago: 130
+  - recipient: alex.navarro@joinmovida.com
+    actor: operations@joinmovida.com
+    kind: event_changed
+    event_id: 6hpkbf4k69tnbcc2c0rl5c0l7ds4fcc17hk4hc0q7kn79p2q7mpk3dqj7t
+    context: Lisboa Beach Bachata Social 2027
+    description: "Venue: Cascais, Lisbon Coast, Portugal → Praia de Carcavelos, Cascais, Portugal"
+    minutes_ago: 135
   # Tier 5: after the event
   - recipient: alex.navarro@joinmovida.com
     kind: event_review_prompt

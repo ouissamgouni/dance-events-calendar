@@ -13,6 +13,8 @@ export interface FeatureFlags {
     unseenStateEnabled: boolean;
     trendingEnabled: boolean;
     trendingBannerEnabled: boolean;
+    /** When true, the Trending trail starts collapsed (users can still expand it). */
+    trendingTrailCollapsedDefault: boolean;
     trendingFloorGoing: number;
     /** Absolute upper bound on number of events that get a Trending
      * decoration in the visible list/map. */
@@ -107,6 +109,7 @@ const defaultFlags: FeatureFlags = {
     unseenStateEnabled: false,
     trendingEnabled: false,
     trendingBannerEnabled: false,
+    trendingTrailCollapsedDefault: false,
     trendingFloorGoing: 3,
     trendingTopN: 3,
     trendingTopPercent: 100,
@@ -182,6 +185,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     unseenStateEnabled: s.unseen_state_enabled ?? false,
                     trendingEnabled: s.trending_enabled ?? false,
                     trendingBannerEnabled: s.trending_banner_enabled ?? false,
+                    trendingTrailCollapsedDefault: s.trending_trail_collapsed_default ?? false,
                     trendingFloorGoing: s.trending_floor_going ?? 3,
                     trendingTopN: s.trending_top_n ?? 3,
                     trendingTopPercent: s.trending_top_percent ?? 100,

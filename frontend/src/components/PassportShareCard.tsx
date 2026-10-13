@@ -267,7 +267,7 @@ export default function PassportShareCard({
                                     <span className="shrink-0 text-lg leading-none">{b.icon}</span>
                                     <span className="min-w-0 flex-1 overflow-hidden">
                                         <span className="flex min-w-0 items-center gap-1 text-[11px] font-semibold leading-tight text-slate-100">
-                                            <span className="truncate">{b.label}</span>
+                                            <span className="line-clamp-2 min-w-0 break-words">{b.label}</span>
                                             {b.tag && (
                                                 <span className="shrink-0 text-[8px] font-medium uppercase tracking-wide text-ink-soft">
                                                     {b.tag}
@@ -275,7 +275,7 @@ export default function PassportShareCard({
                                             )}
                                         </span>
                                         {b.description && (
-                                            <span className="mt-0.5 block truncate text-[10px] leading-tight text-muted">
+                                            <span className="mt-0.5 line-clamp-2 break-words text-[10px] leading-tight text-muted">
                                                 {b.description}
                                             </span>
                                         )}

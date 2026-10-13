@@ -35,12 +35,20 @@ tag_groups:
             "rueda de casino",
             "timba",
           ]
-      - slug: son
-        label: Son
-        synonyms: ["son cubano"]
-      - slug: rueda
-        label: Rueda
-        synonyms: ["rueda de casino"]
+      - slug: bachata
+        label: Bachata
+        is_hero_filter: true
+        hero_ordinal: 2
+        synonyms:
+          [
+            "bachata sensual",
+            "bachata moderna",
+            "bachata dominicana",
+            "dominicana",
+          ]
+      - slug: kizomba
+        label: Kizomba
+        synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
       - slug: afro-cuban
         label: Afro-Cuban
         synonyms:
@@ -56,21 +64,13 @@ tag_groups:
           ]
       - slug: cha-cha
         label: Cha-Cha
-        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
-      - slug: bachata
-        label: Bachata
-        is_hero_filter: true
-        hero_ordinal: 2
-        synonyms:
-          [
-            "bachata sensual",
-            "bachata moderna",
-            "bachata dominicana",
-            "dominicana",
-          ]
-      - slug: kizomba
-        label: Kizomba
-        synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
+        synonyms: ["chacha", "chachacha", "cha cha cha", "cha-cha-cha"]
+      - slug: son
+        label: Son
+        synonyms: ["son cubano"]
+      - slug: rueda
+        label: Rueda
+        synonyms: ["rueda de casino"]
       - slug: semba
         label: Semba
       - slug: konpa
