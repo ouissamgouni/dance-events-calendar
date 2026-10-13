@@ -175,7 +175,13 @@ events:
     longitude: -5.8115
     start: w4 Fri 20:00
     end: w4 Fri 23:59
-    tags: ["dance-style:salsa", "dance-style:bachata", "format:social", "reach:regional"]
+    tags:
+      [
+        "dance-style:salsa",
+        "dance-style:bachata",
+        "format:social",
+        "reach:regional",
+      ]
   - id: ev-tng-12
     calendar_id: morocco-socials
     title: Son Cubano Evening

@@ -1113,9 +1113,7 @@ class TestEventsEndpoint:
             )
 
         with Session(engine) as session:
-            session.add(
-                CalendarSetting(calendar_id="cal-1", name="Cal", enabled=True)
-            )
+            session.add(CalendarSetting(calendar_id="cal-1", name="Cal", enabled=True))
             session.add_all(
                 [
                     event("sub-a", 1, suggestion_id=suggestion_id),
