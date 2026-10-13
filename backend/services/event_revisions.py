@@ -78,6 +78,17 @@ REVISABLE_FIELDS = (
 # An admin picking a venue also picks its coordinates; source syncs never
 # change coordinates of an existing row, so only drafts carry them.
 DRAFT_FIELDS = REVISABLE_FIELDS + ("latitude", "longitude", "timezone")
+# The structured place an autocomplete pick brings along with ``location``.
+PICKED_PLACE_FIELDS = (
+    "venue_name",
+    "street_address",
+    "city",
+    "country",
+    "country_code",
+    "place_id",
+    "place_provider",
+)
+DRAFT_FIELDS += PICKED_PLACE_FIELDS
 # Only an event's organizer proposes these; kept out of REVISABLE_FIELDS so
 # source syncs never stage them.
 CANCEL_FIELDS = ("is_cancelled", "cancellation_note")
@@ -516,6 +527,7 @@ _REVERT_WITH = {
     STATUS_REASON_FIELD: STATUS_FIELD,
     "latitude": "location",
     "longitude": "location",
+    **{field: "location" for field in PICKED_PLACE_FIELDS},
 }
 
 

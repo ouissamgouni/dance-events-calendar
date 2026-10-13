@@ -433,6 +433,11 @@ class CachedEvent(SQLModel, table=True):
     city: Optional[str] = Field(default=None)
     country: Optional[str] = Field(default=None)
     country_code: Optional[str] = Field(default=None, max_length=2)
+    # Place picked from location autocomplete (backend/services/places.py).
+    venue_name: Optional[str] = Field(default=None)
+    street_address: Optional[str] = Field(default=None)
+    place_id: Optional[str] = Field(default=None, max_length=255)
+    place_provider: Optional[str] = Field(default=None, max_length=32)
     price_min: Optional[float] = Field(default=None)
     price_max: Optional[float] = Field(default=None)
     price_currency: Optional[str] = Field(default=None)
@@ -1080,6 +1085,13 @@ class EventSuggestion(SQLModel, table=True):
     links: Optional[list] = Field(default=None, sa_column=Column(JSON))
     latitude: Optional[float] = Field(default=None)
     longitude: Optional[float] = Field(default=None)
+    venue_name: Optional[str] = Field(default=None)
+    street_address: Optional[str] = Field(default=None)
+    city: Optional[str] = Field(default=None)
+    country: Optional[str] = Field(default=None)
+    country_code: Optional[str] = Field(default=None, max_length=2)
+    place_id: Optional[str] = Field(default=None, max_length=255)
+    place_provider: Optional[str] = Field(default=None, max_length=32)
     start: datetime
     end: datetime
     all_day: bool = Field(default=False)

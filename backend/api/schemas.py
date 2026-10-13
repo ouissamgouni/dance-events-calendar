@@ -1543,6 +1543,8 @@ class SiteSettingsResponse(BaseModel):
     event_review_size_step_enabled: bool = True
     # Show the 'remember my choice' checkbox in RSVP/save visibility sheets.
     rsvp_remember_visibility_enabled: bool = True
+    # Place autocomplete via Geoapify (off: Photon).
+    geoapify_enabled: bool = False
     # Hours after an event's end before the review prompt fires.
     review_prompt_delay_hours: int = 3
     # How far past the delay window review_prompt_service scans for newly
@@ -1918,6 +1920,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     review_prompt_enabled: Optional[bool] = None
     event_review_size_step_enabled: Optional[bool] = None
     rsvp_remember_visibility_enabled: Optional[bool] = None
+    geoapify_enabled: Optional[bool] = None
     review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
     review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
     for_you_review_window_days: Optional[int] = Field(default=None, ge=1, le=3650)
@@ -1967,7 +1970,19 @@ class SuggestionImageResponse(BaseModel):
     image_thumb_url: str
 
 
-class EventUpdateRequest(BaseModel):
+class PlaceFields(BaseModel):
+    """Structured place picked from location autocomplete."""
+
+    venue_name: Optional[str] = Field(default=None, max_length=300)
+    street_address: Optional[str] = Field(default=None, max_length=300)
+    city: Optional[str] = Field(default=None, max_length=200)
+    country: Optional[str] = Field(default=None, max_length=200)
+    country_code: Optional[str] = Field(default=None, max_length=2)
+    place_id: Optional[str] = Field(default=None, max_length=255)
+    place_provider: Optional[str] = Field(default=None, max_length=32)
+
+
+class EventUpdateRequest(PlaceFields):
     title: Optional[str] = None
     description: Optional[str] = None
     location: Optional[str] = None
@@ -2023,6 +2038,13 @@ class GeocodeSuggestion(BaseModel):
     type_label: str = "Place"
     bounding_box: Optional[GeocodeBoundingBox] = None
     timezone: Optional[str] = None
+    place_id: Optional[str] = None
+    # Where the suggestion came from: "geoapify" / "photon" (attribution).
+    provider: Optional[str] = None
+    source: Literal["known", "provider"] = "provider"
+    street_address: Optional[str] = None
+    city: Optional[str] = None
+    country_code: Optional[str] = None
 
     @model_validator(mode="after")
     def _resolve_timezone(self) -> "GeocodeSuggestion":
@@ -2056,7 +2078,7 @@ class RecurrenceDateItem(BaseModel):
     end: datetime
 
 
-class EventSuggestionCreate(BaseModel):
+class EventSuggestionCreate(PlaceFields):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     location: Optional[str] = None
@@ -2226,7 +2248,7 @@ class SuggestionUpdateRequest(BaseModel):
     edit_locked: Optional[bool] = None
 
 
-class OwnSuggestionUpdate(BaseModel):
+class OwnSuggestionUpdate(PlaceFields):
     """Submitter edit of their own suggestion; only sent fields change."""
 
     title: Optional[str] = Field(default=None, min_length=1, max_length=200)
@@ -2273,7 +2295,7 @@ class OwnSuggestionUpdate(BaseModel):
         return self
 
 
-class OwnSuggestionResponse(BaseModel):
+class OwnSuggestionResponse(PlaceFields):
     id: UUID
     status: str
     edit_locked: bool = False
@@ -2327,7 +2349,7 @@ class SuggestionAuditEntry(BaseModel):
     created_at: datetime
 
 
-class EventChangeCreate(BaseModel):
+class EventChangeCreate(PlaceFields):
     """A change to a public event; only sent fields are compared."""
 
     title: Optional[str] = Field(default=None, min_length=1, max_length=200)

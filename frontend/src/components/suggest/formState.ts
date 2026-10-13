@@ -1,7 +1,8 @@
 import type { SuggestionImage } from '../../api';
-import type { CalendarEvent, OwnSuggestion } from '../../types';
+import type { CalendarEvent, OwnSuggestion, PlaceFields } from '../../types';
 import type { TagsPickerValue } from '../TagsPicker';
 import { browserTimeZone, toEditFields } from '../../utils/eventDates';
+import { NO_PLACE, pickPlace, type Place } from '../../utils/placeFields';
 import { toZonedInput } from '../../utils/schedule';
 import { parseLocal } from './datetime';
 import { fromRRule, NO_RECURRENCE, type RecurrenceState } from './recurrence';
@@ -27,6 +28,8 @@ export interface SuggestFormState {
     location: string;
     latitude: number | null;
     longitude: number | null;
+    /** Structured place behind `location`; all null when typed by hand. */
+    place: Place;
     links: LinkRow[];
     start: string;
     end: string;
@@ -73,6 +76,7 @@ export function initialFormState(
         location: '',
         latitude: null,
         longitude: null,
+        place: NO_PLACE,
         links: [],
         start: '',
         end: '',
@@ -105,7 +109,7 @@ type PrefillSource = Pick<
     | 'title' | 'description' | 'location' | 'latitude' | 'longitude' | 'links' | 'start' | 'end' | 'all_day'
     | 'timezone' | 'recurrence_rule' | 'recurrence_dates' | 'suggested_tag_ids' | 'price_min' | 'price_max'
     | 'price_currency' | 'price_is_free' | 'image_key' | 'image_thumb_url'
->;
+> & PlaceFields;
 
 /** Prefill the wizard from a saved suggestion so its owner can edit it. */
 export function formStateFromSuggestion(s: PrefillSource): SuggestFormState {
@@ -130,6 +134,7 @@ export function formStateFromSuggestion(s: PrefillSource): SuggestFormState {
         location: s.location ?? '',
         latitude: s.latitude,
         longitude: s.longitude,
+        place: pickPlace(s),
         links: (s.links ?? []).map((l) => ({ url: l.url, label: l.label ?? '' })),
         start: toInput(s.start, 'start'),
         end: toInput(s.end, 'end'),

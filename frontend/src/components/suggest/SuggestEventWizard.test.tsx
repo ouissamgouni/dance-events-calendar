@@ -478,6 +478,67 @@ describe('SuggestEventWizard', () => {
         })
     })
 
+    it('lists known venues first and sends the picked place', async () => {
+        setupTagGroups()
+        let payload: Record<string, unknown> | null = null
+        let searchedKind: string | null = null
+        server.use(
+            http.get('*/api/suggestions/geocode', ({ request }) => {
+                searchedKind = new URL(request.url).searchParams.get('kind')
+                return HttpResponse.json([
+                    { display_name: 'Havana Club, Berlin', name: 'Havana Club', latitude: 52.52, longitude: 13.4, source: 'known', place_kind: 'poi' },
+                    {
+                        display_name: 'Havana Bar, Main St 1, Hamburg',
+                        name: 'Havana Bar',
+                        context: 'Main St 1, Hamburg',
+                        latitude: 53.55,
+                        longitude: 9.99,
+                        source: 'provider',
+                        provider: 'geoapify',
+                        place_kind: 'poi',
+                        place_id: 'geo-1',
+                        street_address: 'Main St 1',
+                        city: 'Hamburg',
+                        country: 'Germany',
+                        country_code: 'DE',
+                    },
+                ])
+            }),
+            http.post('*/api/suggestions', async ({ request }) => {
+                payload = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json({ message: 'under review' }, { status: 201 })
+            }),
+        )
+
+        const { user } = renderWithProviders(<SuggestEventWizard onClose={() => { }} />)
+        await user.type(screen.getByLabelText('Event name'), 'Salsa Social')
+        await user.click(screen.getByRole('button', { name: /^Location/ }))
+        await user.type(screen.getByLabelText('Search for a place or address'), 'Havana')
+        const options = await screen.findAllByRole('option')
+        expect(options.map((o) => o.textContent)).toEqual(['Havana Club', 'Havana BarMain St 1, Hamburg'])
+        expect(screen.getByText('Known venues')).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Geoapify' })).toBeInTheDocument()
+        await user.keyboard('{ArrowDown}{ArrowDown}{Enter}')
+
+        fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2026-07-01T20:00' } })
+        fireEvent.change(screen.getByLabelText('End'), { target: { value: '2026-07-01T23:00' } })
+        await user.click(screen.getByRole('button', { name: 'Next' }))
+        await completeStep2(user)
+        await user.click(screen.getByRole('button', { name: 'Submit Event' }))
+
+        await screen.findByText(/Only you can see it/)
+        expect(searchedKind).toBe('venue')
+        expect(payload).toMatchObject({
+            location: 'Havana Bar, Main St 1, Hamburg',
+            venue_name: 'Havana Bar',
+            street_address: 'Main St 1',
+            city: 'Hamburg',
+            country_code: 'DE',
+            place_id: 'geo-1',
+            place_provider: 'geoapify',
+        })
+    })
+
     it('defaults Going on for signed-in users', async () => {
         setupSignedInUser()
         setupTagGroups()

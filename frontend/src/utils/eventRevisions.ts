@@ -28,6 +28,13 @@ export const DRAFT_FIELDS = [
     'latitude',
     'longitude',
     'timezone',
+    'venue_name',
+    'street_address',
+    'city',
+    'country',
+    'country_code',
+    'place_id',
+    'place_provider',
 ] as const;
 
 const FIELD_LABELS: Record<string, string> = {
@@ -45,6 +52,13 @@ const FIELD_LABELS: Record<string, string> = {
     latitude: 'Latitude',
     longitude: 'Longitude',
     timezone: 'Time zone',
+    venue_name: 'Venue name',
+    street_address: 'Street address',
+    city: 'City',
+    country: 'Country',
+    country_code: 'Country code',
+    place_id: 'Place ID',
+    place_provider: 'Place source',
     recurrence_rule: 'Repeats',
     recurrence_dates: 'Dates',
     suggested_tag_ids: 'Tags',

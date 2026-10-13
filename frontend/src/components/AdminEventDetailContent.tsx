@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CalendarEvent, CalendarSetting } from '../types';
+import type { CalendarEvent, CalendarSetting, PlaceFields } from '../types';
 import type { GeocodeSuggestion } from '../api';
 import { fetchAdminCalendars, retryGeocodingSingle } from '../api';
+import { placeFromSuggestion, type Place } from '../utils/placeFields';
 import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import { formatEventPrice } from '../utils/eventPrice';
@@ -27,7 +28,7 @@ import ExpandableDescription from './ExpandableDescription';
 
 interface Props {
     event: CalendarEvent;
-    onFieldSave: (changes: Partial<CalendarEvent> & { calendar_id?: string }) => Promise<void>;
+    onFieldSave: (changes: Partial<CalendarEvent> & PlaceFields & { calendar_id?: string }) => Promise<void>;
     onTagsUpdated?: () => void;
     compact?: boolean;
 }
@@ -178,6 +179,7 @@ export default function AdminEventDetailContent({
     const [editLocationLat, setEditLocationLat] = useState<number | null>(null);
     const [editLocationLng, setEditLocationLng] = useState<number | null>(null);
     const [editLocationDirty, setEditLocationDirty] = useState(false);
+    const [editPlace, setEditPlace] = useState<Place | null>(null);
 
     const [retryingGeo, setRetryingGeo] = useState(false);
     const [retryGeoMsg, setRetryGeoMsg] = useState<string | null>(null);
@@ -221,6 +223,7 @@ export default function AdminEventDetailContent({
         setEditLocationLat(event.latitude);
         setEditLocationLng(event.longitude);
         setEditLocationDirty(false);
+        setEditPlace(null);
         setEditingField('location');
     };
 
@@ -230,7 +233,7 @@ export default function AdminEventDetailContent({
         setSaveError(null);
     };
 
-    const saveField = async (changes: Partial<CalendarEvent> & { calendar_id?: string }) => {
+    const saveField = async (changes: Partial<CalendarEvent> & PlaceFields & { calendar_id?: string }) => {
         setSaving(true);
         setSaveError(null);
         try {
@@ -397,11 +400,12 @@ export default function AdminEventDetailContent({
                 <div className="space-y-1.5">
                     <AddressAutocomplete
                         value={editValue}
-                        onChange={(v) => { setEditValue(v); setEditLocationDirty(true); }}
+                        onChange={(v) => { setEditValue(v); setEditLocationDirty(true); setEditPlace(null); }}
                         onSelect={(s: GeocodeSuggestion) => {
                             setEditValue(s.display_name);
                             setEditLocationLat(s.latitude);
                             setEditLocationLng(s.longitude);
+                            setEditPlace(placeFromSuggestion(s));
                             setEditLocationDirty(false);
                         }}
                     />
@@ -410,14 +414,15 @@ export default function AdminEventDetailContent({
                         <button
                             disabled={saving}
                             onClick={() => {
-                                const changes: Partial<CalendarEvent> = { location: editValue || null };
+                                const changes: Partial<CalendarEvent> & PlaceFields = { location: editValue || null };
                                 if (!editLocationDirty) {
                                     changes.latitude = editLocationLat ?? undefined;
                                     changes.longitude = editLocationLng ?? undefined;
+                                    if (editPlace) Object.assign(changes, editPlace);
                                 }
                                 saveField(changes);
                             }}
-                            className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
+                            className="text-[11px] font-medium px-2.5 py-1 bg-action text-white rounded hover:opacity-90 disabled:opacity-50 transition"
                         >{saving ? 'Saving…' : 'Save'}</button>
                         <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">Cancel</button>
                     </div>

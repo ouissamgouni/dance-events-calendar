@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { GeocodeSuggestion, InterestProfile, PreferredAreaPayload } from '../api';
 import { searchSuggestionAddress } from '../api';
+import PlaceAttribution from './PlaceAttribution';
 import { AREA_PRESETS } from '../constants/area';
 import {
     bboxSearchArea,
@@ -190,6 +191,7 @@ export default function AreaEditor({
                                 </li>
                             );
                         })}
+                        <li className="px-3"><PlaceAttribution results={suggestions} /></li>
                     </ul>
                 )}
             </div>

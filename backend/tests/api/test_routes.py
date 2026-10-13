@@ -423,6 +423,7 @@ class TestSettingsEndpoint:
         assert body["review_prompt_enabled"] is True
         assert body["event_review_size_step_enabled"] is True
         assert body["rsvp_remember_visibility_enabled"] is True
+        assert body["geoapify_enabled"] is False
         assert body["review_prompt_delay_hours"] == 3
         assert body["review_prompt_lookback_hours"] == 24
         assert body["for_you_review_window_days"] == 180
@@ -448,6 +449,7 @@ class TestSettingsEndpoint:
                 "review_prompt_enabled": False,
                 "event_review_size_step_enabled": False,
                 "rsvp_remember_visibility_enabled": False,
+                "geoapify_enabled": True,
                 "review_prompt_delay_hours": 5,
                 "review_prompt_lookback_hours": 48,
                 "for_you_review_window_days": 365,
@@ -471,6 +473,7 @@ class TestSettingsEndpoint:
         assert body["review_prompt_enabled"] is False
         assert body["event_review_size_step_enabled"] is False
         assert body["rsvp_remember_visibility_enabled"] is False
+        assert body["geoapify_enabled"] is True
         assert body["review_prompt_delay_hours"] == 5
         assert body["review_prompt_lookback_hours"] == 48
         assert body["for_you_review_window_days"] == 365
@@ -1543,7 +1546,7 @@ class TestGeocodeEndpoint:
         app.dependency_overrides[require_admin] = _fake_admin
         try:
             with patch(
-                "backend.api.routes.admin.search_locations",
+                "backend.api.routes.admin.places.autocomplete",
                 return_value=[
                     {
                         "display_name": "Paris, France",
@@ -1581,32 +1584,20 @@ class TestGeocodeEndpoint:
             app.dependency_overrides.clear()
 
     def test_geocode_search_forwards_language_preference(self):
-        """Admin geocode endpoint should forward Accept-Language to search_locations."""
+        """Admin geocode endpoint should forward the primary Accept-Language."""
         app.dependency_overrides[require_admin] = _fake_admin
         try:
-            with patch("backend.api.routes.admin.search_locations") as mock_search:
-                mock_search.return_value = [
-                    {
-                        "display_name": "Athina, Ellada",
-                        "latitude": 37.9838,
-                        "longitude": 23.7275,
-                    }
-                ]
+            with patch("backend.api.routes.admin.places.autocomplete") as mock_search:
+                mock_search.return_value = []
                 client = TestClient(app)
                 resp = client.get(
                     "/api/admin/geocode?q=athens",
                     headers={"Accept-Language": "el-GR,el;q=0.9"},
                 )
                 assert resp.status_code == 200
-                # Verify that search_locations was called with the constructed language preference
                 mock_search.assert_called_once()
-                call_args = mock_search.call_args
-                # Should be called with q, limit, and language parameters
-                assert call_args[0][0] == "athens"  # positional q
-                assert call_args[1]["limit"] == 5  # keyword limit
-                # language should be Greek-first with English fallback
-                assert "el-GR" in call_args[1]["language"]
-                assert "en" in call_args[1]["language"]
+                assert mock_search.call_args.args[1] == "athens"
+                assert mock_search.call_args.kwargs["lang"] == "el"
         finally:
             app.dependency_overrides.clear()
 

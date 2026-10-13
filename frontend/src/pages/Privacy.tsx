@@ -71,7 +71,8 @@ function versions(manageCookies: ReactNode): { en: LegalVersion; fr: LegalVersio
                             'Neon (database)',
                             'Brevo (sending emails)',
                             'Google (Sign in with Google; geocoding of event addresses)',
-                            'OpenStreetMap / CARTO (map tiles — your browser loads them directly, so they see your IP address) and Nominatim (address search text sent from our servers)',
+                            'OpenStreetMap / CARTO (map tiles — your browser loads them directly, so they see your IP address) and Nominatim (geocoding of event addresses from our servers)',
+                            'Geoapify and Photon by komoot (place search text sent from our servers while you type a location)',
                             'Umami Cloud (analytics, only with consent)',
                             'Your browser’s push service (Apple, Google or Mozilla) if you enable push notifications',
                         ]} />
@@ -195,7 +196,8 @@ function versions(manageCookies: ReactNode): { en: LegalVersion; fr: LegalVersio
                             'Neon (base de données)',
                             'Brevo (envoi des e-mails)',
                             'Google (connexion avec Google ; géocodage des adresses d’événements)',
-                            'OpenStreetMap / CARTO (fonds de carte — votre navigateur les charge directement et ils voient votre adresse IP) et Nominatim (texte de recherche d’adresse envoyé depuis nos serveurs)',
+                            'OpenStreetMap / CARTO (fonds de carte — votre navigateur les charge directement et ils voient votre adresse IP) et Nominatim (géocodage des adresses d’événements depuis nos serveurs)',
+                            'Geoapify et Photon de komoot (texte de recherche de lieu envoyé depuis nos serveurs pendant la saisie d’un lieu)',
                             'Umami Cloud (mesure d’audience, uniquement avec consentement)',
                             'Le service push de votre navigateur (Apple, Google ou Mozilla) si vous activez les notifications',
                         ]} />

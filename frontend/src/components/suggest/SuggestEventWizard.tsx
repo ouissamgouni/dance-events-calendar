@@ -85,6 +85,7 @@ function changedFields(
         body.location = state.location.trim() || null;
         body.latitude = state.latitude;
         body.longitude = state.longitude;
+        Object.assign(body, state.place);
     }
     if (state.start !== base.start || state.end !== base.end || state.allDay !== base.allDay || state.timezone !== base.timezone) {
         body.start = bounds.start;
@@ -399,6 +400,7 @@ export default function SuggestEventWizard({ onClose, suggestionId, changeEventI
                         .map((l) => ({ url: l.url.trim(), label: l.label.trim() || null })),
                     latitude: state.latitude,
                     longitude: state.longitude,
+                    ...state.place,
                     start: bounds.start,
                     end: bounds.end,
                     all_day: state.allDay,
@@ -431,6 +433,7 @@ export default function SuggestEventWizard({ onClose, suggestionId, changeEventI
                     .map((l) => ({ url: l.url.trim(), label: l.label.trim() || null })),
                 latitude: state.latitude ?? undefined,
                 longitude: state.longitude ?? undefined,
+                ...state.place,
                 start: bounds.start,
                 end: bounds.end,
                 all_day: state.allDay,

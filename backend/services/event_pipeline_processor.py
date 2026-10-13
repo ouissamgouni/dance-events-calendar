@@ -32,6 +32,7 @@ from backend.services.event_extractor import (
     apply_extractor_image,
 )
 from backend.services.series_detection import maybe_detect_series_for_event
+from backend.services.places import PLACE_FIELDS
 from backend.services.reach import assign_event_tag, sync_event_reach
 from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.sync_service import compute_content_hash
@@ -861,6 +862,9 @@ class EventPipelineProcessor:
             # Published: keep what attendees see until an admin applies the
             # source's edit.
             event_revisions.stage_source_changes(session, existing, live_before)
+            if existing.location != live_before.get("location"):
+                for field in PLACE_FIELDS:
+                    setattr(existing, field, None)
             if not was_reviewed and fields_changed:
                 existing.review_status = "pending"
             session.add(existing)

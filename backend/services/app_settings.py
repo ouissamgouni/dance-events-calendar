@@ -171,6 +171,18 @@ def get_rsvp_remember_visibility_enabled(session: Optional[Session] = None) -> b
     return loader.get_rsvp_remember_visibility_enabled()
 
 
+def get_geoapify_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "geoapify_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return loader.get_geoapify_enabled()
+
+
 def get_review_prompt_delay_hours(session: Optional[Session] = None) -> int:
     s, opened = _open_session(session)
     try:
