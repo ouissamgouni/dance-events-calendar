@@ -21,6 +21,7 @@ import HeaderUserMenu from './components/HeaderUserMenu';
 import DesktopNav from './components/DesktopNav';
 import BottomNav from './components/BottomNav';
 import ProtectedRoute from './components/ProtectedRoute';
+import { SignInSheetProvider } from './context/SignInSheetContext';
 import AppAccessGate from './components/AppAccessGate';
 import SignUpBanner from './components/SignUpBanner';
 import ShareReferralBanner from './components/ShareReferralBanner';
@@ -135,7 +136,9 @@ export default function App() {
                             <EventAssetSummaryProvider>
                               <PwaInstallProvider>
                                 <QaTestPlanProvider>
-                                  <AppShell />
+                                  <SignInSheetProvider>
+                                    <AppShell />
+                                  </SignInSheetProvider>
                                 </QaTestPlanProvider>
                               </PwaInstallProvider>
                             </EventAssetSummaryProvider>

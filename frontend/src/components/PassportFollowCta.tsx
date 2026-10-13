@@ -84,7 +84,7 @@ export default function PassportFollowCta({
         const nextPath = `${window.location.pathname}${window.location.search}`;
         return (
             <Link
-                to={`/login?next=${encodeURIComponent(nextPath)}`}
+                to={`/login?next=${encodeURIComponent(nextPath)}&intent=follow`}
                 onClick={() => {
                     try {
                         localStorage.setItem(FOLLOW_INTENT_KEY, handle);

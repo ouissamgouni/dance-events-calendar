@@ -1,8 +1,9 @@
 import { type RefObject } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { SquareArrowOutUpRight } from 'lucide-react';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
 import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import type { ShareAudience } from '../api';
 
 export type PostRsvpVariant = 'anon' | 'signed-in-default-share' | 'signed-in';
@@ -42,10 +43,9 @@ export default function PostRsvpPopover({
     eventId,
     ticketLikely = false,
 }: Props) {
-    const location = useLocation();
+    const openSignIn = useSignIn();
     const { eventTicketsEnabled, eventMemoriesEnabled } = useOptionalFeatureFlags();
 
-    const next = encodeURIComponent(location.pathname + location.search);
     const isAnon = variant === 'anon';
     const showPicker = !!audience && !!onAudienceChange && !isAnon;
     const assetHref = (hash: string) => `/event/${encodeURIComponent(eventId ?? '')}#${hash}`;
@@ -70,12 +70,12 @@ export default function PostRsvpPopover({
                 onClick: onShare,
                 icon: <SquareArrowOutUpRight aria-hidden className="h-4 w-4" strokeWidth={1.8} />,
             }}
-            primaryAction={isAnon ? { label: 'Sign in', to: `/login?next=${next}` } : undefined}
+            primaryAction={isAnon ? { label: 'Sign in', onClick: () => { onClose(); openSignIn('going'); } } : undefined}
             onClose={onClose}
         >
             {isAnon && (
                 <p className="text-sm leading-5 text-ink-soft">
-                    Sign in to keep this across devices.
+                    Saved on this device only. Sign in to let friends see you’re going and keep your plans on every device.
                 </p>
             )}
             {assetLink && (
