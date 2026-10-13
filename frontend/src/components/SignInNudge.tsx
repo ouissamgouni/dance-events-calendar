@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import useBackToClose from '../hooks/useBackToClose';
 import { createPortal } from 'react-dom';
-import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 
 type Trigger = 'going' | 'save';
 
@@ -115,8 +115,8 @@ interface Props {
 }
 
 const HEADLINE: Record<Trigger, string> = {
-    going: 'Sign in to get more from this',
-    save: 'Sign in to keep this saved',
+    going: 'Tell your friends you’re going',
+    save: 'Keep this event saved',
 };
 
 /**
@@ -124,7 +124,7 @@ const HEADLINE: Record<Trigger, string> = {
  * outside click or Escape.
  */
 export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
-    const location = useLocation();
+    const openSignIn = useSignIn();
     const popoverRef = useRef<HTMLDivElement | null>(null);
     const [pos, setPos] = useState<PopoverPos | null>(null);
     useBackToClose(onClose);
@@ -165,8 +165,6 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
 
     if (!pos) return null;
 
-    const next = encodeURIComponent(location.pathname + location.search);
-
     return createPortal(
         <div
             ref={popoverRef}
@@ -177,11 +175,12 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
             className="z-[12000] border border-line bg-surface p-3 shadow-xl text-left"
         >
             <p className="text-xs font-semibold text-ink">{HEADLINE[trigger]}</p>
+            <p className="mt-0.5 text-xs text-ink-soft">It’s only on this device for now. With a free account you can:</p>
             <ul className="mt-1.5 space-y-0.5 text-xs text-ink-soft list-disc pl-4">
-                <li>See who else is going</li>
-                <li>Save events to your calendar and share it with others</li>
-                <li>Rate events and read reviews</li>
-                <li>Get notifications for upcoming events</li>
+                <li>Keep saves and plans on every device</li>
+                <li>See which friends are going</li>
+                <li>Get reminders before events</li>
+                <li>Rate events and join discussions</li>
             </ul>
             <div className="mt-3 flex justify-end gap-2">
                 <button
@@ -191,13 +190,13 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
                 >
                     Not now
                 </button>
-                <Link
-                    to={`/login?next=${next}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="min-h-9 px-3 text-sm bg-action text-white hover:bg-action"
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onClose(); openSignIn(trigger); }}
+                    className="min-h-9 px-3 text-sm bg-action text-white hover:opacity-90"
                 >
                     Sign in
-                </Link>
+                </button>
             </div>
         </div>,
         document.body,

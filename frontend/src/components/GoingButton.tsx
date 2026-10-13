@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { Eye, UserRoundCheck, UserRoundPlus } from 'lucide-react';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import type { ShareAudience } from '../api';
 import { trackShareConversion } from '../utils/tracking';
@@ -107,8 +107,7 @@ export default function GoingButton({
     const { user } = useAuth();
     const { goingButtonIconVariant, appAuthGateEnabled, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
-    const location = useLocation();
-    const navigate = useNavigate();
+    const openSignIn = useSignIn();
     const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
     const going = isAttending(eventId);
 
@@ -126,10 +125,7 @@ export default function GoingButton({
         errorToast.hide();
         if (!user && !featureFlagsReady) return;
         if (!user && appAuthGateEnabled) {
-            const next = encodeURIComponent(
-                `${location.pathname}${location.search}${location.hash}`,
-            );
-            navigate(`/login?next=${next}`);
+            openSignIn('going');
             return;
         }
         if (going) {

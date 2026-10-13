@@ -25,8 +25,8 @@ test_plan:
     - id: 1
       title: "Request a code for a brand-new email"
       description: >
-        Open http://localhost:5173/login. In the "Sign in with an email code"
-        field enter newcomer@example.com and click "Send code".
+        Open http://localhost:5173/login. Click "Continue with email", enter
+        newcomer@example.com in "Email address" and click "Email me a code".
       expected: >
         The form advances to the 6-digit code step. An amber dev box shows the
         code (also visible in the backend logs). POST /api/auth/email-code/request
@@ -37,7 +37,8 @@ test_plan:
     - id: 2
       title: "Verify the code creates a new email-provider user"
       description: >
-        Enter the code from step 1 and click "Verify & sign in".
+        Enter the code from step 1 in the six boxes (it submits automatically
+        on the 6th digit; "Continue" also works).
       expected: >
         POST /api/auth/email-code/verify returns 200 and you land signed in. The
         nav switches from "Sign in" to your name (derived from the email

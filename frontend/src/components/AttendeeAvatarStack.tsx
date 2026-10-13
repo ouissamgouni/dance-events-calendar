@@ -233,7 +233,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPrev
             const next = encodeURIComponent(location.pathname + location.search);
             return (
                 <Link
-                    to={`/login?next=${next}`}
+                    to={`/login?next=${next}&intent=people`}
                     onClick={(e) => e.stopPropagation()}
                     className={styles.link}
                     title={totalGoing === 1 ? '1 person is going — sign in to see who' : `${totalGoing} people are going — sign in to see who`}

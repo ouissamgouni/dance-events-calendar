@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { Eye } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
@@ -43,8 +43,7 @@ export default function SaveEventButton({
     const { user } = useAuth();
     const { appAuthGateEnabled, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
-    const location = useLocation();
-    const navigate = useNavigate();
+    const openSignIn = useSignIn();
     const saved = isSaved(eventId);
     const buttonRef = useRef<HTMLButtonElement | null>(null);
     const toast = useAnchoredToast(buttonRef);
@@ -58,10 +57,7 @@ export default function SaveEventButton({
         toast.hide();
         if (!user && !featureFlagsReady) return;
         if (!user && appAuthGateEnabled) {
-            const next = encodeURIComponent(
-                `${location.pathname}${location.search}${location.hash}`,
-            );
-            navigate(`/login?next=${next}`);
+            openSignIn('save');
             return;
         }
         const wasSaved = saved;

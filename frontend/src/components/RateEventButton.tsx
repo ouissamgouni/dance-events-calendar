@@ -349,7 +349,7 @@ export default function RateEventButton({
                     <p className="text-ink-soft mt-1">Share your feedback and help others find great events.</p>
                     <div className="mt-2 flex gap-2">
                         <Link
-                            to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
+                            to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}&intent=review`}
                             className="flex-1 text-center bg-sky-600 text-white px-2 py-1 hover:bg-sky-700"
                         >
                             Sign in

@@ -24,8 +24,8 @@ test_plan:
     - id: 1
       title: "Requesting a code sends an email and leaks nothing"
       description: >
-        Open http://localhost:5173/login. In the "Sign in with an email code"
-        field enter a real address you can read and click "Send code".
+        Open http://localhost:5173/login. Click "Continue with email", enter a
+        real address you can read and click "Email me a code".
       expected: >
         The form advances to the 6-digit code step with a "check your email"
         notice and NO code shown on the page. POST /api/auth/email-code/request
@@ -37,7 +37,8 @@ test_plan:
     - id: 2
       title: "Verifying the emailed code signs you in"
       description: >
-        Read the code from the email, enter it, and click "Verify & sign in".
+        Read the code from the email and enter it in the six boxes (it submits
+        automatically on the 6th digit).
       expected: >
         POST /api/auth/email-code/verify returns 200 and you land signed in. A
         User row exists with `provider = 'email'` and a display name derived

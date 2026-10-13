@@ -8,11 +8,11 @@ import { AuthProvider } from '../context/AuthContext'
 import { server } from '../test/server'
 import { makeUser } from '../test/handlers'
 
-function renderLogin() {
+function renderLogin(entry = '/login') {
     return {
         user: userEvent.setup(),
         ...render(
-            <MemoryRouter initialEntries={['/login']}>
+            <MemoryRouter initialEntries={[entry]}>
                 <AuthProvider>
                     <Routes>
                         <Route path="/login" element={<Login />} />
@@ -22,6 +22,12 @@ function renderLogin() {
             </MemoryRouter>,
         ),
     }
+}
+
+async function requestCode(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole('button', { name: /continue with email/i }))
+    await user.type(screen.getByLabelText(/email address/i), 'alice@example.com')
+    await user.click(screen.getByRole('button', { name: /email me a code/i }))
 }
 
 describe('Login — email one-time code', () => {
@@ -34,7 +40,7 @@ describe('Login — email one-time code', () => {
         )
     })
 
-    it('requests a code then verifies it and signs the user in', async () => {
+    it('requests a code then signs the user in once all 6 digits are entered', async () => {
         server.use(
             http.post('*/api/auth/email-code/request', () =>
                 HttpResponse.json({ sent: true, expires_in: 600, dev_code: '123456' }),
@@ -45,16 +51,13 @@ describe('Login — email one-time code', () => {
         )
 
         const { user } = renderLogin()
-
-        const emailInput = await screen.findByLabelText(/sign in with an email code/i)
-        await user.type(emailInput, 'alice@example.com')
-        await user.click(screen.getByRole('button', { name: /send code/i }))
+        await requestCode(user)
 
         const codeInput = await screen.findByLabelText(/6-digit code/i)
         expect(screen.getByText(/123456/)).toBeInTheDocument()
+        expect(screen.getByText(/expires in 10 minutes/i)).toBeInTheDocument()
 
         await user.type(codeInput, '123456')
-        await user.click(screen.getByRole('button', { name: /verify & sign in/i }))
 
         await waitFor(() => expect(screen.getByText('home page')).toBeInTheDocument())
     })
@@ -70,10 +73,7 @@ describe('Login — email one-time code', () => {
         )
 
         const { user } = renderLogin()
-
-        const emailInput = await screen.findByLabelText(/sign in with an email code/i)
-        await user.type(emailInput, 'alice@example.com')
-        await user.click(screen.getByRole('button', { name: /send code/i }))
+        await requestCode(user)
 
         await waitFor(() =>
             expect(
@@ -93,17 +93,34 @@ describe('Login — email one-time code', () => {
         )
 
         const { user } = renderLogin()
-
-        const emailInput = await screen.findByLabelText(/sign in with an email code/i)
-        await user.type(emailInput, 'alice@example.com')
-        await user.click(screen.getByRole('button', { name: /send code/i }))
+        await requestCode(user)
 
         const codeInput = await screen.findByLabelText(/6-digit code/i)
         await user.type(codeInput, '000000')
-        await user.click(screen.getByRole('button', { name: /verify & sign in/i }))
 
         await waitFor(() =>
             expect(screen.getByText(/invalid or expired code/i)).toBeInTheDocument(),
         )
+    })
+})
+
+describe('Login — intent copy', () => {
+    beforeEach(() => {
+        server.use(
+            http.get('*/api/auth/mode', () =>
+                HttpResponse.json({ dev_auth: false, google_client_id: '' }),
+            ),
+        )
+    })
+
+    it('tailors the headline to the intent derived from next', async () => {
+        renderLogin('/login?next=%2Fevent%2Fe1%23messages')
+        expect(await screen.findByRole('heading', { name: /join the conversation/i })).toBeInTheDocument()
+    })
+
+    it('shows the generic headline and benefits without an intent', async () => {
+        renderLogin()
+        expect(await screen.findByRole('heading', { name: /get more out of movida/i })).toBeInTheDocument()
+        expect(screen.getByText(/build your dance passport/i)).toBeInTheDocument()
     })
 })
