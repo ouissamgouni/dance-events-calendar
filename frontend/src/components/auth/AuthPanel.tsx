@@ -343,9 +343,8 @@ export default function AuthPanel({ intent, showHeader = true, onNotNow }: Props
                                 {Array.from({ length: CODE_LENGTH }, (_, i) => (
                                     <div
                                         key={i}
-                                        className={`flex h-12 items-center justify-center rounded-field border bg-surface font-mono text-xl font-semibold text-ink ${
-                                            codeFocused && i === activeBox ? 'border-action ring-1 ring-action' : emailError ? 'border-danger' : 'border-line'
-                                        }`}
+                                        className={`flex h-12 items-center justify-center rounded-field border bg-surface font-mono text-xl font-semibold text-ink ${codeFocused && i === activeBox ? 'border-action ring-1 ring-action' : emailError ? 'border-danger' : 'border-line'
+                                            }`}
                                     >
                                         {codeValue[i] ?? ''}
                                     </div>
