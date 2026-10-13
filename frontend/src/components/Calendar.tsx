@@ -4,7 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import type { DateClickArg } from '@fullcalendar/interaction';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import type { EventClickArg, EventContentArg, EventInput, EventHoveringArg } from '@fullcalendar/core';
+import type { EventClickArg, EventContentArg, EventInput, EventHoveringArg, MoreLinkArg } from '@fullcalendar/core';
 import type { CalendarEvent } from '../types';
 import { trackView } from '../utils/tracking';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -22,7 +22,10 @@ interface Props {
     onEventHover?: (eventId: string | null) => void;
     offMapEventIds?: Set<string>;
     viewMode?: CalendarViewMode;
-    onDateClick?: (date: Date) => void;
+    /** Mobile only: a day cell or its "+N more" link was tapped. */
+    onDayOpen?: (date: Date) => void;
+    /** Days after this instant render as locked (signed-out horizon). */
+    lockedAfter?: Date | null;
 }
 
 const viewToFcView = (view: CalendarViewMode) => {
@@ -33,7 +36,7 @@ const viewToFcView = (view: CalendarViewMode) => {
 };
 
 const Calendar = forwardRef<FullCalendar, Props>(
-    ({ events, sinceDate, initialDate, onDatesChange, onEventClick, hoveredEventId, onEventHover, offMapEventIds, viewMode = 'month', onDateClick }, ref) => {
+    ({ events, sinceDate, initialDate, onDatesChange, onEventClick, hoveredEventId, onEventHover, offMapEventIds, viewMode = 'month', onDayOpen, lockedAfter }, ref) => {
         const { eventColorBarColor } = useFeatureFlags();
         const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
         useEffect(() => {
@@ -125,8 +128,15 @@ const Calendar = forwardRef<FullCalendar, Props>(
         }, [onEventHover]);
 
         const handleDateClick = useCallback((info: DateClickArg) => {
-            onDateClick?.(info.date);
-        }, [onDateClick]);
+            if (isMobile) onDayOpen?.(info.date);
+        }, [isMobile, onDayOpen]);
+
+        // FC ignores a truthy non-string action; a view name would zoom and the popover crashes when we re-render.
+        const handleMoreLinkClick = useCallback((arg: MoreLinkArg): string => {
+            if (!isMobile) return 'popover';
+            onDayOpen?.(arg.date);
+            return true as unknown as string;
+        }, [isMobile, onDayOpen]);
 
         return (
             <FullCalendar
@@ -151,7 +161,10 @@ const Calendar = forwardRef<FullCalendar, Props>(
                 displayEventTime={false}
                 height="auto"
                 dayCellContent={(arg) => isMobile ? String(arg.date.getDate()) : arg.dayNumberText}
+                dayCellClassNames={(arg) => (lockedAfter && arg.date > lockedAfter ? ['fc-day-locked'] : [])}
                 dayMaxEvents={isMobile ? 2 : 3}
+                moreLinkClick={handleMoreLinkClick}
+                firstDay={1}
                 validRange={sinceDate ? { start: sinceDate } : undefined}
                 datesSet={(arg) => onDatesChange?.(arg.start, arg.end)}
             />

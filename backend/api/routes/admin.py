@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 from backend.api.deps import require_admin
 from backend.api.schemas import (
     AdminEventModerationResponse,
+    AdminEventMapPoint,
+    AdminEventMapResponse,
     AdminEventResponse,
     AdminEventNotificationStatsResponse,
     AdminBulkEngagementItem,
@@ -3178,6 +3180,57 @@ def list_admin_event_ids(
 
     ids = session.exec(base).all()
     return EventIdsResponse(ids=list(ids))
+
+
+MAP_POINTS_CAP = 2000
+
+
+@router.get("/events/map-points", response_model=AdminEventMapResponse)
+def list_admin_event_map_points(
+    filters: AdminEventFilters = Depends(_admin_event_filters),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Geolocated events matching the admin filters, for the events map."""
+    base = _apply_admin_event_filters(select(CachedEvent), filters)
+    geolocated = base.where(CachedEvent.latitude != None, CachedEvent.longitude != None)
+    total = session.exec(select(func.count()).select_from(geolocated.subquery())).one()
+    ungeolocated = session.exec(
+        select(func.count()).select_from(
+            _apply_admin_geo_filter(base, "ungeolocated").subquery()
+        )
+    ).one()
+    events = session.exec(
+        geolocated.order_by(CachedEvent.start, CachedEvent.event_id).limit(
+            MAP_POINTS_CAP
+        )
+    ).all()
+    items = [
+        AdminEventMapPoint(
+            event_id=e.event_id,
+            calendar_id=e.calendar_id,
+            title=e.title,
+            start=e.start,
+            end=e.end,
+            all_day=e.all_day,
+            timezone=e.timezone,
+            location=e.location,
+            city=e.city,
+            latitude=e.latitude,
+            longitude=e.longitude,
+            **event_image_fields(e),
+            status=event_status(e),
+            review_status=e.review_status,
+            visibility_state=event_audience(e),
+        )
+        for e in events
+    ]
+    return AdminEventMapResponse(
+        items=items,
+        total=total,
+        ungeolocated=ungeolocated,
+        truncated=total > len(items),
+    )
 
 
 @router.get(

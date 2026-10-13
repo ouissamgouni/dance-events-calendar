@@ -189,6 +189,9 @@ def list_messages(
         count_q = count_q.where(EventMessage.category == category)
 
     total = int(session.exec(count_q).one())
+    # Discussion carries names/avatars: signed-out callers only get the count.
+    if viewer is None:
+        return EventMessagesListResponse(items=[], total=total, muted=False)
     tops = session.exec(
         top_q.order_by(col(EventMessage.created_at).desc()).offset(offset).limit(limit)
     ).all()

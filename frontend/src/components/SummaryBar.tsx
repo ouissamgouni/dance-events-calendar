@@ -52,6 +52,11 @@ export interface SummaryBarProps {
     reachGroup?: TagGroup | null;
     reachFilter: ReachFilter;
     onEditReach?: () => void;
+    /** Events hidden only by the reach filter; drives the "+N local" quick toggle. */
+    reachHiddenCount?: number;
+    /** Session-only relaxation currently applied on top of ``reachFilter``. */
+    reachRelaxation?: 'none' | 'manual' | 'zoom';
+    onToggleReachRelax?: () => void;
 
     // People pill (people icon + count of explicitly-selected handles).
     interestSource: InterestSource;
@@ -117,6 +122,7 @@ interface PillProps {
     label?: string;
     title?: string;
     icon?: React.ReactNode;
+    trailing?: React.ReactNode;
     onClick?: () => void;
     onRemove?: () => void;
     removeAriaLabel?: string;
@@ -135,8 +141,8 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
     return target.closest('button, a, input, select, textarea, [role="button"]') !== null;
 }
 
-function Pill({ label, title, icon, onClick, onRemove, removeAriaLabel, testId, ariaLabel, className, maxWidth, labelMaxWidth, measureKey, measureVariant, measureGear }: PillProps) {
-    const padding = onRemove ? 'pl-2.5 pr-1' : '';
+function Pill({ label, title, icon, trailing, onClick, onRemove, removeAriaLabel, testId, ariaLabel, className, maxWidth, labelMaxWidth, measureKey, measureVariant, measureGear }: PillProps) {
+    const padding = onRemove || trailing ? 'pl-2.5 pr-1' : '';
     return (
         <span
             className={`${PILL_BASE} ${padding} ${onClick ? PILL_INTERACTIVE : ''} ${className ?? ''}`.trim()}
@@ -167,6 +173,7 @@ function Pill({ label, title, icon, onClick, onRemove, removeAriaLabel, testId, 
                     {label}
                 </span>
             )}
+            {trailing}
             {onRemove && (
                 <button
                     type="button"
@@ -217,6 +224,9 @@ export default function SummaryBar(props: SummaryBarProps) {
         reachGroup,
         reachFilter,
         onEditReach,
+        reachHiddenCount = 0,
+        reachRelaxation = 'none',
+        onToggleReachRelax,
         interestSource,
         interestKind,
         interestUserHandles,
@@ -408,7 +418,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         }
 
         setLayout({ visibleCount: count, expandedWidths });
-    }, [candidates, containerWidth, foldedRemainingCount, danceSel.compactLabel, danceSel.fullLabel, areaLabel, startDate, endDate, peopleTypeLabel, peopleStatusLabel, reachFilter, twoLine]);
+    }, [candidates, containerWidth, foldedRemainingCount, danceSel.compactLabel, danceSel.fullLabel, areaLabel, startDate, endDate, peopleTypeLabel, peopleStatusLabel, reachFilter, reachHiddenCount, reachRelaxation, twoLine]);
 
     const hiddenActivePrimaries = Math.max(0, candidates.length - layout.visibleCount);
     const extraCount = foldedRemainingCount + hiddenActivePrimaries;
@@ -464,6 +474,32 @@ export default function SummaryBar(props: SummaryBarProps) {
                 // "Any", "local") intact.
                 const full = REACH_FILTER_LABELS[reachFilter];
                 const short = full.length <= 5 ? full : full.slice(0, 3);
+                const relaxed = reachRelaxation !== 'none';
+                const showToggle = !!onToggleReachRelax && reachFilter !== 'any' && (relaxed || reachHiddenCount > 0);
+                const toggleLabel = relaxed
+                    ? (variant === 'full' && reachRelaxation === 'zoom' ? '+ local · this view' : '+ local')
+                    : (variant === 'full' ? `+${reachHiddenCount} local` : `+${reachHiddenCount}`);
+                const toggle = showToggle ? (
+                    <button
+                        type="button"
+                        aria-pressed={relaxed}
+                        aria-label={relaxed ? 'Hide local events' : `Show ${reachHiddenCount} local events`}
+                        title={relaxed ? 'Hide local events' : `Show ${reachHiddenCount} local events`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleReachRelax?.();
+                        }}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        // eslint-disable-next-line no-restricted-syntax -- rounded chrome matches the approved filter-summary UX design reference
+                        className={`ml-1 inline-flex h-6 shrink-0 items-center gap-1 rounded-[6px] px-1.5 text-xs font-semibold ${relaxed
+                            ? 'bg-action text-white hover:opacity-90'
+                            : 'bg-blue-50 text-action hover:bg-blue-100'}`}
+                        data-testid={tid('summary-chip-reach-toggle')}
+                    >
+                        {toggleLabel}
+                        {relaxed && <span aria-hidden="true">×</span>}
+                    </button>
+                ) : undefined;
                 return (
                     <Pill
                         key={pillKey}
@@ -472,6 +508,7 @@ export default function SummaryBar(props: SummaryBarProps) {
                         ariaLabel={`Event reach: ${full}`}
                         title={`Event reach: ${full}`}
                         onClick={onEditReach}
+                        trailing={toggle}
                         testId={tid('summary-chip-reach')}
                         maxWidth={maxWidth}
                         {...measurementProps}

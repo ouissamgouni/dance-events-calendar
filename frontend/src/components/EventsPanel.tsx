@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowUpDown, Check, RefreshCw, Repeat, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpDown, Check, List as ListIcon, Map as MapIcon, RefreshCw, Repeat, SlidersHorizontal, X } from 'lucide-react';
 import useBackToClose from '../hooks/useBackToClose';
 import useMediaQuery from '../hooks/useMediaQuery';
 import useLongPress from '../hooks/useLongPress';
@@ -54,6 +54,7 @@ import { formatCompactDateRange } from '../utils/eventDates';
 import { EventFlagIcons } from './admin-events/AdminEventCells';
 import AdminEventsToolbar from './admin-events/AdminEventsToolbar';
 import AdminEventsTable from './admin-events/AdminEventsTable';
+import AdminEventsMap from './admin-events/AdminEventsMap';
 import AdminEventsColumnsMenu from './admin-events/AdminEventsColumnsMenu';
 import FilterEditor from './admin-events/FilterEditor';
 import useAdminEventsTablePrefs from './admin-events/useAdminEventsTablePrefs';
@@ -153,6 +154,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
     const [sortSheetOpen, setSortSheetOpen] = useState(false);
     const [actionsSheetOpen, setActionsSheetOpen] = useState(false);
+    const [view, setView] = useState<'list' | 'map'>('list');
+    const [mapReloadToken, setMapReloadToken] = useState(0);
     const [prevSelectedCount, setPrevSelectedCount] = useState(0);
     if (prevSelectedCount !== selectedIds.size) {
         setPrevSelectedCount(selectedIds.size);
@@ -256,6 +259,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setFiltersSheetOpen(false);
             setSortSheetOpen(false);
             setActionsSheetOpen(false);
+            setView('list');
         }
     }, [isOpen, preset, initialCalendarId]);
 
@@ -677,6 +681,48 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         setAllMatchingSelected(false);
     };
 
+    const canShowMap = preset !== 'ungeolocated';
+    // Bulk actions are list-only; drop the selection and any open picker.
+    const switchView = (next: 'list' | 'map') => {
+        if (next === 'map') {
+            exitSelection();
+            setBulkTagPickerOpen(false);
+            setCuratePickerOpen(false);
+            setSeriesTitlePickerOpen(false);
+            setAddSeriesPickerOpen(false);
+        }
+        setView(next);
+    };
+    const refresh = () => {
+        loadEvents();
+        setMapReloadToken((n) => n + 1);
+    };
+    const mapParams = useMemo<EventFilterParams>(() => ({
+        ...toFilterParams(filters),
+        search: debouncedSearch || undefined,
+        ungeolocated: PRESET_FILTERS[preset].ungeolocated || undefined,
+    }), [filters, debouncedSearch, preset]);
+    const showUngeolocated = () => {
+        setFilters({ ...filters, geo: 'ungeolocated' });
+        setView('list');
+    };
+    const viewToggle = canShowMap && (
+        <div className="inline-flex border border-line" role="group" aria-label="View">
+            {(['list', 'map'] as const).map((option) => (
+                <button
+                    key={option}
+                    type="button"
+                    aria-pressed={view === option}
+                    onClick={() => switchView(option)}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium transition ${view === option ? 'bg-action text-white' : 'bg-surface text-ink-soft hover:text-ink'}`}
+                >
+                    {option === 'list' ? <ListIcon className="h-3.5 w-3.5" aria-hidden="true" /> : <MapIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+                    {option === 'list' ? 'List' : 'Map'}
+                </button>
+            ))}
+        </div>
+    );
+
     const mobileList = (
         <>
             <ul className="divide-y divide-line">
@@ -819,12 +865,24 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             {PRESET_TITLES[preset]}
                             <span className="ml-2 text-sm font-normal text-ink-soft">{total}</span>
                         </h2>
-                        <button type="button" onClick={() => loadEvents()} aria-label="Refresh" className="inline-flex h-11 w-11 items-center justify-center text-ink-soft">
+                        {canShowMap && (
+                            <button
+                                type="button"
+                                onClick={() => switchView(view === 'map' ? 'list' : 'map')}
+                                aria-label={view === 'map' ? 'Show list' : 'Show map'}
+                                className="inline-flex h-11 w-11 items-center justify-center text-ink-soft"
+                            >
+                                {view === 'map' ? <ListIcon className="h-5 w-5" aria-hidden="true" /> : <MapIcon className="h-5 w-5" aria-hidden="true" />}
+                            </button>
+                        )}
+                        <button type="button" onClick={refresh} aria-label="Refresh" className="inline-flex h-11 w-11 items-center justify-center text-ink-soft">
                             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
                         </button>
-                        <button type="button" onClick={() => setSelectMode(true)} disabled={events.length === 0} className="min-h-11 px-3 text-sm font-medium text-action disabled:opacity-50">
-                            Select
-                        </button>
+                        {view === 'list' && (
+                            <button type="button" onClick={() => setSelectMode(true)} disabled={events.length === 0} className="min-h-11 px-3 text-sm font-medium text-action disabled:opacity-50">
+                                Select
+                            </button>
+                        )}
                     </div>
                 ))}
 
@@ -850,16 +908,18 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     <span className="inline-flex h-5 min-w-5 items-center justify-center bg-action px-1 text-[11px] font-semibold text-white">{activeFilterChips.length}</span>
                                 )}
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setSortSheetOpen(true)}
-                                aria-label={`Sort and view: ${sortLabel}${groupBySeries ? ', grouped by series' : ''}`}
-                                className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 border px-3 text-sm font-medium ${sortIsDefault ? 'border-line bg-surface text-ink' : 'border-action bg-blue-50 text-action'}`}
-                            >
-                                <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
-                                {sortLabel}
-                                {groupBySeries && <Repeat className="h-3.5 w-3.5" aria-hidden="true" />}
-                            </button>
+                            {view === 'list' && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSortSheetOpen(true)}
+                                    aria-label={`Sort and view: ${sortLabel}${groupBySeries ? ', grouped by series' : ''}`}
+                                    className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 border px-3 text-sm font-medium ${sortIsDefault ? 'border-line bg-surface text-ink' : 'border-action bg-blue-50 text-action'}`}
+                                >
+                                    <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+                                    {sortLabel}
+                                    {groupBySeries && <Repeat className="h-3.5 w-3.5" aria-hidden="true" />}
+                                </button>
+                            )}
                         </div>
                         {activeFilterChips.length > 0 && (
                             <div className="-mx-4 flex gap-2 overflow-x-auto px-4">
@@ -885,7 +945,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                     <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas shrink-0">
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => loadEvents()}
+                                onClick={refresh}
                                 className={`text-muted hover:text-ink-soft p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
                                 title="Refresh"
                                 aria-label="Refresh"
@@ -903,6 +963,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     </span>
                                 )}
                             </h2>
+                            {viewToggle}
                         </div>
                         <button
                             onClick={onClose}
@@ -952,7 +1013,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
 
                 {/* Table */}
                 <div className="flex-1 overflow-auto">
-                    {loading && events.length === 0 ? (
+                    {view === 'map' ? (
+                        <AdminEventsMap
+                            params={mapParams}
+                            reloadToken={mapReloadToken}
+                            onOpenEvent={setAdminDetailEventId}
+                            onShowUngeolocated={showUngeolocated}
+                        />
+                    ) : loading && events.length === 0 ? (
                         <div className="flex items-center justify-center h-full text-muted">
                             <p className="text-xs">Loading…</p>
                         </div>
@@ -980,7 +1048,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 </div>
 
                 {/* Pagination */}
-                {!isMobile && totalPages > 1 && (
+                {!isMobile && view === 'list' && totalPages > 1 && (
                     <div className="flex items-center justify-between px-4 py-2 border-t border-line bg-canvas shrink-0">
                         <span className="text-[10px] text-muted">
                             {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
@@ -1613,7 +1681,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             <AdminEventDetailPanel
                 eventId={adminDetailEventId}
                 onClose={() => setAdminDetailEventId(null)}
-                onEventUpdated={() => loadEvents()}
+                onEventUpdated={refresh}
             />
             {mergeIds && (
                 <MergeEventsDialog

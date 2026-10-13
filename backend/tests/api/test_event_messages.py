@@ -113,6 +113,24 @@ def test_anon_can_read_empty(client, event):
 
 
 @pytest.mark.unit
+def test_anon_sees_count_but_no_messages(client, event):
+    assert _login(client, email="alice@example.com").status_code == 200
+    resp = client.post(
+        f"/api/events/{event.event_id}/messages",
+        json={"category": "accommodation", "body": "Anyone need a roommate?"},
+    )
+    assert resp.status_code in (200, 201)
+
+    anon = TestClient(app).get(f"/api/events/{event.event_id}/messages")
+    assert anon.status_code == 200
+    assert anon.json() == {"items": [], "total": 1, "muted": False}
+
+    signed_in = client.get(f"/api/events/{event.event_id}/messages").json()
+    assert signed_in["total"] == 1
+    assert len(signed_in["items"]) == 1
+
+
+@pytest.mark.unit
 def test_post_and_list_with_reply(client, session, event):
     assert _login(client, email="alice@example.com").status_code == 200
     post = client.post(

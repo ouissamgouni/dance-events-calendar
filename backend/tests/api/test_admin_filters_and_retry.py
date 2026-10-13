@@ -237,6 +237,63 @@ class TestIncludePastFilter:
         assert ids_resp.json()["ids"] == [expected_id]
 
 
+@pytest.mark.unit
+class TestEventMapPoints:
+    def _seed(self, engine):
+        _seed_calendar(engine)
+        with Session(engine) as s:
+            s.add_all(
+                [
+                    _event("b-mapped", days=2, latitude=48.85, longitude=2.35),
+                    _event(
+                        "a-mapped",
+                        days=1,
+                        latitude=41.38,
+                        longitude=2.17,
+                        review_status="pending",
+                    ),
+                    _event("past", days=-3, latitude=40.4, longitude=-3.7),
+                    _event("other", days=1, latitude=1.0, longitude=1.0),
+                    _event("mapped-unknown", location="Somewhere"),
+                    _event("mapped-none"),
+                ]
+            )
+            s.commit()
+
+    def test_returns_geolocated_matches_with_ungeolocated_count(self, client, engine):
+        self._seed(engine)
+
+        resp = client.get("/api/admin/events/map-points", params={"search": "mapped"})
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert [p["event_id"] for p in body["items"]] == ["a-mapped", "b-mapped"]
+        assert body["items"][0]["status"] == "new"
+        assert body["items"][0]["latitude"] == 41.38
+        assert body["total"] == 2
+        assert body["ungeolocated"] == 1
+        assert body["truncated"] is False
+
+    def test_caps_points_and_flags_truncation(self, client, engine, monkeypatch):
+        from backend.api.routes import admin as admin_routes
+
+        self._seed(engine)
+        monkeypatch.setattr(admin_routes, "MAP_POINTS_CAP", 1)
+
+        body = client.get("/api/admin/events/map-points").json()
+
+        assert [p["event_id"] for p in body["items"]] == ["a-mapped"]
+        assert body["total"] == 3
+        assert body["truncated"] is True
+
+    def test_requires_admin(self, client):
+        app.dependency_overrides.pop(require_admin)
+
+        resp = client.get("/api/admin/events/map-points")
+
+        assert resp.status_code in (401, 403)
+
+
 def _event(event_id, days=1, **kwargs):
     now = datetime.now(timezone.utc)
     return CachedEvent(

@@ -229,6 +229,25 @@ describe('SummaryBar', () => {
         expect(screen.getByTestId('summary-chip-reach')).toHaveTextContent('Int');
     });
 
+    it('adds a one-tap local toggle to the Reach pill without opening the editor', async () => {
+        const onEditReach = vi.fn();
+        const onToggleReachRelax = vi.fn();
+        const props = { reachFilter: 'international' as const, onEditReach, onToggleReachRelax };
+        const { rerender } = render(<SummaryBar {...baseProps({ ...props, reachHiddenCount: 0 })} />);
+        expect(screen.queryByTestId('summary-chip-reach-toggle')).toBeNull();
+
+        rerender(<SummaryBar {...baseProps({ ...props, reachHiddenCount: 14 })} />);
+        const toggle = screen.getByTestId('summary-chip-reach-toggle');
+        expect(toggle).toHaveAttribute('aria-pressed', 'false');
+        expect(toggle).toHaveTextContent('+14');
+        await userEvent.click(toggle);
+        expect(onToggleReachRelax).toHaveBeenCalledTimes(1);
+        expect(onEditReach).not.toHaveBeenCalled();
+
+        rerender(<SummaryBar {...baseProps({ ...props, reachHiddenCount: 0, reachRelaxation: 'manual' })} />);
+        expect(screen.getByRole('button', { name: 'Hide local events' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
     it('shows the Discount chip only while the filter is active and deep-links', async () => {
         const onEditDiscount = vi.fn();
         const { rerender } = render(<SummaryBar {...baseProps({ discountActive: false, onEditDiscount })} />);

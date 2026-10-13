@@ -103,6 +103,9 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
  * {@link WIDE_AREA_THRESHOLD_KM}. Used for area-mode interest profiles.
  */
 export function isWideArea(area: { min_lat: number; min_lng: number; max_lat: number; max_lng: number }): boolean {
-    const diagonalKm = haversineKm(area.min_lat, area.min_lng, area.max_lat, area.max_lng);
-    return diagonalKm > WIDE_AREA_THRESHOLD_KM;
+    return areaDiagonalKm(area) > WIDE_AREA_THRESHOLD_KM;
+}
+
+export function areaDiagonalKm(area: { min_lat: number; min_lng: number; max_lat: number; max_lng: number }): number {
+    return haversineKm(area.min_lat, area.min_lng, area.max_lat, area.max_lng);
 }

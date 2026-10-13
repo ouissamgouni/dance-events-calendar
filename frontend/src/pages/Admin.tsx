@@ -292,6 +292,7 @@ export default function Admin() {
     const [trendingTopN, setTrendingTopN] = useState(3);
     const [trendingTopPercent, setTrendingTopPercent] = useState(100);
     const [explorerListPageSize, setExplorerListPageSize] = useState(20);
+    const [anonHorizonDays, setAnonHorizonDays] = useState(30);
     const [showPendingEvents, setShowPendingEvents] = useState(false);
     const [promoCodesEnabled, setPromoCodesEnabled] = useState(false);
     const [organizerClaimsEnabled, setOrganizerClaimsEnabled] = useState(false);
@@ -496,6 +497,7 @@ export default function Admin() {
             setTrendingTopN(s.trending_top_n ?? 3);
             setTrendingTopPercent(s.trending_top_percent ?? 100);
             setExplorerListPageSize(s.explorer_list_page_size ?? 20);
+            setAnonHorizonDays(s.anon_horizon_days ?? 30);
             setShowPendingEvents(s.show_pending_events ?? false);
             setPromoCodesEnabled(s.promo_codes_enabled ?? false);
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
@@ -1282,6 +1284,16 @@ export default function Admin() {
             await updateSettings({ explorer_list_page_size: value });
         } catch {
             setMessage('Failed to update browse list page size.');
+        }
+    };
+
+    const handleAnonHorizonDaysChange = async (value: number) => {
+        if (isNaN(value) || value < 0 || value > 365) return;
+        setAnonHorizonDays(value);
+        try {
+            await updateSettings({ anon_horizon_days: value });
+        } catch {
+            setMessage('Failed to update signed-out horizon.');
         }
     };
 
@@ -2384,6 +2396,23 @@ export default function Admin() {
                                         onKeyDown={(e) => e.key === 'Enter' && handleExplorerListPageSizeChange(explorerListPageSize)}
                                         className="w-16 text-right text-[11px] border border-line px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-action"
                                         data-testid="admin-explorer-list-page-size"
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-card-line">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Signed-out horizon (days)</span>
+                                        <p className="text-[10px] text-muted">Later events are locked behind sign-in (0 = no limit)</p>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={365}
+                                        value={anonHorizonDays}
+                                        onChange={(e) => setAnonHorizonDays(Number(e.target.value))}
+                                        onBlur={(e) => handleAnonHorizonDaysChange(Number(e.target.value))}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAnonHorizonDaysChange(anonHorizonDays)}
+                                        className="w-16 text-right text-[11px] border border-line px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-action"
+                                        data-testid="admin-anon-horizon-days"
                                     />
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-card-line">

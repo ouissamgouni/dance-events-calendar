@@ -6,7 +6,8 @@ export type SignInIntent =
     | 'review'
     | 'message'
     | 'follow'
-    | 'calendar';
+    | 'calendar'
+    | 'explore';
 
 export const SIGN_IN_INTENT_COPY: Record<SignInIntent, { headline: string; subtitle: string }> = {
     generic: {
@@ -40,6 +41,10 @@ export const SIGN_IN_INTENT_COPY: Record<SignInIntent, { headline: string; subti
     calendar: {
         headline: 'Sync your calendar',
         subtitle: 'Subscribe in Apple or Google Calendar and share your plans.',
+    },
+    explore: {
+        headline: 'See every upcoming event',
+        subtitle: 'Free account, no password. Plan months ahead, not just the next few weeks.',
     },
 };
 

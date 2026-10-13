@@ -62,6 +62,15 @@ export const ADMIN_EVENT_STATUS_CHIP_CLASSES: Record<AdminEventStatus, string> =
     removed: 'bg-slate-300 text-ink',
 };
 
+/** Hex fills for raw-HTML Leaflet pins, mirroring the status chip hues. */
+export const ADMIN_EVENT_STATUS_PIN_COLORS: Record<AdminEventStatus, string> = {
+    new: '#2563EB',
+    published: '#079455',
+    unpublished: '#94A3B8',
+    cancelled: '#D92D20',
+    removed: '#334155',
+};
+
 const REMOVAL_REASON_LABELS: Record<AdminEventRemovalReason, string> = {
     admin: 'Removed by admin',
     duplicate: 'Duplicate',

@@ -1448,6 +1448,8 @@ class SiteSettingsResponse(BaseModel):
     trending_top_n: int = 3
     trending_top_percent: int = 100
     explorer_list_page_size: int = 20
+    # Signed-out visitors only see events starting within this many days (0 = no limit).
+    anon_horizon_days: int = 30
     event_color_bar_color: str = "#64748b"
     tag_sort_mode: str = "group"  # "group" | "event_count"
     default_explorer_period: DefaultExplorerPeriod = "next_3_months"
@@ -1854,6 +1856,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     trending_top_n: Optional[int] = Field(default=None, ge=1, le=50)
     trending_top_percent: Optional[int] = Field(default=None, ge=1, le=100)
     explorer_list_page_size: Optional[int] = Field(default=None, ge=1, le=100)
+    anon_horizon_days: Optional[int] = Field(default=None, ge=0, le=365)
     event_color_bar_color: Optional[str] = Field(
         default=None, pattern="^#[0-9a-fA-F]{6}$"
     )
@@ -3075,6 +3078,34 @@ class CalendarDefaultTagsUpdate(BaseModel):
 
 class EventIdsResponse(BaseModel):
     ids: list[str]
+
+
+class AdminEventMapPoint(BaseModel):
+    event_id: str
+    calendar_id: str
+    title: str
+    start: datetime
+    end: datetime
+    all_day: bool = False
+    timezone: Optional[str] = None
+    location: Optional[str] = None
+    city: Optional[str] = None
+    latitude: float
+    longitude: float
+    image_url: Optional[str] = None
+    image_thumb_url: Optional[str] = None
+    status: Literal["new", "published", "unpublished", "cancelled", "removed"]
+    review_status: str = "reviewed"
+    visibility_state: Literal["public", "private"] = "public"
+
+
+class AdminEventMapResponse(BaseModel):
+    items: list[AdminEventMapPoint]
+    # Geolocated matches, including any beyond the cap.
+    total: int
+    # Matches with an address but no coordinates (geo_status=ungeolocated).
+    ungeolocated: int
+    truncated: bool
 
 
 class SyncJobStartRequest(BaseModel):

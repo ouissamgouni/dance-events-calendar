@@ -210,3 +210,30 @@ export function supportedTimeZones(): string[] {
     const intl = Intl as typeof Intl & { supportedValuesOf?: (key: 'timeZone') => string[] };
     return intl.supportedValuesOf?.('timeZone') ?? [browserTimeZone()];
 }
+
+export interface DayEventEntry<T> {
+    event: T;
+    /** 1-based position of the day within the event; equals `dayCount` on its last day. */
+    dayNumber: number;
+    dayCount: number;
+}
+
+/** Events covering the viewer-local `day` (all-day dates read in UTC), multi-day first, then by start. */
+export function eventsOnDay<T extends EventTimes>(events: T[], day: Date): DayEventEntry<T>[] {
+    const key = dayKey(day);
+    const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY_MS);
+    const entries: DayEventEntry<T>[] = [];
+    for (const event of events) {
+        const start = new Date(event.start);
+        const first = event.all_day ? utcDay(event.start) : dayKey(start);
+        const lastInstant = event.all_day
+            ? allDayLastDay(event)
+            : new Date(Math.max(start.getTime(), new Date(event.end || event.start).getTime() - 1));
+        const last = event.all_day ? utcDay(lastInstant.toISOString()) : dayKey(lastInstant);
+        if (key < first || key > last) continue;
+        entries.push({ event, dayNumber: daysBetween(first, key) + 1, dayCount: daysBetween(first, last) + 1 });
+    }
+    return entries.sort((a, b) =>
+        Number(b.dayCount > 1) - Number(a.dayCount > 1)
+        || Date.parse(a.event.start) - Date.parse(b.event.start));
+}

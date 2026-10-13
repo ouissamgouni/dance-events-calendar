@@ -11,9 +11,24 @@ vi.mock('../api', () => ({
     fetchEventFilterOptions: vi.fn(() => Promise.resolve({ calendars: [], audiences: [], statuses: [], flags: [], geo_statuses: [], tags: [] })),
     fetchAdminTagGroups: vi.fn(() => Promise.resolve([])),
     fetchAdminUsers: vi.fn(() => Promise.resolve({ items: [], total: 0 })),
+    fetchAdminEventMapPoints: vi.fn(),
 }))
 vi.mock('../hooks/useAdminCounters', () => ({ notifyAdminDataChanged: vi.fn() }))
-vi.mock('./AdminEventDetailPanel', () => ({ default: () => null }))
+vi.mock('./AdminEventDetailPanel', () => ({
+    default: ({ eventId }: { eventId: string | null }) => (eventId ? <div>Detail {eventId}</div> : null),
+}))
+vi.mock('./EventMap', () => ({
+    default: ({ events, onMarkerSelect }: { events: CalendarEvent[]; onMarkerSelect: (e: CalendarEvent) => void }) => (
+        <div>
+            {events.map((e) => <button key={e.event_id} type="button" onClick={() => onMarkerSelect(e)}>Pin {e.title}</button>)}
+        </div>
+    ),
+}))
+vi.mock('./MyEventsMapPreview', () => ({
+    default: ({ event, onOpen }: { event: CalendarEvent; onOpen: () => void }) => (
+        <button type="button" onClick={onOpen}>Preview {event.title}</button>
+    ),
+}))
 
 const reach = {
     eligible: true,
@@ -227,5 +242,39 @@ describe('EventsPanel on desktop', () => {
         await userEvent.click(apply)
 
         await waitFor(() => expect(lastParams()).toEqual(expect.objectContaining({ start_from: '2026-01-01' })))
+    })
+
+    it('maps every matching event and opens one from its pin preview', async () => {
+        vi.mocked(api.fetchAdminEventMapPoints).mockResolvedValue({
+            events: [{ ...adminEvent('e9', 'Mapped Kizomba'), latitude: 41.4, longitude: 2.2 }],
+            total: 1,
+            ungeolocated: 2,
+            truncated: false,
+        })
+        await renderPanel()
+
+        await userEvent.click(screen.getByRole('button', { name: 'Map' }))
+
+        await userEvent.click(await screen.findByRole('button', { name: 'Pin Mapped Kizomba' }))
+        await userEvent.click(screen.getByRole('button', { name: 'Preview Mapped Kizomba' }))
+        expect(screen.getByText('Detail e9')).toBeInTheDocument()
+        const mapParams = vi.mocked(api.fetchAdminEventMapPoints).mock.lastCall?.[0]
+        expect(mapParams).not.toHaveProperty('limit')
+        expect(mapParams).not.toHaveProperty('sort')
+
+        await userEvent.click(screen.getByRole('button', { name: 'Show them' }))
+        await waitFor(() => expect(lastParams()).toEqual(expect.objectContaining({ geo_status: 'ungeolocated' })))
+        expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('has no map view for the ungeolocated preset', async () => {
+        render(
+            <MemoryRouter>
+                <EventsPanel isOpen onClose={vi.fn()} preset="ungeolocated" />
+            </MemoryRouter>,
+        )
+        await screen.findByText('Friday Salsa')
+
+        expect(screen.queryByRole('button', { name: 'Map' })).not.toBeInTheDocument()
     })
 })

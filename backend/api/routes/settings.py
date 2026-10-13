@@ -195,6 +195,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         explorer_list_page_size=_get_int_setting(
             session, "explorer_list_page_size", 20
         ),
+        anon_horizon_days=_get_int_setting(session, "anon_horizon_days", 30),
         event_color_bar_color=_get_str_setting(
             session, "event_color_bar_color", "#64748b"
         ),
@@ -534,6 +535,16 @@ def update_settings(
             row = SiteSetting(
                 key="explorer_list_page_size",
                 value=str(body.explorer_list_page_size),
+            )
+        session.add(row)
+
+    if body.anon_horizon_days is not None:
+        row = session.get(SiteSetting, "anon_horizon_days")
+        if row:
+            row.value = str(body.anon_horizon_days)
+        else:
+            row = SiteSetting(
+                key="anon_horizon_days", value=str(body.anon_horizon_days)
             )
         session.add(row)
 

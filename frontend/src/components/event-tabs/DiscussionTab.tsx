@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { fetchEventMessages, type EventMessage, type EventMessageCategory } from '../../api';
 import { useAuth } from '../../context/AuthContext';
+import { useSignIn } from '../../context/SignInSheetContext';
 import { timeAgo } from '../../utils/eventMessages';
 import { DISCUSSION_CATEGORY_ORDER, DISCUSSION_LABEL, discussionMeta } from '../discussion/discussionLabels';
 import DiscussionThread from '../discussion/DiscussionThread';
@@ -24,6 +25,7 @@ const FEED_LIMIT = 50;
  */
 export default function DiscussionTab({ eventId, isPast, openComposeToken, onCountLoaded }: Props) {
     const { user } = useAuth();
+    const openSignIn = useSignIn();
     const location = useLocation();
     const [items, setItems] = useState<EventMessage[]>([]);
     const [total, setTotal] = useState(0);
@@ -98,33 +100,51 @@ export default function DiscussionTab({ eventId, isPast, openComposeToken, onCou
             </div>
 
             {/* Category filter chips */}
-            <div className="-mx-1 flex flex-nowrap gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <button
-                    type="button"
-                    onClick={() => setFilter('all')}
-                    className={`shrink-0 border px-2.5 py-1 text-xs font-medium transition ${filter === 'all' ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:border-action'}`}
-                >
-                    All
-                </button>
-                {DISCUSSION_CATEGORY_ORDER.map((c) => {
-                    const meta = discussionMeta(c);
-                    const active = filter === c;
-                    return (
-                        <button
-                            key={c}
-                            type="button"
-                            onClick={() => setFilter(c)}
-                            className={`shrink-0 border px-2.5 py-1 text-xs font-medium transition ${active ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:border-action'}`}
-                        >
-                            {meta.emoji} {meta.label}
-                        </button>
-                    );
-                })}
-            </div>
+            {user && (
+                <div className="-mx-1 flex flex-nowrap gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <button
+                        type="button"
+                        onClick={() => setFilter('all')}
+                        className={`shrink-0 border px-2.5 py-1 text-xs font-medium transition ${filter === 'all' ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:border-action'}`}
+                    >
+                        All
+                    </button>
+                    {DISCUSSION_CATEGORY_ORDER.map((c) => {
+                        const meta = discussionMeta(c);
+                        const active = filter === c;
+                        return (
+                            <button
+                                key={c}
+                                type="button"
+                                onClick={() => setFilter(c)}
+                                className={`shrink-0 border px-2.5 py-1 text-xs font-medium transition ${active ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft hover:border-action'}`}
+                            >
+                                {meta.emoji} {meta.label}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Feed */}
             {loading ? (
                 <p className="text-xs text-ink-soft">Loading…</p>
+            ) : !user && total > 0 ? (
+                <div className="space-y-2 border border-blue-100 bg-blue-50 p-4 text-center" data-testid="discussion-signin-lock">
+                    <p className="text-sm font-semibold text-ink">
+                        {total} {total === 1 ? 'discussion' : 'discussions'} from attendees
+                    </p>
+                    <p className="mx-auto max-w-xs text-xs text-ink-soft">
+                        Sign in to read what other dancers are saying and join the conversation.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => openSignIn('message')}
+                        className="inline-flex items-center justify-center bg-action px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                    >
+                        Sign in to read
+                    </button>
+                </div>
             ) : items.length === 0 ? (
                 <div className="space-y-2 py-6 text-center">
                     <p className="text-sm font-semibold text-ink">
