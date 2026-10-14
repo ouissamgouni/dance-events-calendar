@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchMyPlanShare, fetchSessionAttendanceSummary, fetchSessionAttendees, fetchSingleSessionAttendanceSummary, removeFromMyPlan, updateMyPlanAudience } from '../api';
@@ -11,12 +11,17 @@ import { trackProgramViewed } from '../utils/tracking';
 const authState = vi.hoisted(() => ({ user: null as object | null }));
 const requestInstallInvitation = vi.hoisted(() => vi.fn());
 const attendanceState = vi.hoisted(() => ({ attending: false, toggleAttending: vi.fn(), setAudience: vi.fn() }));
+const signIn = vi.hoisted(() => vi.fn());
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
     return { ...actual, addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn(), fetchMyPlanShare: vi.fn(), fetchSessionAttendanceSummary: vi.fn(), fetchSessionAttendees: vi.fn(), fetchSingleSessionAttendanceSummary: vi.fn(), removeFromMyPlan: vi.fn(), updateMyPlanAudience: vi.fn() };
 });
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user, loading: false }) }));
+vi.mock('../context/SignInSheetContext', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../context/SignInSheetContext')>()),
+    useSignIn: () => signIn,
+}));
 vi.mock('../context/AttendingEventsContext', () => ({
     useAttendingEvents: () => ({
         isAttending: () => attendanceState.attending,
@@ -47,14 +52,18 @@ const schedule: EventSchedule = {
     version: 1, published_at: '2026-09-01T12:00:00Z',
 };
 
-function renderPage(path = '/event/movida-2026/program', flags: Partial<typeof defaultFlags> = {}) {
-    return render(
+function programTree(path = '/event/movida-2026/program', flags: Partial<typeof defaultFlags> = {}) {
+    return (
         <MemoryRouter initialEntries={[path]}>
             <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, eventScheduleEnabled: true, ...flags }, updateFlag: vi.fn(), ready: true }}>
                 <Routes><Route path="/event/:eventId/program/*" element={<EventProgramPage />} /></Routes>
             </FeatureFlagsContext.Provider>
-        </MemoryRouter>,
+        </MemoryRouter>
     );
+}
+
+function renderPage(path = '/event/movida-2026/program', flags: Partial<typeof defaultFlags> = {}) {
+    return render(programTree(path, flags));
 }
 
 function LocationProbe() {
@@ -293,6 +302,23 @@ describe('EventProgramPage', () => {
         await waitFor(() => expect(addToMyPlan).toHaveBeenCalledTimes(1));
         expect(requestInstallInvitation).not.toHaveBeenCalled();
         expect(localStorage.getItem('movida:program-push-optin-pending:dancer')).toBeNull();
+    });
+
+    it('opens sign-in for a guest and adds the session after sign-in', async () => {
+        const view = renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: /Thursday Session/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add to My Plan' }));
+
+        expect(signIn).toHaveBeenCalledWith('my_plans', { onSignedIn: expect.any(Function) });
+        expect(addToMyPlan).not.toHaveBeenCalled();
+
+        authState.user = { user_id: 'dancer' };
+        view.rerender(programTree());
+        const { onSignedIn } = signIn.mock.calls[0][1] as { onSignedIn: () => void };
+        act(() => onSignedIn());
+
+        await waitFor(() => expect(addToMyPlan).toHaveBeenCalledTimes(1));
+        expect(vi.mocked(addToMyPlan).mock.calls[0][1]).toBe('thursday');
     });
 
     it('does not track direct My Plan or draft preview visits', async () => {
