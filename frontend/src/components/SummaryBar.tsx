@@ -9,8 +9,9 @@ import PeopleAvatarTrack, { type PersonMini } from './PeopleAvatarTrack';
 // As available width shrinks, pills hide RIGHT-TO-LEFT by priority and every
 // hidden/never-shown active filter group folds into a single "+X ⚙" control
 // that opens the main Filters sheet. The default bar never wraps or
-// horizontally scrolls; the two-line variant wraps once before applying the
-// same collapse rule. Pills are visually quiet: neutral background, light
+// horizontally scrolls; the two-line variant wraps once and pins the primary
+// pills (truncating labels) before falling back to the same collapse rule.
+// Pills are visually quiet: neutral background, light
 // border, dark text, no active-blue fills — the bar communicates search state
 // without competing with the results.
 
@@ -57,6 +58,8 @@ export interface SummaryBarProps {
     /** Session-only relaxation currently applied on top of ``reachFilter``. */
     reachRelaxation?: 'none' | 'manual' | 'zoom';
     onToggleReachRelax?: () => void;
+    /** Hides the in-chip local toggle while a "N local events hidden" banner offers the same action. */
+    reachToggleHidden?: boolean;
 
     // People pill (people icon + count of explicitly-selected handles).
     interestSource: InterestSource;
@@ -78,7 +81,7 @@ export interface SummaryBarProps {
 
 }
 
-function formatPeriodLabel(startDate: string, endDate: string): string {
+function formatPeriodLabel(startDate: string, endDate: string, compact = false): string {
     // Best-effort short label; falls back to ISO if parsing fails.
     const parse = (iso: string) => {
         const [y, m, d] = iso.split('-').map(Number);
@@ -94,6 +97,16 @@ function formatPeriodLabel(startDate: string, endDate: string): string {
         return start.getTime() === today.getTime() ? 'Any' : `From ${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
     }
     if (!start || !end) return `${startDate}-${endDate}`;
+    if (compact) {
+        const monthDay = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const yearSuffix = (d: Date) => (d.getFullYear() === today.getFullYear() ? '' : ` '${String(d.getFullYear()).slice(-2)}`);
+        if (start.getTime() === today.getTime()) return `Until ${monthDay(end)}${yearSuffix(end)}`;
+        if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
+            return `${monthDay(start)}–${end.getDate()}${yearSuffix(end)}`;
+        }
+        const startSuffix = start.getFullYear() === end.getFullYear() ? '' : yearSuffix(start);
+        return `${monthDay(start)}${startSuffix}–${monthDay(end)}${yearSuffix(end)}`;
+    }
     const sameYear = start.getFullYear() === end.getFullYear();
     const sameMonth = sameYear && start.getMonth() === end.getMonth();
     const fmt = (d: Date, withYear: boolean) =>
@@ -145,7 +158,7 @@ function Pill({ label, title, icon, trailing, onClick, onRemove, removeAriaLabel
     const padding = onRemove || trailing ? 'pl-2.5 pr-1' : '';
     return (
         <span
-            className={`${PILL_BASE} ${padding} ${onClick ? PILL_INTERACTIVE : ''} ${className ?? ''}`.trim()}
+            className={`${PILL_BASE} ${padding} ${onClick ? PILL_INTERACTIVE : ''} ${maxWidth === undefined ? '' : 'overflow-hidden'} ${className ?? ''}`.trim()}
             style={maxWidth === undefined ? undefined : { maxWidth }}
             title={title ?? label}
             aria-label={ariaLabel}
@@ -204,6 +217,56 @@ type PillVariant = 'compact' | 'full';
 interface SummaryLayout {
     visibleCount: number;
     expandedWidths: Partial<Record<CandidateKey, number>>;
+    shrunkWidths?: Partial<Record<CandidateKey, number>>;
+}
+
+// Smallest a pinned pill may shrink to: icon + padding + a couple of ellipsized chars.
+const PILL_MIN_WIDTH = 64;
+
+// Caps pill widths so every item (pills + trailing gear) fits in two wrapped
+// rows, truncating the widest labels first. Returns null when even minimum
+// widths can't fit. Any contiguous split that fits implies the browser's greedy
+// flex-wrap also fits in two rows.
+function shrinkToTwoRows(
+    keys: CandidateKey[],
+    widths: number[],
+    gearWidth: number,
+    available: number,
+    gap: number,
+): Partial<Record<CandidateKey, number>> | null {
+    const items = [...widths, gearWidth];
+    const mins = [...widths.map((w) => Math.min(w, PILL_MIN_WIDTH)), gearWidth];
+    const rowWidth = (from: number, to: number, ws: number[]) =>
+        ws.slice(from, to).reduce((sum, w) => sum + w, 0) + gap * (to - from - 1);
+    let best: { split: number; deficit: number } | null = null;
+    for (let split = 1; split < items.length; split += 1) {
+        if (rowWidth(0, split, mins) > available || rowWidth(split, items.length, mins) > available) continue;
+        const deficit = Math.max(0, rowWidth(0, split, items) - available)
+            + Math.max(0, rowWidth(split, items.length, items) - available);
+        if (!best || deficit < best.deficit) best = { split, deficit };
+    }
+    if (!best) return null;
+    const caps: Partial<Record<CandidateKey, number>> = {};
+    for (const [from, to] of [[0, best.split], [best.split, items.length]]) {
+        const deficit = rowWidth(from, to, items) - available;
+        if (deficit <= 0) continue;
+        const idx: number[] = [];
+        for (let i = from; i < to && i < keys.length; i += 1) idx.push(i);
+        const reduction = (level: number) =>
+            idx.reduce((sum, i) => sum + Math.max(0, widths[i] - Math.max(level, mins[i])), 0);
+        let lo = 0;
+        let hi = Math.max(...idx.map((i) => widths[i]));
+        while (lo < hi) {
+            const mid = Math.ceil((lo + hi) / 2);
+            if (reduction(mid) >= deficit) lo = mid;
+            else hi = mid - 1;
+        }
+        for (const i of idx) {
+            const cap = Math.max(lo, mins[i]);
+            if (widths[i] > cap) caps[keys[i]] = cap;
+        }
+    }
+    return caps;
 }
 
 export default function SummaryBar(props: SummaryBarProps) {
@@ -227,6 +290,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         reachHiddenCount = 0,
         reachRelaxation = 'none',
         onToggleReachRelax,
+        reachToggleHidden = false,
         interestSource,
         interestKind,
         interestUserHandles,
@@ -238,13 +302,15 @@ export default function SummaryBar(props: SummaryBarProps) {
     } = props;
 
     const danceSel = useMemo(() => {
-        if (!danceGroup) return { compactLabel: '', fullLabel: '', count: 0 };
+        if (!danceGroup) return { compactLabel: '', fullLabel: '', titleLabel: '', count: 0 };
         const selected = danceGroup.tags.filter((t) => activeTagIds.has(t.id));
-        if (selected.length === 0) return { compactLabel: 'Any', fullLabel: 'Any', count: 0 };
-        const first = selected[0].label;
+        if (selected.length === 0) return { compactLabel: 'Any', fullLabel: 'Any', titleLabel: 'Any', count: 0 };
+        const short = (tag: (typeof selected)[number]) => tag.short_label?.trim() || tag.label;
+        const first = short(selected[0]);
         return {
             compactLabel: selected.length > 1 ? `${first} +${selected.length - 1}` : first,
-            fullLabel: selected.map((tag) => tag.label).join(', '),
+            fullLabel: selected.map(short).join(', '),
+            titleLabel: selected.map((tag) => tag.label).join(', '),
             count: selected.length,
         };
     }, [danceGroup, activeTagIds]);
@@ -358,6 +424,23 @@ export default function SummaryBar(props: SummaryBarProps) {
             count = i;
         }
 
+        // Two-line mode pins every primary chip; only Discount may fold. Labels
+        // truncate instead of chips disappearing.
+        const primaryCount = candidates.filter((key) => key !== 'discount').length;
+        if (twoLine && count < primaryCount) {
+            const shrunkWidths = shrinkToTwoRows(
+                candidates.slice(0, primaryCount),
+                widths.slice(0, primaryCount),
+                gearW,
+                containerWidth - 1,
+                GAP,
+            );
+            if (shrunkWidths) {
+                setLayout({ visibleCount: primaryCount, expandedWidths: {}, shrunkWidths });
+                return;
+            }
+        }
+
         type RowItem = { key: CandidateKey | null; width: number };
         const rows: Array<{ items: RowItem[]; used: number }> = [];
         const items: RowItem[] = [
@@ -418,7 +501,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         }
 
         setLayout({ visibleCount: count, expandedWidths });
-    }, [candidates, containerWidth, foldedRemainingCount, danceSel.compactLabel, danceSel.fullLabel, areaLabel, startDate, endDate, peopleTypeLabel, peopleStatusLabel, reachFilter, reachHiddenCount, reachRelaxation, twoLine]);
+    }, [candidates, containerWidth, foldedRemainingCount, danceSel.compactLabel, danceSel.fullLabel, areaLabel, startDate, endDate, peopleTypeLabel, peopleStatusLabel, reachFilter, reachHiddenCount, reachRelaxation, reachToggleHidden, twoLine]);
 
     const hiddenActivePrimaries = Math.max(0, candidates.length - layout.visibleCount);
     const extraCount = foldedRemainingCount + hiddenActivePrimaries;
@@ -434,7 +517,8 @@ export default function SummaryBar(props: SummaryBarProps) {
                     <Pill
                         key={pillKey}
                         icon={<img src="/calendar.png" alt="" aria-hidden="true" className={ICON_CLS} />}
-                        label={formatPeriodLabel(startDate, endDate)}
+                        label={formatPeriodLabel(startDate, endDate, variant === 'compact')}
+                        title={formatPeriodLabel(startDate, endDate)}
                         onClick={onEditPeriod}
                         testId={tid('summary-chip-period')}
                         maxWidth={maxWidth}
@@ -462,7 +546,7 @@ export default function SummaryBar(props: SummaryBarProps) {
                         key={pillKey}
                         icon={<img src="/dance.png" alt="" aria-hidden="true" className={ICON_CLS} />}
                         label={variant === 'full' ? danceSel.fullLabel : danceSel.compactLabel}
-                        title={`Dance styles: ${danceSel.fullLabel}`}
+                        title={`Dance styles: ${danceSel.titleLabel}`}
                         onClick={onEditDance}
                         testId={tid('summary-chip-dance')}
                         maxWidth={maxWidth}
@@ -475,7 +559,7 @@ export default function SummaryBar(props: SummaryBarProps) {
                 const full = REACH_FILTER_LABELS[reachFilter];
                 const short = full.length <= 5 ? full : full.slice(0, 3);
                 const relaxed = reachRelaxation !== 'none';
-                const showToggle = !!onToggleReachRelax && reachFilter !== 'any' && (relaxed || reachHiddenCount > 0);
+                const showToggle = !!onToggleReachRelax && reachFilter !== 'any' && (relaxed || (reachHiddenCount > 0 && !reachToggleHidden));
                 const toggleLabel = relaxed
                     ? (variant === 'full' && reachRelaxation === 'zoom' ? '+ local · this view' : '+ local')
                     : (variant === 'full' ? `+${reachHiddenCount} local` : `+${reachHiddenCount}`);
@@ -596,7 +680,8 @@ export default function SummaryBar(props: SummaryBarProps) {
                 <div className={`flex items-center gap-1.5 min-w-0 flex-1 ${twoLine ? 'flex-wrap' : ''}`}>
                     {visibleKeys.map((key) => {
                         const expandedWidth = layout.expandedWidths[key];
-                        return buildPill(key, false, expandedWidth === undefined ? 'compact' : 'full', expandedWidth);
+                        if (expandedWidth === undefined) return buildPill(key, false, 'compact', layout.shrunkWidths?.[key]);
+                        return buildPill(key, false, 'full', expandedWidth);
                     })}
                     {buildGear(extraCount)}
                 </div>

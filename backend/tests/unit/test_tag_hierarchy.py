@@ -178,6 +178,15 @@ class TestTagParentAdmin:
         assert resp.status_code == 200, resp.text
         assert resp.json()["parent_tag_id"] is None
 
+    def test_set_and_clear_short_label(self, admin_client, family):
+        url = f"/api/admin/tags/{family['mambo'].id}"
+        resp = admin_client.patch(url, json={"short_label": " On2 "})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["short_label"] == "On2"
+        resp = admin_client.patch(url, json={"short_label": ""})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["short_label"] is None
+
     @pytest.mark.parametrize(
         "child, parent",
         [

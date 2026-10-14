@@ -22,6 +22,8 @@ export interface Tag {
     hero_ordinal: number | null;
     /** One-level hierarchy within a group (e.g. On2 -> Salsa). */
     parent_tag_id?: number | null;
+    /** Compact label for space-constrained chips (e.g. "On2"). */
+    short_label?: string | null;
 }
 
 export interface TagGroup {

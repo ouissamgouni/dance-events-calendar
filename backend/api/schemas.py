@@ -32,6 +32,7 @@ class TagResponse(BaseModel):
     is_hero_filter: bool = False
     hero_ordinal: Optional[int] = None
     parent_tag_id: Optional[int] = None
+    short_label: Optional[str] = None
 
 
 class EventSearchResponse(BaseModel):
@@ -2678,6 +2679,7 @@ class TagCreate(BaseModel):
         default=None, pattern="^(positive|negative|neutral)$"
     )
     parent_tag_id: Optional[int] = None
+    short_label: Optional[str] = Field(default=None, max_length=32)
 
 
 class TagUpdate(BaseModel):
@@ -2692,6 +2694,7 @@ class TagUpdate(BaseModel):
         default=None, pattern="^(positive|negative|neutral)$"
     )
     parent_tag_id: Optional[int] = None
+    short_label: Optional[str] = Field(default=None, max_length=32)
 
 
 class EventTagAssignment(BaseModel):

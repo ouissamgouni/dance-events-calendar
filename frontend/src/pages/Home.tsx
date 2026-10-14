@@ -1995,6 +1995,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 reachHiddenCount={isCal ? calendarReachHiddenCount : explorerReachHiddenCount}
                 reachRelaxation={reachRelaxation}
                 onToggleReachRelax={handleToggleReachRelax}
+                reachToggleHidden={reachHintVisible}
                 interestSource={interestSource}
                 interestKind={interestKind}
                 interestUserHandles={interestUserHandles}

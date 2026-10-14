@@ -257,6 +257,24 @@ export default function AdminTagCategories() {
         }
     };
 
+    const handleSetShortLabel = async (tag: AdminTag, raw: string) => {
+        const shortLabel = raw.trim() || null;
+        if (shortLabel === (tag.short_label ?? null)) return;
+        setGroups((prev) =>
+            prev.map((g) => ({
+                ...g,
+                tags: g.tags.map((t) => (t.id === tag.id ? { ...t, short_label: shortLabel } : t)),
+            })),
+        );
+        try {
+            setTagActionError(null);
+            await updateTag(tag.id, { short_label: shortLabel });
+        } catch (e) {
+            setTagActionError((e as Error).message || 'Failed to set short label');
+            load();
+        }
+    };
+
     const confirmDeleteTag = async () => {
         const tag = deleteTagTarget;
         if (!tag) return;
@@ -579,6 +597,23 @@ export default function AdminTagCategories() {
                                                         >
                                                             {tag.polarity === 'positive' ? '+' : tag.polarity === 'negative' ? '−' : '•'}
                                                         </button>
+                                                    )}
+                                                    {(group.scope ?? 'event') === 'event' && (
+                                                        <input
+                                                            key={`short-${tag.id}-${tag.short_label ?? ''}`}
+                                                            type="text"
+                                                            defaultValue={tag.short_label ?? ''}
+                                                            maxLength={32}
+                                                            placeholder="short"
+                                                            onBlur={(e) => handleSetShortLabel(tag, e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') e.currentTarget.blur();
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="ml-0.5 w-10 bg-transparent text-[9px] text-white placeholder-white/50 border-b border-white/30 focus:outline-none"
+                                                            title="Short label for compact chips (e.g. On2)"
+                                                            aria-label={`Short label of ${tag.label}`}
+                                                        />
                                                     )}
                                                     {(group.scope ?? 'event') === 'event' && (
                                                         <select

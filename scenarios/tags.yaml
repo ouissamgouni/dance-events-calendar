@@ -8,14 +8,17 @@ tag_groups:
     tags:
       - slug: salsa
         label: Salsa
+        short: Salsa
         is_hero_filter: true
         hero_ordinal: 1
       - slug: salsa-on1
         label: Salsa On1 (LA)
+        short: On1
         parent: salsa
         synonyms: ["salsa on1", "on1", "la style", "linea", "línea"]
       - slug: mambo
         label: Salsa On2 (Mambo)
+        short: On2
         parent: salsa
         synonyms:
           [
@@ -28,6 +31,7 @@ tag_groups:
           ]
       - slug: cuban
         label: Cuban Salsa (Casino)
+        short: Cuban
         parent: salsa
         synonyms:
           [
@@ -54,6 +58,7 @@ tag_groups:
         synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
       - slug: afro-cuban
         label: Afro-Cuban
+        short: Afro
         synonyms:
           [
             "afro cubano",
@@ -84,12 +89,15 @@ tag_groups:
         synonyms: ["brazilian zouk", "lambazouk", "lambada"]
       - slug: argentine-tango
         label: Argentine Tango
+        short: Tango
         synonyms: ["tango", "tango argentino", "milonga"]
       - slug: west-coast-swing
         label: West Coast Swing
+        short: WCS
         synonyms: ["wcs"]
       - slug: lindy-hop
         label: Lindy Hop
+        short: Lindy
         synonyms: ["lindy", "lindyhop"]
 
   - slug: format

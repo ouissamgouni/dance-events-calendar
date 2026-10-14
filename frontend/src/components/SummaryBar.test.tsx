@@ -141,11 +141,18 @@ describe('SummaryBar', () => {
     it.each([
         ['same-month', '2026-01-01', '2026-01-31', 'Jan 1–31'],
         ['same-year', '2026-01-31', '2026-02-05', 'Jan 31–Feb 5'],
-        ['cross-year', '2025-12-30', '2026-01-02', 'Dec 30, 2025–Jan 2, 2026'],
+        ['cross-year', '2025-12-30', '2026-01-02', "Dec 30 '25–Jan 2"],
+        ['next-year', '2027-03-03', '2027-03-05', "Mar 3–5 '27"],
+        ['from-today', '2026-06-01', '2027-04-14', "Until Apr 14 '27"],
     ])('formats a compact %s period label', (_case, startDate, endDate, expected) => {
-        render(<SummaryBar {...baseProps({ startDate, endDate })} />);
-
-        expect(screen.getByTestId('summary-chip-period')).toHaveTextContent(expected);
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date(2026, 5, 1, 12));
+        try {
+            render(<SummaryBar {...baseProps({ startDate, endDate })} />);
+            expect(screen.getByTestId('summary-chip-period')).toHaveTextContent(expected);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('renders the area chip with a map icon and opens the area picker on click', async () => {
@@ -213,6 +220,26 @@ describe('SummaryBar', () => {
         expect(screen.getByTestId('summary-chip-dance')).toHaveTextContent('Any');
     });
 
+    it('uses tag short labels in the Dance chip and keeps full labels in the tooltip', () => {
+        const group = {
+            ...DANCE_GROUP,
+            tags: [
+                { id: 12, label: 'Salsa On2 (Mambo)', short_label: 'On2' },
+                { id: 13, label: 'Salsa On1 (LA)', short_label: 'On1' },
+            ],
+        } as unknown as TagGroup;
+        const { rerender } = render(
+            <SummaryBar {...baseProps({ danceGroup: group, tagGroups: [group], activeTagIds: new Set([12]) })} />,
+        );
+        const chip = screen.getByTestId('summary-chip-dance');
+        expect(chip).toHaveTextContent('On2');
+        expect(chip).not.toHaveTextContent('Mambo');
+        expect(chip).toHaveAttribute('title', 'Dance styles: Salsa On2 (Mambo)');
+
+        rerender(<SummaryBar {...baseProps({ danceGroup: group, tagGroups: [group], activeTagIds: new Set([12, 13]) })} />);
+        expect(screen.getByTestId('summary-chip-dance')).toHaveTextContent('On2 +1');
+    });
+
     it('renders the Reach pill with its sheet icon, short label, and deep-link', async () => {
         const onEditReach = vi.fn();
         const { rerender } = render(<SummaryBar {...baseProps({ reachFilter: 'any', onEditReach })} />);
@@ -246,6 +273,15 @@ describe('SummaryBar', () => {
 
         rerender(<SummaryBar {...baseProps({ ...props, reachHiddenCount: 0, reachRelaxation: 'manual' })} />);
         expect(screen.getByRole('button', { name: 'Hide local events' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('hides the local toggle while the hidden-events banner offers it, but keeps the relaxed toggle', () => {
+        const props = { reachFilter: 'international' as const, onToggleReachRelax: vi.fn(), reachToggleHidden: true };
+        const { rerender } = render(<SummaryBar {...baseProps({ ...props, reachHiddenCount: 14 })} />);
+        expect(screen.queryByTestId('summary-chip-reach-toggle')).toBeNull();
+
+        rerender(<SummaryBar {...baseProps({ ...props, reachRelaxation: 'manual' })} />);
+        expect(screen.getByTestId('summary-chip-reach-toggle')).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('shows the Discount chip only while the filter is active and deep-links', async () => {
@@ -414,6 +450,37 @@ describe('SummaryBar', () => {
         expect(screen.queryByTestId('summary-chip-dance')).toBeNull();
         expect(screen.queryByTestId('summary-chip-reach')).toBeNull();
         expect(screen.getByTestId('summary-open-filters')).toHaveTextContent('+3');
+    });
+
+    it('pins every primary chip in two-line mode by truncating the widest labels', () => {
+        mockMeasuredPillWidths({
+            people: { compact: 80, full: 80 },
+            period: { compact: 120, full: 120 },
+            area: { compact: 110, full: 110 },
+            dance: { compact: 140, full: 140 },
+            reach: { compact: 70, full: 70 },
+        }, 50);
+        render(
+            <SummaryBar
+                {...baseProps({
+                    twoLine: true,
+                    activeTagIds: new Set([10]),
+                    onEditPeople: vi.fn(),
+                    interestSource: 'follows',
+                    onOpenFilters: vi.fn(),
+                })}
+            />,
+        );
+
+        // Natural wrap needs three rows; row one (People, Date, Area) is 23px
+        // too wide, so Date and Area level down to 103px instead of folding.
+        setBarWidth(300);
+        expect(screen.getByTestId('summary-chip-people')).not.toHaveStyle({ maxWidth: '103px' });
+        expect(screen.getByTestId('summary-chip-period')).toHaveStyle({ maxWidth: '103px' });
+        expect(screen.getByTestId('summary-chip-area')).toHaveStyle({ maxWidth: '103px' });
+        expect(screen.getByTestId('summary-chip-dance')).toBeInTheDocument();
+        expect(screen.getByTestId('summary-chip-reach')).toBeInTheDocument();
+        expect(screen.getByTestId('summary-open-filters')).not.toHaveTextContent('+');
     });
 
     it('distributes expansion within each compact row and redistributes unused slack', () => {
