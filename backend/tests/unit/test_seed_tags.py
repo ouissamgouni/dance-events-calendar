@@ -83,3 +83,31 @@ tag_groups:
         select(TagGroup).where(TagGroup.slug == "format")
     ).one()
     assert refreshed_group.onboarding_eligible is True
+
+
+def test_seed_tags_resolves_parent_listed_after_child(session: Session, tmp_path):
+    tags_yaml = tmp_path / "tags.yaml"
+    tags_yaml.write_text(
+        """
+tag_groups:
+  - slug: dance-style
+    label: Dance Style
+    tags:
+      - slug: mambo
+        label: On2
+        parent: salsa
+      - slug: salsa
+        label: Salsa
+      - slug: bachata
+        label: Bachata
+        parent: missing
+""".strip()
+    )
+
+    DatabaseSeeder(session)._seed_tags(tags_yaml)
+    session.commit()
+
+    by_slug = {t.slug: t for t in session.exec(select(Tag)).all()}
+    assert by_slug["mambo"].parent_tag_id == by_slug["salsa"].id
+    assert by_slug["salsa"].parent_tag_id is None
+    assert by_slug["bachata"].parent_tag_id is None

@@ -63,6 +63,7 @@ from backend.services.follows import (
     ensure_calendar_subscription,
 )
 from backend.services.schedules import build_snapshot, session_snapshot, to_utc
+from backend.services.tag_hierarchy import drop_superseded_parents
 
 WEEKDAYS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 RELATIVE_RE = re.compile(
@@ -605,6 +606,7 @@ class DatabaseSeeder:
                 logger.info("Created tag group: %s", slug)
 
             tags_data = group_data.get("tags", [])
+            parent_links: list[tuple[Tag, Optional[str]]] = []
             for tag_idx, tag_data in enumerate(tags_data):
                 tag_slug = tag_data.get("slug")
                 tag_label = tag_data.get("label")
@@ -657,6 +659,7 @@ class DatabaseSeeder:
                     )
                     self.session.add(tag)
                     self.session.flush()
+                parent_links.append((tag, tag_data.get("parent")))
 
                 # Optional per-tag synonyms (scenario-driven, fully reproducible).
                 # When `synonyms:` is provided, it is treated as the authoritative
@@ -687,6 +690,27 @@ class DatabaseSeeder:
                                 continue
                             seen.add(term)
                             self.session.add(TagSynonym(tag_id=tag.id, term=term))
+
+            # Resolved after the loop so a child may be listed before its parent.
+            for tag, parent_slug in parent_links:
+                parent_id = None
+                if parent_slug:
+                    with self.session.no_autoflush:
+                        parent_id = self.session.exec(
+                            select(Tag.id).where(
+                                Tag.group_id == group.id, Tag.slug == parent_slug
+                            )
+                        ).first()
+                    if parent_id is None or parent_id == tag.id:
+                        logger.warning(
+                            "Tag %s/%s: unknown parent %r; ignoring",
+                            slug,
+                            tag.slug,
+                            parent_slug,
+                        )
+                        parent_id = None
+                tag.parent_tag_id = parent_id
+                self.session.add(tag)
 
     def _ensure_system_tag_groups(self) -> None:
         """Idempotently guarantee the tag groups the app depends on.
@@ -2243,6 +2267,7 @@ class DatabaseSeeder:
                 self.session.flush()
 
             tag_refs = (entry.get("dance_tags") or []) + (entry.get("reach_tags") or [])
+            tag_ids: list[int] = []
             for tag_ref in tag_refs:
                 tag = _resolve_tag(str(tag_ref))
                 if tag is None:
@@ -2250,8 +2275,10 @@ class DatabaseSeeder:
                         "Interest profile %r: unknown tag %r", label, tag_ref
                     )
                     continue
+                tag_ids.append(tag.id)
+            for tag_id in drop_superseded_parents(self.session, tag_ids):
                 self.session.add(
-                    UserInterestProfileTag(profile_id=profile.id, tag_id=tag.id)
+                    UserInterestProfileTag(profile_id=profile.id, tag_id=tag_id)
                 )
             logger.info("Seeded interest profile %r for %s", label, user.email)
 

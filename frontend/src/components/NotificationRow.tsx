@@ -78,6 +78,7 @@ const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: strin
     event_removed: { Icon: Bell, cls: 'bg-slate-100 text-ink-soft' },
     event_cancelled: { Icon: CalendarX, cls: 'bg-danger/10 text-danger' },
     organizer_assigned: { Icon: BadgeCheck, cls: 'bg-blue-100 text-action' },
+    interest_profile_updated: { Icon: SquarePen, cls: 'bg-blue-100 text-action' },
     plan_session_added: { Icon: CalendarPlus, cls: 'bg-emerald-100 text-emerald-600' },
     schedule_program_available: { Icon: CalendarCheck, cls: 'bg-blue-100 text-action' },
     schedule_program_updated: { Icon: CalendarCheck, cls: 'bg-blue-100 text-action' },
@@ -577,13 +578,15 @@ export default function NotificationRow({
         item.kind === 'event_change_reverted' ||
         item.kind === 'event_removed' ||
         item.kind === 'event_cancelled' ||
-        item.kind === 'organizer_assigned'
+        item.kind === 'organizer_assigned' ||
+        item.kind === 'interest_profile_updated'
     ) {
         const title = item.context || item.event_title;
         const headlines: Partial<Record<NotificationItem['kind'], string>> = {
             event_changed: 'Event updated',
             event_cancelled: 'Event cancelled',
             organizer_assigned: item.event_id || item.context ? "You're the organizer" : "You're a verified organizer",
+            interest_profile_updated: 'The Movida team updated your saved search',
             event_change_reverted: 'Your change was reverted',
             event_removed: 'Event removed',
             event_change_applied: 'Your suggestion was applied',

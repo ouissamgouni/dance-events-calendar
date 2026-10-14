@@ -1,4 +1,5 @@
 import type { CalendarEvent, TagGroup } from '../types';
+import { dropSupersededParents } from './tagHierarchy';
 
 /**
  * Disjunctive faceting filter shared by the Explorer and the onboarding
@@ -7,6 +8,7 @@ import type { CalendarEvent, TagGroup } from '../types';
  *    that group).
  *  - Across groups: AND (event must satisfy every group that has a selection).
  * Single-select groups behave the same as OR (only one tag can be selected).
+ * A selected sub-style supersedes its parent (legacy "Salsa + On2" = On2).
  */
 export function filterEventsByTags(
     events: CalendarEvent[],
@@ -21,7 +23,7 @@ export function filterEventsByTags(
     }
     const groupBuckets = new Map<string, number[]>();
     const ungrouped: number[] = [];
-    for (const id of activeTagIds) {
+    for (const id of dropSupersededParents(activeTagIds, tagGroups.flatMap((g) => g.tags))) {
         const slug = tagToGroupSlug.get(id);
         if (!slug) { ungrouped.push(id); continue; }
         const arr = groupBuckets.get(slug);

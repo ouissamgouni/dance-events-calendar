@@ -60,4 +60,35 @@ describe('ProfileDraftEditor', () => {
             matches_enabled: true,
         }));
     });
+
+    it('combines salsa sub-styles and lets them replace "All Salsa"', async () => {
+        const user = userEvent.setup();
+        const onSave = vi.fn().mockResolvedValue(undefined);
+        const family = {
+            id: 1,
+            slug: 'dance-style',
+            label: 'Dance styles',
+            tags: [
+                { id: 10, slug: 'salsa', label: 'Salsa' },
+                { id: 11, slug: 'salsa-on1', label: 'On1', parent_tag_id: 10 },
+                { id: 12, slug: 'mambo', label: 'On2', parent_tag_id: 10 },
+            ],
+        } as TagGroup;
+        render(
+            <ProfileDraftEditor
+                mode="edit"
+                danceGroup={family}
+                initialValue={{ label: 'Mine', danceIds: [10], reachFilter: 'any', matchesEnabled: true }}
+                onSave={onSave}
+            />,
+        );
+
+        await user.click(screen.getByRole('button', { name: /dance styles/i }));
+        await user.click(screen.getByRole('button', { name: 'On1' }));
+        await user.click(screen.getByRole('button', { name: 'On2' }));
+        expect(screen.getByRole('button', { name: 'All Salsa' })).toHaveAttribute('aria-pressed', 'false');
+        await user.click(screen.getByRole('button', { name: /back/i }));
+        await user.click(screen.getByRole('button', { name: 'Save changes' }));
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ dance_tag_ids: [11, 12] }));
+    });
 });

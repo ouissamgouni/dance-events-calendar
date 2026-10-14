@@ -1,0 +1,39 @@
+# One alert-enabled default profile per viewer over a wide Europe bbox.
+# Nora's profile is seeded the legacy way ("salsa" + "mambo"); the seeder
+# applies the same normalization as the prod migration → stored as On2 only.
+interest_profiles:
+  - user: nora@example.com
+    label: "Nora: Europe On2"
+    area_label: "Europe & nearby"
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags: ["dance-style:salsa", "dance-style:mambo"]
+    reach_tags: []
+    matches_enabled: true
+    is_active: true
+
+  - user: leo@example.com
+    label: "Leo: Europe On1 + On2"
+    area_label: "Europe & nearby"
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags: ["dance-style:salsa-on1", "dance-style:mambo"]
+    reach_tags: []
+    matches_enabled: true
+    is_active: true
+
+  - user: alma@example.com
+    label: "Alma: Europe all salsa"
+    area_label: "Europe & nearby"
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: []
+    matches_enabled: true
+    is_active: true

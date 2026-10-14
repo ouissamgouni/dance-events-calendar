@@ -140,6 +140,7 @@ export default function ProfileEditor({
                                 allowFreeText={false}
                                 searchable={false}
                                 hideGroupLabels
+                                searchSelection
                             />
                         )}
                     </section>

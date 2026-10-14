@@ -6,6 +6,7 @@ import PeopleFilterPanel from '../components/PeopleFilterPanel';
 import PeopleAvatarTrack, { type PersonMini } from '../components/PeopleAvatarTrack';
 import { trackView } from '../utils/tracking';
 import { filterEventsByTags } from '../utils/tagFilter';
+import { toggleSearchTag } from '../utils/tagHierarchy';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type { CalendarViewMode } from '../components/Calendar';
@@ -944,9 +945,10 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
                 for (const id of Array.from(next)) {
                     if (siblingIds.has(id)) next.delete(id);
                 }
+                next.add(tagId);
+                return next;
             }
-            next.add(tagId);
-            return next;
+            return new Set(toggleSearchTag(next, tagId, group?.tags ?? []));
         });
     }, [tagGroups]);
 

@@ -1302,6 +1302,7 @@ events:
     tags:
       [
         "format:festival",
+        "dance-style:salsa",
         "dance-style:mambo",
         "reach:international",
         "scale:large",
@@ -1399,6 +1400,7 @@ events:
     tags:
       [
         "format:festival",
+        "dance-style:salsa",
         "dance-style:cuban",
         "reach:international",
         "misc:live-band",

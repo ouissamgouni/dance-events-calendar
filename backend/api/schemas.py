@@ -31,6 +31,7 @@ class TagResponse(BaseModel):
     enabled: bool = True
     is_hero_filter: bool = False
     hero_ordinal: Optional[int] = None
+    parent_tag_id: Optional[int] = None
 
 
 class EventSearchResponse(BaseModel):
@@ -1124,6 +1125,34 @@ class InterestProfileResponse(BaseModel):
     notify_enabled: bool = True
     is_active: bool = False
     created_at: datetime
+
+
+class AdminInterestProfileCluster(BaseModel):
+    key: str
+    dance_tag_ids: list[int]
+    reach_filter: ReachFilter
+    # Rounded to whole degrees: the cluster's shared area bucket.
+    min_lat: float
+    min_lng: float
+    max_lat: float
+    max_lng: float
+    area_labels: list[str]
+    profile_count: int
+    user_count: int
+    matches_enabled_count: int
+    upcoming_match_count: int
+    notifications_30d_per_user: float
+    flags: list[str]
+
+
+class AdminInterestProfileRow(InterestProfileResponse):
+    cluster_key: str
+    user_id: UUID
+    user_email: str
+    user_handle: Optional[str] = None
+    user_display_name: Optional[str] = None
+    upcoming_match_count: int
+    notifications_30d: int
 
 
 class EventLinkClickRequest(BaseModel):
@@ -2648,6 +2677,7 @@ class TagCreate(BaseModel):
     polarity: Optional[str] = Field(
         default=None, pattern="^(positive|negative|neutral)$"
     )
+    parent_tag_id: Optional[int] = None
 
 
 class TagUpdate(BaseModel):
@@ -2661,6 +2691,7 @@ class TagUpdate(BaseModel):
     polarity: Optional[str] = Field(
         default=None, pattern="^(positive|negative|neutral)$"
     )
+    parent_tag_id: Optional[int] = None
 
 
 class EventTagAssignment(BaseModel):

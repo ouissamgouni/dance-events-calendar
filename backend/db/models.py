@@ -1384,6 +1384,11 @@ class Tag(SQLModel, table=True):
     # both-polarity ordering in the review flow and the community summary
     # (loved vs mentioned). NULL for event/audience tags.
     polarity: Optional[str] = Field(default=None)
+    # One-level hierarchy within a group (e.g. On2 -> Salsa); selecting a child
+    # in a search profile supersedes its parent. See services/tag_hierarchy.py.
+    parent_tag_id: Optional[int] = Field(
+        default=None, foreign_key="tags.id", nullable=True, index=True
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     group: Optional[TagGroup] = Relationship(back_populates="tags")

@@ -241,6 +241,22 @@ export default function AdminTagCategories() {
         setDeleteTagTarget(tag);
     };
 
+    const handleSetParent = async (tagId: number, parentTagId: number | null) => {
+        setGroups((prev) =>
+            prev.map((g) => ({
+                ...g,
+                tags: g.tags.map((t) => (t.id === tagId ? { ...t, parent_tag_id: parentTagId } : t)),
+            })),
+        );
+        try {
+            setTagActionError(null);
+            await updateTag(tagId, { parent_tag_id: parentTagId });
+        } catch (e) {
+            setTagActionError((e as Error).message || 'Failed to set parent tag');
+            load();
+        }
+    };
+
     const confirmDeleteTag = async () => {
         const tag = deleteTagTarget;
         if (!tag) return;
@@ -563,6 +579,24 @@ export default function AdminTagCategories() {
                                                         >
                                                             {tag.polarity === 'positive' ? '+' : tag.polarity === 'negative' ? '−' : '•'}
                                                         </button>
+                                                    )}
+                                                    {(group.scope ?? 'event') === 'event' && (
+                                                        <select
+                                                            value={tag.parent_tag_id ?? ''}
+                                                            onChange={(e) => handleSetParent(tag.id, e.target.value ? Number(e.target.value) : null)}
+                                                            disabled={group.tags.some((t) => t.parent_tag_id === tag.id)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="ml-0.5 max-w-[72px] bg-transparent text-[9px] text-white focus:outline-none disabled:opacity-40"
+                                                            title={group.tags.some((t) => t.parent_tag_id === tag.id) ? 'Has sub-tags' : 'Parent tag (search: a sub-tag supersedes its parent)'}
+                                                            aria-label={`Parent tag of ${tag.label}`}
+                                                        >
+                                                            <option value="" className="text-ink">↳ none</option>
+                                                            {group.tags
+                                                                .filter((t) => t.id !== tag.id && t.parent_tag_id == null)
+                                                                .map((t) => (
+                                                                    <option key={t.id} value={t.id} className="text-ink">↳ {t.label}</option>
+                                                                ))}
+                                                        </select>
                                                     )}
                                                     <button
                                                         onClick={() => setSynonymsOpenTagId(

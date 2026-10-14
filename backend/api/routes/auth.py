@@ -84,6 +84,7 @@ from backend.services.email import send_login_code_email, send_new_user_notifica
 from backend.services.event_visibility import eligible_event_ids
 from backend.services.follows import ensure_approved_follow_with_subscription
 from backend.services.image_processing import ImageValidationError
+from backend.services.tag_hierarchy import drop_superseded_parents
 from backend.services.user_bootstrap import ensure_default_interest_profile
 from backend.services.user_avatars import (
     delete_user_avatar,
@@ -393,7 +394,7 @@ def _validate_tag_ids(session: Session, tag_ids: list[int]) -> list[int]:
 def _replace_preferred_tags(session: Session, user: User, tag_ids: list[int]) -> None:
     """Replace the user's preferred tag rows in one shot."""
     session.exec(delete(UserPreferredTag).where(UserPreferredTag.user_id == user.id))
-    for tid in tag_ids:
+    for tid in drop_superseded_parents(session, tag_ids):
         session.add(UserPreferredTag(user_id=user.id, tag_id=tid))
 
 

@@ -1,27 +1,49 @@
 import logging
 import math
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlmodel import Session, delete, select
 
-from backend.api.deps import require_user
+from backend.api.deps import require_admin, require_user
 from backend.api.schemas import (
+    AdminInterestProfileCluster,
+    AdminInterestProfileRow,
     InterestProfileRequest,
     InterestProfileResponse,
     InterestProfileUpdateRequest,
 )
 from backend.db.database import get_session
 from backend.db.models import (
+    CachedEvent,
+    EventTag,
+    Notification,
     Tag,
     TagGroup,
     User,
     UserInterestProfile,
     UserInterestProfileTag,
 )
+from backend.services.event_visibility import apply_event_visibility
+from backend.services.notification_delivery import record_delivery
+from backend.services.profile_geography import haversine_km, profile_contains_point
+from backend.services.reach import reach_matches
+from backend.services.tag_hierarchy import drop_superseded_parents
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/interest-profiles", tags=["interest-profiles"])
+admin_router = APIRouter(
+    prefix="/api/admin/interest-profiles", tags=["admin", "interest-profiles"]
+)
+
+PROFILE_UPDATED_BY_ADMIN = "interest_profile_updated"
+# Mirrors WIDE_AREA_THRESHOLD_KM in frontend/src/constants/area.ts.
+WIDE_AREA_THRESHOLD_KM = 150.0
 
 
 def _validate_tag_ids(session: Session, tag_ids: list[int]) -> list[int]:
@@ -217,7 +239,7 @@ def _replace_profile_tags(
             UserInterestProfileTag.profile_id == profile_id
         )
     )
-    for tid in tag_ids:
+    for tid in drop_superseded_parents(session, tag_ids):
         session.add(UserInterestProfileTag(profile_id=profile_id, tag_id=tid))
 
 
@@ -422,3 +444,261 @@ def delete_interest_profile(
     )
     session.delete(profile)
     session.commit()
+
+
+# ── Admin: search-profile insights + per-user editing ────────────────────
+
+
+def _cluster_key(profile: UserInterestProfile, dance_ids: list[int]) -> str:
+    bbox = ",".join(
+        str(round(v))
+        for v in (profile.min_lat, profile.min_lng, profile.max_lat, profile.max_lng)
+    )
+    return f"{'.'.join(map(str, sorted(dance_ids)))}|{profile.reach_filter}|{bbox}"
+
+
+def _profiles_with_users(
+    session: Session, user_id: Optional[UUID] = None
+) -> list[tuple[UserInterestProfile, User]]:
+    statement = (
+        select(UserInterestProfile, User)
+        .join(User, User.id == UserInterestProfile.user_id)  # type: ignore[arg-type]
+        .where(User.deleted_at.is_(None))  # type: ignore[union-attr]
+        .order_by(UserInterestProfile.created_at)
+    )
+    if user_id is not None:
+        statement = statement.where(UserInterestProfile.user_id == user_id)
+    return session.exec(statement).all()
+
+
+def _bulk_dance_ids(session: Session, profile_ids: list[int]) -> dict[int, list[int]]:
+    out: dict[int, list[int]] = {pid: [] for pid in profile_ids}
+    if not profile_ids:
+        return out
+    reach_group_id = session.exec(
+        select(TagGroup.id).where(TagGroup.slug == "reach")
+    ).first()
+    for profile_id, tag_id, group_id in session.exec(
+        select(UserInterestProfileTag.profile_id, Tag.id, Tag.group_id)
+        .join(Tag, Tag.id == UserInterestProfileTag.tag_id)  # type: ignore[arg-type]
+        .where(UserInterestProfileTag.profile_id.in_(profile_ids))  # type: ignore[union-attr]
+    ).all():
+        if group_id != reach_group_id:
+            out[profile_id].append(int(tag_id))
+    return {pid: sorted(ids) for pid, ids in out.items()}
+
+
+def _upcoming_events(session: Session) -> list[tuple[CachedEvent, set[int]]]:
+    """Future visible geolocated events with their tag ids (match candidates)."""
+    statement = (
+        select(CachedEvent)
+        .where(CachedEvent.deleted_at.is_(None))  # type: ignore[union-attr]
+        .where(CachedEvent.is_hidden == False)  # noqa: E712
+        .where(CachedEvent.start > datetime.now(timezone.utc))
+        .where(CachedEvent.latitude.is_not(None))  # type: ignore[union-attr]
+        .where(CachedEvent.longitude.is_not(None))  # type: ignore[union-attr]
+    )
+    events = session.exec(apply_event_visibility(statement, session)).all()
+    tags: dict[str, set[int]] = {}
+    if events:
+        for event_id, tag_id in session.exec(
+            select(EventTag.event_id, EventTag.tag_id).where(
+                EventTag.event_id.in_([e.event_id for e in events])  # type: ignore[union-attr]
+            )
+        ).all():
+            tags.setdefault(event_id, set()).add(int(tag_id))
+    return [(e, tags.get(e.event_id, set())) for e in events]
+
+
+def _matching_event_ids(
+    profile: UserInterestProfile,
+    dance_ids: list[int],
+    events: list[tuple[CachedEvent, set[int]]],
+) -> set[str]:
+    # Same rule as interest_notification_service._find_matches.
+    if not dance_ids:
+        return set()
+    wanted = set(dance_ids)
+    return {
+        e.event_id
+        for e, tags in events
+        if wanted & tags
+        and reach_matches(profile.reach_filter, e.reach)
+        and profile_contains_point(profile, e.latitude, e.longitude)
+    }
+
+
+def _notifications_30d(session: Session, user_ids: list[UUID]) -> dict[UUID, int]:
+    if not user_ids:
+        return {}
+    since = datetime.now(timezone.utc) - timedelta(days=30)
+    rows = session.exec(
+        select(Notification.recipient_user_id, func.count())
+        .where(Notification.kind == "interest_event")
+        .where(Notification.created_at >= since)
+        .where(Notification.recipient_user_id.in_(user_ids))  # type: ignore[union-attr]
+        .group_by(Notification.recipient_user_id)
+    ).all()
+    return {uid: int(count) for uid, count in rows}
+
+
+def _profile_flags(profile: UserInterestProfile, dance_ids: list[int]) -> list[str]:
+    flags = []
+    if not dance_ids:
+        flags.append("no_dance_styles")
+    diagonal = haversine_km(
+        profile.min_lat, profile.min_lng, profile.max_lat, profile.max_lng
+    )
+    if diagonal > WIDE_AREA_THRESHOLD_KM and profile.reach_filter == "any":
+        flags.append("wide_area_any_reach")
+    return flags
+
+
+def _notify_profile_updated(session: Session, profile: UserInterestProfile) -> None:
+    """In-app only; re-surfaces the same row on repeated edits of a profile."""
+    subject_key = f"interest_profile:{profile.id}"
+    notification = session.exec(
+        select(Notification).where(
+            Notification.recipient_user_id == profile.user_id,
+            Notification.kind == PROFILE_UPDATED_BY_ADMIN,
+            Notification.subject_key == subject_key,
+        )
+    ).first()
+    if notification is None:
+        notification = Notification(
+            recipient_user_id=profile.user_id,
+            actor_user_id=profile.user_id,
+            kind=PROFILE_UPDATED_BY_ADMIN,
+            subject_key=subject_key,
+        )
+    notification.context = profile.label[:200]
+    notification.created_at = datetime.now(timezone.utc)
+    notification.read_at = None
+    session.add(notification)
+    session.flush()
+    record_delivery(session, notification.id, "app")
+
+
+@admin_router.get("/clusters", response_model=list[AdminInterestProfileCluster])
+def list_interest_profile_clusters(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Group similar search profiles by dance styles, reach and area bucket."""
+    rows = _profiles_with_users(session)
+    events = _upcoming_events(session)
+    notifications = _notifications_30d(session, list({u.id for _, u in rows}))
+    dance_by_profile = _bulk_dance_ids(session, [p.id for p, _ in rows])
+
+    clusters: dict[str, dict] = {}
+    for profile, user in rows:
+        dance_ids = dance_by_profile[profile.id]
+        key = _cluster_key(profile, dance_ids)
+        cluster = clusters.setdefault(
+            key,
+            {
+                "profile": profile,
+                "dance_ids": dance_ids,
+                "labels": Counter(),
+                "users": set(),
+                "profiles": 0,
+                "enabled": 0,
+                "events": set(),
+                "flags": set(),
+            },
+        )
+        cluster["labels"][profile.area_label] += 1
+        cluster["users"].add(user.id)
+        cluster["profiles"] += 1
+        cluster["enabled"] += int(profile.matches_enabled)
+        cluster["events"] |= _matching_event_ids(profile, dance_ids, events)
+        cluster["flags"].update(_profile_flags(profile, dance_ids))
+
+    out = []
+    for key, c in clusters.items():
+        p = c["profile"]
+        users = c["users"]
+        out.append(
+            AdminInterestProfileCluster(
+                key=key,
+                dance_tag_ids=c["dance_ids"],
+                reach_filter=p.reach_filter,
+                min_lat=round(p.min_lat),
+                min_lng=round(p.min_lng),
+                max_lat=round(p.max_lat),
+                max_lng=round(p.max_lng),
+                area_labels=[label for label, _ in c["labels"].most_common(3)],
+                profile_count=c["profiles"],
+                user_count=len(users),
+                matches_enabled_count=c["enabled"],
+                upcoming_match_count=len(c["events"]),
+                notifications_30d_per_user=round(
+                    sum(notifications.get(u, 0) for u in users) / len(users), 1
+                ),
+                flags=sorted(c["flags"]),
+            )
+        )
+    out.sort(key=lambda c: (-c.user_count, c.key))
+    return out
+
+
+@admin_router.get("", response_model=list[AdminInterestProfileRow])
+def list_admin_interest_profiles(
+    cluster_key: Optional[str] = Query(default=None),
+    user_id: Optional[UUID] = Query(default=None),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Profiles of one cluster and/or one user, with reach and alert volume."""
+    if cluster_key is None and user_id is None:
+        raise HTTPException(status_code=400, detail="cluster_key or user_id required")
+    rows = _profiles_with_users(session, user_id)
+    events = _upcoming_events(session)
+    notifications = _notifications_30d(session, list({u.id for _, u in rows}))
+    dance_by_profile = _bulk_dance_ids(session, [p.id for p, _ in rows])
+
+    out = []
+    for profile, user in rows:
+        dance_ids = dance_by_profile[profile.id]
+        key = _cluster_key(profile, dance_ids)
+        if cluster_key is not None and key != cluster_key:
+            continue
+        out.append(
+            AdminInterestProfileRow(
+                **_serialize_profile(session, profile).model_dump(),
+                cluster_key=key,
+                user_id=user.id,
+                user_email=user.email,
+                user_handle=user.handle,
+                user_display_name=user.display_name,
+                upcoming_match_count=len(
+                    _matching_event_ids(profile, dance_ids, events)
+                ),
+                notifications_30d=notifications.get(user.id, 0),
+            )
+        )
+    return out
+
+
+@admin_router.patch("/{profile_id}", response_model=InterestProfileResponse)
+def admin_update_interest_profile(
+    profile_id: int,
+    payload: InterestProfileUpdateRequest,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Edit a user's profile with the owner's own validation rules."""
+    profile = session.get(UserInterestProfile, profile_id)
+    owner = session.get(User, profile.user_id) if profile else None
+    if profile is None or owner is None or owner.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Interest profile not found")
+    response = update_interest_profile(profile_id, payload, user=owner, session=session)
+    _notify_profile_updated(session, profile)
+    session.commit()
+    logger.info(
+        "Admin %s updated interest profile %s of user %s",
+        admin.get("email"),
+        profile_id,
+        owner.id,
+    )
+    return response

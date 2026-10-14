@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { TagGroup } from '../types';
+import { orderFamilies, searchTagLabel, toggleSearchTag } from '../utils/tagHierarchy';
 
 export interface TagsPickerValue {
     selectedTagIds: number[];
@@ -20,6 +21,8 @@ interface Props {
     hideGroupLabels?: boolean;
     /** When false, tag chips scroll horizontally instead of wrapping. Default true. */
     wrap?: boolean;
+    /** Search semantics: a sub-style supersedes its parent ("All Salsa"). */
+    searchSelection?: boolean;
     /** Container className override. */
     className?: string;
 }
@@ -44,6 +47,7 @@ export default function TagsPicker({
     allowFreeText = true,
     hideGroupLabels = false,
     wrap = true,
+    searchSelection = false,
     className,
 }: Props) {
     const [activeGroupSlug, setActiveGroupSlug] = useState<string | 'all'>('all');
@@ -59,23 +63,28 @@ export default function TagsPicker({
     const [newTagText, setNewTagText] = useState('');
 
     const selectedSet = useMemo(() => new Set(value.selectedTagIds), [value.selectedTagIds]);
+    const allTags = useMemo(() => tagGroups.flatMap((g) => g.tags ?? []), [tagGroups]);
 
     const visibleGroups = useMemo(() => {
         const term = search.trim().toLowerCase();
         return enabledGroups
-            .map((g) => ({
-                ...g,
-                tags: (g.tags ?? [])
+            .map((g) => {
+                const tags = (g.tags ?? [])
                     .filter((t) => t.enabled !== false)
                     .filter((t) => !excludeTagIds || !excludeTagIds.has(t.id))
-                    .filter((t) => !term || t.label.toLowerCase().includes(term)),
-            }))
+                    .filter((t) => !term || t.label.toLowerCase().includes(term));
+                return { ...g, tags: searchSelection ? orderFamilies(tags) : tags };
+            })
             .filter((g) =>
                 activeGroupSlug === 'all' || g.slug === activeGroupSlug,
             );
-    }, [enabledGroups, search, excludeTagIds, activeGroupSlug]);
+    }, [enabledGroups, search, excludeTagIds, activeGroupSlug, searchSelection]);
 
     const toggleTag = (tagId: number) => {
+        if (searchSelection) {
+            onChange({ ...value, selectedTagIds: toggleSearchTag(value.selectedTagIds, tagId, allTags) });
+            return;
+        }
         const set = new Set(value.selectedTagIds);
         if (set.has(tagId)) set.delete(tagId);
         else set.add(tagId);
@@ -219,7 +228,7 @@ export default function TagsPicker({
                                                         : { borderColor: `${tc}60`, color: tc, backgroundColor: 'white' }
                                                 }
                                             >
-                                                {selected && '✓ '}{tag.label}
+                                                {selected && '✓ '}{searchSelection ? searchTagLabel(tag, allTags) : tag.label}
                                             </button>
                                         );
                                     })}
