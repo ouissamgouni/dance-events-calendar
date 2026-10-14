@@ -1508,6 +1508,8 @@ class SiteSettingsResponse(BaseModel):
     # Require authentication for app workspace routes while keeping public
     # detail and shared-link routes readable.
     app_auth_gate_enabled: bool = False
+    # Guests must sign in before Save / I'm going (off = on-device anonymous saves).
+    guest_actions_require_signin: bool = True
     # Ask onboarding users to confirm their name and optionally add a picture.
     onboarding_profile_step_enabled: bool = False
     # Required tag-group ids used by the event suggestion form.
@@ -1903,6 +1905,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     browse_nav_enabled: Optional[bool] = None
     browse_direct_to_explorer_enabled: Optional[bool] = None
     app_auth_gate_enabled: Optional[bool] = None
+    guest_actions_require_signin: Optional[bool] = None
     onboarding_profile_step_enabled: Optional[bool] = None
     suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
     suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)

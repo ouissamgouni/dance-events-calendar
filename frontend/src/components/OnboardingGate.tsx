@@ -46,9 +46,9 @@ export default function OnboardingGate() {
             // ``startsWith('/r/')`` catches the referral landing page.
             return;
         }
-        const nextParam = encodeURIComponent(path + location.search);
+        const nextParam = encodeURIComponent(path + location.search + location.hash);
         navigate(`/onboarding/preferences?next=${nextParam}`, { replace: true });
-    }, [user, loading, location.pathname, location.search, navigate]);
+    }, [user, loading, location.pathname, location.search, location.hash, navigate]);
 
     return null;
 }

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import OrganizerClaimSheet from '../components/OrganizerClaimSheet';
 import type { CalendarEvent } from '../types';
 
@@ -10,14 +10,13 @@ import type { CalendarEvent } from '../types';
 export default function useOrganizerClaimAction(event: CalendarEvent) {
     const { user } = useAuth();
     const { organizerClaimsEnabled } = useFeatureFlags();
-    const navigate = useNavigate();
-    const location = useLocation();
+    const openSignIn = useSignIn();
     const [open, setOpen] = useState(false);
 
     const available = organizerClaimsEnabled && !event.organizer && !event.owner_preview && !event.is_cancelled;
     const start = () => {
         if (!user) {
-            navigate(`/login?next=${encodeURIComponent(location.pathname + location.search)}`);
+            openSignIn('claim', { onSignedIn: () => setOpen(true) });
             return;
         }
         setOpen(true);

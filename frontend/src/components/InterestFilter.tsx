@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import useBackToClose from '../hooks/useBackToClose';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSignIn } from '../context/SignInSheetContext';
 import { fetchMyFollowing, fetchInterestSummary } from '../api';
 import type { FollowUser, InterestSummaryItem } from '../api';
 import { firstNameOf } from '../utils/displayName';
@@ -309,6 +310,8 @@ export function InterestFilterChips({
     // Everyone, discarded on Close (outside click / Escape). Scope + kind
     // apply live from the inline toggles, so they are not drafted here.
     const [draftHandles, setDraftHandles] = useState<string[]>(interestUserHandles);
+    const openSignIn = useSignIn();
+    const navigate = useNavigate();
 
     // Filter is only actually applied once the viewer has explicitly
     // picked a scope or at least one person — nothing is on by default.
@@ -424,6 +427,11 @@ export function InterestFilterChips({
             data-testid="follows-shortcut"
             aria-label="Open the calendar from people I follow"
             title="Open the calendar from people I follow"
+            onClick={(e) => {
+                if (signedIn) return;
+                e.preventDefault();
+                openSignIn('people', { onSignedIn: () => navigate('/tribe/calendars') });
+            }}
             className="hidden sm:inline-flex items-center px-2 py-1 text-xs border border-line bg-surface text-ink-soft hover:border-action hover:text-action transition"
         >
             {/* Heroicons calendar outline */}
@@ -436,9 +444,9 @@ export function InterestFilterChips({
 
     const anonHint = !signedIn && showAnonHint && (
         <span className="text-xs text-ink-soft">
-            <Link to="/login" className="text-action hover:underline">
+            <button type="button" onClick={() => openSignIn('people')} className="text-action hover:underline">
                 Sign in
-            </Link>{' '}
+            </button>{' '}
             to see picks from people you follow.
         </span>
     );

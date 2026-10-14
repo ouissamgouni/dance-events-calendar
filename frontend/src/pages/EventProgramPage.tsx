@@ -10,6 +10,7 @@ import { AttendeeProgramFilters, ProgramDayPicker } from '../components/program/
 import { PlanAttendanceFeedbackSheet, SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
 import { useSetMyPlanCount } from '../context/MyPlanCountContext';
 import { usePwaInstall } from '../context/PwaInstallContext';
@@ -27,6 +28,7 @@ export default function EventProgramPage() {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const { user, loading: authLoading } = useAuth();
+    const openSignIn = useSignIn();
     const { isAttending, toggleAttending, setAudience } = useAttendingEvents();
     const { requestInstallInvitation } = usePwaInstall();
     const { eventScheduleEnabled, programGridAttendeePreviewEnabled } = useFeatureFlags();
@@ -390,7 +392,7 @@ export default function EventProgramPage() {
                     <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
                         <h2 className="text-lg font-bold text-ink">Sign in to build My Plan</h2>
                         <p className="mt-2 max-w-sm text-sm text-ink-soft">Keep your saved sessions available across devices throughout the event.</p>
-                        <button type="button" onClick={() => navigate(`/login?next=${encodeURIComponent(location.pathname + location.search)}`)} className="mt-5 rounded-field bg-action px-4 py-3 text-sm font-semibold text-white">Sign in</button>
+                        <button type="button" onClick={() => openSignIn('my_plans')} className="mt-5 rounded-field bg-action px-4 py-3 text-sm font-semibold text-white">Sign in</button>
                     </div>
                 )}
             </div>

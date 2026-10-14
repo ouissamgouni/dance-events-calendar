@@ -126,7 +126,7 @@ describe('SharedPassportPage', () => {
         renderShared()
 
         await waitFor(() =>
-            expect(screen.getByRole('link', { name: /sign in to follow/i })).toBeInTheDocument(),
+            expect(screen.getByRole('button', { name: /sign in to follow/i })).toBeInTheDocument(),
         )
     })
 

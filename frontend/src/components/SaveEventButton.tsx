@@ -41,7 +41,7 @@ export default function SaveEventButton({
 }: Props) {
     const { isSaved, toggleSave, setSavedAudience, getSavedAudience } = useSavedEvents();
     const { user } = useAuth();
-    const { appAuthGateEnabled, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
+    const { appAuthGateEnabled, guestActionsRequireSignin, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const openSignIn = useSignIn();
     const saved = isSaved(eventId);
@@ -56,8 +56,8 @@ export default function SaveEventButton({
         if (stopPropagation) event.stopPropagation();
         toast.hide();
         if (!user && !featureFlagsReady) return;
-        if (!user && appAuthGateEnabled) {
-            openSignIn('save');
+        if (!user && (appAuthGateEnabled || guestActionsRequireSignin)) {
+            openSignIn('save', { action: { kind: 'save', eventId, eventTitle } });
             return;
         }
         const wasSaved = saved;

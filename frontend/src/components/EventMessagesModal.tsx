@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import useBackToClose from '../hooks/useBackToClose';
 import { createPortal } from 'react-dom';
-import { Link, useLocation } from 'react-router-dom';
 import {
     deleteEventMessage,
     fetchEventMessages,
@@ -12,6 +11,7 @@ import {
     type EventMessageCategory,
 } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { CATEGORY_META, CATEGORY_ORDER, timeAgo } from '../utils/eventMessages';
 import { ConfirmDialog } from './AppDialog';
 import { useToast } from './Toast';
@@ -222,7 +222,7 @@ interface Props {
 
 export default function EventMessagesModal({ eventId, onClose, isPast = false, initialCompose, initialCategory, onChanged }: Props) {
     const { user } = useAuth();
-    const location = useLocation();
+    const openSignIn = useSignIn();
     const toast = useToast();
     const isAdmin = !!user?.is_admin;
 
@@ -381,11 +381,6 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
         }
     }, [muted, eventId, toast]);
 
-    const loginNext = useMemo(
-        () => `/login?next=${encodeURIComponent(`${location.pathname}${location.search}#messages`)}`,
-        [location.pathname, location.search],
-    );
-
     const cardCallbacks: CardCallbacks = {
         signedIn: !!user,
         isPast,
@@ -494,9 +489,9 @@ export default function EventMessagesModal({ eventId, onClose, isPast = false, i
                         </div>
                     ) : (
                         <p className="text-xs text-ink-soft">
-                            <Link to={loginNext} className="font-medium text-action hover:text-action">
+                            <button type="button" onClick={() => openSignIn('message')} className="font-medium text-action hover:text-action">
                                 Sign in
-                            </Link>{' '}
+                            </button>{' '}
                             to post a message or reply.
                         </p>
                     )}

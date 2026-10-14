@@ -115,12 +115,16 @@ describe('Login — intent copy', () => {
 
     it('tailors the headline to the intent derived from next', async () => {
         renderLogin('/login?next=%2Fevent%2Fe1%23messages')
-        expect(await screen.findByRole('heading', { name: /join the conversation/i })).toBeInTheDocument()
+        expect(await screen.findByRole('heading', { name: 'Join the conversation.' })).toBeInTheDocument()
     })
 
-    it('shows the generic headline and benefits without an intent', async () => {
+    it('shows the full-page headline and benefit strip without an intent', async () => {
         renderLogin()
-        expect(await screen.findByRole('heading', { name: /get more out of movida/i })).toBeInTheDocument()
-        expect(screen.getByText(/build your dance passport/i)).toBeInTheDocument()
+        expect(await screen.findByRole('heading', { name: 'Your dance plans, together.' })).toBeInTheDocument()
+        const benefits = screen.getByRole('list', { name: /with a free account/i })
+        expect(benefits).toHaveTextContent('Save events')
+        expect(benefits).toHaveTextContent('Plan together')
+        expect(benefits).toHaveTextContent('Stay updated')
+        expect(screen.getByRole('button', { name: 'Keep browsing' })).toBeInTheDocument()
     })
 })

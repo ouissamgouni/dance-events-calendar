@@ -47,6 +47,8 @@ interface AttendingEventsContextValue {
     getAudience: (eventId: string) => ShareAudience;
     /** True when the user is going AND audience !== 'private'. */
     isSharingPublicly: (eventId: string) => boolean;
+    /** True once server truth for the current identity has loaded (or failed). */
+    ready: boolean;
 }
 
 const AttendingEventsContext = createContext<AttendingEventsContextValue | null>(null);
@@ -129,6 +131,7 @@ export function AttendingEventsProvider({ children }: { children: ReactNode }) {
     const [shareMap, setShareMap] = useState<Record<string, boolean>>(() => readShareMapFromStorage(idKey));
     const [audienceMap, setAudienceMap] = useState<Record<string, ShareAudience>>(() => readAudienceMapFromStorage(idKey));
     const lastIdentity = useRef<string>(idKey);
+    const [syncedKey, setSyncedKey] = useState<string | null>(null);
 
     useEffect(() => { writeIdsToStorage(lastIdentity.current, attendingIds); }, [attendingIds]);
     useEffect(() => { writeShareMapToStorage(lastIdentity.current, shareMap); }, [shareMap]);
@@ -162,7 +165,8 @@ export function AttendingEventsProvider({ children }: { children: ReactNode }) {
             })
             .catch(() => {
                 if (!cancelled) setLoading(false);
-            });
+            })
+            .finally(() => { if (!cancelled) setSyncedKey(idKey); });
         return () => { cancelled = true; };
     }, [idKey]);
 
@@ -257,7 +261,8 @@ export function AttendingEventsProvider({ children }: { children: ReactNode }) {
         setAudience,
         getAudience,
         isSharingPublicly,
-    }), [attendingIds, loading, isAttending, toggleAttending, setAudience, getAudience, isSharingPublicly]);
+        ready: syncedKey === idKey,
+    }), [attendingIds, loading, isAttending, toggleAttending, setAudience, getAudience, isSharingPublicly, syncedKey, idKey]);
 
     return (
         <AttendingEventsContext.Provider value={value}>

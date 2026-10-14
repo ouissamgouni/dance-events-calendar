@@ -46,6 +46,8 @@ export interface FeatureFlags {
     browseDirectToExplorerEnabled: boolean;
     /** Require authentication for app workspace routes. */
     appAuthGateEnabled: boolean;
+    /** Guests must sign in before Save / I'm going. */
+    guestActionsRequireSignin: boolean;
     /** Ask onboarding users to confirm their name and optionally add a picture. */
     onboardingProfileStepEnabled: boolean;
     /** Show the optional event-size question in the review wizard. */
@@ -130,6 +132,8 @@ const defaultFlags: FeatureFlags = {
     browseNavEnabled: false,
     browseDirectToExplorerEnabled: false,
     appAuthGateEnabled: false,
+    // Server default is on; isolated components (tests) keep on-device saves.
+    guestActionsRequireSignin: false,
     onboardingProfileStepEnabled: false,
     eventReviewSizeStepEnabled: true,
     rsvpRememberVisibilityEnabled: true,
@@ -207,6 +211,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     browseNavEnabled: s.browse_nav_enabled ?? false,
                     browseDirectToExplorerEnabled: s.browse_direct_to_explorer_enabled ?? false,
                     appAuthGateEnabled: s.app_auth_gate_enabled ?? false,
+                    guestActionsRequireSignin: s.guest_actions_require_signin ?? true,
                     onboardingProfileStepEnabled: s.onboarding_profile_step_enabled ?? false,
                     eventReviewSizeStepEnabled: s.event_review_size_step_enabled ?? true,
                     rsvpRememberVisibilityEnabled: s.rsvp_remember_visibility_enabled ?? true,

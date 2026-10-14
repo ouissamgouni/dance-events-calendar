@@ -105,7 +105,7 @@ export default function GoingButton({
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user } = useAuth();
-    const { goingButtonIconVariant, appAuthGateEnabled, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
+    const { goingButtonIconVariant, appAuthGateEnabled, guestActionsRequireSignin, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const openSignIn = useSignIn();
     const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
@@ -124,8 +124,8 @@ export default function GoingButton({
         // Dismiss any lingering anchored error toast on every click.
         errorToast.hide();
         if (!user && !featureFlagsReady) return;
-        if (!user && appAuthGateEnabled) {
-            openSignIn('going');
+        if (!user && (appAuthGateEnabled || guestActionsRequireSignin)) {
+            openSignIn('going', { action: { kind: 'going', eventId, eventTitle, isPast } });
             return;
         }
         if (going) {

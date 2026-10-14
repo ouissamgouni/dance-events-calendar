@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { Bell, CalendarDays, Mail, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { fetchAuthMode, fetchDevUsers, requestEmailCode, type AuthMode, type DevUser } from '../../api';
 import { getDeviceId } from '../../utils/deviceId';
 import { trackLoginFailed, trackSignupStarted } from '../../utils/tracking';
-import { SIGN_IN_BENEFITS, SIGN_IN_INTENT_COPY, mailAppFor, type SignInIntent } from './signInIntent';
+import { SIGN_IN_BENEFITS, mailAppFor } from './signInIntent';
 
 declare global {
     interface Window {
@@ -23,19 +23,37 @@ declare global {
 const CODE_LENGTH = 6;
 // GIS caps rendered button width at 400px.
 const GOOGLE_MAX_WIDTH = 400;
+const GIS_WAIT_MS = 8000;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const BENEFIT_ICONS = [CalendarDays, Users, Bell];
+
+const PRIMARY_BUTTON =
+    'flex h-[52px] w-full items-center justify-center gap-3 rounded-auth-button bg-auth-navy px-4 text-base font-semibold text-white transition hover:bg-auth-navy-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-action/35 disabled:cursor-not-allowed disabled:opacity-50';
+const SECONDARY_BUTTON =
+    'flex h-[52px] w-full items-center justify-center gap-3 rounded-auth-button border border-auth-border bg-surface px-4 text-base font-semibold text-auth-navy transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-action/35';
+const FIELD =
+    'h-[52px] w-full rounded-auth-button border bg-surface px-4 text-base text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-[3px] focus:ring-action/35';
 
 interface Props {
-    intent: SignInIntent;
-    /** Hide logo + headline when the container (e.g. a sheet) already shows them. */
-    showHeader?: boolean;
-    onNotNow?: () => void;
+    /** ``page`` adds the benefit strip; ``sheet`` stays compact. */
+    variant: 'page' | 'sheet';
+    headline: string;
+    subtitle: string;
+    headingId?: string;
+    subtitleId?: string;
+    onKeepBrowsing?: () => void;
 }
 
-export default function AuthPanel({ intent, showHeader = true, onNotNow }: Props) {
+export default function AuthPanel({ variant, headline, subtitle, headingId, subtitleId, onKeepBrowsing }: Props) {
     const { user, loading, login, loginWithEmailCode } = useAuth();
+    const uid = useId();
+    const emailErrorId = `${uid}-email-error`;
     const buttonRef = useRef<HTMLDivElement>(null);
     const initialized = useRef(false);
     const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+    const [gisLoaded, setGisLoaded] = useState(() => typeof window !== 'undefined' && !!window.google);
+    const [googleBusy, setGoogleBusy] = useState(false);
+    const [googleError, setGoogleError] = useState<string | null>(null);
     const [devUsers, setDevUsers] = useState<DevUser[]>([]);
     const [customEmail, setCustomEmail] = useState('');
     const [loginError, setLoginError] = useState<string | null>(null);
@@ -70,8 +88,24 @@ export default function AuthPanel({ intent, showHeader = true, onNotNow }: Props
         }
     }, [authMode]);
 
+    // The GIS script loads async; wait for it instead of silently rendering no button.
     useEffect(() => {
-        if (loading || user || initialized.current || !authMode || authMode.dev_auth) return;
+        if (gisLoaded || !authMode?.google_client_id || authMode.dev_auth) return;
+        const started = Date.now();
+        const id = window.setInterval(() => {
+            if (window.google) {
+                setGisLoaded(true);
+                window.clearInterval(id);
+            } else if (Date.now() - started > GIS_WAIT_MS) {
+                setGoogleError('Google sign-in couldn’t load. Check your connection or continue with email.');
+                window.clearInterval(id);
+            }
+        }, 200);
+        return () => window.clearInterval(id);
+    }, [gisLoaded, authMode]);
+
+    useEffect(() => {
+        if (loading || user || initialized.current || !authMode || authMode.dev_auth || !gisLoaded) return;
 
         const clientId = authMode.google_client_id;
         if (!clientId || !window.google) return;
@@ -82,11 +116,15 @@ export default function AuthPanel({ intent, showHeader = true, onNotNow }: Props
             client_id: clientId,
             callback: async (response: { credential: string }) => {
                 trackSignupStarted('google');
+                setGoogleError(null);
+                setGoogleBusy(true);
                 try {
                     await login(response.credential, getDeviceId());
                 } catch {
-                    // Token verification failed — button stays visible to retry
                     trackLoginFailed('google', 'token_invalid');
+                    setGoogleError('Google sign-in didn’t complete. Please try again.');
+                } finally {
+                    setGoogleBusy(false);
                 }
             },
         });
@@ -101,7 +139,7 @@ export default function AuthPanel({ intent, showHeader = true, onNotNow }: Props
                 width: Math.min(GOOGLE_MAX_WIDTH, buttonRef.current.offsetWidth || GOOGLE_MAX_WIDTH),
             });
         }
-    }, [loading, user, login, authMode]);
+    }, [loading, user, login, authMode, gisLoaded]);
 
     const handleDevLoginAs = async (email: string, name?: string) => {
         setLoginError(null);
@@ -124,7 +162,11 @@ export default function AuthPanel({ intent, showHeader = true, onNotNow }: Props
     const handleSendCode = async (e: FormEvent) => {
         e.preventDefault();
         const email = emailValue.trim().toLowerCase();
-        if (!email || emailBusy) return;
+        if (emailBusy) return;
+        if (!EMAIL_RE.test(email)) {
+            setEmailError('Enter a valid email address, like name@example.com.');
+            return;
+        }
         setEmailBusy(true);
         setEmailError(null);
         setDevCode(null);
@@ -179,235 +221,252 @@ export default function AuthPanel({ intent, showHeader = true, onNotNow }: Props
         setResendLeft(0);
     };
 
-    if (loading || authMode === null) {
-        return <p className="py-10 text-center text-sm text-muted">Loading…</p>;
-    }
-
-    const copy = SIGN_IN_INTENT_COPY[intent];
+    const Heading = variant === 'page' ? 'h1' : 'h2';
     const mailApp = emailStep === 'code' ? mailAppFor(emailValue.trim()) : null;
     const activeBox = Math.min(codeValue.length, CODE_LENGTH - 1);
+    const ready = !loading && authMode !== null;
+    const isPage = variant === 'page';
 
     return (
         <div>
-            {showHeader && (
-                <div className="text-center">
-                    <img src="/movida.png" alt="" aria-hidden="true" className="mx-auto h-12 w-12 object-contain" />
-                    <h1 className="mt-3 text-2xl font-bold text-ink">{copy.headline}</h1>
-                    <p className="mt-2 text-sm text-ink-soft">{copy.subtitle}</p>
-                    {intent !== 'generic' && (
-                        <p className="mt-1 text-xs text-ink-soft">Free account, no password.</p>
+            <div className="text-center">
+                <Heading
+                    id={headingId}
+                    className={isPage
+                        ? 'text-balance text-[36px] font-extrabold leading-[1.1] tracking-[-0.035em] text-auth-navy'
+                        : 'text-balance text-[28px] font-bold leading-[1.15] tracking-tight text-auth-navy'}
+                >
+                    {headline}
+                </Heading>
+                <p
+                    id={subtitleId}
+                    className={`text-balance text-auth-muted ${isPage ? 'mx-auto mt-4 max-w-[340px] text-lg leading-[1.55]' : 'mt-3 text-base leading-6'}`}
+                >
+                    {subtitle}
+                </p>
+                <p className={`text-auth-muted ${isPage ? 'mt-6 text-[15px] font-medium' : 'mt-4 text-sm'}`}>
+                    Free account · No password.
+                </p>
+            </div>
+
+            {!ready || !authMode ? (
+                <p role="status" className="py-10 text-center text-sm text-auth-muted">Loading…</p>
+            ) : (
+                <div className={`${isPage ? 'mt-8' : 'mt-6'} flex flex-col gap-3`}>
+                    {authMode.dev_auth ? emailStep === 'email' && (
+                        <div className="flex w-full flex-col gap-3">
+                            <p className="border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                                Dev mode (DEV_AUTH=true): no real Google verification.
+                            </p>
+                            {devUsers.length > 0 && (
+                                <div className="flex max-h-56 flex-col gap-2 overflow-y-auto">
+                                    {devUsers.map((u) => (
+                                        <button
+                                            key={u.email}
+                                            type="button"
+                                            onClick={() => handleDevLoginAs(u.email, u.name)}
+                                            className="rounded-auth-button border border-auth-border bg-surface px-4 py-2 text-left text-sm font-medium text-ink transition hover:bg-canvas"
+                                        >
+                                            Sign in as {u.name}
+                                            <span className="ml-2 text-xs text-ink-soft">{u.email}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            <form onSubmit={handleCustomDevLogin} className="flex flex-col gap-2">
+                                <label className="text-xs text-ink-soft" htmlFor={`${uid}-dev-email`}>
+                                    Or sign in as another email:
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        id={`${uid}-dev-email`}
+                                        type="email"
+                                        required
+                                        value={customEmail}
+                                        onChange={(e) => setCustomEmail(e.target.value)}
+                                        placeholder="user@example.com"
+                                        className="flex-1 rounded-auth-button border border-auth-border px-3 py-2 text-sm"
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="rounded-auth-button border border-auth-border bg-surface px-3 py-2 text-sm font-medium text-ink transition hover:bg-canvas"
+                                    >
+                                        Sign in
+                                    </button>
+                                </div>
+                            </form>
+                            {loginError && <p role="alert" className="text-sm text-danger">{loginError}</p>}
+                        </div>
+                    ) : (
+                        // Kept mounted during the code step: GIS renders into it only once.
+                        <div className={`${emailStep === 'code' ? 'hidden' : 'flex'} h-[52px] w-full items-center justify-center`}>
+                            <div ref={buttonRef} className="flex w-full max-w-[400px] justify-center" />
+                        </div>
+                    )}
+
+                    {googleBusy && (
+                        <p role="status" className="text-center text-sm text-auth-muted">Signing you in…</p>
+                    )}
+                    {googleError && emailStep === 'email' && (
+                        <p role="alert" className="text-center text-sm text-danger">{googleError}</p>
+                    )}
+
+                    {emailStep === 'email' && !emailOpen && (
+                        <button type="button" onClick={() => setEmailOpen(true)} className={PRIMARY_BUTTON}>
+                            <Mail aria-hidden className="h-6 w-6" strokeWidth={1.8} />
+                            Continue with email
+                        </button>
+                    )}
+
+                    {emailStep === 'email' && emailOpen && (
+                        <form onSubmit={handleSendCode} noValidate className="flex w-full flex-col gap-2">
+                            <label className="text-left text-sm font-medium text-auth-navy" htmlFor={`${uid}-email`}>
+                                Email address
+                            </label>
+                            <input
+                                id={`${uid}-email`}
+                                type="email"
+                                required
+                                autoFocus
+                                autoComplete="email"
+                                inputMode="email"
+                                value={emailValue}
+                                onChange={(e) => { setEmailValue(e.target.value); setEmailError(null); }}
+                                placeholder="you@example.com"
+                                aria-invalid={emailError ? true : undefined}
+                                aria-describedby={emailError ? emailErrorId : undefined}
+                                className={`${FIELD} ${emailError ? 'border-danger' : 'border-auth-border'}`}
+                            />
+                            {emailError && <p id={emailErrorId} role="alert" className="text-left text-sm text-danger">{emailError}</p>}
+                            <button type="submit" disabled={emailBusy} className={`${PRIMARY_BUTTON} mt-1`}>
+                                {emailBusy ? 'Sending…' : 'Email me a code'}
+                            </button>
+                        </form>
+                    )}
+
+                    {emailStep === 'code' && (
+                        <form onSubmit={handleVerifyCode} className="flex w-full flex-col gap-3 text-left">
+                            <div>
+                                <h3 className="text-lg font-semibold text-auth-navy">Check your email</h3>
+                                <label htmlFor={`${uid}-code`} className="mt-1 block text-sm text-auth-muted">
+                                    Enter the 6-digit code we sent to{' '}
+                                    <span className="font-medium text-auth-navy">{emailValue.trim()}</span>
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={resetEmailFlow}
+                                    className="mt-1 min-h-9 text-sm font-semibold text-action-strong hover:underline"
+                                >
+                                    Change email
+                                </button>
+                            </div>
+                            <div className="relative">
+                                <input
+                                    id={`${uid}-code`}
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
+                                    pattern="\d{6}"
+                                    maxLength={CODE_LENGTH}
+                                    required
+                                    autoFocus
+                                    value={codeValue}
+                                    onChange={(e) => handleCodeChange(e.target.value)}
+                                    onFocus={() => setCodeFocused(true)}
+                                    onBlur={() => setCodeFocused(false)}
+                                    aria-invalid={emailError ? true : undefined}
+                                    aria-describedby={emailError ? emailErrorId : undefined}
+                                    className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
+                                />
+                                <div aria-hidden="true" className="grid grid-cols-6 gap-2">
+                                    {Array.from({ length: CODE_LENGTH }, (_, i) => (
+                                        <div
+                                            key={i}
+                                            className={`flex h-[52px] items-center justify-center rounded-auth-button border bg-surface font-mono text-xl font-semibold text-auth-navy ${codeFocused && i === activeBox ? 'border-action ring-[3px] ring-action/35' : emailError ? 'border-danger' : 'border-auth-border'
+                                                }`}
+                                        >
+                                            {codeValue[i] ?? ''}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            {emailError && <p id={emailErrorId} role="alert" className="text-sm text-danger">{emailError}</p>}
+                            <button
+                                type="submit"
+                                disabled={emailBusy || codeValue.length !== CODE_LENGTH}
+                                className={PRIMARY_BUTTON}
+                            >
+                                {emailBusy ? 'Checking…' : 'Continue'}
+                            </button>
+                            {mailApp && (
+                                <a href={mailApp.href} target="_blank" rel="noopener noreferrer" className={SECONDARY_BUTTON}>
+                                    <Mail aria-hidden className="h-5 w-5" strokeWidth={1.8} />
+                                    {mailApp.label}
+                                </a>
+                            )}
+                            <p className="text-sm text-auth-muted">
+                                {codeTtlMin ? `The code expires in ${codeTtlMin} minutes. ` : ''}
+                                Didn’t get it? Check your spam folder or{' '}
+                                <button
+                                    type="button"
+                                    disabled={emailBusy || resendLeft > 0}
+                                    onClick={handleSendCode}
+                                    className="font-semibold text-action-strong hover:underline disabled:font-normal disabled:text-auth-muted disabled:no-underline"
+                                >
+                                    {resendLeft > 0 ? `resend in ${resendLeft}s` : 'resend the code'}
+                                </button>
+                                .
+                            </p>
+                        </form>
+                    )}
+
+                    {devCode && (
+                        <p className="border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                            Dev mode: your code is <strong className="font-mono">{devCode}</strong>
+                        </p>
                     )}
                 </div>
             )}
 
-            {intent === 'generic' && emailStep === 'email' && (
-                <ul className={`${showHeader ? 'mt-5' : ''} space-y-2 text-sm text-ink-soft`}>
-                    {SIGN_IN_BENEFITS.map((benefit) => (
-                        <li key={benefit} className="flex items-start gap-2.5">
-                            <svg
-                                viewBox="0 0 20 20"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                                aria-hidden="true"
-                                className="mt-0.5 h-4 w-4 flex-none text-action"
-                            >
-                                <path d="M4 10.5 8 14.5 16 5.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            <span>{benefit}</span>
-                        </li>
-                    ))}
-                </ul>
-            )}
-
-            <div className="mt-6 flex flex-col items-center gap-3">
-                {authMode.dev_auth ? emailStep === 'email' && (
-                    <div className="flex w-full flex-col gap-3">
-                        <p className="border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                            Dev mode (DEV_AUTH=true): no real Google verification.
-                        </p>
-                        {devUsers.length > 0 && (
-                            <div className="flex flex-col gap-2">
-                                {devUsers.map((u) => (
-                                    <button
-                                        key={u.email}
-                                        onClick={() => handleDevLoginAs(u.email, u.name)}
-                                        className="border border-line bg-surface px-4 py-2 text-left text-sm font-medium text-ink shadow-sm transition hover:bg-canvas"
-                                    >
-                                        Sign in as {u.name}
-                                        <span className="ml-2 text-xs text-ink-soft">{u.email}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                        <form onSubmit={handleCustomDevLogin} className="flex flex-col gap-2">
-                            <label className="text-xs text-ink-soft" htmlFor="dev-email">
-                                Or sign in as another email:
-                            </label>
-                            <div className="flex gap-2">
-                                <input
-                                    id="dev-email"
-                                    type="email"
-                                    required
-                                    value={customEmail}
-                                    onChange={(e) => setCustomEmail(e.target.value)}
-                                    placeholder="user@example.com"
-                                    className="flex-1 border border-line px-3 py-2 text-sm"
-                                />
-                                <button
-                                    type="submit"
-                                    className="border border-line bg-surface px-3 py-2 text-sm font-medium text-ink shadow-sm transition hover:bg-canvas"
-                                >
-                                    Sign in
-                                </button>
-                            </div>
-                        </form>
-                        {loginError && <p className="text-sm text-danger">{loginError}</p>}
-                    </div>
-                ) : (
-                    // Kept mounted during the code step: GIS renders into it only once.
-                    <div ref={buttonRef} className={`${emailStep === 'code' ? 'hidden' : 'flex'} min-h-10 w-full max-w-[400px] justify-center`} />
-                )}
-
-                {emailStep === 'email' && !emailOpen && (
+            {onKeepBrowsing && (
+                <div className={`${isPage ? 'mt-5' : 'mt-3'} flex justify-center`}>
                     <button
                         type="button"
-                        onClick={() => setEmailOpen(true)}
-                        // eslint-disable-next-line no-restricted-syntax -- matches the 4px radius of Google's rendered button
-                        className="flex h-10 w-full max-w-[400px] items-center justify-center gap-2 rounded border border-line bg-surface px-3 text-sm font-medium text-ink transition hover:bg-canvas"
+                        onClick={onKeepBrowsing}
+                        className={`min-h-11 px-4 font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-action/35 ${isPage ? 'text-[17px]' : 'text-base'}`}
                     >
-                        <Mail aria-hidden className="h-[18px] w-[18px] text-ink-soft" strokeWidth={1.8} />
-                        Continue with email
-                    </button>
-                )}
-
-                {emailStep === 'email' && emailOpen && (
-                    <form onSubmit={handleSendCode} className="flex w-full max-w-[400px] flex-col gap-2">
-                        <label className="text-xs font-medium text-ink-soft" htmlFor="login-email">
-                            Email address
-                        </label>
-                        <input
-                            id="login-email"
-                            type="email"
-                            required
-                            autoFocus
-                            autoComplete="email"
-                            value={emailValue}
-                            onChange={(e) => setEmailValue(e.target.value)}
-                            placeholder="you@example.com"
-                            className="w-full rounded-field border border-line px-3 py-2 text-sm"
-                        />
-                        <button
-                            type="submit"
-                            disabled={emailBusy}
-                            className="h-10 w-full rounded-field bg-action px-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {emailBusy ? 'Sending…' : 'Email me a code'}
-                        </button>
-                    </form>
-                )}
-
-                {emailStep === 'code' && (
-                    <form onSubmit={handleVerifyCode} className="flex w-full max-w-[400px] flex-col gap-3">
-                        <div>
-                            <h2 className="text-lg font-semibold text-ink">Check your email</h2>
-                            <label htmlFor="login-code" className="mt-1 block text-sm text-ink-soft">
-                                Enter the 6-digit code we sent to{' '}
-                                <span className="font-medium text-ink">{emailValue.trim()}</span>
-                            </label>
-                            <button
-                                type="button"
-                                onClick={resetEmailFlow}
-                                className="mt-1 text-sm font-medium text-action hover:underline"
-                            >
-                                Change email
-                            </button>
-                        </div>
-                        <div className="relative">
-                            <input
-                                id="login-code"
-                                type="text"
-                                inputMode="numeric"
-                                autoComplete="one-time-code"
-                                pattern="\d{6}"
-                                maxLength={CODE_LENGTH}
-                                required
-                                autoFocus
-                                value={codeValue}
-                                onChange={(e) => handleCodeChange(e.target.value)}
-                                onFocus={() => setCodeFocused(true)}
-                                onBlur={() => setCodeFocused(false)}
-                                className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
-                            />
-                            <div aria-hidden="true" className="grid grid-cols-6 gap-2">
-                                {Array.from({ length: CODE_LENGTH }, (_, i) => (
-                                    <div
-                                        key={i}
-                                        className={`flex h-12 items-center justify-center rounded-field border bg-surface font-mono text-xl font-semibold text-ink ${codeFocused && i === activeBox ? 'border-action ring-1 ring-action' : emailError ? 'border-danger' : 'border-line'
-                                            }`}
-                                    >
-                                        {codeValue[i] ?? ''}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        {emailError && <p className="text-sm text-danger">{emailError}</p>}
-                        <button
-                            type="submit"
-                            disabled={emailBusy || codeValue.length !== CODE_LENGTH}
-                            className="h-10 w-full rounded-field bg-action px-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {emailBusy ? 'Checking…' : 'Continue'}
-                        </button>
-                        {mailApp && (
-                            <a
-                                href={mailApp.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                // eslint-disable-next-line no-restricted-syntax -- matches the 4px radius of Google's rendered button
-                                className="flex h-10 w-full items-center justify-center gap-2 rounded border border-line bg-surface text-sm font-medium text-ink transition hover:bg-canvas"
-                            >
-                                <Mail aria-hidden className="h-[18px] w-[18px] text-ink-soft" strokeWidth={1.8} />
-                                {mailApp.label}
-                            </a>
-                        )}
-                        <p className="text-xs text-ink-soft">
-                            {codeTtlMin ? `The code expires in ${codeTtlMin} minutes. ` : ''}
-                            Didn’t get it? Check your spam folder or{' '}
-                            <button
-                                type="button"
-                                disabled={emailBusy || resendLeft > 0}
-                                onClick={handleSendCode}
-                                className="font-medium text-action hover:underline disabled:text-ink-soft disabled:no-underline"
-                            >
-                                {resendLeft > 0 ? `resend in ${resendLeft}s` : 'resend the code'}
-                            </button>
-                            .
-                        </p>
-                    </form>
-                )}
-
-                {emailStep === 'email' && emailError && <p className="w-full max-w-[400px] text-sm text-danger">{emailError}</p>}
-                {devCode && (
-                    <p className="w-full max-w-[400px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                        Dev mode: your code is <strong className="font-mono">{devCode}</strong>
-                    </p>
-                )}
-            </div>
-
-            {onNotNow && (
-                <div className="mt-4 text-center">
-                    <button type="button" onClick={onNotNow} className="min-h-9 px-3 text-sm font-medium text-ink-soft hover:text-ink">
-                        Not now
+                        Keep browsing
                     </button>
                 </div>
             )}
 
-            <p className="mt-6 text-center text-xs text-ink-soft">
-                By continuing you agree to the{' '}
-                <Link to="/terms" className="underline hover:text-ink">Terms</Link> and acknowledge the{' '}
-                <Link to="/privacy" className="underline hover:text-ink">Privacy Policy</Link>.
-                Movida is for people aged 16 and over. With Google, we receive your name, email and profile photo.
+            <hr className={`${isPage ? 'my-8' : 'my-6'} border-auth-border/70`} />
+
+            {isPage && (
+                <>
+                    <ul aria-label="With a free account" className="grid grid-cols-3 rounded-card bg-auth-tint py-6">
+                        {SIGN_IN_BENEFITS.map((benefit, i) => {
+                            const Icon = BENEFIT_ICONS[i];
+                            return (
+                                <li
+                                    key={benefit}
+                                    className={`flex flex-col items-center gap-2.5 px-2 text-center text-base font-medium leading-tight text-auth-navy ${i > 0 ? 'border-l border-auth-border/70' : ''}`}
+                                >
+                                    <Icon aria-hidden className="h-7 w-7" strokeWidth={1.6} />
+                                    {benefit}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <hr className="my-8 border-auth-border/70" />
+                </>
+            )}
+
+            <p className={`text-center text-auth-muted ${isPage ? 'text-sm leading-[1.65]' : 'text-[13px] leading-5'}`}>
+                By continuing, you agree to the{' '}
+                <Link to="/terms" className="underline hover:text-auth-navy">Terms</Link> and acknowledge the{' '}
+                <Link to="/privacy" className="underline hover:text-auth-navy">Privacy Policy</Link>.
+                Ages 16+. With Google, we receive your name, email and profile photo.
             </p>
         </div>
     );

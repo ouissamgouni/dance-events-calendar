@@ -120,9 +120,22 @@
   /* success / going */
   --color-danger: #d92d20;
   /* error / destructive */
+  --color-auth-navy: #15304d;
+  /* sign-in surfaces: primary text + button */
+  --color-auth-navy-hover: #10263d;
+  --color-auth-tint: #eff6ff;
+  /* sign-in benefit strip */
+  --color-auth-muted: #64748b;
+  /* sign-in secondary text */
+  --color-auth-border: #cbd5e1;
+  /* sign-in fields + dividers */
   --radius-card: 14px;
   --radius-field: 8px;
   /* form fields/chips inside full-screen flows */
+  --radius-auth-button: 10px;
+  /* sign-in buttons + fields */
+  --radius-sheet: 28px;
+  /* sign-in sheet top corners */
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
   /* 11px floor: count bubbles + short uppercase eyebrows only; readable text ≥ text-xs */

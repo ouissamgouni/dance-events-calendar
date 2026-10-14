@@ -168,8 +168,9 @@ function AppShell() {
   const isProgram = /^\/event\/[^/]+\/program/.test((backgroundLocation ?? location).pathname);
 
   // Full-screen flows (auth, onboarding), admin and shared views suppress the primary bottom nav.
+  const isLogin = location.pathname === '/login';
   const hideBottomNav =
-    location.pathname === '/login' ||
+    isLogin ||
     location.pathname.startsWith('/onboarding/') ||
     location.pathname.startsWith('/admin') ||
     location.pathname.startsWith('/shared/');
@@ -198,49 +199,51 @@ function AppShell() {
           className="flex flex-col h-full"
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
-          <header
-            className="flex items-center justify-between gap-2 bg-surface border-b border-line px-3 sm:px-4"
-            style={{ height: 'calc(64px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
-          >
-            <div className="flex flex-1 items-center gap-3 min-w-0">
-              <Link to="/" reloadDocument className="flex items-center gap-2 shrink-0">
-                <img src="/movida.png" alt="Movida" className="h-9 w-9 object-contain shrink-0" />
-                <span className="text-[21px] font-bold leading-none tracking-tight">Movida</span>
-              </Link>
-              <DesktopNav />
-              <ExplorerEventSearch
-                headerInline
-                pastToggle
-                className="hidden min-w-0 flex-1 md:flex"
-                onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
-              />
-              <button
-                type="button"
-                onClick={() => navigate('/suggest', { state: { backgroundLocation: backgroundLocation ?? location } })}
-                className="hidden h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-field border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-action transition hover:bg-blue-100 md:inline-flex"
-                data-testid="header-add-event"
-              >
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-                Add event
-              </button>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => navigate('/search', { state: { returnTo: `${location.pathname}${location.search}` } })}
-                aria-label="Search events"
-                title="Search events"
-                className="inline-flex h-11 w-11 items-center justify-center text-ink-soft transition hover:text-ink md:hidden"
-              >
-                <img src="/search.png" alt="" aria-hidden="true" className="h-6 w-6" />
-              </button>
-              <UserSearchBox />
-              <NotificationBell />
-              <HeaderUserMenu />
-            </div>
-          </header>
-          <SignUpBanner />
-          <ShareReferralBanner />
+          {!isLogin && (
+            <header
+              className="flex items-center justify-between gap-2 bg-surface border-b border-line px-3 sm:px-4"
+              style={{ height: 'calc(64px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
+            >
+              <div className="flex flex-1 items-center gap-3 min-w-0">
+                <Link to="/" reloadDocument className="flex items-center gap-2 shrink-0">
+                  <img src="/movida.png" alt="Movida" className="h-9 w-9 object-contain shrink-0" />
+                  <span className="text-[21px] font-bold leading-none tracking-tight">Movida</span>
+                </Link>
+                <DesktopNav />
+                <ExplorerEventSearch
+                  headerInline
+                  pastToggle
+                  className="hidden min-w-0 flex-1 md:flex"
+                  onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
+                />
+                <button
+                  type="button"
+                  onClick={() => navigate('/suggest', { state: { backgroundLocation: backgroundLocation ?? location } })}
+                  className="hidden h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-field border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-action transition hover:bg-blue-100 md:inline-flex"
+                  data-testid="header-add-event"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                  Add event
+                </button>
+              </div>
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => navigate('/search', { state: { returnTo: `${location.pathname}${location.search}` } })}
+                  aria-label="Search events"
+                  title="Search events"
+                  className="inline-flex h-11 w-11 items-center justify-center text-ink-soft transition hover:text-ink md:hidden"
+                >
+                  <img src="/search.png" alt="" aria-hidden="true" className="h-6 w-6" />
+                </button>
+                <UserSearchBox />
+                <NotificationBell />
+                <HeaderUserMenu />
+              </div>
+            </header>
+          )}
+          {!isLogin && <SignUpBanner />}
+          {!isLogin && <ShareReferralBanner />}
           <OnboardingGate />
           <main ref={mainRef} className={`flex-1 ${isMyEvents || isProgram ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-auto'}`}>
             <Suspense fallback={null}>
@@ -354,7 +357,7 @@ function AppShell() {
                 </Routes>
               ) : null}
             </Suspense>
-            {!isMyEvents && (
+            {!isMyEvents && !isProgram && (
               <footer className={`py-3 text-center items-center justify-center gap-3 ${location.pathname.startsWith('/admin') ? 'hidden sm:flex' : 'flex'}`}>
                 <Link to="/privacy" className="text-xs text-ink-soft hover:text-ink transition">
                   Privacy

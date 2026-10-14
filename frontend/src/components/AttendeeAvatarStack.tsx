@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { firstNameOf } from '../utils/displayName';
 import type { Attendee, FriendMini } from '../types';
@@ -195,6 +196,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPrev
     const { isAttending } = useAttendingEvents();
     const { eventCardShowPeopleIconEnabled } = useOptionalFeatureFlags();
     const location = useLocation();
+    const openSignIn = useSignIn();
     const summary = useAttendanceSummary(eventId);
     const styles = SIZE_STYLES[size];
     const viewerGoing = isAttending(eventId);
@@ -234,7 +236,11 @@ export default function AttendeeAvatarStack({ eventId, max = 3, goingFriendsPrev
             return (
                 <Link
                     to={`/login?next=${next}&intent=people`}
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        openSignIn('people');
+                    }}
                     className={styles.link}
                     title={totalGoing === 1 ? '1 person is going — sign in to see who' : `${totalGoing} people are going — sign in to see who`}
                     data-testid="anonymous-attendee-prompt"

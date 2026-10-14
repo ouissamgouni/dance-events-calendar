@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { fetchAspectTagGroups, fetchEventReviews, fetchEventSeriesRollup, fetchRatingAggregate, fetchSeriesReviews } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useRatingAggregate } from '../context/RatingAggregatesContext';
 import type { EventRatingAggregate, EventReviewPublic, SeriesRatingRollup, TagGroup } from '../types';
 import ExperienceBreakdown from './ExperienceBreakdown';
@@ -137,7 +138,7 @@ const PAGE_SIZE = 5;
 
 export default function EventReviewsSection({ eventId, isPast = true, hasStarted, onAggregateLoaded, onOpenReviewForm, refreshToken, collapsible = false }: Props) {
     const { user } = useAuth();
-    const location = useLocation();
+    const openSignIn = useSignIn();
     const [collapsed, setCollapsed] = useState(false);
     // Review count is public — surface it to signed-out visitors from the shared
     // (count-only) aggregate cache so the gated section can still show "N reviews".
@@ -308,23 +309,32 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
 
     if (!user) {
         const count = anonAggregate?.count ?? 0;
-        // Nothing to gate behind sign-in when the event has no reviews yet.
-        if (count === 0) return null;
-        return (
-            <section className="mt-4 border-t border-line px-1 pt-3 space-y-2">
-                {collapseChevron}
-                {!collapsed && (
-                    <p className="text-xs text-ink-soft">
-                        <Link
-                            to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}#community`)}`}
-                            className="text-sky-600 hover:text-sky-700 font-medium"
-                        >
-                            Sign in
-                        </Link>{' '}
-                        to see and leave reviews for this event.
+        if (count === 0) {
+            return (
+                <div className="space-y-2 py-6 text-center">
+                    <p className="text-sm font-semibold text-ink">No reviews yet</p>
+                    <p className="mx-auto max-w-xs text-xs text-ink-soft">
+                        Reviews from dancers who went will show up here.
                     </p>
-                )}
-            </section>
+                </div>
+            );
+        }
+        return (
+            <div className="space-y-2 border border-blue-100 bg-blue-50 p-4 text-center" data-testid="reviews-signin-lock">
+                <p className="text-sm font-semibold text-ink">
+                    {count} {count === 1 ? 'review' : 'reviews'} from dancers
+                </p>
+                <p className="mx-auto max-w-xs text-xs text-ink-soft">
+                    Sign in to read how other dancers experienced this event.
+                </p>
+                <button
+                    type="button"
+                    onClick={() => openSignIn('review')}
+                    className="inline-flex items-center justify-center bg-action px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                >
+                    Sign in to read
+                </button>
+            </div>
         );
     }
 

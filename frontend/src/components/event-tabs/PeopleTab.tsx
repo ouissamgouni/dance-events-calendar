@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchEventAttendees, followUser } from '../../api';
 import type { Attendee } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useSignIn } from '../../context/SignInSheetContext';
 import { useAttendanceSummary } from '../../context/AttendanceSummariesContext';
 
 interface Props {
@@ -150,6 +151,7 @@ function Section({
 /** Event detail "People" tab grouped by the viewer's relationships. */
 export default function PeopleTab({ eventId }: Props) {
     const { user } = useAuth();
+    const openSignIn = useSignIn();
     const summary = useAttendanceSummary(eventId);
     const [attendees, setAttendees] = useState<Attendee[] | null>(null);
     const [unauthorized, setUnauthorized] = useState(false);
@@ -176,13 +178,36 @@ export default function PeopleTab({ eventId }: Props) {
     if (loading) return <p className="text-xs text-ink-soft">Loading…</p>;
 
     if (unauthorized || !user) {
+        const going = summary?.total_going ?? 0;
+        const interested = summary?.total_saved ?? 0;
         return (
-            <div className="space-y-2 py-6 text-center">
-                <p className="text-sm font-semibold text-ink">See who's going</p>
-                <p className="mx-auto max-w-xs text-xs text-ink-soft">Sign in to see friends and other attendees.</p>
-                <Link to="/login" className="inline-block text-sm font-medium text-action hover:underline">
-                    Sign in
-                </Link>
+            <div className="space-y-4">
+                <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-ink">
+                        {summary ? `${going} going · ${interested} interested` : 'People'}
+                    </h3>
+                    <p className="text-xs text-ink-soft">See which friends and dancers are going to this event.</p>
+                </div>
+                {!summary || going + interested > 0 ? (
+                    <div className="space-y-2 border border-blue-100 bg-blue-50 p-4 text-center" data-testid="people-signin-lock">
+                        <p className="text-sm font-semibold text-ink">See who's going</p>
+                        <p className="mx-auto max-w-xs text-xs text-ink-soft">
+                            Sign in to see friends and other dancers going to this event.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => openSignIn('people')}
+                            className="inline-flex items-center justify-center bg-action px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                        >
+                            Sign in to see people
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-2 py-6 text-center">
+                        <p className="text-sm font-semibold text-ink">No one's going yet</p>
+                        <p className="mx-auto max-w-xs text-xs text-ink-soft">Be the first to RSVP.</p>
+                    </div>
+                )}
             </div>
         );
     }

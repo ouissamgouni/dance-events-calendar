@@ -194,6 +194,8 @@ export const handlers = [
     http.get('*/api/settings', () =>
         HttpResponse.json({
             since_date: '2025-01-01',
+            // Most anonymous-flow tests exercise on-device saves.
+            guest_actions_require_signin: false,
             sync_since_date: '2025-01-01',
             sync_interval_minutes: 60,
             auto_sync_enabled: true,

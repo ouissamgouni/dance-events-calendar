@@ -4,15 +4,15 @@
  * - Owner viewing their own passport → nothing.
  * - Already following → a subtle "Following" badge.
  * - Signed-in viewer, not following → a Follow button (POST /follow).
- * - Anonymous viewer → a sign-in prompt linking to /login.
+ * - Anonymous viewer → a prompt that opens the sign-in sheet, then follows.
  *
  * Rendered via PassportView's `headerActions` slot on both the public share
  * page and the profile "Dance Passport" tab.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { followUser } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useToast } from './Toast';
 
 /** localStorage key holding the handle an anonymous viewer intended to follow. */
@@ -30,10 +30,12 @@ export default function PassportFollowCta({
     displayName?: string | null;
 }) {
     const { user } = useAuth();
+    const openSignIn = useSignIn();
     const toast = useToast();
     const [following, setFollowing] = useState(isFollowing);
     const [pending, setPending] = useState<'approved' | 'pending' | null>(null);
     const [busy, setBusy] = useState(false);
+    const [signInNonce, setSignInNonce] = useState(0);
 
     // Replay a pending follow captured before the viewer signed in (they
     // clicked "Sign in to follow" while anonymous, then authenticated and were
@@ -70,32 +72,32 @@ export default function PassportFollowCta({
                 // Non-fatal: the viewer can still tap Follow manually.
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps -- run when auth/handle resolves
-    }, [user, handle, isSelf]);
+    }, [user, handle, isSelf, signInNonce]);
 
     // Nothing to offer without a handle, for the owner, or when already following.
     if (!handle || isSelf) return null;
 
     const who = displayName?.trim() || `@${handle}`;
 
-    // Anonymous viewers get a sign-in prompt instead of a live Follow button.
-    // We stash the intended follow and ask auth to return here so the follow
-    // completes automatically once they're signed in.
+    // Anonymous viewers get a sign-in prompt instead of a live Follow button;
+    // the follow completes automatically once they're signed in.
     if (!user) {
-        const nextPath = `${window.location.pathname}${window.location.search}`;
+        const followAfterSignIn = () => {
+            try {
+                localStorage.setItem(FOLLOW_INTENT_KEY, handle);
+            } catch {
+                // ignore storage errors
+            }
+            setSignInNonce((n) => n + 1);
+        };
         return (
-            <Link
-                to={`/login?next=${encodeURIComponent(nextPath)}&intent=follow`}
-                onClick={() => {
-                    try {
-                        localStorage.setItem(FOLLOW_INTENT_KEY, handle);
-                    } catch {
-                        // ignore storage errors
-                    }
-                }}
+            <button
+                type="button"
+                onClick={() => openSignIn('follow', { onSignedIn: followAfterSignIn })}
                 className="inline-flex items-center gap-1.5 border border-action bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-strong"
             >
                 Sign in to follow {who}
-            </Link>
+            </button>
         );
     }
 

@@ -649,6 +649,7 @@ export interface SiteSettings {
     browse_nav_enabled?: boolean;
     browse_direct_to_explorer_enabled?: boolean;
     app_auth_gate_enabled?: boolean;
+    guest_actions_require_signin?: boolean;
     onboarding_profile_step_enabled?: boolean;
     suggest_event_required_dance_group_id?: number | null;
     suggest_event_required_reach_group_id?: number | null;
