@@ -78,7 +78,7 @@ export default function SignUpBanner() {
                     Sign in to save events across your devices, see who else is going, share your calendar, rate events, get notifications and more.
                 </span>
                 <span className="sm:hidden">
-                    Sign in to save, see who's going, rate, share and more.
+                    Sign in to plan, connect and stay updated.
                 </span>
             </p>
             <div className="flex items-center gap-2 shrink-0">
