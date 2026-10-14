@@ -310,7 +310,9 @@ class TestSettingsEndpoint:
         self, sqlite_client
     ):
         client, engine = sqlite_client
-        assert client.get("/api/settings").json()["guest_actions_require_signin"] is True
+        assert (
+            client.get("/api/settings").json()["guest_actions_require_signin"] is True
+        )
 
         resp = client.put("/api/settings", json={"guest_actions_require_signin": False})
         assert resp.status_code == 200

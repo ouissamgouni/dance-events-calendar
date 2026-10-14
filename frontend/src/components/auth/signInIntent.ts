@@ -21,8 +21,8 @@ export const SIGN_IN_INTENT_COPY: Record<SignInIntent, { headline: string; subti
         subtitle: 'Sign in to save this event and find it later.',
     },
     going: {
-        headline: 'Let your people know.',
-        subtitle: 'Sign in to share where you’re going.',
+        headline: 'Count yourself in.',
+        subtitle: 'Sign in to save this event and let your friends know you’re going.',
     },
     people: {
         headline: 'See who’s dancing.',
@@ -60,7 +60,7 @@ export const SIGN_IN_INTENT_COPY: Record<SignInIntent, { headline: string; subti
 
 export const FULL_PAGE_COPY = {
     headline: 'Your dance plans, together.',
-    subtitle: 'Discover events, make plans and stay connected with your dance community.',
+    subtitle: 'Discover and save events, connect with dancers and stay updated.',
 };
 
 export const SIGN_IN_BENEFITS = ['Save events', 'Plan together', 'Stay updated'] as const;

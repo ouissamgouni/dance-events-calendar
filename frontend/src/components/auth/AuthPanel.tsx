@@ -225,21 +225,34 @@ export default function AuthPanel({ variant, headline, subtitle, headingId, subt
     const mailApp = emailStep === 'code' ? mailAppFor(emailValue.trim()) : null;
     const activeBox = Math.min(codeValue.length, CODE_LENGTH - 1);
     const ready = !loading && authMode !== null;
+    const isPage = variant === 'page';
 
     return (
         <div>
             <div className="text-center">
-                <Heading id={headingId} className="text-[28px] font-bold leading-[1.15] tracking-tight text-auth-navy">
+                <Heading
+                    id={headingId}
+                    className={isPage
+                        ? 'text-balance text-[36px] font-extrabold leading-[1.1] tracking-[-0.035em] text-auth-navy'
+                        : 'text-balance text-[28px] font-bold leading-[1.15] tracking-tight text-auth-navy'}
+                >
                     {headline}
                 </Heading>
-                <p id={subtitleId} className="mt-3 text-base leading-6 text-auth-muted">{subtitle}</p>
-                <p className="mt-4 text-sm text-auth-muted">Free account · No password</p>
+                <p
+                    id={subtitleId}
+                    className={`text-balance text-auth-muted ${isPage ? 'mx-auto mt-4 max-w-[340px] text-lg leading-[1.55]' : 'mt-3 text-base leading-6'}`}
+                >
+                    {subtitle}
+                </p>
+                <p className={`text-auth-muted ${isPage ? 'mt-6 text-[15px] font-medium' : 'mt-4 text-sm'}`}>
+                    Free account · No password.
+                </p>
             </div>
 
             {!ready || !authMode ? (
                 <p role="status" className="py-10 text-center text-sm text-auth-muted">Loading…</p>
             ) : (
-                <div className="mt-6 flex flex-col gap-3">
+                <div className={`${isPage ? 'mt-8' : 'mt-6'} flex flex-col gap-3`}>
                     {authMode.dev_auth ? emailStep === 'email' && (
                         <div className="flex w-full flex-col gap-3">
                             <p className="border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -416,28 +429,28 @@ export default function AuthPanel({ variant, headline, subtitle, headingId, subt
             )}
 
             {onKeepBrowsing && (
-                <div className="mt-3 flex justify-center">
+                <div className={`${isPage ? 'mt-5' : 'mt-3'} flex justify-center`}>
                     <button
                         type="button"
                         onClick={onKeepBrowsing}
-                        className="min-h-11 px-4 text-base font-semibold text-action-strong hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-action/35"
+                        className={`min-h-11 px-4 font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-action/35 ${isPage ? 'text-[17px]' : 'text-base'}`}
                     >
                         Keep browsing
                     </button>
                 </div>
             )}
 
-            <hr className="my-6 border-auth-border" />
+            <hr className={`${isPage ? 'my-8' : 'my-6'} border-auth-border/70`} />
 
-            {variant === 'page' && (
+            {isPage && (
                 <>
-                    <ul aria-label="With a free account" className="grid grid-cols-3 rounded-card bg-auth-tint py-5">
+                    <ul aria-label="With a free account" className="grid grid-cols-3 rounded-card bg-auth-tint py-6">
                         {SIGN_IN_BENEFITS.map((benefit, i) => {
                             const Icon = BENEFIT_ICONS[i];
                             return (
                                 <li
                                     key={benefit}
-                                    className={`flex flex-col items-center gap-2 px-2 text-center text-sm font-medium text-auth-navy ${i > 0 ? 'border-l border-auth-border' : ''}`}
+                                    className={`flex flex-col items-center gap-2.5 px-2 text-center text-base font-medium leading-tight text-auth-navy ${i > 0 ? 'border-l border-auth-border/70' : ''}`}
                                 >
                                     <Icon aria-hidden className="h-7 w-7" strokeWidth={1.6} />
                                     {benefit}
@@ -445,11 +458,11 @@ export default function AuthPanel({ variant, headline, subtitle, headingId, subt
                             );
                         })}
                     </ul>
-                    <hr className="my-6 border-auth-border" />
+                    <hr className="my-8 border-auth-border/70" />
                 </>
             )}
 
-            <p className="text-center text-[13px] leading-5 text-auth-muted">
+            <p className={`text-center text-auth-muted ${isPage ? 'text-sm leading-[1.65]' : 'text-[13px] leading-5'}`}>
                 By continuing, you agree to the{' '}
                 <Link to="/terms" className="underline hover:text-auth-navy">Terms</Link> and acknowledge the{' '}
                 <Link to="/privacy" className="underline hover:text-auth-navy">Privacy Policy</Link>.

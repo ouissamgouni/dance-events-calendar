@@ -38,8 +38,8 @@ export default function Login() {
             <div className="mx-auto w-full max-w-[440px] px-6 pt-[calc(16px+env(safe-area-inset-top))] pb-[calc(32px+env(safe-area-inset-bottom))]">
                 <div className="flex h-14 items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <img src="/movida.png" alt="" aria-hidden="true" className="h-10 w-10 object-contain" />
-                        <span className="text-2xl font-bold leading-none tracking-tight text-auth-navy">Movida</span>
+                        <img src="/icons/logo-transparent-bg.png" alt="" aria-hidden="true" className="-ml-1.5 h-12 w-12 object-contain" />
+                        <span className="text-[28px] font-extrabold leading-none tracking-[-0.03em] text-auth-navy">Movida</span>
                     </div>
                     {dismissible && (
                         <button
@@ -52,7 +52,7 @@ export default function Login() {
                         </button>
                     )}
                 </div>
-                <div className="mt-8 sm:mt-12">
+                <div className="mt-12 sm:mt-16">
                     <AuthPanel
                         variant="page"
                         headline={copy.headline}

@@ -115,8 +115,8 @@ export default function AuthSheet({ intent, onClose }: Props) {
                     <span className="h-1.5 w-11 rounded-full bg-auth-border" />
                 </div>
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <img src="/movida.png" alt="" aria-hidden="true" className="h-8 w-8 object-contain" />
+                    <div className="flex items-center gap-1.5">
+                        <img src="/icons/logo-transparent-bg.png" alt="" aria-hidden="true" className="-ml-1 h-10 w-10 object-contain" />
                         <span className="text-xl font-bold leading-none tracking-tight text-auth-navy">Movida</span>
                     </div>
                     <button
