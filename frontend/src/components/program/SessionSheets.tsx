@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { BookmarkPlus, CalendarDays, ChevronLeft, ChevronRight, Clock, MapPin, Trash2 } from 'lucide-react';
 import BottomSheet from '../BottomSheet';
 import AudiencePicker from '../AudiencePicker';
-import SignInNudge, { useSignInNudge } from '../SignInNudge';
 import { useAuth } from '../../context/AuthContext';
 import { useSignIn } from '../../context/SignInSheetContext';
 import type { ShareAudience } from '../../api';
@@ -32,20 +31,18 @@ export function SessionDetailsSheet({ schedule, session, planned, preview, onClo
     const activityType = schedule.activity_types.find((item) => item.id === session.activity_type_id);
     const { user } = useAuth();
     const openSignIn = useSignIn();
-    const nudge = useSignInNudge('save');
-    const actionRef = useRef<HTMLButtonElement | null>(null);
+    const togglePlanRef = useRef(onTogglePlan);
+    useEffect(() => {
+        togglePlanRef.current = onTogglePlan;
+    });
     const [busy, setBusy] = useState(false);
-    const [showNudge, setShowNudge] = useState(false);
     const [showAttendees, setShowAttendees] = useState(false);
     const attendeeCount = attendanceSummary?.visible_count ?? 0;
     const showAttendanceSection = !preview && (!user || attendanceLoading || attendeeCount > 0);
 
     const toggle = async () => {
         if (!user) {
-            if (nudge.shouldShow) {
-                nudge.markShown();
-                setShowNudge(true);
-            }
+            openSignIn('my_plans', { onSignedIn: () => { togglePlanRef.current(session).catch(() => undefined); } });
             return;
         }
         setBusy(true);
@@ -57,19 +54,15 @@ export function SessionDetailsSheet({ schedule, session, planned, preview, onClo
     };
 
     const footer = !preview && session.allow_plan && !session.is_cancelled ? (
-        <>
-            <button
-                ref={actionRef}
-                type="button"
-                disabled={busy}
-                onClick={toggle}
-                className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-field px-4 text-sm font-semibold disabled:opacity-50 ${planned ? 'border border-danger/30 bg-danger/5 text-danger' : 'bg-action text-white hover:opacity-90'}`}
-            >
-                {planned ? <Trash2 size={18} /> : <BookmarkPlus size={18} />}
-                {busy ? 'Updating…' : planned ? 'In My Plan · Remove' : 'Add to My Plan'}
-            </button>
-            {showNudge ? <SignInNudge anchorRef={actionRef} trigger="save" onClose={() => { nudge.dismiss(); setShowNudge(false); }} /> : null}
-        </>
+        <button
+            type="button"
+            disabled={busy}
+            onClick={toggle}
+            className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-field px-4 text-sm font-semibold disabled:opacity-50 ${planned ? 'border border-danger/30 bg-danger/5 text-danger' : 'bg-action text-white hover:opacity-90'}`}
+        >
+            {planned ? <Trash2 size={18} /> : <BookmarkPlus size={18} />}
+            {busy ? 'Updating…' : planned ? 'In My Plan · Remove' : 'Add to My Plan'}
+        </button>
     ) : undefined;
 
     if (showAttendees) {

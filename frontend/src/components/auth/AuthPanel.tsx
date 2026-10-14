@@ -450,7 +450,7 @@ export default function AuthPanel({ variant, headline, subtitle, headingId, subt
                             return (
                                 <li
                                     key={benefit}
-                                    className={`flex flex-col items-center gap-2.5 px-2 text-center text-base font-medium leading-tight text-auth-navy ${i > 0 ? 'border-l border-auth-border/70' : ''}`}
+                                    className={`flex flex-col items-center gap-2.5 px-2 text-center text-sm font-medium leading-tight text-auth-navy ${i > 0 ? 'border-l border-auth-border/70' : ''}`}
                                 >
                                     <Icon aria-hidden className="h-7 w-7" strokeWidth={1.6} />
                                     {benefit}
