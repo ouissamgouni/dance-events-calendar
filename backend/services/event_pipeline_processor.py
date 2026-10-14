@@ -34,6 +34,7 @@ from backend.services.event_extractor import (
 from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.places import PLACE_FIELDS
 from backend.services.reach import assign_event_tag, sync_event_reach
+from backend.services.tag_hierarchy import with_parent_tag_ids
 from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.sync_service import compute_content_hash
 
@@ -895,7 +896,7 @@ class EventPipelineProcessor:
         buffer.source_values = event_revisions.snapshot(buffer)
         session.add(buffer)
         sync_event_reach(session, buffer, task.default_tag_ids)
-        for tag_id in task.default_tag_ids:
+        for tag_id in with_parent_tag_ids(session, task.default_tag_ids):
             session.add(EventTag(event_id=buffer.event_id, tag_id=tag_id))
         _upsert_calendar_source(session, buffer.event_id, task.calendar_id)
         return buffer, "new"

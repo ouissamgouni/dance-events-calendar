@@ -3,6 +3,7 @@ import type { InterestProfilePayload, ReachFilter } from '../api';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
 import type { TagGroup } from '../types';
 import { generateProfileName } from '../utils/searchProfiles';
+import { orderFamilies, searchTagLabel, toggleSearchTag } from '../utils/tagHierarchy';
 import { REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS } from '../utils/reach';
 import {
     bboxSearchArea,
@@ -137,17 +138,17 @@ export default function ProfileDraftEditor({
                 )}
                 {!danceGroup ? <p className="text-sm text-muted">Loading dance styles…</p> : (
                     <div className="grid grid-cols-2 gap-2">
-                        {danceGroup.tags.map((tag) => {
+                        {orderFamilies(danceGroup.tags).map((tag) => {
                             const selected = danceIds.includes(tag.id);
                             return (
                                 <button
                                     key={tag.id}
                                     type="button"
                                     aria-pressed={selected}
-                                    onClick={() => setDanceIds(selected ? danceIds.filter((id) => id !== tag.id) : [...danceIds, tag.id])}
+                                    onClick={() => setDanceIds(toggleSearchTag(danceIds, tag.id, danceGroup.tags))}
                                     className={selected ? 'min-h-11 border border-action bg-action px-2 text-sm font-semibold text-white' : 'min-h-11 border border-line bg-surface px-2 text-sm font-semibold text-ink hover:bg-canvas'}
                                 >
-                                    {tag.label}{selected ? ' ✓' : ''}
+                                    {searchTagLabel(tag, danceGroup.tags)}{selected ? ' ✓' : ''}
                                 </button>
                             );
                         })}

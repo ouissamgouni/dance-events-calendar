@@ -69,6 +69,10 @@ def assign_event_tag(session: Session, event: CachedEvent, tag: Tag) -> bool:
             session.delete(event_tag)
         event.reach = tag.slug
         session.add(event)
+    if tag.parent_tag_id is not None:
+        parent = session.get(Tag, tag.parent_tag_id)
+        if parent is not None:
+            assign_event_tag(session, event, parent)
     if existing:
         return False
     session.add(EventTag(event_id=event.event_id, tag_id=tag.id))

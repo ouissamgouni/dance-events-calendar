@@ -23,6 +23,9 @@ from backend.api.routes.event_assets import router as event_assets_router
 from backend.api.routes.event_messages import router as event_messages_router
 from backend.api.routes.export import router as export_router
 from backend.api.routes.interest_profiles import router as interest_profiles_router
+from backend.api.routes.interest_profiles import (
+    admin_router as admin_interest_profiles_router,
+)
 from backend.api.routes.notifications import router as notifications_router
 from backend.api.routes.push import router as push_router
 from backend.api.routes.ratings import router as ratings_router
@@ -239,6 +242,7 @@ app.include_router(social_router)
 app.include_router(notifications_router)
 app.include_router(push_router)
 app.include_router(interest_profiles_router)
+app.include_router(admin_interest_profiles_router)
 app.include_router(passport_router)
 app.include_router(my_plan_router)
 app.include_router(schedules_router)

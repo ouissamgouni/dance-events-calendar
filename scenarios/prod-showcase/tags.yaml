@@ -12,9 +12,11 @@ tag_groups:
         hero_ordinal: 1
       - slug: salsa-on1
         label: Salsa On1 (LA)
+        parent: salsa
         synonyms: ["salsa on1", "on1", "la style", "linea", "línea"]
       - slug: mambo
         label: Salsa On2 (Mambo)
+        parent: salsa
         synonyms:
           [
             "salsa on2",
@@ -26,6 +28,7 @@ tag_groups:
           ]
       - slug: cuban
         label: Cuban Salsa (Casino)
+        parent: salsa
         synonyms:
           [
             "cubana",

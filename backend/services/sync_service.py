@@ -38,6 +38,7 @@ from backend.services.event_extractor import (
 )
 from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.reach import assign_event_tag, sync_event_reach
+from backend.services.tag_hierarchy import with_parent_tag_ids
 from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.pipeline.stages.extractor_image import ExtractorImageStage
 from backend.services.pipeline.stages.geocoding import GeocodingStage
@@ -537,7 +538,7 @@ class SyncService:
                     new_event.source_values = event_revisions.snapshot(new_event)
                     session.add(new_event)
                     sync_event_reach(session, new_event, default_tag_ids)
-                    for tag_id in default_tag_ids:
+                    for tag_id in with_parent_tag_ids(session, default_tag_ids):
                         session.add(EventTag(event_id=event.event_id, tag_id=tag_id))
                     _upsert_calendar_source(session, event.event_id, cal.calendar_id)
                     if event.location or event.description:

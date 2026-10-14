@@ -646,12 +646,13 @@ def replace_event_tags(
     """Make ``tag_ids`` the event's tags. Raises ValueError on a reach conflict."""
     from backend.db.models import EventTag, Tag
     from backend.services.reach import sync_event_reach
+    from backend.services.tag_hierarchy import with_parent_tag_ids
 
     have = set(current_tag_ids(session, event.event_id))
     # Tags disabled since a change was proposed are not added.
     wanted = [
         tid
-        for tid in dict.fromkeys(tag_ids)
+        for tid in with_parent_tag_ids(session, tag_ids)
         if (tag := session.get(Tag, tid)) is not None and (tag.enabled or tid in have)
     ]
     sync_event_reach(session, event, wanted)

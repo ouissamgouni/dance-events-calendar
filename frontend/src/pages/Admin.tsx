@@ -34,6 +34,7 @@ import FeedbackPanel from '../components/FeedbackPanel';
 import AdminTagCategories from '../components/AdminTagCategories';
 import AdminAnalytics from '../components/AdminAnalytics';
 import AdminUsersTab from '../components/AdminUsersTab';
+import AdminSearchProfilesPanel from '../components/AdminSearchProfiles';
 import AdminNotificationsTab from '../components/AdminNotificationsTab';
 import AdminUserMultiPicker from '../components/AdminUserMultiPicker';
 import AdminAssetPromptSendNow from '../components/AdminAssetPromptSendNow';
@@ -428,6 +429,7 @@ export default function Admin() {
     const isValidTab = (t: string | undefined): t is AdminTab =>
         t === 'data' || t === 'configuration' || t === 'analytics' || t === 'users' || t === 'notifications';
     const [activeTab, setActiveTab] = useState<AdminTab>(isValidTab(tabParam) ? tabParam : 'data');
+    const [usersView, setUsersView] = useState<'users' | 'profiles'>('users');
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const updateFlagFn = useUpdateFeatureFlag();
@@ -3809,7 +3811,24 @@ export default function Admin() {
 
             {/* ── Users Tab ── */}
             {activeTab === 'users' && (
-                <AdminUsersTab />
+                <div className="space-y-4">
+                    <div role="group" aria-label="Users view" className="flex gap-1.5">
+                        {(['users', 'profiles'] as const).map((view) => (
+                            <button
+                                key={view}
+                                type="button"
+                                aria-pressed={usersView === view}
+                                onClick={() => setUsersView(view)}
+                                className={usersView === view
+                                    ? 'border border-action bg-action px-2.5 py-1 text-[11px] font-medium text-white'
+                                    : 'border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-ink-soft hover:bg-canvas'}
+                            >
+                                {view === 'users' ? 'Users' : 'Search profiles'}
+                            </button>
+                        ))}
+                    </div>
+                    {usersView === 'users' ? <AdminUsersTab /> : <AdminSearchProfilesPanel />}
+                </div>
             )}
 
             {/* ── Notifications Tab ── */}

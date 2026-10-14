@@ -19,12 +19,13 @@ import {
 import type { AdminUserMergeResponse, AdminUserRow } from '../api';
 import { ConfirmDialog, PromptDialog } from './AppDialog';
 import AdminOrganizerSheet from './AdminOrganizerSheet';
+import { AdminUserSearchProfilesSheet } from './AdminSearchProfiles';
 import { FeatureStatusCell, PushSubscriptionCell } from './NotificationStatusBadges';
 import { parseUserAgent } from '../utils/userAgent';
 
 const PAGE_SIZE = 50;
 
-type UserActionKey = 'organizer' | 'managed' | 'label' | 'push' | 'install' | 'install-email' | 'onboarding' | 'merge' | 'unblock' | 'block' | 'delete';
+type UserActionKey = 'organizer' | 'profiles' | 'managed' | 'label' | 'push' | 'install' | 'install-email' | 'onboarding' | 'merge' | 'unblock' | 'block' | 'delete';
 
 type AdminUserSortField =
     | 'created_at'
@@ -66,6 +67,7 @@ export default function AdminUsersTab() {
     const [unblockTarget, setUnblockTarget] = useState<AdminUserRow | null>(null);
     const [mergeTarget, setMergeTarget] = useState<AdminUserRow | null>(null);
     const [organizerTarget, setOrganizerTarget] = useState<AdminUserRow | null>(null);
+    const [profilesTarget, setProfilesTarget] = useState<AdminUserRow | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const isMobile = useMediaQuery('(max-width: 639px)');
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -316,6 +318,7 @@ export default function AdminUsersTab() {
     const runUserAction = (key: UserActionKey, row: AdminUserRow) => {
         setActionRow(null);
         if (key === 'organizer') setOrganizerTarget(row);
+        else if (key === 'profiles') setProfilesTarget(row);
         else if (key === 'managed') void onToggleManaged(row);
         else if (key === 'label') void onEditManagedLabel(row);
         else if (key === 'push') void onToggleForceEnablePush(row);
@@ -676,6 +679,15 @@ export default function AdminUsersTab() {
                                                 </button>
                                                 <button
                                                     type="button"
+                                                    disabled={isDeleted}
+                                                    onClick={() => setProfilesTarget(row)}
+                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title="View and edit search profiles"
+                                                >
+                                                    Search profiles
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
                                                     onClick={() => onToggleManaged(row)}
                                                     className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
@@ -880,6 +892,13 @@ export default function AdminUsersTab() {
                     onChanged={() => void load()}
                 />
             )}
+            {profilesTarget && (
+                <AdminUserSearchProfilesSheet
+                    userId={profilesTarget.user_id}
+                    label={userLabel(profilesTarget)}
+                    onClose={() => setProfilesTarget(null)}
+                />
+            )}
             <MergeUsersDialog
                 open={mergeTarget !== null}
                 source={mergeTarget}
@@ -902,6 +921,7 @@ function UserActionsSheet({ row, busy, fmtDate, onAction, onClose }: {
     const isDeleted = row.deleted_at !== null;
     const actions: { key: UserActionKey; label: string; disabled?: boolean; danger?: boolean }[] = [
         { key: 'organizer', label: row.is_verified_organizer ? 'Organizer ✓' : 'Organizer', disabled: isDeleted },
+        { key: 'profiles', label: 'Search profiles', disabled: isDeleted },
         { key: 'managed', label: row.is_admin_managed ? 'Unmanage' : 'Manage', disabled: isDeleted || row.is_admin },
         ...(row.is_admin_managed ? [{ key: 'label' as const, label: 'Edit label', disabled: isDeleted }] : []),
         { key: 'push', label: row.force_enable_push_prompt ? 'Unforce push prompt' : 'Force push prompt', disabled: isDeleted },

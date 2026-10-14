@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { TagGroup } from '../types';
+import { orderFamilies, searchTagLabel } from '../utils/tagHierarchy';
 
 // Get the PNG image path for a reach tag based on its label.
 function reachIconSrcFor(tagLabel: string): string {
@@ -118,10 +119,10 @@ function buildGroupRows(
                 .map((t) => ({ ...t, _groupColor: g.color ?? t.color ?? '#6b7280' }));
             const heroTags = selectHeroes(tags);
             const remainderTags = selectRemainder(tags, heroTags, sortMode);
-            const ordered = [
+            const ordered = orderFamilies([
                 ...partitionEnabledFirst(heroTags, activeTagIds, countOverrides),
                 ...partitionEnabledFirst(remainderTags, activeTagIds, countOverrides),
-            ];
+            ]);
             return { key: g.slug, label: g.label, tags: ordered };
         })
         .filter((row) => row.tags.length > 0);
@@ -145,7 +146,7 @@ export default function TagFilterPills({
 
     const showLabels = groupRows.length > 1;
 
-    const renderPill = (tag: EnrichedTag, groupKey: string) => {
+    const renderPill = (tag: EnrichedTag, groupKey: string, siblings: EnrichedTag[]) => {
         const active = activeTagIds.has(tag.id);
         const displayCount = countOverrides?.get(tag.id) ?? tag.event_count ?? null;
         const disabled = !active && displayCount === 0;
@@ -171,7 +172,7 @@ export default function TagFilterPills({
                             aria-hidden="true"
                         />
                     )}
-                    <span className="truncate text-center flex-1">{tag.label}</span>
+                    <span className="truncate text-center flex-1">{searchTagLabel(tag, siblings)}</span>
                 </span>
                 {active && (
                     // eslint-disable-next-line no-restricted-syntax -- checkmark badge inside selected pill
@@ -195,7 +196,7 @@ export default function TagFilterPills({
                         </span>
                     )}
                     <div className="grid grid-cols-3 gap-2.5">
-                        {row.tags.map((tag) => renderPill(tag, row.key))}
+                        {row.tags.map((tag) => renderPill(tag, row.key, row.tags))}
                     </div>
                 </div>
             ))}

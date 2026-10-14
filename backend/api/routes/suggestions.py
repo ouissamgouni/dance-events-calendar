@@ -75,6 +75,7 @@ from backend.services.image_processing import ImageValidationError
 from backend.services.geocoding import geocode_location
 from backend.services import places
 from backend.services.reach import sync_event_reach
+from backend.services.tag_hierarchy import with_parent_tag_ids
 from backend.services.recurrence import expand_occurrences, normalize_all_day
 from backend.services.timezones import resolve_event_timezone, valid_timezone
 from backend.services import event_revisions
@@ -374,7 +375,7 @@ def _apply_suggestion_tags(
     event = session.get(CachedEvent, event_id)
     if event is not None:
         sync_event_reach(session, event, suggested_tag_ids)
-    for tag_id in suggested_tag_ids:
+    for tag_id in with_parent_tag_ids(session, suggested_tag_ids):
         tag = session.get(Tag, tag_id)
         if not tag:
             continue

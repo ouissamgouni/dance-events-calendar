@@ -613,6 +613,7 @@ export function LegacyOnboardingWizard() {
                                         allowFreeText={false}
                                         searchable
                                         hideGroupLabels
+                                        searchSelection
                                     />
                                 )}
                             </section>
@@ -833,6 +834,7 @@ export function LegacyOnboardingWizard() {
                                         searchable
                                         hideGroupLabels
                                         wrap={false}
+                                        searchSelection
                                     />
                                 )}
                             </section>

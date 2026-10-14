@@ -20,6 +20,8 @@ export interface Tag {
     enabled: boolean;
     is_hero_filter: boolean;
     hero_ordinal: number | null;
+    /** One-level hierarchy within a group (e.g. On2 -> Salsa). */
+    parent_tag_id?: number | null;
 }
 
 export interface TagGroup {

@@ -1,0 +1,77 @@
+# One Paris-area event per salsa sub-style plus an unspecified salsa night
+# and a bachata control. All international so reach never filters.
+# Events carry the parent "salsa" alongside a sub-style, like prod data.
+base_week: 0
+events:
+  - id: evt-dsh-on2-congress
+    calendar_id: salsa-cal-dsh-001
+    title: Paris On2 Mambo Congress
+    description: Salsa On2 (mambo) congress.
+    location: "Palais des Congrès, Paris, France"
+    latitude: 48.879
+    longitude: 2.283
+    start: w1 Sat 20:00
+    end: w1 Sun 03:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:international
+
+  - id: evt-dsh-on1-weekender
+    calendar_id: salsa-cal-dsh-001
+    title: Paris LA Style On1 Weekender
+    description: Salsa On1 (LA style) weekender.
+    location: "Salle Wagram, Paris, France"
+    latitude: 48.877
+    longitude: 2.298
+    start: w1 Fri 21:00
+    end: w1 Sat 03:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:salsa-on1
+      - reach:international
+
+  - id: evt-dsh-cuban-festival
+    calendar_id: salsa-cal-dsh-001
+    title: Paris Cuban Salsa Festival
+    description: Casino and rueda festival.
+    location: "La Bellevilloise, Paris, France"
+    latitude: 48.868
+    longitude: 2.390
+    start: w2 Sat 20:00
+    end: w2 Sun 03:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:cuban
+      - reach:international
+
+  - id: evt-dsh-salsa-unspecified
+    calendar_id: salsa-cal-dsh-001
+    title: Paris Salsa Night (style not specified)
+    description: Generic salsa night, no sub-style tagged.
+    location: "Cafe Latino, Paris, France"
+    latitude: 48.853
+    longitude: 2.349
+    start: w1 Thu 21:00
+    end: w1 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:international
+
+  - id: evt-dsh-bachata-control
+    calendar_id: salsa-cal-dsh-001
+    title: Paris Bachata Sensual Night
+    description: Control event — no viewer selects bachata.
+    location: "Le Balajo, Paris, France"
+    latitude: 48.853
+    longitude: 2.373
+    start: w1 Wed 21:00
+    end: w1 Thu 01:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:international

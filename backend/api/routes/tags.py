@@ -46,6 +46,7 @@ from backend.services.event_visibility import (
     show_pending_events_enabled,
 )
 from backend.services.reach import assign_event_tag
+from backend.services.tag_hierarchy import with_parent_tag_ids
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ def _tag_to_response(tag: Tag) -> TagResponse:
         enabled=tag.enabled,
         is_hero_filter=tag.is_hero_filter,
         hero_ordinal=tag.hero_ordinal,
+        parent_tag_id=tag.parent_tag_id,
     )
 
 
@@ -164,6 +166,30 @@ def _reach_slug(session: Session, tag: Tag) -> str | None:
     return tag.slug if group and group.slug == "reach" else None
 
 
+def _validate_parent(
+    session: Session, group_id: int, parent_id: int, tag_id: int | None
+) -> None:
+    """One level only: the parent is a top-level tag of the same group and
+    the tag being linked has no children of its own."""
+    parent = session.get(Tag, parent_id)
+    if parent is None or parent.group_id != group_id or parent.id == tag_id:
+        raise HTTPException(
+            status_code=400, detail="Parent must be another tag of the same group"
+        )
+    if parent.parent_tag_id is not None:
+        raise HTTPException(
+            status_code=400, detail="Parent tag cannot itself have a parent"
+        )
+    if (
+        tag_id is not None
+        and session.exec(select(Tag.id).where(Tag.parent_tag_id == tag_id)).first()
+        is not None
+    ):
+        raise HTTPException(
+            status_code=400, detail="A tag with sub-tags cannot have a parent"
+        )
+
+
 def _apply_tag_suggestion_filters(
     query,
     *,
@@ -223,6 +249,7 @@ def get_event_tags(
             enabled=tag.enabled,
             is_hero_filter=tag.is_hero_filter,
             hero_ordinal=tag.hero_ordinal,
+            parent_tag_id=tag.parent_tag_id,
         )
         result.setdefault(et.event_id, []).append(tag_resp)
     return result
@@ -465,6 +492,8 @@ def create_tag(
         .where(Tag.group_id == body.group_id)
         .order_by(col(Tag.ordinal).desc())
     ).first()
+    if body.parent_tag_id is not None:
+        _validate_parent(session, body.group_id, body.parent_tag_id, None)
     tag = Tag(
         group_id=body.group_id,
         slug=slug,
@@ -472,6 +501,7 @@ def create_tag(
         color=body.color,
         ordinal=(max_ordinal or 0) + 1,
         polarity=body.polarity,
+        parent_tag_id=body.parent_tag_id,
     )
     session.add(tag)
     session.commit()
@@ -495,6 +525,14 @@ def update_tag(
     # Handle moving the tag to another group/category.
     new_group_id = update_data.pop("group_id", None)
     if new_group_id is not None and new_group_id != tag.group_id:
+        has_children = session.exec(
+            select(Tag.id).where(Tag.parent_tag_id == tag.id)
+        ).first()
+        if tag.parent_tag_id is not None or has_children is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="Remove parent/sub-tag links before moving this tag",
+            )
         target_group = session.get(TagGroup, new_group_id)
         if not target_group:
             raise HTTPException(status_code=404, detail="Target tag group not found")
@@ -530,6 +568,9 @@ def update_tag(
             update_data["ordinal"] = (max_ordinal or 0) + 1
         tag.group_id = new_group_id
 
+    if update_data.get("parent_tag_id") is not None:
+        _validate_parent(session, tag.group_id, update_data["parent_tag_id"], tag.id)
+
     for field, value in update_data.items():
         setattr(tag, field, value)
     session.add(tag)
@@ -560,6 +601,9 @@ def delete_tag(
         )
 
     # Cascade: delete event_tags, tag_suggestions, tag_synonyms and calendar default tags
+    for child in session.exec(select(Tag).where(Tag.parent_tag_id == tag_id)).all():
+        child.parent_tag_id = None
+        session.add(child)
     for cdt in session.exec(
         select(CalendarDefaultTag).where(CalendarDefaultTag.tag_id == tag_id)
     ).all():
@@ -596,7 +640,10 @@ def set_event_tags(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    tags = [_assert_event_scope_tag(session, tag_id) for tag_id in body.tag_ids]
+    tags = [
+        _assert_event_scope_tag(session, tag_id)
+        for tag_id in with_parent_tag_ids(session, body.tag_ids)
+    ]
     reach_slugs = [slug for tag in tags if (slug := _reach_slug(session, tag))]
     if len(reach_slugs) > 1:
         raise HTTPException(

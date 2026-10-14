@@ -1657,6 +1657,61 @@ export async function updateInterestProfile(
     return parseJsonResponse<InterestProfile>(res, 'Failed to update interest profile');
 }
 
+export interface AdminInterestProfileCluster {
+    key: string;
+    dance_tag_ids: number[];
+    reach_filter: ReachFilter;
+    min_lat: number;
+    min_lng: number;
+    max_lat: number;
+    max_lng: number;
+    area_labels: string[];
+    profile_count: number;
+    user_count: number;
+    matches_enabled_count: number;
+    upcoming_match_count: number;
+    notifications_30d_per_user: number;
+    flags: string[];
+}
+
+export interface AdminInterestProfileRow extends InterestProfile {
+    cluster_key: string;
+    user_id: string;
+    user_email: string;
+    user_handle: string | null;
+    user_display_name: string | null;
+    upcoming_match_count: number;
+    notifications_30d: number;
+}
+
+export async function fetchAdminInterestProfileClusters(): Promise<AdminInterestProfileCluster[]> {
+    const res = await fetch(`${BASE}/admin/interest-profiles/clusters`, { credentials: 'include' });
+    return parseJsonResponse<AdminInterestProfileCluster[]>(res, 'Failed to fetch search profiles');
+}
+
+export async function fetchAdminInterestProfiles(
+    opts: { clusterKey?: string; userId?: string },
+): Promise<AdminInterestProfileRow[]> {
+    const sp = new URLSearchParams();
+    if (opts.clusterKey) sp.set('cluster_key', opts.clusterKey);
+    if (opts.userId) sp.set('user_id', opts.userId);
+    const res = await fetch(`${BASE}/admin/interest-profiles?${sp.toString()}`, { credentials: 'include' });
+    return parseJsonResponse<AdminInterestProfileRow[]>(res, 'Failed to fetch search profiles');
+}
+
+export async function adminUpdateInterestProfile(
+    id: number,
+    payload: InterestProfileUpdatePayload,
+): Promise<InterestProfile> {
+    const res = await fetch(`${BASE}/admin/interest-profiles/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+    });
+    return parseJsonResponse<InterestProfile>(res, 'Failed to update search profile');
+}
+
 export async function deleteInterestProfile(id: number): Promise<void> {
     const res = await fetch(`${BASE}/interest-profiles/${id}`, {
         method: 'DELETE',
@@ -2535,6 +2590,7 @@ export type NotificationKind =
     | 'event_removed'
     | 'event_cancelled'
     | 'organizer_assigned'
+    | 'interest_profile_updated'
     | 'plan_session_added'
     | 'schedule_program_available'
     | 'schedule_program_updated';
@@ -4843,7 +4899,7 @@ export async function createTag(data: { group_id: number; label: string; color?:
     return res.json();
 }
 
-export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number; polarity?: 'positive' | 'negative' | 'neutral' | null }): Promise<Tag> {
+export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number; polarity?: 'positive' | 'negative' | 'neutral' | null; parent_tag_id?: number | null }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
         method: 'PATCH',
         headers: adminJsonHeaders,

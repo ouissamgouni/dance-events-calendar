@@ -344,7 +344,9 @@ class TestAdminDeleteTag:
         default_tag = CalendarDefaultTag(id=1, calendar_id="cal-001", tag_id=7)
         event_tag = EventTag(event_id="evt-001", tag_id=7)
         session.get.return_value = tag
-        session.exec.side_effect = _exec_results(0, [default_tag], [event_tag], [], [])
+        session.exec.side_effect = _exec_results(
+            0, [], [default_tag], [event_tag], [], []
+        )
 
         resp = client.delete("/api/admin/tags/7")
 

@@ -1,0 +1,102 @@
+test_plan:
+  name: "Dance-style hierarchy — sub-styles supersede Salsa; admin search profiles"
+  description: >
+    Salsa On1 / On2 / Cuban are children of the generic "Salsa" tag (shared
+    taxonomy `parent: salsa`). Rules under test:
+      * Events carry the parent next to a sub-style (picking On2 on an event
+        also tags Salsa).
+      * In a search selection a sub-style SUPERSEDES its parent: legacy
+        "Salsa + On2" behaves as On2 only (no Cuban / On1 / unspecified salsa).
+      * Sibling sub-styles combine (On1 + On2 = either).
+      * "All Salsa" (parent alone) matches the whole family, including salsa
+        events with no sub-style.
+    The same rule drives Explore filters, saved-search alerts and the admin
+    Search profiles view. Admin edits to a user's profile notify the owner
+    in-app only.
+
+  preconditions:
+    - "Run with: SCENARIO=dance-style-hierarchy RESET=1 task start:scenario"
+    - "Events: On2 congress, On1 weekender, Cuban festival, unspecified salsa night, bachata control (all Paris, international)."
+    - "Cast: nora (seeded Salsa + On2 → On2), leo (On1 + On2), alma (All Salsa), admin."
+
+  steps:
+    - id: 1
+      title: "Legacy Salsa + On2 profile is stored as On2 only"
+      description: >
+        Sign in as nora. Open Saved searches → "Nora: Europe On2" → Dance styles.
+      expected: >
+        Only "Salsa On2 (Mambo)" is selected. The family is shown together:
+        "All Salsa", then On1, On2, Cuban, followed by the other styles.
+
+    - id: 2
+      title: "Explore default filter applies On2 only"
+      description: >
+        As nora, open Explore (default profile applied) and list upcoming events.
+      expected: >
+        Only "Paris On2 Mambo Congress" is listed. The On1 weekender, Cuban
+        festival, unspecified salsa night and bachata control are NOT listed.
+
+    - id: 3
+      title: "Siblings combine; All Salsa and sub-styles are exclusive"
+      description: >
+        In nora's Explore filter sheet → Dance styles: tap On1 (keep On2), then
+        tap "All Salsa", then tap Cuban.
+      expected: >
+        After On1: On1 + On2 selected; list shows the On2 congress and On1
+        weekender. After "All Salsa": On1/On2 are cleared, "All Salsa" is
+        selected; all four salsa events are listed (bachata still hidden).
+        After Cuban: "All Salsa" is cleared, only Cuban is selected; only the
+        Cuban festival is listed.
+
+    - id: 4
+      title: "Alerts follow the same rule"
+      description: >
+        Trigger one dispatch tick: `SCENARIO=dance-style-hierarchy task notify:trigger:scenario`.
+        Then, per user, `GET /api/notifications?kind=interest_event`.
+      expected: >
+        Stats: interest.created = 7. nora → 1 row (On2 congress). leo → 2 rows
+        (On2 congress, On1 weekender). alma → 4 rows (On2 congress, On1
+        weekender, Cuban festival, unspecified salsa night). Nobody gets the
+        bachata control.
+
+    - id: 5
+      title: "Tagging an event with a sub-style adds Salsa"
+      description: >
+        As admin, open the bachata control event in Admin → Events and set its
+        tags to just "Salsa On1 (LA)" (PUT /api/admin/events/{id}/tags).
+      expected: >
+        The saved event shows both "Salsa" and "Salsa On1 (LA)".
+
+    - id: 6
+      title: "Admin: parent tag editor"
+      description: >
+        Admin → Configuration → Tags → Dance Style. Inspect the "↳" parent
+        select on each dance-style tag.
+      expected: >
+        On1, On2 and Cuban show "↳ Salsa". Salsa's select is disabled ("Has
+        sub-tags"). Options only list top-level tags (no On1/On2/Cuban), so a
+        two-level hierarchy can't be created; the API also rejects it (400).
+
+    - id: 7
+      title: "Admin: search profiles grouped"
+      description: >
+        Admin → Users → "Search profiles".
+      expected: >
+        Three groups (one per viewer): "Salsa On2 (Mambo)" (1 user, 1 upcoming),
+        "Salsa On1 (LA), Salsa On2 (Mambo)" (1 user, 2 upcoming),
+        "Salsa" (1 user, 4 upcoming); each shows Any reach + "Europe & nearby"
+        and the "Wide area + any reach" flag. The admin's own auto-created
+        "Default" profile (no dance style) is a separate group flagged
+        "Never matches (no dance style)". Expanding a group lists its
+        member profile with owner, alerts state and 30-day alert count.
+
+    - id: 8
+      title: "Admin: edit a user's profile; owner is told in-app"
+      description: >
+        Admin → Users → nora → "Search profiles" → Edit → Dance styles: add
+        Cuban → Back → Save changes. Then sign in as nora and open Notifications.
+      expected: >
+        Admin sees nora's profile with On2 + Cuban. nora has one "Others" row
+        "The Movida team updated your saved search · Nora: Europe On2" linking
+        to Saved searches. No email or push is sent for it. Editing again
+        re-surfaces the same row (unread) instead of adding a second one.

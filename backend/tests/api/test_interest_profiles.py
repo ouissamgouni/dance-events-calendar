@@ -7,7 +7,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine, delete
+from sqlmodel import Session, SQLModel, create_engine, delete, select
 
 os.environ.setdefault("SESSION_SECRET", "test-secret-for-interest-profiles")
 os.environ.setdefault("ADMIN_EMAIL", "admin@example.com")
@@ -230,6 +230,47 @@ def test_patch_interest_profile_partial_update(client, tags):
     assert regional.id in data["reach_tag_ids"]
     # Untouched geo fields preserved.
     assert data["max_lat"] == 45.0
+
+
+@pytest.mark.unit
+def test_sub_style_supersedes_parent_but_siblings_combine(client, session, tags):
+    salsa, _forro, _regional = tags
+    on1 = Tag(
+        group_id=salsa.group_id, slug="salsa-on1", label="On1", parent_tag_id=salsa.id
+    )
+    on2 = Tag(
+        group_id=salsa.group_id, slug="mambo", label="On2", parent_tag_id=salsa.id
+    )
+    session.add_all([on1, on2])
+    session.commit()
+    _login(client, email="alice@example.com")
+
+    create_resp = client.post(
+        "/api/interest-profiles",
+        json={
+            "label": "On2",
+            "min_lat": 35.0,
+            "min_lng": -10.0,
+            "max_lat": 45.0,
+            "max_lng": 5.0,
+            "dance_tag_ids": [salsa.id, on2.id],
+        },
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    assert create_resp.json()["dance_tag_ids"] == [on2.id]
+
+    patch_resp = client.patch(
+        f"/api/interest-profiles/{create_resp.json()['id']}",
+        json={"dance_tag_ids": [salsa.id, on1.id, on2.id]},
+    )
+    assert patch_resp.status_code == 200, patch_resp.text
+    assert patch_resp.json()["dance_tag_ids"] == sorted([on1.id, on2.id])
+
+    all_resp = client.patch(
+        f"/api/interest-profiles/{create_resp.json()['id']}",
+        json={"dance_tag_ids": [salsa.id]},
+    )
+    assert all_resp.json()["dance_tag_ids"] == [salsa.id]
 
 
 @pytest.mark.unit
@@ -512,3 +553,127 @@ def test_delete_other_users_profile_returns_404(client, tags):
 
     r = client.delete(f"/api/interest-profiles/{alice_profile_id}")
     assert r.status_code == 404
+
+
+# --- Admin: search-profile clusters + per-user edit -------------------------
+
+
+def _alice_profile(client, session, tags):
+    """Alice: one On2 profile over Spain plus a Cuban-only event inside it."""
+    from datetime import datetime, timedelta, timezone
+
+    from backend.db.models import CachedEvent, EventTag
+
+    salsa, _forro, _regional = tags
+    on2 = Tag(
+        group_id=salsa.group_id, slug="mambo", label="On2", parent_tag_id=salsa.id
+    )
+    cuban = Tag(
+        group_id=salsa.group_id, slug="cuban", label="Cuban", parent_tag_id=salsa.id
+    )
+    session.add_all([on2, cuban])
+    session.commit()
+    start = datetime.now(timezone.utc) + timedelta(days=3)
+    for event_id, tag_ids in (
+        ("on2-night", [salsa.id, on2.id]),
+        ("cuban-night", [salsa.id, cuban.id]),
+    ):
+        session.add(
+            CachedEvent(
+                event_id=event_id,
+                calendar_id="cal",
+                title=event_id,
+                start=start,
+                end=start + timedelta(hours=3),
+                latitude=40.4,
+                longitude=-3.7,
+                review_status="reviewed",
+            )
+        )
+        session.add_all(EventTag(event_id=event_id, tag_id=t) for t in tag_ids)
+    session.commit()
+
+    _login(client, email="alice@example.com")
+    resp = client.post(
+        "/api/interest-profiles",
+        json={
+            "label": "Spain On2",
+            "area_label": "Spain",
+            "min_lat": 36.0,
+            "min_lng": -9.0,
+            "max_lat": 43.0,
+            "max_lng": 3.0,
+            "dance_tag_ids": [salsa.id, on2.id],
+            "matches_enabled": True,
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    _raw_login(client, email="admin@example.com")
+    return resp.json(), on2, cuban
+
+
+@pytest.mark.unit
+def test_admin_clusters_group_profiles_with_reach(client, session, tags):
+    profile, on2, _cuban = _alice_profile(client, session, tags)
+
+    resp = client.get("/api/admin/interest-profiles/clusters")
+    assert resp.status_code == 200, resp.text
+    cluster = next(c for c in resp.json() if c["dance_tag_ids"] == [on2.id])
+    assert cluster["user_count"] == 1
+    assert cluster["matches_enabled_count"] == 1
+    assert cluster["area_labels"] == ["Spain"]
+    # Only the On2 event: the Cuban one is no longer reached via generic Salsa.
+    assert cluster["upcoming_match_count"] == 1
+    assert "no_dance_styles" not in cluster["flags"]
+
+    members = client.get(
+        "/api/admin/interest-profiles", params={"cluster_key": cluster["key"]}
+    ).json()
+    assert [m["id"] for m in members] == [profile["id"]]
+    assert members[0]["user_email"] == "alice@example.com"
+    assert members[0]["upcoming_match_count"] == 1
+
+
+@pytest.mark.unit
+def test_admin_edit_profile_notifies_owner_in_app(client, session, tags):
+    from backend.db.models import Notification, NotificationDelivery
+
+    profile, on2, cuban = _alice_profile(client, session, tags)
+
+    resp = client.patch(
+        f"/api/admin/interest-profiles/{profile['id']}",
+        json={"dance_tag_ids": [on2.id, cuban.id]},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["dance_tag_ids"] == sorted([on2.id, cuban.id])
+    client.patch(
+        f"/api/admin/interest-profiles/{profile['id']}", json={"label": "Spain salsa"}
+    )
+
+    session.expire_all()
+    notes = session.exec(
+        select(Notification).where(Notification.kind == "interest_profile_updated")
+    ).all()
+    assert len(notes) == 1
+    assert notes[0].context == "Spain salsa"
+    assert notes[0].read_at is None
+    channels = session.exec(
+        select(NotificationDelivery.channel).where(
+            NotificationDelivery.notification_id == notes[0].id
+        )
+    ).all()
+    assert set(channels) == {"app"}
+
+    _login(client, email="alice@example.com")
+    feed = client.get("/api/notifications", params={"kind": "interest_profile_updated"})
+    assert feed.status_code == 200, feed.text
+
+
+@pytest.mark.unit
+def test_admin_profile_endpoints_require_admin(client, tags):
+    _login(client, email="bob@example.com")
+    assert client.get("/api/admin/interest-profiles/clusters").status_code == 403
+    assert (
+        client.patch("/api/admin/interest-profiles/1", json={"label": "x"}).status_code
+        == 403
+    )

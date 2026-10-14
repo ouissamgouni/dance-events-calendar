@@ -1,0 +1,17 @@
+# dance-style-hierarchy cast — one viewer per selection shape.
+users:
+  # Legacy "Salsa + On2" profile → stored/matched as On2 only.
+  - email: nora@example.com
+    name: Nora On2
+    handle: nora
+  # On1 + On2 together (siblings combine).
+  - email: leo@example.com
+    name: Leo Linear
+    handle: leo
+  # "All Salsa" (parent only) → whole family incl. unspecified salsa.
+  - email: alma@example.com
+    name: Alma AllSalsa
+    handle: alma
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

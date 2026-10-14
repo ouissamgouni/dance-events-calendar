@@ -441,6 +441,7 @@ def build_snapshot(
     groups = list(session.exec(select(TagGroup)).all())
     groups.sort(key=lambda group: (group.ordinal, group.slug))
     tags = list(session.exec(select(Tag)).all())
+    tags_by_id = {tag.id: tag for tag in tags}
     tags_by_group: dict[int, list[Tag]] = {}
     for tag in tags:
         tags_by_group.setdefault(tag.group_id, []).append(tag)
@@ -557,6 +558,11 @@ def build_snapshot(
                         **(
                             {"polarity": tag.polarity}
                             if tag.polarity is not None
+                            else {}
+                        ),
+                        **(
+                            {"parent": tags_by_id[tag.parent_tag_id].slug}
+                            if tag.parent_tag_id in tags_by_id
                             else {}
                         ),
                         **(

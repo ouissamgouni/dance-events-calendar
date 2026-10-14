@@ -156,6 +156,8 @@ export function resolveNotificationDestination(item: NotificationItem): string {
             return `/event/${item.event_id}`;
         case 'organizer_assigned':
             return item.event_id ? `/event/${item.event_id}` : '/hosting';
+        case 'interest_profile_updated':
+            return '/saved-searches';
         case 'plan_session_added':
             return `/event/${item.event_id}/program${item.schedule_session_id ? `?session=${item.schedule_session_id}` : ''}`;
         case 'schedule_program_available':
@@ -230,6 +232,7 @@ const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> =
     event_removed: 'plans',
     event_cancelled: 'plans',
     organizer_assigned: 'others',
+    interest_profile_updated: 'others',
     plan_session_added: 'people',
     schedule_program_available: 'plans',
     schedule_program_updated: 'plans',

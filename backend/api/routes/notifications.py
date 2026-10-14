@@ -101,6 +101,7 @@ VALID_KINDS = {
     "event_removed",
     "event_cancelled",
     "organizer_assigned",
+    "interest_profile_updated",
 }
 
 

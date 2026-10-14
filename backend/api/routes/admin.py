@@ -180,6 +180,7 @@ from backend.services.geocoding import (
 )
 from backend.services import places
 from backend.services.reach import assign_event_tag, sync_event_reach
+from backend.services.tag_hierarchy import with_parent_tag_ids
 from backend.services.sync_job_service import SyncJobStatus, get_sync_job_service
 from backend.services.sync_service import SyncService
 from backend.services.user_avatars import resolve_user_avatar
@@ -2540,7 +2541,7 @@ def update_event(
         ).all()
         for et in existing_ets:
             session.delete(et)
-        for tid in tag_ids:
+        for tid in with_parent_tag_ids(session, tag_ids):
             tag = session.get(Tag, tid)
             if tag:
                 session.add(EventTag(event_id=event_id, tag_id=tid))
