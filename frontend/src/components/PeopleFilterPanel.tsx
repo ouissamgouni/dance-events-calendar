@@ -16,10 +16,10 @@
  * transitions to the populated filter with Following auto-selected.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { fetchMyFollowing, type FollowUser } from '../api';
 import { firstNameOf } from '../utils/displayName';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useToast } from './Toast';
 import useBackToClose from '../hooks/useBackToClose';
 import type { InterestFilterChange } from './InterestFilter';
@@ -281,6 +281,7 @@ export default function PeopleFilterPanel({
     onExploreAll,
 }: Props) {
     const { refreshUser } = useAuth();
+    const openSignIn = useSignIn();
     const toast = useToast();
     // 'build' (empty-network acquisition) is sticky so the viewer can follow
     // several people before returning; 'find'/'pick'/'invite' are stacked overlays.
@@ -361,9 +362,9 @@ export default function PeopleFilterPanel({
                     </svg>
                 </span>
                 <p className="max-w-xs text-sm text-ink-soft">Sign in to filter events by people you follow.</p>
-                <Link to="/login" className="inline-flex min-h-11 w-full max-w-xs items-center justify-center rounded-field bg-action px-4 text-sm font-semibold text-white hover:opacity-90 active:opacity-80">
+                <button type="button" onClick={() => openSignIn('people')} className="inline-flex min-h-11 w-full max-w-xs items-center justify-center rounded-field bg-action px-4 text-sm font-semibold text-white hover:opacity-90 active:opacity-80">
                     Sign in
-                </Link>
+                </button>
             </div>
         );
     }

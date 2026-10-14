@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import useBackToClose from '../hooks/useBackToClose';
 import { CalendarDays, CalendarPlus, FileSpreadsheet, Share2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { createShareToken, exportIcs, exportXlsx, getShareToken, getCalendarFeedUrl, getAppShareUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { getDeviceId } from '../utils/deviceId';
+import { useSignIn } from '../context/SignInSheetContext';
 import ShareLinkRow from './ShareLinkRow';
 import type { MyEventsTab } from '../utils/myEvents';
 
@@ -33,8 +33,7 @@ const TAB_LABELS: Record<MyEventsTab, string> = {
 
 export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUtilityMenuProps) {
     const { user } = useAuth();
-    const navigate = useNavigate();
-    const location = useLocation();
+    const openSignIn = useSignIn();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState('');
     const [status, setStatus] = useState('');
@@ -77,7 +76,7 @@ export default function MyEventsUtilityMenu({ activeTab, eventIds }: MyEventsUti
 
     const goToSignIn = () => {
         setOpen(false);
-        navigate(`/login?next=${encodeURIComponent(location.pathname + location.search)}`);
+        openSignIn('calendar', { onSignedIn: () => setOpen(true) });
     };
 
     const runDownload = async (kind: 'ics' | 'xlsx') => {

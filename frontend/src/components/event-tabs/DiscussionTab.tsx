@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import { fetchEventMessages, type EventMessage, type EventMessageCategory } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useSignIn } from '../../context/SignInSheetContext';
@@ -26,7 +25,6 @@ const FEED_LIMIT = 50;
 export default function DiscussionTab({ eventId, isPast, openComposeToken, onCountLoaded }: Props) {
     const { user } = useAuth();
     const openSignIn = useSignIn();
-    const location = useLocation();
     const [items, setItems] = useState<EventMessage[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -56,8 +54,6 @@ export default function DiscussionTab({ eventId, isPast, openComposeToken, onCou
         if (!openComposeToken) return;
         setCompose(true);
     }, [openComposeToken]);
-
-    const loginNext = `/login?next=${encodeURIComponent(`${location.pathname}${location.search}?tab=discussion`)}`;
 
     if (thread) {
         return (
@@ -90,12 +86,13 @@ export default function DiscussionTab({ eventId, isPast, openComposeToken, onCou
                         + Start a discussion
                     </button>
                 ) : (
-                    <Link
-                        to={loginNext}
+                    <button
+                        type="button"
+                        onClick={() => openSignIn('message', { onSignedIn: () => setCompose(true) })}
                         className="block w-full bg-action px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:opacity-90"
                     >
                         Sign in to start a discussion
-                    </Link>
+                    </button>
                 )}
             </div>
 

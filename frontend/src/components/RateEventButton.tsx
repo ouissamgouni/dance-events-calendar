@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useRatingAggregate, useInvalidateRatingAggregate } from '../context/RatingAggregatesContext';
 import { useMyRating, useMyRatingsLoaded, useUpsertMyRating } from '../context/MyRatingsContext';
 import RateEventModal from './RateEventModal';
@@ -73,7 +74,8 @@ export default function RateEventButton({
     const ratingsLoaded = useMyRatingsLoaded();
     const upsertMyRating = useUpsertMyRating();
     const [open, setOpen] = useState(false);
-    const [showSignIn, setShowSignIn] = useState(false);
+    const openSignIn = useSignIn();
+    const navigate = useNavigate();
     const [localRating, setLocalRating] = useState<EventRating | null>(initialRating);
 
     // Auto-detect if on event detail page by checking pathname
@@ -141,7 +143,7 @@ export default function RateEventButton({
         e.stopPropagation();
         e.preventDefault();
         if (!user) {
-            setShowSignIn((s) => !s);
+            openSignIn('review', { onSignedIn: () => setOpen(true) });
             return;
         }
         const trackedEntryPoint = appearance === 'count' || appearance === 'preview' || appearance === 'write' ? 'icon' : appearance === 'menuItem' ? 'pill' : appearance;
@@ -302,6 +304,11 @@ export default function RateEventButton({
                     to={linkTo}
                     title={tooltip}
                     className={buttonClasses}
+                    onClick={(e) => {
+                        if (user || appearance === 'count') return;
+                        e.preventDefault();
+                        openSignIn('review', { onSignedIn: () => navigate(linkTo) });
+                    }}
                 >
                     {buttonContent}
                 </Link>
@@ -339,30 +346,6 @@ export default function RateEventButton({
     return (
         <span className={`relative ${appearance === 'menuItem' ? 'flex w-full' : 'inline-flex'}`} onMouseDown={stop} onPointerDown={stop} onClick={stop}>
             {button}
-            {showSignIn && !user && (
-                <div
-                    className="absolute z-50 top-full mt-2 right-0 w-56 border border-line bg-surface shadow-lg p-3 text-xs"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <p className="text-ink font-medium">Sign in to rate</p>
-                    <p className="text-ink-soft mt-1">Share your feedback and help others find great events.</p>
-                    <div className="mt-2 flex gap-2">
-                        <Link
-                            to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}&intent=review`}
-                            className="flex-1 text-center bg-sky-600 text-white px-2 py-1 hover:bg-sky-700"
-                        >
-                            Sign in
-                        </Link>
-                        <button
-                            onClick={() => setShowSignIn(false)}
-                            className="border border-line text-ink-soft px-2 py-1 hover:bg-canvas"
-                        >
-                            Close
-                        </button>
-                    </div>
-                </div>
-            )}
             {open && user && (
                 <RateEventModal
                     eventId={eventId}

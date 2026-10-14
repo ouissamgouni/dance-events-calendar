@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { fetchAspectTagGroups, fetchEventReviews, fetchEventSeriesRollup, fetchRatingAggregate, fetchSeriesReviews } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useRatingAggregate } from '../context/RatingAggregatesContext';
 import type { EventRatingAggregate, EventReviewPublic, SeriesRatingRollup, TagGroup } from '../types';
 import ExperienceBreakdown from './ExperienceBreakdown';
@@ -137,7 +138,7 @@ const PAGE_SIZE = 5;
 
 export default function EventReviewsSection({ eventId, isPast = true, hasStarted, onAggregateLoaded, onOpenReviewForm, refreshToken, collapsible = false }: Props) {
     const { user } = useAuth();
-    const location = useLocation();
+    const openSignIn = useSignIn();
     const [collapsed, setCollapsed] = useState(false);
     // Review count is public — surface it to signed-out visitors from the shared
     // (count-only) aggregate cache so the gated section can still show "N reviews".
@@ -315,12 +316,13 @@ export default function EventReviewsSection({ eventId, isPast = true, hasStarted
                 {collapseChevron}
                 {!collapsed && (
                     <p className="text-xs text-ink-soft">
-                        <Link
-                            to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}#community`)}`}
-                            className="text-sky-600 hover:text-sky-700 font-medium"
+                        <button
+                            type="button"
+                            onClick={() => openSignIn('review')}
+                            className="text-action hover:underline font-medium"
                         >
                             Sign in
-                        </Link>{' '}
+                        </button>{' '}
                         to see and leave reviews for this event.
                     </p>
                 )}

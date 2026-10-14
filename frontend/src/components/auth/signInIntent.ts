@@ -7,53 +7,63 @@ export type SignInIntent =
     | 'message'
     | 'follow'
     | 'calendar'
-    | 'explore';
+    | 'my_plans'
+    | 'explore'
+    | 'claim';
 
 export const SIGN_IN_INTENT_COPY: Record<SignInIntent, { headline: string; subtitle: string }> = {
     generic: {
-        headline: 'Get more out of Movida',
-        subtitle: 'Free account, no password. Works whether you’re new or coming back.',
+        headline: 'Your dance life, connected.',
+        subtitle: 'Sign in or create a free account to keep your plans, join conversations and stay updated.',
     },
     save: {
-        headline: 'Keep this event saved',
-        subtitle: 'Right now it’s only saved on this device. With an account it’s on every device, with reminders.',
+        headline: 'Keep it in your plans.',
+        subtitle: 'Sign in to save this event and find it later.',
     },
     going: {
-        headline: 'Tell your friends you’re going',
-        subtitle: 'Share your plans and get updates before the event.',
+        headline: 'Let your people know.',
+        subtitle: 'Sign in to share where you’re going.',
     },
     people: {
-        headline: 'See who’s going',
-        subtitle: 'Find friends and dancers you know at this event.',
+        headline: 'See who’s dancing.',
+        subtitle: 'Sign in to see which friends and dancers are going.',
     },
     review: {
-        headline: 'Share how it was',
-        subtitle: 'Rate this event and see what other dancers thought.',
+        headline: 'Share your experience.',
+        subtitle: 'Sign in to help other dancers decide where to go next.',
     },
     message: {
-        headline: 'Join the conversation',
-        subtitle: 'Ask the organiser and other dancers a question.',
+        headline: 'Join the conversation.',
+        subtitle: 'Sign in to ask questions, reply and make plans together.',
     },
     follow: {
-        headline: 'Follow dancers you know',
-        subtitle: 'See where they’re dancing next.',
+        headline: 'Follow dancers you know.',
+        subtitle: 'Sign in to see where they’re dancing next.',
     },
     calendar: {
-        headline: 'Sync your calendar',
-        subtitle: 'Subscribe in Apple or Google Calendar and share your plans.',
+        headline: 'Take your plans anywhere.',
+        subtitle: 'Sign in to sync your events with Apple or Google Calendar.',
+    },
+    my_plans: {
+        headline: 'Your plans, together.',
+        subtitle: 'Sign in to organise your saved and upcoming events.',
     },
     explore: {
-        headline: 'See every upcoming event',
-        subtitle: 'Free account, no password. Plan months ahead, not just the next few weeks.',
+        headline: 'See every upcoming event.',
+        subtitle: 'Sign in to plan months ahead, not just the next few weeks.',
+    },
+    claim: {
+        headline: 'Run this event?',
+        subtitle: 'Sign in to claim it and keep its details up to date.',
     },
 };
 
-export const SIGN_IN_BENEFITS = [
-    'Keep your saved events and plans on every device',
-    'See which friends are going and follow dancers you know',
-    'Get reminders and updates for events you’re going to',
-    'Rate events, join discussions and build your dance passport',
-];
+export const FULL_PAGE_COPY = {
+    headline: 'Your dance plans, together.',
+    subtitle: 'Discover events, make plans and stay connected with your dance community.',
+};
+
+export const SIGN_IN_BENEFITS = ['Save events', 'Plan together', 'Stay updated'] as const;
 
 const INTENTS = new Set<string>(Object.keys(SIGN_IN_INTENT_COPY));
 
@@ -62,8 +72,8 @@ export function resolveSignInIntent(intentParam: string | null, next: string | n
     if (!next) return 'generic';
     if (next.includes('#community')) return 'review';
     if (next.includes('#messages') || next.includes('tab=discussion')) return 'message';
-    if (next.includes('#people')) return 'people';
-    if (next.startsWith('/tribe/calendars') || next.startsWith('/my-events')) return 'calendar';
+    if (next.includes('#people') || next.startsWith('/tribe/calendars')) return 'people';
+    if (next.startsWith('/my-events')) return 'my_plans';
     return 'generic';
 }
 

@@ -224,6 +224,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         app_auth_gate_enabled=_get_bool_setting(
             session, "app_auth_gate_enabled", default=False
         ),
+        guest_actions_require_signin=_get_bool_setting(
+            session, "guest_actions_require_signin", default=True
+        ),
         onboarding_profile_step_enabled=_get_bool_setting(
             session, "onboarding_profile_step_enabled", default=False
         ),
@@ -768,6 +771,11 @@ def update_settings(
 
     if body.app_auth_gate_enabled is not None:
         _set_bool_setting(session, "app_auth_gate_enabled", body.app_auth_gate_enabled)
+
+    if body.guest_actions_require_signin is not None:
+        _set_bool_setting(
+            session, "guest_actions_require_signin", body.guest_actions_require_signin
+        )
 
     if body.suggest_event_required_dance_group_id is not None:
         row = session.get(SiteSetting, "suggest_event_required_dance_group_id")

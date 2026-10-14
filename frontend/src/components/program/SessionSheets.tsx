@@ -5,6 +5,7 @@ import BottomSheet from '../BottomSheet';
 import AudiencePicker from '../AudiencePicker';
 import SignInNudge, { useSignInNudge } from '../SignInNudge';
 import { useAuth } from '../../context/AuthContext';
+import { useSignIn } from '../../context/SignInSheetContext';
 import type { ShareAudience } from '../../api';
 import { fetchSessionAttendees } from '../../api';
 import type { EventSchedule, ScheduleSession, SessionAttendanceSummary, SessionPlanAttendee } from '../../types';
@@ -30,6 +31,7 @@ export function SessionDetailsSheet({ schedule, session, planned, preview, onClo
     const level = schedule.levels.find((item) => item.id === session.level_id);
     const activityType = schedule.activity_types.find((item) => item.id === session.activity_type_id);
     const { user } = useAuth();
+    const openSignIn = useSignIn();
     const nudge = useSignInNudge('save');
     const actionRef = useRef<HTMLButtonElement | null>(null);
     const [busy, setBusy] = useState(false);
@@ -102,7 +104,7 @@ export function SessionDetailsSheet({ schedule, session, planned, preview, onClo
                         <h3 className="text-sm font-semibold text-ink">Who’s attending</h3>
                         {!user ? (
                             <p className="mt-2 text-sm text-ink-soft">
-                                <Link to="/login" state={{ redirectTo: `/event/${eventId}/program?session=${session.id}` }} className="font-medium text-action">Sign in</Link> to see shared session plans.
+                                <button type="button" onClick={() => openSignIn('people')} className="font-medium text-action">Sign in</button> to see shared session plans.
                             </p>
                         ) : attendanceLoading ? (
                             <p className="mt-2 text-sm text-muted">Loading attendees…</p>

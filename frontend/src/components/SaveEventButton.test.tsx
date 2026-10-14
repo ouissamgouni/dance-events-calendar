@@ -105,6 +105,36 @@ describe('SaveEventButton (anonymous)', () => {
         expect(screen.getByRole('button', { name: 'Save event' })).toBeInTheDocument()
     })
 
+    it('asks guests to sign in when Save requires an account', async () => {
+        let writes = 0
+        server.use(
+            http.post('*/api/track/event-save', () => {
+                writes += 1
+                return new HttpResponse(null, { status: 204 })
+            }),
+        )
+        const { user } = renderWithProviders(
+            <FeatureFlagsContext.Provider
+                value={{
+                    flags: { ...defaultFlags, guestActionsRequireSignin: true },
+                    updateFlag: vi.fn(),
+                    ready: true,
+                }}
+            >
+                <LocationProbe />
+                <SaveEventButton eventId="evt-guest" />
+            </FeatureFlagsContext.Provider>,
+            { routerEntries: ['/browse'] },
+        )
+
+        await user.click(await screen.findByRole('button', { name: 'Save event' }))
+
+        await waitFor(() =>
+            expect(screen.getByTestId('location')).toHaveTextContent('/login?next=%2Fbrowse&intent=save'),
+        )
+        expect(writes).toBe(0)
+    })
+
     it('does not write anonymous state before feature flags resolve', async () => {
         let writes = 0
         server.use(

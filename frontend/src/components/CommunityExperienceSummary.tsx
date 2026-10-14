@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom';
 import { aspectMood } from './ExperienceBreakdown';
 import ExperienceMoodBox from './ExperienceMoodBox';
 import { useCommunityExperience } from '../hooks/useCommunityExperience';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import { useRatingAggregate } from '../context/RatingAggregatesContext';
 
 interface Props {
@@ -22,6 +22,7 @@ interface Props {
  */
 export default function CommunityExperienceSummary({ eventId, isPast }: Props) {
     const { user } = useAuth();
+    const openSignIn = useSignIn();
     const anonAggregate = useRatingAggregate(eventId);
     const { series, crossEdition, aggregate } = useCommunityExperience(eventId, isPast);
 
@@ -39,12 +40,13 @@ export default function CommunityExperienceSummary({ eventId, isPast }: Props) {
                     </span>
                 </h3>
                 <p className="text-xs text-ink-soft">
-                    <Link
-                        to={`/login?next=${encodeURIComponent(`/event/${eventId}#community`)}`}
-                        className="font-medium text-sky-600 hover:text-sky-700"
+                    <button
+                        type="button"
+                        onClick={() => openSignIn('review')}
+                        className="font-medium text-action hover:underline"
                     >
                         Sign in
-                    </Link>{' '}
+                    </button>{' '}
                     to see and leave reviews for this event.
                 </p>
             </div>

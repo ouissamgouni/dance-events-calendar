@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import AuthPanel from '../components/auth/AuthPanel';
-import { resolveSignInIntent } from '../components/auth/signInIntent';
+import { FULL_PAGE_COPY, SIGN_IN_INTENT_COPY, resolveSignInIntent } from '../components/auth/signInIntent';
+import { clearPendingAuth } from '../components/auth/pendingAuth';
 
 export default function Login() {
     const { user, loading } = useAuth();
@@ -14,6 +16,7 @@ export default function Login() {
     const nextParam = searchParams.get('next');
     const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
     const intent = resolveSignInIntent(searchParams.get('intent'), safeNext);
+    const copy = intent === 'generic' ? FULL_PAGE_COPY : SIGN_IN_INTENT_COPY[intent];
 
     useEffect(() => {
         if (!loading && user) {
@@ -23,13 +26,39 @@ export default function Login() {
     }, [user, loading, navigate, safeNext]);
 
     // "default" key = /login was the first page of this session, so there's nothing to go back to.
-    const handleNotNow = () => (location.key !== 'default' ? navigate(-1) : navigate('/'));
+    const handleKeepBrowsing = () => {
+        clearPendingAuth();
+        if (location.key !== 'default') navigate(-1);
+        else navigate('/');
+    };
+    const dismissible = !appAuthGateEnabled;
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-canvas px-4 py-10 sm:py-16">
-            <div className="w-full max-w-md">
-                <div className="rounded-card border border-card-line bg-surface p-6 shadow-sm sm:p-8">
-                    <AuthPanel intent={intent} onNotNow={appAuthGateEnabled ? undefined : handleNotNow} />
+        <div className="min-h-full bg-surface">
+            <div className="mx-auto w-full max-w-[440px] px-6 pt-[calc(16px+env(safe-area-inset-top))] pb-[calc(32px+env(safe-area-inset-bottom))]">
+                <div className="flex h-14 items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <img src="/movida.png" alt="" aria-hidden="true" className="h-10 w-10 object-contain" />
+                        <span className="text-2xl font-bold leading-none tracking-tight text-auth-navy">Movida</span>
+                    </div>
+                    {dismissible && (
+                        <button
+                            type="button"
+                            onClick={handleKeepBrowsing}
+                            aria-label="Close"
+                            className="-mr-2 flex h-11 w-11 items-center justify-center text-auth-navy transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-action/35"
+                        >
+                            <X aria-hidden className="h-7 w-7" strokeWidth={1.8} />
+                        </button>
+                    )}
+                </div>
+                <div className="mt-8 sm:mt-12">
+                    <AuthPanel
+                        variant="page"
+                        headline={copy.headline}
+                        subtitle={copy.subtitle}
+                        onKeepBrowsing={dismissible ? handleKeepBrowsing : undefined}
+                    />
                 </div>
             </div>
         </div>

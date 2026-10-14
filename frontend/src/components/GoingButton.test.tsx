@@ -58,7 +58,7 @@ describe('GoingButton (anonymous)', () => {
     it('uses the person-plus and person-check states when configured', async () => {
         server.use(
             http.get('*/api/settings', () =>
-                HttpResponse.json({ going_button_icon_variant: 'person' }),
+                HttpResponse.json({ going_button_icon_variant: 'person', guest_actions_require_signin: false }),
             ),
         )
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import { fetchEventMessages, muteEventMessages, type EventMessage, type EventMessageCategory } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useSignIn } from '../context/SignInSheetContext';
 import EventMessagesModal from './EventMessagesModal';
 import { useToast } from './Toast';
 import { CATEGORY_META, CATEGORY_ORDER, timeAgo } from '../utils/eventMessages';
@@ -25,7 +25,7 @@ const PREVIEW_LIMIT = 3;
 
 export default function EventMessagesSection({ eventId, isPast = false, onCountLoaded, refreshToken, collapsible = false, openComposeToken }: Props) {
     const { user } = useAuth();
-    const location = useLocation();
+    const openSignIn = useSignIn();
     const toast = useToast();
 
     const [items, setItems] = useState<EventMessage[]>([]);
@@ -90,7 +90,7 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
         }
     }, [muted, eventId, toast]);
 
-    const loginNext = `/login?next=${encodeURIComponent(`${location.pathname}${location.search}#messages`)}`;
+    const signInToAsk = () => openSignIn('message', { onSignedIn: () => setModal({ compose: true }) });
 
     return (
         <section id="messages" className="space-y-3 max-w-full">
@@ -152,15 +152,16 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
                                 Ask
                             </button>
                         ) : (
-                            <Link
-                                to={loginNext}
+                            <button
+                                type="button"
+                                onClick={signInToAsk}
                                 className="inline-flex items-center gap-1 text-xs text-ink-soft hover:text-ink bg-slate-100 hover:bg-canvas px-2.5 py-1 transition shrink-0"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
                                     <path fillRule="evenodd" d="M10 2c-4.418 0-8 3.134-8 7 0 1.76.743 3.37 1.97 4.6-.097 1.016-.417 2.13-.771 2.966a.75.75 0 0 0 .95.966 8.53 8.53 0 0 0 2.71-1.34A9.77 9.77 0 0 0 10 16c4.418 0 8-3.134 8-7s-3.582-7-8-7Z" clipRule="evenodd" />
                                 </svg>
                                 Sign in to ask
-                            </Link>
+                            </button>
                         )}
                         <button
                             type="button"
@@ -208,9 +209,9 @@ export default function EventMessagesSection({ eventId, isPast = false, onCountL
                                     Be the first to post!
                                 </button>
                             ) : (
-                                <Link to={loginNext} className="font-medium text-action hover:text-action">
+                                <button type="button" onClick={signInToAsk} className="font-medium text-action hover:text-action">
                                     Sign in to post.
-                                </Link>
+                                </button>
                             )}
                         </p>
                     ) : (

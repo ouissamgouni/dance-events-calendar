@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchEventAttendees, followUser } from '../../api';
 import type { Attendee } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useSignIn } from '../../context/SignInSheetContext';
 import { useAttendanceSummary } from '../../context/AttendanceSummariesContext';
 
 interface Props {
@@ -150,6 +151,7 @@ function Section({
 /** Event detail "People" tab grouped by the viewer's relationships. */
 export default function PeopleTab({ eventId }: Props) {
     const { user } = useAuth();
+    const openSignIn = useSignIn();
     const summary = useAttendanceSummary(eventId);
     const [attendees, setAttendees] = useState<Attendee[] | null>(null);
     const [unauthorized, setUnauthorized] = useState(false);
@@ -180,9 +182,9 @@ export default function PeopleTab({ eventId }: Props) {
             <div className="space-y-2 py-6 text-center">
                 <p className="text-sm font-semibold text-ink">See who's going</p>
                 <p className="mx-auto max-w-xs text-xs text-ink-soft">Sign in to see friends and other attendees.</p>
-                <Link to="/login" className="inline-block text-sm font-medium text-action hover:underline">
+                <button type="button" onClick={() => openSignIn('people')} className="inline-block min-h-9 text-sm font-medium text-action hover:underline">
                     Sign in
-                </Link>
+                </button>
             </div>
         );
     }

@@ -43,6 +43,8 @@ interface SavedEventsContextValue {
      */
     setSavedAudience: (eventId: string, audience: ShareAudience) => Promise<boolean>;
     clearAll: () => void;
+    /** True once server truth for the current identity has loaded (or failed). */
+    ready: boolean;
 }
 
 const SavedEventsContext = createContext<SavedEventsContextValue | null>(null);
@@ -115,6 +117,7 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
         () => readAudienceMapFromStorage(idKey),
     );
     const lastIdentity = useRef<string>(idKey);
+    const [syncedKey, setSyncedKey] = useState<string | null>(null);
 
     // Persist to the current identity's cache on every state mutation
     // (write-through). Cheap and matches the pre-refactor behavior.
@@ -147,7 +150,8 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
                 for (const e of entries) next[e.event_id] = e.audience;
                 setAudienceMap(next);
             })
-            .catch(() => { /* offline — keep cached state */ });
+            .catch(() => { /* offline — keep cached state */ })
+            .finally(() => { if (!cancelled) setSyncedKey(idKey); });
         return () => { cancelled = true; };
     }, [idKey]);
 
@@ -226,7 +230,8 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
         getSavedAudience,
         setSavedAudience,
         clearAll,
-    }), [savedIds, isSaved, toggleSave, getSavedAudience, setSavedAudience, clearAll]);
+        ready: syncedKey === idKey,
+    }), [savedIds, isSaved, toggleSave, getSavedAudience, setSavedAudience, clearAll, syncedKey, idKey]);
 
     return (
         <SavedEventsContext.Provider value={value}>

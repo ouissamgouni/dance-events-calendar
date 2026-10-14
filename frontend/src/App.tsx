@@ -168,8 +168,9 @@ function AppShell() {
   const isProgram = /^\/event\/[^/]+\/program/.test((backgroundLocation ?? location).pathname);
 
   // Full-screen flows (auth, onboarding), admin and shared views suppress the primary bottom nav.
+  const isLogin = location.pathname === '/login';
   const hideBottomNav =
-    location.pathname === '/login' ||
+    isLogin ||
     location.pathname.startsWith('/onboarding/') ||
     location.pathname.startsWith('/admin') ||
     location.pathname.startsWith('/shared/');
@@ -198,6 +199,7 @@ function AppShell() {
           className="flex flex-col h-full"
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
+          {!isLogin && (
           <header
             className="flex items-center justify-between gap-2 bg-surface border-b border-line px-3 sm:px-4"
             style={{ height: 'calc(64px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
@@ -239,8 +241,9 @@ function AppShell() {
               <HeaderUserMenu />
             </div>
           </header>
-          <SignUpBanner />
-          <ShareReferralBanner />
+          )}
+          {!isLogin && <SignUpBanner />}
+          {!isLogin && <ShareReferralBanner />}
           <OnboardingGate />
           <main ref={mainRef} className={`flex-1 ${isMyEvents || isProgram ? 'flex min-h-0 flex-col overflow-hidden' : 'overflow-auto'}`}>
             <Suspense fallback={null}>

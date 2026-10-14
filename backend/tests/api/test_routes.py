@@ -306,6 +306,21 @@ class TestSettingsEndpoint:
             assert row is not None
             assert row.value == "true"
 
+    def test_guest_actions_require_signin_defaults_on_and_can_be_disabled(
+        self, sqlite_client
+    ):
+        client, engine = sqlite_client
+        assert client.get("/api/settings").json()["guest_actions_require_signin"] is True
+
+        resp = client.put("/api/settings", json={"guest_actions_require_signin": False})
+        assert resp.status_code == 200
+        assert resp.json()["guest_actions_require_signin"] is False
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "guest_actions_require_signin")
+            assert row is not None
+            assert row.value == "false"
+
     def test_admin_can_update_my_events_route_flag(self, sqlite_client):
         client, engine = sqlite_client
 
