@@ -357,7 +357,7 @@ function AppShell() {
                 </Routes>
               ) : null}
             </Suspense>
-            {!isMyEvents && (
+            {!isMyEvents && !isProgram && (
               <footer className={`py-3 text-center items-center justify-center gap-3 ${location.pathname.startsWith('/admin') ? 'hidden sm:flex' : 'flex'}`}>
                 <Link to="/privacy" className="text-xs text-ink-soft hover:text-ink transition">
                   Privacy
