@@ -546,6 +546,7 @@ def build_snapshot(
                     {
                         "slug": tag.slug,
                         "label": tag.label,
+                        **({"short": tag.short_label} if tag.short_label else {}),
                         "ordinal": tag.ordinal,
                         "enabled": tag.enabled,
                         "is_hero_filter": tag.is_hero_filter,

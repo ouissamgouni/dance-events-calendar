@@ -627,6 +627,7 @@ class DatabaseSeeder:
                 tag_is_hero = tag_data.get("is_hero_filter", False)
                 tag_hero_ordinal = tag_data.get("hero_ordinal", None)
                 tag_polarity = tag_data.get("polarity")
+                tag_short = tag_data.get("short")
                 if tag_polarity not in (None, "positive", "negative", "neutral"):
                     logger.warning(
                         "Tag %s/%s has invalid polarity %r; ignoring",
@@ -644,12 +645,14 @@ class DatabaseSeeder:
                     tag.is_hero_filter = tag_is_hero
                     tag.hero_ordinal = tag_hero_ordinal
                     tag.polarity = tag_polarity
+                    tag.short_label = tag_short
                     self.session.add(tag)
                 else:
                     tag = Tag(
                         group_id=group.id,
                         slug=tag_slug,
                         label=tag_label,
+                        short_label=tag_short,
                         ordinal=tag_ordinal,
                         color=tag_color,
                         enabled=tag_enabled,

@@ -1375,6 +1375,8 @@ class Tag(SQLModel, table=True):
     group_id: int = Field(foreign_key="tag_groups.id", index=True)
     slug: str
     label: str
+    # Compact label for space-constrained chips (e.g. "On2" for "Salsa On2 (Mambo)").
+    short_label: Optional[str] = Field(default=None, max_length=32)
     color: Optional[str] = Field(default=None)
     ordinal: int = Field(default=0)
     enabled: bool = Field(default=True)

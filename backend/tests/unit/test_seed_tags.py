@@ -95,6 +95,7 @@ tag_groups:
     tags:
       - slug: mambo
         label: On2
+        short: On2
         parent: salsa
       - slug: salsa
         label: Salsa
@@ -109,5 +110,7 @@ tag_groups:
 
     by_slug = {t.slug: t for t in session.exec(select(Tag)).all()}
     assert by_slug["mambo"].parent_tag_id == by_slug["salsa"].id
+    assert by_slug["mambo"].short_label == "On2"
+    assert by_slug["salsa"].short_label is None
     assert by_slug["salsa"].parent_tag_id is None
     assert by_slug["bachata"].parent_tag_id is None

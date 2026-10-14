@@ -79,6 +79,7 @@ def _tag_to_response(tag: Tag) -> TagResponse:
         is_hero_filter=tag.is_hero_filter,
         hero_ordinal=tag.hero_ordinal,
         parent_tag_id=tag.parent_tag_id,
+        short_label=tag.short_label,
     )
 
 
@@ -250,6 +251,7 @@ def get_event_tags(
             is_hero_filter=tag.is_hero_filter,
             hero_ordinal=tag.hero_ordinal,
             parent_tag_id=tag.parent_tag_id,
+            short_label=tag.short_label,
         )
         result.setdefault(et.event_id, []).append(tag_resp)
     return result
@@ -502,6 +504,7 @@ def create_tag(
         ordinal=(max_ordinal or 0) + 1,
         polarity=body.polarity,
         parent_tag_id=body.parent_tag_id,
+        short_label=(body.short_label or "").strip() or None,
     )
     session.add(tag)
     session.commit()
@@ -570,6 +573,8 @@ def update_tag(
 
     if update_data.get("parent_tag_id") is not None:
         _validate_parent(session, tag.group_id, update_data["parent_tag_id"], tag.id)
+    if "short_label" in update_data:
+        update_data["short_label"] = (update_data["short_label"] or "").strip() or None
 
     for field, value in update_data.items():
         setattr(tag, field, value)
