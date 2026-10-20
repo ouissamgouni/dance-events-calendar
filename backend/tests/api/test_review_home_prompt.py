@@ -336,6 +336,32 @@ def test_similar_local_event_stays_within_radius_and_style(client, session, styl
 
 
 @pytest.mark.unit
+def test_similar_events_flag_defaults_on_and_disables_rail(client, session, styles):
+    _login(client)
+    me = _me(session)
+    _event(session, "ev-src", ended_hours_ago=10, tags=[styles["salsa"]])
+    _attend(session, me, "ev-src")
+    _event(
+        session,
+        "ev-near",
+        ended_hours_ago=-48,
+        where=VERSAILLES,
+        tags=[styles["salsa"]],
+    )
+    settings = client.get("/api/settings").json()
+    assert settings["review_home_prompt_enabled"] is True
+    assert settings["similar_events_enabled"] is True
+    assert client.get("/api/users/me/review-prompt").json()["similar_count"] == 1
+
+    _login(client, "admin@example.com")
+    resp = client.put("/api/settings", json={"similar_events_enabled": False})
+    assert resp.status_code == 200
+    _login(client)
+    assert client.get("/api/events/ev-src/similar").json()["event_ids"] == []
+    assert client.get("/api/users/me/review-prompt").json()["similar_count"] == 0
+
+
+@pytest.mark.unit
 def test_similar_widens_to_parent_style_and_filters_reach(client, session, styles):
     _login(client)
     _event(

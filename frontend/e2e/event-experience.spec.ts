@@ -226,7 +226,7 @@ test('submits an adaptive experience (sentiment + comment)', async ({ page }) =>
     }
     await submitBtn.click()
 
-    await expect(page.getByText('Thanks for your feedback!')).toBeVisible()
+    await expect(page.getByText('Thanks for your review!')).toBeVisible()
     expect(feedbackBody).toMatchObject({ overall_sentiment: 'great' })
 })
 

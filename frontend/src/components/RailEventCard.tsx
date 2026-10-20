@@ -60,6 +60,8 @@ interface RailEventCardProps {
     pastPresentation?: boolean;
     /** Content rendered below My Events metadata with its own interaction target. */
     supplementalContent?: ReactNode;
+    /** Rail card with a picture header and a save heart on it (review success sheet). */
+    mediaTop?: boolean;
 }
 
 function formatRailDate(value: string, timeZone?: string): string {
@@ -100,12 +102,13 @@ export default function RailEventCard({
     hideIfOnlyCurrentUser = false,
     pastPresentation = false,
     supplementalContent,
+    mediaTop = false,
 }: RailEventCardProps) {
     const { tagsPerCard } = useFeatureFlags();
     const { node: imageSlot } = useEventCardImage(event, {
         past: pastPresentation,
-        className: 'my-3 ml-3 aspect-video w-32 shrink-0 rounded-card',
-        imageTestId: 'my-events-row-image',
+        className: mediaTop ? 'aspect-video w-full' : 'my-3 ml-3 aspect-video w-32 shrink-0 rounded-card',
+        imageTestId: mediaTop ? 'rail-card-image' : 'my-events-row-image',
     });
     const start = new Date(event.start);
     const tz = eventDisplayZone(event);
@@ -176,10 +179,19 @@ export default function RailEventCard({
 
     return (
         <div
-            className={`group relative flex ${cardSize} shrink-0 flex-col border ${surface} text-left transition ${dateRail ? 'rounded-r-card' : 'rounded-card px-2.5 py-2.5'} ${highlighted ? 'ring-1 ring-action' : ''}`}
+            className={`group relative flex ${cardSize} shrink-0 flex-col border ${surface} text-left transition ${dateRail ? 'rounded-r-card' : mediaTop ? 'overflow-hidden rounded-card' : 'rounded-card px-2.5 py-2.5'} ${highlighted ? 'ring-1 ring-action' : ''}`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         >
+            {mediaTop && !isEventPast(event) && (
+                <div
+                    className="absolute top-1.5 right-1.5 z-10 rounded-field bg-surface/90"
+                    data-testid={actionsTestId}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="icon" size="sm" stopPropagation disabled={event.is_cancelled} />
+                </div>
+            )}
             {!compact && (
                 <div
                     className="absolute top-1 right-1 z-10 flex items-center gap-1"
@@ -201,7 +213,8 @@ export default function RailEventCard({
                 {dateRail && (
                     <EventDateRail start={start} timeZone={tz} />
                 )}
-                <div className={`flex min-w-0 flex-1 flex-col ${dateRail ? 'px-2.5 py-2.5' : ''}`}>
+                {mediaTop && imageSlot}
+                <div className={`flex min-w-0 flex-1 flex-col ${dateRail || mediaTop ? 'px-2.5 py-2.5' : ''}`}>
                     <h3 className={`min-w-0 line-clamp-2 text-body font-semibold leading-snug text-ink group-hover:text-action ${compact ? '' : 'pr-16'}`} title={event.title}>
                         {isNew && (
                             <span

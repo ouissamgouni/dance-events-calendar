@@ -35,9 +35,30 @@ const ENTRY_POINT_LABELS: Record<string, string> = {
     unknown: 'Unknown (before tracking)',
 };
 
+type ToggleKey = 'review_home_prompt_enabled' | 'similar_events_enabled';
+
+const TOGGLES: { key: ToggleKey; label: string; help: string }[] = [
+    {
+        key: 'review_home_prompt_enabled',
+        label: 'Home review prompt',
+        help: 'Opens the review wizard on Home (once per session) for the latest attended, unreviewed event. Admin “Force Home prompt” skips the cooldown and fatigue pause.',
+    },
+    {
+        key: 'similar_events_enabled',
+        label: 'Similar events after review',
+        help: 'Shows a “Similar events you might like” rail on the review success sheet, from every review entry point.',
+    },
+];
+
+interface Props {
+    onMessage: (msg: string) => void;
+    ratingsEnabled?: boolean;
+    onOpenFeatureFlags?: () => void;
+}
+
 /** Admin settings + last-30-days stats for the Home review prompt and similar-events rail. */
-export default function AdminReviewHomePromptSettings({ onMessage }: { onMessage: (msg: string) => void }) {
-    const [enabled, setEnabled] = useState(true);
+export default function AdminReviewHomePromptSettings({ onMessage, ratingsEnabled = true, onOpenFeatureFlags }: Props) {
+    const [toggles, setToggles] = useState<Record<ToggleKey, boolean>>({ review_home_prompt_enabled: true, similar_events_enabled: true });
     const [values, setValues] = useState<Record<IntKey, number>>(
         () => Object.fromEntries(INT_FIELDS.map((f) => [f.key, f.fallback])) as Record<IntKey, number>,
     );
@@ -46,7 +67,10 @@ export default function AdminReviewHomePromptSettings({ onMessage }: { onMessage
     useEffect(() => {
         fetchSettings()
             .then((s: SiteSettings) => {
-                setEnabled(s.review_home_prompt_enabled ?? true);
+                setToggles({
+                    review_home_prompt_enabled: s.review_home_prompt_enabled ?? true,
+                    similar_events_enabled: s.similar_events_enabled ?? true,
+                });
                 setValues((prev) => {
                     const next = { ...prev };
                     for (const f of INT_FIELDS) next[f.key] = s[f.key] ?? f.fallback;
@@ -57,15 +81,15 @@ export default function AdminReviewHomePromptSettings({ onMessage }: { onMessage
         fetchReviewPromptStats(30).then(setStats).catch(() => setStats(null));
     }, []);
 
-    const toggle = async () => {
-        const next = !enabled;
-        setEnabled(next);
+    const toggle = async ({ key, label }: (typeof TOGGLES)[number]) => {
+        const next = !toggles[key];
+        setToggles((prev) => ({ ...prev, [key]: next }));
         try {
-            await updateSettings({ review_home_prompt_enabled: next });
-            onMessage(`Home review prompt ${next ? 'enabled' : 'disabled'}.`);
+            await updateSettings({ [key]: next });
+            onMessage(`${label} ${next ? 'enabled' : 'disabled'}.`);
         } catch {
-            setEnabled(!next);
-            onMessage('Failed to update Home review prompt.');
+            setToggles((prev) => ({ ...prev, [key]: !next }));
+            onMessage(`Failed to update ${label}.`);
         }
     };
 
@@ -83,22 +107,35 @@ export default function AdminReviewHomePromptSettings({ onMessage }: { onMessage
 
     return (
         <div className="border border-card-line p-3 space-y-3" data-testid="admin-review-home-prompt">
-            <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-ink">Home review prompt</span>
-                <button
-                    onClick={toggle}
-                    aria-label="Toggle Home review prompt"
-                    // eslint-disable-next-line no-restricted-syntax -- toggle switch is circular by design
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${enabled ? 'bg-success' : 'bg-gray-300'}`}
-                >
-                    {/* eslint-disable-next-line no-restricted-syntax -- toggle knob is circular by design */}
-                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                </button>
-            </div>
-            <p className="text-[10px] text-muted">
-                Opens the review wizard on Home (once per session) for the latest attended, unreviewed event,
-                then shows similar events on the thanks screen. Admin &ldquo;Force Home prompt&rdquo; skips the cooldown and fatigue pause.
-            </p>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-ink">Home review prompt &amp; similar events</span>
+            {!ratingsEnabled && (
+                <div className="flex items-center justify-between gap-2 text-[10px] text-ink-soft bg-canvas border border-line p-2">
+                    <span>Requires the Show ratings feature flag.</span>
+                    {onOpenFeatureFlags && (
+                        <button type="button" onClick={onOpenFeatureFlags} className="text-action hover:underline whitespace-nowrap">
+                            Open feature flags
+                        </button>
+                    )}
+                </div>
+            )}
+            {TOGGLES.map((t) => (
+                <div key={t.key} className="flex items-center justify-between gap-3">
+                    <div>
+                        <span className="text-[11px] font-medium text-ink">{t.label}</span>
+                        <p className="text-[10px] text-muted">{t.help}</p>
+                    </div>
+                    <button
+                        onClick={() => toggle(t)}
+                        aria-label={`Toggle ${t.label}`}
+                        aria-pressed={toggles[t.key]}
+                        // eslint-disable-next-line no-restricted-syntax -- toggle switch is circular by design
+                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${toggles[t.key] ? 'bg-success' : 'bg-gray-300'}`}
+                    >
+                        {/* eslint-disable-next-line no-restricted-syntax -- toggle knob is circular by design */}
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${toggles[t.key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                </div>
+            ))}
             {INT_FIELDS.map((field) => (
                 <div key={field.key} className="flex items-center justify-between border-t border-card-line pt-2.5">
                     <div>

@@ -81,6 +81,7 @@ export default function EventDetailPage() {
         if (location.hash === '#discounts') return 'deals';
         if (location.hash === '#community') return 'reviews';
         if (location.hash === '#messages') return 'discussion';
+        if (location.hash === '#people') return 'people';
         if (location.hash === '#memories') return 'memories';
         return 'overview';
     })();
@@ -193,6 +194,12 @@ export default function EventDetailPage() {
         if (location.hash !== '#messages' || !event) return;
         setActiveTab('discussion');
     }, [location.hash, event]);
+
+    // Keyed on navigation so re-clicking a `#people` link (e.g. "See everyone going") re-selects the tab.
+    useEffect(() => {
+        if (location.hash !== '#people' || !event) return;
+        setActiveTab('people');
+    }, [location.hash, location.key, event]);
 
     // `#ticket` opens the sheet once; keeping the hash would reopen it when the overlay pops back.
     const [ticketSheetOpen, setTicketSheetOpen] = useState(false);

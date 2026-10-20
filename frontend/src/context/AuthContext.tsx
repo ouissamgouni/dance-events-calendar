@@ -12,6 +12,7 @@ import {
 } from '../api';
 import { rotateDeviceId } from '../utils/deviceId';
 import { clearBrowseSession } from '../utils/browseSession';
+import { clearSharePrompt } from '../hooks/useReferralAttribution';
 import { clearUmamiBaseContext, setAnalyticsDisabled, setUmamiBaseContext, umamiIdentify } from '../utils/umami';
 import {
     trackLoginCompleted,
@@ -205,6 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // activity that happened during this user's session.
         rotateDeviceId();
         clearBrowseSession();
+        clearSharePrompt();
         clearUmamiBaseContext();
         setAnalyticsDisabled(false);
         setUser(null);
@@ -215,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await apiDeleteMe();
         rotateDeviceId();
         clearBrowseSession();
+        clearSharePrompt();
         clearUmamiBaseContext();
         setAnalyticsDisabled(false);
         setUser(null);

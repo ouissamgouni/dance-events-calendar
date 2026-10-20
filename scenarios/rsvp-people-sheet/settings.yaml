@@ -1,4 +1,2 @@
 settings:
   rsvp_people_sheet_enabled: true
-  # Proves the people sheet ignores "remember my choice" and always opens.
-  rsvp_remember_visibility_enabled: true

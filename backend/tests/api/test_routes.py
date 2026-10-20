@@ -455,8 +455,7 @@ class TestSettingsEndpoint:
         assert body["activity_digest_schedule"] == "tue,fri @ 09:00"
         assert body["review_prompt_enabled"] is True
         assert body["event_review_size_step_enabled"] is True
-        assert body["rsvp_remember_visibility_enabled"] is True
-        assert body["rsvp_people_sheet_enabled"] is False
+        assert body["rsvp_people_sheet_enabled"] is True
         assert body["geoapify_enabled"] is False
         assert body["review_prompt_delay_hours"] == 3
         assert body["review_prompt_lookback_hours"] == 24
@@ -482,8 +481,7 @@ class TestSettingsEndpoint:
                 "activity_digest_schedule": "mon,thu @ 18:30",
                 "review_prompt_enabled": False,
                 "event_review_size_step_enabled": False,
-                "rsvp_remember_visibility_enabled": False,
-                "rsvp_people_sheet_enabled": True,
+                "rsvp_people_sheet_enabled": False,
                 "geoapify_enabled": True,
                 "review_prompt_delay_hours": 5,
                 "review_prompt_lookback_hours": 48,
@@ -507,8 +505,7 @@ class TestSettingsEndpoint:
         assert body["activity_digest_schedule"] == "mon,thu @ 18:30"
         assert body["review_prompt_enabled"] is False
         assert body["event_review_size_step_enabled"] is False
-        assert body["rsvp_remember_visibility_enabled"] is False
-        assert body["rsvp_people_sheet_enabled"] is True
+        assert body["rsvp_people_sheet_enabled"] is False
         assert body["geoapify_enabled"] is True
         assert body["review_prompt_delay_hours"] == 5
         assert body["review_prompt_lookback_hours"] == 48
@@ -535,8 +532,7 @@ class TestSettingsEndpoint:
                 == "false"
             )
             assert (
-                session.get(SiteSetting, "rsvp_remember_visibility_enabled").value
-                == "false"
+                session.get(SiteSetting, "rsvp_people_sheet_enabled").value == "false"
             )
             assert session.get(SiteSetting, "review_prompt_delay_hours").value == "5"
             assert (

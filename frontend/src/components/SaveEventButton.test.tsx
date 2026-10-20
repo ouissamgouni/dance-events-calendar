@@ -159,7 +159,7 @@ describe('SaveEventButton (anonymous)', () => {
 })
 
 describe('SaveEventButton visibility', () => {
-    it('uses a mobile bottom sheet with horizontal audience pills', async () => {
+    it('uses a mobile bottom sheet with a collapsed visibility summary', async () => {
         useMobileViewport()
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
@@ -171,6 +171,9 @@ describe('SaveEventButton visibility', () => {
         const sheet = await screen.findByRole('dialog', { name: 'Saved!' })
         expect(sheet).toHaveAttribute('aria-modal', 'true')
         expect(screen.getByText('Summer Salsa Social')).toHaveClass('truncate', 'text-sm')
+        expect(within(sheet).getByTestId('rsvp-visibility-summary')).toHaveTextContent('Visible to: Friends')
+
+        await user.click(within(sheet).getByRole('button', { name: 'Change' }))
         expect(screen.getByRole('radiogroup', { name: 'Who can see you saved this event?' })).toHaveClass('flex', 'w-full')
         expect(screen.getAllByRole('radio')).toHaveLength(3)
         expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-10', 'text-sm')
@@ -198,7 +201,7 @@ describe('SaveEventButton visibility', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
-    it('skips the sheet on a new save once the choice is remembered', async () => {
+    it('always opens the sheet, ignoring a legacy remembered choice', async () => {
         useMobileViewport()
         localStorage.setItem('audience.remember.saved.user-1', '1')
         server.use(
@@ -207,17 +210,7 @@ describe('SaveEventButton visibility', () => {
         const { user } = renderWithProviders(<SaveEventButton eventId="evt-remembered" eventTitle="Summer Salsa Social" />)
 
         await user.click(await screen.findByRole('button', { name: 'Save event' }))
-        expect(await screen.findByRole('button', { name: 'Unsave event' })).toBeInTheDocument()
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-
-        await user.click(await screen.findByRole('button', { name: 'Visibility: Friends \u2014 edit' }))
-        await screen.findByRole('dialog', { name: 'Saved!' })
-        expect(screen.getByRole('radio', { name: /^Friends/ })).toHaveAttribute('aria-checked', 'true')
-        await user.click(screen.getByRole('button', { name: 'Done' }))
-
-        await user.click(screen.getByRole('button', { name: 'Unsave event' }))
-        await screen.findByRole('dialog', { name: 'Saved!' })
-        expect(screen.getByRole('radio', { name: /^Friends/ })).toHaveAttribute('aria-checked', 'true')
+        expect(await screen.findByRole('dialog', { name: 'Saved!' })).toBeInTheDocument()
     })
 
     it('defaults to public audience for users without a saved preference', async () => {
@@ -233,9 +226,8 @@ describe('SaveEventButton visibility', () => {
 
         await user.click(await screen.findByRole('button', { name: 'Save event' }))
 
-        await screen.findByRole('dialog', { name: 'Saved!' })
-        const radios = screen.getAllByRole('radio')
-        expect(radios[0]).toBeChecked()
+        const sheet = await screen.findByRole('dialog', { name: 'Saved!' })
+        expect(within(sheet).getByTestId('rsvp-visibility-summary')).toHaveTextContent('Visible to: Public')
     })
 
     it('uses the RSVP last-used audience as fallback and remembers changes separately', async () => {
@@ -249,9 +241,10 @@ describe('SaveEventButton visibility', () => {
         const { user } = renderWithProviders(<SaveEventButton eventId="evt-last-used" eventTitle="Summer Salsa Social" />)
 
         await user.click(await screen.findByRole('button', { name: 'Save event' }))
-        await screen.findByRole('dialog', { name: 'Saved!' })
-        expect(screen.getByRole('radio', { name: /^Friends/ })).toHaveAttribute('aria-checked', 'true')
+        const sheet = await screen.findByRole('dialog', { name: 'Saved!' })
+        expect(within(sheet).getByTestId('rsvp-visibility-summary')).toHaveTextContent('Visible to: Friends')
 
+        await user.click(within(sheet).getByRole('button', { name: 'Change' }))
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
         await waitFor(() =>
             expect(localStorage.getItem('audience.lastUsed.saved.user-1')).toBe('private'),
@@ -259,7 +252,7 @@ describe('SaveEventButton visibility', () => {
         expect(localStorage.getItem('audience.lastUsed.user-1')).toBe('friends')
     })
 
-    it('remembers the save choice without touching RSVP settings', async () => {
+    it('changing a save audience never touches RSVP settings', async () => {
         useMobileViewport()
         const patches: unknown[] = []
         server.use(
@@ -273,19 +266,19 @@ describe('SaveEventButton visibility', () => {
 
         await user.click(await screen.findByRole('button', { name: 'Save event' }))
         await screen.findByRole('dialog', { name: 'Saved!' })
-        expect(screen.getByRole('checkbox', { name: 'Remember my choice' })).toBeChecked()
+        await user.click(screen.getByRole('button', { name: 'Change' }))
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
+        expect(screen.queryByRole('button', { name: 'Make default' })).not.toBeInTheDocument()
         await user.click(screen.getByRole('button', { name: 'Done' }))
 
-        expect(localStorage.getItem('audience.remember.saved.user-1')).toBe('1')
-        expect(localStorage.getItem('audience.remember.user-1')).toBeNull()
+        expect(localStorage.getItem('audience.lastUsed.user-1')).toBeNull()
         expect(patches).toEqual([])
     })
 
     it.each([
         ['with an account default', 'friends'],
         ['without an account default', undefined],
-    ] as const)('does not leak a remembered save choice into the next RSVP (%s)', async (_label, accountDefault) => {
+    ] as const)('does not leak a save choice into the next RSVP (%s)', async (_label, accountDefault) => {
         useMobileViewport()
         server.use(
             http.get('*/api/auth/me', () =>
@@ -301,13 +294,14 @@ describe('SaveEventButton visibility', () => {
 
         await user.click(await screen.findByRole('button', { name: 'Save event' }))
         await screen.findByRole('dialog', { name: 'Saved!' })
+        await user.click(screen.getByRole('button', { name: 'Change' }))
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
         await user.click(screen.getByRole('button', { name: 'Done' }))
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
         await user.click(screen.getByRole('button', { name: "I'm going" }))
-        await screen.findByRole('dialog', { name: "You're going!" })
-        const expected = accountDefault === 'friends' ? /^Friends/ : /^Public/
-        expect(screen.getByRole('radio', { name: expected })).toHaveAttribute('aria-checked', 'true')
+        const sheet = await screen.findByRole('dialog', { name: "You're going!" })
+        const expected = accountDefault === 'friends' ? 'Friends' : 'Public'
+        expect(within(sheet).getByTestId('rsvp-visibility-summary')).toHaveTextContent(`Visible to: ${expected}`)
     })
 })

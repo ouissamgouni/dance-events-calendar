@@ -54,7 +54,7 @@ describe('RateEventModal', () => {
         await user.click(screen.getByRole('button', { name: /Continue/i }))
         await user.click(screen.getByRole('button', { name: /Submit/i }))
 
-        expect(await screen.findByText('Thanks for your feedback!')).toBeInTheDocument()
+        expect(await screen.findByText('Thanks for your review!')).toBeInTheDocument()
         expect(submittedBody).toMatchObject({ overall_sentiment: 'amazing' })
     })
 
@@ -172,7 +172,7 @@ describe('RateEventModal', () => {
         await user.click(screen.getByRole('button', { name: /Continue/i }))
         await user.click(screen.getByRole('button', { name: /Submit/i }))
 
-        expect(await screen.findByText('Thanks for your feedback!')).toBeInTheDocument()
+        expect(await screen.findByText('Thanks for your review!')).toBeInTheDocument()
         expect(submittedBody).toMatchObject({ aspect_scores: { music: 4 } })
     })
 
@@ -224,7 +224,7 @@ describe('RateEventModal', () => {
         await user.click(screen.getByRole('button', { name: /Continue/i }))
         await user.click(screen.getByRole('button', { name: /Submit/i }))
 
-        expect(await screen.findByText('Thanks for your feedback!')).toBeInTheDocument()
+        expect(await screen.findByText('Thanks for your review!')).toBeInTheDocument()
         expect(submittedBody).toMatchObject({ aspect_scores: {}, aspect_tag_ids: [21] })
     })
 
@@ -300,7 +300,7 @@ describe('RateEventModal — earlier edition', () => {
         await user.click(screen.getByRole('button', { name: /Continue/i }))
         await user.click(screen.getByRole('button', { name: /Continue/i }))
         await user.click(screen.getByRole('button', { name: /Submit/i }))
-        expect(await screen.findByText('Thanks for your feedback!')).toBeInTheDocument()
+        expect(await screen.findByText('Thanks for your review!')).toBeInTheDocument()
     }
 
     it('reviews the picked past edition of a series', async () => {
@@ -356,20 +356,23 @@ describe('RateEventModal — home review prompt', () => {
                 end: '2026-10-24T23:00:00Z', all_day: false, color: null, view_count: 0, price_min: null,
                 price_max: null, price_currency: null, price_is_free: false, links: null, tags: [],
             }])),
+            http.get('*/api/users/me/pending-reviews', () => HttpResponse.json([
+                { event_id: 'evt-1', event_title: 'Rooftop Salsa', event_start: null, event_end: null, friend_proof: null },
+                { event_id: 'evt-3', event_title: 'Older Social', event_start: null, event_end: null, friend_proof: null },
+            ])),
         )
         const onNotNow = vi.fn()
-        const onRateNext = vi.fn()
+        const onClose = vi.fn()
 
         const { user } = renderWithProviders(
             <FeatureFlagsProvider>
                 <RateEventModal
                     eventId="evt-1"
                     initialRating={null}
-                    onClose={() => { }}
+                    onClose={onClose}
                     onSubmitted={() => { }}
                     entryPoint="home-prompt"
                     prompt={{ friendProof: 'Laura', showIncentive: true, onNotNow }}
-                    rateNext={{ count: 2, onRateNext }}
                 />
             </FeatureFlagsProvider>,
         )
@@ -386,10 +389,40 @@ describe('RateEventModal — home review prompt', () => {
         await user.click(screen.getByRole('button', { name: /Submit/i }))
 
         expect(await screen.findByText('Next Salsa Night')).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Thanks for your review!' })).toBeInTheDocument()
         expect(screen.getByRole('link', { name: /See more/ })).toHaveAttribute('href', '/browse?tag_ids=3')
         expect(submittedBody).toMatchObject({ overall_sentiment: 'great', entry_point: 'home-prompt' })
-        expect(screen.getByText('2 more to rate')).toBeInTheDocument()
-        await user.click(screen.getByRole('button', { name: 'Rate next' }))
-        expect(onRateNext).toHaveBeenCalled()
+        await user.click(await screen.findByRole('button', { name: 'Rate next' }))
+        expect(await screen.findByRole('heading', { name: 'How was it?' })).toBeInTheDocument()
+        expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('hides Rate next when nothing else is pending and flags a pending comment', async () => {
+        server.use(
+            http.get('*/api/tags', () => HttpResponse.json([])),
+            http.post('*/api/events/:eventId/feedback', async ({ request }) => {
+                const body = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json(ratingResponse(body), { status: 201 })
+            }),
+            http.get('*/api/users/me/pending-reviews', () => HttpResponse.json([])),
+        )
+        const onClose = vi.fn()
+        const { user } = renderWithProviders(
+            <FeatureFlagsProvider>
+                <RateEventModal eventId="evt-1" initialRating={null} onClose={onClose} onSubmitted={() => { }} />
+            </FeatureFlagsProvider>,
+        )
+
+        await user.click(screen.getByRole('radio', { name: /Amazing/i }))
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        await user.type(screen.getByRole('textbox'), 'Great DJ')
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        await user.click(screen.getByRole('button', { name: /Submit/i }))
+
+        expect(await screen.findByRole('heading', { name: 'Thanks for your review!' })).toBeInTheDocument()
+        expect(screen.getByText('Your comment will appear once our team has checked it.')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Rate next' })).not.toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Not now' }))
+        expect(onClose).toHaveBeenCalled()
     })
 })

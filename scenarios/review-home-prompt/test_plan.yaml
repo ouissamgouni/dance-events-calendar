@@ -4,18 +4,21 @@ test_plan:
     The Home page auto-opens the existing review wizard (bottom sheet on
     mobile, modal on desktop) once per session for the latest attended,
     unreviewed event, under server-side frequency caps. After submitting,
-    the thanks screen shows similar upcoming events (same dance styles,
-    area sized by the reviewed event's reach) with "See more" into a
-    pre-filtered Explorer, plus a "N more to rate" chain. Admins can force
-    the prompt for chosen attendees.
+    a success bottom sheet (party popper, "Thanks for your review!") shows
+    similar upcoming events (same dance styles, area sized by the reviewed
+    event's reach) in a scrollable rail with dots and "See more" into a
+    pre-filtered Explorer, plus "Rate next" (any entry point, only while
+    unrated events remain), "Explore more events" and "Not now". Admins
+    can force the prompt for chosen attendees.
 
   preconditions:
     - >-
       Start scenario:
       `SCENARIO=review-home-prompt RESET=1 task start:scenario`
+    - "Use a mobile viewport (e.g. iPhone 14) for the sheet checks."
 
   cast:
-    - "Alice — attended ev-lyon-wed + ev-lyon-sat (last week), reviewed nothing."
+    - "Alice — attended ev-lyon-wed, ev-lyon-congress (international) and ev-lyon-sat last week; reviewed nothing; international search area = Europe."
     - "Bob   — attended ev-lyon-sat, email + push review prompts OFF."
     - "Admin — admin@example.com."
 
@@ -28,32 +31,62 @@ test_plan:
         Salsa Saturday?" with the date · place line, the incentive line
         "Share how it went, then discover similar events!" and a "Not now"
         button. The header menu avatar shows a dot; the menu's Reviews row
-        shows "2".
+        shows "3".
 
     - id: 2
-      title: "Review then discover similar events"
-      description: "Pick Great → Continue through the steps → Submit."
+      title: "Success sheet: local rail with 12 cards"
+      description: "Pick Great → Continue through the steps (add a comment) → Submit."
       expected: >
-        Thanks screen shows "You might like these next" with Villeurbanne
-        Salsa Night only (Paris is too far, Lyon Bachata is another style),
-        a "See more →" link, and "1 more to rate · Rate next". Reviews badge
-        drops to 1.
+        Success sheet: party popper, "Thanks for your review!", the
+        community line, and "Your comment will appear once our team has
+        checked it." (never described as published). "Similar events you
+        might like" lists 12 Lyon-area salsa cards (picture, title, date,
+        place, heart) — no Paris (too far), Lyon Bachata (other style) or
+        Madrid. The next card peeks at the right edge, dots under the rail
+        follow horizontal scrolling, and the page behind doesn't scroll.
+        Buttons: "Rate next", "Explore more events", "Not now"; ✕ top-right.
 
     - id: 3
-      title: "Rate next chain"
-      description: "On the thanks screen, click Rate next."
+      title: "Rail interactions"
+      description: "Swipe the rail horizontally, tap a heart, then tap a card."
       expected: >
-        The wizard re-opens for Lyon Salsa Wednesday without the prompt header
-        (entry point rate-next). Submit it too.
+        Horizontal swipes scroll the rail (cards snap) without dismissing the
+        sheet; the heart saves the event without opening it; tapping the card
+        closes the sheet and opens the event page.
 
     - id: 4
-      title: "See more → pre-filtered Explorer"
-      description: "On this second thanks screen, click See more →."
+      title: "Rate next → international rail"
+      description: "On Saturday's success sheet click Rate next, then review Lyon Salsa Congress."
       expected: >
-        Explorer opens with the Salsa style selected and the area chip
-        "Lyon … · 25 km"; the area_* params are removed from the URL.
+        The wizard opens for Lyon Salsa Congress in the same sheet (no prompt
+        header, entry point rate-next). Its success sheet lists 12 salsa
+        festivals across Europe (Barcelona, Milan, Berlin …) and none of the
+        local socials; "Rate next" is still shown (Wednesday pending).
 
     - id: 5
+      title: "Rate next from another entry point + last one"
+      description: >
+        Close the sheet. Open Lyon Salsa Wednesday from the menu → Reviews
+        (or the "Share your experience" card) and submit a review.
+      expected: >
+        The success sheet looks the same as from the Home prompt. It has no
+        "Rate next" (nothing left to rate) and the Reviews badge is gone.
+        (Repeat on a fresh scenario from the event page to see "Rate next"
+        appear outside the Home prompt.)
+
+    - id: 6
+      title: "Dismissal + navigation"
+      description: >
+        On a success sheet try each: swipe the sheet down from the top, ✕,
+        "Not now", "Explore more events", "See more →".
+      expected: >
+        Swipe-down (≥ 80px), ✕ and "Not now" close the sheet. "Explore more
+        events" opens `/browse`. "See more →" opens Explorer with Salsa
+        selected and the area chip ("Lyon … · 25 km" for a local event, the
+        Europe area for the congress); the area_* params are removed from
+        the URL.
+
+    - id: 7
       title: "Once per session + cooldown"
       description: >
         As Bob, open `/`, click "Not now". Reload `/`, then open a new tab
@@ -62,22 +95,28 @@ test_plan:
         The first visit shows the prompt; the reload doesn't (session flag);
         the new session doesn't either (72h cooldown).
 
-    - id: 6
+    - id: 8
       title: "Admin force"
       description: >
-        As Admin: /admin → Notifications → Review prompt → Send now: pick
-        "Lyon Salsa Saturday", select Bob, tick "Force Home prompt", Send.
-        Then as Bob, in a new session, open `/`.
+        As Admin: /admin → Configuration → Notifications → Review prompt →
+        Send now: pick "Lyon Salsa Saturday", select Bob, tick "Force Home
+        prompt", Send. Then as Bob, in a new session, open `/`.
       expected: >
         The admin message reports "Home prompt forced for 1" (Bob's status
         home_prompt_only since his channels are off). Bob's Home shows the
         prompt again despite the cooldown.
 
-    - id: 7
-      title: "Admin settings + stats"
-      description: "As Admin, open the Home review prompt card."
+    - id: 9
+      title: "Admin flags, settings + stats"
+      description: >
+        As Admin, open Configuration → Notifications → "Home review prompt &
+        similar events". Turn "Similar events after review" off, then review
+        an event as Bob.
       expected: >
-        Caps/radii are editable (cooldown 72, max asks 2, max age 14, fatigue
-        4 / 30 days, radii 25/150/1500, cards 6). "Last 30 days" lists
-        shown/dismissed/reviewed with conversion, and reviews by entry point
-        include "Home prompt".
+        Both toggles ("Home review prompt", "Similar events after review")
+        are ON by default. Caps/radii are editable (cooldown 72, max asks 2,
+        max age 14, fatigue 4 / 30 days, radii 25/150/1500, cards 12 from
+        this scenario's env). With similar events off, the Home prompt has no
+        incentive line and the success sheet has no rail. "Last 30 days"
+        lists shown/dismissed/reviewed with conversion, and reviews by entry
+        point include "Home prompt" and "Rate next (chain)".

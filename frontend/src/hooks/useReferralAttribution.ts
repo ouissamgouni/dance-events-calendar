@@ -63,6 +63,68 @@ export function getActiveReferral(): StoredReferral | null {
     return read();
 }
 
+// The invite prompt belongs to the tab that opened the link, unlike the 7-day attribution.
+const PROMPT_KEY = 'movida_share_prompt';
+
+export interface SharePrompt {
+    src: string;
+    eventId: string;
+    inv?: string;
+    /** Guest asked to sign in to accept; accept automatically once signed in. */
+    intent?: boolean;
+    /** Accepted, declined or not applicable; kept so a reload doesn't re-prompt. */
+    done?: boolean;
+}
+
+function readPrompt(): SharePrompt | null {
+    try {
+        const raw = sessionStorage.getItem(PROMPT_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as SharePrompt;
+        return parsed && typeof parsed.src === 'string' && typeof parsed.eventId === 'string' ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function writePrompt(prompt: SharePrompt): void {
+    try {
+        sessionStorage.setItem(PROMPT_KEY, JSON.stringify(prompt));
+    } catch { /* ignore */ }
+    try {
+        window.dispatchEvent(new CustomEvent('referral:changed'));
+    } catch { /* ignore */ }
+}
+
+/** Pending share-link invite for this tab, or null once resolved. */
+export function getSharePrompt(): SharePrompt | null {
+    const prompt = readPrompt();
+    return prompt && !prompt.done ? prompt : null;
+}
+
+export function setSharePromptIntent(): void {
+    const prompt = getSharePrompt();
+    if (prompt) writePrompt({ ...prompt, intent: true });
+}
+
+export function resolveSharePrompt(): void {
+    const prompt = readPrompt();
+    if (prompt && !prompt.done) writePrompt({ ...prompt, intent: false, done: true });
+}
+
+/** Drop the invite entirely, e.g. on sign-out so the next account doesn't inherit it. */
+export function clearSharePrompt(): void {
+    try {
+        sessionStorage.removeItem(PROMPT_KEY);
+    } catch { /* ignore */ }
+}
+
+function capturePrompt(src: string, eventId: string, inv?: string): void {
+    const existing = readPrompt();
+    if (existing && existing.src === src && existing.eventId === eventId && (existing.inv ?? undefined) === inv) return;
+    writePrompt({ src, eventId, ...(inv ? { inv } : {}) });
+}
+
 /** Capture `?ref=share&src={share_code}` from the current URL on mount,
  *  fire a server-side `click` ping, and stash the source for later
  *  attribution. Idempotent within an event/source pair. */
@@ -76,6 +138,7 @@ export function useReferralAttribution(eventId: string | null | undefined): void
         if (!src) return;
         const rawInv = params.get('inv');
         const inv = rawInv && INVITE_CODE_RE.test(rawInv) ? rawInv : undefined;
+        capturePrompt(src, eventId, inv);
 
         // Skip if we've already attributed this exact share for this event
         // in the current TTL window (defensive against double mounts and

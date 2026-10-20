@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -120,6 +120,11 @@ def _login(client: TestClient, email: str) -> None:
 
 def test_plan_activity_reconciles_attending_followers(engine, schedule_event):
     with Session(engine) as session:
+        # Plan activity is only fanned out for upcoming events; keep this one in the future.
+        event = session.get(CachedEvent, "back-2-mambo-2026")
+        event.start = datetime.now(timezone.utc) + timedelta(days=5)
+        event.end = event.start + timedelta(days=5)
+        session.add(event)
         users = {
             handle: User(
                 email=f"{handle}@example.com",

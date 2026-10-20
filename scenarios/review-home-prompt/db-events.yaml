@@ -70,3 +70,281 @@ events:
       - format:social
       - dance-style:bachata
       - reach:local
+
+  # ── Rail stress: 11 more local salsa events within 25 km of Lyon ──
+  - id: ev-local-01
+    calendar_id: salsa-cal-001
+    title: Salsa Sunset on the Rhône
+    location: "Berges du Rhône, Lyon, France"
+    latitude: 45.7540
+    longitude: 4.8430
+    start: w1 Sun 18:00
+    end: w1 Sun 22:00
+    image_url: https://picsum.photos/seed/rhp-local-01/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-02
+    calendar_id: salsa-cal-001
+    title: Vénissieux Salsa Club
+    location: "Vénissieux, France"
+    latitude: 45.6970
+    longitude: 4.8860
+    start: w2 Mon 20:30
+    end: w2 Mon 23:30
+    image_url: https://picsum.photos/seed/rhp-local-02/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-03
+    calendar_id: salsa-cal-001
+    title: Caluire Salsa Practica
+    location: "Caluire-et-Cuire, France"
+    latitude: 45.7950
+    longitude: 4.8460
+    start: w2 Tue 20:00
+    end: w2 Tue 23:00
+    image_url: https://picsum.photos/seed/rhp-local-03/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-04
+    calendar_id: salsa-cal-001
+    title: Croix-Rousse Salsa Wednesday
+    location: "Croix-Rousse, Lyon, France"
+    latitude: 45.7780
+    longitude: 4.8270
+    start: w2 Wed 20:30
+    end: w2 Wed 23:59
+    image_url: https://picsum.photos/seed/rhp-local-04/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-05
+    calendar_id: salsa-cal-001
+    title: Bron Salsa & Timba
+    location: "Bron, France"
+    latitude: 45.7380
+    longitude: 4.9130
+    start: w2 Fri 21:00
+    end: w2 Sat 01:00
+    image_url: https://picsum.photos/seed/rhp-local-05/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-06
+    calendar_id: salsa-cal-001
+    title: Confluence Salsa Rooftop
+    location: "Confluence, Lyon, France"
+    latitude: 45.7430
+    longitude: 4.8180
+    start: w2 Sat 21:00
+    end: w2 Sat 23:59
+    image_url: https://picsum.photos/seed/rhp-local-06/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-07
+    calendar_id: salsa-cal-001
+    title: Écully Salsa Afternoon
+    location: "Écully, France"
+    latitude: 45.7740
+    longitude: 4.7770
+    start: w3 Sun 15:00
+    end: w3 Sun 19:00
+    image_url: https://picsum.photos/seed/rhp-local-07/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-08
+    calendar_id: salsa-cal-001
+    title: Part-Dieu After-Work Salsa
+    location: "Part-Dieu, Lyon, France"
+    latitude: 45.7610
+    longitude: 4.8590
+    start: w3 Tue 19:00
+    end: w3 Tue 22:00
+    image_url: https://picsum.photos/seed/rhp-local-08/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-09
+    calendar_id: salsa-cal-001
+    title: Vieux Lyon Salsa Cave
+    location: "Vieux Lyon, France"
+    latitude: 45.7620
+    longitude: 4.8270
+    start: w3 Thu 21:00
+    end: w3 Thu 23:59
+    image_url: https://picsum.photos/seed/rhp-local-09/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-10
+    calendar_id: salsa-cal-001
+    title: Saint-Priest Salsa Night
+    location: "Saint-Priest, France"
+    latitude: 45.6960
+    longitude: 4.9440
+    start: w3 Sat 21:00
+    end: w3 Sat 23:59
+    image_url: https://picsum.photos/seed/rhp-local-10/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  - id: ev-local-11
+    calendar_id: salsa-cal-001
+    title: Tassin Salsa Social
+    location: "Tassin-la-Demi-Lune, France"
+    latitude: 45.7640
+    longitude: 4.7800
+    start: w4 Fri 21:00
+    end: w4 Fri 23:59
+    image_url: https://picsum.photos/seed/rhp-local-11/800/600
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  # ── International case: festival Alice attended + 12 upcoming festivals ──
+  # Ends Fri, between the Wed and Sat socials, so it's second in the Rate next chain.
+  - id: ev-lyon-congress
+    calendar_id: salsa-cal-001
+    title: Lyon Salsa Congress
+    location: "Centre de Congrès, Lyon, France"
+    latitude: 45.7840
+    longitude: 4.8520
+    start: w-1 Thu 18:00
+    end: w-1 Fri 18:00
+    image_url: https://picsum.photos/seed/rhp-congress/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-01
+    calendar_id: salsa-cal-001
+    title: Barcelona Salsa Festival
+    location: "Barcelona, Spain"
+    latitude: 41.3874
+    longitude: 2.1686
+    start: w1 Fri 18:00
+    end: w1 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-01/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-02
+    calendar_id: salsa-cal-001
+    title: Milano Salsa Congress
+    location: "Milan, Italy"
+    latitude: 45.4642
+    longitude: 9.1900
+    start: w2 Fri 18:00
+    end: w2 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-02/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-03
+    calendar_id: salsa-cal-001
+    title: Berlin Salsa Weekender
+    location: "Berlin, Germany"
+    latitude: 52.5200
+    longitude: 13.4050
+    start: w3 Fri 18:00
+    end: w3 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-03/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-04
+    calendar_id: salsa-cal-001
+    title: Lisbon Salsa Fest
+    location: "Lisbon, Portugal"
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w4 Fri 18:00
+    end: w4 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-04/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-05
+    calendar_id: salsa-cal-001
+    title: Amsterdam Salsa Congress
+    location: "Amsterdam, Netherlands"
+    latitude: 52.3676
+    longitude: 4.9041
+    start: w5 Fri 18:00
+    end: w5 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-05/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-06
+    calendar_id: salsa-cal-001
+    title: Prague Salsa Festival
+    location: "Prague, Czechia"
+    latitude: 50.0755
+    longitude: 14.4378
+    start: w6 Fri 18:00
+    end: w6 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-06/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-07
+    calendar_id: salsa-cal-001
+    title: Brussels Salsa Weekend
+    location: "Brussels, Belgium"
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w7 Fri 18:00
+    end: w7 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-07/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-08
+    calendar_id: salsa-cal-001
+    title: Vienna Salsa Congress
+    location: "Vienna, Austria"
+    latitude: 48.2082
+    longitude: 16.3738
+    start: w8 Fri 18:00
+    end: w8 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-08/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-09
+    calendar_id: salsa-cal-001
+    title: Madrid Salsa Festival
+    location: "Madrid, Spain"
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w9 Fri 18:00
+    end: w9 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-09/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-10
+    calendar_id: salsa-cal-001
+    title: Zurich Salsa Weekender
+    location: "Zurich, Switzerland"
+    latitude: 47.3769
+    longitude: 8.5417
+    start: w10 Fri 18:00
+    end: w10 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-10/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-11
+    calendar_id: salsa-cal-001
+    title: London Salsa Congress
+    location: "London, United Kingdom"
+    latitude: 51.5072
+    longitude: -0.1276
+    start: w11 Fri 18:00
+    end: w11 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-11/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  - id: ev-intl-12
+    calendar_id: salsa-cal-001
+    title: Rome Salsa Festival
+    location: "Rome, Italy"
+    latitude: 41.9028
+    longitude: 12.4964
+    start: w12 Fri 18:00
+    end: w12 Sun 23:00
+    image_url: https://picsum.photos/seed/rhp-intl-12/800/600
+    tags: [format:festival, dance-style:salsa, reach:international]
+
+  # Local social far away: never in the international rail (reach filter).
+  - id: ev-madrid-local
+    calendar_id: salsa-cal-001
+    title: Madrid Tuesday Salsa
+    location: "Madrid, Spain"
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w1 Tue 21:00
+    end: w1 Tue 23:59
+    tags: [format:social, dance-style:salsa, reach:local]

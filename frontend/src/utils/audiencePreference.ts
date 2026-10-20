@@ -23,7 +23,6 @@ interface RsvpAudienceUser {
 export type AudienceKind = 'going' | 'saved';
 
 const KEY_PREFIX = 'audience.lastUsed.';
-const REMEMBER_KEY_PREFIX = 'audience.remember.';
 
 function kindPrefix(base: string, kind: AudienceKind): string {
     return kind === 'saved' ? `${base}saved.` : base;
@@ -93,33 +92,6 @@ export function defaultRsvpAudienceFor(user: RsvpAudienceUser): ShareAudience {
 /** Saves have no account-level default, so fall back to the RSVP one. */
 export function defaultSavedAudienceFor(user: RsvpAudienceUser): ShareAudience {
     return getLastUsedAudience(user.user_id, 'saved') ?? defaultRsvpAudienceFor(user);
-}
-
-/** Whether the user ticked "Remember my choice"; ``null`` when never answered. */
-export function getRememberAudience(
-    identity: string | null | undefined,
-    kind: AudienceKind = 'going',
-): boolean | null {
-    if (!identity) return null;
-    try {
-        const raw = window.localStorage.getItem(`${kindPrefix(REMEMBER_KEY_PREFIX, kind)}${identity}`);
-        return raw === null ? null : raw === '1';
-    } catch {
-        return null;
-    }
-}
-
-export function setRememberAudience(
-    identity: string | null | undefined,
-    remember: boolean,
-    kind: AudienceKind = 'going',
-): void {
-    if (!identity) return;
-    try {
-        window.localStorage.setItem(`${kindPrefix(REMEMBER_KEY_PREFIX, kind)}${identity}`, remember ? '1' : '0');
-    } catch {
-        /* swallow quota / disabled-storage errors */
-    }
 }
 
 export const AUDIENCE_TIER_LABELS: Record<ShareAudience, string> = {

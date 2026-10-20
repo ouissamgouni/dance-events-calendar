@@ -325,9 +325,6 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         event_review_size_step_enabled=app_settings.get_event_review_size_step_enabled(
             session
         ),
-        rsvp_remember_visibility_enabled=app_settings.get_rsvp_remember_visibility_enabled(
-            session
-        ),
         rsvp_people_sheet_enabled=app_settings.get_rsvp_people_sheet_enabled(session),
         geoapify_enabled=app_settings.get_geoapify_enabled(session),
         review_prompt_delay_hours=app_settings.get_review_prompt_delay_hours(session),
@@ -336,6 +333,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         ),
         for_you_review_window_days=app_settings.get_for_you_review_window_days(session),
         review_home_prompt_enabled=app_settings.get_review_home_prompt_enabled(session),
+        similar_events_enabled=app_settings.get_similar_events_enabled(session),
         **{
             key: app_settings.get_review_home_prompt_int(key, session)
             for key in app_settings.REVIEW_HOME_PROMPT_INT_KEYS
@@ -937,13 +935,6 @@ def update_settings(
             body.event_review_size_step_enabled,
         )
 
-    if body.rsvp_remember_visibility_enabled is not None:
-        _set_bool_setting(
-            session,
-            "rsvp_remember_visibility_enabled",
-            body.rsvp_remember_visibility_enabled,
-        )
-
     if body.rsvp_people_sheet_enabled is not None:
         _set_bool_setting(
             session,
@@ -990,6 +981,11 @@ def update_settings(
     if body.review_home_prompt_enabled is not None:
         _set_bool_setting(
             session, "review_home_prompt_enabled", body.review_home_prompt_enabled
+        )
+
+    if body.similar_events_enabled is not None:
+        _set_bool_setting(
+            session, "similar_events_enabled", body.similar_events_enabled
         )
 
     for key in app_settings.REVIEW_HOME_PROMPT_INT_KEYS:

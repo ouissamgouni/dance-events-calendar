@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { Eye, UserRoundCheck, UserRoundPlus } from 'lucide-react';
+import { UserRoundCheck, UserRoundPlus } from 'lucide-react';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useSignIn } from '../context/SignInSheetContext';
@@ -12,9 +12,7 @@ import RsvpVisibilitySheet from './RsvpVisibilitySheet';
 import { useAnchoredToast } from './AnchoredToast';
 import AudienceTierIcon from './AudienceTierIcon';
 import {
-    AUDIENCE_TIER_LABELS,
     defaultRsvpAudienceFor,
-    getRememberAudience,
     setLastUsedAudience,
 } from '../utils/audiencePreference';
 import { buildEventShareUrl } from '../utils/postRsvp';
@@ -106,7 +104,7 @@ export default function GoingButton({
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user } = useAuth();
-    const { goingButtonIconVariant, appAuthGateEnabled, guestActionsRequireSignin, rsvpRememberVisibilityEnabled, rsvpPeopleSheetEnabled } = useOptionalFeatureFlags();
+    const { goingButtonIconVariant, appAuthGateEnabled, guestActionsRequireSignin, rsvpPeopleSheetEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const openSignIn = useSignIn();
     const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
@@ -158,37 +156,17 @@ export default function GoingButton({
             //      when the account-level default is unset).
             //   3. Legacy boolean fallback for very old payloads.
             const defaultAudience = defaultRsvpAudienceFor(user);
-            const skipSheet = rsvpRememberVisibilityEnabled && !rsvpPeopleSheetEnabled && getRememberAudience(user.user_id) === true;
             // Always RSVP immediately with the default audience — no extra
             // confirmation click. The post-RSVP popover surfaces an inline
             // picker so the user can change visibility on the fly.
             toggleAttending(eventId, defaultAudience).then((ok) => {
                 if (ok) {
                     maybeFireShareConversion();
-                    if (skipSheet) {
-                        errorToast.show(isPast ? 'You attended' : "You're going", 3000, {
-                            leading: '🎉',
-                            action: {
-                                icon: (
-                                    <>
-                                        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                                        <AudienceTierIcon audience={defaultAudience} className="h-3.5 w-3.5" />
-                                    </>
-                                ),
-                                label: `Visibility: ${AUDIENCE_TIER_LABELS[defaultAudience]} \u2014 edit`,
-                                onClick: () => {
-                                    setPendingAudience(defaultAudience);
-                                    setEditOpen(true);
-                                },
-                            },
-                        });
-                    }
                 } else {
                     setPostRsvpVariant(null);
                     errorToast.show("Couldn't mark you as going \u2014 try again", 3200);
                 }
             });
-            if (skipSheet) return;
             showPostRsvp(
                 defaultAudience !== 'private'
                     ? 'signed-in-default-share'

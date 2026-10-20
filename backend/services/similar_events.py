@@ -221,6 +221,8 @@ def similar_events(
     radius_key, allowed_reaches, reach_filter = _REACH_RULES[reach]
     style_ids = _dance_style_tag_ids(session, event.event_id)
     result = SimilarEventsResult(style_tag_ids=style_ids, reach_filter=reach_filter)
+    if not app_settings.get_similar_events_enabled(session):
+        return result
     if not style_ids or event.latitude is None or event.longitude is None:
         return result
 

@@ -56,22 +56,25 @@ describe('PostRsvpPopover', () => {
         expect(onClose).toHaveBeenCalledOnce()
     })
 
-    it('keeps the anchored presentation on desktop without auto-dismiss', () => {
+    it('keeps the anchored presentation on desktop when the people sheet is off', () => {
         vi.useFakeTimers()
         setMobileViewport(false)
         const anchor = document.createElement('button')
         document.body.appendChild(anchor)
         const onClose = vi.fn()
+        const flags = { ...defaultFlags, rsvpPeopleSheetEnabled: false }
 
         renderWithProviders(
-            <PostRsvpPopover
-                anchorRef={{ current: anchor }}
-                variant="signed-in"
-                onClose={onClose}
-                onShare={vi.fn()}
-                audience="friends"
-                onAudienceChange={vi.fn()}
-            />,
+            <FeatureFlagsContext.Provider value={{ flags, updateFlag: vi.fn() }}>
+                <PostRsvpPopover
+                    anchorRef={{ current: anchor }}
+                    variant="signed-in"
+                    onClose={onClose}
+                    onShare={vi.fn()}
+                    audience="friends"
+                    onAudienceChange={vi.fn()}
+                />
+            </FeatureFlagsContext.Provider>,
         )
 
         const popover = screen.getByRole('dialog', { name: "You're going!" })
@@ -170,7 +173,7 @@ describe('PostRsvpPopover', () => {
             Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
 
             expect(screen.getByRole('dialog', { name: "You're going!" })).toHaveAttribute('aria-modal', 'true')
-            expect(screen.getByText('Who sees you’re going')).toBeInTheDocument()
+            expect(await screen.findByTestId('rsvp-visibility-summary')).toHaveTextContent('Visible to: Friends')
             expect(screen.queryByRole('checkbox', { name: 'Remember my choice' })).not.toBeInTheDocument()
             expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument()
             expect(screen.getByRole('link', { name: 'See it in My Events' })).toHaveAttribute('href', '/my-events')

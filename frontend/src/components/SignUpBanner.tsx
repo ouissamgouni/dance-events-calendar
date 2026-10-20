@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getActiveReferral } from '../hooks/useReferralAttribution';
+import { getSharePrompt } from '../hooks/useReferralAttribution';
+import { signInPath } from './auth/signInIntent';
 
 const STORAGE_KEY = 'signup_banner_dismissed_at';
 // Re-show the banner this many days after a dismiss so users who weren't
@@ -21,11 +22,10 @@ function isDismissedRecently(): boolean {
     }
 }
 
-/** Detect an active ``?ref=share&src=…`` attribution \u2014 either persisted
- *  in localStorage or still present in the current URL (e.g. on first
- *  paint of a deep link, before the route child has run its effect). */
+/** A share-link invite is pending in this tab, or still in the URL before
+ *  the route child has captured it. */
 function hasActiveShareReferral(): boolean {
-    if (getActiveReferral()) return true;
+    if (getSharePrompt()) return true;
     if (typeof window === 'undefined') return false;
     const params = new URLSearchParams(window.location.search);
     return params.get('ref') === 'share' && !!params.get('src');
@@ -43,7 +43,7 @@ function hasActiveShareReferral(): boolean {
  */
 export default function SignUpBanner() {
     const { user, loading } = useAuth();
-    const { pathname } = useLocation();
+    const { pathname, search, hash } = useLocation();
     const [dismissed, setDismissed] = useState<boolean>(true);
     const [shareReferralActive, setShareReferralActive] = useState<boolean>(false);
 
@@ -83,7 +83,7 @@ export default function SignUpBanner() {
             </p>
             <div className="flex items-center gap-2 shrink-0">
                 <Link
-                    to="/login"
+                    to={signInPath(`${pathname}${search}${hash}`)}
                     className="min-h-8 bg-action px-3 text-sm font-semibold text-white hover:bg-action transition"
                 >
                     Sign in

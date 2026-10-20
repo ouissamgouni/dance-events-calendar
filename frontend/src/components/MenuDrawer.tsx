@@ -5,6 +5,7 @@ import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { firstNameOf } from '../utils/displayName';
 import useBackToClose from '../hooks/useBackToClose';
 import { usePendingReviewCount } from '../hooks/usePendingReviewCount';
+import { signInPath } from './auth/signInIntent';
 
 /**
  * Primary menu drawer opened by the header burger (top-right). Holds the
@@ -88,7 +89,7 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                 ) : (
                     <div className="px-5 py-4 border-b border-line">
                         <Link
-                            to="/login"
+                            to={signInPath(`${location.pathname}${location.search}${location.hash}`)}
                             onClick={onClose}
                             className="flex items-center justify-center w-full bg-action px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition"
                         >

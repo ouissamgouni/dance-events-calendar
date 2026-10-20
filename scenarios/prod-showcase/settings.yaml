@@ -1,6 +1,6 @@
 settings:
   summary_two_line_enabled: true
-  app_auth_gate_enabled: true
+  app_auth_gate_enabled: false
   browse_nav_enabled: true
   network_going_snapshot_enabled: true
   promo_codes_enabled: true
@@ -20,3 +20,4 @@ settings:
   event_assets_max_tickets: 2
   event_assets_ticket_retention_days: 30
   event_assets_max_ticket_mb: 5
+  rsvp_people_sheet_enabled: true

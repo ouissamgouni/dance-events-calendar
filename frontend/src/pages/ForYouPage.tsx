@@ -543,7 +543,6 @@ export default function ForYouPage() {
             {user && (
                 <HomeReviewPrompt
                     blocked={!!selectedEvent}
-                    pendingReviews={pendingReviews}
                     onReviewed={handleReviewed}
                 />
             )}

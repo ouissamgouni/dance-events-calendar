@@ -271,6 +271,11 @@ export function trackRateNextClicked(): void {
     umamiTrack('rate_next_clicked');
 }
 
+export function trackReviewExploreMoreClicked(): void {
+    if (!readConsent().analytics) return;
+    umamiTrack('review_explore_more_clicked');
+}
+
 export function trackRatingDeleted(): void {
     if (!readConsent().analytics) return;
     umamiTrack('rating_deleted');

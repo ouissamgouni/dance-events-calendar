@@ -173,7 +173,7 @@ describe('GoingButton (anonymous)', () => {
 })
 
 describe('GoingButton visibility', () => {
-    it('uses mobile bottom sheets with horizontal audience pills', async () => {
+    it('collapses the default visibility into a summary that expands on Change', async () => {
         useMobileViewport()
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
@@ -184,23 +184,26 @@ describe('GoingButton visibility', () => {
 
         const confirmationSheet = await screen.findByRole('dialog', { name: "You're going!" })
         expect(confirmationSheet).toHaveAttribute('aria-modal', 'true')
-        expect(screen.getByText('Summer Salsa Social')).toHaveClass('truncate', 'text-sm')
+        expect(within(confirmationSheet).getByTestId('rsvp-visibility-summary')).toHaveTextContent('Visible to: Friends')
+        expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+        expect(within(confirmationSheet).getByRole('button', { name: 'Bring someone along' })).toBeInTheDocument()
+
+        await user.click(within(confirmationSheet).getByRole('button', { name: 'Change' }))
         expect(screen.getByRole('radiogroup', { name: 'Who can see you in the attendee list?' })).toHaveClass('flex', 'w-full')
         expect(screen.getAllByRole('radio')[0]).toHaveClass('min-h-10', 'text-sm')
-        expect(within(confirmationSheet).getByRole('button', { name: 'Share' })).toBeInTheDocument()
 
         await user.click(within(confirmationSheet).getByRole('button', { name: 'Done' }))
         await user.click(screen.getByRole('button', { name: 'Not going' }))
 
         const editSheet = screen.getByRole('dialog', { name: "You're going!" })
         expect(editSheet).toHaveAttribute('aria-modal', 'true')
-        expect(screen.getByRole('radiogroup', { name: 'Who can see you in the attendee list?' })).toHaveClass('flex', 'w-full')
+        expect(within(editSheet).getByTestId('rsvp-visibility-summary')).toBeInTheDocument()
         expect(within(editSheet).getByRole('button', { name: 'Not going' })).toHaveClass('text-danger')
         expect(within(editSheet).getByRole('button', { name: 'Done' })).toBeInTheDocument()
-        expect(within(editSheet).getByRole('checkbox', { name: 'Remember my choice' })).toBeChecked()
+        expect(screen.queryByRole('checkbox', { name: 'Remember my choice' })).not.toBeInTheDocument()
     })
 
-    it('remembers the choice when the sheet is closed via the backdrop', async () => {
+    it('closes via the backdrop', async () => {
         useMobileViewport()
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
@@ -212,19 +215,6 @@ describe('GoingButton visibility', () => {
         await user.click(sheet.parentElement!)
 
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-        expect(localStorage.getItem('audience.remember.user-1')).toBe('1')
-    })
-
-    it('ignores a remembered save choice when RSVPing', async () => {
-        useMobileViewport()
-        localStorage.setItem('audience.remember.saved.user-1', '1')
-        server.use(
-            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
-        )
-        const { user } = renderGoingButton('evt-save-remembered')
-
-        await user.click(await screen.findByRole('button', { name: "I'm going" }))
-        expect(await screen.findByRole('dialog', { name: "You're going!" })).toBeInTheDocument()
     })
 
     it('remembers the audience picked in the post-RSVP sheet as last used', async () => {
@@ -236,14 +226,16 @@ describe('GoingButton visibility', () => {
 
         await user.click(await screen.findByRole('button', { name: "I'm going" }))
         await screen.findByRole('dialog', { name: "You're going!" })
+        await user.click(screen.getByRole('button', { name: 'Change' }))
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
 
         await waitFor(() =>
             expect(localStorage.getItem('audience.lastUsed.user-1')).toBe('private'),
         )
+        expect(screen.getByRole('radiogroup')).toBeInTheDocument()
     })
 
-    it('saves the picked audience as account default when remember is checked', async () => {
+    it('saves a changed audience as the account default only via Make default', async () => {
         useMobileViewport()
         const patches: unknown[] = []
         server.use(
@@ -253,130 +245,53 @@ describe('GoingButton visibility', () => {
                 return HttpResponse.json({})
             }),
         )
-        const { user } = renderGoingButton('evt-remember')
+        const { user } = renderGoingButton('evt-make-default')
 
         await user.click(await screen.findByRole('button', { name: "I'm going" }))
         await screen.findByRole('dialog', { name: "You're going!" })
-        expect(screen.getByRole('checkbox', { name: 'Remember my choice' })).toBeChecked()
+        await user.click(screen.getByRole('button', { name: 'Change' }))
         await user.click(screen.getByRole('radio', { name: /^Private/ }))
         expect(patches).toEqual([])
-        await user.click(screen.getByRole('button', { name: 'Done' }))
+
+        await user.click(await screen.findByRole('button', { name: 'Make default' }))
 
         await waitFor(() =>
             expect(patches).toEqual([{ share_attendance_default_audience: 'private' }]),
         )
-        expect(localStorage.getItem('audience.remember.user-1')).toBe('1')
     })
 
-    it('does not remember the choice when leaving via Not going', async () => {
-        useMobileViewport()
-        const patches: unknown[] = []
-        server.use(
-            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
-            http.patch('*/api/social/me/visibility', async ({ request }) => {
-                patches.push(await request.json())
-                return HttpResponse.json({})
-            }),
-        )
-        const { user } = renderGoingButton('evt-not-going')
-
-        await user.click(await screen.findByRole('button', { name: "I'm going" }))
-        const sheet = await screen.findByRole('dialog', { name: "You're going!" })
-        await user.click(within(sheet).getByRole('button', { name: 'Done' }))
-        localStorage.removeItem('audience.remember.user-1')
-        patches.length = 0
-
-        await user.click(screen.getByRole('button', { name: 'Not going' }))
-        const editSheet = await screen.findByRole('dialog', { name: "You're going!" })
-        await user.click(screen.getByRole('radio', { name: /^Private/ }))
-        await user.click(within(editSheet).getByRole('button', { name: 'Not going' }))
-
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-        expect(patches).toEqual([])
-        expect(localStorage.getItem('audience.remember.user-1')).toBeNull()
-    })
-
-    it('does not save the account default when remember is unchecked', async () => {
-        useMobileViewport()
-        const patches: unknown[] = []
-        server.use(
-            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
-            http.patch('*/api/social/me/visibility', async ({ request }) => {
-                patches.push(await request.json())
-                return HttpResponse.json({})
-            }),
-        )
-        const { user } = renderGoingButton('evt-no-remember')
-
-        await user.click(await screen.findByRole('button', { name: "I'm going" }))
-        await screen.findByRole('dialog', { name: "You're going!" })
-        await user.click(screen.getByRole('checkbox', { name: 'Remember my choice' }))
-        await user.click(screen.getByRole('radio', { name: /^Private/ }))
-
-        await waitFor(() =>
-            expect(localStorage.getItem('audience.lastUsed.user-1')).toBe('private'),
-        )
-        expect(patches).toEqual([])
-    })
-
-    it('skips the post-RSVP sheet once the choice is remembered but still opens it on edit', async () => {
+    it('always opens the sheet, ignoring a legacy remembered choice', async () => {
         useMobileViewport()
         localStorage.setItem('audience.remember.user-1', '1')
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
         )
-        const { user } = renderGoingButton('evt-remembered')
+        const { user } = renderGoingButton('evt-legacy-remembered')
 
         await user.click(await screen.findByRole('button', { name: "I'm going" }))
-        expect(await screen.findByRole('button', { name: 'Not going' })).toBeInTheDocument()
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-
-        await user.click(await screen.findByRole('button', { name: 'Visibility: Friends \u2014 edit' }))
-        expect(await screen.findByRole('dialog', { name: "You're going!" })).toBeInTheDocument()
-        await user.click(screen.getByRole('button', { name: 'Done' }))
-
-        await user.click(screen.getByRole('button', { name: 'Not going' }))
-        expect(await screen.findByRole('dialog', { name: "You're going!" })).toBeInTheDocument()
+        const dialog = await screen.findByRole('dialog', { name: "You're going!" })
+        expect(await within(dialog).findByText('You’re the first of your crew — bring someone along.')).toBeInTheDocument()
     })
 
-    it('hides the remember checkbox when the flag is off', async () => {
+    it('shows the full picker without people suggestions when the people sheet is off', async () => {
         useMobileViewport()
-        server.use(
-            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
-            http.get('*/api/settings', () =>
-                HttpResponse.json({ rsvp_remember_visibility_enabled: false }),
-            ),
-        )
-        const { user } = renderGoingButton('evt-flag-off')
-
-        await user.click(await screen.findByRole('button', { name: "I'm going" }))
-        await screen.findByRole('dialog', { name: "You're going!" })
-        await waitFor(() => expect(screen.queryByRole('checkbox')).not.toBeInTheDocument())
-    })
-
-    it('always opens the people sheet, even with a remembered choice, when the flag is on', async () => {
-        useMobileViewport()
-        localStorage.setItem('audience.remember.user-1', '1')
         let settingsServed = false
         server.use(
             http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
             http.get('*/api/settings', () => {
                 settingsServed = true
-                return HttpResponse.json({ rsvp_people_sheet_enabled: true })
+                return HttpResponse.json({ rsvp_people_sheet_enabled: false, guest_actions_require_signin: false })
             }),
-            http.get('*/api/events/:eventId/attendees', () => HttpResponse.json([])),
-            http.get('*/api/social/me/referral', () =>
-                HttpResponse.json({ code: 'INV1', url: '/r/INV1', used_count: 0 }),
-            ),
         )
-        const { user } = renderGoingButton('evt-people-sheet')
+        const { user } = renderGoingButton('evt-flag-off')
 
         const goingButton = await screen.findByRole('button', { name: "I'm going" })
         await waitFor(() => expect(settingsServed).toBe(true))
         await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
         await user.click(goingButton)
         const dialog = await screen.findByRole('dialog', { name: "You're going!" })
-        expect(within(dialog).getByRole('button', { name: 'Bring someone along' })).toBeInTheDocument()
-        expect(await within(dialog).findByText('You’re the first of your crew — bring someone along.')).toBeInTheDocument()
+        expect(within(dialog).getByRole('radiogroup', { name: 'Who can see you in the attendee list?' })).toBeInTheDocument()
+        expect(within(dialog).getByRole('button', { name: 'Share' })).toBeInTheDocument()
+        expect(within(dialog).queryByTestId('rsvp-visibility-summary')).not.toBeInTheDocument()
     })
 })
