@@ -860,7 +860,13 @@ tasks:
       - |
         cd "{{.SOURCE_DIR}}"
         echo "Deploying backend to movida.fly.dev (from $(pwd))..."
-        fly deploy --remote-only -c config/fly.prod.toml
+        # Retry: Fly's Machines API intermittently drops connections (unexpected EOF).
+        for ATTEMPT in 1 2 3; do
+          if fly deploy --remote-only -c config/fly.prod.toml; then break; fi
+          if [ "$ATTEMPT" = 3 ]; then echo "❌ fly deploy failed after 3 attempts" >&2; exit 1; fi
+          echo "⚠️  fly deploy failed (attempt $ATTEMPT/3) — retrying in 10s..."
+          sleep 10
+        done
       - |
         echo "Waiting for machine to be ready..."
         sleep 5
