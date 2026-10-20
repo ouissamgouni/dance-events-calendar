@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import RateEventModal from './RateEventModal'
@@ -330,5 +330,66 @@ describe('RateEventModal — earlier edition', () => {
         await submitAmazing(user)
 
         expect(submitted).toEqual([{ eventId: 'evt-upcoming', body: expect.objectContaining({ scope: 'past_edition' }) }])
+    })
+})
+
+describe('RateEventModal — home review prompt', () => {
+    it('shows the prompt context, then similar events and the rate-next chain after submit', async () => {
+        let submittedBody: Record<string, unknown> | null = null
+        server.use(
+            http.get('*/api/tags', () => HttpResponse.json([])),
+            http.get('*/api/events/:eventId', () => HttpResponse.json({
+                event_id: 'evt-1', calendar_id: 'cal-1', title: 'Rooftop Salsa', description: null,
+                location: null, city: 'Lyon', latitude: null, longitude: null,
+                start: '2026-10-10T20:00:00Z', end: '2026-10-11T01:00:00Z', all_day: false, tags: [],
+            })),
+            http.post('*/api/events/:eventId/feedback', async ({ request }) => {
+                submittedBody = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json(ratingResponse(submittedBody), { status: 201 })
+            }),
+            http.get('*/api/events/:eventId/similar', () => HttpResponse.json({
+                event_ids: ['evt-2'], style_tag_ids: [3], reach_filter: 'any', area: null,
+            })),
+            http.post('*/api/events/by-ids', () => HttpResponse.json([{
+                event_id: 'evt-2', calendar_id: 'cal-1', title: 'Next Salsa Night', description: null,
+                location: 'Lyon', latitude: null, longitude: null, start: '2026-10-24T20:00:00Z',
+                end: '2026-10-24T23:00:00Z', all_day: false, color: null, view_count: 0, price_min: null,
+                price_max: null, price_currency: null, price_is_free: false, links: null, tags: [],
+            }])),
+        )
+        const onNotNow = vi.fn()
+        const onRateNext = vi.fn()
+
+        const { user } = renderWithProviders(
+            <FeatureFlagsProvider>
+                <RateEventModal
+                    eventId="evt-1"
+                    initialRating={null}
+                    onClose={() => { }}
+                    onSubmitted={() => { }}
+                    entryPoint="home-prompt"
+                    prompt={{ friendProof: 'Laura', showIncentive: true, onNotNow }}
+                    rateNext={{ count: 2, onRateNext }}
+                />
+            </FeatureFlagsProvider>,
+        )
+
+        expect(await screen.findByRole('heading', { name: 'How was Rooftop Salsa?' })).toBeInTheDocument()
+        expect(screen.getByText('Laura already reviewed it.')).toBeInTheDocument()
+        expect(screen.getByText('Share how it went, then discover similar events!')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Not now' }))
+        expect(onNotNow).toHaveBeenCalled()
+
+        await user.click(screen.getByRole('radio', { name: /Great/i }))
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        await user.click(screen.getByRole('button', { name: /Submit/i }))
+
+        expect(await screen.findByText('Next Salsa Night')).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: /See more/ })).toHaveAttribute('href', '/browse?tag_ids=3')
+        expect(submittedBody).toMatchObject({ overall_sentiment: 'great', entry_point: 'home-prompt' })
+        expect(screen.getByText('2 more to rate')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Rate next' }))
+        expect(onRateNext).toHaveBeenCalled()
     })
 })

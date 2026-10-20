@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     fetchShareSource,
+    redeemReferral,
     redeemShareFollow,
     type ShareSourceResponse,
 } from '../api';
@@ -67,6 +68,13 @@ function clearIntent(shareCode: string): void {
     } catch { /* ignore */ }
 }
 
+/** Friend invites become mutual via the invite code; plain shares stay one-way. */
+function redeem(shareCode: string, inviteCode: string | null): Promise<string | null> {
+    return inviteCode
+        ? redeemReferral(inviteCode, true).then((r) => r.inviter_handle)
+        : redeemShareFollow(shareCode, true).then((r) => r.sharer_handle);
+}
+
 /**
  * Phase 3 (D2) — share-link doubles as referral.
  *
@@ -93,6 +101,10 @@ function clearIntent(shareCode: string): void {
  * befriend a stranger. The sharer gets a regular new-follower
  * notification and can follow back manually.
  *
+ * Exception: friend-invite links (``&inv=<invite code>``, from the post-RSVP
+ * "Bring someone along" CTA) offer mutual friendship via redeem-referral,
+ * since the sharer explicitly opted in.
+ *
  * Note: share-link conversions do NOT bump
  * ``user_referrals.used_count`` — that surface stays invite-only
  * (D2 decision).
@@ -100,6 +112,7 @@ function clearIntent(shareCode: string): void {
 export default function ShareReferralBanner() {
     const { user, loading: authLoading } = useAuth();
     const [shareCode, setShareCode] = useState<string | null>(null);
+    const [inviteCode, setInviteCode] = useState<string | null>(null);
     const [source, setSource] = useState<ShareSourceResponse | null>(null);
     const [followOptIn, setFollowOptIn] = useState(true);
     const [status, setStatus] = useState<
@@ -121,20 +134,25 @@ export default function ShareReferralBanner() {
             // ``?ref=share&src=…`` deep link without waiting for the
             // child route's effect to run.
             let src: string | null = null;
+            let inv: string | null = null;
             const ref = getActiveReferral();
             if (ref) {
                 src = ref.src;
+                inv = ref.inv ?? null;
             } else if (typeof window !== 'undefined') {
                 const params = new URLSearchParams(window.location.search);
                 if (params.get('ref') === 'share') {
                     src = params.get('src');
+                    inv = params.get('inv');
                 }
             }
             if (!src || isConsumed(src) || isDismissed(src)) {
                 setShareCode(null);
+                setInviteCode(null);
                 return;
             }
             setShareCode(src);
+            setInviteCode(inv);
         };
         evaluate();
         window.addEventListener('referral:changed', evaluate);
@@ -148,7 +166,7 @@ export default function ShareReferralBanner() {
             return;
         }
         let cancelled = false;
-        fetchShareSource(shareCode)
+        fetchShareSource(shareCode, inviteCode)
             .then((r) => {
                 if (cancelled) return;
                 setSource(r);
@@ -158,7 +176,7 @@ export default function ShareReferralBanner() {
                 setSource(null);
             });
         return () => { cancelled = true; };
-    }, [shareCode]);
+    }, [shareCode, inviteCode]);
 
     // Auto-hide after a successful redemption. Declared unconditionally
     // (React Rules of Hooks) and short-circuits when status is not
@@ -186,10 +204,10 @@ export default function ShareReferralBanner() {
         }
         clearIntent(shareCode);
         setStatus({ kind: 'redeeming' });
-        redeemShareFollow(shareCode, true)
-            .then((r) => {
+        redeem(shareCode, source.friend_invite ? inviteCode : null)
+            .then((handle) => {
                 markConsumed(shareCode);
-                setStatus({ kind: 'redeemed', handle: r.sharer_handle });
+                setStatus({ kind: 'redeemed', handle });
                 window.dispatchEvent(new CustomEvent('network:changed'));
             })
             .catch((e: unknown) => {
@@ -198,7 +216,7 @@ export default function ShareReferralBanner() {
                     message: e instanceof Error ? e.message : String(e),
                 });
             });
-    }, [user, shareCode, source, status.kind]);
+    }, [user, shareCode, inviteCode, source, status.kind]);
 
     // ``handle`` is optional on a User (auto-assigned for share_code only,
     // not for handle). Fall back to display_name so the banner still
@@ -213,6 +231,7 @@ export default function ShareReferralBanner() {
     // Only prefix with ``@`` when we have a real handle; display_name is
     // free-form ("Sharer Persona") and shouldn't be ``@``-prefixed.
     const sharerLabelDisplay = source.handle ? `@${source.handle}` : sharerLabel;
+    const friendInvite = !!source.friend_invite && !!inviteCode;
 
     const handleDismiss = () => {
         markDismissed(shareCode);
@@ -227,10 +246,10 @@ export default function ShareReferralBanner() {
             return;
         }
         setStatus({ kind: 'redeeming' });
-        redeemShareFollow(shareCode, true)
-            .then((r) => {
+        redeem(shareCode, friendInvite ? inviteCode : null)
+            .then((handle) => {
                 markConsumed(shareCode);
-                setStatus({ kind: 'redeemed', handle: r.sharer_handle });
+                setStatus({ kind: 'redeemed', handle });
                 window.dispatchEvent(new CustomEvent('network:changed'));
             })
             .catch((e: unknown) => {
@@ -249,8 +268,9 @@ export default function ShareReferralBanner() {
                 className="flex items-center justify-between gap-3 bg-emerald-50 border-b border-emerald-100 px-4 py-1.5 text-xs text-ink"
             >
                 <p>
-                    You're now following{' '}
-                    <strong>{status.handle ? `@${status.handle}` : sharerLabelDisplay}</strong>.
+                    {friendInvite ? 'You and ' : 'You\'re now following '}
+                    <strong>{status.handle ? `@${status.handle}` : sharerLabelDisplay}</strong>
+                    {friendInvite ? ' are now friends.' : '.'}
                 </p>
                 {(status.handle ?? source.handle) ? (
                     <Link
@@ -280,8 +300,17 @@ export default function ShareReferralBanner() {
                     />
                 ) : null}
                 <p className="min-w-0 truncate sm:whitespace-normal">
-                    You arrived via <strong>{sharerLabelDisplay}</strong>{' '}
-                    {user ? '— follow them?' : '— sign in to follow them.'}
+                    {friendInvite ? (
+                        <>
+                            <strong>{sharerLabelDisplay}</strong> invited you{' '}
+                            {user ? '— become friends?' : '— sign in to become friends.'}
+                        </>
+                    ) : (
+                        <>
+                            You arrived via <strong>{sharerLabelDisplay}</strong>{' '}
+                            {user ? '— follow them?' : '— sign in to follow them.'}
+                        </>
+                    )}
                     {!user ? (
                         <span className="hidden sm:inline text-ink-soft">
                             {' '}Signing in also lets you save events across devices,
@@ -300,7 +329,7 @@ export default function ShareReferralBanner() {
                         onChange={(e) => setFollowOptIn(e.target.checked)}
                         className="h-3 w-3 accent-blue-500"
                     />
-                    Follow them
+                    {friendInvite ? 'Become friends' : 'Follow them'}
                 </label>
                 {user ? (
                     <button
@@ -309,7 +338,7 @@ export default function ShareReferralBanner() {
                         disabled={status.kind === 'redeeming'}
                         className="min-h-8 bg-action px-3 text-sm font-semibold text-white hover:bg-action transition disabled:opacity-60"
                     >
-                        {status.kind === 'redeeming' ? 'Following…' : 'Continue'}
+                        {status.kind === 'redeeming' ? (friendInvite ? 'Connecting…' : 'Following…') : 'Continue'}
                     </button>
                 ) : (
                     <Link

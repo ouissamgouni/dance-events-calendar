@@ -1026,6 +1026,13 @@ def test_review_prompt_send_now_per_user_statuses(client, session, monkeypatch):
     assert status_by_email["ned@example.com"] == "skipped_not_attended"
     assert emailed == [("gina@example.com", None)]
 
+    from backend.db.models import NotificationDelivery
+
+    email_rows = session.exec(
+        select(NotificationDelivery).where(NotificationDelivery.channel == "email")
+    ).all()
+    assert [(d.mode, d.source) for d in email_rows] == [("instant", "admin")]
+
 
 def test_review_prompt_send_now_resend(client, session, monkeypatch):
     emailed: list = []

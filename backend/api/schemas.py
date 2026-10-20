@@ -1579,6 +1579,8 @@ class SiteSettingsResponse(BaseModel):
     event_review_size_step_enabled: bool = True
     # Show the 'remember my choice' checkbox in RSVP/save visibility sheets.
     rsvp_remember_visibility_enabled: bool = True
+    # Post-RSVP sheet: people suggestions, friend-invite share, next steps.
+    rsvp_people_sheet_enabled: bool = False
     # Place autocomplete via Geoapify (off: Photon).
     geoapify_enabled: bool = False
     # Hours after an event's end before the review prompt fires.
@@ -1590,6 +1592,17 @@ class SiteSettingsResponse(BaseModel):
     # How far back attended-but-unreviewed events surface in the "Share your
     # experience" trail on the "For you" page. Default 180 (about 6 months).
     for_you_review_window_days: int = 180
+    # Home review prompt (auto-opens the review wizard) + similar-events rail.
+    review_home_prompt_enabled: bool = True
+    review_home_prompt_cooldown_hours: int = 72
+    review_home_prompt_max_impressions_per_event: int = 2
+    review_home_prompt_max_event_age_days: int = 14
+    review_home_prompt_fatigue_dismissals: int = 4
+    review_home_prompt_fatigue_pause_days: int = 30
+    similar_events_radius_local_km: int = 25
+    similar_events_radius_regional_km: int = 150
+    similar_events_radius_international_km: int = 1500
+    similar_events_limit: int = 6
     # Minimum reviews before an event/series shows a computed "Overall Mood"
     # headline label; below this the UI shows an "Early feedback" state.
     review_mood_headline_min_reviews: int = 3
@@ -1697,45 +1710,88 @@ class ForceSendUserResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class NotificationLogEntry(BaseModel):
-    id: int
+class NotificationActivityUser(BaseModel):
+    id: UUID
+    email: str
+    handle: Optional[str] = None
+    display_name: Optional[str] = None
+
+
+class NotificationActivityTopicCount(BaseModel):
+    topic: str
+    count: int
+
+
+class NotificationActivityItem(BaseModel):
     notification_id: int
-    delivered_at: datetime
     kind: str
-    # One of "interest_match" | "activity_digest" | "event_reminder" —
-    # mirrors the admin Configuration page's 3 notification feature gates.
-    type: str
-    # One of "app" | "email" | "push" — the channel this specific
-    # delivery event went out on. One row per channel-event, so a single
-    # Notification with all 3 channels delivered produces 3 rows here.
-    channel: str
-    # Email route ("instant" | "digest") and sender ("request" | "job" |
-    # "tick" | "admin"); null for rows recorded before they were tracked.
-    mode: Optional[str] = None
-    source: Optional[str] = None
-    # Seconds between notification creation and this delivery.
-    latency_seconds: Optional[float] = None
-    recipient_user_id: UUID
-    recipient_email: str
-    recipient_handle: Optional[str] = None
-    recipient_display_name: Optional[str] = None
-    # Plain-text, channel-agnostic description of what the notification is
-    # about (e.g. "Maria is going to Salsa Social Friday"), reconstructed
-    # from the same data + copy used by the real senders
-    # (``activity_email._render_plain``). Not a verbatim copy of any
-    # historically delivered email/push text — see that function's
-    # per-kind branches for the exact phrasing rules.
+    # Delivery feature (app_settings.NOTIFICATION_FEATURES) or "other".
+    topic: str
+    # Reconstructed via activity_email._render_plain, not the verbatim sent copy.
     summary: str
-    actor_display_name: Optional[str] = None
-    actor_handle: Optional[str] = None
+    created_at: datetime
     event_id: Optional[str] = None
     event_title: Optional[str] = None
-    context: Optional[str] = None
+    actor_display_name: Optional[str] = None
+    actor_handle: Optional[str] = None
+    app_at: Optional[datetime] = None
+    email_at: Optional[datetime] = None
+    push_at: Optional[datetime] = None
+    read_at: Optional[datetime] = None
+    push_opened_at: Optional[datetime] = None
+    email_clicked_at: Optional[datetime] = None
+    latency_seconds: Optional[float] = None
 
 
-class NotificationLogResponse(BaseModel):
-    items: list[NotificationLogEntry]
-    total: int
+class NotificationActivityMessage(BaseModel):
+    # One outbound send; email + push merged when same time, source and items.
+    channels: list[str]
+    mode: Optional[str] = None
+    source: Optional[str] = None
+    # "auto" | "user" | "forced" | "unknown"
+    trigger: str
+    sent_at: datetime
+    item_count: int
+    engaged_count: int
+    topics: list[NotificationActivityTopicCount]
+    items: list[NotificationActivityItem]
+
+
+class NotificationActivityInApp(BaseModel):
+    item_count: int
+    read_count: int
+    topics: list[NotificationActivityTopicCount]
+    items: list[NotificationActivityItem]
+
+
+class NotificationActivityGroup(BaseModel):
+    day: date
+    user: NotificationActivityUser
+    last_at: datetime
+    messages: list[NotificationActivityMessage]
+    in_app: Optional[NotificationActivityInApp] = None
+
+
+class NotificationActivitySummary(BaseModel):
+    email_digest: int = 0
+    email_instant: int = 0
+    push: int = 0
+    in_app_items: int = 0
+    auto: int = 0
+    user: int = 0
+    forced: int = 0
+    unknown: int = 0
+    email_items: int = 0
+    email_clicked: int = 0
+    push_items: int = 0
+    push_opened: int = 0
+    app_read: int = 0
+
+
+class NotificationActivityResponse(BaseModel):
+    summary: NotificationActivitySummary
+    groups: list[NotificationActivityGroup]
+    total_groups: int
 
 
 class ForceInterestMatchSendResponse(BaseModel):
@@ -1772,6 +1828,8 @@ class ReviewPromptSendNowRequest(BaseModel):
     # When true, re-send email/push even to users already prompted for this
     # event; otherwise only channels that haven't fired yet are sent.
     resend: bool = False
+    # Also queue the Home review prompt for these users, bypassing cooldown/fatigue.
+    force_home_prompt: bool = False
 
 
 class ReviewPromptSendNowResponse(BaseModel):
@@ -1779,6 +1837,7 @@ class ReviewPromptSendNowResponse(BaseModel):
     pushed: int
     in_app_created: int
     results: list[ForceSendUserResult]
+    home_prompt_forced: int = 0
     # Per-user status is one of: "sent" | "already_sent" | "skipped_disabled"
     # | "skipped_not_found" | "skipped_not_attended" | "skipped_already_rated".
 
@@ -1792,6 +1851,22 @@ class ReviewPromptCandidate(BaseModel):
     name: Optional[str] = None
     handle: Optional[str] = None
     already_rated: bool = False
+
+
+class ReviewPromptStatsCount(BaseModel):
+    key: str
+    count: int
+
+
+class ReviewPromptStatsResponse(BaseModel):
+    days: int
+    shown: int
+    dismissed: int
+    reviewed: int
+    forced_shown: int
+    forced_reviewed: int
+    # Reviews created in the window, by the surface they came from.
+    reviews_by_entry_point: list[ReviewPromptStatsCount]
 
 
 AssetPromptKind = Literal["ticket", "memories"]
@@ -1958,10 +2033,35 @@ class SiteSettingsUpdateRequest(BaseModel):
     review_prompt_enabled: Optional[bool] = None
     event_review_size_step_enabled: Optional[bool] = None
     rsvp_remember_visibility_enabled: Optional[bool] = None
+    rsvp_people_sheet_enabled: Optional[bool] = None
     geoapify_enabled: Optional[bool] = None
     review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
     review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
     for_you_review_window_days: Optional[int] = Field(default=None, ge=1, le=3650)
+    review_home_prompt_enabled: Optional[bool] = None
+    review_home_prompt_cooldown_hours: Optional[int] = Field(
+        default=None, ge=1, le=2160
+    )
+    review_home_prompt_max_impressions_per_event: Optional[int] = Field(
+        default=None, ge=1, le=10
+    )
+    review_home_prompt_max_event_age_days: Optional[int] = Field(
+        default=None, ge=1, le=365
+    )
+    review_home_prompt_fatigue_dismissals: Optional[int] = Field(
+        default=None, ge=1, le=50
+    )
+    review_home_prompt_fatigue_pause_days: Optional[int] = Field(
+        default=None, ge=1, le=365
+    )
+    similar_events_radius_local_km: Optional[int] = Field(default=None, ge=1, le=20000)
+    similar_events_radius_regional_km: Optional[int] = Field(
+        default=None, ge=1, le=20000
+    )
+    similar_events_radius_international_km: Optional[int] = Field(
+        default=None, ge=1, le=20000
+    )
+    similar_events_limit: Optional[int] = Field(default=None, ge=1, le=24)
     review_mood_headline_min_reviews: Optional[int] = Field(default=None, ge=1, le=1000)
     event_message_cta_min_going: Optional[int] = Field(default=None, ge=1, le=10000)
     duplicate_auto_detect_enabled: Optional[bool] = None
@@ -3208,6 +3308,10 @@ class FeedbackSubmissionCreate(BaseModel):
     is_anonymous: bool = False
     # past_edition: written from an upcoming edition about an earlier one.
     scope: Literal["this_edition", "past_edition"] = "this_edition"
+    # Surface the review was written from (attribution stats only).
+    entry_point: Optional[str] = Field(
+        default=None, max_length=32, pattern=r"^[a-z0-9_-]+$"
+    )
     tag_suggestions: list[TagSuggestionInline] = Field(
         default_factory=list, max_length=10
     )
@@ -3482,6 +3586,40 @@ class PendingReviewResponse(BaseModel):
     # Social proof line ("Laura", "Laura and Marc", "Laura, Marc +3 others")
     # for followed users who already reviewed; None when no nameable proof.
     friend_proof: Optional[str] = None
+
+
+class SimilarEventsArea(BaseModel):
+    label: Optional[str] = None
+    min_lat: float
+    min_lng: float
+    max_lat: float
+    max_lng: float
+    center_lat: Optional[float] = None
+    center_lng: Optional[float] = None
+    radius_km: Optional[float] = None
+
+
+class SimilarEventsResponse(BaseModel):
+    # Ranked ids; the client hydrates them via POST /api/events/by-ids.
+    event_ids: list[str]
+    style_tag_ids: list[int]
+    # Explorer reach filter: any | regional_plus | international.
+    reach_filter: str
+    area: Optional[SimilarEventsArea] = None
+
+
+class ReviewHomePromptResponse(BaseModel):
+    """The event the Home review prompt should ask about, if any."""
+
+    prompt: Optional[PendingReviewResponse] = None
+    forced: bool = False
+    similar_count: int = 0
+    # All pending reviews, including the prompted one (drives "N more to rate").
+    pending_total: int = 0
+
+
+class ReviewHomePromptImpressionRequest(BaseModel):
+    outcome: Literal["shown", "dismissed"]
 
 
 # --- Social / friends graph (Phase A) ----------------------------------------
@@ -4301,6 +4439,8 @@ class ShareSourceResponse(BaseModel):
     handle: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    # True when the ``inv`` query param is the sharer's own invite code.
+    friend_invite: bool = False
 
 
 class RedeemShareFollowRequest(BaseModel):

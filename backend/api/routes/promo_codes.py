@@ -150,18 +150,38 @@ def _notify_submitter(session: Session, promo: EventPromoCode, kind: str) -> Non
 
     if promo.event_id not in eligible_event_ids(session, [promo.event_id]):
         return
-    notif = Notification(
-        recipient_user_id=promo.submitter_user_id,
-        actor_user_id=promo.submitter_user_id,
-        kind=kind,
-        event_id=promo.event_id,
-        context=promo.code,
-        description=(
-            promo.admin_notes[:255]
-            if kind == "promo_code_rejected" and promo.admin_notes
-            else None
-        ),
+    subject_key = f"promo:{promo.id}"
+    description = (
+        promo.admin_notes[:255]
+        if kind == "promo_code_rejected" and promo.admin_notes
+        else None
     )
+    # Re-decisions on the same promo (e.g. approve -> edit -> approve) resurface
+    # the existing row instead of violating the dedupe index.
+    notif = session.exec(
+        select(Notification).where(
+            Notification.recipient_user_id == promo.submitter_user_id,
+            Notification.kind == kind,
+            Notification.actor_user_id == promo.submitter_user_id,
+            Notification.event_id == promo.event_id,
+            Notification.subject_key == subject_key,
+        )
+    ).first()
+    if notif is not None:
+        notif.context = promo.code
+        notif.description = description
+        notif.created_at = datetime.now(timezone.utc)
+        notif.read_at = None
+    else:
+        notif = Notification(
+            recipient_user_id=promo.submitter_user_id,
+            actor_user_id=promo.submitter_user_id,
+            kind=kind,
+            event_id=promo.event_id,
+            subject_key=subject_key,
+            context=promo.code,
+            description=description,
+        )
     session.add(notif)
 
 

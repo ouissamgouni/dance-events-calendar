@@ -41,7 +41,7 @@ export default function SaveEventButton({
 }: Props) {
     const { isSaved, toggleSave, setSavedAudience, getSavedAudience } = useSavedEvents();
     const { user } = useAuth();
-    const { appAuthGateEnabled, guestActionsRequireSignin, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
+    const { appAuthGateEnabled, guestActionsRequireSignin, rsvpRememberVisibilityEnabled, rsvpPeopleSheetEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const openSignIn = useSignIn();
     const saved = isSaved(eventId);
@@ -78,7 +78,7 @@ export default function SaveEventButton({
             // then open the visibility popover so the user can adjust on the
             // fly — parity with the post-RSVP popover that GoingButton shows.
             const defaultAudience = defaultSavedAudienceFor(user);
-            const skipSheet = rsvpRememberVisibilityEnabled && getRememberAudience(user.user_id, 'saved') === true;
+            const skipSheet = rsvpRememberVisibilityEnabled && !rsvpPeopleSheetEnabled && getRememberAudience(user.user_id, 'saved') === true;
             toggleSave(eventId, defaultAudience).then((ok) => {
                 if (!ok) {
                     toast.show("Couldn't save \u2014 try again", 3200);

@@ -1,0 +1,72 @@
+# Two past Lyon socials Alice attended (prompt + "rate next" chain) and
+# upcoming events probing the similar-events rules: same style nearby
+# (shown), same style far away (hidden), other style nearby (hidden).
+base_week: 0
+events:
+  - id: ev-lyon-wed
+    calendar_id: salsa-cal-001
+    title: Lyon Salsa Wednesday
+    location: "La Plateforme, Lyon, France"
+    latitude: 45.7597
+    longitude: 4.8422
+    start: w-1 Wed 20:00
+    end: w-1 Wed 23:30
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-lyon-sat
+    calendar_id: salsa-cal-001
+    title: Lyon Salsa Saturday
+    location: "Le Sucre, Lyon, France"
+    latitude: 45.7387
+    longitude: 4.8178
+    start: w-1 Sat 21:00
+    end: w-1 Sat 23:59
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # Similar: same style, ~5 km away, upcoming → shown on the thanks screen.
+  - id: ev-villeurbanne-salsa
+    calendar_id: salsa-cal-001
+    title: Villeurbanne Salsa Night
+    location: "Villeurbanne, France"
+    latitude: 45.7719
+    longitude: 4.8902
+    start: w1 Fri 21:00
+    end: w1 Fri 23:59
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # Same style but ~390 km away → outside the 25 km (and 50 km widened) radius.
+  - id: ev-paris-salsa
+    calendar_id: salsa-cal-001
+    title: Paris Salsa Social
+    location: "Paris, France"
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w1 Sat 21:00
+    end: w1 Sat 23:59
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # Nearby but a different style → not similar.
+  - id: ev-lyon-bachata
+    calendar_id: salsa-cal-001
+    title: Lyon Bachata Night
+    location: "Lyon, France"
+    latitude: 45.7640
+    longitude: 4.8357
+    start: w1 Thu 21:00
+    end: w1 Thu 23:59
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local

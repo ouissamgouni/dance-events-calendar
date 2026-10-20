@@ -1,0 +1,54 @@
+# Post-RSVP people sheet + friend-invite share.
+#
+# Cast (relative to `viewer`, the persona under test):
+#   - ana, bea   — mutual friends of viewer         -> "Your people going"
+#   - leo        — viewer follows (one-way)         -> "Your people going"
+#   - paz        — viewer has a PENDING request     -> excluded everywhere
+#   - mia        — stranger, friends with ana + bea -> "Also going", 2 mutual friends
+#   - sam        — stranger, friends with ana       -> "Also going", 1 mutual friend
+#   - tom, zoe   — strangers, no mutuals            -> "Also going" (zoe falls past the cap of 3)
+#   - kai        — friends-only RSVP, not a friend  -> hidden from viewer
+#   - hid        — private RSVP                     -> never shown
+#   - newbie     — receiver of the friend-invite share (no follows)
+#   - admin
+users:
+  - email: viewer@example.com
+    name: Vera Viewer
+    handle: viewer
+  - email: ana@example.com
+    name: Ana Lopez
+    handle: ana
+  - email: bea@example.com
+    name: Bea Costa
+    handle: bea
+  - email: leo@example.com
+    name: Leo Martin
+    handle: leo
+  - email: paz@example.com
+    name: Paz Romero
+    handle: paz
+    account_visibility: friends
+  - email: mia@example.com
+    name: Mia Chen
+    handle: mia
+  - email: sam@example.com
+    name: Sam Okafor
+    handle: sam
+  - email: tom@example.com
+    name: Tom Weber
+    handle: tom
+  - email: zoe@example.com
+    name: Zoe Petit
+    handle: zoe
+  - email: kai@example.com
+    name: Kai Nakamura
+    handle: kai
+  - email: hid@example.com
+    name: Hidden Dancer
+    handle: hid
+  - email: newbie@example.com
+    name: Nina Newbie
+    handle: newbie
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

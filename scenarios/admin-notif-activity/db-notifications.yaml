@@ -1,0 +1,256 @@
+# Delivery history for the admin Notifications activity view.
+# minutes_ago day offsets: D0 = 0 · D1 = 1440 · D2 = 2880 · D3 = 4320 ·
+# D4 = 5760 · D5 = 7200. Run the scenario after ~04:00 local so each
+# day's rows stay on the same calendar day.
+# Deliveries sharing channel + mode + source + minutes_ago form ONE message
+# (a digest when mode is digest); email and push with the same items and
+# time merge into one "Email + Push" row.
+notifications:
+  # ── Maya ─────────────────────────────────────────────────────────────
+  # D0: 4-item auto digest (email at 20m ago); first item clicked and pushed.
+  - recipient: maya@example.com
+    actor: leo@example.com
+    kind: subscription_going
+    event_id: evt-na-paris-social
+    minutes_ago: 200
+    deliveries:
+      - { channel: push, source: tick }
+      - {
+          channel: email,
+          mode: digest,
+          source: tick,
+          minutes_ago: 20,
+          engaged: true,
+        }
+  - recipient: maya@example.com
+    kind: interest_event
+    event_id: evt-na-lyon-congress
+    minutes_ago: 150
+    deliveries:
+      - { channel: email, mode: digest, source: tick, minutes_ago: 20 }
+  - recipient: maya@example.com
+    actor: omar@example.com
+    kind: new_follower
+    minutes_ago: 120
+    deliveries:
+      - { channel: email, mode: digest, source: tick, minutes_ago: 20 }
+  - recipient: maya@example.com
+    actor: leo@example.com
+    kind: event_message
+    event_id: evt-na-paris-social
+    context: "Who's carpooling from Montmartre?"
+    minutes_ago: 90
+    deliveries:
+      - { channel: email, mode: digest, source: tick, minutes_ago: 20 }
+  # D0: in-app only (shows with "Include in-app").
+  - recipient: maya@example.com
+    actor: nina@example.com
+    kind: new_friend
+    minutes_ago: 40
+  # D0: instant reminder, email + push merged, push opened.
+  - recipient: maya@example.com
+    kind: event_reminder
+    event_id: evt-na-bachata-night
+    minutes_ago: 10
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+      - { channel: push, source: tick, engaged: true }
+  # D1: review prompt forced via Configuration → "Send now".
+  - recipient: maya@example.com
+    kind: event_review_prompt
+    event_id: evt-na-past-social
+    minutes_ago: 1470
+    deliveries:
+      - { channel: email, mode: instant, source: admin }
+      - { channel: push, source: admin }
+  # D2: organizer program announcement forced by an admin.
+  - recipient: maya@example.com
+    actor: admin@example.com
+    kind: schedule_program_available
+    event_id: evt-na-weekender
+    context: Brussels Latin Weekender
+    minutes_ago: 2925
+    deliveries:
+      - { channel: email, mode: instant, source: admin }
+
+  # ── Leo ──────────────────────────────────────────────────────────────
+  # D0: push sent inside Maya's request (User action trigger).
+  - recipient: leo@example.com
+    actor: maya@example.com
+    kind: follow_request_approved
+    minutes_ago: 35
+    deliveries:
+      - { channel: push, source: request }
+  # D1: 2-item auto digest, not engaged.
+  - recipient: leo@example.com
+    actor: maya@example.com
+    kind: subscription_going
+    event_id: evt-na-paris-social
+    minutes_ago: 1740
+    deliveries:
+      - { channel: email, mode: digest, source: tick, minutes_ago: 1500 }
+  - recipient: leo@example.com
+    actor: maya@example.com
+    kind: plan_session_added
+    event_id: evt-na-weekender
+    context: Salsa On2 Bootcamp
+    minutes_ago: 1680
+    deliveries:
+      - { channel: email, mode: digest, source: tick, minutes_ago: 1500 }
+
+  # ── Nina ─────────────────────────────────────────────────────────────
+  # D0: legacy row without mode/source (Unknown trigger).
+  - recipient: nina@example.com
+    actor: maya@example.com
+    kind: subscription_review
+    event_id: evt-na-past-social
+    minutes_ago: 70
+    deliveries:
+      - { channel: email }
+  # D2: instant interest match, email + push, push opened.
+  - recipient: nina@example.com
+    kind: interest_event
+    event_id: evt-na-weekender
+    minutes_ago: 2980
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+      - { channel: push, source: tick, engaged: true }
+
+  # ── Omar ─────────────────────────────────────────────────────────────
+  # D1: ticket prompt, email clicked.
+  - recipient: omar@example.com
+    kind: event_ticket_prompt
+    event_id: evt-na-lyon-congress
+    minutes_ago: 1490
+    deliveries:
+      - { channel: email, mode: instant, source: tick, engaged: true }
+      - { channel: push, source: tick }
+  # D3: memories prompt, push only.
+  - recipient: omar@example.com
+    kind: event_memories_prompt
+    event_id: evt-na-past-social
+    minutes_ago: 4340
+    deliveries:
+      - { channel: push, source: tick }
+
+  # ── Ines ─────────────────────────────────────────────────────────────
+  # D3: 3-item digest forced via Configuration → digest "Send now".
+  - recipient: ines@example.com
+    actor: leo@example.com
+    kind: subscription_going
+    event_id: evt-na-lyon-congress
+    minutes_ago: 4520
+    deliveries:
+      - { channel: email, mode: digest, source: admin, minutes_ago: 4350 }
+  - recipient: ines@example.com
+    actor: theo@example.com
+    kind: new_follower
+    minutes_ago: 4500
+    deliveries:
+      - { channel: email, mode: digest, source: admin, minutes_ago: 4350 }
+  - recipient: ines@example.com
+    actor: theo@example.com
+    kind: event_message
+    event_id: evt-na-lyon-congress
+    context: "Anyone sharing an Airbnb?"
+    minutes_ago: 4470
+    deliveries:
+      - { channel: email, mode: digest, source: admin, minutes_ago: 4350 }
+
+  # ── Theo ─────────────────────────────────────────────────────────────
+  - recipient: theo@example.com
+    kind: event_reminder
+    event_id: evt-na-sunday-practica
+    minutes_ago: 5775
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+  # D5: promo code decision sent by a background job.
+  - recipient: theo@example.com
+    actor: admin@example.com
+    kind: promo_code_approved
+    event_id: evt-na-weekender
+    context: MOVIDA10
+    minutes_ago: 7225
+    deliveries:
+      - { channel: email, mode: instant, source: job }
+      - { channel: push, source: job }
+
+  # ── Routine reminders (pagination filler) ────────────────────────────
+  - recipient: pablo@example.com
+    kind: event_reminder
+    event_id: evt-na-bachata-night
+    minutes_ago: 15
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+      - { channel: push, source: tick, engaged: true }
+  - recipient: pablo@example.com
+    kind: event_reminder
+    event_id: evt-na-sunday-practica
+    minutes_ago: 2895
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+      - { channel: push, source: tick }
+  - recipient: pablo@example.com
+    kind: event_reminder
+    event_id: evt-na-paris-social
+    minutes_ago: 5790
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+      - { channel: push, source: tick }
+  - recipient: rosa@example.com
+    kind: event_reminder
+    event_id: evt-na-bachata-night
+    minutes_ago: 1455
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+      - { channel: push, source: tick }
+  - recipient: rosa@example.com
+    kind: event_reminder
+    event_id: evt-na-sunday-practica
+    minutes_ago: 4335
+    deliveries:
+      - { channel: email, mode: instant, source: tick, engaged: true }
+      - { channel: push, source: tick }
+  - recipient: rosa@example.com
+    kind: event_reminder
+    event_id: evt-na-paris-social
+    minutes_ago: 7215
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+      - { channel: push, source: tick }
+  - recipient: sami@example.com
+    kind: event_reminder
+    event_id: evt-na-bachata-night
+    minutes_ago: 25
+    deliveries:
+      - { channel: push, source: tick }
+  - recipient: sami@example.com
+    kind: event_reminder
+    event_id: evt-na-sunday-practica
+    minutes_ago: 1465
+    deliveries:
+      - { channel: push, source: tick }
+  - recipient: sami@example.com
+    kind: event_reminder
+    event_id: evt-na-paris-social
+    minutes_ago: 2905
+    deliveries:
+      - { channel: push, source: tick, engaged: true }
+  - recipient: yara@example.com
+    kind: event_reminder
+    event_id: evt-na-bachata-night
+    minutes_ago: 4345
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+  - recipient: yara@example.com
+    kind: event_reminder
+    event_id: evt-na-sunday-practica
+    minutes_ago: 5785
+    deliveries:
+      - { channel: email, mode: instant, source: tick }
+  - recipient: yara@example.com
+    kind: event_reminder
+    event_id: evt-na-paris-social
+    minutes_ago: 7235
+    deliveries:
+      - { channel: email, mode: instant, source: tick }

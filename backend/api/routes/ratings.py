@@ -51,8 +51,12 @@ from backend.api.schemas import (
     PendingReviewResponse,
     RatingApproveRequest,
     RatingRejectRequest,
+    ReviewHomePromptImpressionRequest,
+    ReviewHomePromptResponse,
     SeriesEditionSummary,
     SeriesRatingRollup,
+    SimilarEventsArea,
+    SimilarEventsResponse,
     TagResponse,
     TopReviewTag,
 )
@@ -90,10 +94,17 @@ from backend.services import push_jobs
 from backend.services.notifications import fan_out_review, withdraw_review_notifications
 from backend.services.passport import attended_events
 from backend.services.profanity import contains_profanity
+from backend.services.review_home_prompt import (
+    mark_reviewed as mark_prompt_reviewed,
+    pick_prompt_event,
+    record_impression,
+    unreviewed_attended_events,
+)
 from backend.services.review_prompt_service import (
     friend_review_proof,
     proof_phrase,
 )
+from backend.services.similar_events import similar_events, similar_events_count
 
 logger = logging.getLogger(__name__)
 
@@ -715,6 +726,7 @@ def submit_feedback(
             feedback_submission_id=feedback_submission_id,
             status="approved",
             admin_notes=admin_notes,
+            entry_point=body.entry_point,
             created_at=now,
             updated_at=now,
         )
@@ -725,6 +737,8 @@ def submit_feedback(
     _replace_aspect_tags(session, rating.id, aspect_tag_pairs)
     if body.is_anonymous:
         withdraw_review_notifications(session, user.id, event_id)
+    if body.scope == "this_edition":
+        mark_prompt_reviewed(session, user.id, event_id)
 
     # Linked tag suggestions (optional). Decoupled moderation: each row gets
     # the same feedback_submission_id but its own status="pending".
@@ -1282,6 +1296,72 @@ def list_my_pending_reviews(
             )
         )
     return out
+
+
+@router.get("/api/users/me/review-prompt", response_model=ReviewHomePromptResponse)
+def get_my_review_prompt(
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    """The attended event the Home review prompt should ask about (or none),
+    under the admin-configurable frequency caps; admin forces jump the queue."""
+    event, forced = pick_prompt_event(session, user)
+    if event is None:
+        return ReviewHomePromptResponse()
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        days=get_for_you_review_window_days(session)
+    )
+    pending_total = len(unreviewed_attended_events(session, user, cutoff))
+    proof = friend_review_proof(session, user.id, event.event_id)
+    return ReviewHomePromptResponse(
+        prompt=PendingReviewResponse(
+            event_id=event.event_id,
+            event_title=event.title,
+            event_start=event.start,
+            event_end=event.end,
+            event_location=event.location,
+            event_city=event.city,
+            event_country=event.country,
+            friend_proof=proof_phrase(proof) if proof else None,
+        ),
+        forced=forced,
+        similar_count=similar_events_count(session, event, user),
+        pending_total=max(1, pending_total),
+    )
+
+
+@router.post("/api/users/me/review-prompt/{event_id}/impression", status_code=204)
+@limiter.limit("60/hour")
+def post_my_review_prompt_impression(
+    event_id: str,
+    body: ReviewHomePromptImpressionRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    if not record_impression(session, user, event_id, body.outcome):
+        raise HTTPException(status_code=404, detail="Event not found")
+    session.commit()
+
+
+@router.get("/api/events/{event_id}/similar", response_model=SimilarEventsResponse)
+def get_similar_events(
+    event_id: str,
+    sentiment: str | None = Query(
+        default=None, pattern="^(amazing|great|okay|disappointing|bad)$"
+    ),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    """Upcoming events sharing the event's dance styles, in an area sized by its reach."""
+    event = _require_user_facing_event(session, event_id)
+    result = similar_events(session, event, user, sentiment)
+    return SimilarEventsResponse(
+        event_ids=result.event_ids,
+        style_tag_ids=result.style_tag_ids,
+        reach_filter=result.reach_filter,
+        area=SimilarEventsArea(**vars(result.area)) if result.area else None,
+    )
 
 
 # ── Admin endpoints ──────────────────────────────────────────────────

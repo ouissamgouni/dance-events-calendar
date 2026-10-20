@@ -19,6 +19,7 @@ import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdow
 import { useAuth } from '../context/AuthContext';
 import { useUpdateFeatureFlag } from '../context/FeatureFlagsContext';
 import SyncProgressCard from '../components/SyncProgressCard';
+import AdminReviewHomePromptSettings from '../components/AdminReviewHomePromptSettings';
 import SyncJobsHistoryTable from '../components/SyncJobsHistoryTable';
 import EventsPanel from '../components/EventsPanel';
 import type { EventsPanelPreset } from '../components/EventsPanel';
@@ -310,6 +311,7 @@ export default function Admin() {
     const [eventCardSaveShowStatsEnabled, setEventCardSaveShowStatsEnabled] = useState(false);
     const [eventCardImgoingShowStatsEnabled, setEventCardImgoingShowStatsEnabled] = useState(false);
     const [rsvpRememberVisibilityEnabled, setRsvpRememberVisibilityEnabled] = useState(true);
+    const [rsvpPeopleSheetEnabled, setRsvpPeopleSheetEnabled] = useState(false);
     const [geoapifyEnabled, setGeoapifyEnabled] = useState(false);
     const [eventCardImgoingLocationBottomEnabled, setEventCardImgoingLocationBottomEnabled] = useState(true);
     const [eventCardShowPeopleIconEnabled, setEventCardShowPeopleIconEnabled] = useState(false);
@@ -365,6 +367,7 @@ export default function Admin() {
     const [reviewNowCandidatesLoading, setReviewNowCandidatesLoading] = useState(false);
     const [reviewNowUsers, setReviewNowUsers] = useState<ReviewPromptCandidate[]>([]);
     const [reviewNowResend, setReviewNowResend] = useState(false);
+    const [reviewNowForceHome, setReviewNowForceHome] = useState(false);
     const [reviewNowBusy, setReviewNowBusy] = useState(false);
     const [reviewNowMessage, setReviewNowMessage] = useState<string>('');
     // Max matched events shown inline in an interest-match digest email
@@ -517,6 +520,7 @@ export default function Admin() {
             setEventCardSaveShowStatsEnabled(s.event_card_save_show_stats_enabled ?? false);
             setEventCardImgoingShowStatsEnabled(s.event_card_imgoing_show_stats_enabled ?? false);
             setRsvpRememberVisibilityEnabled(s.rsvp_remember_visibility_enabled ?? true);
+            setRsvpPeopleSheetEnabled(s.rsvp_people_sheet_enabled ?? false);
             setGeoapifyEnabled(s.geoapify_enabled ?? false);
             setEventCardImgoingLocationBottomEnabled(s.event_card_imgoing_location_bottom_enabled ?? true);
             setEventCardShowPeopleIconEnabled(s.event_card_show_people_icon_enabled ?? false);
@@ -1011,6 +1015,18 @@ export default function Admin() {
         } catch {
             setRsvpRememberVisibilityEnabled(!newVal);
             setMessage('Failed to update remember visibility toggle.');
+        }
+    };
+
+    const handleToggleRsvpPeopleSheet = async () => {
+        const newVal = !rsvpPeopleSheetEnabled;
+        setRsvpPeopleSheetEnabled(newVal);
+        try {
+            await updateSettings({ rsvp_people_sheet_enabled: newVal });
+            setMessage(`Post-RSVP people sheet ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setRsvpPeopleSheetEnabled(!newVal);
+            setMessage('Failed to update post-RSVP people sheet toggle.');
         }
     };
 
@@ -1718,11 +1734,13 @@ export default function Admin() {
                 reviewNowEvent.event_id,
                 reviewNowUsers.map((u) => u.user_id),
                 reviewNowResend,
+                reviewNowForceHome,
             );
             const sent = res.results.filter((r) => r.status === 'sent').length;
             const skipped = res.results.length - sent;
             const msg = `Review prompt send-now: ${sent} of ${reviewNowUsers.length} user(s) sent `
                 + `(${res.emailed} email, ${res.pushed} push, ${res.in_app_created} in-app)`
+                + (reviewNowForceHome ? `; Home prompt forced for ${res.home_prompt_forced ?? 0}` : '')
                 + (skipped ? `; ${skipped} skipped.` : '.');
             setReviewNowMessage(msg);
             setMessage(msg);
@@ -2718,6 +2736,21 @@ export default function Admin() {
                                     </button>
                                 </div>
 
+                                {/* Post-RSVP people sheet */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Post-RSVP people sheet</span>
+                                        <p className="text-[10px] text-muted">Always show the RSVP sheet with people going, friend-invite share and next steps</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleRsvpPeopleSheet}
+                                        aria-label="Toggle post-RSVP people sheet"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${rsvpPeopleSheetEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${rsvpPeopleSheetEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
                                 {/* Place autocomplete provider */}
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -3534,6 +3567,15 @@ export default function Admin() {
                                                 />
                                                 Resend
                                             </label>
+                                            <label className="flex items-center gap-1 text-[10px] text-ink-soft" htmlFor="review-now-force-home" title="Also open the review wizard on their next Home visit, skipping the cooldown and fatigue pause (works even with email/push off)">
+                                                <input
+                                                    id="review-now-force-home"
+                                                    type="checkbox"
+                                                    checked={reviewNowForceHome}
+                                                    onChange={(e) => setReviewNowForceHome(e.target.checked)}
+                                                />
+                                                Force Home prompt
+                                            </label>
                                             <button
                                                 type="button"
                                                 onClick={handleSendReviewPromptNow}
@@ -3550,6 +3592,9 @@ export default function Admin() {
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Home review prompt + similar events */}
+                                <AdminReviewHomePromptSettings onMessage={setMessage} />
 
                                 {/* Ticket / memories prompts */}
                                 {EVENT_ASSET_PROMPTS.map((prompt) => {

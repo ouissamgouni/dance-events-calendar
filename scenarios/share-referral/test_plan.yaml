@@ -9,7 +9,8 @@ test_plan:
     conversions do NOT show up in the E7 referral leaderboard. The
     generic "Sign in to save events…" banner is suppressed while the
     share-referral banner is active so visitors aren't faced with two
-    stacked sign-in CTAs.
+    stacked sign-in CTAs. Friend-invite links (``&inv=<invite code>``,
+    mutual friendship) are covered by the rsvp-people-sheet scenario.
 
   preconditions:
     - "task start:scenario SCENARIO=share-referral"

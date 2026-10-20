@@ -1125,6 +1125,8 @@ export interface FeedbackSubmissionCreate {
     comment?: string;
     is_anonymous: boolean;
     scope?: ReviewScope;
+    /** Surface the review was written from (attribution stats). */
+    entry_point?: string;
     tag_suggestions: RatingTagSuggestionInline[];
     website?: string; // honeypot
 }
@@ -1300,6 +1302,35 @@ export interface PendingReview {
     /** Social proof line ("Laura", "Laura and Marc", "Laura, Marc +3 others")
      * for followed users who already reviewed; null when no nameable proof. */
     friend_proof: string | null;
+}
+
+export interface ReviewHomePrompt {
+    prompt: PendingReview | null;
+    forced: boolean;
+    similar_count: number;
+    /** All pending reviews, including the prompted one. */
+    pending_total: number;
+}
+
+export type ExplorerReachFilter = 'any' | 'regional_plus' | 'international';
+
+export interface SimilarEventsArea {
+    label: string | null;
+    min_lat: number;
+    min_lng: number;
+    max_lat: number;
+    max_lng: number;
+    center_lat: number | null;
+    center_lng: number | null;
+    radius_km: number | null;
+}
+
+export interface SimilarEvents {
+    /** Ranked; hydrate with fetchEventsByIds. */
+    event_ids: string[];
+    style_tag_ids: number[];
+    reach_filter: ExplorerReachFilter;
+    area: SimilarEventsArea | null;
 }
 
 export interface PassportStats {

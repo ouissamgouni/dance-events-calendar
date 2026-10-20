@@ -171,6 +171,18 @@ def get_rsvp_remember_visibility_enabled(session: Optional[Session] = None) -> b
     return loader.get_rsvp_remember_visibility_enabled()
 
 
+def get_rsvp_people_sheet_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "rsvp_people_sheet_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return loader.get_rsvp_people_sheet_enabled()
+
+
 def get_geoapify_enabled(session: Optional[Session] = None) -> bool:
     s, opened = _open_session(session)
     try:
@@ -229,6 +241,33 @@ def get_review_mood_headline_min_reviews(session: Optional[Session] = None) -> i
     if override is not None and override > 0:
         return override
     return loader.get_review_mood_headline_min_reviews()
+
+
+def get_review_home_prompt_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "review_home_prompt_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return loader.get_review_home_prompt_enabled()
+
+
+REVIEW_HOME_PROMPT_INT_KEYS = tuple(loader.REVIEW_HOME_PROMPT_INT_DEFAULTS)
+
+
+def get_review_home_prompt_int(key: str, session: Optional[Session] = None) -> int:
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, key)
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return loader.get_review_home_prompt_int(key)
 
 
 def get_event_message_cta_min_going(session: Optional[Session] = None) -> int:

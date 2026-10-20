@@ -1,0 +1,4 @@
+calendars:
+  - id: "notif-activity-cal"
+    name: "Salsa"
+    color: "#e11d48"

@@ -1,0 +1,59 @@
+# Pre-seeded events for the rsvp-people-sheet scenario.
+#   - evt-rps-001: upcoming, crowded (people sections + cap + See everyone going)
+#   - evt-rps-002: upcoming, nobody else going (empty hint)
+#   - evt-rps-003: past (Your people there / Also there, no invite share)
+base_week: 0
+events:
+  - id: evt-rps-001
+    calendar_id: salsa-cal-001
+    title: Friday Salsa Social (people sheet)
+    description: |
+      Crowded social. RSVP here as viewer to see the post-RSVP people sheet.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w1 Fri 21:00
+    end: w1 Sat 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - reach:local
+
+  - id: evt-rps-002
+    calendar_id: salsa-cal-001
+    title: Tuesday Practica (nobody going yet)
+    description: |
+      Quiet practica with no RSVPs, for the empty-state hint.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w1 Tue 20:00
+    end: w1 Tue 23:00
+    price_is_free: true
+    tags:
+      - format:practice
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - reach:local
+
+  - id: evt-rps-003
+    calendar_id: salsa-cal-001
+    title: Last Saturday Social (past)
+    description: |
+      Already happened. "I attended" shows the past-tense sheet.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w-1 Sat 21:00
+    end: w-1 Sun 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - reach:local

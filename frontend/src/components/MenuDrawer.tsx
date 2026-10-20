@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { firstNameOf } from '../utils/displayName';
 import useBackToClose from '../hooks/useBackToClose';
+import { usePendingReviewCount } from '../hooks/usePendingReviewCount';
 
 /**
  * Primary menu drawer opened by the header burger (top-right). Holds the
@@ -15,6 +16,7 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
     const { organizerClaimsEnabled } = useOptionalFeatureFlags();
     const location = useLocation();
     const navigate = useNavigate();
+    const pendingReviews = usePendingReviewCount();
 
     // Close on route change and on Escape.
     useEffect(() => {
@@ -113,6 +115,14 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                             <Link to="/reviews" onClick={onClose} className={rowClass}>
                                 <img src="/review.png" alt="" aria-hidden="true" className={iconClass} />
                                 <span>Reviews</span>
+                                {pendingReviews > 0 && (
+                                    <span
+                                        className="ml-auto min-w-5 bg-action px-1.5 py-0.5 text-center text-xs font-semibold text-white"
+                                        aria-label={`${pendingReviews} to review`}
+                                    >
+                                        {pendingReviews > 99 ? '99+' : pendingReviews}
+                                    </span>
+                                )}
                             </Link>
                             <Link to="/notifications" onClick={onClose} className={rowClass}>
                                 <img src="/notification.png" alt="" aria-hidden="true" className={iconClass} />

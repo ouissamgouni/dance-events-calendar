@@ -307,7 +307,7 @@ def _deliver(
                     .values({column: stamp})
                 )
                 for nid in ids:
-                    record_delivery(session, nid, channel, stamp)
+                    record_delivery(session, nid, channel, stamp, source="tick")
             session.commit()
 
     logger.info(

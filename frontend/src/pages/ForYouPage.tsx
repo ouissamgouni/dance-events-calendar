@@ -18,6 +18,7 @@ import RailEventCard from '../components/RailEventCard';
 import EventCard from '../components/EventCard';
 import TribeGoingCard from '../components/TribeGoingCard';
 import ShareExperienceCard from '../components/ShareExperienceCard';
+import HomeReviewPrompt from '../components/HomeReviewPrompt';
 import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
 import SectionHeading, { type SectionHeadingAction } from '../components/SectionHeading';
 import ScrollDotsIndicator from '../components/ScrollDots';
@@ -537,6 +538,13 @@ export default function ForYouPage() {
                     event={selectedEvent}
                     onClose={handleCloseModal}
                     source="explore"
+                />
+            )}
+            {user && (
+                <HomeReviewPrompt
+                    blocked={!!selectedEvent}
+                    pendingReviews={pendingReviews}
+                    onReviewed={handleReviewed}
                 />
             )}
         </div>

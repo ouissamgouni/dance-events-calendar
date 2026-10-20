@@ -4783,6 +4783,7 @@ def create_my_referral(
 @router.get("/share-source/{share_code}", response_model=ShareSourceResponse)
 def get_share_source(
     share_code: str,
+    inv: Optional[str] = Query(default=None, max_length=32),
     session: Session = Depends(get_session),
 ):
     """Resolve a ``?ref=share&src=`` token to the originating user.
@@ -4803,8 +4804,20 @@ def get_share_source(
     ).first()
     if sharer is None:
         raise HTTPException(status_code=404, detail="Unknown share source")
+    friend_invite = False
+    inv_code = (inv or "").strip().upper()
+    if inv_code:
+        friend_invite = (
+            session.exec(
+                select(UserReferral.id)
+                .where(func.upper(UserReferral.code) == inv_code)
+                .where(UserReferral.inviter_user_id == sharer.id)
+            ).first()
+            is not None
+        )
     return ShareSourceResponse(
         handle=sharer.handle,
         display_name=sharer.display_name,
         avatar_url=resolve_user_avatar(sharer),
+        friend_invite=friend_invite,
     )

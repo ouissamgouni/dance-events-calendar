@@ -74,6 +74,7 @@ export default function RateEventButton({
     const ratingsLoaded = useMyRatingsLoaded();
     const upsertMyRating = useUpsertMyRating();
     const [open, setOpen] = useState(false);
+    const [openedFrom, setOpenedFrom] = useState<RatingEntryPoint | undefined>(entryPoint);
     const openSignIn = useSignIn();
     const navigate = useNavigate();
     const [localRating, setLocalRating] = useState<EventRating | null>(initialRating);
@@ -98,6 +99,7 @@ export default function RateEventButton({
         if (!user) return;
         lastAutoOpenToken.current = autoOpenToken;
         trackRatingModalOpened(entryPoint ?? 'notification', !!myRatingFromCtx);
+        setOpenedFrom(entryPoint ?? 'notification');
         setOpen(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [autoOpenToken, user]);
@@ -148,6 +150,7 @@ export default function RateEventButton({
         }
         const trackedEntryPoint = appearance === 'count' || appearance === 'preview' || appearance === 'write' ? 'icon' : appearance === 'menuItem' ? 'pill' : appearance;
         trackRatingModalOpened(entryPoint ?? trackedEntryPoint, !!myRating);
+        setOpenedFrom(entryPoint ?? trackedEntryPoint);
         setOpen(true);
     };
 
@@ -354,6 +357,7 @@ export default function RateEventButton({
                     onClose={() => setOpen(false)}
                     onSubmitted={(r) => onChanged(r)}
                     onDeleted={() => onChanged(null)}
+                    entryPoint={openedFrom}
                 />
             )}
         </span>

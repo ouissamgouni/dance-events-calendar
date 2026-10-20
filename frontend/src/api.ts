@@ -1,6 +1,7 @@
 import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanCount, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleContributor, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 import type { AdminEventNotificationStats, SharedMyPlanResponse } from './types';
+import type { ReviewHomePrompt, ReviewSentiment, SimilarEvents } from './types';
 import type {
     AdminEventModeration,
     AdminEventStatus,
@@ -763,6 +764,8 @@ export interface SiteSettings {
     event_review_size_step_enabled?: boolean;
     /** Show the 'remember my choice' checkbox in RSVP/save visibility sheets. */
     rsvp_remember_visibility_enabled?: boolean;
+    /** Post-RSVP sheet with people suggestions + friend-invite share. */
+    rsvp_people_sheet_enabled?: boolean;
     /** Place autocomplete via Geoapify (off: Photon). */
     geoapify_enabled?: boolean;
     /** Hours after an event's end before the review prompt fires. 1-720,
@@ -775,6 +778,18 @@ export interface SiteSettings {
      * your experience" trail on the "For you" page. 1-3650, client default
      * 180 (about 6 months). */
     for_you_review_window_days?: number;
+    /** Home review prompt (auto-opens the review wizard on Home) + the
+     * similar-events rail on its thanks screen. Defaults in backend loader. */
+    review_home_prompt_enabled?: boolean;
+    review_home_prompt_cooldown_hours?: number;
+    review_home_prompt_max_impressions_per_event?: number;
+    review_home_prompt_max_event_age_days?: number;
+    review_home_prompt_fatigue_dismissals?: number;
+    review_home_prompt_fatigue_pause_days?: number;
+    similar_events_radius_local_km?: number;
+    similar_events_radius_regional_km?: number;
+    similar_events_radius_international_km?: number;
+    similar_events_limit?: number;
     /** Minimum reviews before an event/series shows a computed "Overall
      * Mood" headline label; below this the UI shows an "Early feedback"
      * state. 1-1000, client default 3. */
@@ -929,15 +944,18 @@ export interface ReviewPromptSendNowResponse {
     pushed: number;
     in_app_created: number;
     results: ForceSendUserResult[];
+    home_prompt_forced?: number;
 }
 
 export async function sendReviewPromptNow(
     eventId: string,
     userIds: string[],
     resend?: boolean,
+    forceHomePrompt?: boolean,
 ): Promise<ReviewPromptSendNowResponse> {
     const body: Record<string, unknown> = { event_id: eventId, user_ids: userIds };
     if (resend) body.resend = true;
+    if (forceHomePrompt) body.force_home_prompt = true;
     const res = await fetch(`${BASE}/admin/notifications/review-prompt/send-now`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -963,6 +981,56 @@ export async function fetchReviewPromptCandidates(
         { credentials: 'include' },
     );
     return parseJsonResponse<ReviewPromptCandidate[]>(res, 'Failed to load attendees');
+}
+
+export interface ReviewPromptStats {
+    days: number;
+    shown: number;
+    dismissed: number;
+    reviewed: number;
+    forced_shown: number;
+    forced_reviewed: number;
+    reviews_by_entry_point: { key: string; count: number }[];
+}
+
+export async function fetchReviewPromptStats(days = 30): Promise<ReviewPromptStats> {
+    const res = await fetch(`${BASE}/admin/review-prompt/stats?days=${days}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<ReviewPromptStats>(res, 'Failed to load review prompt stats');
+}
+
+export async function fetchReviewHomePrompt(): Promise<ReviewHomePrompt> {
+    const res = await fetch(`${BASE}/users/me/review-prompt`, { credentials: 'include' });
+    return parseJsonResponse<ReviewHomePrompt>(res, 'Failed to load review prompt');
+}
+
+export async function postReviewHomePromptImpression(
+    eventId: string,
+    outcome: 'shown' | 'dismissed',
+): Promise<void> {
+    const res = await fetch(
+        `${BASE}/users/me/review-prompt/${encodeURIComponent(eventId)}/impression`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ outcome }),
+        },
+    );
+    if (!res.ok) throw new Error('Failed to record review prompt impression');
+}
+
+/** Upcoming events like a reviewed one (not the suggest-wizard duplicate check). */
+export async function fetchEventSimilar(
+    eventId: string,
+    sentiment?: ReviewSentiment | null,
+): Promise<SimilarEvents> {
+    const qs = sentiment ? `?sentiment=${encodeURIComponent(sentiment)}` : '';
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/similar${qs}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<SimilarEvents>(res, 'Failed to load similar events');
 }
 
 export type AssetPromptKind = 'ticket' | 'memories';
@@ -1053,63 +1121,105 @@ export async function fetchNotificationToggleCounts(): Promise<NotificationToggl
     return parseJsonResponse<NotificationToggleCounts>(res, 'Failed to fetch notification toggle counts');
 }
 
-export type NotificationLogType = 'interest_match' | 'activity_digest' | 'event_reminder' | 'review_prompt';
-export type NotificationLogChannel = 'app' | 'email' | 'push';
-export type NotificationLogMode = 'instant' | 'digest';
-export type NotificationLogSource = 'request' | 'job' | 'tick' | 'admin';
+export type NotificationActivityChannel = 'app' | 'email' | 'push';
+export type NotificationActivityTrigger = 'auto' | 'user' | 'forced' | 'unknown';
 
-export interface NotificationLogEntry {
-    id: number;
+export interface NotificationActivityTopicCount {
+    topic: string;
+    count: number;
+}
+
+export interface NotificationActivityItem {
     notification_id: number;
-    delivered_at: string;
     kind: string;
-    type: NotificationLogType | string;
-    channel: NotificationLogChannel | string;
-    mode: NotificationLogMode | string | null;
-    source: NotificationLogSource | string | null;
-    latency_seconds: number | null;
-    recipient_user_id: string;
-    recipient_email: string;
-    recipient_handle: string | null;
-    recipient_display_name: string | null;
+    topic: string;
     summary: string;
-    actor_display_name: string | null;
-    actor_handle: string | null;
+    created_at: string;
     event_id: string | null;
     event_title: string | null;
-    context: string | null;
+    actor_display_name: string | null;
+    actor_handle: string | null;
+    app_at: string | null;
+    email_at: string | null;
+    push_at: string | null;
+    read_at: string | null;
+    push_opened_at: string | null;
+    email_clicked_at: string | null;
+    latency_seconds: number | null;
 }
 
-export interface NotificationLogList {
-    items: NotificationLogEntry[];
-    total: number;
+export interface NotificationActivityMessage {
+    channels: NotificationActivityChannel[];
+    mode: 'instant' | 'digest' | null;
+    source: string | null;
+    trigger: NotificationActivityTrigger;
+    sent_at: string;
+    item_count: number;
+    engaged_count: number;
+    topics: NotificationActivityTopicCount[];
+    items: NotificationActivityItem[];
 }
 
-export async function fetchAdminNotificationsLog(
-    opts?: {
-        type?: NotificationLogType;
-        channel?: NotificationLogChannel;
-        mode?: NotificationLogMode;
-        source?: NotificationLogSource;
-        q?: string;
-        limit?: number;
-        offset?: number;
-    },
-): Promise<NotificationLogList> {
+export interface NotificationActivityGroup {
+    day: string;
+    user: { id: string; email: string; handle: string | null; display_name: string | null };
+    last_at: string;
+    messages: NotificationActivityMessage[];
+    in_app: {
+        item_count: number;
+        read_count: number;
+        topics: NotificationActivityTopicCount[];
+        items: NotificationActivityItem[];
+    } | null;
+}
+
+export interface NotificationActivitySummary {
+    email_digest: number;
+    email_instant: number;
+    push: number;
+    in_app_items: number;
+    auto: number;
+    user: number;
+    forced: number;
+    unknown: number;
+    email_items: number;
+    email_clicked: number;
+    push_items: number;
+    push_opened: number;
+    app_read: number;
+}
+
+export interface NotificationActivityResponse {
+    summary: NotificationActivitySummary;
+    groups: NotificationActivityGroup[];
+    total_groups: number;
+}
+
+export interface NotificationActivityParams {
+    start: string;
+    end: string;
+    tz: string;
+    user_id?: string;
+    q?: string;
+    topic?: string;
+    channel?: NotificationActivityChannel;
+    trigger?: NotificationActivityTrigger;
+    include_in_app?: boolean;
+    limit?: number;
+    offset?: number;
+}
+
+export async function fetchAdminNotificationActivity(
+    params: NotificationActivityParams,
+): Promise<NotificationActivityResponse> {
     const sp = new URLSearchParams();
-    if (opts?.type) sp.set('type', opts.type);
-    if (opts?.channel) sp.set('channel', opts.channel);
-    if (opts?.mode) sp.set('mode', opts.mode);
-    if (opts?.source) sp.set('source', opts.source);
-    if (opts?.q) sp.set('q', opts.q);
-    if (opts?.limit) sp.set('limit', String(opts.limit));
-    if (opts?.offset) sp.set('offset', String(opts.offset));
-    const qs = sp.toString();
-    const res = await fetch(
-        `${BASE}/admin/notifications/log${qs ? `?${qs}` : ''}`,
-        { credentials: 'include' },
-    );
-    return parseJsonResponse<NotificationLogList>(res, 'Failed to fetch notifications log');
+    for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== '' && value !== false) sp.set(key, String(value));
+    }
+    const res = await fetch(`${BASE}/admin/notifications/activity?${sp.toString()}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<NotificationActivityResponse>(res, 'Failed to fetch notification activity');
 }
 
 export async function trackEventView(eventId: string, deviceId?: string, source?: string): Promise<void> {
@@ -2319,6 +2429,8 @@ export interface ShareSourceResponse {
     handle: string | null;
     display_name: string | null;
     avatar_url: string | null;
+    /** True when the `inv` code passed in belongs to this sharer. */
+    friend_invite?: boolean;
 }
 
 /** Resolve a `?ref=share&src=` token to the sharer preview shown by the
@@ -2326,9 +2438,11 @@ export interface ShareSourceResponse {
  *  Anonymous-safe — the share_code is already in the visitor's URL. */
 export async function fetchShareSource(
     shareCode: string,
+    inviteCode?: string | null,
 ): Promise<ShareSourceResponse | null> {
+    const qs = inviteCode ? `?inv=${encodeURIComponent(inviteCode)}` : '';
     const res = await fetch(
-        `${BASE}/social/share-source/${encodeURIComponent(shareCode)}`,
+        `${BASE}/social/share-source/${encodeURIComponent(shareCode)}${qs}`,
         { credentials: 'include' },
     );
     if (res.status === 404) return null;

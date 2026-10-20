@@ -54,6 +54,7 @@ import {
     toProfileGeometry,
     type SearchArea,
 } from '../utils/searchArea';
+import { AREA_URL_PARAMS, searchAreaFromUrlParams } from '../utils/similarEventsLink';
 import { readBrowseSession, saveBrowseSession, touchBrowseSession, type BrowseAreaOverride } from '../utils/browseSession';
 
 // Worldwide bbox shortcut reused by the area sheet's "Anywhere" apply path.
@@ -398,8 +399,21 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
     // doc).
     const [areaSessionOverride, setAreaSessionOverride] = useState<BrowseAreaOverride>(() => {
         if (config.areaMode === 'show-all') return { kind: 'show-all' };
+        const urlArea = searchAreaFromUrlParams(searchParams);
+        if (urlArea) return { kind: 'preset', area: urlArea };
         return location.pathname === '/browse' ? readBrowseSession()?.area ?? null : null;
     });
+
+    // area_* params are one-shot: once applied as the session area, drop them
+    // so later area changes aren't overridden on reload.
+    useEffect(() => {
+        if (areaSessionOverride?.kind !== 'preset' || !AREA_URL_PARAMS.some((k) => searchParams.has(k))) return;
+        flyToArea(toPreferredArea(areaSessionOverride.area));
+        const next = new URLSearchParams(searchParams);
+        AREA_URL_PARAMS.forEach((k) => next.delete(k));
+        setSearchParams(next, { replace: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Parse explicit bbox from the URL exactly once on mount; treat the four
     // params as all-or-nothing to match the backend validator.
@@ -812,6 +826,7 @@ export function ExplorerView({ config = EXPLORER_CONFIG }: { config?: ExplorerVi
         else next.delete('reach');
         if (discountOnly) next.set('discount', '1');
         else next.delete('discount');
+        AREA_URL_PARAMS.forEach((k) => next.delete(k));
         // Reflect the fullscreen map view in the URL so it is shareable and
         // survives reload; the back button returns to the list.
         if (mapFullscreen) next.set('view', 'map');

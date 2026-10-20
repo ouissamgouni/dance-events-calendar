@@ -1,6 +1,6 @@
 import logging
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
@@ -59,8 +59,14 @@ from backend.api.schemas import (
     ForceInterestMatchPreviewUser,
     ForceSendUserResult,
     GeocodeSuggestion,
-    NotificationLogEntry,
-    NotificationLogResponse,
+    NotificationActivityGroup,
+    NotificationActivityInApp,
+    NotificationActivityItem,
+    NotificationActivityMessage,
+    NotificationActivityResponse,
+    NotificationActivitySummary,
+    NotificationActivityTopicCount,
+    NotificationActivityUser,
     NotificationToggleCountEntry,
     NotificationToggleCountsResponse,
     PaginatedEventsResponse,
@@ -1208,27 +1214,40 @@ def notification_toggle_counts(
     )
 
 
-# Notification type (as shown in the admin Notifications tab) -> the
-# Notification.kind values that roll up into it. Built from the same
-# single-source-of-truth maps the delivery workers use, so the log can
-# never drift from what "interest_match" / "activity_digest" actually mean.
-def _notification_kinds_by_type() -> dict[str, list[str]]:
-    from backend.services import activity_email
-    from backend.services.reminder_service import EVENT_REMINDER
-    from backend.services.review_prompt_service import EVENT_REVIEW_PROMPT
+# Kinds outside activity_email.FEATURE_BY_KIND -> their delivery feature.
+_TOPIC_BY_EXTRA_KIND = {
+    "event_reminder": "event_reminders",
+    "promo_code_added": "promo_codes",
+    "promo_code_approved": "promo_codes",
+    "promo_code_rejected": "promo_codes",
+    "schedule_program_available": "schedule_updates",
+    "schedule_program_updated": "schedule_updates",
+    "planned_session_changed": "schedule_updates",
+    "event_changed": "schedule_updates",
+    "event_cancelled": "schedule_updates",
+    "event_removed": "schedule_updates",
+}
+_TRIGGER_BY_SOURCE = {
+    "tick": "auto",
+    "job": "auto",
+    "request": "user",
+    "admin": "forced",
+}
+_ACTIVITY_ITEMS_CAP = 20
 
-    kinds_by_type: dict[str, list[str]] = {
-        "interest_match": [],
-        "activity_digest": [],
-        "event_reminder": [EVENT_REMINDER],
-        "review_prompt": [EVENT_REVIEW_PROMPT],
-    }
-    for kind, feature in activity_email.FEATURE_BY_KIND.items():
-        if feature == "interest_matches":
-            kinds_by_type["interest_match"].append(kind)
-        elif feature in ("social_activity", "suggested_events"):
-            kinds_by_type["activity_digest"].append(kind)
-    return kinds_by_type
+
+def _notification_topic(kind: str) -> str:
+    from backend.services import activity_email
+
+    return activity_email.FEATURE_BY_KIND.get(kind) or _TOPIC_BY_EXTRA_KIND.get(
+        kind, "other"
+    )
+
+
+def _as_utc(value: datetime) -> datetime:
+    from datetime import timezone
+
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
 def _delivery_latency_seconds(created_at, delivered_at) -> Optional[float]:
@@ -1243,67 +1262,76 @@ def _delivery_latency_seconds(created_at, delivered_at) -> Optional[float]:
     return max(0.0, (delivered_at - created_at).total_seconds())
 
 
-@router.get("/notifications/log", response_model=NotificationLogResponse)
-def admin_notifications_log(
-    type: Optional[str] = Query(default=None),
-    channel: Optional[str] = Query(default=None),
-    mode: Optional[str] = Query(default=None),
-    source: Optional[str] = Query(default=None),
+@router.get("/notifications/activity", response_model=NotificationActivityResponse)
+def admin_notifications_activity(
+    start: datetime = Query(...),
+    end: datetime = Query(...),
+    tz: str = Query(default="UTC", max_length=64),
+    user_id: Optional[UUID] = Query(default=None),
     q: Optional[str] = Query(default=None, max_length=120),
-    limit: int = Query(default=50, ge=1, le=200),
+    topic: Optional[str] = Query(default=None, max_length=40),
+    channel: Optional[str] = Query(default=None),
+    trigger: Optional[str] = Query(default=None),
+    include_in_app: bool = Query(default=False),
+    limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """List every notification delivery event ever recorded, newest first,
-    for the admin Notifications tab.
+    """Notification activity grouped by (day in ``tz``, recipient), newest
+    first, for the admin Notifications tab.
 
-    Reads from ``NotificationDelivery`` — one row per actual app/email/push
-    distribution event — so only channels that were actually (or, for
-    "app", eligibly) delivered show up here; a notification suppressed by
-    a recipient's disabled channel produces no row for that channel.
-
-    ``type`` filters to one of "interest_match" / "activity_digest" /
-    "event_reminder" (matching the 3 feature gates in Configuration).
-    ``channel`` filters to "app", "email", or "push". ``mode`` filters email
-    rows to "instant" / "digest"; ``source`` to "request" / "job" / "tick" /
-    "admin". ``q`` matches the
-    recipient's handle, display name, or email (case-insensitive
-    substring).
+    Each group lists outbound *messages* — one email or push send,
+    reconstructed from the ``NotificationDelivery`` rows sharing (channel,
+    delivered_at, source, mode), so a digest is one message with N items;
+    an email and a push carrying the same items at the same instant are
+    merged into one message. ``in_app`` holds items that reached the feed
+    that day and is only populated with ``include_in_app``.
     """
-    kinds_by_type = _notification_kinds_by_type()
-    if type is not None and type not in kinds_by_type:
-        raise HTTPException(status_code=400, detail=f"Unknown type: {type}")
-    if channel is not None and channel not in ("app", "email", "push"):
-        raise HTTPException(status_code=400, detail=f"Unknown channel: {channel}")
-    if mode is not None and mode not in ("instant", "digest"):
-        raise HTTPException(status_code=400, detail=f"Unknown mode: {mode}")
-    if source is not None and source not in ("request", "job", "tick", "admin"):
-        raise HTTPException(status_code=400, detail=f"Unknown source: {source}")
-
-    from sqlalchemy.orm import aliased
+    from collections import Counter
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
     from backend.services.activity_email import _render_plain
 
-    Actor = aliased(User)
+    try:
+        zone = ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise HTTPException(status_code=400, detail=f"Unknown timezone: {tz}")
+    start, end = _as_utc(start), _as_utc(end)
+    # One hour of slack absorbs a DST shift inside a 31-day local range.
+    if end <= start or end - start > timedelta(days=31, hours=1):
+        raise HTTPException(status_code=400, detail="Range must be within 31 days")
+    if channel is not None and channel not in ("app", "email", "push"):
+        raise HTTPException(status_code=400, detail=f"Unknown channel: {channel}")
+    if trigger is not None and trigger not in ("auto", "user", "forced", "unknown"):
+        raise HTTPException(status_code=400, detail=f"Unknown trigger: {trigger}")
+
     stmt = (
-        select(NotificationDelivery, Notification, User, Actor, CachedEvent)
+        select(
+            NotificationDelivery.notification_id,
+            NotificationDelivery.channel,
+            NotificationDelivery.mode,
+            NotificationDelivery.source,
+            NotificationDelivery.delivered_at,
+            Notification.recipient_user_id,
+            Notification.kind,
+            Notification.read_at,
+            Notification.push_opened_at,
+            Notification.email_clicked_at,
+        )
         .join(Notification, Notification.id == NotificationDelivery.notification_id)
-        .join(User, User.id == Notification.recipient_user_id)
-        .outerjoin(Actor, Actor.id == Notification.actor_user_id)
-        .outerjoin(CachedEvent, CachedEvent.event_id == Notification.event_id)
+        .where(NotificationDelivery.delivered_at >= start)
+        .where(NotificationDelivery.delivered_at < end)
     )
-    if type is not None:
-        stmt = stmt.where(col(Notification.kind).in_(kinds_by_type[type]))
     if channel is not None:
         stmt = stmt.where(NotificationDelivery.channel == channel)
-    if mode is not None:
-        stmt = stmt.where(NotificationDelivery.mode == mode)
-    if source is not None:
-        stmt = stmt.where(NotificationDelivery.source == source)
+    elif not include_in_app:
+        stmt = stmt.where(NotificationDelivery.channel != "app")
+    if user_id is not None:
+        stmt = stmt.where(Notification.recipient_user_id == user_id)
     if q:
         needle = f"%{q.strip().lower()}%"
-        stmt = stmt.where(
+        stmt = stmt.join(User, User.id == Notification.recipient_user_id).where(
             or_(
                 func.lower(User.handle).like(needle),
                 func.lower(User.display_name).like(needle),
@@ -1311,39 +1339,236 @@ def admin_notifications_log(
             )
         )
 
-    total = int(session.exec(select(func.count()).select_from(stmt.subquery())).one())
-    rows = session.exec(
-        stmt.order_by(col(NotificationDelivery.delivered_at).desc())
-        .limit(limit)
-        .offset(offset)
-    ).all()
+    # item info tuple: (kind, read_at, push_opened_at, email_clicked_at)
+    raw_groups: dict[tuple, dict] = {}
+    for (
+        nid,
+        ch,
+        mode,
+        source,
+        delivered_at,
+        recipient_id,
+        kind,
+        read_at,
+        opened_at,
+        clicked_at,
+    ) in session.exec(stmt).all():
+        delivered_at = _as_utc(delivered_at)
+        key = (delivered_at.astimezone(zone).date(), recipient_id)
+        group = raw_groups.setdefault(
+            key, {"last_at": delivered_at, "sends": {}, "in_app": {}}
+        )
+        group["last_at"] = max(group["last_at"], delivered_at)
+        info = (kind, read_at, opened_at, clicked_at)
+        if ch == "app":
+            group["in_app"][nid] = info
+        else:
+            group["sends"].setdefault((delivered_at, source, ch, mode), {})[nid] = info
 
-    kind_to_type = {k: t for t, kinds in kinds_by_type.items() for k in kinds}
-    items = [
-        NotificationLogEntry(
-            id=d.id,
+    def _messages(sends: dict) -> list[dict]:
+        merged: dict[tuple, dict] = {}
+        for (sent_at, source, ch, mode), items in sends.items():
+            message = merged.get((sent_at, source, frozenset(items)))
+            if message is None:
+                merged[(sent_at, source, frozenset(items))] = {
+                    "sent_at": sent_at,
+                    "source": source,
+                    "mode": mode,
+                    "channels": [ch],
+                    "items": items,
+                }
+            else:
+                message["channels"].append(ch)
+                message["mode"] = message["mode"] or mode
+        return sorted(merged.values(), key=lambda m: m["sent_at"], reverse=True)
+
+    def _trigger(message: dict) -> str:
+        return _TRIGGER_BY_SOURCE.get(message["source"], "unknown")
+
+    def _engaged(message: dict, info: tuple) -> bool:
+        return bool(
+            ("email" in message["channels"] and info[3])
+            or ("push" in message["channels"] and info[2])
+        )
+
+    summary = NotificationActivitySummary()
+    built: list[tuple] = []
+    for (day, recipient_id), group in raw_groups.items():
+        messages = [
+            m
+            for m in _messages(group["sends"])
+            if (trigger is None or _trigger(m) == trigger)
+            and (
+                topic is None
+                or any(_notification_topic(i[0]) == topic for i in m["items"].values())
+            )
+        ]
+        in_app = (
+            {}
+            if trigger is not None
+            else {
+                nid: info
+                for nid, info in group["in_app"].items()
+                if topic is None or _notification_topic(info[0]) == topic
+            }
+        )
+        if not messages and not in_app:
+            continue
+        for m in messages:
+            setattr(summary, _trigger(m), getattr(summary, _trigger(m)) + 1)
+            infos = list(m["items"].values())
+            if "email" in m["channels"]:
+                if m["mode"] == "digest":
+                    summary.email_digest += 1
+                else:
+                    summary.email_instant += 1
+                summary.email_items += len(infos)
+                summary.email_clicked += sum(1 for i in infos if i[3])
+            if "push" in m["channels"]:
+                summary.push += 1
+                summary.push_items += len(infos)
+                summary.push_opened += sum(1 for i in infos if i[2])
+        summary.in_app_items += len(in_app)
+        summary.app_read += sum(1 for i in in_app.values() if i[1])
+        built.append((day, recipient_id, group["last_at"], messages, in_app))
+
+    built.sort(key=lambda b: (b[0], b[2]), reverse=True)
+    page = built[offset : offset + limit]
+
+    def _shown(items: dict) -> list[int]:
+        return sorted(items, reverse=True)[:_ACTIVITY_ITEMS_CAP]
+
+    shown_ids: set[int] = set()
+    for _, _, _, messages, in_app in page:
+        for m in messages:
+            shown_ids.update(_shown(m["items"]))
+        shown_ids.update(_shown(in_app))
+
+    notifs = (
+        {
+            n.id: n
+            for n in session.exec(
+                select(Notification).where(col(Notification.id).in_(shown_ids))
+            ).all()
+        }
+        if shown_ids
+        else {}
+    )
+    user_ids = {b[1] for b in page} | {n.actor_user_id for n in notifs.values()}
+    users = (
+        {
+            u.id: u
+            for u in session.exec(select(User).where(col(User.id).in_(user_ids))).all()
+        }
+        if user_ids
+        else {}
+    )
+    event_ids = {n.event_id for n in notifs.values() if n.event_id}
+    events = (
+        {
+            e.event_id: e
+            for e in session.exec(
+                select(CachedEvent).where(col(CachedEvent.event_id).in_(event_ids))
+            ).all()
+        }
+        if event_ids
+        else {}
+    )
+    first_at: dict[tuple[int, str], datetime] = {}
+    if shown_ids:
+        for nid, ch, at in session.exec(
+            select(
+                NotificationDelivery.notification_id,
+                NotificationDelivery.channel,
+                func.min(NotificationDelivery.delivered_at),
+            )
+            .where(col(NotificationDelivery.notification_id).in_(shown_ids))
+            .group_by(
+                NotificationDelivery.notification_id, NotificationDelivery.channel
+            )
+        ).all():
+            first_at[(nid, ch)] = _as_utc(at)
+
+    def _item(nid: int, sent_at: Optional[datetime]) -> NotificationActivityItem:
+        n = notifs[nid]
+        actor = users.get(n.actor_user_id)
+        event = events.get(n.event_id) if n.event_id else None
+        return NotificationActivityItem(
             notification_id=n.id,
-            delivered_at=d.delivered_at,
             kind=n.kind,
-            type=kind_to_type.get(n.kind, n.kind),
-            channel=d.channel,
-            mode=d.mode,
-            source=d.source,
-            latency_seconds=_delivery_latency_seconds(n.created_at, d.delivered_at),
-            recipient_user_id=u.id,
-            recipient_email=u.email,
-            recipient_handle=u.handle,
-            recipient_display_name=u.display_name,
+            topic=_notification_topic(n.kind),
             summary=_render_plain(n.kind, actor, event, n.context),
+            created_at=n.created_at,
+            event_id=n.event_id,
+            event_title=event.title if event else None,
             actor_display_name=actor.display_name if actor else None,
             actor_handle=actor.handle if actor else None,
-            event_id=event.event_id if event else None,
-            event_title=event.title if event else None,
-            context=n.context,
+            app_at=first_at.get((nid, "app")),
+            email_at=first_at.get((nid, "email")),
+            push_at=first_at.get((nid, "push")),
+            read_at=n.read_at,
+            push_opened_at=n.push_opened_at,
+            email_clicked_at=n.email_clicked_at,
+            latency_seconds=_delivery_latency_seconds(n.created_at, sent_at),
         )
-        for d, n, u, actor, event in rows
-    ]
-    return NotificationLogResponse(items=items, total=total)
+
+    def _topics(infos) -> list[NotificationActivityTopicCount]:
+        counts = Counter(_notification_topic(i[0]) for i in infos)
+        return [
+            NotificationActivityTopicCount(topic=t, count=c)
+            for t, c in counts.most_common()
+        ]
+
+    groups: list[NotificationActivityGroup] = []
+    for day, recipient_id, last_at, messages, in_app in page:
+        recipient = users[recipient_id]
+        groups.append(
+            NotificationActivityGroup(
+                day=day,
+                user=NotificationActivityUser(
+                    id=recipient.id,
+                    email=recipient.email,
+                    handle=recipient.handle,
+                    display_name=recipient.display_name,
+                ),
+                last_at=last_at,
+                messages=[
+                    NotificationActivityMessage(
+                        channels=sorted(m["channels"]),
+                        mode=m["mode"],
+                        source=m["source"],
+                        trigger=_trigger(m),
+                        sent_at=m["sent_at"],
+                        item_count=len(m["items"]),
+                        engaged_count=sum(
+                            1 for i in m["items"].values() if _engaged(m, i)
+                        ),
+                        topics=_topics(m["items"].values()),
+                        items=[
+                            _item(nid, m["sent_at"])
+                            for nid in _shown(m["items"])
+                            if nid in notifs
+                        ],
+                    )
+                    for m in messages
+                ],
+                in_app=(
+                    NotificationActivityInApp(
+                        item_count=len(in_app),
+                        read_count=sum(1 for i in in_app.values() if i[1]),
+                        topics=_topics(in_app.values()),
+                        items=[
+                            _item(nid, None) for nid in _shown(in_app) if nid in notifs
+                        ],
+                    )
+                    if in_app
+                    else None
+                ),
+            )
+        )
+    return NotificationActivityResponse(
+        summary=summary, groups=groups, total_groups=len(built)
+    )
 
 
 @router.post(
@@ -1404,7 +1629,7 @@ def force_send_interest_matches(
         eligible_ids, body.lookback_hours
     )
     digest_stats = activity_email.run_once(
-        force=True, user_ids=eligible_ids, kinds=(INTEREST_EVENT,)
+        force=True, user_ids=eligible_ids, kinds=(INTEREST_EVENT,), source="admin"
     )
     delivered = set(digest_stats.get("delivered_recipients") or [])
     for uid in eligible_ids:
@@ -1549,6 +1774,7 @@ def digest_send_now(
         kinds=scoped_kinds,
         max_notifications_per_user=body.max_notifications_per_user,
         resend=body.resend,
+        source="admin",
     )
     delivered = set(stats.get("delivered_recipients") or [])
     for uid in eligible_ids:
@@ -1765,6 +1991,9 @@ def review_prompt_send_now(
     from backend.services.email import send_event_review_prompt_email
     from backend.services.push_service import send_push
     from backend.services.notification_delivery import record_delivery
+    from backend.services.review_home_prompt import (
+        force_prompt as force_home_review_prompt,
+    )
 
     event = session.get(CachedEvent, body.event_id)
     if (
@@ -1797,7 +2026,7 @@ def review_prompt_send_now(
     )
 
     results: list[ForceSendUserResult] = []
-    emailed = pushed = in_app_created = 0
+    emailed = pushed = in_app_created = home_prompt_forced = 0
     stamp_now = datetime.now(timezone.utc)
 
     for uid in body.user_ids:
@@ -1821,10 +2050,20 @@ def review_prompt_send_now(
                 )
             )
             continue
+        # The Home prompt is in-app, so it ignores the email/push opt-outs below.
+        if body.force_home_prompt:
+            force_home_review_prompt(
+                session, uid, body.event_id, _admin.get("email"), stamp_now
+            )
+            home_prompt_forced += 1
         if not (user.email_review_prompt_enabled or user.push_review_prompt_enabled):
             results.append(
                 ForceSendUserResult(
-                    user_id=uid, email=user.email, status="skipped_disabled"
+                    user_id=uid,
+                    email=user.email,
+                    status="home_prompt_only"
+                    if body.force_home_prompt
+                    else "skipped_disabled",
                 )
             )
             continue
@@ -1860,7 +2099,14 @@ def review_prompt_send_now(
         ):
             if send_event_review_prompt_email(user, event, friend_proof=phrase):
                 notif.emailed_at = stamp_now
-                record_delivery(session, notif.id, "email", stamp_now)
+                record_delivery(
+                    session,
+                    notif.id,
+                    "email",
+                    stamp_now,
+                    mode="instant",
+                    source="admin",
+                )
                 emailed += 1
                 did_send = True
         if user.push_review_prompt_enabled and (body.resend or notif.pushed_at is None):
@@ -1874,7 +2120,7 @@ def review_prompt_send_now(
             )
             if delivered:
                 notif.pushed_at = stamp_now
-                record_delivery(session, notif.id, "push", stamp_now)
+                record_delivery(session, notif.id, "push", stamp_now, source="admin")
                 pushed += delivered
                 did_send = True
         session.add(notif)
@@ -1892,6 +2138,54 @@ def review_prompt_send_now(
         pushed=pushed,
         in_app_created=in_app_created,
         results=results,
+        home_prompt_forced=home_prompt_forced,
+    )
+
+
+@router.get("/review-prompt/stats")
+def review_prompt_stats(
+    days: int = Query(30, ge=1, le=365),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Home review prompt funnel + where reviews came from over the last ``days``."""
+    from datetime import timezone
+    from backend.api.schemas import ReviewPromptStatsCount, ReviewPromptStatsResponse
+    from backend.db.models import ReviewPromptImpression
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    shown = dismissed = reviewed = forced_shown = forced_reviewed = 0
+    for outcome, forced, count in session.exec(
+        select(
+            ReviewPromptImpression.outcome, ReviewPromptImpression.forced, func.count()
+        )
+        .where(ReviewPromptImpression.shown_at >= since)
+        .group_by(ReviewPromptImpression.outcome, ReviewPromptImpression.forced)
+    ).all():
+        shown += count
+        dismissed += count if outcome == "dismissed" else 0
+        reviewed += count if outcome == "reviewed" else 0
+        forced_shown += count if forced else 0
+        forced_reviewed += count if forced and outcome == "reviewed" else 0
+    by_entry = session.exec(
+        select(EventRating.entry_point, func.count())
+        .where(EventRating.created_at >= since)
+        .group_by(EventRating.entry_point)
+    ).all()
+    return ReviewPromptStatsResponse(
+        days=days,
+        shown=shown,
+        dismissed=dismissed,
+        reviewed=reviewed,
+        forced_shown=forced_shown,
+        forced_reviewed=forced_reviewed,
+        reviews_by_entry_point=sorted(
+            (
+                ReviewPromptStatsCount(key=key or "unknown", count=count)
+                for key, count in by_entry
+            ),
+            key=lambda c: -c.count,
+        ),
     )
 
 

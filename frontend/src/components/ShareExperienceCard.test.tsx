@@ -12,12 +12,17 @@ vi.mock('../context/RatingAggregatesContext', () => ({
 vi.mock('../utils/tracking', () => ({
     trackRatingModalOpened: vi.fn(),
 }))
-// Stub the heavy modal with a tiny fake that lets the test drive onSubmitted.
+// Stub the heavy modal with a tiny fake that lets the test drive onSubmitted/onClose.
 vi.mock('./RateEventModal', () => ({
-    default: ({ onSubmitted }: { onSubmitted: (r: unknown) => void }) => (
-        <button type="button" onClick={() => onSubmitted({ id: 'r1' })}>
-            fake-submit
-        </button>
+    default: ({ onSubmitted, onClose }: { onSubmitted: (r: unknown) => void; onClose: () => void }) => (
+        <>
+            <button type="button" onClick={() => onSubmitted({ id: 'r1' })}>
+                fake-submit
+            </button>
+            <button type="button" onClick={onClose}>
+                fake-close
+            </button>
+        </>
     ),
 }))
 
@@ -49,11 +54,13 @@ describe('ShareExperienceCard', () => {
         expect(screen.getByText('Reviewed by Laura')).toBeInTheDocument()
     })
 
-    it('opens the modal and calls onReviewed after submitting', () => {
+    it('calls onReviewed once the thanks screen is closed after submitting', () => {
         const onReviewed = vi.fn()
         render(<ShareExperienceCard review={makeReview()} onReviewed={onReviewed} />)
         fireEvent.click(screen.getByRole('button', { name: 'Review' }))
         fireEvent.click(screen.getByRole('button', { name: 'fake-submit' }))
+        expect(onReviewed).not.toHaveBeenCalled()
+        fireEvent.click(screen.getByRole('button', { name: 'fake-close' }))
         expect(onReviewed).toHaveBeenCalledWith('ev-1')
     })
 })

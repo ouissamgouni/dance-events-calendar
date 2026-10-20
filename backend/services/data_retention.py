@@ -14,12 +14,15 @@ from backend.db.models import (
     EventLinkClick,
     EventSave,
     EventView,
+    ReviewPromptForce,
+    ReviewPromptImpression,
     ShareEvent,
 )
 
 # Matches the retention stated in the privacy policy.
 ANALYTICS_RETENTION = timedelta(days=365)
 LOGIN_CODE_RETENTION = timedelta(days=1)
+REVIEW_PROMPT_RETENTION = timedelta(days=180)
 
 # Counts on these tables power public popularity, so rows stay and only lose the device link.
 _PSEUDONYMISE = (EventView, EventLinkClick, EventExport, ShareEvent)
@@ -47,6 +50,16 @@ def apply_retention(session: Session, now: datetime | None = None) -> dict:
         )
     )
     stats[EmailLoginCode.__tablename__] = result.rowcount or 0
+    result = session.execute(
+        delete(ReviewPromptImpression).where(
+            ReviewPromptImpression.shown_at < now - REVIEW_PROMPT_RETENTION
+        )
+    )
+    stats[ReviewPromptImpression.__tablename__] = result.rowcount or 0
+    result = session.execute(
+        delete(ReviewPromptForce).where(ReviewPromptForce.expires_at < now)
+    )
+    stats[ReviewPromptForce.__tablename__] = result.rowcount or 0
     session.commit()
     return stats
 

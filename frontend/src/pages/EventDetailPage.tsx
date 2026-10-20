@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { CalendarDays } from 'lucide-react';
 import { EventMergedError, fetchEvent, updateEvent } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { trackView } from '../utils/tracking';
+import { trackView, type RatingEntryPoint } from '../utils/tracking';
 import { eventDisplayZone } from '../utils/eventDates';
 import { useReferralAttribution } from '../hooks/useReferralAttribution';
 import useMediaQuery from '../hooks/useMediaQuery';
@@ -130,6 +130,11 @@ export default function EventDetailPage() {
     // `autoOpenToken` ref would initialize to the already-bumped value and
     // never see a "change" to react to.
     const autoOpenRatingRef = useRef(location.pathname.endsWith('/review'));
+    const [reviewEntryPoint] = useState<RatingEntryPoint>(() => {
+        if (!autoOpenRatingRef.current) return 'detail';
+        const via = new URLSearchParams(location.search).get('via');
+        return via === 'push' ? 'notification-push' : via === 'email' ? 'notification-email' : 'notification';
+    });
     useEffect(() => {
         if (!autoOpenRatingRef.current || !event || authLoading) return;
         if (!user) {
@@ -543,6 +548,7 @@ export default function EventDetailPage() {
                                         isPast={isPast}
                                         shareUrl={shareUrl}
                                         reviewOpenToken={reviewOpenToken}
+                                        reviewEntryPoint={reviewEntryPoint}
                                         onRatingChanged={() => setReviewsRefreshToken((t) => t + 1)}
                                         eventHasReviews={reviewCount > 0}
                                         onPostMessage={() => { setAskComposeToken((t) => t + 1); goToTab('discussion'); }}

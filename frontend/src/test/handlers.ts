@@ -177,6 +177,16 @@ export const handlers = [
     // ── Suggestion duplicate check (none by default) ────────────────────────
     http.get('*/api/suggestions/similar', () => HttpResponse.json([])),
 
+    // ── Review thanks-screen rail + Home review prompt (none by default) ────
+    http.get('*/api/events/:eventId/similar', () =>
+        HttpResponse.json({ event_ids: [], style_tag_ids: [], reach_filter: 'any', area: null }),
+    ),
+    http.get('*/api/users/me/review-prompt', () =>
+        HttpResponse.json({ prompt: null, forced: false, similar_count: 0, pending_total: 0 }),
+    ),
+    http.post('*/api/users/me/review-prompt/:eventId/impression', () => new HttpResponse(null, { status: 204 })),
+    http.get('*/api/users/me/pending-reviews', () => HttpResponse.json([])),
+
     // ── Suggestion geocode lookup ───────────────────────────────────────────
     http.get('*/api/suggestions/geocode', ({ request }) => {
         const url = new URL(request.url)
