@@ -359,3 +359,237 @@ def run_once() -> dict:
         # same minimal shape as the "nothing due" early return above.
         return {"prompts": 0}
     return {"prompts": created, "emailed": emailed, "pushed": pushed}
+
+
+def force_candidates(session: Session, event: CachedEvent) -> list[dict]:
+    """Going users of ``event`` with review, prompt row, push device and Home state."""
+    from sqlmodel import col
+
+    from backend.db.models import PushSubscription
+    from backend.services.review_home_prompt import home_states
+
+    users = {
+        u.id: u
+        for u in session.exec(
+            select(User)
+            .join(UserEventAttendance, UserEventAttendance.user_id == User.id)  # type: ignore[arg-type]
+            .where(UserEventAttendance.event_id == event.event_id)
+            .where(col(User.deleted_at).is_(None))
+        ).all()
+    }
+    if not users:
+        return []
+    ids = set(users)
+    rated = set(
+        session.exec(
+            select(EventRating.user_id)
+            .where(EventRating.event_id == event.event_id)
+            .where(EventRating.scope == "this_edition")
+            .where(col(EventRating.user_id).in_(ids))
+        ).all()
+    )
+    notifs = {
+        n.recipient_user_id: n
+        for n in session.exec(
+            select(Notification)
+            .where(Notification.kind == EVENT_REVIEW_PROMPT)
+            .where(Notification.event_id == event.event_id)
+            .where(Notification.actor_user_id == Notification.recipient_user_id)
+            .where(col(Notification.recipient_user_id).in_(ids))
+        ).all()
+    }
+    with_push = set(
+        session.exec(
+            select(PushSubscription.user_id)
+            .where(col(PushSubscription.user_id).in_(ids))
+            .distinct()
+        ).all()
+    )
+    homes = home_states(session, event.event_id, ids)
+    return [
+        {
+            "user": user,
+            "already_rated": uid in rated,
+            "notification": notifs.get(uid),
+            "has_push_subscription": uid in with_push,
+            "home": homes[uid],
+        }
+        for uid, user in users.items()
+    ]
+
+
+def force_send(
+    session: Session,
+    event: CachedEvent,
+    user_ids: list,
+    channels: set[str],
+    resend: bool,
+    forced_by: Optional[str],
+    now: datetime,
+    dry_run: bool = False,
+) -> dict:
+    """Admin send-now on the chosen channels; opt-outs apply to email/push only.
+
+    With ``dry_run`` nothing is sent or written. Caller commits.
+    """
+    # Late imports keep these patchable in tests.
+    from backend.services.email import send_event_review_prompt_email
+    from backend.services.push_service import send_push
+    from backend.services.review_home_prompt import force_prompt
+
+    candidates = {c["user"].id: c for c in force_candidates(session, event)}
+    known = {
+        u.id: u
+        for u in session.exec(
+            select(User).where(User.id.in_(user_ids))  # type: ignore[union-attr]
+        ).all()
+    }
+    stats = {
+        "in_app_created": 0,
+        "in_app_resurfaced": 0,
+        "emailed": 0,
+        "pushed": 0,
+        "home_prompt_forced": 0,
+    }
+    results: list[dict] = []
+    for uid in user_ids:
+        user = known.get(uid)
+        if user is None or user.deleted_at is not None:
+            results.append({"user_id": uid, "email": "", "status": "skipped_not_found"})
+            continue
+        cand = candidates.get(uid)
+        if cand is None:
+            status, used = "skipped_not_attended", []
+        elif cand["already_rated"]:
+            status, used = "skipped_already_rated", []
+        else:
+            used = _force_send_one(
+                session,
+                event,
+                cand,
+                channels,
+                resend,
+                forced_by,
+                now,
+                dry_run,
+                stats,
+                send_event_review_prompt_email,
+                send_push,
+                force_prompt,
+            )
+            if used:
+                status = "sent"
+            elif not (
+                channels & {"app", "home"}
+                or ("email" in channels and user.email_review_prompt_enabled)
+                or ("push" in channels and user.push_review_prompt_enabled)
+            ):
+                status = "skipped_disabled"
+            else:
+                status = "already_sent"
+        results.append(
+            {"user_id": uid, "email": user.email, "status": status, "channels": used}
+        )
+    return {**stats, "results": results}
+
+
+def _force_send_one(
+    session,
+    event,
+    cand,
+    channels,
+    resend,
+    forced_by,
+    now,
+    dry_run,
+    stats,
+    send_email,
+    send_push_fn,
+    force_home,
+) -> list[str]:
+    user = cand["user"]
+    notif = cand["notification"]
+    used: list[str] = []
+
+    if "home" in channels:
+        if not dry_run:
+            force_home(session, user.id, event.event_id, forced_by, now)
+        stats["home_prompt_forced"] += 1
+        used.append("home")
+
+    app_new = "app" in channels and notif is None
+    app_resurface = "app" in channels and notif is not None and resend
+    email_wanted = (
+        "email" in channels
+        and user.email_review_prompt_enabled
+        and (resend or notif is None or notif.emailed_at is None)
+    )
+    push_wanted = (
+        "push" in channels
+        and user.push_review_prompt_enabled
+        and (resend or notif is None or notif.pushed_at is None)
+    )
+
+    if dry_run:
+        if app_new or app_resurface:
+            stats["in_app_created" if app_new else "in_app_resurfaced"] += 1
+            used.append("app")
+        if email_wanted:
+            stats["emailed"] += 1
+            used.append("email")
+        if push_wanted and cand["has_push_subscription"]:
+            stats["pushed"] += 1
+            used.append("push")
+        return used
+
+    if not (app_new or app_resurface or email_wanted or push_wanted):
+        return used
+
+    proof = friend_review_proof(session, user.id, event.event_id)
+    phrase = proof_phrase(proof) if proof else None
+    if notif is None:
+        notif = Notification(
+            recipient_user_id=user.id,
+            actor_user_id=user.id,  # self: no external actor
+            kind=EVENT_REVIEW_PROMPT,
+            event_id=event.event_id,
+            context=phrase,
+            # Row still anchors dedupe + email/push tracking when in-app is off.
+            read_at=None if app_new else now,
+        )
+        session.add(notif)
+        session.flush()
+    elif phrase and notif.context != phrase:
+        notif.context = phrase
+    if app_new:
+        record_delivery(session, notif.id, "app", now, source="admin")
+        stats["in_app_created"] += 1
+        used.append("app")
+    elif app_resurface:
+        notif.read_at = None
+        notif.created_at = now
+        record_delivery(session, notif.id, "app", now, source="admin")
+        stats["in_app_resurfaced"] += 1
+        used.append("app")
+
+    if email_wanted and send_email(user, event, friend_proof=phrase):
+        notif.emailed_at = now
+        record_delivery(session, notif.id, "email", now, mode="instant", source="admin")
+        stats["emailed"] += 1
+        used.append("email")
+    if push_wanted:
+        push_title, push_body = review_prompt_push_copy(event.title, phrase)
+        delivered = send_push_fn(
+            user.id,
+            title=push_title,
+            body=push_body,
+            url=tracked_url(f"/event/{event.event_id}/review", notif.id, "push"),
+            tag=f"review-prompt:{event.event_id}",
+        )
+        if delivered:
+            notif.pushed_at = now
+            record_delivery(session, notif.id, "push", now, source="admin")
+            stats["pushed"] += delivered
+            used.append("push")
+    session.add(notif)
+    return used

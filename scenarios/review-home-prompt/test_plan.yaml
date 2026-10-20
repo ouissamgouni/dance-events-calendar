@@ -99,12 +99,24 @@ test_plan:
       title: "Admin force"
       description: >
         As Admin: /admin → Configuration → Notifications → Review prompt →
-        Send now: pick "Lyon Salsa Saturday", select Bob, tick "Force Home
-        prompt", Send. Then as Bob, in a new session, open `/`.
+        Send now: pick "Lyon Salsa Saturday", select Bob, keep only the
+        "In-app" and "Home prompt" channels, click Preview, then Confirm send.
+        Then as Bob, in a new session, open `/`.
       expected: >
-        The admin message reports "Home prompt forced for 1" (Bob's status
-        home_prompt_only since his channels are off). Bob's Home shows the
+        Bob's row shows channel chips (Email/Push "opted out"). The preview
+        reads "Would send to 1 of 1 user(s) (1 in-app, 0 email, 0 push,
+        1 Home)" and nothing is sent until Confirm. After Confirm, Bob gets
+        the in-app notification but no email or push, and his Home shows the
         prompt again despite the cooldown.
+
+    - id: 10
+      title: "Second user on the same tab"
+      description: >
+        As Alice, open `/` and see the prompt, close it, sign out, then sign
+        in as Bob in the same tab (no reload) and open `/`.
+      expected: >
+        Bob's Home prompt check runs (the session flag is per user), so Bob
+        gets his own prompt if he is eligible.
 
     - id: 9
       title: "Admin flags, settings + stats"

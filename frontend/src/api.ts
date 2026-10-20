@@ -864,6 +864,7 @@ export interface ForceSendUserResult {
     user_id: string;
     email: string;
     status: 'sent' | 'no_pending_notifications' | 'skipped_disabled' | 'skipped_not_found';
+    channels?: string[];
 }
 
 export interface ForceInterestMatchSendResponse {
@@ -938,28 +939,30 @@ export async function sendDigestNow(
     return parseJsonResponse<DigestSendNowResponse>(res, 'Failed to send digest now');
 }
 
+export type ReviewPromptChannel = 'app' | 'email' | 'push' | 'home';
+
 export interface ReviewPromptSendNowResponse {
     emailed: number;
     pushed: number;
     in_app_created: number;
+    in_app_resurfaced?: number;
     results: ForceSendUserResult[];
     home_prompt_forced?: number;
+    dry_run?: boolean;
 }
 
-export async function sendReviewPromptNow(
-    eventId: string,
-    userIds: string[],
-    resend?: boolean,
-    forceHomePrompt?: boolean,
-): Promise<ReviewPromptSendNowResponse> {
-    const body: Record<string, unknown> = { event_id: eventId, user_ids: userIds };
-    if (resend) body.resend = true;
-    if (forceHomePrompt) body.force_home_prompt = true;
+export async function sendReviewPromptNow(params: {
+    event_id: string;
+    user_ids: string[];
+    channels: ReviewPromptChannel[];
+    resend?: boolean;
+    dry_run?: boolean;
+}): Promise<ReviewPromptSendNowResponse> {
     const res = await fetch(`${BASE}/admin/notifications/review-prompt/send-now`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(body),
+        body: JSON.stringify(params),
     });
     return parseJsonResponse<ReviewPromptSendNowResponse>(res, 'Failed to send review prompt now');
 }
@@ -970,16 +973,37 @@ export interface ReviewPromptCandidate {
     name: string | null;
     handle: string | null;
     already_rated: boolean;
+    email_enabled: boolean;
+    push_enabled: boolean;
+    has_push_subscription: boolean;
+    notification: {
+        created_at: string;
+        read_at: string | null;
+        emailed_at: string | null;
+        pushed_at: string | null;
+    } | null;
+    home: {
+        forced_until: string | null;
+        shown_count: number;
+        last_shown_at: string | null;
+        last_outcome: 'shown' | 'dismissed' | 'reviewed' | null;
+    };
+}
+
+export interface ReviewPromptCandidatesResponse {
+    event_id: string;
+    home_warning: 'disabled' | 'too_recent' | 'too_old' | null;
+    candidates: ReviewPromptCandidate[];
 }
 
 export async function fetchReviewPromptCandidates(
     eventId: string,
-): Promise<ReviewPromptCandidate[]> {
+): Promise<ReviewPromptCandidatesResponse> {
     const res = await fetch(
         `${BASE}/admin/events/${encodeURIComponent(eventId)}/review-prompt-candidates`,
         { credentials: 'include' },
     );
-    return parseJsonResponse<ReviewPromptCandidate[]>(res, 'Failed to load attendees');
+    return parseJsonResponse<ReviewPromptCandidatesResponse>(res, 'Failed to load attendees');
 }
 
 export interface ReviewPromptStats {

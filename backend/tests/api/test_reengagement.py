@@ -1018,13 +1018,16 @@ def test_review_prompt_send_now_per_user_statuses(client, session, monkeypatch):
     assert r.status_code == 200, r.text
     data = r.json()
     assert data["emailed"] == 1
-    assert data["in_app_created"] == 1  # only gina gets an in-app prompt
+    assert data["in_app_created"] == 2  # in-app ignores email/push opt-outs
     status_by_email = {row["email"]: row["status"] for row in data["results"]}
     assert status_by_email["gina@example.com"] == "sent"
-    assert status_by_email["bob@example.com"] == "skipped_disabled"
+    assert status_by_email["bob@example.com"] == "sent"
     assert status_by_email["carol@example.com"] == "skipped_already_rated"
     assert status_by_email["ned@example.com"] == "skipped_not_attended"
     assert emailed == [("gina@example.com", None)]
+    channels_by_email = {row["email"]: row["channels"] for row in data["results"]}
+    assert channels_by_email["gina@example.com"] == ["app", "email"]
+    assert channels_by_email["bob@example.com"] == ["app"]
 
     from backend.db.models import NotificationDelivery
 
@@ -1032,6 +1035,16 @@ def test_review_prompt_send_now_per_user_statuses(client, session, monkeypatch):
         select(NotificationDelivery).where(NotificationDelivery.channel == "email")
     ).all()
     assert [(d.mode, d.source) for d in email_rows] == [("instant", "admin")]
+
+    r = client.post(
+        "/api/admin/notifications/review-prompt/send-now",
+        json={
+            "event_id": "ev-past",
+            "user_ids": [str(bob.id)],
+            "channels": ["email", "push"],
+        },
+    )
+    assert r.json()["results"][0]["status"] == "skipped_disabled"
 
 
 def test_review_prompt_send_now_resend(client, session, monkeypatch):
@@ -1149,7 +1162,7 @@ def test_review_prompt_candidates_lists_only_attendees(client, session):
     _login(client, "admin@example.com")
     r = client.get("/api/admin/events/ev-past/review-prompt-candidates")
     assert r.status_code == 200, r.text
-    rows = {row["email"]: row for row in r.json()}
+    rows = {row["email"]: row for row in r.json()["candidates"]}
     assert set(rows) == {"gina@example.com", "carol@example.com"}  # ned excluded
     assert rows["gina@example.com"]["already_rated"] is False
     assert rows["carol@example.com"]["already_rated"] is True

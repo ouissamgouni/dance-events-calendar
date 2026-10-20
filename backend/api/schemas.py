@@ -1701,6 +1701,8 @@ class ForceSendUserResult(BaseModel):
     user_id: UUID
     email: str
     status: str  # "sent" | "no_pending_notifications" | "skipped_disabled" | "skipped_not_found"
+    # Channels used (or, on a dry run, that would be used) for this user.
+    channels: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1820,15 +1822,22 @@ class DigestSendNowResponse(BaseModel):
     results: list[ForceSendUserResult]
 
 
+ReviewPromptChannel = Literal["app", "email", "push", "home"]
+
+
 class ReviewPromptSendNowRequest(BaseModel):
     # The event whose post-event review prompt should be force-sent.
     event_id: str
     user_ids: list[UUID] = Field(..., min_length=1, max_length=50)
+    # "home" queues the Home review prompt, bypassing cooldown/fatigue.
+    channels: list[ReviewPromptChannel] = Field(
+        default_factory=lambda: ["app", "email", "push"], min_length=1
+    )
     # When true, re-send email/push even to users already prompted for this
     # event; otherwise only channels that haven't fired yet are sent.
     resend: bool = False
-    # Also queue the Home review prompt for these users, bypassing cooldown/fatigue.
-    force_home_prompt: bool = False
+    # Report what would be sent without sending or writing anything.
+    dry_run: bool = False
 
 
 class ReviewPromptSendNowResponse(BaseModel):
@@ -1836,20 +1845,11 @@ class ReviewPromptSendNowResponse(BaseModel):
     pushed: int
     in_app_created: int
     results: list[ForceSendUserResult]
+    in_app_resurfaced: int = 0
     home_prompt_forced: int = 0
+    dry_run: bool = False
     # Per-user status is one of: "sent" | "already_sent" | "skipped_disabled"
     # | "skipped_not_found" | "skipped_not_attended" | "skipped_already_rated".
-
-
-class ReviewPromptCandidate(BaseModel):
-    # An attendee of a given event, offered as a force-send target. Only
-    # users who RSVP'd "Going" appear; ``already_rated`` flags those who
-    # have since reviewed (the force-send would skip them).
-    user_id: UUID
-    email: str
-    name: Optional[str] = None
-    handle: Optional[str] = None
-    already_rated: bool = False
 
 
 class ReviewPromptStatsCount(BaseModel):
@@ -1877,6 +1877,35 @@ class AssetPromptNotificationState(BaseModel):
     read_at: Optional[datetime] = None
     emailed_at: Optional[datetime] = None
     pushed_at: Optional[datetime] = None
+
+
+class ReviewPromptHomeState(BaseModel):
+    forced_until: Optional[datetime] = None
+    shown_count: int = 0
+    last_shown_at: Optional[datetime] = None
+    # shown | dismissed | reviewed
+    last_outcome: Optional[str] = None
+
+
+class ReviewPromptCandidate(BaseModel):
+    # A "Going" attendee of the event; ``already_rated`` users are skipped.
+    user_id: UUID
+    email: str
+    name: Optional[str] = None
+    handle: Optional[str] = None
+    already_rated: bool = False
+    email_enabled: bool = False
+    push_enabled: bool = False
+    has_push_subscription: bool = False
+    notification: Optional[AssetPromptNotificationState] = None
+    home: ReviewPromptHomeState = Field(default_factory=ReviewPromptHomeState)
+
+
+class ReviewPromptCandidatesResponse(BaseModel):
+    event_id: str
+    # Why the Home prompt won't show for this event now: disabled | too_recent | too_old
+    home_warning: Optional[str] = None
+    candidates: list[ReviewPromptCandidate]
 
 
 class AssetPromptCandidate(BaseModel):
