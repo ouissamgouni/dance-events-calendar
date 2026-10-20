@@ -23,6 +23,7 @@ from backend.db.models import (  # noqa: E402
     EventSeries,
     EventSeriesMember,
     EventTag,
+    Notification,
     ReviewPromptForce,
     ReviewPromptImpression,
     Tag,
@@ -230,17 +231,84 @@ def test_admin_force_bypasses_cooldown_even_with_channels_off(client, session):
         json={
             "event_id": "ev-forced",
             "user_ids": [user_id],
-            "force_home_prompt": True,
+            "channels": ["home"],
         },
     )
     assert resp.status_code == 200
     assert resp.json()["home_prompt_forced"] == 1
-    assert resp.json()["results"][0]["status"] == "home_prompt_only"
+    assert resp.json()["in_app_created"] == 0
+    assert resp.json()["results"][0]["status"] == "sent"
+    assert resp.json()["results"][0]["channels"] == ["home"]
+    assert session.exec(select(Notification)).all() == []
 
     _login(client)
     body = client.get("/api/users/me/review-prompt").json()
     assert body["prompt"]["event_id"] == "ev-forced"
     assert body["forced"] is True
+
+
+@pytest.mark.unit
+def test_send_now_dry_run_previews_without_side_effects(client, session, monkeypatch):
+    sent: list = []
+    monkeypatch.setattr(
+        "backend.services.email.send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: sent.append(u.email) or True,
+    )
+    monkeypatch.setattr(
+        "backend.services.push_service.send_push", lambda *a, **k: sent.append(a) or 1
+    )
+    _login(client)
+    me = _me(session)
+    _event(session, "ev-a", ended_hours_ago=10)
+    _attend(session, me, "ev-a")
+    user_id = str(me.id)
+
+    _login(client, "admin@example.com")
+    payload = {
+        "event_id": "ev-a",
+        "user_ids": [user_id],
+        "channels": ["app", "email", "home"],
+    }
+    preview = client.post(
+        "/api/admin/notifications/review-prompt/send-now",
+        json={**payload, "dry_run": True},
+    ).json()
+    assert preview["dry_run"] is True
+    assert (preview["in_app_created"], preview["emailed"], preview["pushed"]) == (
+        1,
+        1,
+        0,
+    )
+    assert preview["home_prompt_forced"] == 1
+    assert preview["results"][0]["channels"] == ["home", "app", "email"]
+    assert sent == []
+    session.expire_all()
+    assert session.exec(select(Notification)).all() == []
+    assert session.exec(select(ReviewPromptForce)).all() == []
+
+    real = client.post(
+        "/api/admin/notifications/review-prompt/send-now", json=payload
+    ).json()
+    assert real["results"][0]["channels"] == ["home", "app", "email"]
+    assert sent == ["user@example.com"]  # push not selected
+
+    rows = client.get("/api/admin/events/ev-a/review-prompt-candidates").json()
+    cand = rows["candidates"][0]
+    assert cand["notification"]["emailed_at"] is not None
+    assert cand["home"]["forced_until"] is not None
+    assert rows["home_warning"] is None
+
+
+@pytest.mark.unit
+def test_candidates_home_warning(client, session):
+    _event(session, "ev-fresh", ended_hours_ago=1)
+    _event(session, "ev-ancient", ended_hours_ago=24 * 200)
+    _login(client, "admin@example.com")
+    get = lambda eid: client.get(  # noqa: E731
+        f"/api/admin/events/{eid}/review-prompt-candidates"
+    ).json()["home_warning"]
+    assert get("ev-fresh") == "too_recent"
+    assert get("ev-ancient") == "too_old"
 
 
 @pytest.mark.unit

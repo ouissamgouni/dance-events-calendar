@@ -41,7 +41,7 @@ const TOGGLES: { key: ToggleKey; label: string; help: string }[] = [
     {
         key: 'review_home_prompt_enabled',
         label: 'Home review prompt',
-        help: 'Opens the review wizard on Home (once per session) for the latest attended, unreviewed event. Admin “Force Home prompt” skips the cooldown and fatigue pause.',
+        help: 'Opens the review wizard on Home (once per session) for the latest attended, unreviewed event. Admin Send now with the “Home prompt” channel skips the cooldown and fatigue pause.',
     },
     {
         key: 'similar_events_enabled',

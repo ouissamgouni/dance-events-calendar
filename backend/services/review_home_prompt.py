@@ -229,3 +229,63 @@ def force_prompt(
     row.created_at = now
     row.expires_at = now + FORCE_TTL
     session.add(row)
+
+
+def home_ineligible_reason(
+    session: Session, event: CachedEvent, now: Optional[datetime] = None
+) -> Optional[str]:
+    """Why a forced Home prompt for ``event`` wouldn't show right now, if anything."""
+    now = now or datetime.now(timezone.utc)
+    if not app_settings.get_review_home_prompt_enabled(session):
+        return "disabled"
+    delay = timedelta(hours=app_settings.get_review_prompt_delay_hours(session))
+    if _as_utc(event.end) > now - delay:
+        return "too_recent"
+    window_days = max(
+        app_settings.get_review_home_prompt_int(
+            "review_home_prompt_max_event_age_days", session
+        ),
+        app_settings.get_for_you_review_window_days(session),
+    )
+    if _as_utc(event.start) < now - timedelta(days=window_days):
+        return "too_old"
+    return None
+
+
+def home_states(
+    session: Session, event_id: str, user_ids: set, now: Optional[datetime] = None
+) -> dict:
+    """Per-user Home prompt state for one event: active force and impressions."""
+    now = now or datetime.now(timezone.utc)
+    states: dict = {
+        uid: {
+            "forced_until": None,
+            "shown_count": 0,
+            "last_shown_at": None,
+            "last_outcome": None,
+        }
+        for uid in user_ids
+    }
+    if not user_ids:
+        return states
+    for force in session.exec(
+        select(ReviewPromptForce).where(
+            ReviewPromptForce.event_id == event_id,
+            col(ReviewPromptForce.user_id).in_(user_ids),
+            ReviewPromptForce.expires_at > now,
+        )
+    ).all():
+        states[force.user_id]["forced_until"] = _as_utc(force.expires_at)
+    for imp in session.exec(
+        select(ReviewPromptImpression)
+        .where(
+            ReviewPromptImpression.event_id == event_id,
+            col(ReviewPromptImpression.user_id).in_(user_ids),
+        )
+        .order_by(col(ReviewPromptImpression.shown_at))
+    ).all():
+        state = states[imp.user_id]
+        state["shown_count"] += 1
+        state["last_shown_at"] = _as_utc(imp.shown_at)
+        state["last_outcome"] = imp.outcome
+    return states

@@ -15,7 +15,7 @@ import {
     previewInterestMatches, fetchNotificationToggleCounts,
     sendReviewPromptNow, searchEvents, fetchReviewPromptCandidates,
 } from '../api';
-import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse, EventSearchResult, ReviewPromptCandidate, AssetPromptKind, NotificationChannelSettings } from '../api';
+import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse, EventSearchResult, ReviewPromptCandidate, ReviewPromptCandidatesResponse, ReviewPromptChannel, ReviewPromptSendNowResponse, AssetPromptKind, NotificationChannelSettings } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useUpdateFeatureFlag } from '../context/FeatureFlagsContext';
 import SyncProgressCard from '../components/SyncProgressCard';
@@ -263,6 +263,61 @@ const DEFAULT_EVENT_ASSET_LIMITS = Object.fromEntries(
     EVENT_ASSET_LIMITS.map((limit) => [limit.key, limit.fallback]),
 ) as Record<EventAssetLimitKey, number>;
 
+const REVIEW_NOW_CHANNELS: { key: ReviewPromptChannel; label: string }[] = [
+    { key: 'app', label: 'In-app' },
+    { key: 'email', label: 'Email' },
+    { key: 'push', label: 'Push' },
+    { key: 'home', label: 'Home prompt' },
+];
+
+const REVIEW_NOW_HOME_WARNINGS: Record<NonNullable<ReviewPromptCandidatesResponse['home_warning']>, string> = {
+    disabled: 'The Home review prompt is off site-wide — the Home channel won\'t show until it\'s turned on.',
+    too_recent: 'This event is still inside the review delay — the Home prompt will only show once the delay has passed.',
+    too_old: 'This event is older than the review window — the Home prompt won\'t show for it.',
+};
+
+function fmtReviewNow(iso: string) {
+    return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function reviewNowChips(c: ReviewPromptCandidate): { label: string; text: string; on: boolean }[] {
+    const n = c.notification;
+    const h = c.home;
+    return [
+        { label: 'In-app', text: n ? `✓ ${fmtReviewNow(n.created_at)} · ${n.read_at ? 'read' : 'unread'}` : '—', on: !!n },
+        { label: 'Email', text: n?.emailed_at ? `✓ ${fmtReviewNow(n.emailed_at)}` : c.email_enabled ? '—' : 'opted out', on: !!n?.emailed_at },
+        {
+            label: 'Push',
+            text: n?.pushed_at
+                ? `✓ ${fmtReviewNow(n.pushed_at)}`
+                : !c.push_enabled ? 'opted out' : !c.has_push_subscription ? 'no device' : '—',
+            on: !!n?.pushed_at,
+        },
+        {
+            label: 'Home',
+            text: h.forced_until
+                ? `forced until ${fmtReviewNow(h.forced_until)}${h.shown_count ? ` · shown ${h.shown_count}×` : ''}`
+                : h.shown_count ? `shown ${h.shown_count}× · ${h.last_outcome}` : '—',
+            on: !!h.forced_until || h.shown_count > 0,
+        },
+    ];
+}
+
+function reviewNowSummary(res: ReviewPromptSendNowResponse): string {
+    const sent = res.results.filter((r) => r.status === 'sent').length;
+    const skipped: Record<string, number> = {};
+    for (const r of res.results) {
+        if (r.status !== 'sent') skipped[r.status] = (skipped[r.status] ?? 0) + 1;
+    }
+    const skippedText = Object.entries(skipped)
+        .map(([s, n]) => `${n} ${s.replace(/^skipped_/, '').replace(/_/g, ' ')}`)
+        .join(', ');
+    const resurfaced = res.in_app_resurfaced ? `, ${res.in_app_resurfaced} resurfaced` : '';
+    return `${res.dry_run ? 'Would send to' : 'Sent to'} ${sent} of ${res.results.length} user(s) `
+        + `(${res.in_app_created} in-app${resurfaced}, ${res.emailed} email, ${res.pushed} push, ${res.home_prompt_forced ?? 0} Home)`
+        + (skippedText ? `; skipped: ${skippedText}.` : '.');
+}
+
 
 export default function Admin() {
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
@@ -366,7 +421,11 @@ export default function Admin() {
     const [reviewNowCandidatesLoading, setReviewNowCandidatesLoading] = useState(false);
     const [reviewNowUsers, setReviewNowUsers] = useState<ReviewPromptCandidate[]>([]);
     const [reviewNowResend, setReviewNowResend] = useState(false);
-    const [reviewNowForceHome, setReviewNowForceHome] = useState(false);
+    const [reviewNowChannels, setReviewNowChannels] = useState<Record<ReviewPromptChannel, boolean>>({ app: true, email: true, push: true, home: true });
+    const [reviewNowHomeWarning, setReviewNowHomeWarning] = useState<ReviewPromptCandidatesResponse['home_warning']>(null);
+    const [reviewNowReload, setReviewNowReload] = useState(0);
+    // Dry-run result, tied to the exact selection it was computed for.
+    const [reviewNowPreview, setReviewNowPreview] = useState<{ key: string; res: ReviewPromptSendNowResponse } | null>(null);
     const [reviewNowBusy, setReviewNowBusy] = useState(false);
     const [reviewNowMessage, setReviewNowMessage] = useState<string>('');
     // Max matched events shown inline in an interest-match digest email
@@ -1706,31 +1765,51 @@ export default function Admin() {
         let cancelled = false;
         setReviewNowCandidatesLoading(true);
         fetchReviewPromptCandidates(reviewNowEvent.event_id)
-            .then((rows) => { if (!cancelled) setReviewNowCandidates(rows); })
-            .catch(() => { if (!cancelled) setReviewNowCandidates([]); })
+            .then((data) => {
+                if (cancelled) return;
+                setReviewNowCandidates(data.candidates);
+                setReviewNowHomeWarning(data.home_warning);
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setReviewNowCandidates([]);
+                setReviewNowHomeWarning(null);
+            })
             .finally(() => { if (!cancelled) setReviewNowCandidatesLoading(false); });
         return () => { cancelled = true; };
-    }, [reviewNowEvent]);
+    }, [reviewNowEvent, reviewNowReload]);
 
-    const handleSendReviewPromptNow = async () => {
-        if (!reviewNowEvent || reviewNowUsers.length === 0) return;
+    const reviewNowActiveChannels = REVIEW_NOW_CHANNELS.filter((c) => reviewNowChannels[c.key]).map((c) => c.key);
+    const reviewNowKey = JSON.stringify([
+        reviewNowEvent?.event_id ?? null,
+        reviewNowUsers.map((u) => u.user_id),
+        reviewNowActiveChannels,
+        reviewNowResend,
+    ]);
+    const reviewNowPreviewRes = reviewNowPreview?.key === reviewNowKey ? reviewNowPreview.res : null;
+
+    const runReviewPromptNow = async (dryRun: boolean) => {
+        if (!reviewNowEvent || reviewNowUsers.length === 0 || reviewNowActiveChannels.length === 0) return;
         setReviewNowBusy(true);
+        setReviewNowMessage('');
         try {
-            const res = await sendReviewPromptNow(
-                reviewNowEvent.event_id,
-                reviewNowUsers.map((u) => u.user_id),
-                reviewNowResend,
-                reviewNowForceHome,
-            );
-            const sent = res.results.filter((r) => r.status === 'sent').length;
-            const skipped = res.results.length - sent;
-            const msg = `Review prompt send-now: ${sent} of ${reviewNowUsers.length} user(s) sent `
-                + `(${res.emailed} email, ${res.pushed} push, ${res.in_app_created} in-app)`
-                + (reviewNowForceHome ? `; Home prompt forced for ${res.home_prompt_forced ?? 0}` : '')
-                + (skipped ? `; ${skipped} skipped.` : '.');
+            const res = await sendReviewPromptNow({
+                event_id: reviewNowEvent.event_id,
+                user_ids: reviewNowUsers.map((u) => u.user_id),
+                channels: reviewNowActiveChannels,
+                resend: reviewNowResend,
+                dry_run: dryRun,
+            });
+            if (dryRun) {
+                setReviewNowPreview({ key: reviewNowKey, res });
+                return;
+            }
+            const msg = `Review prompt send-now: ${reviewNowSummary(res)}`;
             setReviewNowMessage(msg);
             setMessage(msg);
+            setReviewNowPreview(null);
             setReviewNowUsers([]);
+            setReviewNowReload((n) => n + 1);
         } catch (e) {
             const msg = e instanceof Error ? e.message : 'Failed to send review prompt now.';
             setReviewNowMessage(msg);
@@ -3410,8 +3489,9 @@ export default function Admin() {
                                             <span className="text-[11px] font-medium text-ink">Send now</span>
                                             <p className="text-[10px] text-muted">
                                                 Fire the "how was it?" prompt for a specific event to hand-picked
-                                                attendees now, bypassing the delay window. Non-attendees and users
-                                                who already rated are skipped; per-channel opt-outs are respected.
+                                                attendees on the channels you pick, bypassing the delay window.
+                                                Users who already rated are skipped; email/push opt-outs are respected.
+                                                Preview shows what would go out before you confirm.
                                             </p>
                                         </div>
                                         {reviewNowEvent ? (
@@ -3466,6 +3546,11 @@ export default function Admin() {
                                                 )}
                                             </div>
                                         )}
+                                        {reviewNowEvent && reviewNowHomeWarning && reviewNowChannels.home && (
+                                            <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1">
+                                                {REVIEW_NOW_HOME_WARNINGS[reviewNowHomeWarning]}
+                                            </p>
+                                        )}
                                         {reviewNowEvent && (
                                             <div className="border border-line rounded">
                                                 <div className="flex items-center justify-between px-2 py-1 border-b border-card-line">
@@ -3493,19 +3578,21 @@ export default function Admin() {
                                                 ) : reviewNowCandidates.length === 0 ? (
                                                     <p className="text-[10px] text-muted px-2 py-2">No attendees for this event.</p>
                                                 ) : (
-                                                    <ul className="max-h-40 overflow-auto divide-y divide-gray-50">
+                                                    <ul className="max-h-56 overflow-auto divide-y divide-gray-50">
                                                         {reviewNowCandidates.map((c) => {
                                                             const checked = reviewNowUsers.some((u) => u.user_id === c.user_id);
                                                             return (
                                                                 <li key={c.user_id}>
                                                                     <label
-                                                                        className={`flex items-center gap-2 px-2 py-1 text-[11px] ${c.already_rated ? 'text-gray-300' : 'text-ink hover:bg-canvas cursor-pointer'}`}
+                                                                        className={`flex items-start gap-2 px-2 py-1 text-[11px] ${c.already_rated ? 'text-gray-300' : 'text-ink hover:bg-canvas cursor-pointer'}`}
                                                                         title={c.already_rated ? 'Already rated — will be skipped' : undefined}
                                                                     >
                                                                         <input
                                                                             type="checkbox"
+                                                                            className="mt-0.5"
                                                                             disabled={c.already_rated}
                                                                             checked={checked}
+                                                                            aria-label={`Select ${c.name || c.handle || c.email}`}
                                                                             onChange={() => {
                                                                                 setReviewNowMessage('');
                                                                                 setReviewNowUsers((prev) =>
@@ -3515,9 +3602,23 @@ export default function Admin() {
                                                                                 );
                                                                             }}
                                                                         />
-                                                                        <span className="min-w-0 flex-1 truncate">
-                                                                            {c.name || c.handle || c.email}
-                                                                            <span className="text-muted"> · {c.email}</span>
+                                                                        <span className="min-w-0 flex-1">
+                                                                            <span className="block truncate">
+                                                                                {c.name || c.handle || c.email}
+                                                                                <span className="text-muted"> · {c.email}</span>
+                                                                            </span>
+                                                                            {!c.already_rated && (
+                                                                                <span className="mt-0.5 flex flex-wrap gap-1">
+                                                                                    {reviewNowChips(c).map((chip) => (
+                                                                                        <span
+                                                                                            key={chip.label}
+                                                                                            className={`text-[9px] px-1 rounded-field ${chip.on ? 'bg-emerald-50 text-success' : 'bg-canvas text-muted'}`}
+                                                                                        >
+                                                                                            {chip.label}: {chip.text}
+                                                                                        </span>
+                                                                                    ))}
+                                                                                </span>
+                                                                            )}
                                                                         </span>
                                                                         {c.already_rated && <span className="text-[9px] text-muted">rated</span>}
                                                                     </label>
@@ -3528,8 +3629,18 @@ export default function Admin() {
                                                 )}
                                             </div>
                                         )}
-                                        <div className="flex items-center gap-2">
-                                            <label className="flex items-center gap-1 text-[10px] text-ink-soft" htmlFor="review-now-resend" title="Re-send email/push even to users already prompted for this event">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {REVIEW_NOW_CHANNELS.map((ch) => (
+                                                <label key={ch.key} className="flex items-center gap-1 text-[10px] text-ink-soft">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={reviewNowChannels[ch.key]}
+                                                        onChange={(e) => setReviewNowChannels((prev) => ({ ...prev, [ch.key]: e.target.checked }))}
+                                                    />
+                                                    {ch.label}
+                                                </label>
+                                            ))}
+                                            <label className="flex items-center gap-1 text-[10px] text-ink-soft" htmlFor="review-now-resend" title="Resurface in-app and re-send email/push even to users already prompted for this event">
                                                 <input
                                                     id="review-now-resend"
                                                     type="checkbox"
@@ -3538,24 +3649,32 @@ export default function Admin() {
                                                 />
                                                 Resend
                                             </label>
-                                            <label className="flex items-center gap-1 text-[10px] text-ink-soft" htmlFor="review-now-force-home" title="Also open the review wizard on their next Home visit, skipping the cooldown and fatigue pause (works even with email/push off)">
-                                                <input
-                                                    id="review-now-force-home"
-                                                    type="checkbox"
-                                                    checked={reviewNowForceHome}
-                                                    onChange={(e) => setReviewNowForceHome(e.target.checked)}
-                                                />
-                                                Force Home prompt
-                                            </label>
-                                            <button
-                                                type="button"
-                                                onClick={handleSendReviewPromptNow}
-                                                disabled={!reviewNowEvent || reviewNowUsers.length === 0 || reviewNowBusy}
-                                                className="ml-auto text-[11px] px-2.5 py-1 rounded bg-success text-white disabled:bg-gray-300 hover:bg-success/90"
-                                            >
-                                                {reviewNowBusy ? 'Sending…' : `Send now${reviewNowUsers.length ? ` (${reviewNowUsers.length})` : ''}`}
-                                            </button>
+                                            {reviewNowPreviewRes ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => runReviewPromptNow(false)}
+                                                    disabled={reviewNowBusy}
+                                                    className="ml-auto text-[11px] px-2.5 py-1 rounded bg-success text-white disabled:bg-gray-300 hover:bg-success/90"
+                                                >
+                                                    {reviewNowBusy ? 'Sending…' : `Confirm send (${reviewNowUsers.length})`}
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => runReviewPromptNow(true)}
+                                                    disabled={!reviewNowEvent || reviewNowUsers.length === 0 || reviewNowActiveChannels.length === 0 || reviewNowBusy}
+                                                    className="ml-auto text-[11px] px-2.5 py-1 rounded border border-success text-success disabled:border-gray-300 disabled:text-muted hover:bg-emerald-50"
+                                                >
+                                                    {reviewNowBusy ? 'Checking…' : `Preview${reviewNowUsers.length ? ` (${reviewNowUsers.length})` : ''}`}
+                                                </button>
+                                            )}
                                         </div>
+                                        {reviewNowPreviewRes && (
+                                            <div className="text-[10px] text-ink-soft bg-canvas border border-line p-2" role="status">
+                                                <span className="font-medium text-ink">Preview: </span>
+                                                {reviewNowSummary(reviewNowPreviewRes)}
+                                            </div>
+                                        )}
                                         {reviewNowMessage && (
                                             <div className="text-[10px] text-success bg-emerald-50 border border-emerald-200 p-2">
                                                 {reviewNowMessage}

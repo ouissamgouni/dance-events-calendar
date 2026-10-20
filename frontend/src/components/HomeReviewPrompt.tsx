@@ -6,14 +6,15 @@ import { useHomeReviewPrompt } from '../hooks/useHomeReviewPrompt';
 import RateEventModal from './RateEventModal';
 
 interface Props {
+    userId: string;
     /** Hold the prompt while another overlay (e.g. an event modal) is open. */
     blocked: boolean;
     onReviewed: (eventId: string) => void;
 }
 
 /** Uber-style "How was it?" wizard auto-opened on Home; "Rate next" chains inside the modal. */
-export default function HomeReviewPrompt({ blocked, onReviewed }: Props) {
-    const { prompt, dismiss, clear } = useHomeReviewPrompt(!blocked);
+export default function HomeReviewPrompt({ userId, blocked, onReviewed }: Props) {
+    const { prompt, dismiss, clear } = useHomeReviewPrompt(!blocked, userId);
     const [submitted, setSubmitted] = useState(false);
     const upsertMyRating = useUpsertMyRating();
     const invalidateAggregate = useInvalidateRatingAggregate();

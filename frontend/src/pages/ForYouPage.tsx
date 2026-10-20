@@ -542,6 +542,7 @@ export default function ForYouPage() {
             )}
             {user && (
                 <HomeReviewPrompt
+                    userId={user.user_id ?? user.email}
                     blocked={!!selectedEvent}
                     onReviewed={handleReviewed}
                 />

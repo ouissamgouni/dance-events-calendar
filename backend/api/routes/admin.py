@@ -71,6 +71,8 @@ from backend.api.schemas import (
     NotificationToggleCountsResponse,
     PaginatedEventsResponse,
     ReviewPromptCandidate,
+    ReviewPromptCandidatesResponse,
+    ReviewPromptHomeState,
     ReviewPromptSendNowRequest,
     ReviewPromptSendNowResponse,
     RevisionActor,
@@ -1910,57 +1912,53 @@ def asset_prompt_send_now(
 
 @router.get(
     "/events/{event_id}/review-prompt-candidates",
-    response_model=list[ReviewPromptCandidate],
+    response_model=ReviewPromptCandidatesResponse,
 )
 def review_prompt_candidates(
     event_id: str,
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """List the attendees of an event as force-send targets.
+    """Going attendees of an event with per-channel review prompt status."""
+    from backend.services.review_home_prompt import home_ineligible_reason
+    from backend.services.review_prompt_service import force_candidates
 
-    Only users who RSVP'd "Going" are returned (device-only anonymous rows
-    are excluded); ``already_rated`` flags those who have since reviewed so
-    the admin UI can grey them out.
-    """
     event = session.get(CachedEvent, event_id)
     if event is None or event.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    attendee_ids = set(
-        session.exec(
-            select(UserEventAttendance.user_id)
-            .where(UserEventAttendance.event_id == event_id)
-            .where(UserEventAttendance.user_id.is_not(None))  # type: ignore[union-attr]
-        ).all()
-    )
-    if not attendee_ids:
-        return []
-    users = session.exec(
-        select(User)
-        .where(User.id.in_(attendee_ids))  # type: ignore[union-attr]
-        .where(User.deleted_at.is_(None))  # type: ignore[union-attr]
-    ).all()
-    rated = set(
-        session.exec(
-            select(EventRating.user_id)
-            .where(EventRating.event_id == event_id)
-            .where(EventRating.scope == "this_edition")
-            .where(EventRating.user_id.in_(attendee_ids))  # type: ignore[union-attr]
-        ).all()
-    )
-    candidates = [
-        ReviewPromptCandidate(
-            user_id=u.id,
-            email=u.email,
-            name=u.display_name,
-            handle=u.handle,
-            already_rated=u.id in rated,
+    candidates = []
+    for c in force_candidates(session, event):
+        user, notif = c["user"], c["notification"]
+        candidates.append(
+            ReviewPromptCandidate(
+                user_id=user.id,
+                email=user.email,
+                name=user.display_name,
+                handle=user.handle,
+                already_rated=c["already_rated"],
+                email_enabled=bool(user.email_review_prompt_enabled),
+                push_enabled=bool(user.push_review_prompt_enabled),
+                has_push_subscription=c["has_push_subscription"],
+                notification=(
+                    AssetPromptNotificationState(
+                        created_at=notif.created_at,
+                        read_at=notif.read_at,
+                        emailed_at=notif.emailed_at,
+                        pushed_at=notif.pushed_at,
+                    )
+                    if notif
+                    else None
+                ),
+                home=ReviewPromptHomeState(**c["home"]),
+            )
         )
-        for u in users
-    ]
     candidates.sort(key=lambda c: (c.already_rated, c.email.casefold()))
-    return candidates
+    return ReviewPromptCandidatesResponse(
+        event_id=event.event_id,
+        home_warning=home_ineligible_reason(session, event),
+        candidates=candidates,
+    )
 
 
 @router.post(
@@ -1972,28 +1970,15 @@ def review_prompt_send_now(
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Admin override: send the post-event review prompt for a specific event
-    to hand-picked attendees right now, bypassing the delay/lookback window.
+    """Admin override: send the post-event review prompt for one event to
+    hand-picked attendees on the chosen channels, bypassing the delay window.
 
-    Only users who actually RSVP'd "Going" and haven't rated the event yet are
-    eligible; per-channel opt-outs are respected. A user already prompted for
-    this event is skipped unless ``resend`` is set. When friends of the
-    recipient have already reviewed the event, the social-proof variant of the
-    copy is used across all three channels.
+    Only "Going" attendees who haven't rated the event are eligible; email/push
+    opt-outs are respected. ``dry_run`` reports what would happen without
+    sending or writing anything.
     """
     from datetime import datetime, timezone
-    from backend.services.review_prompt_service import (
-        EVENT_REVIEW_PROMPT,
-        friend_review_proof,
-        proof_phrase,
-        review_prompt_push_copy,
-    )
-    from backend.services.email import send_event_review_prompt_email
-    from backend.services.push_service import send_push
-    from backend.services.notification_delivery import record_delivery
-    from backend.services.review_home_prompt import (
-        force_prompt as force_home_review_prompt,
-    )
+    from backend.services.review_prompt_service import force_send
 
     event = session.get(CachedEvent, body.event_id)
     if (
@@ -2003,142 +1988,28 @@ def review_prompt_send_now(
     ):
         raise HTTPException(status_code=404, detail="Event not found")
 
-    users = {
-        u.id: u
-        for u in session.exec(
-            select(User).where(User.id.in_(body.user_ids))  # type: ignore[union-attr]
-        ).all()
-    }
-    attended = set(
-        session.exec(
-            select(UserEventAttendance.user_id)
-            .where(UserEventAttendance.event_id == body.event_id)
-            .where(UserEventAttendance.user_id.in_(body.user_ids))  # type: ignore[union-attr]
-        ).all()
+    out = force_send(
+        session,
+        event,
+        body.user_ids,
+        set(body.channels),
+        body.resend,
+        _admin.get("email"),
+        datetime.now(timezone.utc),
+        dry_run=body.dry_run,
     )
-    rated = set(
-        session.exec(
-            select(EventRating.user_id)
-            .where(EventRating.scope == "this_edition")
-            .where(EventRating.event_id == body.event_id)
-            .where(EventRating.user_id.in_(body.user_ids))  # type: ignore[union-attr]
-        ).all()
-    )
-
-    results: list[ForceSendUserResult] = []
-    emailed = pushed = in_app_created = home_prompt_forced = 0
-    stamp_now = datetime.now(timezone.utc)
-
-    for uid in body.user_ids:
-        user = users.get(uid)
-        if user is None or user.deleted_at is not None:
-            results.append(
-                ForceSendUserResult(user_id=uid, email="", status="skipped_not_found")
-            )
-            continue
-        if uid not in attended:
-            results.append(
-                ForceSendUserResult(
-                    user_id=uid, email=user.email, status="skipped_not_attended"
-                )
-            )
-            continue
-        if uid in rated:
-            results.append(
-                ForceSendUserResult(
-                    user_id=uid, email=user.email, status="skipped_already_rated"
-                )
-            )
-            continue
-        # The Home prompt is in-app, so it ignores the email/push opt-outs below.
-        if body.force_home_prompt:
-            force_home_review_prompt(
-                session, uid, body.event_id, _admin.get("email"), stamp_now
-            )
-            home_prompt_forced += 1
-        if not (user.email_review_prompt_enabled or user.push_review_prompt_enabled):
-            results.append(
-                ForceSendUserResult(
-                    user_id=uid,
-                    email=user.email,
-                    status="home_prompt_only"
-                    if body.force_home_prompt
-                    else "skipped_disabled",
-                )
-            )
-            continue
-
-        notif = session.exec(
-            select(Notification)
-            .where(Notification.recipient_user_id == uid)
-            .where(Notification.kind == EVENT_REVIEW_PROMPT)
-            .where(Notification.actor_user_id == uid)
-            .where(Notification.event_id == body.event_id)
-        ).first()
-        proof = friend_review_proof(session, uid, body.event_id)
-        phrase = proof_phrase(proof) if proof else None
-        created = notif is None
-        if notif is None:
-            notif = Notification(
-                recipient_user_id=uid,
-                actor_user_id=uid,  # self: no external actor
-                kind=EVENT_REVIEW_PROMPT,
-                event_id=body.event_id,
-                context=phrase,
-            )
-            session.add(notif)
-            session.flush()
-            record_delivery(session, notif.id, "app")
-            in_app_created += 1
-        elif phrase and notif.context != phrase:
-            notif.context = phrase
-
-        did_send = False
-        if user.email_review_prompt_enabled and (
-            body.resend or notif.emailed_at is None
-        ):
-            if send_event_review_prompt_email(user, event, friend_proof=phrase):
-                notif.emailed_at = stamp_now
-                record_delivery(
-                    session,
-                    notif.id,
-                    "email",
-                    stamp_now,
-                    mode="instant",
-                    source="admin",
-                )
-                emailed += 1
-                did_send = True
-        if user.push_review_prompt_enabled and (body.resend or notif.pushed_at is None):
-            push_title, push_body = review_prompt_push_copy(event.title, phrase)
-            delivered = send_push(
-                uid,
-                title=push_title,
-                body=push_body,
-                url=f"/event/{body.event_id}/review",
-                tag=f"review-prompt:{body.event_id}",
-            )
-            if delivered:
-                notif.pushed_at = stamp_now
-                record_delivery(session, notif.id, "push", stamp_now, source="admin")
-                pushed += delivered
-                did_send = True
-        session.add(notif)
-        results.append(
-            ForceSendUserResult(
-                user_id=uid,
-                email=user.email,
-                status="sent" if (created or did_send) else "already_sent",
-            )
-        )
-
-    session.commit()
+    if body.dry_run:
+        session.rollback()
+    else:
+        session.commit()
     return ReviewPromptSendNowResponse(
-        emailed=emailed,
-        pushed=pushed,
-        in_app_created=in_app_created,
-        results=results,
-        home_prompt_forced=home_prompt_forced,
+        emailed=out["emailed"],
+        pushed=out["pushed"],
+        in_app_created=out["in_app_created"],
+        in_app_resurfaced=out["in_app_resurfaced"],
+        home_prompt_forced=out["home_prompt_forced"],
+        results=[ForceSendUserResult(**r) for r in out["results"]],
+        dry_run=body.dry_run,
     )
 
 

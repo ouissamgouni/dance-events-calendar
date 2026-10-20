@@ -20,16 +20,35 @@ const prompt = {
     pending_total: 1,
 }
 
-function renderPrompt() {
+function renderPrompt(userId = 'user-a') {
     return renderWithProviders(
         <FeatureFlagsProvider>
-            <HomeReviewPrompt blocked={false} onReviewed={() => { }} />
+            <HomeReviewPrompt userId={userId} blocked={false} onReviewed={() => { }} />
         </FeatureFlagsProvider>,
     )
 }
 
 describe('HomeReviewPrompt', () => {
     afterEach(() => window.sessionStorage.clear())
+
+    it('checks again when a different user signs in on the same tab', async () => {
+        let promptRequests = 0
+        server.use(
+            http.get('*/api/users/me/review-prompt', () => {
+                promptRequests += 1
+                return HttpResponse.json({ ...prompt, prompt: null })
+            }),
+        )
+
+        const first = renderPrompt('user-a')
+        await waitFor(() => expect(promptRequests).toBe(1), { timeout: 3000 })
+        expect(window.sessionStorage.getItem(REVIEW_PROMPT_SESSION_KEY)).toBe('user-a')
+        first.unmount()
+
+        renderPrompt('user-b')
+        await waitFor(() => expect(promptRequests).toBe(2), { timeout: 3000 })
+        expect(window.sessionStorage.getItem(REVIEW_PROMPT_SESSION_KEY)).toBe('user-b')
+    })
 
     it('opens the wizard once per session and records shown + dismissed', async () => {
         const outcomes: string[] = []
@@ -51,7 +70,7 @@ describe('HomeReviewPrompt', () => {
 
         const { user, unmount } = renderPrompt()
         expect(await screen.findByRole('button', { name: 'Not now' }, { timeout: 3000 })).toBeInTheDocument()
-        expect(window.sessionStorage.getItem(REVIEW_PROMPT_SESSION_KEY)).toBe('1')
+        expect(window.sessionStorage.getItem(REVIEW_PROMPT_SESSION_KEY)).toBe('user-a')
 
         await user.click(screen.getByRole('button', { name: 'Not now' }))
         await waitFor(() => expect(outcomes).toEqual(['shown', 'dismissed']))
