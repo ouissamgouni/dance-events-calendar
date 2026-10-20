@@ -25,6 +25,7 @@ function attendedWhen(startIso: string | null): string {
 
 export default function ShareExperienceCard({ review, onReviewed }: Props) {
     const [open, setOpen] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
     const upsertMyRating = useUpsertMyRating();
     const invalidateAggregate = useInvalidateRatingAggregate();
 
@@ -35,11 +36,16 @@ export default function ShareExperienceCard({ review, onReviewed }: Props) {
         setOpen(true);
     };
 
+    // Keep the modal up after submit so the thanks screen (similar events) shows.
     const handleSubmitted = (rating: EventRating) => {
         upsertMyRating(review.event_id, rating);
         invalidateAggregate(review.event_id);
+        setSubmitted(true);
+    };
+
+    const handleClose = () => {
         setOpen(false);
-        onReviewed(review.event_id);
+        if (submitted) onReviewed(review.event_id);
     };
 
     return (
@@ -65,8 +71,9 @@ export default function ShareExperienceCard({ review, onReviewed }: Props) {
                 <RateEventModal
                     eventId={review.event_id}
                     initialRating={null}
-                    onClose={() => setOpen(false)}
+                    onClose={handleClose}
                     onSubmitted={handleSubmitted}
+                    entryPoint="for-you-share-experience"
                 />
             )}
         </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import GoingButton from './GoingButton'
@@ -352,5 +352,31 @@ describe('GoingButton visibility', () => {
         await user.click(await screen.findByRole('button', { name: "I'm going" }))
         await screen.findByRole('dialog', { name: "You're going!" })
         await waitFor(() => expect(screen.queryByRole('checkbox')).not.toBeInTheDocument())
+    })
+
+    it('always opens the people sheet, even with a remembered choice, when the flag is on', async () => {
+        useMobileViewport()
+        localStorage.setItem('audience.remember.user-1', '1')
+        let settingsServed = false
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/settings', () => {
+                settingsServed = true
+                return HttpResponse.json({ rsvp_people_sheet_enabled: true })
+            }),
+            http.get('*/api/events/:eventId/attendees', () => HttpResponse.json([])),
+            http.get('*/api/social/me/referral', () =>
+                HttpResponse.json({ code: 'INV1', url: '/r/INV1', used_count: 0 }),
+            ),
+        )
+        const { user } = renderGoingButton('evt-people-sheet')
+
+        const goingButton = await screen.findByRole('button', { name: "I'm going" })
+        await waitFor(() => expect(settingsServed).toBe(true))
+        await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
+        await user.click(goingButton)
+        const dialog = await screen.findByRole('dialog', { name: "You're going!" })
+        expect(within(dialog).getByRole('button', { name: 'Bring someone along' })).toBeInTheDocument()
+        expect(await within(dialog).findByText('You’re the first of your crew — bring someone along.')).toBeInTheDocument()
     })
 })

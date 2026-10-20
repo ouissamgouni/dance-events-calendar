@@ -70,6 +70,8 @@ from backend.db.models import (
     Notification,
     PassportShareToken,
     PushSubscription,
+    ReviewPromptForce,
+    ReviewPromptImpression,
     ShareToken,
     Tag,
     User,
@@ -1569,6 +1571,10 @@ def purge_user_account(session: Session, user_id) -> None:
     )
     session.exec(delete(MyPlanShareToken).where(MyPlanShareToken.user_id == user_id))
     session.exec(delete(PushSubscription).where(PushSubscription.user_id == user_id))
+    session.exec(
+        delete(ReviewPromptImpression).where(ReviewPromptImpression.user_id == user_id)
+    )
+    session.exec(delete(ReviewPromptForce).where(ReviewPromptForce.user_id == user_id))
     for message in session.exec(
         select(EventMessage).where(EventMessage.author_user_id == user_id)
     ).all():

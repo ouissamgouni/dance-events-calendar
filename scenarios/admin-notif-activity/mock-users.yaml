@@ -1,0 +1,41 @@
+# Mock users for "admin-notif-activity".
+#   * admin — matches ADMIN_EMAIL; reviews the activity view.
+#   * maya  — power user: digest, reminder, forced review prompt, forced
+#             program email, in-app-only friend row (3 days).
+#   * leo, nina, omar, ines, theo — one or two notable sends each.
+#   * pablo, rosa, sami, yara — routine reminders that push the list past
+#             one page (24 user-days in total).
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+  - email: maya@example.com
+    name: Maya Duarte
+    handle: maya
+  - email: leo@example.com
+    name: Leo Marchetti
+    handle: leo
+  - email: nina@example.com
+    name: Nina Petrova
+    handle: nina
+  - email: omar@example.com
+    name: Omar Haddad
+    handle: omar
+  - email: ines@example.com
+    name: Ines Moreau
+    handle: ines
+  - email: theo@example.com
+    name: Theo Lambert
+    handle: theo
+  - email: pablo@example.com
+    name: Pablo Ruiz
+    handle: pablo
+  - email: rosa@example.com
+    name: Rosa Lima
+    handle: rosa
+  - email: sami@example.com
+    name: Sami Benali
+    handle: sami
+  - email: yara@example.com
+    name: Yara Costa
+    handle: yara

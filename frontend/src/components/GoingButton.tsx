@@ -7,7 +7,7 @@ import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/Featur
 import type { ShareAudience } from '../api';
 import { trackShareConversion } from '../utils/tracking';
 import { getActiveReferral } from '../hooks/useReferralAttribution';
-import PostRsvpPopover, { type PostRsvpVariant } from './PostRsvpPopover';
+import PostRsvpPopover, { PostRsvpSocial, type PostRsvpVariant } from './PostRsvpPopover';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
 import { useAnchoredToast } from './AnchoredToast';
 import AudienceTierIcon from './AudienceTierIcon';
@@ -17,6 +17,7 @@ import {
     getRememberAudience,
     setLastUsedAudience,
 } from '../utils/audiencePreference';
+import { buildEventShareUrl } from '../utils/postRsvp';
 
 interface Props {
     eventId: string;
@@ -105,7 +106,7 @@ export default function GoingButton({
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user } = useAuth();
-    const { goingButtonIconVariant, appAuthGateEnabled, guestActionsRequireSignin, rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
+    const { goingButtonIconVariant, appAuthGateEnabled, guestActionsRequireSignin, rsvpRememberVisibilityEnabled, rsvpPeopleSheetEnabled } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const openSignIn = useSignIn();
     const resolvedIconVariant = iconVariant ?? goingButtonIconVariant;
@@ -157,7 +158,7 @@ export default function GoingButton({
             //      when the account-level default is unset).
             //   3. Legacy boolean fallback for very old payloads.
             const defaultAudience = defaultRsvpAudienceFor(user);
-            const skipSheet = rsvpRememberVisibilityEnabled && getRememberAudience(user.user_id) === true;
+            const skipSheet = rsvpRememberVisibilityEnabled && !rsvpPeopleSheetEnabled && getRememberAudience(user.user_id) === true;
             // Always RSVP immediately with the default audience — no extra
             // confirmation click. The post-RSVP popover surfaces an inline
             // picker so the user can change visibility on the fly.
@@ -258,7 +259,7 @@ export default function GoingButton({
     }, [eventId, setAudience, errorToast, userId]);
 
     const shareEventNow = useCallback(async () => {
-        const url = `${window.location.origin}/event/${eventId}`;
+        const url = buildEventShareUrl(window.location.origin, eventId, user?.share_code);
         const canNativeShare =
             typeof navigator !== 'undefined' && typeof navigator.share === 'function';
         if (canNativeShare) {
@@ -275,7 +276,7 @@ export default function GoingButton({
             }
         }
         setPostRsvpVariant(null);
-    }, [eventId]);
+    }, [eventId, user?.share_code]);
 
     const postRsvpNode = postRsvpVariant ? (
         <PostRsvpPopover
@@ -326,8 +327,13 @@ export default function GoingButton({
             onAudienceChange={handlePopoverAudienceChange}
             pickerAriaLabel="Who can see you in the attendee list?"
             secondaryAction={{ label: unmarkLabel, onClick: stopGoing, tone: 'danger' }}
+            primaryTone={rsvpPeopleSheetEnabled && !isPast ? 'neutral' : 'primary'}
             onClose={closeEdit}
-        />
+        >
+            {rsvpPeopleSheetEnabled && (
+                <PostRsvpSocial eventId={eventId} eventTitle={eventTitle} isPast={isPast} onNavigate={closeEdit} />
+            )}
+        </RsvpVisibilitySheet>
     ) : null;
 
     if (appearance === 'pill') {

@@ -216,7 +216,9 @@ def run_once() -> dict:
                     .values(emailed_at=stamp_now)
                 )
                 for nid in emailed_ids:
-                    record_delivery(session, nid, "email", stamp_now)
+                    record_delivery(
+                        session, nid, "email", stamp_now, mode="instant", source="tick"
+                    )
             if pushed_ids:
                 session.exec(
                     update(Notification)
@@ -224,7 +226,7 @@ def run_once() -> dict:
                     .values(pushed_at=stamp_now)
                 )
                 for nid in pushed_ids:
-                    record_delivery(session, nid, "push", stamp_now)
+                    record_delivery(session, nid, "push", stamp_now, source="tick")
             session.commit()
 
     logger.info(

@@ -214,7 +214,9 @@ export function trackLogout(): void {
 
 // ── Rating funnel (Umami only — DB rows live in event_ratings) ───────────
 
-export type RatingEntryPoint = 'detail' | 'list' | 'map' | 'icon' | 'pill' | 'notification' | 'for-you-share-experience';
+export type RatingEntryPoint =
+    | 'detail' | 'list' | 'map' | 'icon' | 'pill' | 'notification' | 'for-you-share-experience'
+    | 'home-prompt' | 'notification-push' | 'notification-email' | 'rate-next';
 
 export function trackRatingModalOpened(entryPoint: RatingEntryPoint, isEdit: boolean): void {
     if (!readConsent().analytics) return;
@@ -228,6 +230,7 @@ export function trackRatingSubmitted(props: {
     audienceCount: number;
     isAnonymous: boolean;
     isEdit: boolean;
+    entryPoint?: RatingEntryPoint;
 }): void {
     if (!readConsent().analytics) return;
     umamiTrack('rating_submitted', {
@@ -237,7 +240,35 @@ export function trackRatingSubmitted(props: {
         audience_count: props.audienceCount,
         is_anonymous: props.isAnonymous,
         is_edit: props.isEdit,
+        entry_point: props.entryPoint ?? 'unknown',
     });
+}
+
+// ── Home review prompt + similar events (Umami only — exact counts live in review_prompt_impressions) ──
+
+export function trackReviewPromptShown(forced: boolean): void {
+    if (!readConsent().analytics) return;
+    umamiTrack('review_prompt_shown', { forced });
+}
+
+export function trackReviewPromptDismissed(): void {
+    if (!readConsent().analytics) return;
+    umamiTrack('review_prompt_dismissed');
+}
+
+export function trackSimilarEventsSeeMoreClicked(): void {
+    if (!readConsent().analytics) return;
+    umamiTrack('similar_events_see_more_clicked');
+}
+
+export function trackSimilarEventClicked(position: number): void {
+    if (!readConsent().analytics) return;
+    umamiTrack('similar_event_clicked', { position });
+}
+
+export function trackRateNextClicked(): void {
+    if (!readConsent().analytics) return;
+    umamiTrack('rate_next_clicked');
 }
 
 export function trackRatingDeleted(): void {

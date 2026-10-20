@@ -14,12 +14,15 @@ import { useAuth } from '../context/AuthContext';
 import CancelEventSheet from './CancelEventSheet';
 import EventPromoCodeDialog from './EventPromoCodeDialog';
 import { isPromoSectionVisible } from '../utils/sectionVisibility';
+import type { RatingEntryPoint } from '../utils/tracking';
 
 interface Props {
     event: CalendarEvent;
     isPast: boolean;
     shareUrl: string;
     reviewOpenToken?: number;
+    /** Attribution for reviews written here (e.g. arrived from a push). */
+    reviewEntryPoint?: RatingEntryPoint;
     onRatingChanged?: () => void;
     eventHasReviews?: boolean;
     /** Open the Discussion tab / composer ("Start discussion"). */
@@ -44,6 +47,7 @@ export default function EventActionDock({
     isPast,
     shareUrl,
     reviewOpenToken,
+    reviewEntryPoint = 'detail',
     onRatingChanged,
     eventHasReviews,
     onPostMessage,
@@ -82,7 +86,7 @@ export default function EventActionDock({
                         appearance="pill"
                         eventHasReviews={eventHasReviews}
                         autoOpenToken={reviewOpenToken}
-                        entryPoint="detail"
+                        entryPoint={reviewEntryPoint}
                         isEventDetailPage
                         showCount={false}
                         isPast={isPast}
@@ -111,7 +115,7 @@ export default function EventActionDock({
                             appearance="pill"
                             eventHasReviews={eventHasReviews}
                             autoOpenToken={reviewOpenToken}
-                            entryPoint="detail"
+                            entryPoint={reviewEntryPoint}
                             isEventDetailPage
                             showCount={false}
                             isPast={isPast}

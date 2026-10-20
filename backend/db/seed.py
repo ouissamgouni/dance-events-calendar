@@ -2802,6 +2802,13 @@ class DatabaseSeeder:
                 group_key: "..."           # optional
                 minutes_ago: 30            # optional, default 0
                 read: false                # optional, default false
+                deliveries:                # optional email/push delivery-log rows
+                  - channel: email         # email | push
+                    mode: digest           # optional: digest | instant
+                    source: tick           # optional: tick | job | request | admin
+                    minutes_ago: 10        # optional, defaults to the row's; equal
+                                           # values share delivered_at (one message)
+                    engaged: true          # optional: sets email_clicked_at / push_opened_at
         """
         if not path.exists():
             return
@@ -2883,6 +2890,7 @@ class DatabaseSeeder:
             notif.read_at = created_at if entry.get("read") else None
             notif.emailed_at = created_at
             notif.pushed_at = created_at
+            self._seed_notification_deliveries(notif, entry, created_at, now)
             self.session.add(notif)
             curated.setdefault(recipient.id, []).append(notif)
         self.session.flush()
@@ -2906,6 +2914,49 @@ class DatabaseSeeder:
         self.session.flush()
         if seeded:
             logger.info("Seeded %d curated notifications", seeded)
+
+    def _seed_notification_deliveries(
+        self, notif: Any, entry: dict, created_at: datetime, now: datetime
+    ) -> None:
+        """Replace the row's email/push delivery log with ``entry["deliveries"]``."""
+        deliveries = entry.get("deliveries") or []
+        if not deliveries:
+            return
+
+        from backend.db.models import NotificationDelivery
+        from backend.services.notification_delivery import record_delivery
+
+        self.session.exec(
+            delete(NotificationDelivery)
+            .where(NotificationDelivery.notification_id == notif.id)
+            .where(NotificationDelivery.channel != "app")
+        )
+        notif.email_clicked_at = None
+        notif.push_opened_at = None
+        for spec in deliveries:
+            channel = spec.get("channel") if isinstance(spec, dict) else None
+            if channel not in ("email", "push"):
+                logger.warning("Skipping delivery: bad channel %r", spec)
+                continue
+            sent_at = (
+                now - timedelta(minutes=int(spec["minutes_ago"]))
+                if spec.get("minutes_ago") is not None
+                else created_at
+            )
+            record_delivery(
+                self.session,
+                notif.id,
+                channel,
+                sent_at,
+                mode=spec.get("mode"),
+                source=spec.get("source"),
+            )
+            if spec.get("engaged"):
+                engaged_at = sent_at + timedelta(minutes=5)
+                if channel == "email":
+                    notif.email_clicked_at = engaged_at
+                else:
+                    notif.push_opened_at = engaged_at
 
     def _seed_ratings(self, path: Path) -> None:
         """Pre-seed EventRating rows from db-events.yaml `ratings:` list.

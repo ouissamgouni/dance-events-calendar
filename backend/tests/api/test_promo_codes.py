@@ -279,6 +279,33 @@ def test_admin_reject_persists_notes_and_notification(client, session, event, fl
     assert notifs[0].description == "Spam content."
 
 
+@pytest.mark.unit
+def test_reapprove_and_second_code_same_event_do_not_500(
+    client, session, event, flag_on
+):
+    assert _login(client, email="user@example.com").status_code == 200
+    first = client.post(
+        f"/api/events/{event.event_id}/promo-codes", json={"code": "ONE10"}
+    ).json()["id"]
+    second = client.post(
+        f"/api/events/{event.event_id}/promo-codes", json={"code": "TWO10"}
+    ).json()["id"]
+
+    assert _login(client, email="admin@example.com").status_code == 200
+    assert client.post(f"/api/admin/promo-codes/{first}/approve").status_code == 200
+    assert client.post(f"/api/admin/promo-codes/{second}/approve").status_code == 200
+    resp = client.post(
+        f"/api/admin/promo-codes/{first}/reject", json={"admin_notes": "Expired"}
+    )
+    assert resp.status_code == 200
+    assert client.post(f"/api/admin/promo-codes/{first}/approve").status_code == 200
+
+    notifs = session.exec(
+        select(Notification).where(Notification.kind == "promo_code_approved")
+    ).all()
+    assert sorted(n.context for n in notifs) == ["ONE10", "TWO10"]
+
+
 # ── Owner edit + delete ──────────────────────────────────────────────
 
 

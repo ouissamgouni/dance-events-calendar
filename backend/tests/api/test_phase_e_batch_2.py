@@ -811,6 +811,30 @@ def test_d2_share_source_unknown_404(client, session):
     assert r.status_code == 404
 
 
+def test_share_source_friend_invite_only_for_sharers_own_code(client, session):
+    _make_user(session, "sharer@example.com", "sharer")
+    _make_user(session, "other@example.com", "other")
+    _login(client, "sharer@example.com")
+    share_code = client.get("/api/auth/me").json()["share_code"]
+    own_inv = client.get("/api/social/me/referral").json()["code"]
+    _logout(client)
+    _login(client, "other@example.com")
+    other_inv = client.get("/api/social/me/referral").json()["code"]
+    _logout(client)
+
+    def _friend_invite(inv: str | None) -> bool:
+        url = f"/api/social/share-source/{share_code}"
+        r = client.get(url, params={"inv": inv} if inv is not None else None)
+        assert r.status_code == 200, r.text
+        return r.json()["friend_invite"]
+
+    assert _friend_invite(None) is False
+    assert _friend_invite(own_inv) is True
+    assert _friend_invite(own_inv.lower()) is True
+    assert _friend_invite(other_inv) is False
+    assert _friend_invite("NOPE1234") is False
+
+
 def test_d2_share_source_deleted_user_404(client, session):
     _make_user(session, "ghost@example.com", "ghost")
     _login(client, "ghost@example.com")

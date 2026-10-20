@@ -54,6 +54,8 @@ export interface FeatureFlags {
     eventReviewSizeStepEnabled: boolean;
     /** Show the 'remember my choice' checkbox in RSVP/save visibility sheets. */
     rsvpRememberVisibilityEnabled: boolean;
+    /** Post-RSVP sheet with people suggestions + friend-invite share; always shown. */
+    rsvpPeopleSheetEnabled: boolean;
     /** When true, tags on event cards render as colored badges (legacy
      * look). When false (default), tags render as inline "Practice · Indoor"
      * text so cards stay quieter. */
@@ -137,6 +139,7 @@ const defaultFlags: FeatureFlags = {
     onboardingProfileStepEnabled: false,
     eventReviewSizeStepEnabled: true,
     rsvpRememberVisibilityEnabled: true,
+    rsvpPeopleSheetEnabled: false,
     tagAsBadge: false,
     tagBadgeColored: false,
     trendingTrailRichEnabled: false,
@@ -215,6 +218,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     onboardingProfileStepEnabled: s.onboarding_profile_step_enabled ?? false,
                     eventReviewSizeStepEnabled: s.event_review_size_step_enabled ?? true,
                     rsvpRememberVisibilityEnabled: s.rsvp_remember_visibility_enabled ?? true,
+                    rsvpPeopleSheetEnabled: s.rsvp_people_sheet_enabled ?? false,
                     tagAsBadge: s.tag_as_badge_enabled ?? false,
                     tagBadgeColored: s.tag_badge_colored ?? false,
                     trendingTrailRichEnabled: s.trending_trail_rich_enabled ?? false,

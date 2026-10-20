@@ -1,0 +1,62 @@
+# Events referenced by the seeded notifications (titles show in item rows).
+base_week: 0
+events:
+  - id: evt-na-paris-social
+    calendar_id: notif-activity-cal
+    title: Paris Friday Salsa Social
+    location: Studio Harmonic, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: now+48h
+    end: now+52h
+    tags: [dance-style:salsa, format:social, reach:local]
+
+  - id: evt-na-lyon-congress
+    calendar_id: notif-activity-cal
+    title: Lyon Salsa Congress
+    location: Palais des Congrès, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    start: now+240h
+    end: now+250h
+    tags: [dance-style:salsa, format:social, reach:international]
+
+  - id: evt-na-past-social
+    calendar_id: notif-activity-cal
+    title: Rooftop Salsa Social
+    location: Skybar, Lisbon, Portugal
+    latitude: 38.7139
+    longitude: -9.1394
+    start: now-56h
+    end: now-52h
+    tags: [dance-style:salsa, format:social, reach:local]
+
+  - id: evt-na-bachata-night
+    calendar_id: notif-activity-cal
+    title: Bachata Night Montmartre
+    location: La Bellevilloise, Paris, France
+    latitude: 48.8686
+    longitude: 2.3925
+    start: now+20h
+    end: now+24h
+    tags: [dance-style:bachata, format:social, reach:local]
+
+  - id: evt-na-sunday-practica
+    calendar_id: notif-activity-cal
+    title: Sunday Salsa Practica
+    location: Le Petit Bain, Paris, France
+    latitude: 48.8352
+    longitude: 2.3770
+    start: now+72h
+    end: now+75h
+    tags: [dance-style:salsa, format:social, reach:local]
+
+  - id: evt-na-weekender
+    calendar_id: notif-activity-cal
+    title: Brussels Latin Weekender
+    location: Tour & Taxis, Brussels, Belgium
+    latitude: 50.8676
+    longitude: 4.3486
+    start: now+480h
+    end: now+530h
+    tags: [dance-style:salsa, format:social, reach:international]

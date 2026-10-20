@@ -1,0 +1,18 @@
+follows:
+  # viewer <-> ana, viewer <-> bea: friends
+  - { follower: viewer, followee: ana }
+  - { follower: ana, followee: viewer }
+  - { follower: viewer, followee: bea }
+  - { follower: bea, followee: viewer }
+  # viewer -> leo: following only
+  - { follower: viewer, followee: leo }
+  # viewer -> paz: pending request (paz is friends-only)
+  - { follower: viewer, followee: paz, status: pending }
+  # mia is friends with ana and bea -> 2 mutual friends with viewer
+  - { follower: mia, followee: ana }
+  - { follower: ana, followee: mia }
+  - { follower: mia, followee: bea }
+  - { follower: bea, followee: mia }
+  # sam is friends with ana -> 1 mutual friend with viewer
+  - { follower: sam, followee: ana }
+  - { follower: ana, followee: sam }

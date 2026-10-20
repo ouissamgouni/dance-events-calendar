@@ -14,10 +14,12 @@ import {
     fetchEventSeriesRollup,
     submitFeedback,
 } from '../api';
-import { trackRatingDeleted, trackRatingSubmitFailed, trackRatingSubmitted } from '../utils/tracking';
+import { trackRatingDeleted, trackRatingSubmitFailed, trackRatingSubmitted, trackRateNextClicked, type RatingEntryPoint } from '../utils/tracking';
 import { SENTIMENTS, SENTIMENT_META } from '../utils/reviewSentiment';
 import { ConfirmDialog } from './AppDialog';
+import SimilarEventsRail from './SimilarEventsRail';
 import useBackToClose from '../hooks/useBackToClose';
+import { refreshPendingReviewCount } from '../hooks/usePendingReviewCount';
 
 interface Props {
     eventId: string;
@@ -27,6 +29,12 @@ interface Props {
     onDeleted?: () => void;
     /** 'past_edition' when reviewing an earlier edition from an upcoming one. */
     scope?: ReviewScope;
+    /** Surface this review is written from; stored for attribution stats. */
+    entryPoint?: RatingEntryPoint;
+    /** Home review prompt: event context header, incentive line and "Not now". */
+    prompt?: { friendProof: string | null; showIncentive: boolean; onNotNow: () => void };
+    /** Thanks-screen chain to the next unreviewed event. */
+    rateNext?: { count: number; onRateNext: () => void };
 }
 
 type Identity = 'name' | 'anonymous';
@@ -166,7 +174,17 @@ type WizardStep =
     | { kind: 'comment' }
     | { kind: 'identity' };
 
-export default function RateEventModal({ eventId, initialRating, onClose, onSubmitted, onDeleted, scope = 'this_edition' }: Props) {
+export default function RateEventModal({
+    eventId,
+    initialRating,
+    onClose,
+    onSubmitted,
+    onDeleted,
+    scope = 'this_edition',
+    entryPoint,
+    prompt,
+    rateNext,
+}: Props) {
     const { user } = useAuth();
     const { eventReviewSizeStepEnabled, eventMemoriesEnabled } = useFeatureFlags();
     const assetSummary = useEventAssetSummary(eventMemoriesEnabled ? eventId : null);
@@ -196,6 +214,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
     const [audienceGroups, setAudienceGroups] = useState<TagGroup[] | null>(null);
     const [eventTagKeys, setEventTagKeys] = useState<string[]>([]);
     const [eventTitle, setEventTitle] = useState<string>('');
+    const [eventMeta, setEventMeta] = useState<{ start: string; place: string | null } | null>(null);
     const [selectedAspects, setSelectedAspects] = useState<Set<string>>(
         new Set(Object.keys(initialRating?.aspect_scores ?? {})),
     );
@@ -246,6 +265,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
             .then((ev) => {
                 setEventTagKeys(ev.tags.map((t) => `${t.group_slug}:${t.slug}`));
                 setEventTitle(ev.title);
+                setEventMeta({ start: ev.start, place: ev.city || ev.location || null });
             })
             .catch(() => setEventTagKeys([]));
     }, [eventId]);
@@ -409,6 +429,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                 comment: trimmedComment || undefined,
                 is_anonymous: identity === 'anonymous',
                 scope: target.scope,
+                entry_point: entryPoint,
                 tag_suggestions: [],
                 website: website || undefined,
             });
@@ -419,8 +440,10 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                 audienceCount: audienceTagIds.size,
                 isAnonymous: identity === 'anonymous',
                 isEdit: !!initialRating,
+                entryPoint,
             });
             onSubmitted(res.rating);
+            refreshPendingReviewCount();
             setThanks(true);
         } catch (e) {
             const msg = e instanceof Error ? e.message : 'Failed to submit. Please try again.';
@@ -443,6 +466,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
         try {
             await deleteMyRating(eventId, scope);
             trackRatingDeleted();
+            refreshPendingReviewCount();
             onDeleted?.();
             onClose();
         } catch (e) {
@@ -465,7 +489,8 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
     const stepTitle = ((): string => {
         switch (current.kind) {
             case 'intro':
-                return initialRating ? 'Edit your review' : 'How was it?';
+                if (initialRating) return 'Edit your review';
+                return prompt && eventTitle ? `How was ${eventTitle}?` : 'How was it?';
             case 'aspect':
                 return offeredAspects.find((x) => x.slug === current.slug)?.label ?? 'Rate';
             case 'event-size':
@@ -482,38 +507,58 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
     return createPortal(
         <>
             <div
-                className="fixed inset-0 z-[10500] bg-slate-900/50 flex items-center justify-center p-4"
+                className="fixed inset-0 z-[10500] bg-slate-900/50 flex items-end justify-center sm:items-center sm:p-4"
                 onClick={onClose}
             >
                 <div
-                    className="bg-surface shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto border border-line"
+                    className="bg-surface shadow-lg w-full max-w-md max-h-[90dvh] overflow-y-auto border border-line rounded-t-card sm:rounded-card pb-[env(safe-area-inset-bottom)] animate-slide-up"
                     onClick={(e) => e.stopPropagation()}
                     role="dialog"
                     aria-modal="true"
                     aria-label={thanks ? 'Feedback received' : mode === 'view' ? 'Your review' : 'Rate this event'}
                 >
                     {thanks ? (
-                        <div className="p-5 text-center space-y-3">
-                            <div className="text-3xl">🙌</div>
-                            <h2 className="text-base font-semibold text-ink">Thanks for your feedback!</h2>
-                            <p className="text-xs text-ink-soft">
-                                Your review is live. Any comment you added will appear once it's checked by our team.
-                            </p>
-                            {assetSummary?.can_add_memory && (
-                                <Link
-                                    to={`/event/${encodeURIComponent(eventId)}#memories`}
-                                    onClick={onClose}
-                                    className="block text-sm font-semibold text-action hover:underline"
-                                >
-                                    📸 Add memories from the event
-                                </Link>
+                        <div className="p-5 space-y-4">
+                            <div className="text-center space-y-3">
+                                <div className="text-3xl">🙌</div>
+                                <h2 className="text-base font-semibold text-ink">Thanks for your feedback!</h2>
+                                <p className="text-xs text-ink-soft">
+                                    Your review is live. Any comment you added will appear once it's checked by our team.
+                                </p>
+                                {assetSummary?.can_add_memory && (
+                                    <Link
+                                        to={`/event/${encodeURIComponent(eventId)}#memories`}
+                                        onClick={onClose}
+                                        className="block text-sm font-semibold text-action hover:underline"
+                                    >
+                                        📸 Add memories from the event
+                                    </Link>
+                                )}
+                            </div>
+                            <SimilarEventsRail eventId={target.eventId} sentiment={sentiment} onNavigate={onClose} />
+                            {rateNext && rateNext.count > 0 && (
+                                <div className="flex items-center justify-between gap-3 rounded-card bg-canvas px-3 py-2">
+                                    <span className="text-sm text-ink">{rateNext.count} more to rate</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            trackRateNextClicked();
+                                            rateNext.onRateNext();
+                                        }}
+                                        className="shrink-0 rounded-field bg-action px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                                    >
+                                        Rate next
+                                    </button>
+                                </div>
                             )}
-                            <button
-                                onClick={onClose}
-                                className="mt-2 bg-sky-600 text-white px-4 py-1.5 text-xs hover:bg-sky-700"
-                            >
-                                Close
-                            </button>
+                            <div className="text-center">
+                                <button
+                                    onClick={onClose}
+                                    className="rounded-field border border-line bg-surface px-4 py-1.5 text-xs text-ink hover:bg-canvas"
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     ) : mode === 'pick' ? (
                         <div className="p-4 space-y-3">
@@ -651,7 +696,20 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                 </button>
                             </div>
 
-                            {current.kind === 'intro' && eventTitle && (
+                            {current.kind === 'intro' && prompt && !initialRating ? (
+                                <div className="-mt-2 space-y-1 text-xs text-ink-soft" data-testid="review-prompt-context">
+                                    {eventMeta && (
+                                        <p>
+                                            {new Date(eventMeta.start).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+                                            {eventMeta.place ? ` · ${eventMeta.place}` : ''}
+                                        </p>
+                                    )}
+                                    {prompt.friendProof && <p>{prompt.friendProof} already reviewed it.</p>}
+                                    {prompt.showIncentive && (
+                                        <p className="font-medium text-action">Share how it went, then discover similar events!</p>
+                                    )}
+                                </div>
+                            ) : current.kind === 'intro' && eventTitle && (
                                 <p className="-mt-2 text-xs text-ink-soft">
                                     {target.start
                                         ? `Rate the ${new Date(target.start).toLocaleDateString()} edition of ${eventTitle}`
@@ -906,6 +964,15 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                         className="rounded-full border border-line text-ink text-sm px-4 py-2 hover:bg-canvas disabled:opacity-50"
                                     >
                                         Delete
+                                    </button>
+                                )}
+                                {prompt && step === 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={prompt.onNotNow}
+                                        className="rounded-full border border-line bg-surface text-ink text-sm px-4 py-2 hover:bg-canvas"
+                                    >
+                                        Not now
                                     </button>
                                 )}
                             </div>

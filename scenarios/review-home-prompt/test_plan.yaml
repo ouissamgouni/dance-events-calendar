@@ -1,0 +1,83 @@
+test_plan:
+  name: "Home review prompt + similar events"
+  description: >
+    The Home page auto-opens the existing review wizard (bottom sheet on
+    mobile, modal on desktop) once per session for the latest attended,
+    unreviewed event, under server-side frequency caps. After submitting,
+    the thanks screen shows similar upcoming events (same dance styles,
+    area sized by the reviewed event's reach) with "See more" into a
+    pre-filtered Explorer, plus a "N more to rate" chain. Admins can force
+    the prompt for chosen attendees.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=review-home-prompt RESET=1 task start:scenario`
+
+  cast:
+    - "Alice — attended ev-lyon-wed + ev-lyon-sat (last week), reviewed nothing."
+    - "Bob   — attended ev-lyon-sat, email + push review prompts OFF."
+    - "Admin — admin@example.com."
+
+  steps:
+    - id: 1
+      title: "Prompt opens on Home"
+      description: "Sign in as Alice, open `/` and wait ~1s."
+      expected: >
+        The review wizard opens (bottom sheet on mobile) titled "How was Lyon
+        Salsa Saturday?" with the date · place line, the incentive line
+        "Share how it went, then discover similar events!" and a "Not now"
+        button. The header menu avatar shows a dot; the menu's Reviews row
+        shows "2".
+
+    - id: 2
+      title: "Review then discover similar events"
+      description: "Pick Great → Continue through the steps → Submit."
+      expected: >
+        Thanks screen shows "You might like these next" with Villeurbanne
+        Salsa Night only (Paris is too far, Lyon Bachata is another style),
+        a "See more →" link, and "1 more to rate · Rate next". Reviews badge
+        drops to 1.
+
+    - id: 3
+      title: "Rate next chain"
+      description: "On the thanks screen, click Rate next."
+      expected: >
+        The wizard re-opens for Lyon Salsa Wednesday without the prompt header
+        (entry point rate-next). Submit it too.
+
+    - id: 4
+      title: "See more → pre-filtered Explorer"
+      description: "On this second thanks screen, click See more →."
+      expected: >
+        Explorer opens with the Salsa style selected and the area chip
+        "Lyon … · 25 km"; the area_* params are removed from the URL.
+
+    - id: 5
+      title: "Once per session + cooldown"
+      description: >
+        As Bob, open `/`, click "Not now". Reload `/`, then open a new tab
+        (new session) and open `/`.
+      expected: >
+        The first visit shows the prompt; the reload doesn't (session flag);
+        the new session doesn't either (72h cooldown).
+
+    - id: 6
+      title: "Admin force"
+      description: >
+        As Admin: /admin → Notifications → Review prompt → Send now: pick
+        "Lyon Salsa Saturday", select Bob, tick "Force Home prompt", Send.
+        Then as Bob, in a new session, open `/`.
+      expected: >
+        The admin message reports "Home prompt forced for 1" (Bob's status
+        home_prompt_only since his channels are off). Bob's Home shows the
+        prompt again despite the cooldown.
+
+    - id: 7
+      title: "Admin settings + stats"
+      description: "As Admin, open the Home review prompt card."
+      expected: >
+        Caps/radii are editable (cooldown 72, max asks 2, max age 14, fatigue
+        4 / 30 days, radii 25/150/1500, cards 6). "Last 30 days" lists
+        shown/dismissed/reviewed with conversion, and reviews by entry point
+        include "Home prompt".

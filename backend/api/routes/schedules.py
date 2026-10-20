@@ -1355,7 +1355,14 @@ def notify_program_available(
             email_status = "already_sent"
         elif send_schedule_program_available_email(user, event, session_count):
             notification.emailed_at = stamp_now
-            record_delivery(session, notification.id, "email", stamp_now)
+            record_delivery(
+                session,
+                notification.id,
+                "email",
+                stamp_now,
+                mode="instant",
+                source="admin",
+            )
             emailed += 1
             did_send = True
             email_status = "sent"
@@ -1378,7 +1385,9 @@ def notify_program_available(
             )
             if delivered:
                 notification.pushed_at = stamp_now
-                record_delivery(session, notification.id, "push", stamp_now)
+                record_delivery(
+                    session, notification.id, "push", stamp_now, source="admin"
+                )
                 pushed += delivered
                 did_send = True
                 push_status = "sent"
@@ -1645,7 +1654,12 @@ def _deliver_publication(key: str) -> None:
                     now = datetime.now(timezone.utc)
                     notification.emailed_at = now
                     record_delivery(
-                        session, notification.id, "email", now, source="job"
+                        session,
+                        notification.id,
+                        "email",
+                        now,
+                        mode="instant",
+                        source="job",
                     )
             if notification.pushed_at is None and user.push_schedule_updates_enabled:
                 if kind == "planned_session_changed":
@@ -1805,7 +1819,14 @@ def _notify_publication_going_attendees(
                 sent = False
             if sent:
                 notification.emailed_at = delivered_at
-                record_delivery(session, notification.id, "email", delivered_at)
+                record_delivery(
+                    session,
+                    notification.id,
+                    "email",
+                    delivered_at,
+                    mode="instant",
+                    source="admin",
+                )
                 emailed += 1
                 email_status = "sent"
             else:
@@ -1839,7 +1860,9 @@ def _notify_publication_going_attendees(
                 delivered = 0
             if delivered:
                 notification.pushed_at = delivered_at
-                record_delivery(session, notification.id, "push", delivered_at)
+                record_delivery(
+                    session, notification.id, "push", delivered_at, source="admin"
+                )
                 pushed += delivered
                 push_status = "sent"
             else:

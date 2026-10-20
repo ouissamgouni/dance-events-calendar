@@ -456,6 +456,7 @@ class TestSettingsEndpoint:
         assert body["review_prompt_enabled"] is True
         assert body["event_review_size_step_enabled"] is True
         assert body["rsvp_remember_visibility_enabled"] is True
+        assert body["rsvp_people_sheet_enabled"] is False
         assert body["geoapify_enabled"] is False
         assert body["review_prompt_delay_hours"] == 3
         assert body["review_prompt_lookback_hours"] == 24
@@ -482,6 +483,7 @@ class TestSettingsEndpoint:
                 "review_prompt_enabled": False,
                 "event_review_size_step_enabled": False,
                 "rsvp_remember_visibility_enabled": False,
+                "rsvp_people_sheet_enabled": True,
                 "geoapify_enabled": True,
                 "review_prompt_delay_hours": 5,
                 "review_prompt_lookback_hours": 48,
@@ -506,6 +508,7 @@ class TestSettingsEndpoint:
         assert body["review_prompt_enabled"] is False
         assert body["event_review_size_step_enabled"] is False
         assert body["rsvp_remember_visibility_enabled"] is False
+        assert body["rsvp_people_sheet_enabled"] is True
         assert body["geoapify_enabled"] is True
         assert body["review_prompt_delay_hours"] == 5
         assert body["review_prompt_lookback_hours"] == 48

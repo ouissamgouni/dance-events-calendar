@@ -12,17 +12,22 @@ interface StoredReferral {
     src: string;
     eventId: string;
     capturedAt: number;
+    /** Sharer's invite code when the link was a friend invite. */
+    inv?: string;
 }
+
+const INVITE_CODE_RE = /^[A-Za-z0-9_-]{4,32}$/;
 
 /** Persist the referral source from a `?ref=share&src=` URL into
  *  localStorage so subsequent in-session conversions can be attributed
  *  back to the originating share_code. */
-function persist(src: string, eventId: string): void {
+function persist(src: string, eventId: string, inv?: string): void {
     try {
         const payload: StoredReferral = {
             src,
             eventId,
             capturedAt: Date.now(),
+            ...(inv ? { inv } : {}),
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
@@ -69,22 +74,26 @@ export function useReferralAttribution(eventId: string | null | undefined): void
         if (params.get('ref') !== 'share') return;
         const src = params.get('src');
         if (!src) return;
+        const rawInv = params.get('inv');
+        const inv = rawInv && INVITE_CODE_RE.test(rawInv) ? rawInv : undefined;
 
         // Skip if we've already attributed this exact share for this event
         // in the current TTL window (defensive against double mounts and
         // back/forward navigation).
         const existing = read();
-        if (existing && existing.src === src && existing.eventId === eventId) {
+        const sameShare = !!existing && existing.src === src && existing.eventId === eventId;
+        if (sameShare && (!inv || existing?.inv === inv)) {
             return;
         }
 
-        persist(src, eventId);
+        persist(src, eventId, inv);
         // Notify in-app listeners (e.g. ShareReferralBanner mounted at the
         // App level, whose own effect already ran with an empty store
         // before this route child's effect persisted the attribution).
         try {
             window.dispatchEvent(new CustomEvent('referral:changed'));
         } catch { /* ignore */ }
+        if (sameShare) return;
         // Best-effort; failures are silent (analytics, not functional state).
         trackShare({
             eventId,

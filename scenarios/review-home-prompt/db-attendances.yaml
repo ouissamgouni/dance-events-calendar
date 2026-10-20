@@ -1,0 +1,16 @@
+attendances:
+  - event_id: ev-lyon-wed
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+
+  - event_id: ev-lyon-sat
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+
+  # Bob attended with both review-prompt channels off → admin force still works.
+  - event_id: ev-lyon-sat
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public

@@ -1,0 +1,163 @@
+test_plan:
+  name: "Post-RSVP people sheet + friend-invite share"
+  description: >
+    With ``rsvp_people_sheet_enabled`` on, "I'm going" always opens one
+    sheet (mobile bottom sheet, desktop centered modal) containing: a
+    compact visibility row with "Make default", a collapsed "Your people
+    going" trail (friends + following), an "Also going" list of up to 3
+    followable attendees ranked by mutual friends, a primary "Bring
+    someone along" share whose link carries the sharer's invite code, and
+    a "See it in My Events" next step. The receiver of that link is
+    offered MUTUAL friendship (redeem-referral) instead of the one-way
+    share-follow.
+
+  preconditions:
+    - "task start:scenario SCENARIO=rsvp-people-sheet"
+    - "Seeded: viewer + ana/bea (friends), leo (following), paz (pending), mia/sam/tom/zoe (strangers), kai (friends-only RSVP), hid (private RSVP), newbie (receiver), admin."
+    - "Use a fresh browser profile or incognito when switching users."
+
+  steps:
+    - id: 1
+      title: "RSVP opens the people sheet (mobile)"
+      description: >
+        Mobile viewport. Sign in as viewer. Open ``/event/evt-rps-001``
+        and tap "I'm going".
+      expected: >
+        Bottom sheet "🎉 You're going!" with the event title. Order:
+        visibility row "Who sees you're going" (Public/Friends/Private)
+        → "Your people going" → "Also going" → "Bring someone along"
+        → footer "See it in My Events" + Done (neutral). No "Remember
+        my choice" checkbox.
+
+    - id: 2
+      title: "Your people going = friends + following, collapsed"
+      expected: >
+        Avatar trail with 3 faces and text "Ana Lopez, Bea Costa + 1
+        more" (ana, bea, leo). Paz (pending request), Kai (friends-only,
+        not a friend) and Hidden Dancer (private) are NOT listed
+        anywhere. Tapping the trail closes the sheet and opens
+        ``/event/evt-rps-001#people``.
+
+    - id: 3
+      title: "Also going = followable strangers ranked by mutual friends, max 3"
+      expected: >
+        Rows in order: Mia Chen "2 mutual friends", Sam Okafor "1 mutual
+        friend", Tom Weber (no mutuals line). Zoe is past the cap, so a
+        "See everyone going" link is shown (→ People tab). Each row has a
+        Follow pill.
+
+    - id: 4
+      title: "Follow from the sheet"
+      description: "Tap Follow on Tom Weber."
+      expected: >
+        Pill flips to "Following" in place (row stays). Reopen the
+        People tab: Tom is under "Following going".
+
+    - id: 5
+      title: "Visibility + Make default"
+      description: >
+        In the sheet pick "Friends". Then tap "Make default".
+      expected: >
+        Picking Friends applies immediately (pill icon on the Going
+        button updates). "Make default" appears only while the choice
+        differs from the account default; after tapping it shows "Saved
+        as default" and GET /api/auth/me returns
+        ``share_attendance_default_audience: "friends"``.
+
+    - id: 6
+      title: "Bring someone along — friend-invite link"
+      description: >
+        Desktop viewport (no Web Share API) so the link is copied. Tap
+        "Bring someone along".
+      expected: >
+        Button turns into "Link copied · Copy again"; sheet stays open.
+        Helper reads "Share it with who you'd like there — you'll be
+        connected as friends." Clipboard holds
+        ``/event/evt-rps-001?ref=share&src=<viewer share_code>&inv=<viewer
+        invite code>`` (invite code = GET /api/social/me/referral
+        ``code``). On mobile the native share sheet opens instead with
+        "I'm going to Friday Salsa Social (people sheet) — come with
+        me?".
+
+    - id: 7
+      title: "Desktop presentation is a centered modal"
+      expected: >
+        On desktop the sheet is a centered dialog (``aria-modal=true``)
+        with a dimmed backdrop, not an anchored popover. Esc / backdrop
+        click / Done close it.
+
+    - id: 8
+      title: "See it in My Events"
+      description: 'RSVP again on another event (or reopen via Going pill) and tap "See it in My Events".'
+      expected: "Sheet closes and ``/my-events`` lists Friday Salsa Social."
+
+    - id: 9
+      title: "Receiver without an account → becomes friends after sign-in"
+      description: >
+        In INCOGNITO, open the copied link from step 6. Stay signed out.
+      expected: >
+        Banner ``data-testid="share-referral-banner"``: "@viewer invited
+        you — sign in to become friends." Checkbox "Become friends" is
+        checked. Click Sign in, log in as newbie (Dev Mock). Banner
+        auto-redeems (POST /api/auth/redeem-referral, response
+        ``mutual_follow_created: true``) and shows "You and @viewer are
+        now friends." Both users list each other as friends; viewer gets
+        new-follower/new-friend notifications; viewer's referral
+        ``used_count`` is 1.
+
+    - id: 10
+      title: "Negative: tampered invite code falls back to one-way follow"
+      description: >
+        In a fresh incognito open the same URL but replace ``inv=`` with
+        another user's invite code (sign in as ana and GET
+        /api/social/me/referral to mint one), then sign in as zoe.
+      expected: >
+        GET /api/social/share-source/<code>?inv=... returns
+        ``friend_invite: false``. Banner shows the legacy "You arrived
+        via @viewer — follow them?" copy and only creates zoe → viewer
+        (one-way, via redeem-share-follow). No friendship with ana.
+
+    - id: 11
+      title: "Empty state"
+      description: "As viewer, RSVP to ``/event/evt-rps-002``."
+      expected: >
+        No people sections; hint "You're the first of your crew — bring
+        someone along." above the "Bring someone along" button.
+
+    - id: 12
+      title: "Past event"
+      description: 'As viewer, tap "I attended" on ``/event/evt-rps-003``.'
+      expected: >
+        Title "You attended!", "Your people there" (Ana Lopez) and "Also
+        there" (Tom Weber, unless already followed in step 4). No "Bring
+        someone along", no "See it in My Events"; Done is the primary
+        button.
+
+    - id: 13
+      title: "Edit sheet (already going)"
+      description: "On evt-rps-001 tap the Going pill again."
+      expected: >
+        Same visibility row + people + "Bring someone along"; footer is
+        "Not going" (red) + Done.
+
+    - id: 14
+      title: "Remembered visibility no longer skips the sheet"
+      description: >
+        Set localStorage ``audience.remember.<viewer user_id>`` = ``1``,
+        reload, RSVP to an event.
+      expected: >
+        The sheet still opens (no "🎉 You're going" toast-only path).
+
+    - id: 15
+      title: "Save sheet"
+      description: "Tap the bookmark on evt-rps-002."
+      expected: >
+        "🔖 Saved!" sheet always opens with "Who sees you saved it"
+        picker; no Remember checkbox; no people/share sections.
+
+    - id: 16
+      title: "Kill switch"
+      description: 'Admin → Settings: turn off "Post-RSVP people sheet"; reload as viewer and RSVP.'
+      expected: >
+        Legacy behaviour: anchored desktop popover with Share + Done,
+        Remember checkbox, no people sections.

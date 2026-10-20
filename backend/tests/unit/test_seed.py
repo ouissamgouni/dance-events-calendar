@@ -1026,6 +1026,55 @@ class TestDatabaseSeeder:
         assert follower.read_at is not None
         assert by_kind["milestone_unlocked"].read_at is None
 
+    def test_seed_notification_deliveries_are_idempotent(self, tmp_path, monkeypatch):
+        from backend.db.models import NotificationDelivery
+
+        scenarios_dir = tmp_path / "scenarios"
+        scenario_dir = scenarios_dir / "notifs"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n  - email: alice@example.com\n    name: Alice\n    handle: alice\n"
+        )
+        (scenario_dir / "db-notifications.yaml").write_text(
+            "notifications:\n"
+            "  - recipient: alice@example.com\n"
+            "    kind: milestone_unlocked\n"
+            "    subject_key: first_event\n"
+            "    minutes_ago: 60\n"
+            "    deliveries:\n"
+            "      - {channel: email, mode: digest, source: tick, minutes_ago: 30, engaged: true}\n"
+            "      - {channel: push, source: tick}\n"
+            "      - {channel: fax}\n"
+        )
+        monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+            DatabaseSeeder(session).seed(scenario_dir)
+            notif = session.exec(
+                select(Notification).where(Notification.kind == "milestone_unlocked")
+            ).one()
+            rows = session.exec(
+                select(NotificationDelivery).where(
+                    NotificationDelivery.notification_id == notif.id
+                )
+            ).all()
+
+        by_channel = {r.channel: r for r in rows if r.channel != "app"}
+        assert len(rows) - sum(r.channel == "app" for r in rows) == 2
+        email, push = by_channel["email"], by_channel["push"]
+        assert (email.mode, email.source) == ("digest", "tick")
+        assert (push.mode, push.source) == (None, "tick")
+        assert push.delivered_at == notif.created_at
+        assert email.delivered_at - notif.created_at == timedelta(minutes=30)
+        assert notif.email_clicked_at == email.delivered_at + timedelta(minutes=5)
+        assert notif.push_opened_at is None
+
     def test_seed_generated_events_fixture(self, tmp_path, monkeypatch):
         scenario_dir = tmp_path / "generated"
         scenario_dir.mkdir(parents=True)

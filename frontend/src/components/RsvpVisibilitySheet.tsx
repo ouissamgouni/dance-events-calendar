@@ -35,6 +35,10 @@ interface Props {
     secondaryAction?: SecondaryAction;
     /** Defaults to a "Done" button that closes the sheet. */
     primaryAction?: PrimaryAction;
+    /** Next-step link shown at the start of the footer row. */
+    footerLink?: { label: string; to: string };
+    /** Neutral styling when another CTA in the body is the primary one. */
+    primaryTone?: 'primary' | 'neutral';
     onClose: () => void;
 }
 
@@ -61,7 +65,8 @@ function computePopoverPos(trigger: HTMLElement): PopoverPos {
 
 /**
  * Shared confirmation/visibility sheet for RSVP + save flows. Bottom sheet on
- * mobile, anchored popover on desktop; same content in both.
+ * mobile; on desktop an anchored popover, or a centered modal when the
+ * people-sheet flag is on.
  */
 export default function RsvpVisibilitySheet({
     anchorRef,
@@ -75,15 +80,31 @@ export default function RsvpVisibilitySheet({
     children,
     secondaryAction,
     primaryAction,
+    footerLink,
+    primaryTone = 'primary',
     onClose,
 }: Props) {
     const isMobile = useMediaQuery('(max-width: 639px)');
     const [pos, setPos] = useState<PopoverPos | null>(null);
     const popoverRef = useRef<HTMLDivElement | null>(null);
     const { user, refreshUser } = useAuth();
-    const { rsvpRememberVisibilityEnabled } = useOptionalFeatureFlags();
+    const { rsvpRememberVisibilityEnabled, rsvpPeopleSheetEnabled } = useOptionalFeatureFlags();
     const [remember, setRemember] = useState(() => getRememberAudience(user?.user_id, kind) ?? true);
-    const showRemember = rsvpRememberVisibilityEnabled && !!user && !!audience && !!onAudienceChange;
+    const showRemember = rsvpRememberVisibilityEnabled && !rsvpPeopleSheetEnabled && !!user && !!audience && !!onAudienceChange;
+    // Bottom sheet on mobile, centered modal on desktop.
+    const asSheet = isMobile || rsvpPeopleSheetEnabled;
+    const [defaultState, setDefaultState] = useState<'idle' | 'saving' | 'saved'>('idle');
+    const showMakeDefault = rsvpPeopleSheetEnabled && kind === 'going' && !!user && !!audience && !!onAudienceChange
+        && (defaultState === 'saved' || audience !== user.share_attendance_default_audience);
+
+    const makeDefault = () => {
+        if (!audience || defaultState === 'saving') return;
+        setDefaultState('saving');
+        updateMyVisibility({ share_attendance_default_audience: audience })
+            .then(() => refreshUser())
+            .then(() => setDefaultState('saved'))
+            .catch(() => setDefaultState('idle'));
+    };
 
     const persistRemember = () => {
         if (!showRemember || !user) return;
@@ -105,10 +126,10 @@ export default function RsvpVisibilitySheet({
         dismissRef.current = dismiss;
     });
     // BottomSheet owns back-button handling on mobile.
-    useBackToClose(dismiss, !isMobile);
+    useBackToClose(dismiss, !asSheet);
 
     useEffect(() => {
-        if (isMobile) return;
+        if (asSheet) return;
         const onPointerDown = (e: PointerEvent) => {
             if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) dismissRef.current();
         };
@@ -121,10 +142,10 @@ export default function RsvpVisibilitySheet({
             document.removeEventListener('pointerdown', onPointerDown);
             document.removeEventListener('keydown', onKey);
         };
-    }, [isMobile]);
+    }, [asSheet]);
 
     useEffect(() => {
-        if (isMobile) return;
+        if (asSheet) return;
         const update = () => {
             if (anchorRef.current) setPos(computePopoverPos(anchorRef.current));
         };
@@ -135,27 +156,63 @@ export default function RsvpVisibilitySheet({
             window.removeEventListener('scroll', update, true);
             window.removeEventListener('resize', update);
         };
-    }, [anchorRef, isMobile]);
+    }, [anchorRef, asSheet]);
 
     const btnBase = 'flex min-h-10 items-center justify-center gap-1.5 rounded-field px-3 text-sm font-semibold';
     const secondaryTone = secondaryAction?.tone === 'danger' ? 'text-danger' : 'text-ink';
-    const primaryClass = `${btnBase} bg-action px-4 text-white hover:opacity-90`;
+    const primaryClass = primaryTone === 'neutral'
+        ? `${btnBase} border border-line bg-surface px-4 text-ink hover:bg-canvas`
+        : `${btnBase} bg-action px-4 text-white hover:opacity-90`;
     const primary = primaryAction ?? { label: 'Done', onClick: dismiss };
     const handleSecondary = () => {
         if (secondaryAction?.tone !== 'danger') persistRemember();
         secondaryAction?.onClick();
     };
 
+    const picker = audience && onAudienceChange ? (
+        <AudiencePicker
+            value={audience}
+            onChange={onAudienceChange}
+            size="sheet"
+            ariaLabel={pickerAriaLabel}
+        />
+    ) : null;
+
     const body = (
         <>
-            {children}
-            {audience && onAudienceChange && (
-                <AudiencePicker
-                    value={audience}
-                    onChange={onAudienceChange}
-                    size="sheet"
-                    ariaLabel={pickerAriaLabel}
-                />
+            {rsvpPeopleSheetEnabled ? (
+                <>
+                    {picker && (
+                        <div className="mb-4" data-testid="rsvp-visibility-row">
+                            <div className="mb-1.5 flex items-center justify-between gap-2">
+                                <span className="text-xs font-medium text-ink-soft">
+                                    {kind === 'saved' ? 'Who sees you saved it' : 'Who sees you’re going'}
+                                </span>
+                                {showMakeDefault && (
+                                    defaultState === 'saved' ? (
+                                        <span className="text-xs text-ink-soft">Saved as default</span>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={makeDefault}
+                                            disabled={defaultState === 'saving'}
+                                            className="text-xs font-medium text-action hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            Make default
+                                        </button>
+                                    )
+                                )}
+                            </div>
+                            {picker}
+                        </div>
+                    )}
+                    {children}
+                </>
+            ) : (
+                <>
+                    {children}
+                    {picker}
+                </>
             )}
             <div className="mt-3 flex items-center gap-2">
                 {showRemember && (
@@ -168,6 +225,15 @@ export default function RsvpVisibilitySheet({
                         />
                         Remember my choice
                     </label>
+                )}
+                {footerLink && (
+                    <Link
+                        to={footerLink.to}
+                        onClick={dismiss}
+                        className="text-sm font-semibold text-action hover:underline"
+                    >
+                        {footerLink.label}
+                    </Link>
                 )}
                 <div className="ml-auto flex items-center gap-2">
                     {secondaryAction && (
@@ -192,19 +258,23 @@ export default function RsvpVisibilitySheet({
         </>
     );
 
-    if (isMobile) {
+    if (asSheet) {
         return createPortal(
-            <BottomSheet
-                title={title}
-                subtitle={subtitle}
-                variant="floating"
-                compact
-                onClose={dismiss}
-                layer="transient"
-                headerLeading={<span aria-hidden className="text-xl leading-none">{emoji}</span>}
-            >
-                {body}
-            </BottomSheet>,
+            // Portal events still bubble through React ancestors (e.g. clickable cards).
+            <div onClick={(e) => e.stopPropagation()}>
+                <BottomSheet
+                    title={title}
+                    subtitle={subtitle}
+                    variant="floating"
+                    compact
+                    desktop={rsvpPeopleSheetEnabled ? 'modal' : 'sheet'}
+                    onClose={dismiss}
+                    layer="transient"
+                    headerLeading={<span aria-hidden className="text-xl leading-none">{emoji}</span>}
+                >
+                    {body}
+                </BottomSheet>
+            </div>,
             document.body,
         );
     }

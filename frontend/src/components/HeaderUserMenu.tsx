@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { firstNameOf } from '../utils/displayName';
+import { usePendingReviewCount } from '../hooks/usePendingReviewCount';
 import MenuDrawer from './MenuDrawer';
 
 /**
@@ -18,17 +19,22 @@ export default function HeaderUserMenu({
     const { user } = useAuth();
     const [open, setOpen] = useState(false);
     const firstName = firstNameOf(user?.name);
+    const pendingReviews = usePendingReviewCount();
 
     return (
         <div className={'shrink-0 ' + (className ?? '')}>
             <button
                 type="button"
                 onClick={() => setOpen(true)}
-                aria-label={user ? `${firstName || 'Account'} menu` : 'Menu'}
+                aria-label={user ? `${firstName || 'Account'} menu${pendingReviews > 0 ? `, ${pendingReviews} to review` : ''}` : 'Menu'}
                 aria-haspopup="dialog"
                 aria-expanded={open}
-                className="inline-flex items-center gap-1.5 h-11 px-1 -mr-1 text-ink-soft hover:text-ink transition"
+                className="relative inline-flex items-center gap-1.5 h-11 px-1 -mr-1 text-ink-soft hover:text-ink transition"
             >
+                {pendingReviews > 0 && (
+                    // eslint-disable-next-line no-restricted-syntax -- status dot is circular by design
+                    <span aria-hidden="true" className="absolute right-0 top-2 h-2 w-2 rounded-full bg-action" />
+                )}
                 {user && (
                     user.avatar_url ? (
                         <img

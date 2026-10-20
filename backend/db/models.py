@@ -1577,11 +1577,46 @@ class EventRating(SQLModel, table=True):
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None)
+    # Surface the first submission came from (home_prompt, notification_push, ...).
+    entry_point: Optional[str] = Field(default=None, max_length=32)
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), index=True
     )
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ReviewPromptImpression(SQLModel, table=True):
+    """One Home review-prompt showing; drives frequency caps and prompt stats."""
+
+    __tablename__ = "review_prompt_impressions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    shown_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
+    outcome: str = Field(default="shown", max_length=16)  # shown | dismissed | reviewed
+    forced: bool = Field(default=False)
+
+
+class ReviewPromptForce(SQLModel, table=True):
+    """Admin override: show the Home review prompt for this event to this user."""
+
+    __tablename__ = "review_prompt_forces"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "event_id", name="uq_review_prompt_force_user_event"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    forced_by: Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime = Field(nullable=False)
 
 
 class EventRatingAspectScore(SQLModel, table=True):

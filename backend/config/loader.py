@@ -286,6 +286,12 @@ def get_rsvp_remember_visibility_enabled() -> bool:
     return True if parsed is None else parsed
 
 
+def get_rsvp_people_sheet_enabled() -> bool:
+    """Post-RSVP sheet with people suggestions + friend-invite share. Default False."""
+    parsed = _parse_bool(os.getenv("RSVP_PEOPLE_SHEET_ENABLED"))
+    return False if parsed is None else parsed
+
+
 def get_geoapify_enabled() -> bool:
     """Use Geoapify for place autocomplete (else Photon). Default False."""
     parsed = _parse_bool(os.getenv("GEOAPIFY_ENABLED"))
@@ -342,6 +348,34 @@ def get_review_mood_headline_min_reviews() -> int:
         return max(1, int(raw))
     except (TypeError, ValueError):
         return 3
+
+
+def get_review_home_prompt_enabled() -> bool:
+    """Auto-open the review wizard on Home for a recent unreviewed event. Default True."""
+    parsed = _parse_bool(os.getenv("REVIEW_HOME_PROMPT_ENABLED"))
+    return True if parsed is None else parsed
+
+
+# Tuned for ~1-2 attended events per month; env var = key upper-cased.
+REVIEW_HOME_PROMPT_INT_DEFAULTS: dict[str, int] = {
+    "review_home_prompt_cooldown_hours": 72,
+    "review_home_prompt_max_impressions_per_event": 2,
+    "review_home_prompt_max_event_age_days": 14,
+    "review_home_prompt_fatigue_dismissals": 4,
+    "review_home_prompt_fatigue_pause_days": 30,
+    "similar_events_radius_local_km": 25,
+    "similar_events_radius_regional_km": 150,
+    "similar_events_radius_international_km": 1500,
+    "similar_events_limit": 6,
+}
+
+
+def get_review_home_prompt_int(key: str) -> int:
+    default = REVIEW_HOME_PROMPT_INT_DEFAULTS[key]
+    try:
+        return max(1, int(os.getenv(key.upper(), str(default))))
+    except (TypeError, ValueError):
+        return default
 
 
 def get_web_push_enabled() -> bool:

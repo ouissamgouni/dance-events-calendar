@@ -328,12 +328,18 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         rsvp_remember_visibility_enabled=app_settings.get_rsvp_remember_visibility_enabled(
             session
         ),
+        rsvp_people_sheet_enabled=app_settings.get_rsvp_people_sheet_enabled(session),
         geoapify_enabled=app_settings.get_geoapify_enabled(session),
         review_prompt_delay_hours=app_settings.get_review_prompt_delay_hours(session),
         review_prompt_lookback_hours=app_settings.get_review_prompt_lookback_hours(
             session
         ),
         for_you_review_window_days=app_settings.get_for_you_review_window_days(session),
+        review_home_prompt_enabled=app_settings.get_review_home_prompt_enabled(session),
+        **{
+            key: app_settings.get_review_home_prompt_int(key, session)
+            for key in app_settings.REVIEW_HOME_PROMPT_INT_KEYS
+        },
         review_mood_headline_min_reviews=app_settings.get_review_mood_headline_min_reviews(
             session
         ),
@@ -938,6 +944,13 @@ def update_settings(
             body.rsvp_remember_visibility_enabled,
         )
 
+    if body.rsvp_people_sheet_enabled is not None:
+        _set_bool_setting(
+            session,
+            "rsvp_people_sheet_enabled",
+            body.rsvp_people_sheet_enabled,
+        )
+
     if body.geoapify_enabled is not None:
         _set_bool_setting(session, "geoapify_enabled", body.geoapify_enabled)
 
@@ -972,6 +985,19 @@ def update_settings(
                 key="for_you_review_window_days",
                 value=str(body.for_you_review_window_days),
             )
+        session.add(row)
+
+    if body.review_home_prompt_enabled is not None:
+        _set_bool_setting(
+            session, "review_home_prompt_enabled", body.review_home_prompt_enabled
+        )
+
+    for key in app_settings.REVIEW_HOME_PROMPT_INT_KEYS:
+        value = getattr(body, key)
+        if value is None:
+            continue
+        row = session.get(SiteSetting, key) or SiteSetting(key=key)
+        row.value = str(value)
         session.add(row)
 
     if body.review_mood_headline_min_reviews is not None:

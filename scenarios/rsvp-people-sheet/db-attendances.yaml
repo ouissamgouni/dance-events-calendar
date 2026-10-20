@@ -1,0 +1,66 @@
+# attending_since controls attendee order (oldest first) for tie-breaks.
+attendances:
+  # evt-rps-001 — crowded upcoming event
+  - {
+      event_id: evt-rps-001,
+      email: ana@example.com,
+      share_audience: friends,
+      attending_since: now-30h,
+    }
+  - {
+      event_id: evt-rps-001,
+      email: bea@example.com,
+      share_audience: public,
+      attending_since: now-29h,
+    }
+  - {
+      event_id: evt-rps-001,
+      email: leo@example.com,
+      share_audience: public,
+      attending_since: now-28h,
+    }
+  - {
+      event_id: evt-rps-001,
+      email: paz@example.com,
+      share_audience: public,
+      attending_since: now-27h,
+    }
+  - {
+      event_id: evt-rps-001,
+      email: tom@example.com,
+      share_audience: public,
+      attending_since: now-26h,
+    }
+  - {
+      event_id: evt-rps-001,
+      email: zoe@example.com,
+      share_audience: public,
+      attending_since: now-25h,
+    }
+  - {
+      event_id: evt-rps-001,
+      email: sam@example.com,
+      share_audience: public,
+      attending_since: now-24h,
+    }
+  - {
+      event_id: evt-rps-001,
+      email: mia@example.com,
+      share_audience: public,
+      attending_since: now-23h,
+    }
+  - {
+      event_id: evt-rps-001,
+      email: kai@example.com,
+      share_audience: friends,
+      attending_since: now-22h,
+    }
+  - {
+      event_id: evt-rps-001,
+      email: hid@example.com,
+      share_audience: private,
+      attending_since: now-21h,
+    }
+  # evt-rps-003 — past event
+  - { event_id: evt-rps-003, email: ana@example.com, share_audience: public }
+  - { event_id: evt-rps-003, email: tom@example.com, share_audience: public }
