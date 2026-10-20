@@ -1135,6 +1135,153 @@ def test_schedule_json_import_v2_round_trips_session_contributors(
     assert sessions["party"]["instructors"] is None
 
 
+def test_schedule_room_details_descriptions_and_multi_room_sessions(
+    client, schedule_event
+):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Zagreb", "days": ["2026-11-27"]}
+        ).status_code
+        == 201
+    )
+    document = {
+        "schema_version": 2,
+        "event_id": "back-2-mambo-2026",
+        "timezone": "Europe/Zagreb",
+        "day_start_hour": 7,
+        "days": ["2026-11-27"],
+        "rooms": [
+            {
+                "external_id": "salsa",
+                "name": "Salsa Room",
+                "details": "Ground floor · Grand Pass only",
+                "sort_order": 0,
+            },
+            {"external_id": "mambo", "name": "Mambo Room", "sort_order": 1},
+            {"external_id": "seminar", "name": "Seminar Room", "sort_order": 2},
+        ],
+        "sessions": [
+            {
+                "external_id": "social",
+                "title": "Afternoon Social",
+                "description": "Open floor for everyone.",
+                "start": "2026-11-27T17:00:00",
+                "end": "2026-11-27T20:00:00",
+                "room_external_ids": ["mambo", "salsa"],
+            },
+            {
+                "external_id": "talk",
+                "title": "Community Talk",
+                "start": "2026-11-27T18:00:00",
+                "end": "2026-11-27T19:00:00",
+                "room_external_id": "seminar",
+            },
+        ],
+    }
+    assert (
+        client.post(
+            f"{base}/import", json={"mode": "replace", "document": document}
+        ).status_code
+        == 200
+    )
+
+    draft = client.get(base).json()
+    rooms = {row["name"]: row for row in draft["rooms"]}
+    assert rooms["Salsa Room"]["details"] == "Ground floor · Grand Pass only"
+    salsa, mambo, seminar = (
+        rooms["Salsa Room"]["id"],
+        rooms["Mambo Room"]["id"],
+        rooms["Seminar Room"]["id"],
+    )
+    sessions = {row["title"]: row for row in draft["sessions"]}
+    social = sessions["Afternoon Social"]
+    assert social["room_ids"] == [salsa, mambo]
+    assert social["room_id"] == salsa
+    assert social["description"] == "Open floor for everyone."
+    assert sessions["Community Talk"]["room_ids"] == [seminar]
+
+    exported = client.get(f"{base}/export").json()
+    exported_social = next(
+        row for row in exported["sessions"] if row["external_id"] == "social"
+    )
+    assert exported_social["room_external_ids"] == ["salsa", "mambo"]
+    assert exported["rooms"][0]["details"] == "Ground floor · Grand Pass only"
+    repeated = client.post(
+        f"{base}/import", json={"mode": "merge", "document": exported}
+    )
+    assert repeated.json()["operations"]["updated"] == 0
+
+    overlapping = client.post(
+        f"{base}/sessions",
+        json={
+            "title": "Mambo Bootcamp",
+            "start": "2026-11-27T17:30:00Z",
+            "end": "2026-11-27T18:30:00Z",
+            "room_ids": [mambo],
+        },
+    )
+    assert overlapping.status_code == 201
+    assert overlapping.json()["room_ids"] == [mambo]
+    overlap_issues = [
+        issue for issue in client.get(base).json()["issues"]
+        if issue["code"] == "room_overlap"
+    ]
+    assert len(overlap_issues) == 1
+    assert set(overlap_issues[0]["session_ids"]) == {
+        social["id"],
+        overlapping.json()["id"],
+    }
+
+    assert client.delete(f"{base}/rooms/{mambo}").status_code == 409
+
+    legacy = client.patch(
+        f"{base}/sessions/{social['id']}", json={"room_id": seminar}
+    )
+    assert legacy.status_code == 200
+    assert legacy.json()["room_ids"] == [seminar]
+    widened = client.patch(
+        f"{base}/sessions/{social['id']}", json={"room_ids": [seminar, salsa]}
+    )
+    assert widened.json()["room_ids"] == [salsa, seminar]
+    assert widened.json()["room_id"] == salsa
+    assert (
+        client.patch(
+            f"{base}/sessions/{social['id']}", json={"room_ids": [999999]}
+        ).status_code
+        == 422
+    )
+
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+    public = client.get("/api/events/back-2-mambo-2026/schedule").json()
+    public_social = next(row for row in public["sessions"] if row["id"] == social["id"])
+    assert public_social["room_ids"] == [salsa, seminar]
+    assert public_social["description"] == "Open floor for everyone."
+    assert public["rooms"][0]["details"] == "Ground floor · Grand Pass only"
+
+
+def test_schedule_diff_ignores_fields_missing_from_older_publications():
+    previous = {
+        "rooms": [{"id": 1, "name": "Grand Hall"}],
+        "sessions": [{"id": "session-1", "title": "Workshop", "room_id": 1}],
+    }
+    current = {
+        "rooms": [{"id": 1, "name": "Grand Hall", "details": None}],
+        "sessions": [
+            {
+                "id": "session-1",
+                "title": "Workshop",
+                "room_id": 1,
+                "room_ids": [1],
+                "description": None,
+            }
+        ],
+    }
+
+    assert compute_change_details(current, previous) == []
+
+
 def test_schedule_json_import_rejects_unknown_reference_without_writes(
     client, schedule_event
 ):

@@ -1,0 +1,878 @@
+{
+  "schema_version": 2,
+  "event_id": "65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374",
+  "timezone": "Europe/Zagreb",
+  "day_start_hour": 7,
+  "days": [
+    "2026-11-27",
+    "2026-11-28",
+    "2026-11-29"
+  ],
+  "venues": [
+    {
+      "external_id": "sheraton-zagreb",
+      "name": "Hotel Sheraton Zagreb",
+      "address": "Ul. kneza Borne 2, 10000 Zagreb, Croatia",
+      "sort_order": 0
+    }
+  ],
+  "rooms": [
+    {
+      "external_id": "salsa-room",
+      "name": "Salsa Room",
+      "details": "Ground floor · Grand Pass only",
+      "venue_external_id": "sheraton-zagreb",
+      "color": "pink",
+      "sort_order": 0
+    },
+    {
+      "external_id": "mambo-room",
+      "name": "Mambo Room",
+      "details": "Ground floor · Grand Pass only",
+      "venue_external_id": "sheraton-zagreb",
+      "color": "amber",
+      "sort_order": 1
+    },
+    {
+      "external_id": "cha-cha-cha-room",
+      "name": "Cha Cha Cha Room",
+      "details": "Ground floor · Grand Pass only",
+      "venue_external_id": "sheraton-zagreb",
+      "color": "emerald",
+      "sort_order": 2
+    },
+    {
+      "external_id": "seminar-room",
+      "name": "Seminar Room",
+      "details": "1st floor · All passes (Grand + Party)",
+      "venue_external_id": "sheraton-zagreb",
+      "color": "violet",
+      "sort_order": 3
+    }
+  ],
+  "levels": [
+    {
+      "external_id": "open-level",
+      "label": "Open Level",
+      "notation": "○○○",
+      "sort_order": 0
+    },
+    {
+      "external_id": "improver",
+      "label": "Improver",
+      "notation": "●○○",
+      "sort_order": 1
+    },
+    {
+      "external_id": "intermediate",
+      "label": "Intermediate",
+      "notation": "●●○",
+      "sort_order": 2
+    },
+    {
+      "external_id": "advanced",
+      "label": "Advanced",
+      "notation": "●●●",
+      "sort_order": 3
+    }
+  ],
+  "activity_types": [
+    {
+      "external_id": "workshop",
+      "name": "Workshop",
+      "color": "blue",
+      "sort_order": 0
+    },
+    {
+      "external_id": "yoga",
+      "name": "Yoga",
+      "color": "emerald",
+      "sort_order": 1
+    },
+    {
+      "external_id": "talk",
+      "name": "Talk",
+      "color": "violet",
+      "sort_order": 2
+    },
+    {
+      "external_id": "party",
+      "name": "Social & Party",
+      "color": "amber",
+      "sort_order": 3
+    },
+    {
+      "external_id": "rehearsal",
+      "name": "Show Rehearsal",
+      "color": "orange",
+      "sort_order": 4
+    }
+  ],
+  "contributors": [
+    {
+      "external_id": "alicia-velasco",
+      "display_name": "Alicia Velasco",
+      "sort_order": 0
+    },
+    {
+      "external_id": "willy-jessy",
+      "display_name": "Willy & Jessy",
+      "sort_order": 1
+    },
+    {
+      "external_id": "diego-yaritza",
+      "display_name": "Diego & Yaritza",
+      "sort_order": 2
+    },
+    {
+      "external_id": "jose-nerea",
+      "display_name": "Jose & Nerea",
+      "sort_order": 3
+    },
+    {
+      "external_id": "aldo-mambo-candela",
+      "display_name": "Aldo & his Mambo Candela",
+      "sort_order": 4
+    },
+    {
+      "external_id": "bersy-cortez",
+      "display_name": "Bersy Cortez",
+      "sort_order": 5
+    },
+    {
+      "external_id": "ouissam-martina",
+      "display_name": "Ouissam & Martina",
+      "sort_order": 6
+    },
+    {
+      "external_id": "ana-novak",
+      "display_name": "Ana Novak",
+      "sort_order": 7
+    }
+  ],
+  "sessions": [
+    {
+      "external_id": "fri-body-movement-on2",
+      "title": "Body Movement Fundamentals for Salsa & Mambo (On2)",
+      "description": "Building a strong foundation for your On2 dancing by focusing on posture, body control, and clean movement.",
+      "contributors": [
+        {
+          "contributor_external_id": "alicia-velasco",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-27T14:00:00",
+      "end": "2026-11-27T14:55:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "fri-salsa-romantica",
+      "title": "Salsa Romantica (On1)",
+      "description": "Delve into the art of graceful partnering, intricate turns, and heartwarming connections that define the soulful spirit of Salsa Romantica.",
+      "contributors": [
+        {
+          "contributor_external_id": "willy-jessy",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-27T15:00:00",
+      "end": "2026-11-27T15:55:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "fri-turn-spin",
+      "title": "Turn & Spin Technique – Solo & Couple (On2)",
+      "description": "Learn the fundamentals of timing, balance, spotting, and body alignment for clean and controlled turns and spins, both solo and with a partner on On2 timing.",
+      "contributors": [
+        {
+          "contributor_external_id": "diego-yaritza",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-27T16:00:00",
+      "end": "2026-11-27T17:00:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "fri-afternoon-social",
+      "title": "Afternoon Social – Salsa & Mambo",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-27T17:00:00",
+      "end": "2026-11-27T20:00:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "party",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "fri-yoga",
+      "title": "Yoga",
+      "description": null,
+      "contributors": [
+        {
+          "contributor_external_id": "ana-novak",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-27T20:10:00",
+      "end": "2026-11-27T20:50:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "yoga",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "fri-show-rehearsal",
+      "title": "Show Rehearsal",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-27T22:00:00",
+      "end": "2026-11-27T22:30:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "rehearsal",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "fri-party-gala-show",
+      "title": "Party & Gala Show",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-27T22:30:00",
+      "end": "2026-11-28T05:00:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "party",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-yoga",
+      "title": "Yoga",
+      "description": null,
+      "contributors": [
+        {
+          "contributor_external_id": "ana-novak",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T10:00:00",
+      "end": "2026-11-28T10:45:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "yoga",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-musicality-intro",
+      "title": "Musicality Intro – Dancing with the Music (On2)",
+      "description": "Learn how to dance comfortably to slow, mid-tempo, and fast salsa music while adapting your movement and energy to different musical styles and moods.",
+      "contributors": [
+        {
+          "contributor_external_id": "diego-yaritza",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T11:00:00",
+      "end": "2026-11-28T11:50:00",
+      "room_external_ids": [
+        "salsa-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "intermediate",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-intro-mambo-on1",
+      "title": "Introduction to Mambo for Salsa On1 Dancers",
+      "description": "Discover mambo from the ground up! Learn the basic steps, timing, and rhythm that define this iconic style of dancing.",
+      "contributors": [
+        {
+          "contributor_external_id": "ouissam-martina",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T11:00:00",
+      "end": "2026-11-28T11:50:00",
+      "room_external_ids": [
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-on2-timing",
+      "title": "Dancing to On2 Timing: Son vs Palladium Mambo vs NY Style vs Clave",
+      "description": "Explore the rich variations of dancing On2, from Son and Palladium Mambo to NY Style and clave-driven rhythms. Learn to syncopate with musical precision and dance with deeper style and flavor.",
+      "contributors": [
+        {
+          "contributor_external_id": "jose-nerea",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T12:00:00",
+      "end": "2026-11-28T12:50:00",
+      "room_external_ids": [
+        "salsa-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-lady-style-fundamentals",
+      "title": "Lady Style Fundamentals & More (On2)",
+      "description": "Building a strong foundation in salsa styling. This class focuses on posture, arm styling, balance, and body movement to help you feel more confident, elegant, and expressive on the dance floor.",
+      "contributors": [
+        {
+          "contributor_external_id": "alicia-velasco",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T12:00:00",
+      "end": "2026-11-28T12:50:00",
+      "room_external_ids": [
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-men-style",
+      "title": "Men Style (On2): Foundations & Concepts",
+      "description": "Learn the foundations of men’s styling in mambo through timing, posture, movement, and musicality. Build cleaner technique and a more natural, confident presence on the dance floor.",
+      "contributors": [
+        {
+          "contributor_external_id": "aldo-mambo-candela",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T12:00:00",
+      "end": "2026-11-28T12:50:00",
+      "room_external_ids": [
+        "cha-cha-cha-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-leading-following",
+      "title": "Leading & Following Concepts (On1)",
+      "description": "Learn clear communication, timing, and connection techniques to dance with more ease, confidence, and flow.",
+      "contributors": [
+        {
+          "contributor_external_id": "willy-jessy",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T13:00:00",
+      "end": "2026-11-28T13:50:00",
+      "room_external_ids": [
+        "salsa-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "intermediate",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-body-movement-technique",
+      "title": "Salsa/Mambo Body Movement Fundamentals – Technique & Expression",
+      "description": "Build a strong foundation for your dancing by focusing on posture, body control, and clean movement to feel more grounded and confident on the dance floor.",
+      "contributors": [
+        {
+          "contributor_external_id": "bersy-cortez",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T13:00:00",
+      "end": "2026-11-28T13:50:00",
+      "room_external_ids": [
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-seminar-1300",
+      "title": "Seminar (TBA)",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-28T13:00:00",
+      "end": "2026-11-28T13:50:00",
+      "room_external_ids": [
+        "seminar-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "talk",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-mambo-syllabus",
+      "title": "Mambo Syllabus",
+      "description": "Explore the artistry of Mambo dancing – from foundational steps to advanced footwork, this syllabus session is crafted to enhance your Mambo skills, ensuring you move with precision, style, and confidence on the dance floor.",
+      "contributors": [
+        {
+          "contributor_external_id": "aldo-mambo-candela",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T14:00:00",
+      "end": "2026-11-28T14:50:00",
+      "room_external_ids": [
+        "salsa-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "intermediate",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-art-of-connection",
+      "title": "Art of Connection in Mambo",
+      "description": "Enter the world of the connection, silent communication, and moving as one. Smooth signals, playful responses, and plenty of “aha!” moments guaranteed.",
+      "contributors": [
+        {
+          "contributor_external_id": "ouissam-martina",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T14:00:00",
+      "end": "2026-11-28T14:50:00",
+      "room_external_ids": [
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-olu-olu-coffee-lounge",
+      "title": "Olu Olu Coffee Lounge",
+      "description": "Salsa Friendships vs. Everyday Friendships\nWhat makes dance friendships different – and why can they feel so close?\n\nThe Dance Floor Hierarchy\nWho gets asked to dance – and what really shapes those choices?",
+      "contributors": [],
+      "start": "2026-11-28T14:00:00",
+      "end": "2026-11-28T14:50:00",
+      "room_external_ids": [
+        "seminar-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "talk",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-musicality-social",
+      "title": "Musicality: Social Dancing Skills (On2)",
+      "description": "Recognizing the basic structure of a salsa song and expressing it. From intro to mambo, trumpet parts, and descarga, this class shows you how to bring each section to life in your social dancing.",
+      "contributors": [
+        {
+          "contributor_external_id": "jose-nerea",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T15:00:00",
+      "end": "2026-11-28T15:50:00",
+      "room_external_ids": [
+        "salsa-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-mambo-fusion",
+      "title": "Mambo Fusion",
+      "description": "Immerse yourself in the rhythmic journey of Mambo Fusion, a workshop blending the lively footwork and timing of salsa On2 with the rich and vibrant Afro-Cuban dance body movements.",
+      "contributors": [
+        {
+          "contributor_external_id": "bersy-cortez",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-28T15:00:00",
+      "end": "2026-11-28T15:50:00",
+      "room_external_ids": [
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "intermediate",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-community-talks",
+      "title": "Community Talks: More Than Just a Dance?",
+      "description": "Chemistry, Attraction & Emotions on the Dance Floor.\nPanel discussions.",
+      "contributors": [],
+      "start": "2026-11-28T15:00:00",
+      "end": "2026-11-28T15:50:00",
+      "room_external_ids": [
+        "seminar-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "talk",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-afternoon-party",
+      "title": "Afternoon Salsa & Mambo Party",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-28T16:00:00",
+      "end": "2026-11-28T19:00:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "party",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-show-rehearsal",
+      "title": "Show Rehearsal",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-28T19:15:00",
+      "end": "2026-11-28T20:15:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "rehearsal",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sat-gala-night",
+      "title": "Gala Salsa & Mambo Night",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-28T22:30:00",
+      "end": "2026-11-29T06:00:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "party",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-son-montuno",
+      "title": "Son Montuno",
+      "description": "Step into the heartbeat behind mambo and salsa – Son Montuno.",
+      "contributors": [
+        {
+          "contributor_external_id": "jose-nerea",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-29T11:30:00",
+      "end": "2026-11-29T12:30:00",
+      "room_external_ids": [
+        "salsa-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-pachanga",
+      "title": "Pachanga",
+      "description": "This fun, funky class focuses on playful footwork, bounce, and body action to add flavor and rhythm to your salsa dancing.",
+      "contributors": [
+        {
+          "contributor_external_id": "alicia-velasco",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-29T11:30:00",
+      "end": "2026-11-29T12:30:00",
+      "room_external_ids": [
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "intermediate",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-salsa-con-sabor",
+      "title": "Salsa con Sabor (On1)",
+      "description": "Bring more flavor into your dancing by adding body movement, styling, and musical expression to your salsa. Perfect for improver/intermediate dancers looking to feel more natural, relaxed, and expressive on the dance floor.",
+      "contributors": [
+        {
+          "contributor_external_id": "willy-jessy",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-29T12:40:00",
+      "end": "2026-11-29T13:40:00",
+      "room_external_ids": [
+        "salsa-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "intermediate",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-mambo-flow-flavour",
+      "title": "Mambo – Flow & Flavour",
+      "description": "Take your partnerwork to the next level with fluid transitions and playful styling.",
+      "contributors": [
+        {
+          "contributor_external_id": "ouissam-martina",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-29T12:40:00",
+      "end": "2026-11-29T13:40:00",
+      "room_external_ids": [
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "open-level",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-mambo-palladium",
+      "title": "Mambo / Palladium Style",
+      "description": "Explore vintage mambo footwork, styling, and musicality that shaped the roots of salsa as we know it today.",
+      "contributors": [
+        {
+          "contributor_external_id": "diego-yaritza",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-29T13:50:00",
+      "end": "2026-11-29T14:50:00",
+      "room_external_ids": [
+        "salsa-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "intermediate",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-lady-style-diva",
+      "title": "Lady Style (On2): Unleash Your Inner Diva",
+      "description": "Add elegance, flow, and a touch of diva energy to your dancing while letting your personality shine on the dance floor.",
+      "contributors": [
+        {
+          "contributor_external_id": "bersy-cortez",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-29T13:50:00",
+      "end": "2026-11-29T14:50:00",
+      "room_external_ids": [
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": "intermediate",
+      "activity_type_external_id": "workshop",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-yoga",
+      "title": "Yoga",
+      "description": null,
+      "contributors": [
+        {
+          "contributor_external_id": "ana-novak",
+          "role": "instructor"
+        }
+      ],
+      "start": "2026-11-29T15:00:00",
+      "end": "2026-11-29T15:50:00",
+      "room_external_ids": [
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "yoga",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-seminar-1500",
+      "title": "Seminar (TBA)",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-29T15:00:00",
+      "end": "2026-11-29T16:00:00",
+      "room_external_ids": [
+        "seminar-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "talk",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-afternoon-party",
+      "title": "Afternoon Salsa & Mambo Party",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-29T16:30:00",
+      "end": "2026-11-29T19:30:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "party",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    },
+    {
+      "external_id": "sun-farewell-party",
+      "title": "Farewell Party",
+      "description": null,
+      "contributors": [],
+      "start": "2026-11-29T23:00:00",
+      "end": "2026-11-30T04:00:00",
+      "room_external_ids": [
+        "salsa-room",
+        "mambo-room"
+      ],
+      "venue_external_id": "sheraton-zagreb",
+      "level_external_id": null,
+      "activity_type_external_id": "party",
+      "attendee_note": null,
+      "allow_plan": true,
+      "is_cancelled": false
+    }
+  ]
+}

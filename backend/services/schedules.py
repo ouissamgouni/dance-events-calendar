@@ -14,6 +14,7 @@ from backend.db.models import (
     ScheduleRoom,
     ScheduleSession,
     ScheduleSessionContributor,
+    ScheduleSessionRoom,
     ScheduleVenue,
     User,
     UserFollow,
@@ -316,14 +317,76 @@ def published_schedule_event_ids(session: Session, event_ids: list[str]) -> set[
     )
 
 
+def session_room_ids_by_session(
+    session: Session, session_ids: list[UUID]
+) -> dict[UUID, list[int]]:
+    if not session_ids:
+        return {}
+    rows = session.exec(
+        select(ScheduleSessionRoom)
+        .where(col(ScheduleSessionRoom.session_id).in_(session_ids))
+        .order_by(ScheduleSessionRoom.session_id, ScheduleSessionRoom.position)
+    ).all()
+    result: dict[UUID, list[int]] = {}
+    for row in rows:
+        result.setdefault(row.session_id, []).append(row.room_id)
+    return result
+
+
+def replace_session_rooms(
+    session: Session, row: ScheduleSession, room_ids: list[int]
+) -> None:
+    """Store *room_ids* (already validated, ordered) and mirror the first into room_id."""
+    for existing in session.exec(
+        select(ScheduleSessionRoom).where(ScheduleSessionRoom.session_id == row.id)
+    ).all():
+        session.delete(existing)
+    session.flush()
+    for position, room_id in enumerate(room_ids):
+        session.add(
+            ScheduleSessionRoom(session_id=row.id, room_id=room_id, position=position)
+        )
+    row.room_id = room_ids[0] if room_ids else None
+    session.add(row)
+
+
+def ordered_room_ids(
+    session: Session, schedule_id: int, room_ids: list[int]
+) -> list[int] | None:
+    """Return *room_ids* deduplicated and sorted like the grid columns, or None if any is unknown."""
+    unique = set(room_ids)
+    if not unique:
+        return []
+    rooms = session.exec(
+        select(ScheduleRoom).where(
+            col(ScheduleRoom.id).in_(unique), ScheduleRoom.schedule_id == schedule_id
+        )
+    ).all()
+    if len(rooms) != len(unique):
+        return None
+    return [
+        room.id for room in sorted(rooms, key=lambda room: (room.sort_order, room.id))
+    ]
+
+
+def effective_room_ids(row: ScheduleSession, room_ids: list[int] | None) -> list[int]:
+    # Rows written before multi-room support (or via legacy room_id-only paths) have no join rows.
+    if room_ids and room_ids[0] == row.room_id:
+        return list(room_ids)
+    return [row.room_id] if row.room_id is not None else []
+
+
 def session_snapshot(
-    row: ScheduleSession, contributors: list[ScheduleSessionContributor] | None = None
+    row: ScheduleSession,
+    contributors: list[ScheduleSessionContributor] | None = None,
+    room_ids: list[int] | None = None,
 ) -> dict:
     return {
         "id": str(row.id),
         "external_id": row.external_id,
         "title": row.title,
         "instructors": row.instructors,
+        "description": row.description,
         "contributors": [
             {
                 "contributor_id": assignment.contributor_id,
@@ -335,6 +398,7 @@ def session_snapshot(
         "start": utc_isoformat(row.start),
         "end": utc_isoformat(row.end),
         "room_id": row.room_id,
+        "room_ids": effective_room_ids(row, room_ids),
         "venue_id": row.venue_id,
         "level_id": row.level_id,
         "activity_type_id": row.activity_type_id,
@@ -397,6 +461,7 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
     assignments_by_session: dict[UUID, list[ScheduleSessionContributor]] = {}
     for assignment in assignments:
         assignments_by_session.setdefault(assignment.session_id, []).append(assignment)
+    rooms_by_session = session_room_ids_by_session(session, [row.id for row in sessions])
     return {
         "event_id": schedule.event_id,
         "timezone": schedule.timezone,
@@ -418,6 +483,7 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
                 "external_id": row.external_id,
                 "venue_id": row.venue_id,
                 "name": row.name,
+                "details": row.details,
                 "color": row.color,
                 "sort_order": row.sort_order,
             }
@@ -453,7 +519,11 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
             for row in contributors
         ],
         "sessions": [
-            session_snapshot(row, assignments_by_session.get(row.id, []))
+            session_snapshot(
+                row,
+                assignments_by_session.get(row.id, []),
+                rooms_by_session.get(row.id),
+            )
             for row in sessions
         ],
     }
@@ -515,16 +585,21 @@ def compute_issues(session: Session, schedule: EventSchedule) -> list[dict]:
                 }
             )
         seen[key] = row
+    rooms_by_session = session_room_ids_by_session(session, [row.id for row in sessions])
     by_room: dict[int, list[ScheduleSession]] = {}
     for row in sessions:
-        if row.room_id is not None:
-            by_room.setdefault(row.room_id, []).append(row)
+        for room_id in effective_room_ids(row, rooms_by_session.get(row.id)):
+            by_room.setdefault(room_id, []).append(row)
+    reported_pairs: set[tuple[UUID, UUID]] = set()
     for room_sessions in by_room.values():
         room_sessions.sort(key=lambda item: item.start)
         for index, left in enumerate(room_sessions):
             for right in room_sessions[index + 1 :]:
                 if right.start >= left.end:
                     break
+                if (left.id, right.id) in reported_pairs:
+                    continue
+                reported_pairs.add((left.id, right.id))
                 issues.append(
                     {
                         "code": "room_overlap",
@@ -545,6 +620,23 @@ def _issue(code: str, severity: str, message: str, session_id) -> dict:
     }
 
 
+def normalize_snapshot(snapshot: dict) -> dict:
+    """Fill fields added after older publications so they don't show up as changes."""
+    return {
+        **snapshot,
+        "rooms": [{"details": None, **row} for row in snapshot.get("rooms", [])],
+        "sessions": [
+            {
+                "description": None,
+                **row,
+                "room_ids": row.get("room_ids")
+                or ([row["room_id"]] if row.get("room_id") is not None else []),
+            }
+            for row in snapshot.get("sessions", [])
+        ],
+    }
+
+
 def compute_diff(draft: dict, published: dict | None) -> dict:
     if published is None:
         return {
@@ -560,6 +652,7 @@ def compute_diff(draft: dict, published: dict | None) -> dict:
             ),
             "changes": compute_change_details(draft, None),
         }
+    published = normalize_snapshot(published)
     draft_sessions = {row["id"]: row for row in draft["sessions"]}
     published_sessions = {row["id"]: row for row in published.get("sessions", [])}
     shared_ids = draft_sessions.keys() & published_sessions.keys()
@@ -597,7 +690,7 @@ def compute_diff(draft: dict, published: dict | None) -> dict:
 
 
 def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
-    previous = previous or {
+    previous = normalize_snapshot(previous) if previous else {
         "timezone": None,
         "day_start_hour": None,
         "days": [],
@@ -615,8 +708,14 @@ def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
     previous_contributors = {
         row["id"]: row["display_name"] for row in previous.get("contributors", [])
     }
+    current_rooms = {row["id"]: row["name"] for row in current.get("rooms", [])}
+    previous_rooms = {row["id"]: row["name"] for row in previous.get("rooms", [])}
 
-    def display_value(field: str, value, contributor_names: dict) -> object:
+    def display_value(
+        field: str, value, contributor_names: dict, room_names: dict
+    ) -> object:
+        if field == "room_ids" and isinstance(value, list):
+            return " + ".join(room_names.get(room_id, "Unknown room") for room_id in value)
         if field != "contributors" or not isinstance(value, list):
             return value
         return ", ".join(
@@ -685,10 +784,13 @@ def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
                 {
                     "field": field,
                     "before": display_value(
-                        field, previous_row.get(field), previous_contributors
+                        field,
+                        previous_row.get(field),
+                        previous_contributors,
+                        previous_rooms,
                     ),
                     "after": display_value(
-                        field, current_row.get(field), current_contributors
+                        field, current_row.get(field), current_contributors, current_rooms
                     ),
                 }
                 for field in current_row

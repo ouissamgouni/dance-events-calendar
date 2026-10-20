@@ -74,6 +74,7 @@ from backend.db.models import (
     ScheduleRoom,
     ScheduleSession,
     ScheduleSessionContributor,
+    ScheduleSessionRoom,
     ScheduleVenue,
     User,
     UserEventAttendance,
@@ -87,11 +88,14 @@ from backend.services.schedules import (
     compute_issues,
     default_schedule_days,
     latest_publication,
+    ordered_room_ids,
     plan_counts,
     plan_entries,
+    replace_session_rooms,
     seed_default_activity_types,
     seed_default_dance_levels,
     session_attendance_projection,
+    session_room_ids_by_session,
     session_snapshot,
     to_utc,
     validate_timezone,
@@ -859,6 +863,22 @@ def update_room(
 def delete_room(event_id: str, row_id: int, session: Session = Depends(get_session)):
     schedule = _schedule_for_event(session, event_id)
     row = _row_for_schedule(session, ScheduleRoom, row_id, schedule.id)
+    secondary_use = session.exec(
+        select(ScheduleSessionRoom)
+        .join(ScheduleSession, ScheduleSession.id == ScheduleSessionRoom.session_id)
+        .where(
+            ScheduleSessionRoom.room_id == row_id,
+            ScheduleSession.deleted_at.is_(None),
+        )
+    ).first()
+    if secondary_use:
+        raise HTTPException(
+            status_code=409, detail="Item is used by one or more sessions"
+        )
+    for link in session.exec(
+        select(ScheduleSessionRoom).where(ScheduleSessionRoom.room_id == row_id)
+    ).all():
+        session.delete(link)
     _delete_if_unused(session, row, ScheduleSession.room_id == row_id)
 
 
@@ -996,10 +1016,16 @@ def create_session(
     schedule = _schedule_for_event(session, event_id)
     data = body.model_dump()
     assignments = data.pop("contributors")
+    room_ids = data.pop("room_ids")
+    if room_ids is None:
+        room_ids = [data["room_id"]] if data["room_id"] is not None else []
+    room_ids = _validated_room_ids(session, schedule, room_ids)
+    data["room_id"] = room_ids[0] if room_ids else None
     data = _validated_session_data(session, schedule, data)
     row = ScheduleSession(schedule_id=schedule.id, **data)
     session.add(row)
     session.flush()
+    replace_session_rooms(session, row, room_ids)
     if assignments is not None:
         _replace_session_contributors(session, schedule, row, assignments)
     session.commit()
@@ -1020,11 +1046,18 @@ def update_session(
         raise HTTPException(status_code=404, detail="Session not found")
     data = body.model_dump(exclude_unset=True)
     assignments = data.pop("contributors", None)
+    room_ids = data.pop("room_ids", None)
+    if room_ids is None and "room_id" in data:
+        room_ids = [data["room_id"]] if data["room_id"] is not None else []
+    if room_ids is not None:
+        room_ids = _validated_room_ids(session, schedule, room_ids)
+        data["room_id"] = room_ids[0] if room_ids else None
     if data.get("title") is None and "title" in data:
         raise HTTPException(status_code=422, detail="Title is required")
     merged = {
         "title": row.title,
         "instructors": row.instructors,
+        "description": row.description,
         "start": row.start,
         "end": row.end,
         "room_id": row.room_id,
@@ -1040,6 +1073,8 @@ def update_session(
     _apply(row, merged)
     row.updated_at = datetime.now(timezone.utc)
     session.add(row)
+    if room_ids is not None:
+        replace_session_rooms(session, row, room_ids)
     if assignments is not None:
         _replace_session_contributors(session, schedule, row, assignments)
     session.commit()
@@ -1078,16 +1113,18 @@ def duplicate_session(
     ):
         raise HTTPException(status_code=404, detail="Session not found")
     source_assignments = _session_contributors(session, source.id)
-    data = session_snapshot(source, source_assignments)
+    data = _session_response(session, source)
     data.pop("id")
     data.pop("external_id")
     data.pop("contributors")
+    room_ids = data.pop("room_ids")
     data["title"] = f"{source.title} (copy)"
     data["start"] = source.start
     data["end"] = source.end
     row = ScheduleSession(schedule_id=schedule.id, **data)
     session.add(row)
     session.flush()
+    replace_session_rooms(session, row, room_ids)
     _replace_session_contributors(
         session,
         schedule,
@@ -1963,7 +2000,20 @@ def _session_contributors(
 
 
 def _session_response(session: Session, row: ScheduleSession) -> dict:
-    return session_snapshot(row, _session_contributors(session, row.id))
+    return session_snapshot(
+        row,
+        _session_contributors(session, row.id),
+        session_room_ids_by_session(session, [row.id]).get(row.id),
+    )
+
+
+def _validated_room_ids(
+    session: Session, schedule: EventSchedule, room_ids: list[int]
+) -> list[int]:
+    ordered = ordered_room_ids(session, schedule.id, room_ids)
+    if ordered is None:
+        raise HTTPException(status_code=422, detail="Unknown room")
+    return ordered
 
 
 def _replace_session_contributors(

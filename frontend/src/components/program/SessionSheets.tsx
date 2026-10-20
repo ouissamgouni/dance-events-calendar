@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookmarkPlus, CalendarDays, ChevronLeft, ChevronRight, Clock, MapPin, Trash2 } from 'lucide-react';
+import { BookmarkPlus, CalendarDays, ChevronLeft, ChevronRight, Clock, Info, MapPin, Trash2 } from 'lucide-react';
 import BottomSheet from '../BottomSheet';
 import AudiencePicker from '../AudiencePicker';
 import { useAuth } from '../../context/AuthContext';
 import { useSignIn } from '../../context/SignInSheetContext';
 import type { ShareAudience } from '../../api';
 import { fetchSessionAttendees } from '../../api';
-import type { EventSchedule, ScheduleSession, SessionAttendanceSummary, SessionPlanAttendee } from '../../types';
-import { formatDayLabel, formatTimeRange, programDayOf } from '../../utils/schedule';
+import type { EventSchedule, ScheduleRoom, ScheduleSession, SessionAttendanceSummary, SessionPlanAttendee } from '../../types';
+import { formatDayLabel, formatTimeRange, programDayOf, sessionRooms } from '../../utils/schedule';
 import RoomPill from './RoomPill';
 import SessionAttendeeStack from './SessionAttendeeStack';
 
@@ -25,8 +25,10 @@ interface SheetProps {
 }
 
 export function SessionDetailsSheet({ schedule, session, planned, preview, onClose, onTogglePlan, attendanceSummary, attendanceLoading = false, eventId }: SheetProps) {
-    const room = schedule.rooms.find((item) => item.id === session.room_id);
+    const rooms = sessionRooms(schedule.rooms, session);
+    const room = rooms[0];
     const venue = schedule.venues.find((item) => item.id === (session.venue_id ?? room?.venue_id));
+    const roomDetails = [...new Set(rooms.map((item) => item.details?.trim()).filter((value): value is string => Boolean(value)))];
     const level = schedule.levels.find((item) => item.id === session.level_id);
     const activityType = schedule.activity_types.find((item) => item.id === session.activity_type_id);
     const { user } = useAuth();
@@ -78,7 +80,7 @@ export function SessionDetailsSheet({ schedule, session, planned, preview, onClo
     return (
         <BottomSheet title="Session details" onClose={onClose} footer={footer}>
             <div className="space-y-5 pb-2">
-                <RoomPill room={room} venue={venue} />
+                <RoomPill rooms={rooms} venue={venue} />
                 <div>
                     {session.instructors ? <p className="text-xl font-bold text-ink">{session.instructors}</p> : null}
                     <h2 className={`${session.instructors ? 'mt-1 text-base font-medium' : 'text-xl font-bold'} text-ink`}>{session.title}</h2>
@@ -86,11 +88,20 @@ export function SessionDetailsSheet({ schedule, session, planned, preview, onClo
                         {level ? <span className="rounded-field bg-blue-50 px-2 py-1 text-xs font-medium text-action">{level.label}</span> : null}
                         {activityType ? <span className="rounded-field bg-canvas px-2 py-1 text-xs font-medium text-ink-soft">{activityType.name}</span> : null}
                     </div>
+                    {session.description?.trim() ? <p className="mt-3 whitespace-pre-line text-sm leading-6 text-ink">{session.description.trim()}</p> : null}
                 </div>
                 <div className="space-y-3 border-t border-line pt-4 text-sm text-ink">
                     <p className="flex items-start gap-3"><CalendarDays size={18} className="mt-0.5 shrink-0 text-ink-soft" />{formatDayLabel(programDayOf(session.start, schedule.timezone, schedule.day_start_hour), true)}</p>
                     <p className="flex items-start gap-3"><Clock size={18} className="mt-0.5 shrink-0 text-ink-soft" />{formatTimeRange(session, schedule.timezone)}</p>
-                    {venue ? <p className="flex items-start gap-3"><MapPin size={18} className="mt-0.5 shrink-0 text-ink-soft" />{room ? `${room.name} · ` : ''}{venue.name}{venue.address ? `, ${venue.address}` : ''}</p> : null}
+                    {venue || rooms.length ? (
+                        <div className="flex items-start gap-3">
+                            <MapPin size={18} className="mt-0.5 shrink-0 text-ink-soft" />
+                            <div>
+                                <p>{[rooms.map((item) => item.name).join(' + '), venue ? `${venue.name}${venue.address ? `, ${venue.address}` : ''}` : null].filter(Boolean).join(' · ')}</p>
+                                {roomDetails.length ? <p className="mt-0.5 text-ink-soft">{roomDetails.join(' / ')}</p> : null}
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
                 {showAttendanceSection ? (
                     <div className="border-t border-line pt-4">
@@ -117,6 +128,19 @@ export function SessionDetailsSheet({ schedule, session, planned, preview, onClo
                 ) : null}
                 {session.is_cancelled ? <p className="border border-line bg-canvas p-3 text-sm font-medium text-danger">This session was cancelled by the organizer.</p> : null}
                 {session.attendee_note ? <p className="text-sm leading-6 text-ink-soft">{session.attendee_note}</p> : null}
+            </div>
+        </BottomSheet>
+    );
+}
+
+export function RoomDetailsSheet({ schedule, room, onClose }: { schedule: EventSchedule; room: ScheduleRoom; onClose: () => void }) {
+    const venue = schedule.venues.find((item) => item.id === room.venue_id);
+    return (
+        <BottomSheet title={room.name} onClose={onClose}>
+            <div className="space-y-3 pb-2 text-sm text-ink">
+                {room.details ? <p className="flex items-start gap-3"><Info size={18} className="mt-0.5 shrink-0 text-ink-soft" />{room.details}</p> : null}
+                {venue ? <p className="flex items-start gap-3"><MapPin size={18} className="mt-0.5 shrink-0 text-ink-soft" />{venue.name}{venue.address ? `, ${venue.address}` : ''}</p> : null}
+                {!room.details && !venue ? <p className="text-ink-soft">No extra details for this room.</p> : null}
             </div>
         </BottomSheet>
     );
@@ -254,12 +278,12 @@ export function TimeSlotSheet({ schedule, sessions, label, onClose, onSelect }: 
         <BottomSheet title={`${label} · ${sessions.length} ${sessions.length === 1 ? 'session' : 'sessions'}`} onClose={onClose}>
             <div className="space-y-3">
                 {sessions.map((session) => {
-                    const room = schedule.rooms.find((item) => item.id === session.room_id);
-                    const venue = schedule.venues.find((item) => item.id === (session.venue_id ?? room?.venue_id));
+                    const rooms = sessionRooms(schedule.rooms, session);
+                    const venue = schedule.venues.find((item) => item.id === (session.venue_id ?? rooms[0]?.venue_id));
                     const level = schedule.levels.find((item) => item.id === session.level_id);
                     return (
                         <button key={session.id} type="button" onClick={() => onSelect(session)} className="w-full rounded-card border border-card-line bg-surface p-3 text-left shadow-sm">
-                            <RoomPill room={room} venue={venue} compact />
+                            <RoomPill rooms={rooms} venue={venue} compact />
                             {session.instructors ? <p className="mt-2 text-sm font-bold text-ink">{session.instructors}</p> : null}
                             <p className="text-sm text-ink">{session.title}</p>
                             <div className="mt-1 flex gap-2 text-xs text-ink-soft">

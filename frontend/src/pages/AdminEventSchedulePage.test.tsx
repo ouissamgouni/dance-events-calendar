@@ -103,7 +103,8 @@ describe('AdminEventSchedulePage', () => {
 
         expect(screen.getByRole('dialog', { name: 'Edit session' })).toBeInTheDocument();
         expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Musicality');
-        expect(screen.getByLabelText('Room')).toHaveValue('1');
+        expect(screen.getByRole('checkbox', { name: 'Grand Hall' })).toBeChecked();
+        fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), { target: { value: 'Find the clave.' } });
         expect(screen.getByLabelText('Contributor 1')).toHaveValue('1');
         fireEvent.change(screen.getByLabelText('Contributor 1 role'), { target: { value: 'performer' } });
         fireEvent.click(screen.getByRole('button', { name: 'Add artist or instructor' }));
@@ -113,6 +114,9 @@ describe('AdminEventSchedulePage', () => {
 
         await waitFor(() => expect(updateScheduleSession).toHaveBeenCalledWith(event.event_id, 'session-1', expect.objectContaining({
             instructors: null,
+            description: 'Find the clave.',
+            room_id: 1,
+            room_ids: [1],
             contributors: [
                 { contributor_id: 1, role: 'performer' },
                 { contributor_id: 2, role: 'dj' },

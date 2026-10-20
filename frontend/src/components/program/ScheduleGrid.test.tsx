@@ -119,4 +119,25 @@ describe('ScheduleGrid', () => {
         expect(preview).not.toHaveTextContent('D');
         expect(preview).toHaveTextContent('+1');
     });
+
+    it('spans multi-room sessions, flags descriptions and opens room details', () => {
+        const onRoomClick = vi.fn();
+        render(<ScheduleGrid schedule={{
+            ...schedule,
+            rooms: [
+                { id: 1, venue_id: null, name: 'Salsa Room', details: 'Ground floor · Grand Pass only', color: 'pink', sort_order: 0 },
+                { id: 2, venue_id: null, name: 'Mambo Room', color: 'amber', sort_order: 1 },
+            ],
+            sessions: [{ ...schedule.sessions[0], room_id: 1, room_ids: [1, 2], description: 'Dance all night.' }],
+        }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} onRoomClick={onRoomClick} />);
+
+        const session = screen.getByRole('button', { name: /Late Night Afterparty/ });
+        expect(session.style.gridColumn).toBe('2 / 4');
+        expect(session).toHaveTextContent('Has details');
+        expect(screen.getByTestId('session-details-icon')).toBeInTheDocument();
+
+        expect(screen.getByText('Ground floor · Grand Pass only')).toBeInTheDocument();
+        screen.getByRole('button', { name: 'Salsa Room room details' }).click();
+        expect(onRoomClick).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    });
 });

@@ -218,6 +218,7 @@ export interface ScheduleRoom {
     id: number;
     venue_id: number | null;
     name: string;
+    details?: string | null;
     color: string;
     sort_order: number;
 }
@@ -256,10 +257,13 @@ export interface ScheduleSession {
     external_id?: string | null;
     title: string;
     instructors: string | null;
+    description?: string | null;
     contributors?: ScheduleSessionContributor[];
     start: string;
     end: string;
     room_id: number | null;
+    /** All rooms in grid column order; missing on programs published before multi-room support. */
+    room_ids?: number[];
     venue_id: number | null;
     level_id: number | null;
     activity_type_id: number | null;
@@ -373,6 +377,7 @@ export interface ProgramExportSession {
     local_end_time: string;
     venue_id: number | null;
     room_id: number | null;
+    room_ids?: number[];
     level_id: number | null;
     activity_type_id: number | null;
     venue: string | null;
@@ -380,6 +385,7 @@ export interface ProgramExportSession {
     address: string | null;
     level: string | null;
     activity_type: string | null;
+    description?: string | null;
     attendee_note: string | null;
     is_cancelled: boolean;
     status: 'active' | 'cancelled' | 'removed';
@@ -410,7 +416,7 @@ export interface ScheduleImportDocument {
     day_start_hour: number;
     days: string[];
     venues: Array<{ external_id: string; name: string; address?: string | null; sort_order?: number }>;
-    rooms: Array<{ external_id: string; name: string; venue_external_id?: string | null; color?: string; sort_order?: number }>;
+    rooms: Array<{ external_id: string; name: string; details?: string | null; venue_external_id?: string | null; color?: string; sort_order?: number }>;
     levels: Array<{ external_id: string; label: string; notation?: string | null; sort_order?: number }>;
     activity_types: Array<{ external_id: string; name: string; color?: string; sort_order?: number }>;
     contributors?: Array<{ external_id: string; display_name: string; sort_order?: number }>;
@@ -418,10 +424,12 @@ export interface ScheduleImportDocument {
         external_id: string;
         title: string;
         instructors?: string | null;
+        description?: string | null;
         contributors?: Array<{ contributor_external_id: string; role: ScheduleContributorRole }>;
         start: string;
         end: string;
         room_external_id?: string | null;
+        room_external_ids?: string[] | null;
         venue_external_id?: string | null;
         level_external_id?: string | null;
         activity_type_external_id?: string | null;

@@ -7,14 +7,14 @@ import ScheduleGrid from '../components/program/ScheduleGrid';
 import MyPlanList from '../components/program/MyPlanList';
 import PlanAudienceSheet from '../components/program/PlanAudienceSheet';
 import { AttendeeProgramFilters, ProgramDayPicker } from '../components/program/ProgramControls';
-import { PlanAttendanceFeedbackSheet, SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
+import { PlanAttendanceFeedbackSheet, RoomDetailsSheet, SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useSignIn } from '../context/SignInSheetContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
 import { useSetMyPlanCount } from '../context/MyPlanCountContext';
 import { usePwaInstall } from '../context/PwaInstallContext';
-import type { CalendarEvent, EventSchedule, MyPlanEntry, PlanAudience, ScheduleSession, SessionAttendanceSummary } from '../types';
+import type { CalendarEvent, EventSchedule, MyPlanEntry, PlanAudience, ScheduleRoom, ScheduleSession, SessionAttendanceSummary } from '../types';
 import { defaultRsvpAudienceFor } from '../utils/audiencePreference';
 import { programInstallDismissedKey, programPushOptInKey } from '../utils/installPromptStorage';
 import { filterScheduleSessions, firstDayWithSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
@@ -53,6 +53,7 @@ export default function EventProgramPage() {
     const [selectedDay, setSelectedDay] = useState('');
     const [selectedSession, setSelectedSession] = useState<ScheduleSession | null>(null);
     const [selectedHour, setSelectedHour] = useState<number | null>(null);
+    const [selectedRoom, setSelectedRoom] = useState<ScheduleRoom | null>(null);
     const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS);
     const [positionRequest, setPositionRequest] = useState(0);
     const [error, setError] = useState<string | null>(null);
@@ -380,7 +381,7 @@ export default function EventProgramPage() {
 
             <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col">
                 {activeTab === 'program' ? (
-                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} compactHeader attendeeSummaries={attendanceSummaries} />
+                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} compactHeader attendeeSummaries={attendanceSummaries} onRoomClick={setSelectedRoom} />
                 ) : user ? (
                     <div className="flex min-h-0 flex-1 flex-col">
                         {plan.length ? <div className="shrink-0 border-b border-line bg-surface px-4 py-2 text-right">
@@ -406,6 +407,7 @@ export default function EventProgramPage() {
                     onSelect={openSession}
                 />
             ) : null}
+            {selectedRoom ? <RoomDetailsSheet schedule={schedule} room={selectedRoom} onClose={() => setSelectedRoom(null)} /> : null}
             {selectedSession ? (
                 <SessionDetailsSheet schedule={schedule} session={selectedSession} planned={plannedIds.has(selectedSession.id)} preview={preview} onClose={closeSession} onTogglePlan={togglePlan} attendanceSummary={selectedAttendance} attendanceLoading={selectedAttendanceLoading} eventId={event.event_id} />
             ) : null}

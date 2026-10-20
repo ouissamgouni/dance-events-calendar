@@ -587,6 +587,7 @@ class ScheduleRoom(SQLModel, table=True):
         default=None, foreign_key="schedule_venues.id", index=True
     )
     name: str = Field(max_length=120, nullable=False)
+    details: Optional[str] = Field(default=None, max_length=160)
     color: str = Field(default="blue", max_length=24, nullable=False)
     sort_order: int = Field(default=0, nullable=False)
 
@@ -663,6 +664,7 @@ class ScheduleSession(SQLModel, table=True):
     )
     title: str = Field(max_length=200, nullable=False)
     instructors: Optional[str] = Field(default=None, max_length=300)
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
     start: datetime
     end: datetime
     room_id: Optional[int] = Field(
@@ -711,6 +713,25 @@ class ScheduleSessionContributor(SQLModel, table=True):
         foreign_key="schedule_contributors.id", index=True, nullable=False
     )
     role: str = Field(default="instructor", max_length=20, nullable=False)
+    position: int = Field(default=0, nullable=False)
+
+
+class ScheduleSessionRoom(SQLModel, table=True):
+    """All rooms a session occupies; position 0 mirrors ScheduleSession.room_id."""
+
+    __tablename__ = "schedule_session_rooms"
+    __table_args__ = (
+        UniqueConstraint("session_id", "room_id", name="uq_schedule_session_room"),
+        UniqueConstraint(
+            "session_id", "position", name="uq_schedule_session_room_position"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: UUID = Field(
+        foreign_key="schedule_sessions.id", index=True, nullable=False
+    )
+    room_id: int = Field(foreign_key="schedule_rooms.id", index=True, nullable=False)
     position: int = Field(default=0, nullable=False)
 
 

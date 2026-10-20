@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Info } from 'lucide-react';
 import type { EventSchedule, ScheduleRoom, ScheduleSession, SessionAttendanceSummary } from '../../types';
-import { formatTime, isSessionActive, minuteOfProgramDay, programDayOf, sessionsForDay } from '../../utils/schedule';
+import { formatTime, isSessionActive, minuteOfProgramDay, programDayOf, roomColumnRuns, sessionRoomIds, sessionsForDay } from '../../utils/schedule';
 import { roomColor } from './RoomPill';
 import SessionAttendeeStack from './SessionAttendeeStack';
 
@@ -13,12 +14,13 @@ interface Props {
     positionRequest?: number;
     compactHeader?: boolean;
     attendeeSummaries?: Map<string, SessionAttendanceSummary>;
+    onRoomClick?: (room: ScheduleRoom) => void;
 }
 
 const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 24;
 
-export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0, compactHeader = false, attendeeSummaries }: Props) {
+export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0, compactHeader = false, attendeeSummaries, onRoomClick }: Props) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const positionedDays = useRef(new Set<string>());
     const handledPositionRequest = useRef(0);
@@ -35,8 +37,11 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
         () => new Map(schedule.contributors?.map((contributor) => [contributor.id, contributor.display_name]) ?? []),
         [schedule.contributors],
     );
-    const usedRoomIds = new Set(sessions.flatMap((session) => session.room_id == null ? [] : [session.room_id]));
+    const usedRoomIds = new Set(sessions.flatMap(sessionRoomIds));
     const rooms = schedule.rooms.filter((room) => usedRoomIds.has(room.id));
+    const columnRoomIds = rooms.map((room) => room.id);
+    const hasRoomDetails = rooms.some((room) => room.details);
+    const headerHeight = (compactHeader ? 40 : 48) + (hasRoomDetails ? 16 : 0);
     const startMinutes = sessions.map((session) => minuteOfProgramDay(session.start, schedule.timezone, schedule.day_start_hour));
     const endMinutes = sessions.map((session) => {
         const start = minuteOfProgramDay(session.start, schedule.timezone, schedule.day_start_hour);
@@ -67,10 +72,10 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
         handledPositionRequest.current = positionRequest;
     }, [axisStart, positionRequest, schedule.day_start_hour, schedule.timezone, sessions]);
 
-    const roomColumn = (roomId: number | null): string => {
-        if (roomId == null) return `2 / ${rooms.length + 2}`;
-        const index = rooms.findIndex((room) => room.id === roomId);
-        return `${index + 2}`;
+    const roomColumns = (session: ScheduleSession): string[] => {
+        const runs = roomColumnRuns(sessionRoomIds(session), columnRoomIds);
+        if (!runs.length) return [`2 / ${rooms.length + 2}`];
+        return runs.map(([start, end]) => `${start + 2} / ${end + 2}`);
     };
     const sessionRow = (session: ScheduleSession): string => {
         const start = minuteOfProgramDay(session.start, schedule.timezone, schedule.day_start_hour);
@@ -87,14 +92,14 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                 className="relative grid min-w-max"
                 style={{
                     gridTemplateColumns: `48px repeat(${Math.max(rooms.length, 1)}, minmax(144px, 1fr))`,
-                    gridTemplateRows: `${compactHeader ? 40 : 48}px repeat(${rowCount}, ${SLOT_HEIGHT}px)`,
+                    gridTemplateRows: `${headerHeight}px repeat(${rowCount}, ${SLOT_HEIGHT}px)`,
                     minWidth: `${48 + Math.max(rooms.length, 1) * 144}px`,
                 }}
             >
                 <div className="sticky left-0 top-0 z-30 border-b border-r border-line bg-surface" />
                 <div aria-hidden="true" className="sticky left-0 z-20 border-r border-line bg-surface" style={{ gridColumn: 1, gridRow: `2 / ${rowCount + 2}` }} />
                 {rooms.length ? rooms.map((room, index) => (
-                    <RoomHeader key={room.id} room={room} column={index + 2} />
+                    <RoomHeader key={room.id} room={room} column={index + 2} onClick={onRoomClick} />
                 )) : (
                     <div className="sticky top-0 z-20 flex min-w-0 items-center justify-center border-b border-line bg-canvas px-2 text-xs font-semibold text-ink-soft" style={{ gridColumn: 2, gridRow: 1 }}>
                         <span className="truncate">Event-wide</span>
@@ -131,8 +136,8 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                     />
                 ) : null}
 
-                {sessions.map((session) => {
-                    const room = schedule.rooms.find((item) => item.id === session.room_id);
+                {sessions.flatMap((session) => {
+                    const room = schedule.rooms.find((item) => item.id === sessionRoomIds(session)[0]);
                     const level = schedule.levels.find((item) => item.id === session.level_id);
                     const contributors = session.contributors
                         ?.map((assignment) => contributorNames.get(assignment.contributor_id))
@@ -141,18 +146,25 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                     const color = roomColor(room?.color ?? 'slate');
                     const activeNow = showNow && isSessionActive(session, now);
                     const attendance = attendeeSummaries?.get(session.id);
-                    return (
+                    const hasDescription = Boolean(session.description?.trim());
+                    return roomColumns(session).map((gridColumn, runIndex) => (
                         <button
-                            key={session.id}
+                            key={`${session.id}-${runIndex}`}
                             type="button"
                             onClick={() => onSessionClick(session)}
                             aria-current={activeNow ? 'time' : undefined}
                             className={`relative z-10 m-0.5 min-h-11 overflow-hidden rounded-field border px-2 py-2 text-left shadow-sm ${color.cell} ${activeNow ? 'ring-2 ring-action ring-inset' : ''} ${session.is_cancelled ? 'opacity-60' : ''}`}
-                            style={{ gridColumn: roomColumn(session.room_id), gridRow: sessionRow(session) }}
+                            style={{ gridColumn, gridRow: sessionRow(session) }}
                         >
                             <span className={`block line-clamp-2 text-xs font-semibold leading-4 text-ink ${session.is_cancelled ? 'line-through' : ''}`}>{session.title}</span>
                             {contributors ? <span className="mt-0.5 block whitespace-normal text-xs leading-4 text-ink-soft">{contributors}</span> : null}
-                            {level ? <span className="mt-1 block truncate text-xs font-medium text-action">{level.label}</span> : null}
+                            {level || hasDescription ? (
+                                <span className="mt-1 flex min-w-0 items-center gap-1 text-xs font-medium text-action">
+                                    {level ? <span className="truncate">{level.label}</span> : null}
+                                    {hasDescription ? <Info size={14} aria-hidden="true" className="shrink-0 text-ink-soft" data-testid="session-details-icon" /> : null}
+                                </span>
+                            ) : null}
+                            {hasDescription ? <span className="sr-only">Has details</span> : null}
                             {activeNow ? <span className="mt-1 inline-block bg-action px-1.5 py-0.5 text-xs font-bold text-white">Now</span> : null}
                             {attendance?.visible_count ? (
                                 <span className="mt-1 block" aria-label={`${attendance.visible_count} people in their plan`}>
@@ -161,18 +173,28 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                             ) : null}
                             {plannedSessionIds?.has(session.id) ? <span className="sr-only">In My Plan</span> : null}
                         </button>
-                    );
+                    ));
                 })}
             </div>
         </div>
     );
 }
 
-function RoomHeader({ room, column }: { room: ScheduleRoom; column: number }) {
+function RoomHeader({ room, column, onClick }: { room: ScheduleRoom; column: number; onClick?: (room: ScheduleRoom) => void }) {
     const color = roomColor(room.color);
+    const className = `sticky top-0 z-20 flex min-w-0 flex-col items-center justify-center border-b border-line px-2 text-center text-xs font-semibold ${color.header}`;
+    const content = (
+        <>
+            <span className="block max-w-full truncate">{room.name}</span>
+            {room.details ? <span className="block max-w-full truncate font-normal opacity-80">{room.details}</span> : null}
+        </>
+    );
+    if (!onClick) {
+        return <div className={className} style={{ gridColumn: column, gridRow: 1 }}>{content}</div>;
+    }
     return (
-        <div className={`sticky top-0 z-20 flex min-w-0 items-center justify-center border-b border-line px-2 text-center text-xs font-semibold ${color.header}`} style={{ gridColumn: column, gridRow: 1 }}>
-            <span className="truncate">{room.name}</span>
-        </div>
+        <button type="button" onClick={() => onClick(room)} aria-label={`${room.name} room details`} className={className} style={{ gridColumn: column, gridRow: 1 }}>
+            {content}
+        </button>
     );
 }

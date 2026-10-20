@@ -145,6 +145,7 @@ class ScheduleRoomResponse(BaseModel):
     external_id: Optional[str] = None
     venue_id: Optional[int] = None
     name: str
+    details: Optional[str] = None
     color: str
     sort_order: int = 0
 
@@ -186,16 +187,25 @@ class ScheduleSessionResponse(BaseModel):
     external_id: Optional[str] = None
     title: str
     instructors: Optional[str] = None
+    description: Optional[str] = None
     contributors: list[ScheduleSessionContributorResponse] = []
     start: datetime
     end: datetime
     room_id: Optional[int] = None
+    room_ids: list[int] = []
     venue_id: Optional[int] = None
     level_id: Optional[int] = None
     activity_type_id: Optional[int] = None
     attendee_note: Optional[str] = None
     allow_plan: bool = True
     is_cancelled: bool = False
+
+    @model_validator(mode="after")
+    def default_room_ids(self):
+        # Snapshots published before multi-room support only carry room_id.
+        if not self.room_ids and self.room_id is not None:
+            self.room_ids = [self.room_id]
+        return self
 
 
 class EventScheduleResponse(BaseModel):
@@ -284,6 +294,7 @@ class ProgramExportSessionResponse(BaseModel):
     local_end_time: str
     venue_id: Optional[int] = None
     room_id: Optional[int] = None
+    room_ids: list[int] = []
     level_id: Optional[int] = None
     activity_type_id: Optional[int] = None
     venue: Optional[str] = None
@@ -291,6 +302,7 @@ class ProgramExportSessionResponse(BaseModel):
     address: Optional[str] = None
     level: Optional[str] = None
     activity_type: Optional[str] = None
+    description: Optional[str] = None
     attendee_note: Optional[str] = None
     is_cancelled: bool = False
     status: Literal["active", "cancelled", "removed"]
@@ -347,6 +359,11 @@ class ScheduleImportRoom(BaseModel):
         description="Stable import key, unique among rooms and preserved across reimports.",
     )
     name: str = Field(min_length=1, max_length=120)
+    details: Optional[str] = Field(
+        default=None,
+        max_length=160,
+        description="Short line shown under the room name, e.g. floor or pass access.",
+    )
     venue_external_id: Optional[str] = Field(default=None, max_length=120)
     color: str = Field(default="blue", max_length=24)
     sort_order: int = 0
@@ -397,10 +414,15 @@ class ScheduleImportSession(BaseModel):
     )
     title: str = Field(min_length=1, max_length=200)
     instructors: Optional[str] = Field(default=None, max_length=300)
+    description: Optional[str] = Field(default=None, max_length=2000)
     contributors: Optional[list[ScheduleImportSessionContributor]] = None
     start: datetime
     end: datetime
     room_external_id: Optional[str] = Field(default=None, max_length=120)
+    room_external_ids: Optional[list[str]] = Field(
+        default=None,
+        description="All rooms the session occupies; overrides room_external_id when set.",
+    )
     venue_external_id: Optional[str] = Field(default=None, max_length=120)
     level_external_id: Optional[str] = Field(default=None, max_length=120)
     activity_type_external_id: Optional[str] = Field(default=None, max_length=120)
@@ -551,6 +573,7 @@ class ScheduleVenueRequest(BaseModel):
 
 class ScheduleRoomRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+    details: Optional[str] = Field(default=None, max_length=160)
     venue_id: Optional[int] = None
     color: str = Field(default="blue", max_length=24)
     sort_order: int = 0
@@ -581,10 +604,12 @@ class ScheduleSessionContributorInput(BaseModel):
 class ScheduleSessionCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     instructors: Optional[str] = Field(default=None, max_length=300)
+    description: Optional[str] = Field(default=None, max_length=2000)
     contributors: Optional[list[ScheduleSessionContributorInput]] = None
     start: datetime
     end: datetime
     room_id: Optional[int] = None
+    room_ids: Optional[list[int]] = None
     venue_id: Optional[int] = None
     level_id: Optional[int] = None
     activity_type_id: Optional[int] = None
@@ -596,10 +621,12 @@ class ScheduleSessionCreateRequest(BaseModel):
 class ScheduleSessionUpdateRequest(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=200)
     instructors: Optional[str] = Field(default=None, max_length=300)
+    description: Optional[str] = Field(default=None, max_length=2000)
     contributors: Optional[list[ScheduleSessionContributorInput]] = None
     start: Optional[datetime] = None
     end: Optional[datetime] = None
     room_id: Optional[int] = None
+    room_ids: Optional[list[int]] = None
     venue_id: Optional[int] = None
     level_id: Optional[int] = None
     activity_type_id: Optional[int] = None

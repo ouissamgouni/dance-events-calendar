@@ -136,6 +136,28 @@ export function firstDayWithSessions(
     )) ?? null;
 }
 
+export function sessionRoomIds(session: Pick<ScheduleSession, 'room_id' | 'room_ids'>): number[] {
+    if (session.room_ids?.length) return session.room_ids;
+    return session.room_id == null ? [] : [session.room_id];
+}
+
+export function sessionRooms<Room extends { id: number }>(rooms: Room[], session: Pick<ScheduleSession, 'room_id' | 'room_ids'>): Room[] {
+    return sessionRoomIds(session).flatMap((id) => rooms.find((room) => room.id === id) ?? []);
+}
+
+/** Groups a session's rooms into runs of adjacent columns, as [start, endExclusive] indexes into `columnRoomIds`. */
+export function roomColumnRuns(roomIds: number[], columnRoomIds: number[]): Array<[number, number]> {
+    const indexes = [...new Set(roomIds.map((id) => columnRoomIds.indexOf(id)).filter((index) => index >= 0))]
+        .sort((left, right) => left - right);
+    const runs: Array<[number, number]> = [];
+    for (const index of indexes) {
+        const last = runs[runs.length - 1];
+        if (last && last[1] === index) last[1] = index + 1;
+        else runs.push([index, index + 1]);
+    }
+    return runs;
+}
+
 export interface ScheduleFilters {
     instructor: string;
     contributorId?: number | null;

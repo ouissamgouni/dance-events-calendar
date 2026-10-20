@@ -313,6 +313,13 @@ def notify_planned_session_changes(
         "allow_plan",
         "is_cancelled",
     }
+
+    def rooms_of(row: dict) -> list:
+        # Snapshots published before multi-room support only carry room_id.
+        return row.get("room_ids") or (
+            [row["room_id"]] if row.get("room_id") is not None else []
+        )
+
     changed_ids = set(previous_sessions) - set(current_sessions)
     changed_ids.update(
         session_id
@@ -322,6 +329,8 @@ def notify_planned_session_changes(
             != current_sessions[session_id].get(field)
             for field in relevant_fields
         )
+        or rooms_of(previous_sessions[session_id])
+        != rooms_of(current_sessions[session_id])
     )
     if not changed_ids:
         return []
@@ -347,9 +356,10 @@ def notify_planned_session_changes(
                 "end"
             ) != after.get("end"):
                 changes.append("has a new time")
-            if before.get("room_id") != after.get("room_id") or before.get(
-                "venue_id"
-            ) != after.get("venue_id"):
+            if (
+                rooms_of(before) != rooms_of(after)
+                or before.get("venue_id") != after.get("venue_id")
+            ):
                 changes.append("has a new location")
             if not before.get("is_cancelled") and after.get("is_cancelled"):
                 changes.append("was cancelled")

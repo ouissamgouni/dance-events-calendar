@@ -1,5 +1,5 @@
 import type { ProgramExport, ProgramExportSession, ScheduleRoom } from '../../types';
-import { formatDayLabel, minuteOfProgramDay } from '../../utils/schedule';
+import { formatDayLabel, minuteOfProgramDay, roomColumnRuns, sessionRoomIds } from '../../utils/schedule';
 import { roomColor } from './RoomPill';
 
 interface Props {
@@ -110,8 +110,9 @@ function PrintableSheet({ program, groups, range, eyebrow }: { program: ProgramE
                         </div>;
                     })}
 
-                    {visibleSessions.map((session) => {
-                        const room = program.rooms.find((item) => item.id === session.room_id);
+                    {visibleSessions.flatMap((session) => {
+                        const roomIds = sessionRoomIds(session);
+                        const room = program.rooms.find((item) => item.id === roomIds[0]);
                         const level = program.levels.find((item) => item.id === session.level_id);
                         const fullLevelLabel = session.level || level?.label;
                         const compactLevelLabel = level?.notation || fullLevelLabel;
@@ -119,18 +120,21 @@ function PrintableSheet({ program, groups, range, eyebrow }: { program: ProgramE
                             .map((assignment) => program.contributors.find((contributor) => contributor.id === assignment.contributor_id)?.display_name)
                             .filter((name): name is string => Boolean(name))
                             .join(', ') || session.instructors;
-                        const roomIndex = columns.findIndex((column) => column.day === session.program_day && (column.room?.id ?? null) === session.room_id);
+                        const eventWideIndex = columns.findIndex((column) => column.day === session.program_day && column.room === null);
+                        const runs: Array<[number, number]> = roomIds.length
+                            ? roomColumnRuns(roomIds, columns.map((column) => column.day === session.program_day && column.room ? column.room.id : -1))
+                            : [[eventWideIndex, eventWideIndex + 1]];
                         const color = roomColor(room?.color ?? 'slate');
                         const sessionStart = Math.max(range.start, minuteOfProgramDay(session.start, program.timezone, program.day_start_hour));
                         const sessionEnd = Math.min(range.end, sessionEndMinute(session, program));
                         const firstRow = Math.floor((sessionStart - range.start) / SLOT_MINUTES) + 3;
                         const span = Math.max(1, Math.ceil((sessionEnd - sessionStart) / SLOT_MINUTES));
-                        return (
+                        return runs.map(([startIndex, endIndex], runIndex) => (
                             <article
-                                key={session.id}
+                                key={`${session.id}-${runIndex}`}
                                 className={`program-calendar-session z-10 m-0.5 min-w-0 border px-1.5 py-1 ${color.cell} ${session.is_cancelled ? 'opacity-60' : ''}`}
-                                style={{ gridColumn: roomIndex + 2, gridRow: `${firstRow} / span ${span}` }}
-                                data-room={room?.name ?? 'Event-wide'}
+                                style={{ gridColumn: `${startIndex + 2} / ${endIndex + 2}`, gridRow: `${firstRow} / span ${span}` }}
+                                data-room={room ? program.rooms.filter((item) => roomIds.includes(item.id)).map((item) => item.name).join(' + ') : 'Event-wide'}
                             >
                                 <div className="flex min-w-0 items-start gap-1">
                                     <p className={`min-w-0 flex-1 whitespace-normal text-[10px] font-bold leading-3 ${session.is_cancelled ? 'line-through' : ''}`}>{session.title}</p>
@@ -140,7 +144,7 @@ function PrintableSheet({ program, groups, range, eyebrow }: { program: ProgramE
                                 {contributorNames ? <p className="program-calendar-contributors mt-0.5 whitespace-normal break-words text-[9px] leading-3 text-ink-soft">{contributorNames}</p> : null}
                                 {session.is_cancelled ? <p className="text-[8px] font-bold uppercase text-danger">Cancelled</p> : null}
                             </article>
-                        );
+                        ));
                     })}
                 </div>
             ) : (
@@ -153,9 +157,9 @@ function PrintableSheet({ program, groups, range, eyebrow }: { program: ProgramE
 function buildDayGroups(days: string[], sessions: ProgramExportSession[], program: ProgramExport): DayGroup[] {
     return days.map((day) => {
         const daySessions = sessions.filter((session) => session.program_day === day);
-        const usedRoomIds = new Set(daySessions.flatMap((session) => session.room_id == null ? [] : [session.room_id]));
+        const usedRoomIds = new Set(daySessions.flatMap(sessionRoomIds));
         const rooms = program.rooms.filter((room) => usedRoomIds.has(room.id));
-        const hasEventWide = daySessions.some((session) => session.room_id == null);
+        const hasEventWide = daySessions.some((session) => !sessionRoomIds(session).length);
         return {
             day,
             sessions: daySessions,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayDateLabel, formatDayLabel, isSessionActive, minuteOfProgramDay, programDayOf, scheduleInstructors, sessionsOverlap, toZonedInput, zonedInputToIso } from './schedule';
+import { filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayDateLabel, formatDayLabel, isSessionActive, minuteOfProgramDay, programDayOf, roomColumnRuns, scheduleInstructors, sessionRoomIds, sessionsOverlap, toZonedInput, zonedInputToIso } from './schedule';
 import type { MyPlanEntry, ScheduleSession } from '../types';
 
 const session = (id: string, start: string, end: string): ScheduleSession => ({
@@ -15,6 +15,20 @@ const session = (id: string, start: string, end: string): ScheduleSession => ({
     attendee_note: null,
     allow_plan: true,
     is_cancelled: false,
+});
+
+describe('schedule room helpers', () => {
+    it('falls back to room_id for sessions published before multi-room support', () => {
+        expect(sessionRoomIds({ room_id: 4 })).toEqual([4]);
+        expect(sessionRoomIds({ room_id: null })).toEqual([]);
+        expect(sessionRoomIds({ room_id: 1, room_ids: [1, 2] })).toEqual([1, 2]);
+    });
+
+    it('groups rooms into runs of adjacent columns', () => {
+        expect(roomColumnRuns([2, 1], [1, 2, 3])).toEqual([[0, 2]]);
+        expect(roomColumnRuns([1, 3], [1, 2, 3])).toEqual([[0, 1], [2, 3]]);
+        expect(roomColumnRuns([9], [1, 2])).toEqual([]);
+    });
 });
 
 describe('schedule time helpers', () => {

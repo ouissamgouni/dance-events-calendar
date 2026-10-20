@@ -62,7 +62,12 @@ from backend.services.follows import (
     ensure_approved_follow_with_subscription,
     ensure_calendar_subscription,
 )
-from backend.services.schedules import build_snapshot, session_snapshot, to_utc
+from backend.services.schedules import (
+    build_snapshot,
+    replace_session_rooms,
+    session_snapshot,
+    to_utc,
+)
 from backend.services.tag_hierarchy import drop_superseded_parents
 
 WEEKDAYS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -3221,11 +3226,20 @@ class DatabaseSeeder:
             for row in entry.get("sessions", []) or []:
                 session_id = UUID(str(row["id"]))
                 schedule_session = self.session.get(ScheduleSession, session_id)
+                room_names = row.get("rooms") or ([row["room"]] if row.get("room") else [])
+                session_room_ids = [
+                    room.id
+                    for room in sorted(
+                        {rooms[name].id: rooms[name] for name in room_names}.values(),
+                        key=lambda room: (room.sort_order, room.id),
+                    )
+                ]
                 values = {
                     "schedule_id": schedule.id,
                     "external_id": row.get("external_id"),
                     "title": row["title"],
                     "instructors": row.get("instructors"),
+                    "description": row.get("description"),
                     "start": self._schedule_datetime(
                         row["start"],
                         schedule_now,
@@ -3235,7 +3249,7 @@ class DatabaseSeeder:
                     "end": self._schedule_datetime(
                         row["end"], schedule_now, tz_name=entry["timezone"], **relative
                     ),
-                    "room_id": rooms[row["room"]].id if row.get("room") else None,
+                    "room_id": session_room_ids[0] if session_room_ids else None,
                     "venue_id": venues[row["venue"]].id if row.get("venue") else None,
                     "level_id": levels[row["level"]].id if row.get("level") else None,
                     "activity_type_id": (
@@ -3256,6 +3270,7 @@ class DatabaseSeeder:
                         setattr(schedule_session, key, value)
                 self.session.add(schedule_session)
                 self.session.flush()
+                replace_session_rooms(self.session, schedule_session, session_room_ids)
                 self.session.exec(
                     delete(ScheduleSessionContributor).where(
                         ScheduleSessionContributor.session_id == schedule_session.id

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CalendarPlus, X } from 'lucide-react';
 import type { EventSchedule, MyPlanEntry, ScheduleSession } from '../../types';
-import { findPlanConflicts, focusedPlanEntry, formatDayLabel, formatTimeRange, programDayOf } from '../../utils/schedule';
+import { findPlanConflicts, focusedPlanEntry, formatDayLabel, formatTimeRange, programDayOf, sessionRooms } from '../../utils/schedule';
 import RoomPill from './RoomPill';
 
 interface Props {
@@ -50,13 +50,13 @@ export default function MyPlanList({ schedule, entries, onOpen, onRemove, onProg
                         <h2 className="mb-3 text-base font-bold text-ink">{formatDayLabel(day, true)}</h2>
                         <div className="space-y-3">
                             {dayEntries.map((entry) => {
-                                const room = schedule.rooms.find((item) => item.id === entry.session.room_id);
-                                const venue = schedule.venues.find((item) => item.id === (entry.session.venue_id ?? room?.venue_id));
+                                const rooms = sessionRooms(schedule.rooms, entry.session);
+                                const venue = schedule.venues.find((item) => item.id === (entry.session.venue_id ?? rooms[0]?.venue_id));
                                 const overlap = conflicts.get(entry.session_id);
                                 const focused = focus?.entry.session_id === entry.session_id;
                                 const sessionContent = (
                                     <>
-                                        <RoomPill room={room} venue={venue} compact />
+                                        <RoomPill rooms={rooms} venue={venue} compact />
                                         {entry.session.instructors ? <p className="mt-2 font-bold text-ink">{entry.session.instructors}</p> : null}
                                         <p className="text-sm text-ink">{entry.session.title}</p>
                                     </>

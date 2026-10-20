@@ -15,10 +15,12 @@ schedules:
     rooms:
       - name: Grand Hall
         venue: Slovanský dům
+        details: Ground floor · Full pass only
         color: amber
         sort_order: 0
       - name: Lounge Hall
         venue: Slovanský dům
+        details: 1st floor · All passes
         color: pink
         sort_order: 1
       - name: Nyx
@@ -83,6 +85,9 @@ schedules:
       - id: "10000000-0000-4000-8000-000000001601"
         title: Shines / Partnerwork
         contributors: [{ display_name: "Jemis & Dyanna", role: instructor }]
+        description: |-
+          Clean shines into smooth partnerwork transitions.
+          Bring comfortable shoes and water.
         start: "2026-10-16T12:00:00Z"
         end: "2026-10-16T13:00:00Z"
         room: Grand Hall
@@ -117,9 +122,10 @@ schedules:
         activity_type: Bootcamp
       - id: "10000000-0000-4000-8000-000000001605"
         title: Afternoon Social Party
+        description: Grand Hall and Lounge Hall open as one floor for the afternoon social.
         start: "2026-10-16T13:00:00Z"
         end: "2026-10-16T18:00:00Z"
-        room: Main Hall
+        rooms: [Grand Hall, Lounge Hall]
         venue: Slovanský dům
         activity_type: Social
       - id: "10000000-0000-4000-8000-000000001606"
