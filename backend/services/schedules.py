@@ -461,7 +461,9 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
     assignments_by_session: dict[UUID, list[ScheduleSessionContributor]] = {}
     for assignment in assignments:
         assignments_by_session.setdefault(assignment.session_id, []).append(assignment)
-    rooms_by_session = session_room_ids_by_session(session, [row.id for row in sessions])
+    rooms_by_session = session_room_ids_by_session(
+        session, [row.id for row in sessions]
+    )
     return {
         "event_id": schedule.event_id,
         "timezone": schedule.timezone,
@@ -585,7 +587,9 @@ def compute_issues(session: Session, schedule: EventSchedule) -> list[dict]:
                 }
             )
         seen[key] = row
-    rooms_by_session = session_room_ids_by_session(session, [row.id for row in sessions])
+    rooms_by_session = session_room_ids_by_session(
+        session, [row.id for row in sessions]
+    )
     by_room: dict[int, list[ScheduleSession]] = {}
     for row in sessions:
         for room_id in effective_room_ids(row, rooms_by_session.get(row.id)):
@@ -690,17 +694,21 @@ def compute_diff(draft: dict, published: dict | None) -> dict:
 
 
 def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
-    previous = normalize_snapshot(previous) if previous else {
-        "timezone": None,
-        "day_start_hour": None,
-        "days": [],
-        "venues": [],
-        "rooms": [],
-        "levels": [],
-        "activity_types": [],
-        "contributors": [],
-        "sessions": [],
-    }
+    previous = (
+        normalize_snapshot(previous)
+        if previous
+        else {
+            "timezone": None,
+            "day_start_hour": None,
+            "days": [],
+            "venues": [],
+            "rooms": [],
+            "levels": [],
+            "activity_types": [],
+            "contributors": [],
+            "sessions": [],
+        }
+    )
     changes: list[dict] = []
     current_contributors = {
         row["id"]: row["display_name"] for row in current.get("contributors", [])
@@ -715,7 +723,9 @@ def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
         field: str, value, contributor_names: dict, room_names: dict
     ) -> object:
         if field == "room_ids" and isinstance(value, list):
-            return " + ".join(room_names.get(room_id, "Unknown room") for room_id in value)
+            return " + ".join(
+                room_names.get(room_id, "Unknown room") for room_id in value
+            )
         if field != "contributors" or not isinstance(value, list):
             return value
         return ", ".join(
@@ -790,7 +800,10 @@ def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
                         previous_rooms,
                     ),
                     "after": display_value(
-                        field, current_row.get(field), current_contributors, current_rooms
+                        field,
+                        current_row.get(field),
+                        current_contributors,
+                        current_rooms,
                     ),
                 }
                 for field in current_row

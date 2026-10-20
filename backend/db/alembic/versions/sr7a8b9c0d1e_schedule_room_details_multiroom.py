@@ -20,7 +20,9 @@ def upgrade() -> None:
     op.add_column(
         "schedule_rooms", sa.Column("details", sa.String(length=160), nullable=True)
     )
-    op.add_column("schedule_sessions", sa.Column("description", sa.Text(), nullable=True))
+    op.add_column(
+        "schedule_sessions", sa.Column("description", sa.Text(), nullable=True)
+    )
     op.create_table(
         "schedule_session_rooms",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -50,7 +52,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_schedule_session_rooms_room_id", table_name="schedule_session_rooms")
+    op.drop_index(
+        "ix_schedule_session_rooms_room_id", table_name="schedule_session_rooms"
+    )
     op.drop_index(
         "ix_schedule_session_rooms_session_id", table_name="schedule_session_rooms"
     )

@@ -356,10 +356,9 @@ def notify_planned_session_changes(
                 "end"
             ) != after.get("end"):
                 changes.append("has a new time")
-            if (
-                rooms_of(before) != rooms_of(after)
-                or before.get("venue_id") != after.get("venue_id")
-            ):
+            if rooms_of(before) != rooms_of(after) or before.get(
+                "venue_id"
+            ) != after.get("venue_id"):
                 changes.append("has a new location")
             if not before.get("is_cancelled") and after.get("is_cancelled"):
                 changes.append("was cancelled")

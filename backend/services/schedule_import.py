@@ -173,7 +173,9 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
     assignments_by_session: dict = {}
     for assignment in assignments:
         assignments_by_session.setdefault(assignment.session_id, []).append(assignment)
-    rooms_by_session = session_room_ids_by_session(session, [row.id for row in sessions])
+    rooms_by_session = session_room_ids_by_session(
+        session, [row.id for row in sessions]
+    )
     zone = ZoneInfo(schedule.timezone)
 
     def local_iso(value: datetime) -> str:

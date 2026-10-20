@@ -3226,7 +3226,9 @@ class DatabaseSeeder:
             for row in entry.get("sessions", []) or []:
                 session_id = UUID(str(row["id"]))
                 schedule_session = self.session.get(ScheduleSession, session_id)
-                room_names = row.get("rooms") or ([row["room"]] if row.get("room") else [])
+                room_names = row.get("rooms") or (
+                    [row["room"]] if row.get("room") else []
+                )
                 session_room_ids = [
                     room.id
                     for room in sorted(

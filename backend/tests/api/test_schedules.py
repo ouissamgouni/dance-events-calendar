@@ -1225,7 +1225,8 @@ def test_schedule_room_details_descriptions_and_multi_room_sessions(
     assert overlapping.status_code == 201
     assert overlapping.json()["room_ids"] == [mambo]
     overlap_issues = [
-        issue for issue in client.get(base).json()["issues"]
+        issue
+        for issue in client.get(base).json()["issues"]
         if issue["code"] == "room_overlap"
     ]
     assert len(overlap_issues) == 1
@@ -1236,9 +1237,7 @@ def test_schedule_room_details_descriptions_and_multi_room_sessions(
 
     assert client.delete(f"{base}/rooms/{mambo}").status_code == 409
 
-    legacy = client.patch(
-        f"{base}/sessions/{social['id']}", json={"room_id": seminar}
-    )
+    legacy = client.patch(f"{base}/sessions/{social['id']}", json={"room_id": seminar})
     assert legacy.status_code == 200
     assert legacy.json()["room_ids"] == [seminar]
     widened = client.patch(
