@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState } from 'react';
-import { Eye } from 'lucide-react';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useSignIn } from '../context/SignInSheetContext';
@@ -7,8 +6,7 @@ import { useFeatureFlagsReady, useOptionalFeatureFlags } from '../context/Featur
 import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
 import RsvpVisibilitySheet from './RsvpVisibilitySheet';
-import AudienceTierIcon from './AudienceTierIcon';
-import { AUDIENCE_TIER_LABELS, defaultSavedAudienceFor, getRememberAudience, setLastUsedAudience } from '../utils/audiencePreference';
+import { defaultSavedAudienceFor, setLastUsedAudience } from '../utils/audiencePreference';
 import type { ShareAudience } from '../api';
 
 interface Props {
@@ -41,7 +39,7 @@ export default function SaveEventButton({
 }: Props) {
     const { isSaved, toggleSave, setSavedAudience, getSavedAudience } = useSavedEvents();
     const { user } = useAuth();
-    const { appAuthGateEnabled, guestActionsRequireSignin, rsvpRememberVisibilityEnabled, rsvpPeopleSheetEnabled } = useOptionalFeatureFlags();
+    const { appAuthGateEnabled, guestActionsRequireSignin } = useOptionalFeatureFlags();
     const featureFlagsReady = useFeatureFlagsReady();
     const openSignIn = useSignIn();
     const saved = isSaved(eventId);
@@ -78,29 +76,9 @@ export default function SaveEventButton({
             // then open the visibility popover so the user can adjust on the
             // fly — parity with the post-RSVP popover that GoingButton shows.
             const defaultAudience = defaultSavedAudienceFor(user);
-            const skipSheet = rsvpRememberVisibilityEnabled && !rsvpPeopleSheetEnabled && getRememberAudience(user.user_id, 'saved') === true;
             toggleSave(eventId, defaultAudience).then((ok) => {
                 if (!ok) {
                     toast.show("Couldn't save \u2014 try again", 3200);
-                    return;
-                }
-                if (skipSheet) {
-                    toast.show('Saved', 3000, {
-                        leading: <SavedBookmarkIcon className="h-3.5 w-3.5" />,
-                        action: {
-                            icon: (
-                                <>
-                                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                                    <AudienceTierIcon audience={defaultAudience} className="h-3.5 w-3.5" />
-                                </>
-                            ),
-                            label: `Visibility: ${AUDIENCE_TIER_LABELS[defaultAudience]} \u2014 edit`,
-                            onClick: () => {
-                                setPendingAudience(defaultAudience);
-                                setPopoverOpen(true);
-                            },
-                        },
-                    });
                     return;
                 }
                 setPendingAudience(defaultAudience);

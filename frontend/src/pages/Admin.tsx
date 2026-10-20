@@ -310,8 +310,7 @@ export default function Admin() {
     const [onboardingProfileStepEnabled, setOnboardingProfileStepEnabled] = useState(false);
     const [eventCardSaveShowStatsEnabled, setEventCardSaveShowStatsEnabled] = useState(false);
     const [eventCardImgoingShowStatsEnabled, setEventCardImgoingShowStatsEnabled] = useState(false);
-    const [rsvpRememberVisibilityEnabled, setRsvpRememberVisibilityEnabled] = useState(true);
-    const [rsvpPeopleSheetEnabled, setRsvpPeopleSheetEnabled] = useState(false);
+    const [rsvpPeopleSheetEnabled, setRsvpPeopleSheetEnabled] = useState(true);
     const [geoapifyEnabled, setGeoapifyEnabled] = useState(false);
     const [eventCardImgoingLocationBottomEnabled, setEventCardImgoingLocationBottomEnabled] = useState(true);
     const [eventCardShowPeopleIconEnabled, setEventCardShowPeopleIconEnabled] = useState(false);
@@ -519,8 +518,7 @@ export default function Admin() {
             setOnboardingProfileStepEnabled(s.onboarding_profile_step_enabled ?? false);
             setEventCardSaveShowStatsEnabled(s.event_card_save_show_stats_enabled ?? false);
             setEventCardImgoingShowStatsEnabled(s.event_card_imgoing_show_stats_enabled ?? false);
-            setRsvpRememberVisibilityEnabled(s.rsvp_remember_visibility_enabled ?? true);
-            setRsvpPeopleSheetEnabled(s.rsvp_people_sheet_enabled ?? false);
+            setRsvpPeopleSheetEnabled(s.rsvp_people_sheet_enabled ?? true);
             setGeoapifyEnabled(s.geoapify_enabled ?? false);
             setEventCardImgoingLocationBottomEnabled(s.event_card_imgoing_location_bottom_enabled ?? true);
             setEventCardShowPeopleIconEnabled(s.event_card_show_people_icon_enabled ?? false);
@@ -1003,18 +1001,6 @@ export default function Admin() {
         } catch {
             setEventCardImgoingShowStatsEnabled(!newVal);
             setMessage('Failed to update "I\'m going" stats toggle.');
-        }
-    };
-
-    const handleToggleRsvpRememberVisibility = async () => {
-        const newVal = !rsvpRememberVisibilityEnabled;
-        setRsvpRememberVisibilityEnabled(newVal);
-        try {
-            await updateSettings({ rsvp_remember_visibility_enabled: newVal });
-            setMessage(`Remember visibility checkbox ${newVal ? 'enabled' : 'disabled'}.`);
-        } catch {
-            setRsvpRememberVisibilityEnabled(!newVal);
-            setMessage('Failed to update remember visibility toggle.');
         }
     };
 
@@ -2721,21 +2707,6 @@ export default function Admin() {
                                     </button>
                                 </div>
 
-                                {/* RSVP/save sheets: remember visibility checkbox */}
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <span className="text-[11px] font-medium text-ink">Remember visibility checkbox</span>
-                                        <p className="text-[10px] text-muted">Let users save their RSVP/save visibility choice as their default</p>
-                                    </div>
-                                    <button
-                                        onClick={handleToggleRsvpRememberVisibility}
-                                        aria-label="Toggle remember visibility checkbox"
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${rsvpRememberVisibilityEnabled ? 'bg-success' : 'bg-gray-300'}`}
-                                    >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${rsvpRememberVisibilityEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                    </button>
-                                </div>
-
                                 {/* Post-RSVP people sheet */}
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -3594,7 +3565,11 @@ export default function Admin() {
                                 </div>
 
                                 {/* Home review prompt + similar events */}
-                                <AdminReviewHomePromptSettings onMessage={setMessage} />
+                                <AdminReviewHomePromptSettings
+                                    onMessage={setMessage}
+                                    ratingsEnabled={showRatings}
+                                    onOpenFeatureFlags={() => setActiveConfigTab('feature-flags')}
+                                />
 
                                 {/* Ticket / memories prompts */}
                                 {EVENT_ASSET_PROMPTS.map((prompt) => {

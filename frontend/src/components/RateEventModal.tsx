@@ -1,25 +1,32 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import type { EventRating, ReviewScope, ReviewSentiment, SeriesEditionSummary, Tag, TagGroup } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useEventAssetSummary } from '../context/EventAssetSummaryContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import { useMyRatingLookup } from '../context/MyRatingsContext';
+import { useMyRatingLookup, useUpsertMyRating } from '../context/MyRatingsContext';
+import { useInvalidateRatingAggregate } from '../context/RatingAggregatesContext';
 import {
     deleteMyRating,
     fetchAspectTagGroups,
     fetchAudienceTagGroups,
     fetchEvent,
     fetchEventSeriesRollup,
+    fetchMyPendingReviews,
     submitFeedback,
 } from '../api';
-import { trackRatingDeleted, trackRatingSubmitFailed, trackRatingSubmitted, trackRateNextClicked, type RatingEntryPoint } from '../utils/tracking';
+import { trackRatingDeleted, trackRatingModalOpened, trackRatingSubmitFailed, trackRatingSubmitted, type RatingEntryPoint } from '../utils/tracking';
 import { SENTIMENTS, SENTIMENT_META } from '../utils/reviewSentiment';
 import { ConfirmDialog } from './AppDialog';
-import SimilarEventsRail from './SimilarEventsRail';
+import ReviewSuccessSheet from './ReviewSuccessSheet';
 import useBackToClose from '../hooks/useBackToClose';
 import { refreshPendingReviewCount } from '../hooks/usePendingReviewCount';
+
+// Shared across a "Rate next" chain so nested modals don't restore overflow out of order.
+let scrollLocks = 0;
+let savedBodyOverflow = '';
+const SWIPE_DISMISS_PX = 80;
 
 interface Props {
     eventId: string;
@@ -33,8 +40,8 @@ interface Props {
     entryPoint?: RatingEntryPoint;
     /** Home review prompt: event context header, incentive line and "Not now". */
     prompt?: { friendProof: string | null; showIncentive: boolean; onNotNow: () => void };
-    /** Thanks-screen chain to the next unreviewed event. */
-    rateNext?: { count: number; onRateNext: () => void };
+    /** Called when a review is submitted further down the "Rate next" chain. */
+    onChainedReviewed?: (eventId: string) => void;
 }
 
 type Identity = 'name' | 'anonymous';
@@ -183,7 +190,7 @@ export default function RateEventModal({
     scope = 'this_edition',
     entryPoint,
     prompt,
-    rateNext,
+    onChainedReviewed,
 }: Props) {
     const { user } = useAuth();
     const { eventReviewSizeStepEnabled, eventMemoriesEnabled } = useFeatureFlags();
@@ -233,9 +240,26 @@ export default function RateEventModal({
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [thanks, setThanks] = useState(false);
+    const [commentPending, setCommentPending] = useState(false);
+    const [nextEventIds, setNextEventIds] = useState<string[]>([]);
+    const [chainedEventId, setChainedEventId] = useState<string | null>(null);
+    const [dragY, setDragY] = useState(0);
+    const dragStart = useRef<{ x: number; y: number } | null>(null);
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+    const upsertMyRating = useUpsertMyRating();
+    const invalidateAggregate = useInvalidateRatingAggregate();
 
     useBackToClose(onClose, !submitting);
+
+    useEffect(() => {
+        if (scrollLocks++ === 0) {
+            savedBodyOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+        }
+        return () => {
+            if (--scrollLocks === 0) document.body.style.overflow = savedBodyOverflow;
+        };
+    }, []);
 
     useEffect(() => {
         if (scope !== 'past_edition' || initialRating) return;
@@ -444,7 +468,11 @@ export default function RateEventModal({
             });
             onSubmitted(res.rating);
             refreshPendingReviewCount();
+            setCommentPending(!!trimmedComment && res.rating.comment_status === 'pending');
             setThanks(true);
+            fetchMyPendingReviews()
+                .then((rows) => setNextEventIds(rows.map((r) => r.event_id).filter((id) => id !== target.eventId && id !== eventId)))
+                .catch(() => setNextEventIds([]));
         } catch (e) {
             const msg = e instanceof Error ? e.message : 'Failed to submit. Please try again.';
             trackRatingSubmitFailed(msg.slice(0, 60));
@@ -504,6 +532,49 @@ export default function RateEventModal({
         }
     })();
 
+    if (chainedEventId) {
+        return (
+            <RateEventModal
+                key={chainedEventId}
+                eventId={chainedEventId}
+                initialRating={null}
+                onClose={onClose}
+                onSubmitted={(rating) => {
+                    upsertMyRating(chainedEventId, rating);
+                    invalidateAggregate(chainedEventId);
+                    onChainedReviewed?.(chainedEventId);
+                }}
+                entryPoint="rate-next"
+                onChainedReviewed={onChainedReviewed}
+            />
+        );
+    }
+
+    const rateNextEvent = () => {
+        const next = nextEventIds[0];
+        if (!next) return;
+        trackRatingModalOpened('rate-next', false);
+        setChainedEventId(next);
+    };
+
+    // Swipe-down dismiss for the success sheet; only from the top so inner scrolling still works.
+    const onTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+        if (!thanks || e.currentTarget.scrollTop > 0) return;
+        dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+    const onTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+        if (!dragStart.current) return;
+        const dx = e.touches[0].clientX - dragStart.current.x;
+        const dy = e.touches[0].clientY - dragStart.current.y;
+        setDragY(dy > 0 && Math.abs(dy) > Math.abs(dx) ? dy : 0);
+    };
+    const onTouchEnd = () => {
+        if (!dragStart.current) return;
+        dragStart.current = null;
+        if (dragY >= SWIPE_DISMISS_PX) onClose();
+        else setDragY(0);
+    };
+
     return createPortal(
         <>
             <div
@@ -511,55 +582,27 @@ export default function RateEventModal({
                 onClick={onClose}
             >
                 <div
-                    className="bg-surface shadow-lg w-full max-w-md max-h-[90dvh] overflow-y-auto border border-line rounded-t-card sm:rounded-card pb-[env(safe-area-inset-bottom)] animate-slide-up"
+                    className={`bg-surface shadow-lg w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain border border-line rounded-t-card sm:rounded-card pb-[env(safe-area-inset-bottom)] animate-slide-up ${dragY > 0 ? '' : 'transition-transform'}`}
+                    style={dragY > 0 ? { transform: `translateY(${dragY}px)` } : undefined}
                     onClick={(e) => e.stopPropagation()}
+                    onTouchStart={onTouchStart}
+                    onTouchMove={onTouchMove}
+                    onTouchEnd={onTouchEnd}
+                    onTouchCancel={onTouchEnd}
                     role="dialog"
                     aria-modal="true"
-                    aria-label={thanks ? 'Feedback received' : mode === 'view' ? 'Your review' : 'Rate this event'}
+                    aria-label={thanks ? 'Review submitted' : mode === 'view' ? 'Your review' : 'Rate this event'}
                 >
                     {thanks ? (
-                        <div className="p-5 space-y-4">
-                            <div className="text-center space-y-3">
-                                <div className="text-3xl">🙌</div>
-                                <h2 className="text-base font-semibold text-ink">Thanks for your feedback!</h2>
-                                <p className="text-xs text-ink-soft">
-                                    Your review is live. Any comment you added will appear once it's checked by our team.
-                                </p>
-                                {assetSummary?.can_add_memory && (
-                                    <Link
-                                        to={`/event/${encodeURIComponent(eventId)}#memories`}
-                                        onClick={onClose}
-                                        className="block text-sm font-semibold text-action hover:underline"
-                                    >
-                                        📸 Add memories from the event
-                                    </Link>
-                                )}
-                            </div>
-                            <SimilarEventsRail eventId={target.eventId} sentiment={sentiment} onNavigate={onClose} />
-                            {rateNext && rateNext.count > 0 && (
-                                <div className="flex items-center justify-between gap-3 rounded-card bg-canvas px-3 py-2">
-                                    <span className="text-sm text-ink">{rateNext.count} more to rate</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            trackRateNextClicked();
-                                            rateNext.onRateNext();
-                                        }}
-                                        className="shrink-0 rounded-field bg-action px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-                                    >
-                                        Rate next
-                                    </button>
-                                </div>
-                            )}
-                            <div className="text-center">
-                                <button
-                                    onClick={onClose}
-                                    className="rounded-field border border-line bg-surface px-4 py-1.5 text-xs text-ink hover:bg-canvas"
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
+                        <ReviewSuccessSheet
+                            eventId={target.eventId}
+                            sentiment={sentiment}
+                            commentPending={commentPending}
+                            memoriesLink={!!assetSummary?.can_add_memory}
+                            remaining={nextEventIds.length}
+                            onRateNext={rateNextEvent}
+                            onClose={onClose}
+                        />
                     ) : mode === 'pick' ? (
                         <div className="p-4 space-y-3">
                             <div className="flex items-center justify-between">

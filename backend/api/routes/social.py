@@ -4785,6 +4785,7 @@ def get_share_source(
     share_code: str,
     inv: Optional[str] = Query(default=None, max_length=32),
     session: Session = Depends(get_session),
+    viewer: Optional[User] = Depends(get_current_user_optional),
 ):
     """Resolve a ``?ref=share&src=`` token to the originating user.
 
@@ -4815,9 +4816,26 @@ def get_share_source(
             ).first()
             is not None
         )
+    viewer_follows = False
+    viewer_is_friend = False
+    if viewer is not None and viewer.id != sharer.id:
+        viewer_follows = (
+            session.exec(
+                select(UserFollow.id)
+                .where(UserFollow.follower_id == viewer.id)
+                .where(UserFollow.followee_id == sharer.id)
+                .where(UserFollow.status == "approved")
+            ).first()
+            is not None
+        )
+        viewer_is_friend = viewer_follows and is_mutual_follow(
+            session, viewer.id, sharer.id
+        )
     return ShareSourceResponse(
         handle=sharer.handle,
         display_name=sharer.display_name,
         avatar_url=resolve_user_avatar(sharer),
         friend_invite=friend_invite,
+        viewer_follows=viewer_follows,
+        viewer_is_friend=viewer_is_friend,
     )

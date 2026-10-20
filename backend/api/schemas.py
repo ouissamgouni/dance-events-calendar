@@ -1577,10 +1577,8 @@ class SiteSettingsResponse(BaseModel):
     review_prompt_enabled: bool = True
     # Show the optional event-size question in the review wizard.
     event_review_size_step_enabled: bool = True
-    # Show the 'remember my choice' checkbox in RSVP/save visibility sheets.
-    rsvp_remember_visibility_enabled: bool = True
     # Post-RSVP sheet: people suggestions, friend-invite share, next steps.
-    rsvp_people_sheet_enabled: bool = False
+    rsvp_people_sheet_enabled: bool = True
     # Place autocomplete via Geoapify (off: Photon).
     geoapify_enabled: bool = False
     # Hours after an event's end before the review prompt fires.
@@ -1594,6 +1592,7 @@ class SiteSettingsResponse(BaseModel):
     for_you_review_window_days: int = 180
     # Home review prompt (auto-opens the review wizard) + similar-events rail.
     review_home_prompt_enabled: bool = True
+    similar_events_enabled: bool = True
     review_home_prompt_cooldown_hours: int = 72
     review_home_prompt_max_impressions_per_event: int = 2
     review_home_prompt_max_event_age_days: int = 14
@@ -2032,13 +2031,13 @@ class SiteSettingsUpdateRequest(BaseModel):
     notification_channels: Optional[dict[str, NotificationChannelUpdate]] = None
     review_prompt_enabled: Optional[bool] = None
     event_review_size_step_enabled: Optional[bool] = None
-    rsvp_remember_visibility_enabled: Optional[bool] = None
     rsvp_people_sheet_enabled: Optional[bool] = None
     geoapify_enabled: Optional[bool] = None
     review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
     review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
     for_you_review_window_days: Optional[int] = Field(default=None, ge=1, le=3650)
     review_home_prompt_enabled: Optional[bool] = None
+    similar_events_enabled: Optional[bool] = None
     review_home_prompt_cooldown_hours: Optional[int] = Field(
         default=None, ge=1, le=2160
     )
@@ -4441,6 +4440,9 @@ class ShareSourceResponse(BaseModel):
     avatar_url: Optional[str] = None
     # True when the ``inv`` query param is the sharer's own invite code.
     friend_invite: bool = False
+    # Relationship of the signed-in viewer to the sharer (false for anon).
+    viewer_follows: bool = False
+    viewer_is_friend: bool = False
 
 
 class RedeemShareFollowRequest(BaseModel):

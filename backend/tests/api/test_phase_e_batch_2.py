@@ -835,6 +835,30 @@ def test_share_source_friend_invite_only_for_sharers_own_code(client, session):
     assert _friend_invite("NOPE1234") is False
 
 
+def test_share_source_reports_viewer_relationship(client, session):
+    _make_user(session, "sharer@example.com", "sharer")
+    _make_user(session, "viewer@example.com", "viewer")
+    _login(client, "sharer@example.com")
+    share_code = client.get("/api/auth/me").json()["share_code"]
+    inv = client.get("/api/social/me/referral").json()["code"]
+    _logout(client)
+
+    def _relationship() -> tuple[bool, bool]:
+        body = client.get(f"/api/social/share-source/{share_code}").json()
+        return body["viewer_follows"], body["viewer_is_friend"]
+
+    assert _relationship() == (False, False)
+    _login(client, "viewer@example.com")
+    assert _relationship() == (False, False)
+    client.post(
+        "/api/auth/redeem-share-follow",
+        json={"share_code": share_code, "consent": True},
+    )
+    assert _relationship() == (True, False)
+    client.post("/api/auth/redeem-referral", json={"code": inv, "consent": True})
+    assert _relationship() == (True, True)
+
+
 def test_d2_share_source_deleted_user_404(client, session):
     _make_user(session, "ghost@example.com", "ghost")
     _login(client, "ghost@example.com")

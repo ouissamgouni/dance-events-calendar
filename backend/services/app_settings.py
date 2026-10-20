@@ -159,18 +159,6 @@ def get_event_review_size_step_enabled(session: Optional[Session] = None) -> boo
     return loader.get_event_review_size_step_enabled()
 
 
-def get_rsvp_remember_visibility_enabled(session: Optional[Session] = None) -> bool:
-    s, opened = _open_session(session)
-    try:
-        override = _get_bool_row(s, "rsvp_remember_visibility_enabled")
-    finally:
-        if opened:
-            s.close()
-    if override is not None:
-        return override
-    return loader.get_rsvp_remember_visibility_enabled()
-
-
 def get_rsvp_people_sheet_enabled(session: Optional[Session] = None) -> bool:
     s, opened = _open_session(session)
     try:
@@ -253,6 +241,18 @@ def get_review_home_prompt_enabled(session: Optional[Session] = None) -> bool:
     if override is not None:
         return override
     return loader.get_review_home_prompt_enabled()
+
+
+def get_similar_events_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "similar_events_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return loader.get_similar_events_enabled()
 
 
 REVIEW_HOME_PROMPT_INT_KEYS = tuple(loader.REVIEW_HOME_PROMPT_INT_DEFAULTS)

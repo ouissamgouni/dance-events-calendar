@@ -8,7 +8,13 @@ import useBackToClose from '../hooks/useBackToClose';
 import { useAuth } from '../context/AuthContext';
 import { useOptionalFeatureFlags } from '../context/FeatureFlagsContext';
 import { updateMyVisibility, type ShareAudience } from '../api';
-import { getRememberAudience, setRememberAudience, type AudienceKind } from '../utils/audiencePreference';
+import AudienceTierIcon from './AudienceTierIcon';
+import {
+    AUDIENCE_TIER_LABELS,
+    defaultRsvpAudienceFor,
+    defaultSavedAudienceFor,
+    type AudienceKind,
+} from '../utils/audiencePreference';
 
 interface SecondaryAction {
     label: string;
@@ -88,17 +94,20 @@ export default function RsvpVisibilitySheet({
     const [pos, setPos] = useState<PopoverPos | null>(null);
     const popoverRef = useRef<HTMLDivElement | null>(null);
     const { user, refreshUser } = useAuth();
-    const { rsvpRememberVisibilityEnabled, rsvpPeopleSheetEnabled } = useOptionalFeatureFlags();
-    const [remember, setRemember] = useState(() => getRememberAudience(user?.user_id, kind) ?? true);
-    const showRemember = rsvpRememberVisibilityEnabled && !rsvpPeopleSheetEnabled && !!user && !!audience && !!onAudienceChange;
+    const { rsvpPeopleSheetEnabled } = useOptionalFeatureFlags();
     // Bottom sheet on mobile, centered modal on desktop.
     const asSheet = isMobile || rsvpPeopleSheetEnabled;
     const [defaultState, setDefaultState] = useState<'idle' | 'saving' | 'saved'>('idle');
     const showMakeDefault = rsvpPeopleSheetEnabled && kind === 'going' && !!user && !!audience && !!onAudienceChange
         && (defaultState === 'saved' || audience !== user.share_attendance_default_audience);
+    const defaultAudience = user ? (kind === 'saved' ? defaultSavedAudienceFor(user) : defaultRsvpAudienceFor(user)) : null;
+    const [pickerOpen, setPickerOpen] = useState(false);
+    // The usual choice needs no decision: show a one-line summary until the user wants to change it.
+    const collapsed = rsvpPeopleSheetEnabled && !pickerOpen && !!audience && audience === defaultAudience;
 
     const makeDefault = () => {
         if (!audience || defaultState === 'saving') return;
+        setPickerOpen(true);
         setDefaultState('saving');
         updateMyVisibility({ share_attendance_default_audience: audience })
             .then(() => refreshUser())
@@ -106,21 +115,7 @@ export default function RsvpVisibilitySheet({
             .catch(() => setDefaultState('idle'));
     };
 
-    const persistRemember = () => {
-        if (!showRemember || !user) return;
-        setRememberAudience(user.user_id, remember, kind);
-        // Only RSVPs have an account-level default; saves stay local.
-        if (kind === 'going' && remember && audience && audience !== user.share_attendance_default_audience) {
-            updateMyVisibility({ share_attendance_default_audience: audience })
-                .then(() => refreshUser())
-                .catch(() => { /* best-effort; per-event audience already applied */ });
-        }
-    };
-
-    const dismiss = () => {
-        persistRemember();
-        onClose();
-    };
+    const dismiss = onClose;
     const dismissRef = useRef(dismiss);
     useEffect(() => {
         dismissRef.current = dismiss;
@@ -164,15 +159,14 @@ export default function RsvpVisibilitySheet({
         ? `${btnBase} border border-line bg-surface px-4 text-ink hover:bg-canvas`
         : `${btnBase} bg-action px-4 text-white hover:opacity-90`;
     const primary = primaryAction ?? { label: 'Done', onClick: dismiss };
-    const handleSecondary = () => {
-        if (secondaryAction?.tone !== 'danger') persistRemember();
-        secondaryAction?.onClick();
-    };
 
     const picker = audience && onAudienceChange ? (
         <AudiencePicker
             value={audience}
-            onChange={onAudienceChange}
+            onChange={(next) => {
+                setPickerOpen(true);
+                onAudienceChange(next);
+            }}
             size="sheet"
             ariaLabel={pickerAriaLabel}
         />
@@ -182,7 +176,22 @@ export default function RsvpVisibilitySheet({
         <>
             {rsvpPeopleSheetEnabled ? (
                 <>
-                    {picker && (
+                    {picker && audience && collapsed && (
+                        <div className="mb-4 flex items-center justify-between gap-2" data-testid="rsvp-visibility-summary">
+                            <span className="flex min-w-0 items-center gap-1.5 text-sm text-ink-soft">
+                                <AudienceTierIcon audience={audience} className="h-4 w-4 shrink-0" />
+                                Visible to: <span className="font-medium text-ink">{AUDIENCE_TIER_LABELS[audience]}</span>
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setPickerOpen(true)}
+                                className="text-xs font-medium text-action hover:underline"
+                            >
+                                Change
+                            </button>
+                        </div>
+                    )}
+                    {picker && !collapsed && (
                         <div className="mb-4" data-testid="rsvp-visibility-row">
                             <div className="mb-1.5 flex items-center justify-between gap-2">
                                 <span className="text-xs font-medium text-ink-soft">
@@ -215,17 +224,6 @@ export default function RsvpVisibilitySheet({
                 </>
             )}
             <div className="mt-3 flex items-center gap-2">
-                {showRemember && (
-                    <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-soft">
-                        <input
-                            type="checkbox"
-                            checked={remember}
-                            onChange={(e) => setRemember(e.target.checked)}
-                            className="h-4 w-4 accent-action"
-                        />
-                        Remember my choice
-                    </label>
-                )}
                 {footerLink && (
                     <Link
                         to={footerLink.to}
@@ -239,7 +237,7 @@ export default function RsvpVisibilitySheet({
                     {secondaryAction && (
                         <button
                             type="button"
-                            onClick={handleSecondary}
+                            onClick={secondaryAction.onClick}
                             className={`${btnBase} border border-line bg-surface hover:bg-canvas ${secondaryTone}`}
                         >
                             {secondaryAction.icon}

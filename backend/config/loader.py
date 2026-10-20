@@ -280,16 +280,10 @@ def get_event_review_size_step_enabled() -> bool:
     return True if parsed is None else parsed
 
 
-def get_rsvp_remember_visibility_enabled() -> bool:
-    """Show the 'remember my choice' checkbox in RSVP/save sheets. Default True."""
-    parsed = _parse_bool(os.getenv("RSVP_REMEMBER_VISIBILITY_ENABLED"))
-    return True if parsed is None else parsed
-
-
 def get_rsvp_people_sheet_enabled() -> bool:
-    """Post-RSVP sheet with people suggestions + friend-invite share. Default False."""
+    """Post-RSVP sheet with people suggestions + friend-invite share. Default True."""
     parsed = _parse_bool(os.getenv("RSVP_PEOPLE_SHEET_ENABLED"))
-    return False if parsed is None else parsed
+    return True if parsed is None else parsed
 
 
 def get_geoapify_enabled() -> bool:
@@ -353,6 +347,12 @@ def get_review_mood_headline_min_reviews() -> int:
 def get_review_home_prompt_enabled() -> bool:
     """Auto-open the review wizard on Home for a recent unreviewed event. Default True."""
     parsed = _parse_bool(os.getenv("REVIEW_HOME_PROMPT_ENABLED"))
+    return True if parsed is None else parsed
+
+
+def get_similar_events_enabled() -> bool:
+    """Similar-events rail on the review thanks sheet. Default True."""
+    parsed = _parse_bool(os.getenv("SIMILAR_EVENTS_ENABLED"))
     return True if parsed is None else parsed
 
 

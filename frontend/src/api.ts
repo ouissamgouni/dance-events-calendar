@@ -762,8 +762,6 @@ export interface SiteSettings {
     review_prompt_enabled?: boolean;
     /** Show the optional event-size question in the review wizard. */
     event_review_size_step_enabled?: boolean;
-    /** Show the 'remember my choice' checkbox in RSVP/save visibility sheets. */
-    rsvp_remember_visibility_enabled?: boolean;
     /** Post-RSVP sheet with people suggestions + friend-invite share. */
     rsvp_people_sheet_enabled?: boolean;
     /** Place autocomplete via Geoapify (off: Photon). */
@@ -781,6 +779,7 @@ export interface SiteSettings {
     /** Home review prompt (auto-opens the review wizard on Home) + the
      * similar-events rail on its thanks screen. Defaults in backend loader. */
     review_home_prompt_enabled?: boolean;
+    similar_events_enabled?: boolean;
     review_home_prompt_cooldown_hours?: number;
     review_home_prompt_max_impressions_per_event?: number;
     review_home_prompt_max_event_age_days?: number;
@@ -2431,6 +2430,9 @@ export interface ShareSourceResponse {
     avatar_url: string | null;
     /** True when the `inv` code passed in belongs to this sharer. */
     friend_invite?: boolean;
+    /** Signed-in viewer already follows / is friends with the sharer. */
+    viewer_follows?: boolean;
+    viewer_is_friend?: boolean;
 }
 
 /** Resolve a `?ref=share&src=` token to the sharer preview shown by the

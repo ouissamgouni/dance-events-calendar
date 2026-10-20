@@ -1,15 +1,14 @@
 test_plan:
   name: "Phase E (D2) — share-link doubles as referral"
   description: >
-    Verify the share-referral banner: an anon visitor arriving on a
-    ``?ref=share&src=<share_code>`` URL sees a "Follow @sharer?" prompt
-    with the opt-in defaulted ON. After sign-in (or if already signed
-    in) a single click follows the sharer (one-way; the sharer is NOT
-    auto-followed back). Self-shares are filtered. Share-link
-    conversions do NOT show up in the E7 referral leaderboard. The
-    generic "Sign in to save events…" banner is suppressed while the
-    share-referral banner is active so visitors aren't faced with two
-    stacked sign-in CTAs. Friend-invite links (``&inv=<invite code>``,
+    Verify the share-link invite: an anon visitor arriving on a
+    ``?ref=share&src=<share_code>`` event URL gets a one-time sheet
+    offering to follow the sharer. After sign-up they land back on the
+    event and the follow is applied automatically (one-way; the sharer is
+    NOT auto-followed back). Self-shares and already-connected viewers
+    see nothing, and the invite belongs to the tab that opened the link
+    (cleared on sign-out). Share-link conversions do NOT show up in the
+    E7 referral leaderboard. Friend-invite links (``&inv=<invite code>``,
     mutual friendship) are covered by the rsvp-people-sheet scenario.
 
   preconditions:
@@ -26,58 +25,49 @@ test_plan:
       expected: "share_code is a lowercase 8-char base32 token."
 
     - id: 2
-      title: "Anon visitor lands on a ?ref=share&src=<code> URL → banner appears"
+      title: "Anon visitor lands on a ?ref=share&src=<code> URL → invite sheet"
       description: >
         In an INCOGNITO window, navigate to
         ``/event/evt-sr-001?ref=share&src=<share_code>`` (the
         scenario seeds ``evt-sr-001`` for exactly this purpose). Stay
         signed out.
       expected: >
-        Top of the page (under the nav) shows
-        ``data-testid="share-referral-banner"`` with copy
-        "You arrived via @sharer — sign in to follow them." plus a
-        value-prop subtext ("Signing in also lets you save events
-        across devices…"). The opt-in checkbox
-        ``data-testid="share-referral-opt-in"`` is CHECKED by
-        default (D2 decision). A "Sign in" CTA replaces the
-        Continue button. The generic ``SignUpBanner`` is
-        suppressed — only the share-referral banner shows.
+        A one-time sheet ``data-testid="share-referral-sheet"`` opens
+        over the event page (bottom sheet on mobile, centered modal on
+        desktop): "Sharer shared this event", "Follow them to see where
+        they're dancing next.", buttons "Not now" + "Sign up to follow".
+        No banner under the nav, and the generic ``SignUpBanner`` stays
+        hidden while the invite is pending. sessionStorage holds
+        ``movida_share_prompt``.
 
     - id: 3
-      title: "Sign in as viewer with opt-in checked → auto-redeem"
-      description: "Click Sign in, complete the Dev Mock login as viewer."
+      title: "Sign up as viewer → auto-follow and land back on the event"
+      description: 'Click "Sign up to follow", complete the Dev Mock login as viewer (and onboarding if shown).'
       expected: >
-        Because the opt-in was checked at click time we stash an
-        intent flag (``share_referral_banner_intent:<code>``) and
-        auto-fire POST /api/auth/redeem-share-follow after sign-in
-        — no second "Continue" click. Banner jumps straight to the
-        green confirmation row with
-        ``data-testid="share-referral-banner-redeemed"`` and copy
-        "You're now following @sharer." plus an "Open profile"
-        link. Auto-hides after ~6s. Network panel: a single POST
-        with response ``{ sharer_handle: "sharer",
-        follow_created: true }``. Friends tab now lists @sharer as
-        someone you follow; the reverse edge is NOT created (the
-        sharer must follow back manually if they want to).
+        The sign-in sheet opens in place (no jump to the home page).
+        After sign-in (and onboarding, which returns to the event), a
+        single POST /api/auth/redeem-share-follow fires automatically
+        (``follow_created: true``) and a toast reads "You're now following
+        Sharer". The user is on ``/event/evt-sr-001``. The reverse edge
+        is NOT created.
 
     - id: 4
-      title: "Anon visitor with opt-in UN-checked → no auto-redeem"
+      title: '"Not now" closes the invite for this tab'
       description: >
-        Repeat step 2 in a fresh incognito, untick the opt-in,
-        click Sign in, complete the login.
+        Repeat step 2 in a fresh incognito, click "Not now", then reload
+        the page (URL still carries ``?ref=share``).
       expected: >
-        No intent flag is stashed; no redemption fires after
-        sign-in. The banner disappears (no active intent and the
-        user opted out of following). Friends tab does NOT list
-        @sharer.
+        The sheet closes and does not reappear on reload
+        (``movida_share_prompt`` is marked done). No follow is created.
 
     - id: 5
-      title: "Hard refresh: banner does NOT reappear"
-      description: "Reload the page."
+      title: "Already following → no prompt"
+      description: >
+        As viewer (who follows sharer after step 3), open the same link
+        in a new tab.
       expected: >
-        No banner. localStorage carries
-        ``share_referral_banner_consumed:<share_code>`` so the
-        redeem fires at most once per share.
+        GET /api/social/share-source/<code> returns ``viewer_follows:
+        true``; no sheet is shown.
 
     - id: 6
       title: "Negative: sharer arriving on their own link sees nothing"
@@ -85,21 +75,20 @@ test_plan:
         Sign in as sharer, then visit
         ``/event/<id>?ref=share&src=<their own share_code>``.
       expected: >
-        No banner — self-shares are filtered client-side
+        No sheet — self-shares are filtered client-side
         (`user.share_code === shareCode`).
 
     - id: 7
-      title: "Negative: dismiss + new share_code → banner returns"
+      title: "Two accounts on one device: the invite does not carry over"
       description: >
-        Sign in as viewer (fresh incognito), visit
-        ``/event/<id>?ref=share&src=<sharer code>``, click the ×.
-        Then visit the same URL again with a DIFFERENT share_code.
+        In one browser: open the link signed out, sign in as viewer
+        WITHOUT accepting (close the sign-in sheet, then sign in via the
+        menu), sign out, then sign in as admin and browse to the event
+        without the ``?ref=share`` params.
       expected: >
-        After the dismiss, banner stays hidden for the original
-        share_code (localStorage
-        ``share_referral_banner_dismissed:<share_code>`` set). A new
-        URL with a different share_code shows the banner again — the
-        dismiss is per-share, not global.
+        Sign-out clears ``movida_share_prompt``; admin never sees the
+        invite sheet. The invite also never shows on other pages
+        (e.g. ``/browse``) — only on the shared event.
 
     - id: 8
       title: "Negative: share-link conversion does NOT bump E7 leaderboard"
@@ -108,7 +97,7 @@ test_plan:
         ``used_count`` on the displayed referral. (It will be 0
         because the sharer never minted an E7 invite code.) DevTools:
         GET /api/social/me/referral confirms ``used_count: 0`` even
-        after step 4 redeemed the share-link.
+        after step 3 redeemed the share-link.
       expected: >
         ``used_count`` remains 0. Share-link conversions are
         tracked separately and do NOT credit the inviter on the

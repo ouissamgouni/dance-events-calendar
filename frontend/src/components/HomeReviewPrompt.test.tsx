@@ -23,7 +23,7 @@ const prompt = {
 function renderPrompt() {
     return renderWithProviders(
         <FeatureFlagsProvider>
-            <HomeReviewPrompt blocked={false} pendingReviews={[]} onReviewed={() => { }} />
+            <HomeReviewPrompt blocked={false} onReviewed={() => { }} />
         </FeatureFlagsProvider>,
     )
 }
