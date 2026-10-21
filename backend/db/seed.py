@@ -38,6 +38,7 @@ from backend.db.models import (
     ScheduleActivityType,
     ScheduleContributor,
     ScheduleLevel,
+    ScheduleOverviewItem,
     SchedulePublication,
     ScheduleRoom,
     ScheduleSession,
@@ -62,7 +63,14 @@ from backend.services.follows import (
     ensure_approved_follow_with_subscription,
     ensure_calendar_subscription,
 )
-from backend.services.schedules import build_snapshot, session_snapshot, to_utc
+from backend.services.schedules import (
+    build_snapshot,
+    overview_item_snapshot,
+    replace_overview_item_rooms,
+    replace_session_rooms,
+    session_snapshot,
+    to_utc,
+)
 from backend.services.tag_hierarchy import drop_superseded_parents
 
 WEEKDAYS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -3144,6 +3152,7 @@ class DatabaseSeeder:
                     event_id=event_id,
                     timezone=entry["timezone"],
                     day_start_hour=entry.get("day_start_hour", 6),
+                    session_color_mode=entry.get("session_color_mode", "room"),
                     days=[
                         self._schedule_day(day, schedule_now, **relative)
                         for day in entry.get("days", [])
@@ -3154,12 +3163,28 @@ class DatabaseSeeder:
             else:
                 schedule.timezone = entry["timezone"]
                 schedule.day_start_hour = entry.get("day_start_hour", 6)
+                schedule.session_color_mode = entry.get("session_color_mode", "room")
                 schedule.days = [
                     self._schedule_day(day, schedule_now, **relative)
                     for day in entry.get("days", [])
                 ]
                 schedule.updated_at = datetime.now(timezone.utc)
                 self.session.add(schedule)
+
+            if entry.get("import"):
+                # Reuse a reviewed schedule import document (path relative to this YAML).
+                from backend.api.schemas import ScheduleImportDocument
+                from backend.services.schedule_import import apply_import_document
+
+                document = json.loads((path.parent / entry["import"]).read_text())
+                apply_import_document(
+                    self.session,
+                    schedule,
+                    ScheduleImportDocument.model_validate(
+                        {**document, "event_id": event_id}
+                    ),
+                    "replace",
+                )
 
             venues = self._seed_schedule_named_rows(
                 ScheduleVenue, schedule.id, entry.get("venues", [])
@@ -3221,11 +3246,22 @@ class DatabaseSeeder:
             for row in entry.get("sessions", []) or []:
                 session_id = UUID(str(row["id"]))
                 schedule_session = self.session.get(ScheduleSession, session_id)
+                room_names = row.get("rooms") or (
+                    [row["room"]] if row.get("room") else []
+                )
+                session_room_ids = [
+                    room.id
+                    for room in sorted(
+                        {rooms[name].id: rooms[name] for name in room_names}.values(),
+                        key=lambda room: (room.sort_order, room.id),
+                    )
+                ]
                 values = {
                     "schedule_id": schedule.id,
                     "external_id": row.get("external_id"),
                     "title": row["title"],
                     "instructors": row.get("instructors"),
+                    "description": row.get("description"),
                     "start": self._schedule_datetime(
                         row["start"],
                         schedule_now,
@@ -3235,7 +3271,7 @@ class DatabaseSeeder:
                     "end": self._schedule_datetime(
                         row["end"], schedule_now, tz_name=entry["timezone"], **relative
                     ),
-                    "room_id": rooms[row["room"]].id if row.get("room") else None,
+                    "room_id": session_room_ids[0] if session_room_ids else None,
                     "venue_id": venues[row["venue"]].id if row.get("venue") else None,
                     "level_id": levels[row["level"]].id if row.get("level") else None,
                     "activity_type_id": (
@@ -3256,6 +3292,7 @@ class DatabaseSeeder:
                         setattr(schedule_session, key, value)
                 self.session.add(schedule_session)
                 self.session.flush()
+                replace_session_rooms(self.session, schedule_session, session_room_ids)
                 self.session.exec(
                     delete(ScheduleSessionContributor).where(
                         ScheduleSessionContributor.session_id == schedule_session.id
@@ -3276,6 +3313,62 @@ class DatabaseSeeder:
                             position=position,
                         )
                     )
+
+            for row in sorted(
+                entry.get("overview_items", []) or [],
+                key=lambda row: row.get("parent") is not None,
+            ):
+                item_id = UUID(str(row["id"]))
+                item = self.session.get(ScheduleOverviewItem, item_id)
+                item_room_ids = [
+                    room.id
+                    for room in sorted(
+                        {
+                            rooms[name].id: rooms[name] for name in row.get("rooms", [])
+                        }.values(),
+                        key=lambda room: (room.sort_order, room.id),
+                    )
+                ]
+                values = {
+                    "schedule_id": schedule.id,
+                    "external_id": row.get("external_id"),
+                    "parent_id": UUID(str(row["parent"]))
+                    if row.get("parent")
+                    else None,
+                    "title": row["title"],
+                    "subtitle": row.get("subtitle"),
+                    "description": row.get("description"),
+                    "url": row.get("url"),
+                    "url_label": row.get("url_label"),
+                    "start": self._schedule_datetime(
+                        row["start"],
+                        schedule_now,
+                        tz_name=entry["timezone"],
+                        **relative,
+                    ),
+                    "end": self._schedule_datetime(
+                        row["end"], schedule_now, tz_name=entry["timezone"], **relative
+                    ),
+                    "activity_type_id": (
+                        activity_types[row["activity_type"]].id
+                        if row.get("activity_type")
+                        else None
+                    ),
+                    "venue_id": venues[row["venue"]].id if row.get("venue") else None,
+                    "opens_detail": row.get("opens_detail", False),
+                    "allow_plan": row.get("allow_plan", False),
+                    "is_cancelled": row.get("is_cancelled", False),
+                    "sort_order": row.get("sort_order", 0),
+                    "updated_at": datetime.now(timezone.utc),
+                }
+                if item is None:
+                    item = ScheduleOverviewItem(id=item_id, **values)
+                else:
+                    for key, value in values.items():
+                        setattr(item, key, value)
+                self.session.add(item)
+                self.session.flush()
+                replace_overview_item_rooms(self.session, item, item_room_ids)
 
             self.session.flush()
             publication = self.session.exec(
@@ -3313,36 +3406,98 @@ class DatabaseSeeder:
                 row.updated_at = datetime.now(timezone.utc)
                 self.session.add(row)
 
+            for update in entry.get("draft_overview_updates", []) or []:
+                row = self.session.get(
+                    ScheduleOverviewItem, UUID(str(update["item_id"]))
+                )
+                if row is None or row.schedule_id != schedule.id:
+                    continue
+                for key, value in update.items():
+                    if key != "item_id":
+                        setattr(row, key, value)
+                row.updated_at = datetime.now(timezone.utc)
+                self.session.add(row)
+
             if publication is None:
                 continue
             published_sessions = {
                 row["id"]: row for row in publication.snapshot.get("sessions", [])
             }
+            published_items = {
+                row["id"]: row for row in publication.snapshot.get("overview_items", [])
+            }
             for plan in entry.get("plans", []) or []:
                 user = self.session.exec(
                     select(User).where(User.email == plan["email"].strip().lower())
                 ).first()
-                session_id = UUID(str(plan["session_id"]))
-                schedule_session = self.session.get(ScheduleSession, session_id)
-                if user is None or schedule_session is None:
+                if user is None:
                     continue
-                existing = self.session.exec(
-                    select(UserPlanSession).where(
-                        UserPlanSession.user_id == user.id,
-                        UserPlanSession.session_id == session_id,
-                    )
-                ).first()
-                if existing is None:
-                    self.session.add(
-                        UserPlanSession(
-                            user_id=user.id,
-                            session_id=session_id,
-                            event_id=event_id,
-                            last_known_session=published_sessions.get(
-                                str(session_id), session_snapshot(schedule_session)
-                            ),
+                if plan.get("overview_item_id") or plan.get("overview_item"):
+                    # `overview_item` is an external_id (e.g. items created by `import:`).
+                    overview_item = (
+                        self.session.get(
+                            ScheduleOverviewItem, UUID(str(plan["overview_item_id"]))
                         )
+                        if plan.get("overview_item_id")
+                        else self.session.exec(
+                            select(ScheduleOverviewItem).where(
+                                ScheduleOverviewItem.schedule_id == schedule.id,
+                                ScheduleOverviewItem.external_id
+                                == plan["overview_item"],
+                            )
+                        ).first()
                     )
+                    if overview_item is None:
+                        continue
+                    existing = self.session.exec(
+                        select(UserPlanSession).where(
+                            UserPlanSession.user_id == user.id,
+                            UserPlanSession.overview_item_id == overview_item.id,
+                        )
+                    ).first()
+                    if existing is None:
+                        self.session.add(
+                            UserPlanSession(
+                                user_id=user.id,
+                                overview_item_id=overview_item.id,
+                                event_id=event_id,
+                                last_known_session=published_items.get(
+                                    str(overview_item.id),
+                                    overview_item_snapshot(overview_item),
+                                ),
+                            )
+                        )
+                else:
+                    schedule_session = (
+                        self.session.get(ScheduleSession, UUID(str(plan["session_id"])))
+                        if plan.get("session_id")
+                        else self.session.exec(
+                            select(ScheduleSession).where(
+                                ScheduleSession.schedule_id == schedule.id,
+                                ScheduleSession.external_id == plan.get("session"),
+                            )
+                        ).first()
+                    )
+                    if schedule_session is None:
+                        continue
+                    session_id = schedule_session.id
+                    existing = self.session.exec(
+                        select(UserPlanSession).where(
+                            UserPlanSession.user_id == user.id,
+                            UserPlanSession.session_id == session_id,
+                        )
+                    ).first()
+                    if existing is None:
+                        self.session.add(
+                            UserPlanSession(
+                                user_id=user.id,
+                                session_id=session_id,
+                                event_id=event_id,
+                                last_known_session=published_sessions.get(
+                                    str(session_id), session_snapshot(schedule_session)
+                                ),
+                            )
+                        )
                 audience = plan.get("audience")
                 if audience in {"followers", "friends", "private"}:
                     audience_row = self.session.exec(

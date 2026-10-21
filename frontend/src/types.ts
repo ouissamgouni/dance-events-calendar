@@ -218,6 +218,7 @@ export interface ScheduleRoom {
     id: number;
     venue_id: number | null;
     name: string;
+    details?: string | null;
     color: string;
     sort_order: number;
 }
@@ -256,10 +257,13 @@ export interface ScheduleSession {
     external_id?: string | null;
     title: string;
     instructors: string | null;
+    description?: string | null;
     contributors?: ScheduleSessionContributor[];
     start: string;
     end: string;
     room_id: number | null;
+    /** All rooms in grid column order; missing on programs published before multi-room support. */
+    room_ids?: number[];
     venue_id: number | null;
     level_id: number | null;
     activity_type_id: number | null;
@@ -268,10 +272,36 @@ export interface ScheduleSession {
     is_cancelled: boolean;
 }
 
+export interface ScheduleOverviewItem {
+    id: string;
+    external_id?: string | null;
+    /** Set on moments nested inside a top-level item (one level max). */
+    parent_id: string | null;
+    title: string;
+    subtitle: string | null;
+    description: string | null;
+    url: string | null;
+    url_label: string | null;
+    start: string;
+    end: string;
+    activity_type_id: number | null;
+    venue_id: number | null;
+    room_ids: number[];
+    opens_detail: boolean;
+    /** Top-level items only; missing on programs published before plannable overview items. */
+    allow_plan?: boolean;
+    is_cancelled: boolean;
+    sort_order: number;
+}
+
+export type SessionColorMode = 'room' | 'activity_type' | 'activity_type_stripe';
+
 export interface EventSchedule {
     event_id: string;
     timezone: string;
     day_start_hour: number;
+    /** Missing on programs published before the setting existed (= 'room'). */
+    session_color_mode?: SessionColorMode;
     days: string[];
     venues: ScheduleVenue[];
     rooms: ScheduleRoom[];
@@ -279,6 +309,8 @@ export interface EventSchedule {
     activity_types: ScheduleActivityType[];
     contributors?: ScheduleContributor[];
     sessions: ScheduleSession[];
+    /** Missing on programs published before the overview level existed. */
+    overview_items?: ScheduleOverviewItem[];
     version: number | null;
     published_at: string | null;
 }
@@ -296,8 +328,15 @@ export interface SessionAttendanceSummary {
     preview_attendees: SessionPlanAttendee[];
 }
 
+export interface OverviewItemAttendanceSummary {
+    overview_item_id: string;
+    visible_count: number;
+    preview_attendees: SessionPlanAttendee[];
+}
+
 export interface SessionAttendanceSummaryBatch {
     sessions: SessionAttendanceSummary[];
+    overview_items?: OverviewItemAttendanceSummary[];
 }
 
 export interface ScheduleIssue {
@@ -305,6 +344,7 @@ export interface ScheduleIssue {
     severity: 'warning' | 'error';
     message: string;
     session_ids: string[];
+    overview_item_ids?: string[];
 }
 
 export interface ScheduleFieldChange {
@@ -314,7 +354,7 @@ export interface ScheduleFieldChange {
 }
 
 export interface ScheduleChange {
-    entity_type: 'schedule' | 'venue' | 'room' | 'level' | 'activity_type' | 'contributor' | 'session';
+    entity_type: 'schedule' | 'venue' | 'room' | 'level' | 'activity_type' | 'contributor' | 'session' | 'overview_item';
     operation: 'create' | 'update' | 'remove';
     entity_id: string;
     label: string;
@@ -334,11 +374,22 @@ export interface AdminEventSchedule extends EventSchedule {
     diff: ScheduleDiff;
 }
 
-export interface MyPlanEntry {
-    session_id: string;
-    status: 'active' | 'cancelled' | 'removed';
-    session: ScheduleSession;
-}
+export type MyPlanEntryStatus = 'active' | 'cancelled' | 'removed';
+
+export type MyPlanEntry =
+    | {
+        /** Missing on responses from before plannable overview items. */
+        kind?: 'session';
+        session_id: string;
+        status: MyPlanEntryStatus;
+        session: ScheduleSession;
+    }
+    | {
+        kind: 'overview_item';
+        overview_item_id: string;
+        status: MyPlanEntryStatus;
+        overview_item: ScheduleOverviewItem;
+    };
 
 export type PlanAudience = 'followers' | 'friends' | 'private';
 
@@ -373,6 +424,7 @@ export interface ProgramExportSession {
     local_end_time: string;
     venue_id: number | null;
     room_id: number | null;
+    room_ids?: number[];
     level_id: number | null;
     activity_type_id: number | null;
     venue: string | null;
@@ -380,6 +432,7 @@ export interface ProgramExportSession {
     address: string | null;
     level: string | null;
     activity_type: string | null;
+    description?: string | null;
     attendee_note: string | null;
     is_cancelled: boolean;
     status: 'active' | 'cancelled' | 'removed';
@@ -391,6 +444,7 @@ export interface ProgramExport {
     program_url: string;
     timezone: string;
     day_start_hour: number;
+    session_color_mode?: SessionColorMode;
     available_days: string[];
     selected_days: string[];
     venues: ScheduleVenue[];
@@ -408,9 +462,10 @@ export interface ScheduleImportDocument {
     event_id?: string | null;
     timezone: string;
     day_start_hour: number;
+    session_color_mode?: SessionColorMode | null;
     days: string[];
     venues: Array<{ external_id: string; name: string; address?: string | null; sort_order?: number }>;
-    rooms: Array<{ external_id: string; name: string; venue_external_id?: string | null; color?: string; sort_order?: number }>;
+    rooms: Array<{ external_id: string; name: string; details?: string | null; venue_external_id?: string | null; color?: string; sort_order?: number }>;
     levels: Array<{ external_id: string; label: string; notation?: string | null; sort_order?: number }>;
     activity_types: Array<{ external_id: string; name: string; color?: string; sort_order?: number }>;
     contributors?: Array<{ external_id: string; display_name: string; sort_order?: number }>;
@@ -418,10 +473,12 @@ export interface ScheduleImportDocument {
         external_id: string;
         title: string;
         instructors?: string | null;
+        description?: string | null;
         contributors?: Array<{ contributor_external_id: string; role: ScheduleContributorRole }>;
         start: string;
         end: string;
         room_external_id?: string | null;
+        room_external_ids?: string[] | null;
         venue_external_id?: string | null;
         level_external_id?: string | null;
         activity_type_external_id?: string | null;
@@ -429,6 +486,24 @@ export interface ScheduleImportDocument {
         allow_plan?: boolean;
         is_cancelled?: boolean;
     }>;
+    overview_items?: Array<{
+        external_id: string;
+        parent_external_id?: string | null;
+        title: string;
+        subtitle?: string | null;
+        description?: string | null;
+        url?: string | null;
+        url_label?: string | null;
+        start: string;
+        end: string;
+        activity_type_external_id?: string | null;
+        venue_external_id?: string | null;
+        room_external_ids?: string[];
+        opens_detail?: boolean;
+        allow_plan?: boolean;
+        is_cancelled?: boolean;
+        sort_order?: number;
+    }> | null;
 }
 
 export interface ScheduleImportPreview {

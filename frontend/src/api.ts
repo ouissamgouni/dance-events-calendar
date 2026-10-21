@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanCount, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleContributor, ScheduleSession, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanCount, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleContributor, ScheduleSession, ScheduleOverviewItem, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee, OverviewItemAttendanceSummary, SessionColorMode } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 import type { AdminEventNotificationStats, SharedMyPlanResponse } from './types';
 import type { ReviewHomePrompt, ReviewSentiment, SimilarEvents } from './types';
@@ -270,6 +270,22 @@ export async function fetchSingleSessionAttendanceSummary(eventId: string, sessi
     return parseJsonResponse<SessionAttendanceSummary>(res, 'Failed to load session attendance');
 }
 
+export async function fetchOverviewItemAttendanceSummary(eventId: string, itemId: string): Promise<OverviewItemAttendanceSummary> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/schedule/overview-items/${encodeURIComponent(itemId)}/attendance-summary`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return parseJsonResponse<OverviewItemAttendanceSummary>(res, 'Failed to load attendance');
+}
+
+export async function fetchOverviewItemAttendees(eventId: string, itemId: string): Promise<SessionPlanAttendee[]> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/schedule/overview-items/${encodeURIComponent(itemId)}/attendees`, {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+    return parseJsonResponse<SessionPlanAttendee[]>(res, 'Failed to load attendees');
+}
+
 export async function fetchSessionAttendees(eventId: string, sessionId: string): Promise<SessionPlanAttendee[]> {
     const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/schedule/sessions/${encodeURIComponent(sessionId)}/attendees`, {
         credentials: 'include',
@@ -307,7 +323,7 @@ export async function createAdminEventSchedule(eventId: string, body: { timezone
     return scheduleRequest<AdminEventSchedule>(eventId, '', 'POST', body);
 }
 
-export async function updateAdminEventSchedule(eventId: string, body: { timezone?: string; day_start_hour?: number; days?: string[] }): Promise<AdminEventSchedule> {
+export async function updateAdminEventSchedule(eventId: string, body: { timezone?: string; day_start_hour?: number; days?: string[]; session_color_mode?: SessionColorMode }): Promise<AdminEventSchedule> {
     return scheduleRequest<AdminEventSchedule>(eventId, '', 'PATCH', body);
 }
 
@@ -391,6 +407,20 @@ export async function duplicateScheduleSession(eventId: string, id: string): Pro
     return scheduleRequest<ScheduleSession>(eventId, `/sessions/${id}/duplicate`, 'POST');
 }
 
+export type ScheduleOverviewItemInput = Omit<ScheduleOverviewItem, 'id' | 'external_id'>;
+
+export async function createScheduleOverviewItem(eventId: string, body: ScheduleOverviewItemInput): Promise<ScheduleOverviewItem> {
+    return scheduleRequest<ScheduleOverviewItem>(eventId, '/overview-items', 'POST', body);
+}
+
+export async function updateScheduleOverviewItem(eventId: string, id: string, body: ScheduleOverviewItemInput): Promise<ScheduleOverviewItem> {
+    return scheduleRequest<ScheduleOverviewItem>(eventId, `/overview-items/${id}`, 'PUT', body);
+}
+
+export async function deleteScheduleOverviewItem(eventId: string, id: string): Promise<void> {
+    return scheduleRequest<void>(eventId, `/overview-items/${id}`, 'DELETE');
+}
+
 export interface SchedulePublishResponse extends EventSchedule {
     notification_summary: {
         impacted_planners: number;
@@ -412,7 +442,8 @@ export interface SchedulePlanner {
     going: boolean;
     planned_session_count: number;
     sessions: Array<{
-        session_id: string;
+        session_id: string | null;
+        overview_item_id?: string | null;
         title: string;
         start: string;
         end: string;
@@ -608,6 +639,22 @@ export async function removeFromMyPlan(eventId: string, sessionId: string): Prom
         { method: 'DELETE', credentials: 'include' },
     );
     if (!res.ok) await parseJsonResponse(res, 'Failed to remove this session from My Plan');
+}
+
+export async function addOverviewItemToMyPlan(eventId: string, itemId: string): Promise<MyPlanEntry> {
+    const res = await fetch(
+        `${BASE}/events/${encodeURIComponent(eventId)}/my-plan/overview-items/${encodeURIComponent(itemId)}`,
+        { method: 'PUT', credentials: 'include' },
+    );
+    return parseJsonResponse<MyPlanEntry>(res, 'Failed to add this item to My Plan');
+}
+
+export async function removeOverviewItemFromMyPlan(eventId: string, itemId: string): Promise<void> {
+    const res = await fetch(
+        `${BASE}/events/${encodeURIComponent(eventId)}/my-plan/overview-items/${encodeURIComponent(itemId)}`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    if (!res.ok) await parseJsonResponse(res, 'Failed to remove this item from My Plan');
 }
 
 export interface SiteSettings {
@@ -2797,6 +2844,7 @@ export interface NotificationItem {
      *  Null for kinds that don't use it. */
     subject_key?: string | null;
     schedule_session_id?: string | null;
+    schedule_overview_item_id?: string | null;
     /** True when the viewer is also attending `event_id` (drives the
      *  "You and X are going to ..." phrasing on subscription_going rows). */
     also_going?: boolean;

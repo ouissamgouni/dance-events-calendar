@@ -15,10 +15,12 @@ schedules:
     rooms:
       - name: Grand Hall
         venue: Slovanský dům
+        details: Ground floor · Full pass only
         color: amber
         sort_order: 0
       - name: Lounge Hall
         venue: Slovanský dům
+        details: 1st floor · All passes
         color: pink
         sort_order: 1
       - name: Nyx
@@ -64,6 +66,9 @@ schedules:
       - name: Other
         color: slate
         sort_order: 7
+      - name: Registration
+        color: slate
+        sort_order: 8
     # Transcribed from the official "Back 2 Mambo Program – First Weekend" poster.
     # Poster times are Europe/Prague (UTC+2 on these dates); values below are UTC.
     # Session ids encode the program day and a sequence: 1000…-0000-0000-00DD-0000000000NN.
@@ -83,6 +88,9 @@ schedules:
       - id: "10000000-0000-4000-8000-000000001601"
         title: Shines / Partnerwork
         contributors: [{ display_name: "Jemis & Dyanna", role: instructor }]
+        description: |-
+          Clean shines into smooth partnerwork transitions.
+          Bring comfortable shoes and water.
         start: "2026-10-16T12:00:00Z"
         end: "2026-10-16T13:00:00Z"
         room: Grand Hall
@@ -117,9 +125,10 @@ schedules:
         activity_type: Bootcamp
       - id: "10000000-0000-4000-8000-000000001605"
         title: Afternoon Social Party
+        description: Grand Hall and Lounge Hall open as one floor for the afternoon social.
         start: "2026-10-16T13:00:00Z"
         end: "2026-10-16T18:00:00Z"
-        room: Main Hall
+        rooms: [Grand Hall, Lounge Hall]
         venue: Slovanský dům
         activity_type: Social
       - id: "10000000-0000-4000-8000-000000001606"
@@ -643,11 +652,166 @@ schedules:
         end: "2026-10-19T23:00:00Z"
         venue: Slovanský dům
         activity_type: Afterparty
+    # High-level Overview level. Ids: 2000…-00DD-0000000000NN (DD = program day).
+    # QA fixtures: linked blocks (opens_detail), static Registration rows, a Registration row with
+    # details (info sheet), party moments, one cancelled item and one linked item with no sessions.
+    overview_items:
+      # ── Thursday 15 Oct ──────────────────────────────────────────────
+      - id: "20000000-0000-4000-8000-000000001501"
+        title: Registration
+        start: "2026-10-15T20:00:00Z"
+        end: "2026-10-16T03:00:00Z"
+        venue: Slovanský dům
+        activity_type: Registration
+      - id: "20000000-0000-4000-8000-000000001502"
+        title: Mambo Preparty
+        subtitle: Warm-up night before the weekend
+        start: "2026-10-15T21:00:00Z"
+        end: "2026-10-16T05:00:00Z"
+        rooms: [Grand Hall]
+        venue: Slovanský dům
+        activity_type: Party
+        opens_detail: true
+      # ── Friday 16 Oct ────────────────────────────────────────────────
+      - id: "20000000-0000-4000-8000-000000001601"
+        title: Registration & Info Desk
+        description: Pick up your wristband in the Slovanský dům lobby. Bring your ticket QR code.
+        start: "2026-10-16T10:00:00Z"
+        end: "2026-10-16T19:00:00Z"
+        venue: Slovanský dům
+        activity_type: Registration
+      - id: "20000000-0000-4000-8000-000000001602"
+        title: Welcome coffee
+        # Linked but no session starts in the window: admin shows a warning; attendees see a static row.
+        start: "2026-10-16T10:00:00Z"
+        end: "2026-10-16T11:00:00Z"
+        venue: Slovanský dům
+        activity_type: Other
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001603"
+        title: Workshops & Bootcamps
+        start: "2026-10-16T12:00:00Z"
+        end: "2026-10-16T22:00:00Z"
+        venue: Slovanský dům
+        activity_type: Workshop
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001604"
+        title: Afternoon Social Party
+        start: "2026-10-16T13:00:00Z"
+        end: "2026-10-16T18:00:00Z"
+        rooms: [Grand Hall, Lounge Hall]
+        venue: Slovanský dům
+        activity_type: Social
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001605"
+        title: Mambo Night
+        subtitle: Shows + party till dawn
+        start: "2026-10-16T22:00:00Z"
+        end: "2026-10-17T05:00:00Z"
+        rooms: [Main Hall]
+        venue: Slovanský dům
+        activity_type: Party
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001606"
+        parent: "20000000-0000-4000-8000-000000001605"
+        title: Shows
+        start: "2026-10-16T22:00:00Z"
+        end: "2026-10-16T23:00:00Z"
+        activity_type: Show
+      - id: "20000000-0000-4000-8000-000000001607"
+        parent: "20000000-0000-4000-8000-000000001605"
+        title: Artist hour
+        description: Catch your favorite artist on the dance floor!
+        start: "2026-10-17T01:00:00Z"
+        end: "2026-10-17T02:00:00Z"
+        activity_type: Show
+      # ── Saturday 17 Oct ──────────────────────────────────────────────
+      - id: "20000000-0000-4000-8000-000000001701"
+        title: Workshops & Bootcamps
+        start: "2026-10-17T09:00:00Z"
+        end: "2026-10-17T22:00:00Z"
+        venue: Slovanský dům
+        activity_type: Workshop
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001702"
+        title: Afternoon Social Party
+        start: "2026-10-17T14:00:00Z"
+        end: "2026-10-17T18:00:00Z"
+        rooms: [Main Hall]
+        venue: Slovanský dům
+        activity_type: Social
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001703"
+        title: Mambo Night
+        subtitle: Shows + party till dawn
+        start: "2026-10-17T22:00:00Z"
+        end: "2026-10-18T05:00:00Z"
+        rooms: [Main Hall]
+        venue: Slovanský dům
+        activity_type: Party
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001704"
+        parent: "20000000-0000-4000-8000-000000001703"
+        title: Shows
+        start: "2026-10-17T22:00:00Z"
+        end: "2026-10-17T23:00:00Z"
+        activity_type: Show
+      # ── Sunday 18 Oct ────────────────────────────────────────────────
+      - id: "20000000-0000-4000-8000-000000001801"
+        title: Sunday brunch meetup
+        description: Cancelled — the venue café is closed on Sunday morning.
+        start: "2026-10-18T07:00:00Z"
+        end: "2026-10-18T08:30:00Z"
+        venue: Slovanský dům
+        activity_type: Other
+        is_cancelled: true
+      - id: "20000000-0000-4000-8000-000000001802"
+        title: Workshops & Bootcamps
+        start: "2026-10-18T09:00:00Z"
+        end: "2026-10-18T22:00:00Z"
+        venue: Slovanský dům
+        activity_type: Workshop
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001803"
+        title: Afternoon Social Party
+        start: "2026-10-18T15:00:00Z"
+        end: "2026-10-18T18:00:00Z"
+        rooms: [Main Hall]
+        venue: Slovanský dům
+        activity_type: Social
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001804"
+        title: Shows
+        start: "2026-10-18T19:00:00Z"
+        end: "2026-10-18T20:00:00Z"
+        rooms: [Main Hall]
+        venue: Slovanský dům
+        activity_type: Show
+        opens_detail: true
+      - id: "20000000-0000-4000-8000-000000001805"
+        title: Farewell Mambo Night
+        start: "2026-10-18T22:00:00Z"
+        end: "2026-10-19T05:00:00Z"
+        rooms: [Main Hall]
+        venue: Slovanský dům
+        activity_type: Party
+        opens_detail: true
+      # ── Monday 19 Oct ────────────────────────────────────────────────
+      - id: "20000000-0000-4000-8000-000000001901"
+        title: AfterParty
+        start: "2026-10-19T20:00:00Z"
+        end: "2026-10-19T23:00:00Z"
+        venue: Slovanský dům
+        activity_type: Afterparty
+        opens_detail: true
     published: true
-    # QA fixture: unpublished draft edit so publication isolation is visible.
+    # QA fixture: unpublished draft edits so publication isolation is visible.
     draft_updates:
       - session_id: "10000000-0000-4000-8000-000000001601"
         title: Shines / Partnerwork – Updated draft
+    draft_overview_updates:
+      - item_id: "20000000-0000-4000-8000-000000001701"
+        title: Workshops, Bootcamps & Pilates
     # QA fixture: Maya's plan has two overlapping Friday 14:00 workshops and the cancelled Saturday session.
     plans:
       - email: dancer@example.com

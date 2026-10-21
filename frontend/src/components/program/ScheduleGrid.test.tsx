@@ -82,6 +82,19 @@ describe('ScheduleGrid', () => {
         expect(screen.queryByText('Workshop')).not.toBeInTheDocument();
     });
 
+    it('adds an activity-type stripe only in stripe color mode', () => {
+        const typed: EventSchedule = {
+            ...schedule,
+            activity_types: [{ id: 2, name: 'Workshop', color: 'blue', sort_order: 0 }],
+            sessions: [{ ...schedule.sessions[0], activity_type_id: 2 }],
+        };
+        const { rerender } = render(<ScheduleGrid schedule={typed} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} />);
+        expect(screen.queryByTestId('session-type-stripe')).not.toBeInTheDocument();
+
+        rerender(<ScheduleGrid schedule={{ ...typed, session_color_mode: 'activity_type_stripe' }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} />);
+        expect(screen.getByTestId('session-type-stripe')).toHaveClass('bg-blue-400');
+    });
+
     it('falls back to the level label when notation is unavailable', () => {
         render(<ScheduleGrid schedule={{
             ...schedule,
@@ -118,5 +131,26 @@ describe('ScheduleGrid', () => {
         expect(preview).toHaveTextContent('C');
         expect(preview).not.toHaveTextContent('D');
         expect(preview).toHaveTextContent('+1');
+    });
+
+    it('spans multi-room sessions, flags descriptions and opens room details', () => {
+        const onRoomClick = vi.fn();
+        render(<ScheduleGrid schedule={{
+            ...schedule,
+            rooms: [
+                { id: 1, venue_id: null, name: 'Salsa Room', details: 'Ground floor · Grand Pass only', color: 'pink', sort_order: 0 },
+                { id: 2, venue_id: null, name: 'Mambo Room', color: 'amber', sort_order: 1 },
+            ],
+            sessions: [{ ...schedule.sessions[0], room_id: 1, room_ids: [1, 2], description: 'Dance all night.' }],
+        }} day="2026-10-16" onSessionClick={vi.fn()} onTimeClick={vi.fn()} onRoomClick={onRoomClick} />);
+
+        const session = screen.getByRole('button', { name: /Late Night Afterparty/ });
+        expect(session.style.gridColumn).toBe('2 / 4');
+        expect(session).toHaveTextContent('Has details');
+        expect(screen.getByTestId('session-details-icon')).toBeInTheDocument();
+
+        expect(screen.getByText('Ground floor · Grand Pass only')).toBeInTheDocument();
+        screen.getByRole('button', { name: 'Salsa Room room details' }).click();
+        expect(onRoomClick).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
     });
 });

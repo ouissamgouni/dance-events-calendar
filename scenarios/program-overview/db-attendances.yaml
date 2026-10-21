@@ -1,0 +1,10 @@
+attendances:
+  - event_id: salsa-grand-2026
+    email: dancer@example.com
+    share_publicly: true
+  - event_id: salsa-grand-2026
+    email: friend@example.com
+    share_publicly: true
+  - event_id: live-overview-social
+    email: dancer@example.com
+    share_publicly: true

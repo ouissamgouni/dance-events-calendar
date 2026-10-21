@@ -45,6 +45,7 @@ from backend.services.event_visibility import (
     event_is_user_facing,
 )
 from backend.services.notifications import (
+    OVERVIEW_GROUP_PREFIX,
     filter_privacy_safe_notifications,
     notification_is_privacy_safe,
 )
@@ -391,6 +392,14 @@ def _hydrate(
                     UUID(rep.group_key)
                     if rep.kind in {"planned_session_changed", "plan_session_added"}
                     and rep.group_key
+                    and not rep.group_key.startswith(OVERVIEW_GROUP_PREFIX)
+                    else None
+                ),
+                schedule_overview_item_id=(
+                    UUID(rep.group_key.removeprefix(OVERVIEW_GROUP_PREFIX))
+                    if rep.kind in {"planned_session_changed", "plan_session_added"}
+                    and rep.group_key
+                    and rep.group_key.startswith(OVERVIEW_GROUP_PREFIX)
                     else None
                 ),
                 description=rep.description,

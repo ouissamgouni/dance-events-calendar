@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchMyPlanShare, fetchSessionAttendanceSummary, fetchSessionAttendees, fetchSingleSessionAttendanceSummary, removeFromMyPlan, updateMyPlanAudience } from '../api';
+import { addOverviewItemToMyPlan, addToMyPlan, downloadMyPlanIcs, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchMyPlanShare, fetchSessionAttendanceSummary, fetchSessionAttendees, fetchSingleSessionAttendanceSummary, removeFromMyPlan, updateMyPlanAudience } from '../api';
 import { defaultFlags, FeatureFlagsContext } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, EventSchedule } from '../types';
 import EventProgramPage from './EventProgramPage';
@@ -15,7 +15,7 @@ const signIn = vi.hoisted(() => vi.fn());
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn(), fetchMyPlanShare: vi.fn(), fetchSessionAttendanceSummary: vi.fn(), fetchSessionAttendees: vi.fn(), fetchSingleSessionAttendanceSummary: vi.fn(), removeFromMyPlan: vi.fn(), updateMyPlanAudience: vi.fn() };
+    return { ...actual, addOverviewItemToMyPlan: vi.fn(), addToMyPlan: vi.fn(), downloadMyPlanIcs: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchEvent: vi.fn(), fetchEventSchedule: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchMyPlan: vi.fn(), fetchMyPlanShare: vi.fn(), fetchSessionAttendanceSummary: vi.fn(), fetchSessionAttendees: vi.fn(), fetchSingleSessionAttendanceSummary: vi.fn(), removeFromMyPlan: vi.fn(), updateMyPlanAudience: vi.fn() };
 });
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user, loading: false }) }));
 vi.mock('../context/SignInSheetContext', async (importOriginal) => ({
@@ -496,6 +496,76 @@ describe('EventProgramPage', () => {
 
         expect(screen.getByText('Program editor destination')).toBeInTheDocument();
         expect(screen.getByTestId('location')).toHaveTextContent('/event/movida-2026/program/edit');
+    });
+
+    it('opens the Overview by default and drills down into the full schedule', async () => {
+        const overviewItem = { external_id: null, parent_id: null, subtitle: null, description: null, url: null, url_label: null, activity_type_id: null, venue_id: null, room_ids: [], opens_detail: false, is_cancelled: false, sort_order: 0 };
+        vi.mocked(fetchEventSchedule).mockResolvedValue({
+            ...schedule,
+            overview_items: [
+                { ...overviewItem, id: 'registration', title: 'Registration', start: '2026-10-15T10:00:00Z', end: '2026-10-15T16:00:00Z' },
+                { ...overviewItem, id: 'workshops', title: 'Workshops', start: '2026-10-15T11:00:00Z', end: '2026-10-15T14:00:00Z', activity_type_id: 1, opens_detail: true },
+                { ...overviewItem, id: 'party', title: 'Thursday Party', subtitle: 'Dress in white', start: '2026-10-15T20:00:00Z', end: '2026-10-16T02:00:00Z', activity_type_id: 2 },
+                { ...overviewItem, id: 'shows', parent_id: 'party', title: 'Shows', description: 'Artist performances', start: '2026-10-15T22:00:00Z', end: '2026-10-15T22:30:00Z' },
+            ],
+        });
+        function HistoryProbe() {
+            const location = useLocation();
+            const navigate = useNavigate();
+            return <><output data-testid="search">{location.search}</output><button type="button" onClick={() => navigate(-1)}>Browser back</button></>;
+        }
+        render(
+            <MemoryRouter initialEntries={['/event/movida-2026/program?day=2026-10-15']}>
+                <FeatureFlagsContext.Provider value={{ flags: { ...defaultFlags, eventScheduleEnabled: true }, updateFlag: vi.fn(), ready: true }}>
+                    <HistoryProbe />
+                    <Routes><Route path="/event/:eventId/program/*" element={<EventProgramPage />} /></Routes>
+                </FeatureFlagsContext.Provider>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByText('Registration')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Registration/ })).not.toBeInTheDocument();
+        expect(screen.getByText('Dress in white')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /Shows/ }));
+        expect(await screen.findByText('Artist performances')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+        fireEvent.click(screen.getByRole('button', { name: /Workshops.*1 session/ }));
+        expect(await screen.findByRole('button', { name: /Thursday Session/ })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Full schedule' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByTestId('search')).toHaveTextContent('focus=workshops');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Browser back' }));
+        expect(await screen.findByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByText('Registration')).toBeInTheDocument();
+    });
+
+    it('adds a plannable overview item to My Plan and shows its conflicts', async () => {
+        authState.user = { user_id: 'dancer' };
+        attendanceState.attending = true;
+        const bootcamp = {
+            id: 'bootcamp', external_id: null, parent_id: null, title: 'Partnerwork Bootcamp', subtitle: 'Separate ticket', description: null, url: null, url_label: null,
+            start: '2026-10-15T12:30:00Z', end: '2026-10-15T14:00:00Z', activity_type_id: 1, venue_id: null, room_ids: [],
+            opens_detail: false, allow_plan: true, is_cancelled: false, sort_order: 0,
+        };
+        vi.mocked(fetchEventSchedule).mockResolvedValue({ ...schedule, overview_items: [bootcamp] });
+        vi.mocked(fetchMyPlan).mockResolvedValue({
+            entries: [{ session_id: 'thursday', status: 'active', session: schedule.sessions[0] }],
+            audience: 'private',
+        });
+        vi.mocked(addOverviewItemToMyPlan).mockResolvedValue({ kind: 'overview_item', overview_item_id: 'bootcamp', status: 'active', overview_item: bootcamp });
+        renderPage('/event/movida-2026/program?day=2026-10-15');
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Add Partnerwork Bootcamp to My Plan' }));
+        await waitFor(() => expect(addOverviewItemToMyPlan).toHaveBeenCalledWith(event.event_id, 'bootcamp'));
+        expect(await screen.findByRole('button', { name: 'Remove Partnerwork Bootcamp from My Plan' })).toHaveAttribute('aria-pressed', 'true');
+
+        fireEvent.click(screen.getByRole('button', { name: 'My Plan (2)' }));
+        const entry = (await screen.findByText('Partnerwork Bootcamp')).closest('article')!;
+        expect(within(entry).getByText('Separate ticket')).toBeInTheDocument();
+        expect(within(entry).getByText(/Time conflict/).parentElement).toHaveTextContent('Thursday Session');
     });
 
     it('returns a direct Program visit to Event without adding a loop', async () => {

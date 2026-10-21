@@ -8,12 +8,14 @@ import {
     createScheduleActivityType,
     createScheduleContributor,
     createScheduleLevel,
+    createScheduleOverviewItem,
     createScheduleRoom,
     createScheduleSession,
     createScheduleVenue,
     deleteScheduleActivityType,
     deleteScheduleContributor,
     deleteScheduleLevel,
+    deleteScheduleOverviewItem,
     deleteScheduleRoom,
     deleteScheduleSession,
     deleteScheduleVenue,
@@ -35,9 +37,11 @@ import {
     updateScheduleActivityType,
     updateScheduleContributor,
     updateScheduleLevel,
+    updateScheduleOverviewItem,
     updateScheduleRoom,
     updateScheduleSession,
     updateScheduleVenue,
+    type ScheduleOverviewItemInput,
     type ScheduleSessionInput,
     type SchedulePlanner,
     type SchedulePublishResponse,
@@ -45,19 +49,20 @@ import {
     type EventScheduleEditor,
 } from '../api';
 import ScheduleGrid from '../components/program/ScheduleGrid';
+import ProgramOverview from '../components/program/ProgramOverview';
 import ProgramExportPanel from '../components/program/ProgramExportPanel';
 import { ProgramDayPicker, ProgramFilters } from '../components/program/ProgramControls';
-import { ROOM_COLORS, roomColor } from '../components/program/RoomPill';
-import type { AdminEventSchedule, CalendarEvent, ProgramExport, ScheduleActivityType, ScheduleChange, ScheduleContributor, ScheduleContributorRole, ScheduleImportDocument, ScheduleImportPreview, ScheduleLevel, ScheduleRoom, ScheduleSession, ScheduleVenue } from '../types';
-import { filterScheduleSessions, firstDayWithSessions, formatDayDateLabel, formatTime, formatTimeRange, programDayOf, sessionsForDay, sessionsOverlap, toZonedInput, zonedInputToIso, type ScheduleFilters } from '../utils/schedule';
+import { SCHEDULE_COLORS, SESSION_COLOR_MODES, scheduleColor } from '../utils/scheduleColors';
+import type { AdminEventSchedule, CalendarEvent, ProgramExport, ScheduleActivityType, ScheduleChange, ScheduleContributor, ScheduleContributorRole, ScheduleImportDocument, ScheduleImportPreview, ScheduleLevel, ScheduleOverviewItem, ScheduleRoom, ScheduleSession, ScheduleVenue, SessionColorMode } from '../types';
+import { filterScheduleSessions, firstDayWithSessions, formatDayDateLabel, formatTime, formatTimeRange, programDayOf, sessionRoomIds, sessionRooms, sessionsForDay, sessionsInOverviewWindow, sessionsOverlap, toZonedInput, zonedInputToIso, type ScheduleFilters } from '../utils/schedule';
 
-type Section = 'schedule' | 'sessions' | 'locations' | 'taxonomy' | 'export' | 'settings';
+type Section = 'overview' | 'schedule' | 'sessions' | 'locations' | 'taxonomy' | 'export' | 'settings';
 type ConfigEntity = ScheduleVenue | ScheduleRoom | ScheduleLevel | ScheduleActivityType | ScheduleContributor;
 type ConfigKind = 'venue' | 'room' | 'level' | 'activity' | 'contributor';
 type TaxonomyKind = Extract<ConfigKind, 'level' | 'activity' | 'contributor'>;
 const FIELD_CLASS = 'w-full rounded-field border border-line bg-surface px-3 py-2 font-normal text-ink focus:border-action focus:outline-none';
 const EMPTY_FILTERS: ScheduleFilters = { instructor: '', levelIds: [], activityTypeIds: [] };
-const defaultScheduleDay = (value: AdminEventSchedule, eventStart?: string) => firstDayWithSessions(value.days, value.sessions, value.timezone, value.day_start_hour)
+const defaultScheduleDay = (value: AdminEventSchedule, eventStart?: string) => firstDayWithSessions(value.days, [...value.sessions, ...(value.overview_items ?? [])], value.timezone, value.day_start_hour)
     ?? value.days[0]
     ?? (eventStart ? programDayOf(eventStart, value.timezone, value.day_start_hour) : '');
 
@@ -68,6 +73,7 @@ function draftProgramExport(event: CalendarEvent, schedule: AdminEventSchedule):
         program_url: `/event/${encodeURIComponent(event.event_id)}/program`,
         timezone: schedule.timezone,
         day_start_hour: schedule.day_start_hour,
+        session_color_mode: schedule.session_color_mode,
         available_days: schedule.days,
         selected_days: schedule.days,
         venues: schedule.venues,
@@ -80,7 +86,7 @@ function draftProgramExport(event: CalendarEvent, schedule: AdminEventSchedule):
         sessions: schedule.sessions.map((session) => {
             const day = programDayOf(session.start, schedule.timezone, schedule.day_start_hour);
             const venue = schedule.venues.find((item) => item.id === session.venue_id);
-            const room = schedule.rooms.find((item) => item.id === session.room_id);
+            const roomNames = sessionRooms(schedule.rooms, session).map((item) => item.name).join(' + ');
             return {
                 ...session,
                 contributors: session.contributors ?? [],
@@ -89,7 +95,7 @@ function draftProgramExport(event: CalendarEvent, schedule: AdminEventSchedule):
                 local_start_time: formatTime(session.start, schedule.timezone),
                 local_end_time: formatTime(session.end, schedule.timezone),
                 venue: venue?.name ?? null,
-                room: room?.name ?? null,
+                room: roomNames || null,
                 address: venue?.address ?? null,
                 level: schedule.levels.find((item) => item.id === session.level_id)?.label ?? null,
                 activity_type: schedule.activity_types.find((item) => item.id === session.activity_type_id)?.name ?? null,
@@ -110,6 +116,7 @@ export default function AdminEventSchedulePage() {
     const [selectedDay, setSelectedDay] = useState('');
     const [sessionsDay, setSessionsDay] = useState('');
     const [editingSession, setEditingSession] = useState<ScheduleSession | 'new' | null>(null);
+    const [editingOverview, setEditingOverview] = useState<{ item: ScheduleOverviewItem | null; parent?: ScheduleOverviewItem } | null>(null);
     const [editingConfig, setEditingConfig] = useState<{ kind: ConfigKind; item?: ConfigEntity } | null>(null);
     const [showPublish, setShowPublish] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
@@ -144,6 +151,7 @@ export default function AdminEventSchedulePage() {
                 setEvent(eventValue);
                 setSchedule(scheduleValue);
                 if (scheduleValue) setSelectedDay(defaultScheduleDay(scheduleValue, eventValue.start));
+                if (scheduleValue?.overview_items?.some((item) => !item.parent_id)) setSection('overview');
             })
             .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Schedule unavailable'))
             .finally(() => setLoading(false));
@@ -211,12 +219,20 @@ export default function AdminEventSchedulePage() {
             </header>
             <div className="flex min-h-0 flex-1 flex-col md:flex-row">
                 <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface p-2 md:w-48 md:flex-col md:border-b-0 md:border-r md:p-3">
-                    {(['schedule', 'sessions', 'locations', 'taxonomy', 'export', 'settings'] as Section[]).map((item) => (
+                    {(['overview', 'schedule', 'sessions', 'locations', 'taxonomy', 'export', 'settings'] as Section[]).map((item) => (
                         <button key={item} type="button" onClick={() => setSection(item)} className={`shrink-0 rounded-field px-3 py-2 text-left text-sm font-semibold capitalize ${section === item ? 'bg-action/10 text-action' : 'text-ink-soft hover:bg-canvas'}`}>{item}</button>
                     ))}
                 </nav>
                 <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     {error ? <div className="border-b border-line bg-rose-50 px-4 py-2 text-sm text-danger">{error}</div> : null}
+                    {section === 'overview' ? (
+                        <>
+                            <div className="shrink-0 border-b border-line bg-surface px-3">
+                                <ProgramDayPicker schedule={schedule} sessions={(schedule.overview_items ?? []).filter((item) => !item.parent_id)} selectedDay={selectedDay} onSelect={setSelectedDay} endSlot={<button type="button" onClick={() => setEditingOverview({ item: null })} className="ml-auto flex shrink-0 items-center gap-2 rounded-field bg-action px-3 py-2 text-xs font-semibold text-white"><Plus size={15} />Add item</button>} />
+                            </div>
+                            <ProgramOverview schedule={schedule} day={selectedDay} admin={{ issues: schedule.issues, onEdit: (item) => setEditingOverview({ item }), onAddMoment: (parent) => setEditingOverview({ item: null, parent }) }} />
+                        </>
+                    ) : null}
                     {section === 'schedule' || section === 'sessions' ? (
                         <div className="shrink-0 border-b border-line bg-surface px-3">
                             <ProgramFilters schedule={schedule} filters={filters} onChange={updateFilters} />
@@ -237,6 +253,7 @@ export default function AdminEventSchedulePage() {
             </div>
 
             {editingSession ? <SessionEditor schedule={schedule} day={selectedDay} session={editingSession === 'new' ? null : editingSession} eventId={event.event_id} onClose={() => setEditingSession(null)} onSaved={async () => { setEditingSession(null); await reload(); }} onError={setError} /> : null}
+            {editingOverview ? <OverviewItemEditor schedule={schedule} day={selectedDay} item={editingOverview.item} parent={editingOverview.parent} eventId={event.event_id} onClose={() => setEditingOverview(null)} onSaved={async () => { setEditingOverview(null); await reload(); }} onError={setError} /> : null}
             {editingConfig ? <ConfigEditor schedule={schedule} eventId={event.event_id} kind={editingConfig.kind} item={editingConfig.item} onClose={() => setEditingConfig(null)} onSaved={async () => { setEditingConfig(null); await reload(); }} onError={setError} /> : null}
             {section === 'locations' ? <button type="button" onClick={() => setEditingConfig({ kind: 'venue' })} className="fixed bottom-6 right-6 z-40 flex h-12 items-center gap-2 rounded-field bg-action px-4 text-sm font-semibold text-white shadow-lg"><Plus size={18} />Add</button> : null}
             {showPublish ? <PublishDialog schedule={schedule} eventId={event.event_id} onClose={() => setShowPublish(false)} onPublished={reload} onError={setError} /> : null}
@@ -257,7 +274,7 @@ function SessionsTable({ schedule, day, onEdit }: { schedule: AdminEventSchedule
                         <tr key={session.id} onClick={() => onEdit(session)} className="cursor-pointer border-t border-card-line hover:bg-canvas">
                             <td className="p-3 text-ink-soft">{formatDayDateLabel(programDayOf(session.start, schedule.timezone, schedule.day_start_hour))}</td>
                             <td className="p-3 font-medium text-ink">{formatTimeRange(session, schedule.timezone)}</td>
-                            <td className="p-3 text-ink-soft">{schedule.rooms.find((room) => room.id === session.room_id)?.name ?? 'Event-wide'}</td>
+                            <td className="p-3 text-ink-soft">{sessionRooms(schedule.rooms, session).map((room) => room.name).join(' + ') || 'Event-wide'}</td>
                             <td className="p-3 font-semibold text-ink">{session.title}</td>
                             <td className="p-3 text-ink-soft">{session.contributors?.map((assignment) => schedule.contributors?.find((contributor) => contributor.id === assignment.contributor_id)?.display_name).filter(Boolean).join(', ') || session.instructors || '—'}</td>
                             <td className="p-3 text-ink-soft">{schedule.activity_types.find((type) => type.id === session.activity_type_id)?.name ?? '—'}</td>
@@ -276,7 +293,7 @@ function ConfigLists({ schedule, kinds, onEdit }: { schedule: AdminEventSchedule
             <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold capitalize text-ink">{kind === 'activity' ? 'Activity types' : `${kind}s`}</h2><button type="button" onClick={() => onEdit(kind)} className="flex items-center gap-1 text-sm font-semibold text-action"><Plus size={16} />Add</button></div>
             <div className="overflow-hidden rounded-card border border-card-line bg-surface">{rows(kind).map((item) => (
                 <button key={item.id} type="button" onClick={() => onEdit(kind, item)} className="flex w-full items-center gap-3 border-b border-card-line px-4 py-3 text-left last:border-b-0 hover:bg-canvas">
-                    {'color' in item ? <span className={`h-4 w-4 shrink-0 ${roomColor(item.color).header}`} /> : null}
+                    {'color' in item ? <span className={`h-4 w-4 shrink-0 ${scheduleColor(item.color).header}`} /> : null}
                     <span className="flex-1 font-medium text-ink">{'display_name' in item ? item.display_name : 'name' in item ? item.name : item.label}</span>
                     {'notation' in item && item.notation ? <span className="text-sm text-ink-soft">{item.notation}</span> : null}
                 </button>
@@ -310,7 +327,7 @@ function TaxonomyPanel({ schedule, onEdit }: { schedule: AdminEventSchedule; onE
             </div>
             <div role="tabpanel" aria-label={selectedTab.label} className="mt-4 overflow-hidden rounded-card border border-card-line bg-surface">
                 {rows[selectedKind].map((item) => <button key={item.id} type="button" onClick={() => onEdit(selectedKind, item)} className="flex w-full items-center gap-3 border-b border-card-line px-4 py-3 text-left last:border-b-0 hover:bg-canvas">
-                    {'color' in item ? <span className={`h-4 w-4 shrink-0 ${roomColor(item.color).header}`} /> : null}
+                    {'color' in item ? <span className={`h-4 w-4 shrink-0 ${scheduleColor(item.color).header}`} /> : null}
                     <span className="flex-1 font-medium text-ink">{'display_name' in item ? item.display_name : 'name' in item ? item.name : item.label}</span>
                     {'notation' in item && item.notation ? <span className="text-sm text-ink-soft">{item.notation}</span> : null}
                 </button>)}
@@ -323,13 +340,15 @@ function TaxonomyPanel({ schedule, onEdit }: { schedule: AdminEventSchedule; onE
 function SettingsPanel({ schedule, eventId, canManageEditors, onSaved }: { schedule: AdminEventSchedule; eventId: string; canManageEditors: boolean; onSaved: (value: AdminEventSchedule) => void }) {
     const [timezone, setTimezone] = useState(schedule.timezone);
     const [cutoff, setCutoff] = useState(schedule.day_start_hour);
+    const [colorMode, setColorMode] = useState<SessionColorMode>(schedule.session_color_mode ?? 'room');
     const [busy, setBusy] = useState(false);
     const timezoneOptions = supportedTimezones(schedule.timezone);
     return <div className="mx-auto w-full max-w-2xl space-y-8 overflow-y-auto p-6">
-        <form className="space-y-5" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { onSaved(await updateAdminEventSchedule(eventId, { timezone, day_start_hour: cutoff })); } finally { setBusy(false); } }}>
+        <form className="space-y-5" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { onSaved(await updateAdminEventSchedule(eventId, { timezone, day_start_hour: cutoff, session_color_mode: colorMode })); } finally { setBusy(false); } }}>
             <h2 className="text-lg font-bold text-ink">Schedule settings</h2>
             <TimezoneCombobox value={timezone} options={timezoneOptions} onChange={setTimezone} />
             <label className="block text-sm font-semibold text-ink">Program day changes at<select value={cutoff} onChange={(event) => setCutoff(Number(event.target.value))} className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 font-normal">{Array.from({ length: 12 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}</select></label>
+            <label className="block text-sm font-semibold text-ink">Color sessions in the grid<select value={colorMode} onChange={(event) => setColorMode(event.target.value as SessionColorMode)} className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 font-normal">{SESSION_COLOR_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select><span className="mt-1 block text-xs font-normal text-ink-soft">Sessions without an activity type keep their room color.</span></label>
             <button disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save settings'}</button>
         </form>
         {canManageEditors ? <ProgramEditorsPanel eventId={eventId} /> : null}
@@ -487,7 +506,7 @@ function PlannerRosterDialog({ eventId, schedule, onClose }: { eventId: string; 
                     {planner.going ? <span className="rounded-field bg-emerald-50 px-2 py-1 text-xs font-semibold text-success">Going</span> : null}
                     <span className="text-xs font-semibold text-ink-soft">{planner.planned_session_count} {planner.planned_session_count === 1 ? 'session' : 'sessions'}</span>
                 </summary>
-                <ul className="mt-3 space-y-2 pl-4">{planner.sessions.map((session) => <li key={session.session_id} className="text-sm text-ink"><span className={session.status !== 'active' ? 'line-through text-ink-soft' : ''}>{session.title}</span><span className="ml-2 text-xs text-ink-soft">{formatDayDateLabel(programDayOf(session.start, schedule.timezone, schedule.day_start_hour))} · {formatTimeRange(session, schedule.timezone)}</span></li>)}</ul>
+                <ul className="mt-3 space-y-2 pl-4">{planner.sessions.map((session) => <li key={session.session_id ?? session.overview_item_id} className="text-sm text-ink"><span className={session.status !== 'active' ? 'line-through text-ink-soft' : ''}>{session.title}</span><span className="ml-2 text-xs text-ink-soft">{formatDayDateLabel(programDayOf(session.start, schedule.timezone, schedule.day_start_hour))} · {formatTimeRange(session, schedule.timezone)}</span></li>)}</ul>
             </details>
         ))}</div> : null}
     </div></Modal>;
@@ -567,13 +586,22 @@ function ScheduleImportPanel({ eventId, onApplied }: { eventId: string; onApplie
 function SessionEditor({ schedule, day, session, eventId, onClose, onSaved, onError }: { schedule: AdminEventSchedule; day: string; session: ScheduleSession | null; eventId: string; onClose: () => void; onSaved: () => void; onError: (message: string | null) => void }) {
     const initialStart = session ? toZonedInput(session.start, schedule.timezone) : `${day}T10:00`;
     const initialEnd = session ? toZonedInput(session.end, schedule.timezone) : `${day}T11:00`;
-    const [form, setForm] = useState({ title: session?.title ?? '', contributors: session?.contributors ?? [], start: initialStart, end: initialEnd, room_id: session?.room_id?.toString() ?? '', venue_id: session?.venue_id?.toString() ?? '', level_id: session?.level_id?.toString() ?? '', activity_type_id: session?.activity_type_id?.toString() ?? '', attendee_note: session?.attendee_note ?? '', allow_plan: session?.allow_plan ?? true, is_cancelled: session?.is_cancelled ?? false });
+    const [form, setForm] = useState({ title: session?.title ?? '', description: session?.description ?? '', contributors: session?.contributors ?? [], start: initialStart, end: initialEnd, room_ids: session ? sessionRoomIds(session) : [] as number[], venue_id: session?.venue_id?.toString() ?? '', level_id: session?.level_id?.toString() ?? '', activity_type_id: session?.activity_type_id?.toString() ?? '', attendee_note: session?.attendee_note ?? '', allow_plan: session?.allow_plan ?? true, is_cancelled: session?.is_cancelled ?? false });
     const [busy, setBusy] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const startIso = form.start ? zonedInputToIso(form.start, schedule.timezone) : '';
     const endIso = form.end ? zonedInputToIso(form.end, schedule.timezone) : '';
     const draftSession = { ...session, id: session?.id ?? 'draft', start: startIso, end: endIso } as ScheduleSession;
-    const conflicts = schedule.sessions.filter((row) => row.id !== session?.id && form.room_id && row.room_id === Number(form.room_id) && sessionsOverlap(draftSession, row));
+    const conflicts = schedule.sessions.filter((row) => row.id !== session?.id && sessionRoomIds(row).some((roomId) => form.room_ids.includes(roomId)) && sessionsOverlap(draftSession, row));
+    const orderedRoomIds = schedule.rooms.filter((room) => form.room_ids.includes(room.id)).map((room) => room.id);
+    const toggleRoom = (roomId: number, checked: boolean) => {
+        const room = schedule.rooms.find((item) => item.id === roomId);
+        setForm({
+            ...form,
+            room_ids: checked ? [...form.room_ids, roomId] : form.room_ids.filter((id) => id !== roomId),
+            venue_id: checked && room?.venue_id != null ? room.venue_id.toString() : form.venue_id,
+        });
+    };
     const moveContributor = (index: number, offset: -1 | 1) => {
         const target = index + offset;
         if (target < 0 || target >= form.contributors.length) return;
@@ -583,20 +611,92 @@ function SessionEditor({ schedule, day, session, eventId, onClose, onSaved, onEr
     };
     const submit = async (event: React.FormEvent) => {
         event.preventDefault(); setBusy(true); onError(null);
-        const body: ScheduleSessionInput = { title: form.title, instructors: null, contributors: form.contributors.map(({ contributor_id, role }) => ({ contributor_id, role })), start: startIso, end: endIso, room_id: form.room_id ? Number(form.room_id) : null, venue_id: form.venue_id ? Number(form.venue_id) : null, level_id: form.level_id ? Number(form.level_id) : null, activity_type_id: form.activity_type_id ? Number(form.activity_type_id) : null, attendee_note: form.attendee_note || null, allow_plan: form.allow_plan, is_cancelled: form.is_cancelled };
+        const body: ScheduleSessionInput = { title: form.title, instructors: null, description: form.description.trim() || null, contributors: form.contributors.map(({ contributor_id, role }) => ({ contributor_id, role })), start: startIso, end: endIso, room_id: orderedRoomIds[0] ?? null, room_ids: orderedRoomIds, venue_id: form.venue_id ? Number(form.venue_id) : null, level_id: form.level_id ? Number(form.level_id) : null, activity_type_id: form.activity_type_id ? Number(form.activity_type_id) : null, attendee_note: form.attendee_note || null, allow_plan: form.allow_plan, is_cancelled: form.is_cancelled };
         try { if (session) await updateScheduleSession(eventId, session.id, body); else await createScheduleSession(eventId, body); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not save session'); } finally { setBusy(false); }
     };
     return <Modal title={session ? 'Edit session' : 'Add session'} onClose={onClose}><form onSubmit={submit} className="space-y-4">
         <Field label="Title"><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={FIELD_CLASS} /></Field>
         <Field label="Artists & instructors"><div className="space-y-2">{form.contributors.map((assignment, index) => <div key={`${assignment.contributor_id}-${index}`} className="grid grid-cols-[1fr_8rem_auto_auto_auto] gap-2"><select aria-label={`Contributor ${index + 1}`} value={assignment.contributor_id} onChange={(event) => setForm({ ...form, contributors: form.contributors.map((item, itemIndex) => itemIndex === index ? { ...item, contributor_id: Number(event.target.value) } : item) })} className={FIELD_CLASS}>{(schedule.contributors ?? []).map((contributor) => <option key={contributor.id} value={contributor.id}>{contributor.display_name}</option>)}</select><select aria-label={`Contributor ${index + 1} role`} value={assignment.role} onChange={(event) => setForm({ ...form, contributors: form.contributors.map((item, itemIndex) => itemIndex === index ? { ...item, role: event.target.value as ScheduleContributorRole } : item) })} className={FIELD_CLASS}>{(['instructor', 'dj', 'performer', 'host', 'other'] as ScheduleContributorRole[]).map((role) => <option key={role} value={role}>{role}</option>)}</select><button type="button" disabled={index === 0} aria-label={`Move contributor ${index + 1} up`} onClick={() => moveContributor(index, -1)} className="flex h-11 w-11 items-center justify-center text-ink-soft disabled:text-muted"><ChevronUp size={17} /></button><button type="button" disabled={index === form.contributors.length - 1} aria-label={`Move contributor ${index + 1} down`} onClick={() => moveContributor(index, 1)} className="flex h-11 w-11 items-center justify-center text-ink-soft disabled:text-muted"><ChevronDown size={17} /></button><button type="button" aria-label={`Remove contributor ${index + 1}`} onClick={() => setForm({ ...form, contributors: form.contributors.filter((_, itemIndex) => itemIndex !== index) })} className="flex h-11 w-11 items-center justify-center text-danger"><X size={17} /></button></div>)}<button type="button" disabled={!(schedule.contributors?.some((item) => !form.contributors.some((assignment) => assignment.contributor_id === item.id)))} onClick={() => { const contributor = schedule.contributors?.find((item) => !form.contributors.some((assignment) => assignment.contributor_id === item.id)); if (contributor) setForm({ ...form, contributors: [...form.contributors, { contributor_id: contributor.id, role: 'instructor', position: form.contributors.length }] }); }} className="flex min-h-11 items-center gap-2 text-sm font-semibold text-action disabled:text-muted"><Plus size={16} />Add artist or instructor</button></div></Field>
         <div className="grid grid-cols-2 gap-3"><Field label="Start"><input required type="datetime-local" value={form.start} onChange={(event) => setForm({ ...form, start: event.target.value })} className={FIELD_CLASS} /></Field><Field label="End"><input required type="datetime-local" value={form.end} onChange={(event) => setForm({ ...form, end: event.target.value })} className={FIELD_CLASS} /></Field></div>
-        <div className="grid grid-cols-2 gap-3"><Field label="Room"><select value={form.room_id} onChange={(event) => { const room = schedule.rooms.find((item) => item.id === Number(event.target.value)); setForm({ ...form, room_id: event.target.value, venue_id: room?.venue_id?.toString() ?? form.venue_id }); }} className={FIELD_CLASS}><option value="">Event-wide</option>{schedule.rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select></Field><Field label="Venue"><select value={form.venue_id} onChange={(event) => setForm({ ...form, venue_id: event.target.value })} className={FIELD_CLASS}><option value="">No venue</option>{schedule.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></Field></div>
+        <fieldset><legend className="text-sm font-semibold text-ink">Rooms</legend><div className="mt-1 flex flex-wrap gap-2">{schedule.rooms.map((room) => <label key={room.id} className="flex min-h-9 items-center gap-2 rounded-field border border-line px-3 text-sm text-ink"><input type="checkbox" checked={form.room_ids.includes(room.id)} onChange={(event) => toggleRoom(room.id, event.target.checked)} />{room.name}</label>)}</div><p className="mt-1 text-xs text-ink-soft">No room selected means event-wide. Several rooms make the session span those columns.</p></fieldset>
+        <Field label="Venue"><select value={form.venue_id} onChange={(event) => setForm({ ...form, venue_id: event.target.value })} className={FIELD_CLASS}><option value="">No venue</option>{schedule.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></Field>
         <div className="grid grid-cols-2 gap-3"><Field label="Level"><select value={form.level_id} onChange={(event) => setForm({ ...form, level_id: event.target.value })} className={FIELD_CLASS}><option value="">No level</option>{schedule.levels.map((level) => <option key={level.id} value={level.id}>{level.label}</option>)}</select></Field><Field label="Activity type"><select value={form.activity_type_id} onChange={(event) => setForm({ ...form, activity_type_id: event.target.value })} className={FIELD_CLASS}><option value="">No type</option>{schedule.activity_types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</select></Field></div>
+        <Field label="Description"><textarea maxLength={2000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className={`${FIELD_CLASS} min-h-24`} placeholder="What attendees will learn or experience" /></Field>
         <Field label="Attendee note"><textarea maxLength={500} value={form.attendee_note} onChange={(event) => setForm({ ...form, attendee_note: event.target.value })} className={`${FIELD_CLASS} min-h-20`} /></Field>
         <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={form.allow_plan} onChange={(event) => setForm({ ...form, allow_plan: event.target.checked })} />Attendees may add this to My Plan</label>
         {session ? <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={form.is_cancelled} onChange={(event) => setForm({ ...form, is_cancelled: event.target.checked })} />Mark session cancelled</label> : null}
         {conflicts.length ? <div className="border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>Scheduling conflict.</strong> This overlaps {conflicts.map((item) => item.title).join(', ')} in the same room. You may still save intentionally.</div> : null}
         <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4">{session ? <div className="flex gap-2"><button type="button" onClick={async () => { await duplicateScheduleSession(eventId, session.id); await onSaved(); }} className="rounded-field border border-line px-3 py-2 text-sm">Duplicate</button><button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await deleteScheduleSession(eventId, session.id); await onSaved(); }} className="rounded-field px-3 py-2 text-sm font-semibold text-danger">{confirmDelete ? 'Confirm delete' : 'Delete'}</button></div> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : conflicts.length ? 'Save anyway' : 'Save'}</button></div></div>
+    </form></Modal>;
+}
+
+function OverviewItemEditor({ schedule, day, item, parent, eventId, onClose, onSaved, onError }: { schedule: AdminEventSchedule; day: string; item: ScheduleOverviewItem | null; parent?: ScheduleOverviewItem; eventId: string; onClose: () => void; onSaved: () => void; onError: (message: string | null) => void }) {
+    const tz = schedule.timezone;
+    const momentDefaultEnd = parent ? new Date(Math.min(Date.parse(parent.end), Date.parse(parent.start) + 60 * 60 * 1000)).toISOString() : '';
+    const [form, setForm] = useState({
+        title: item?.title ?? '',
+        subtitle: item?.subtitle ?? '',
+        description: item?.description ?? '',
+        url: item?.url ?? '',
+        url_label: item?.url_label ?? '',
+        start: item ? toZonedInput(item.start, tz) : parent ? toZonedInput(parent.start, tz) : `${day}T10:00`,
+        end: item ? toZonedInput(item.end, tz) : parent ? toZonedInput(momentDefaultEnd, tz) : `${day}T12:00`,
+        parent_id: item?.parent_id ?? parent?.id ?? '',
+        activity_type_id: item?.activity_type_id?.toString() ?? '',
+        venue_id: item?.venue_id?.toString() ?? '',
+        room_ids: item?.room_ids ?? [] as number[],
+        opens_detail: item?.opens_detail ?? false,
+        allow_plan: item?.allow_plan ?? false,
+        is_cancelled: item?.is_cancelled ?? false,
+    });
+    const [busy, setBusy] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const startIso = form.start ? zonedInputToIso(form.start, tz) : '';
+    const endIso = form.end ? zonedInputToIso(form.end, tz) : '';
+    const formDay = startIso ? programDayOf(startIso, tz, schedule.day_start_hour) : day;
+    const allItems = schedule.overview_items ?? [];
+    const moments = item ? allItems.filter((row) => row.parent_id === item.id) : [];
+    const parentOptions = allItems.filter((row) => !row.parent_id && row.id !== item?.id && programDayOf(row.start, tz, schedule.day_start_hour) === formDay);
+    const isMoment = Boolean(form.parent_id);
+    const windowCount = startIso && endIso ? sessionsInOverviewWindow(schedule.sessions, { start: startIso, end: endIso }).length : 0;
+    const submit = async (event: React.FormEvent) => {
+        event.preventDefault(); setBusy(true); onError(null);
+        const body: ScheduleOverviewItemInput = {
+            parent_id: form.parent_id || null,
+            title: form.title,
+            subtitle: form.subtitle.trim() || null,
+            description: form.description.trim() || null,
+            url: form.url.trim() || null,
+            url_label: form.url_label.trim() || null,
+            start: startIso,
+            end: endIso,
+            activity_type_id: form.activity_type_id ? Number(form.activity_type_id) : null,
+            venue_id: form.venue_id ? Number(form.venue_id) : null,
+            room_ids: schedule.rooms.filter((room) => form.room_ids.includes(room.id)).map((room) => room.id),
+            opens_detail: !isMoment && form.opens_detail,
+            allow_plan: !isMoment && form.allow_plan,
+            is_cancelled: form.is_cancelled,
+            sort_order: item?.sort_order ?? 0,
+        };
+        try { if (item) await updateScheduleOverviewItem(eventId, item.id, body); else await createScheduleOverviewItem(eventId, body); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not save overview item'); } finally { setBusy(false); }
+    };
+    const remove = async () => {
+        if (!item) return;
+        try { await deleteScheduleOverviewItem(eventId, item.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not delete overview item'); }
+    };
+    return <Modal title={item ? (isMoment ? 'Edit moment' : 'Edit overview item') : isMoment ? 'Add moment' : 'Add overview item'} onClose={onClose}><form onSubmit={submit} className="space-y-4">
+        <Field label="Title"><input required maxLength={200} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={FIELD_CLASS} placeholder={isMoment ? 'Show performances' : 'Workshops'} /></Field>
+        <Field label="Subtitle"><input maxLength={200} value={form.subtitle} onChange={(event) => setForm({ ...form, subtitle: event.target.value })} className={FIELD_CLASS} placeholder="Tagline shown under the title" /></Field>
+        <Field label="Part of"><select value={form.parent_id} disabled={moments.length > 0} onChange={(event) => setForm({ ...form, parent_id: event.target.value, opens_detail: event.target.value ? false : form.opens_detail, allow_plan: event.target.value ? false : form.allow_plan })} className={FIELD_CLASS}><option value="">Top-level item</option>{parentOptions.map((row) => <option key={row.id} value={row.id}>{row.title} · {formatTimeRange(row, tz)}</option>)}</select>{moments.length ? <p className="mt-1 text-xs font-normal text-ink-soft">This item has moments, so it stays top-level.</p> : null}</Field>
+        <div className="grid grid-cols-2 gap-3"><Field label="Start"><input required type="datetime-local" value={form.start} onChange={(event) => setForm({ ...form, start: event.target.value })} className={FIELD_CLASS} /></Field><Field label="End"><input required type="datetime-local" value={form.end} onChange={(event) => setForm({ ...form, end: event.target.value })} className={FIELD_CLASS} /></Field></div>
+        <div className="grid grid-cols-2 gap-3"><Field label="Activity type"><select value={form.activity_type_id} onChange={(event) => setForm({ ...form, activity_type_id: event.target.value })} className={FIELD_CLASS}><option value="">No type</option>{schedule.activity_types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</select></Field><Field label="Venue"><select value={form.venue_id} onChange={(event) => setForm({ ...form, venue_id: event.target.value })} className={FIELD_CLASS}><option value="">{isMoment ? 'Same as parent' : 'No venue'}</option>{schedule.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></Field></div>
+        {schedule.rooms.length ? <fieldset><legend className="text-sm font-semibold text-ink">Rooms</legend><div className="mt-1 flex flex-wrap gap-2">{schedule.rooms.map((room) => <label key={room.id} className="flex min-h-9 items-center gap-2 rounded-field border border-line px-3 text-sm text-ink"><input type="checkbox" checked={form.room_ids.includes(room.id)} onChange={(event) => setForm({ ...form, room_ids: event.target.checked ? [...form.room_ids, room.id] : form.room_ids.filter((id) => id !== room.id) })} />{room.name}</label>)}</div>{isMoment ? <p className="mt-1 text-xs text-ink-soft">Leave empty to use the parent's rooms.</p> : null}</fieldset> : null}
+        {!isMoment ? <div><label className="flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={form.opens_detail} onChange={(event) => setForm({ ...form, opens_detail: event.target.checked })} />Has detailed schedule</label><p className={`mt-1 text-xs ${form.opens_detail && !windowCount ? 'text-amber-800' : 'text-ink-soft'}`}>{windowCount} {windowCount === 1 ? 'session starts' : 'sessions start'} in this window.{form.opens_detail ? ' Attendees tapping this item jump to the full schedule at its start time.' : ''}</p></div> : null}
+        {!isMoment ? <div><label className="flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={form.allow_plan} onChange={(event) => setForm({ ...form, allow_plan: event.target.checked })} />Attendees can add to My Plan</label><p className="mt-1 text-xs text-ink-soft">For blocks booked as a whole, like a bootcamp or a separate-ticket class.</p></div> : null}
+        <Field label="Description"><textarea maxLength={2000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className={`${FIELD_CLASS} min-h-24`} /></Field>
+        <div className="grid grid-cols-[2fr_1fr] gap-3"><Field label="Link"><input type="url" maxLength={500} value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} className={FIELD_CLASS} placeholder="https://" /></Field><Field label="Link label"><input maxLength={80} value={form.url_label} onChange={(event) => setForm({ ...form, url_label: event.target.value })} className={FIELD_CLASS} placeholder="More info" /></Field></div>
+        {item ? <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={form.is_cancelled} onChange={(event) => setForm({ ...form, is_cancelled: event.target.checked })} />Mark cancelled</label> : null}
+        <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="rounded-field px-3 py-2 text-sm font-semibold text-danger">{confirmDelete ? (moments.length ? `Confirm delete (and ${moments.length} ${moments.length === 1 ? 'moment' : 'moments'})` : 'Confirm delete') : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button></div></div>
     </form></Modal>;
 }
 
@@ -606,11 +706,12 @@ function ConfigEditor({ schedule, eventId, kind, item, onClose, onSaved, onError
     const [secondary, setSecondary] = useState(item && 'address' in item ? item.address ?? '' : item && 'notation' in item ? item.notation ?? '' : '');
     const [color, setColor] = useState(item && 'color' in item ? item.color : 'blue');
     const [venueId, setVenueId] = useState(item && 'venue_id' in item ? item.venue_id?.toString() ?? '' : '');
+    const [details, setDetails] = useState(item && 'venue_id' in item ? item.details ?? '' : '');
     const [confirmDelete, setConfirmDelete] = useState(false);
     const save = async () => {
         try {
             if (kind === 'venue') { const body = { name, address: secondary || null, sort_order: item?.sort_order ?? schedule.venues.length }; if (item) await updateScheduleVenue(eventId, item.id, body); else await createScheduleVenue(eventId, body); }
-            if (kind === 'room') { const body = { name, venue_id: venueId ? Number(venueId) : null, color, sort_order: item?.sort_order ?? schedule.rooms.length }; if (item) await updateScheduleRoom(eventId, item.id, body); else await createScheduleRoom(eventId, body); }
+            if (kind === 'room') { const body = { name, details: details.trim() || null, venue_id: venueId ? Number(venueId) : null, color, sort_order: item?.sort_order ?? schedule.rooms.length }; if (item) await updateScheduleRoom(eventId, item.id, body); else await createScheduleRoom(eventId, body); }
             if (kind === 'level') { const body = { label: name, notation: secondary || null, sort_order: item?.sort_order ?? schedule.levels.length }; if (item) await updateScheduleLevel(eventId, item.id, body); else await createScheduleLevel(eventId, body); }
             if (kind === 'activity') { const body = { name, color, sort_order: item?.sort_order ?? schedule.activity_types.length }; if (item) await updateScheduleActivityType(eventId, item.id, body); else await createScheduleActivityType(eventId, body); }
             if (kind === 'contributor') { const body = { display_name: name, sort_order: item?.sort_order ?? schedule.contributors?.length ?? 0 }; if (item) await updateScheduleContributor(eventId, item.id, body); else await createScheduleContributor(eventId, body); }
@@ -618,7 +719,7 @@ function ConfigEditor({ schedule, eventId, kind, item, onClose, onSaved, onError
         } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not save item'); }
     };
     const remove = async () => { if (!item) return; try { if (kind === 'venue') await deleteScheduleVenue(eventId, item.id); if (kind === 'room') await deleteScheduleRoom(eventId, item.id); if (kind === 'level') await deleteScheduleLevel(eventId, item.id); if (kind === 'activity') await deleteScheduleActivityType(eventId, item.id); if (kind === 'contributor') await deleteScheduleContributor(eventId, item.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not delete item'); } };
-    return <Modal title={`${item ? 'Edit' : 'Add'} ${kind === 'activity' ? 'activity type' : kind}`} onClose={onClose}><div className="space-y-4"><Field label={kind === 'level' ? 'Label' : 'Name'}><input value={name} onChange={(event) => setName(event.target.value)} className={FIELD_CLASS} /></Field>{kind === 'venue' ? <Field label="Address"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} /></Field> : null}{kind === 'level' ? <Field label="Notation"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} placeholder="*, **, ***" /></Field> : null}{kind === 'room' ? <Field label="Venue"><select value={venueId} onChange={(event) => setVenueId(event.target.value)} className={FIELD_CLASS}><option value="">No venue</option>{schedule.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></Field> : null}{kind === 'room' || kind === 'activity' ? <Field label="Color"><div className="flex flex-wrap gap-2">{Object.keys(ROOM_COLORS).map((value) => <button key={value} type="button" aria-label={value} onClick={() => setColor(value)} className={`h-9 w-9 border-2 ${roomColor(value).header} ${color === value ? 'border-action' : 'border-transparent'}`} />)}</div></Field> : null}<div className="flex justify-between border-t border-line pt-4">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-danger"><Trash2 size={16} />{confirmDelete ? 'Confirm delete' : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Cancel</button><button type="button" onClick={save} disabled={!name.trim()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save</button></div></div></div></Modal>;
+    return <Modal title={`${item ? 'Edit' : 'Add'} ${kind === 'activity' ? 'activity type' : kind}`} onClose={onClose}><div className="space-y-4"><Field label={kind === 'level' ? 'Label' : 'Name'}><input value={name} onChange={(event) => setName(event.target.value)} className={FIELD_CLASS} /></Field>{kind === 'venue' ? <Field label="Address"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} /></Field> : null}{kind === 'level' ? <Field label="Notation"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} placeholder="*, **, ***" /></Field> : null}{kind === 'room' ? <Field label="Details"><input maxLength={160} value={details} onChange={(event) => setDetails(event.target.value)} className={FIELD_CLASS} placeholder="Ground floor · Grand Pass only" /></Field> : null}{kind === 'room' ? <Field label="Venue"><select value={venueId} onChange={(event) => setVenueId(event.target.value)} className={FIELD_CLASS}><option value="">No venue</option>{schedule.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></Field> : null}{kind === 'room' || kind === 'activity' ? <Field label="Color"><div className="flex flex-wrap gap-2">{Object.keys(SCHEDULE_COLORS).map((value) => <button key={value} type="button" aria-label={value} onClick={() => setColor(value)} className={`h-9 w-9 border-2 ${scheduleColor(value).header} ${color === value ? 'border-action' : 'border-transparent'}`} />)}</div></Field> : null}<div className="flex justify-between border-t border-line pt-4">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-danger"><Trash2 size={16} />{confirmDelete ? 'Confirm delete' : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Cancel</button><button type="button" onClick={save} disabled={!name.trim()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save</button></div></div></div></Modal>;
 }
 
 function PublishDialog({ schedule, eventId, onClose, onPublished, onError }: { schedule: AdminEventSchedule; eventId: string; onClose: () => void; onPublished: () => Promise<void>; onError: (message: string | null) => void }) {

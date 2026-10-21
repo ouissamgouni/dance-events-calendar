@@ -1,0 +1,98 @@
+schedules:
+  # Both levels come from the reviewed import document kept in docs/programs.
+  - event_id: salsa-grand-2026
+    timezone: Europe/Zagreb
+    day_start_hour: 7
+    days:
+      - "2026-11-27"
+      - "2026-11-28"
+      - "2026-11-29"
+    import: ../../docs/programs/salsa-grand-2026.schedule.json
+    published: true
+    # Imported rows have generated ids, so plans reference external ids.
+    # Bootcamp part 1/3 (14:00–16:00) overlaps Salsa Romantica (15:00) for the conflict check.
+    plans:
+      - email: dancer@example.com
+        overview_item: fri-bootcamp-1
+        audience: friends
+      - email: dancer@example.com
+        session: fri-salsa-romantica
+      - email: friend@example.com
+        overview_item: fri-bootcamp-1
+        audience: friends
+      - email: friend@example.com
+        overview_item: sat-bootcamp-3
+
+  # Overview-only program (no detailed sessions), relative to seed time for Now/default-day checks.
+  # day_start_hour 0 keeps "today" aligned with the UTC calendar date the seeder uses.
+  - event_id: live-overview-social
+    timezone: UTC
+    day_start_hour: 0
+    days:
+      - today
+      - tomorrow
+    venues:
+      - name: Riverside Hall
+        address: 1 River Walk, London
+        sort_order: 0
+    rooms:
+      - name: Main Floor
+        venue: Riverside Hall
+        color: amber
+        sort_order: 0
+      - name: Terrace
+        venue: Riverside Hall
+        color: emerald
+        sort_order: 1
+    activity_types:
+      - name: Registration
+        color: slate
+        sort_order: 0
+      - name: Party
+        color: pink
+        sort_order: 1
+      - name: Show
+        color: indigo
+        sort_order: 2
+      - name: Social
+        color: amber
+        sort_order: 3
+    sessions: []
+    overview_items:
+      - id: "40000000-0000-4000-8000-000000000001"
+        title: Doors & registration
+        description: Wristbands at the Riverside Hall entrance. Cash bar opens with the doors.
+        start: now-10m
+        end: now+2h
+        venue: Riverside Hall
+        activity_type: Registration
+      - id: "40000000-0000-4000-8000-000000000002"
+        title: Riverside Salsa Night
+        subtitle: Two floors, one river view
+        start: now+30m
+        end: now+5h
+        rooms: [Main Floor, Terrace]
+        venue: Riverside Hall
+        activity_type: Party
+      - id: "40000000-0000-4000-8000-000000000003"
+        parent: "40000000-0000-4000-8000-000000000002"
+        title: Live band set
+        description: Orquesta del Río plays two sets of classic salsa dura.
+        start: now+2h
+        end: now+165m
+        activity_type: Show
+      - id: "40000000-0000-4000-8000-000000000004"
+        parent: "40000000-0000-4000-8000-000000000002"
+        title: Last dance
+        start: now+285m
+        end: now+5h
+      - id: "40000000-0000-4000-8000-000000000005"
+        title: Recovery picnic
+        url: https://example.com/recovery-picnic
+        url_label: Picnic map
+        start: now+22h
+        end: now+25h
+        rooms: [Terrace]
+        venue: Riverside Hall
+        activity_type: Social
+    published: true

@@ -116,6 +116,12 @@ def build_program_projection(
         if days is not None and program_day not in selected_days:
             continue
         room = rooms.get(row.get("room_id"), {})
+        room_ids = row.get("room_ids") or (
+            [row["room_id"]] if row.get("room_id") is not None else []
+        )
+        room_names = " + ".join(
+            rooms[room_id]["name"] for room_id in room_ids if room_id in rooms
+        )
         venue = venues.get(row.get("venue_id") or room.get("venue_id"), {})
         level = levels.get(row.get("level_id"), {})
         activity_type = activity_types.get(row.get("activity_type_id"), {})
@@ -135,13 +141,15 @@ def build_program_projection(
                 "local_end_time": local_end.strftime("%H:%M"),
                 "venue_id": row.get("venue_id") or room.get("venue_id"),
                 "room_id": row.get("room_id"),
+                "room_ids": room_ids,
                 "level_id": row.get("level_id"),
                 "activity_type_id": row.get("activity_type_id"),
                 "venue": venue.get("name"),
-                "room": room.get("name"),
+                "room": room_names or None,
                 "address": venue.get("address"),
                 "level": level.get("label"),
                 "activity_type": activity_type.get("name"),
+                "description": row.get("description"),
                 "attendee_note": row.get("attendee_note"),
                 "is_cancelled": status != "active",
                 "status": status,
@@ -168,6 +176,7 @@ def build_program_projection(
         "program_url": f"{app_url}/event/{quote(event.event_id, safe='')}/program",
         "timezone": timezone_name,
         "day_start_hour": day_start_hour,
+        "session_color_mode": snapshot.get("session_color_mode", "room"),
         "available_days": available_days,
         "selected_days": selected_days,
         "venues": snapshot.get("venues", []),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayDateLabel, formatDayLabel, isSessionActive, minuteOfProgramDay, programDayOf, scheduleInstructors, sessionsOverlap, toZonedInput, zonedInputToIso } from './schedule';
-import type { MyPlanEntry, ScheduleSession } from '../types';
+import { filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayDateLabel, formatDayLabel, isSessionActive, minuteOfProgramDay, overviewItemOpensSchedule, overviewItemsForDay, programDayOf, roomColumnRuns, scheduleInstructors, sessionRoomIds, sessionsInOverviewWindow, sessionsOverlap, toZonedInput, zonedInputToIso } from './schedule';
+import type { MyPlanEntry, ScheduleOverviewItem, ScheduleSession } from '../types';
 
 const session = (id: string, start: string, end: string): ScheduleSession => ({
     id,
@@ -17,6 +17,55 @@ const session = (id: string, start: string, end: string): ScheduleSession => ({
     is_cancelled: false,
 });
 
+const overviewItem = (id: string, start: string, end: string, extra: Partial<ScheduleOverviewItem> = {}): ScheduleOverviewItem => ({
+    id, parent_id: null, title: id, subtitle: null, description: null, url: null, url_label: null,
+    start, end, activity_type_id: null, venue_id: null, room_ids: [], opens_detail: false, is_cancelled: false, sort_order: 0,
+    ...extra,
+});
+
+describe('overview helpers', () => {
+    it('groups moments under their after-midnight parent on the same program day', () => {
+        const items = [
+            overviewItem('Party', '2026-10-16T20:30:00Z', '2026-10-17T03:00:00Z'),
+            overviewItem('Artist hour', '2026-10-17T00:00:00Z', '2026-10-17T01:00:00Z', { parent_id: 'Party' }),
+            overviewItem('Shows', '2026-10-16T22:00:00Z', '2026-10-16T22:30:00Z', { parent_id: 'Party' }),
+            overviewItem('Workshops', '2026-10-16T09:00:00Z', '2026-10-16T14:00:00Z'),
+        ];
+        const entries = overviewItemsForDay(items, '2026-10-16', 'Europe/Prague', 6);
+        expect(entries.map((entry) => entry.item.id)).toEqual(['Workshops', 'Party']);
+        expect(entries[1].moments.map((moment) => moment.id)).toEqual(['Shows', 'Artist hour']);
+        expect(overviewItemsForDay(items, '2026-10-17', 'Europe/Prague', 6)).toEqual([]);
+    });
+
+    it('counts only active sessions starting inside [start, end)', () => {
+        const block = overviewItem('Workshops', '2026-10-16T11:00:00Z', '2026-10-16T15:00:00Z', { opens_detail: true });
+        const sessions = [
+            session('at-start', '2026-10-16T11:00:00Z', '2026-10-16T12:00:00Z'),
+            session('before', '2026-10-16T10:30:00Z', '2026-10-16T11:30:00Z'),
+            session('at-end', '2026-10-16T15:00:00Z', '2026-10-16T16:00:00Z'),
+            { ...session('cancelled', '2026-10-16T12:00:00Z', '2026-10-16T13:00:00Z'), is_cancelled: true },
+        ];
+        expect(sessionsInOverviewWindow(sessions, block).map((row) => row.id)).toEqual(['at-start']);
+        expect(overviewItemOpensSchedule(block, sessions)).toBe(true);
+        expect(overviewItemOpensSchedule({ ...block, opens_detail: false }, sessions)).toBe(false);
+        expect(overviewItemOpensSchedule(block, [])).toBe(false);
+    });
+});
+
+describe('schedule room helpers', () => {
+    it('falls back to room_id for sessions published before multi-room support', () => {
+        expect(sessionRoomIds({ room_id: 4 })).toEqual([4]);
+        expect(sessionRoomIds({ room_id: null })).toEqual([]);
+        expect(sessionRoomIds({ room_id: 1, room_ids: [1, 2] })).toEqual([1, 2]);
+    });
+
+    it('groups rooms into runs of adjacent columns', () => {
+        expect(roomColumnRuns([2, 1], [1, 2, 3])).toEqual([[0, 2]]);
+        expect(roomColumnRuns([1, 3], [1, 2, 3])).toEqual([[0, 1], [2, 3]]);
+        expect(roomColumnRuns([9], [1, 2])).toEqual([]);
+    });
+});
+
 describe('schedule time helpers', () => {
     it('keeps early-morning sessions on the previous program day', () => {
         expect(programDayOf('2026-10-17T00:30:00Z', 'Europe/Prague', 6)).toBe('2026-10-16');
@@ -31,6 +80,21 @@ describe('schedule time helpers', () => {
         ];
         expect(findPlanConflicts(entries).get('a')).toEqual(['B']);
         expect(findPlanConflicts(entries).has('c')).toBe(false);
+    });
+
+    it('reports conflicts between planned sessions and overview items', () => {
+        const bootcamp: ScheduleOverviewItem = {
+            id: 'bootcamp', parent_id: null, title: 'Bootcamp part 1', subtitle: null, description: null, url: null, url_label: null,
+            start: '2026-10-16T12:30:00Z', end: '2026-10-16T14:00:00Z', activity_type_id: null, venue_id: null, room_ids: [],
+            opens_detail: false, allow_plan: true, is_cancelled: false, sort_order: 0,
+        };
+        const entries: MyPlanEntry[] = [
+            { session_id: 'a', status: 'active', session: session('A', '2026-10-16T12:00:00Z', '2026-10-16T13:00:00Z') },
+            { kind: 'overview_item', overview_item_id: 'bootcamp', status: 'active', overview_item: bootcamp },
+        ];
+        expect(findPlanConflicts(entries).get('bootcamp')).toEqual(['A']);
+        expect(findPlanConflicts(entries).get('a')).toEqual(['Bootcamp part 1']);
+        expect(focusedPlanEntry(entries, new Date('2026-10-16T13:30:00Z'))?.entry).toBe(entries[1]);
     });
 
     it('does not treat equivalent mixed-precision boundaries as overlapping', () => {

@@ -282,6 +282,72 @@ schedules:
         venue: Atelier Sablon
         activity_type: Social
         attendee_note: Closing announcements at 21:30.
+    overview_items:
+      - id: "33000000-0000-4000-8000-000000000101"
+        title: Registration desk
+        description: Collect your wristband at the Atelier Sablon entrance.
+        start: w7 Fri 20:00
+        end: w7 Sat 00:00
+        venue: Atelier Sablon
+      - id: "33000000-0000-4000-8000-000000000102"
+        title: Welcome Party
+        start: w7 Fri 22:00
+        end: w7 Sat 05:00
+        rooms: [Grand Hall]
+        venue: Atelier Sablon
+        activity_type: Party
+        opens_detail: true
+      - id: "33000000-0000-4000-8000-000000000201"
+        title: Workshops
+        start: w7 Sat 12:00
+        end: w7 Sat 15:00
+        venue: Atelier Sablon
+        activity_type: Workshop
+        opens_detail: true
+      - id: "33000000-0000-4000-8000-000000000202"
+        title: Afternoon Social
+        start: w7 Sat 16:00
+        end: w7 Sat 19:00
+        rooms: [Lounge Hall]
+        venue: Atelier Sablon
+        activity_type: Social
+        opens_detail: true
+      - id: "33000000-0000-4000-8000-000000000203"
+        title: Saturday Night
+        subtitle: Shows + DJ Sabor & DJ Kemo
+        start: w7 Sat 23:00
+        end: w7 Sun 05:00
+        rooms: [Grand Hall]
+        venue: Atelier Sablon
+        activity_type: Party
+        opens_detail: true
+      - id: "33000000-0000-4000-8000-000000000204"
+        parent: "33000000-0000-4000-8000-000000000203"
+        title: Shows
+        start: w7 Sat 23:00
+        end: w7 Sat 23:30
+        activity_type: Show
+      - id: "33000000-0000-4000-8000-000000000301"
+        title: Workshops
+        start: w7 Sun 12:00
+        end: w7 Sun 14:00
+        venue: Atelier Sablon
+        activity_type: Workshop
+        opens_detail: true
+      - id: "33000000-0000-4000-8000-000000000302"
+        title: Farewell Social
+        start: w7 Sun 15:00
+        end: w7 Sun 22:00
+        rooms: [Grand Hall]
+        venue: Atelier Sablon
+        activity_type: Social
+        opens_detail: true
+      - id: "33000000-0000-4000-8000-000000000303"
+        parent: "33000000-0000-4000-8000-000000000302"
+        title: Closing announcements
+        description: Thank-yous, photo and next year's dates.
+        start: w7 Sun 21:30
+        end: w7 Sun 21:45
     published: true
     plans:
       - email: elena.moreau@joinmovida.com

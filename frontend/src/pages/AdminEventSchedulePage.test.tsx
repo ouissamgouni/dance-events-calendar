@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addScheduleEditor, applyScheduleImport, createAdminEventSchedule, exportEventSchedule, fetchAdminEventSchedule, fetchAdminUsers, fetchEvent, fetchEventScheduleEditorAccess, fetchOptionalAdminEventSchedule, fetchScheduleEditors, fetchScheduleImportSchema, fetchSchedulePlanners, previewScheduleImport, publishEventSchedule, removeScheduleEditor, updateScheduleSession, type AdminUserRow } from '../api';
+import { addScheduleEditor, applyScheduleImport, createAdminEventSchedule, createScheduleOverviewItem, exportEventSchedule, fetchAdminEventSchedule, fetchAdminUsers, fetchEvent, fetchEventScheduleEditorAccess, fetchOptionalAdminEventSchedule, fetchScheduleEditors, fetchScheduleImportSchema, fetchSchedulePlanners, previewScheduleImport, publishEventSchedule, removeScheduleEditor, updateAdminEventSchedule, updateScheduleOverviewItem, updateScheduleSession, type AdminUserRow } from '../api';
 import type { AdminEventSchedule, CalendarEvent } from '../types';
 import AdminEventSchedulePage from './AdminEventSchedulePage';
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, addScheduleEditor: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchAdminUsers: vi.fn(), fetchEvent: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleEditors: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn(), removeScheduleEditor: vi.fn(), updateScheduleSession: vi.fn() };
+    return { ...actual, addScheduleEditor: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), createScheduleOverviewItem: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchAdminUsers: vi.fn(), fetchEvent: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleEditors: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn(), removeScheduleEditor: vi.fn(), updateAdminEventSchedule: vi.fn(), updateScheduleOverviewItem: vi.fn(), updateScheduleSession: vi.fn() };
 });
 
 const event: CalendarEvent = {
@@ -92,6 +92,58 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
     });
 
+    it('opens the Overview section and adds a moment to a linked item', async () => {
+        const workshops = { id: 'workshops', external_id: null, parent_id: null, title: 'Workshops', subtitle: null, description: null, url: null, url_label: null, start: '2026-10-16T10:00:00Z', end: '2026-10-16T14:00:00Z', activity_type_id: 1, venue_id: null, room_ids: [], opens_detail: true, is_cancelled: false, sort_order: 0 };
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({
+            ...schedule,
+            overview_items: [workshops],
+            issues: [{ code: 'overview_outside_schedule_days', severity: 'warning', message: 'Workshops is outside the configured days', session_ids: [], overview_item_ids: ['workshops'] }],
+        });
+        vi.mocked(createScheduleOverviewItem).mockResolvedValue({ ...workshops, id: 'moment', parent_id: 'workshops', opens_detail: false });
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByText('→ 1 session in full schedule')).toBeInTheDocument();
+        expect(screen.getByText('Workshops is outside the configured days')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Add moment' }));
+
+        expect(screen.getByRole('dialog', { name: 'Add moment' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Part of' })).toHaveValue('workshops');
+        expect(screen.queryByRole('checkbox', { name: 'Has detailed schedule' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('checkbox', { name: 'Attendees can add to My Plan' })).not.toBeInTheDocument();
+        fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: 'Teacher demo' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(createScheduleOverviewItem).toHaveBeenCalledWith(event.event_id, expect.objectContaining({
+            parent_id: 'workshops',
+            title: 'Teacher demo',
+            start: '2026-10-16T10:00:00.000Z',
+            end: '2026-10-16T11:00:00.000Z',
+            opens_detail: false,
+            allow_plan: false,
+        })));
+    });
+
+    it('lets editors make a top-level overview item plannable', async () => {
+        const bootcamp = { id: 'bootcamp', external_id: null, parent_id: null, title: 'Bootcamp', subtitle: null, description: null, url: null, url_label: null, start: '2026-10-16T10:00:00Z', end: '2026-10-16T14:00:00Z', activity_type_id: 1, venue_id: null, room_ids: [], opens_detail: false, allow_plan: false, is_cancelled: false, sort_order: 0 };
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({ ...schedule, overview_items: [bootcamp] });
+        vi.mocked(updateScheduleOverviewItem).mockResolvedValue({ ...bootcamp, allow_plan: true });
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: /Bootcamp/ }));
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Attendees can add to My Plan' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(updateScheduleOverviewItem).toHaveBeenCalledWith(event.event_id, 'bootcamp', expect.objectContaining({ allow_plan: true })));
+    });
+
     it('opens a populated session editor from the schedule grid', async () => {
         render(
             <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
@@ -103,7 +155,8 @@ describe('AdminEventSchedulePage', () => {
 
         expect(screen.getByRole('dialog', { name: 'Edit session' })).toBeInTheDocument();
         expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Musicality');
-        expect(screen.getByLabelText('Room')).toHaveValue('1');
+        expect(screen.getByRole('checkbox', { name: 'Grand Hall' })).toBeChecked();
+        fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), { target: { value: 'Find the clave.' } });
         expect(screen.getByLabelText('Contributor 1')).toHaveValue('1');
         fireEvent.change(screen.getByLabelText('Contributor 1 role'), { target: { value: 'performer' } });
         fireEvent.click(screen.getByRole('button', { name: 'Add artist or instructor' }));
@@ -113,6 +166,9 @@ describe('AdminEventSchedulePage', () => {
 
         await waitFor(() => expect(updateScheduleSession).toHaveBeenCalledWith(event.event_id, 'session-1', expect.objectContaining({
             instructors: null,
+            description: 'Find the clave.',
+            room_id: 1,
+            room_ids: [1],
             contributors: [
                 { contributor_id: 1, role: 'performer' },
                 { contributor_id: 2, role: 'dj' },
@@ -273,6 +329,23 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.queryByText('dancer@example.com')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
         expect(screen.getByTitle('Draft attendee preview')).toHaveAttribute('src', '/event/movida-2026/program?preview=draft&embed=program');
+    });
+
+    it('saves the grid session color mode with the schedule settings', async () => {
+        vi.mocked(updateAdminEventSchedule).mockResolvedValue({ ...schedule, session_color_mode: 'activity_type_stripe' });
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'settings' }));
+        const mode = screen.getByRole('combobox', { name: /Color sessions in the grid/ });
+        expect(mode).toHaveValue('room');
+        fireEvent.change(mode, { target: { value: 'activity_type_stripe' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+        await waitFor(() => expect(updateAdminEventSchedule).toHaveBeenCalledWith(event.event_id, expect.objectContaining({ session_color_mode: 'activity_type_stripe' })));
     });
 
     it('shows users who added sessions to their plans', async () => {

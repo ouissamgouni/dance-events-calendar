@@ -56,6 +56,13 @@ describe('resolveNotificationDestination — reminder ask deep-link', () => {
         );
     });
 
+    it('routes planned overview item notifications to the item', () => {
+        expect(resolveNotificationDestination(item({ kind: 'planned_session_changed', schedule_overview_item_id: 'boot' })))
+            .toBe('/event/evt-1/program/plan?item=boot');
+        expect(resolveNotificationDestination(item({ kind: 'plan_session_added', schedule_overview_item_id: 'boot' })))
+            .toBe('/event/evt-1/program?view=overview&item=boot');
+    });
+
     it('routes submitter notifications without yielding /event/null', () => {
         expect(resolveNotificationDestination(item({ kind: 'event_changed' }))).toBe('/event/evt-1');
         expect(resolveNotificationDestination(item({ kind: 'suggestion_approved' }))).toBe('/event/evt-1');

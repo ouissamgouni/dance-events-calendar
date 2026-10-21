@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlmodel import Session, col, select
+from sqlmodel import Session, col, or_, select
 
 from backend.db.models import (
     CachedEvent,
@@ -10,10 +10,13 @@ from backend.db.models import (
     ScheduleActivityType,
     ScheduleContributor,
     ScheduleLevel,
+    ScheduleOverviewItem,
+    ScheduleOverviewItemRoom,
     SchedulePublication,
     ScheduleRoom,
     ScheduleSession,
     ScheduleSessionContributor,
+    ScheduleSessionRoom,
     ScheduleVenue,
     User,
     UserFollow,
@@ -115,16 +118,19 @@ def latest_publication(
     ).first()
 
 
+def plan_target_id(row: UserPlanSession) -> str:
+    return str(row.overview_item_id or row.session_id)
+
+
 def plan_entries(
     session: Session,
     user_id,
     event_id: str,
     publication: SchedulePublication | None,
 ) -> list[dict]:
-    current = {
-        row["id"]: row
-        for row in (publication.snapshot.get("sessions", []) if publication else [])
-    }
+    snapshot = publication.snapshot if publication else {}
+    current_sessions = {row["id"]: row for row in snapshot.get("sessions", [])}
+    current_items = {row["id"]: row for row in snapshot.get("overview_items", [])}
     rows = session.exec(
         select(UserPlanSession)
         .where(
@@ -135,17 +141,30 @@ def plan_entries(
     ).all()
     entries = []
     for row in rows:
-        item = current.get(str(row.session_id))
+        is_item = row.overview_item_id is not None
+        current = current_items if is_item else current_sessions
+        item = current.get(plan_target_id(row))
         item_status = "removed"
         if item is not None:
             item_status = "cancelled" if item.get("is_cancelled") else "active"
-        entries.append(
-            {
-                "session_id": row.session_id,
-                "status": item_status,
-                "session": item or row.last_known_session,
-            }
-        )
+        if is_item:
+            entries.append(
+                {
+                    "kind": "overview_item",
+                    "overview_item_id": row.overview_item_id,
+                    "status": item_status,
+                    "overview_item": item or row.last_known_session,
+                }
+            )
+        else:
+            entries.append(
+                {
+                    "kind": "session",
+                    "session_id": row.session_id,
+                    "status": item_status,
+                    "session": item or row.last_known_session,
+                }
+            )
     return entries
 
 
@@ -186,7 +205,9 @@ def plan_counts(
         if publication is None:
             continue
         current_session_ids_by_event[schedule.event_id] = {
-            str(item["id"]) for item in publication.snapshot.get("sessions", [])
+            str(item["id"])
+            for key in ("sessions", "overview_items")
+            for item in publication.snapshot.get(key, [])
         }
 
     rows = session.exec(
@@ -196,7 +217,7 @@ def plan_counts(
         )
     ).all()
     for row in rows:
-        if str(row.session_id) in current_session_ids_by_event.get(row.event_id, set()):
+        if plan_target_id(row) in current_session_ids_by_event.get(row.event_id, set()):
             counts[row.event_id] += 1
     return counts
 
@@ -207,19 +228,24 @@ def session_attendance_projection(
     event_id: str,
     publication: SchedulePublication,
 ) -> dict[str, list[dict]]:
-    current_session_ids = {
+    """Visible planners keyed by session id or overview item id."""
+    current_ids = {
         UUID(row["id"])
-        for row in publication.snapshot.get("sessions", [])
+        for key in ("sessions", "overview_items")
+        for row in publication.snapshot.get(key, [])
         if not row.get("is_cancelled", False)
     }
-    if not current_session_ids:
+    if not current_ids:
         return {}
 
     plan_rows = session.exec(
         select(UserPlanSession)
         .where(
             UserPlanSession.event_id == event_id,
-            col(UserPlanSession.session_id).in_(current_session_ids),
+            or_(
+                col(UserPlanSession.session_id).in_(current_ids),
+                col(UserPlanSession.overview_item_id).in_(current_ids),
+            ),
         )
         .order_by(UserPlanSession.added_at)
     ).all()
@@ -285,7 +311,7 @@ def session_attendance_projection(
             "handle": owner.handle,
         }
         rank = 0 if is_self else 1 if is_friend else 2
-        projected.setdefault(str(row.session_id), []).append(
+        projected.setdefault(plan_target_id(row), []).append(
             (rank, row.added_at, attendee)
         )
 
@@ -316,14 +342,160 @@ def published_schedule_event_ids(session: Session, event_ids: list[str]) -> set[
     )
 
 
+def session_room_ids_by_session(
+    session: Session, session_ids: list[UUID]
+) -> dict[UUID, list[int]]:
+    if not session_ids:
+        return {}
+    rows = session.exec(
+        select(ScheduleSessionRoom)
+        .where(col(ScheduleSessionRoom.session_id).in_(session_ids))
+        .order_by(ScheduleSessionRoom.session_id, ScheduleSessionRoom.position)
+    ).all()
+    result: dict[UUID, list[int]] = {}
+    for row in rows:
+        result.setdefault(row.session_id, []).append(row.room_id)
+    return result
+
+
+def replace_session_rooms(
+    session: Session, row: ScheduleSession, room_ids: list[int]
+) -> None:
+    """Store *room_ids* (already validated, ordered) and mirror the first into room_id."""
+    for existing in session.exec(
+        select(ScheduleSessionRoom).where(ScheduleSessionRoom.session_id == row.id)
+    ).all():
+        session.delete(existing)
+    session.flush()
+    for position, room_id in enumerate(room_ids):
+        session.add(
+            ScheduleSessionRoom(session_id=row.id, room_id=room_id, position=position)
+        )
+    row.room_id = room_ids[0] if room_ids else None
+    session.add(row)
+
+
+def ordered_room_ids(
+    session: Session, schedule_id: int, room_ids: list[int]
+) -> list[int] | None:
+    """Return *room_ids* deduplicated and sorted like the grid columns, or None if any is unknown."""
+    unique = set(room_ids)
+    if not unique:
+        return []
+    rooms = session.exec(
+        select(ScheduleRoom).where(
+            col(ScheduleRoom.id).in_(unique), ScheduleRoom.schedule_id == schedule_id
+        )
+    ).all()
+    if len(rooms) != len(unique):
+        return None
+    return [
+        room.id for room in sorted(rooms, key=lambda room: (room.sort_order, room.id))
+    ]
+
+
+def schedule_overview_items(
+    session: Session, schedule_id: int
+) -> list[ScheduleOverviewItem]:
+    return session.exec(
+        select(ScheduleOverviewItem)
+        .where(ScheduleOverviewItem.schedule_id == schedule_id)
+        .order_by(
+            ScheduleOverviewItem.start,
+            ScheduleOverviewItem.sort_order,
+            ScheduleOverviewItem.title,
+        )
+    ).all()
+
+
+def overview_room_ids_by_item(
+    session: Session, item_ids: list[UUID]
+) -> dict[UUID, list[int]]:
+    if not item_ids:
+        return {}
+    rows = session.exec(
+        select(ScheduleOverviewItemRoom)
+        .where(col(ScheduleOverviewItemRoom.item_id).in_(item_ids))
+        .order_by(ScheduleOverviewItemRoom.item_id, ScheduleOverviewItemRoom.position)
+    ).all()
+    result: dict[UUID, list[int]] = {}
+    for row in rows:
+        result.setdefault(row.item_id, []).append(row.room_id)
+    return result
+
+
+def replace_overview_item_rooms(
+    session: Session, item: ScheduleOverviewItem, room_ids: list[int]
+) -> None:
+    for existing in session.exec(
+        select(ScheduleOverviewItemRoom).where(
+            ScheduleOverviewItemRoom.item_id == item.id
+        )
+    ).all():
+        session.delete(existing)
+    session.flush()
+    for position, room_id in enumerate(room_ids):
+        session.add(
+            ScheduleOverviewItemRoom(
+                item_id=item.id, room_id=room_id, position=position
+            )
+        )
+
+
+def delete_overview_item(session: Session, item: ScheduleOverviewItem) -> None:
+    children = session.exec(
+        select(ScheduleOverviewItem).where(ScheduleOverviewItem.parent_id == item.id)
+    ).all()
+    for row in [*children, item]:
+        replace_overview_item_rooms(session, row, [])
+    for child in children:
+        session.delete(child)
+    session.flush()
+    session.delete(item)
+
+
+def overview_item_snapshot(
+    row: ScheduleOverviewItem, room_ids: list[int] | None = None
+) -> dict:
+    return {
+        "id": str(row.id),
+        "external_id": row.external_id,
+        "parent_id": str(row.parent_id) if row.parent_id else None,
+        "title": row.title,
+        "subtitle": row.subtitle,
+        "description": row.description,
+        "url": row.url,
+        "url_label": row.url_label,
+        "start": utc_isoformat(row.start),
+        "end": utc_isoformat(row.end),
+        "activity_type_id": row.activity_type_id,
+        "venue_id": row.venue_id,
+        "room_ids": list(room_ids or []),
+        "opens_detail": row.opens_detail,
+        "allow_plan": row.allow_plan,
+        "is_cancelled": row.is_cancelled,
+        "sort_order": row.sort_order,
+    }
+
+
+def effective_room_ids(row: ScheduleSession, room_ids: list[int] | None) -> list[int]:
+    # Rows written before multi-room support (or via legacy room_id-only paths) have no join rows.
+    if room_ids and room_ids[0] == row.room_id:
+        return list(room_ids)
+    return [row.room_id] if row.room_id is not None else []
+
+
 def session_snapshot(
-    row: ScheduleSession, contributors: list[ScheduleSessionContributor] | None = None
+    row: ScheduleSession,
+    contributors: list[ScheduleSessionContributor] | None = None,
+    room_ids: list[int] | None = None,
 ) -> dict:
     return {
         "id": str(row.id),
         "external_id": row.external_id,
         "title": row.title,
         "instructors": row.instructors,
+        "description": row.description,
         "contributors": [
             {
                 "contributor_id": assignment.contributor_id,
@@ -335,6 +507,7 @@ def session_snapshot(
         "start": utc_isoformat(row.start),
         "end": utc_isoformat(row.end),
         "room_id": row.room_id,
+        "room_ids": effective_room_ids(row, room_ids),
         "venue_id": row.venue_id,
         "level_id": row.level_id,
         "activity_type_id": row.activity_type_id,
@@ -397,10 +570,18 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
     assignments_by_session: dict[UUID, list[ScheduleSessionContributor]] = {}
     for assignment in assignments:
         assignments_by_session.setdefault(assignment.session_id, []).append(assignment)
+    rooms_by_session = session_room_ids_by_session(
+        session, [row.id for row in sessions]
+    )
+    overview_items = schedule_overview_items(session, schedule_id)
+    rooms_by_item = overview_room_ids_by_item(
+        session, [row.id for row in overview_items]
+    )
     return {
         "event_id": schedule.event_id,
         "timezone": schedule.timezone,
         "day_start_hour": schedule.day_start_hour,
+        "session_color_mode": schedule.session_color_mode,
         "days": schedule.days,
         "venues": [
             {
@@ -418,6 +599,7 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
                 "external_id": row.external_id,
                 "venue_id": row.venue_id,
                 "name": row.name,
+                "details": row.details,
                 "color": row.color,
                 "sort_order": row.sort_order,
             }
@@ -453,8 +635,16 @@ def build_snapshot(session: Session, schedule: EventSchedule) -> dict:
             for row in contributors
         ],
         "sessions": [
-            session_snapshot(row, assignments_by_session.get(row.id, []))
+            session_snapshot(
+                row,
+                assignments_by_session.get(row.id, []),
+                rooms_by_session.get(row.id),
+            )
             for row in sessions
+        ],
+        "overview_items": [
+            overview_item_snapshot(row, rooms_by_item.get(row.id))
+            for row in overview_items
         ],
     }
 
@@ -515,16 +705,23 @@ def compute_issues(session: Session, schedule: EventSchedule) -> list[dict]:
                 }
             )
         seen[key] = row
+    rooms_by_session = session_room_ids_by_session(
+        session, [row.id for row in sessions]
+    )
     by_room: dict[int, list[ScheduleSession]] = {}
     for row in sessions:
-        if row.room_id is not None:
-            by_room.setdefault(row.room_id, []).append(row)
+        for room_id in effective_room_ids(row, rooms_by_session.get(row.id)):
+            by_room.setdefault(room_id, []).append(row)
+    reported_pairs: set[tuple[UUID, UUID]] = set()
     for room_sessions in by_room.values():
         room_sessions.sort(key=lambda item: item.start)
         for index, left in enumerate(room_sessions):
             for right in room_sessions[index + 1 :]:
                 if right.start >= left.end:
                     break
+                if (left.id, right.id) in reported_pairs:
+                    continue
+                reported_pairs.add((left.id, right.id))
                 issues.append(
                     {
                         "code": "room_overlap",
@@ -533,6 +730,77 @@ def compute_issues(session: Session, schedule: EventSchedule) -> list[dict]:
                         "session_ids": [str(left.id), str(right.id)],
                     }
                 )
+    issues.extend(_overview_issues(session, schedule, sessions))
+    return issues
+
+
+def _overview_issue(code: str, severity: str, message: str, item_id) -> dict:
+    return {
+        "code": code,
+        "severity": severity,
+        "message": message,
+        "session_ids": [],
+        "overview_item_ids": [str(item_id)],
+    }
+
+
+def _overview_issues(
+    session: Session, schedule: EventSchedule, sessions: list[ScheduleSession]
+) -> list[dict]:
+    items = schedule_overview_items(session, schedule.id)
+    by_id = {row.id: row for row in items}
+    allowed_days = set(schedule.days)
+    session_starts = [to_utc(row.start) for row in sessions if not row.is_cancelled]
+    issues: list[dict] = []
+    for row in items:
+        if row.end <= row.start:
+            issues.append(
+                _overview_issue(
+                    "overview_invalid_time",
+                    "error",
+                    f"{row.title} ends before it starts",
+                    row.id,
+                )
+            )
+        if (
+            allowed_days
+            and program_day_for(
+                row.start, schedule.timezone, schedule.day_start_hour
+            ).isoformat()
+            not in allowed_days
+        ):
+            issues.append(
+                _overview_issue(
+                    "overview_outside_schedule_days",
+                    "warning",
+                    f"{row.title} is outside the configured days",
+                    row.id,
+                )
+            )
+        parent = by_id.get(row.parent_id) if row.parent_id else None
+        if parent is not None and (
+            to_utc(row.start) < to_utc(parent.start)
+            or to_utc(row.end) > to_utc(parent.end)
+        ):
+            issues.append(
+                _overview_issue(
+                    "overview_moment_outside_parent",
+                    "warning",
+                    f"{row.title} is outside {parent.title}'s time window",
+                    row.id,
+                )
+            )
+        if row.opens_detail and not any(
+            to_utc(row.start) <= start < to_utc(row.end) for start in session_starts
+        ):
+            issues.append(
+                _overview_issue(
+                    "overview_no_sessions_in_window",
+                    "warning",
+                    f"{row.title} links to the full schedule but no sessions start in its time window",
+                    row.id,
+                )
+            )
     return issues
 
 
@@ -542,6 +810,27 @@ def _issue(code: str, severity: str, message: str, session_id) -> dict:
         "severity": severity,
         "message": message,
         "session_ids": [str(session_id)],
+    }
+
+
+def normalize_snapshot(snapshot: dict) -> dict:
+    """Fill fields added after older publications so they don't show up as changes."""
+    return {
+        **snapshot,
+        "session_color_mode": snapshot.get("session_color_mode", "room"),
+        "rooms": [{"details": None, **row} for row in snapshot.get("rooms", [])],
+        "sessions": [
+            {
+                "description": None,
+                **row,
+                "room_ids": row.get("room_ids")
+                or ([row["room_id"]] if row.get("room_id") is not None else []),
+            }
+            for row in snapshot.get("sessions", [])
+        ],
+        "overview_items": [
+            {"allow_plan": False, **row} for row in snapshot.get("overview_items", [])
+        ],
     }
 
 
@@ -557,9 +846,11 @@ def compute_diff(draft: dict, published: dict | None) -> dict:
                 or draft["levels"]
                 or draft["activity_types"]
                 or draft["contributors"]
+                or draft.get("overview_items")
             ),
             "changes": compute_change_details(draft, None),
         }
+    published = normalize_snapshot(published)
     draft_sessions = {row["id"]: row for row in draft["sessions"]}
     published_sessions = {row["id"]: row for row in published.get("sessions", [])}
     shared_ids = draft_sessions.keys() & published_sessions.keys()
@@ -576,12 +867,14 @@ def compute_diff(draft: dict, published: dict | None) -> dict:
     config_keys = (
         "timezone",
         "day_start_hour",
+        "session_color_mode",
         "days",
         "venues",
         "rooms",
         "levels",
         "activity_types",
         "contributors",
+        "overview_items",
     )
     return {
         "added_session_ids": sorted(draft_sessions.keys() - published_sessions.keys()),
@@ -597,17 +890,23 @@ def compute_diff(draft: dict, published: dict | None) -> dict:
 
 
 def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
-    previous = previous or {
-        "timezone": None,
-        "day_start_hour": None,
-        "days": [],
-        "venues": [],
-        "rooms": [],
-        "levels": [],
-        "activity_types": [],
-        "contributors": [],
-        "sessions": [],
-    }
+    previous = (
+        normalize_snapshot(previous)
+        if previous
+        else {
+            "timezone": None,
+            "day_start_hour": None,
+            "session_color_mode": None,
+            "days": [],
+            "venues": [],
+            "rooms": [],
+            "levels": [],
+            "activity_types": [],
+            "contributors": [],
+            "sessions": [],
+            "overview_items": [],
+        }
+    )
     changes: list[dict] = []
     current_contributors = {
         row["id"]: row["display_name"] for row in current.get("contributors", [])
@@ -615,8 +914,16 @@ def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
     previous_contributors = {
         row["id"]: row["display_name"] for row in previous.get("contributors", [])
     }
+    current_rooms = {row["id"]: row["name"] for row in current.get("rooms", [])}
+    previous_rooms = {row["id"]: row["name"] for row in previous.get("rooms", [])}
 
-    def display_value(field: str, value, contributor_names: dict) -> object:
+    def display_value(
+        field: str, value, contributor_names: dict, room_names: dict
+    ) -> object:
+        if field == "room_ids" and isinstance(value, list):
+            return " + ".join(
+                room_names.get(room_id, "Unknown room") for room_id in value
+            )
         if field != "contributors" or not isinstance(value, list):
             return value
         return ", ".join(
@@ -624,7 +931,7 @@ def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
             for row in value
         )
 
-    setting_fields = ("timezone", "day_start_hour", "days")
+    setting_fields = ("timezone", "day_start_hour", "session_color_mode", "days")
     changed_settings = [
         {
             "field": field,
@@ -652,6 +959,7 @@ def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
         ("activity_types", "activity_type", "name"),
         ("contributors", "contributor", "display_name"),
         ("sessions", "session", "title"),
+        ("overview_items", "overview_item", "title"),
     )
     for key, entity_type, label_field in collections:
         current_rows = {str(row["id"]): row for row in current.get(key, [])}
@@ -685,10 +993,16 @@ def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
                 {
                     "field": field,
                     "before": display_value(
-                        field, previous_row.get(field), previous_contributors
+                        field,
+                        previous_row.get(field),
+                        previous_contributors,
+                        previous_rooms,
                     ),
                     "after": display_value(
-                        field, current_row.get(field), current_contributors
+                        field,
+                        current_row.get(field),
+                        current_contributors,
+                        current_rooms,
                     ),
                 }
                 for field in current_row

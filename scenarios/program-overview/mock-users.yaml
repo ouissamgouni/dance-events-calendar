@@ -1,0 +1,13 @@
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public
+  - email: dancer@example.com
+    name: Overview Dancer
+    handle: overview-dancer
+    account_visibility: public
+  - email: friend@example.com
+    name: Bootcamp Buddy
+    handle: bootcamp-buddy
+    account_visibility: public
