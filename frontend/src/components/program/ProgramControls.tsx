@@ -171,18 +171,6 @@ export function AttendeeProgramFilters({ schedule, filters, onChange, cancelledF
                     ) : undefined}
                 >
                     {sheetView === 'filters' ? <div className="space-y-5">
-                        {levels.length ? (
-                            <fieldset>
-                                <legend className="mb-2 text-sm font-semibold text-ink">Level</legend>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {levels.map((level) => (
-                                        <button key={level.id} type="button" aria-pressed={draftFilters.levelIds.includes(level.id)} onClick={() => toggleDraft('levelIds', level.id)} className={`min-h-11 rounded-field border px-2 py-2 text-sm font-medium ${draftFilters.levelIds.includes(level.id) ? 'border-action bg-action/10 text-action' : 'border-line bg-surface text-ink-soft'}`}>
-                                            {level.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </fieldset>
-                        ) : null}
                         {activityTypes.length ? (
                             <fieldset>
                                 <legend className="mb-2 text-sm font-semibold text-ink">Activity type</legend>
@@ -191,6 +179,18 @@ export function AttendeeProgramFilters({ schedule, filters, onChange, cancelledF
                                         <button key={type.id} type="button" aria-pressed={draftFilters.activityTypeIds.includes(type.id)} onClick={() => toggleDraft('activityTypeIds', type.id)} className={`flex min-h-11 items-center gap-2 rounded-field border px-3 py-2 text-sm font-medium ${draftFilters.activityTypeIds.includes(type.id) ? 'border-action bg-action/10 text-action' : 'border-line bg-surface text-ink-soft'}`}>
                                             <TypeDot color={type.color} />
                                             {type.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </fieldset>
+                        ) : null}
+                        {levels.length ? (
+                            <fieldset>
+                                <legend className="mb-2 text-sm font-semibold text-ink">Level</legend>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {levels.map((level) => (
+                                        <button key={level.id} type="button" aria-pressed={draftFilters.levelIds.includes(level.id)} onClick={() => toggleDraft('levelIds', level.id)} className={`min-h-11 rounded-field border px-2 py-2 text-sm font-medium ${draftFilters.levelIds.includes(level.id) ? 'border-action bg-action/10 text-action' : 'border-line bg-surface text-ink-soft'}`}>
+                                            {level.label}
                                         </button>
                                     ))}
                                 </div>
@@ -214,7 +214,7 @@ export function AttendeeProgramFilters({ schedule, filters, onChange, cancelledF
                             <label htmlFor={instructorSearchId} className="sr-only">Search artists and instructors</label>
                             <div className="relative">
                                 <Search size={17} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                                <input id={instructorSearchId} type="search" autoFocus value={instructorQuery} onChange={(event) => setInstructorQuery(event.target.value)} placeholder="Search artists & instructors" className="min-h-11 w-full rounded-field border border-line bg-surface py-2 pl-10 pr-3 text-base text-ink outline-none focus:border-action sm:text-sm" />
+                                <input id={instructorSearchId} type="search" value={instructorQuery} onChange={(event) => setInstructorQuery(event.target.value)} placeholder="Search artists & instructors" className="min-h-11 w-full rounded-field border border-line bg-surface py-2 pl-10 pr-3 text-base text-ink outline-none focus:border-action sm:text-sm" />
                             </div>
                             <fieldset className="mt-3 divide-y divide-line">
                                 <legend className="sr-only">Instructor</legend>
