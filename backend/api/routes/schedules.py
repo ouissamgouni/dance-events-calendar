@@ -30,6 +30,7 @@ from backend.api.schemas import (
     MyPlanEntryResponse,
     MyPlanResponse,
     MyPlanShareResponse,
+    OverviewItemAttendanceSummaryResponse,
     UpdateMyPlanAudienceRequest,
     ProgramExportResponse,
     ScheduleActivityTypeRequest,
@@ -48,6 +49,8 @@ from backend.api.schemas import (
     SchedulePublishResponse,
     ScheduleLevelRequest,
     ScheduleLevelResponse,
+    ScheduleOverviewItemRequest,
+    ScheduleOverviewItemResponse,
     ScheduleRoomRequest,
     ScheduleRoomResponse,
     ScheduleSessionCreateRequest,
@@ -70,6 +73,8 @@ from backend.db.models import (
     ScheduleActivityType,
     ScheduleContributor,
     ScheduleLevel,
+    ScheduleOverviewItem,
+    ScheduleOverviewItemRoom,
     SchedulePublication,
     ScheduleRoom,
     ScheduleSession,
@@ -87,10 +92,15 @@ from backend.services.schedules import (
     compute_diff,
     compute_issues,
     default_schedule_days,
+    delete_overview_item,
     latest_publication,
     ordered_room_ids,
+    overview_item_snapshot,
+    overview_room_ids_by_item,
     plan_counts,
     plan_entries,
+    plan_target_id,
+    replace_overview_item_rooms,
     replace_session_rooms,
     seed_default_activity_types,
     seed_default_dance_levels,
@@ -311,7 +321,79 @@ def get_session_attendance_summary(
             }
             for row in publication.snapshot.get("sessions", [])
             if not row.get("is_cancelled", False)
-        ]
+        ],
+        "overview_items": [
+            {
+                "overview_item_id": row["id"],
+                "visible_count": len(projected.get(row["id"], [])),
+                "preview_attendees": projected.get(row["id"], [])[:3],
+            }
+            for row in publication.snapshot.get("overview_items", [])
+            if row.get("allow_plan") and not row.get("is_cancelled", False)
+        ],
+    }
+
+
+def _plannable_overview_item(publication: SchedulePublication, item_id: UUID) -> dict:
+    item = next(
+        (
+            row
+            for row in publication.snapshot.get("overview_items", [])
+            if row["id"] == str(item_id)
+        ),
+        None,
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Overview item not found")
+    return item
+
+
+@public_router.get(
+    "/schedule/overview-items/{item_id}/attendees",
+    response_model=list[SessionPlanAttendeeResponse],
+)
+def get_overview_item_attendees(
+    event_id: str,
+    item_id: UUID,
+    response: Response,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    _plannable_overview_item(publication, item_id)
+    response.headers["Cache-Control"] = "private, no-store"
+    return session_attendance_projection(session, user, event_id, publication).get(
+        str(item_id), []
+    )
+
+
+@public_router.get(
+    "/schedule/overview-items/{item_id}/attendance-summary",
+    response_model=OverviewItemAttendanceSummaryResponse,
+)
+def get_overview_item_attendance_summary(
+    event_id: str,
+    item_id: UUID,
+    response: Response,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    _plannable_overview_item(publication, item_id)
+    attendees = session_attendance_projection(session, user, event_id, publication).get(
+        str(item_id), []
+    )
+    response.headers["Cache-Control"] = "private, no-store"
+    return {
+        "overview_item_id": item_id,
+        "visible_count": len(attendees),
+        "preview_attendees": attendees[:5],
     }
 
 
@@ -543,7 +625,7 @@ def export_my_plan_ics(
     if publication is None:
         raise HTTPException(status_code=404, detail="Published schedule not found")
     selected_sessions = [
-        (entry["session"], entry["status"])
+        (entry.get("session") or entry["overview_item"], entry["status"])
         for entry in plan_entries(session, user.id, event_id, publication)
     ]
     projection = _published_projection(
@@ -623,6 +705,79 @@ def remove_from_my_plan(
         select(UserPlanSession).where(
             UserPlanSession.user_id == user.id,
             UserPlanSession.session_id == session_id,
+            UserPlanSession.event_id == event_id,
+        )
+    ).first()
+    if row is not None:
+        session.delete(row)
+        session.flush()
+        reconcile_plan_activity_notifications(session, user, event_id, alert=False)
+        session.commit()
+
+
+@public_router.put(
+    "/my-plan/overview-items/{item_id}",
+    response_model=MyPlanEntryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_overview_item_to_my_plan(
+    event_id: str,
+    item_id: UUID,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+    item = _plannable_overview_item(publication, item_id)
+    if (
+        not item.get("allow_plan", False)
+        or item.get("parent_id")
+        or item.get("is_cancelled", False)
+    ):
+        raise HTTPException(
+            status_code=409, detail="This item cannot be added to My Plan"
+        )
+    existing = session.exec(
+        select(UserPlanSession).where(
+            UserPlanSession.user_id == user.id,
+            UserPlanSession.overview_item_id == item_id,
+        )
+    ).first()
+    if existing is None:
+        session.add(
+            UserPlanSession(
+                user_id=user.id,
+                overview_item_id=item_id,
+                event_id=event_id,
+                last_known_session=item,
+            )
+        )
+        session.flush()
+        reconcile_plan_activity_notifications(session, user, event_id, alert=True)
+        session.commit()
+    return {
+        "kind": "overview_item",
+        "overview_item_id": item_id,
+        "status": "active",
+        "overview_item": item,
+    }
+
+
+@public_router.delete(
+    "/my-plan/overview-items/{item_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def remove_overview_item_from_my_plan(
+    event_id: str,
+    item_id: UUID,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    row = session.exec(
+        select(UserPlanSession).where(
+            UserPlanSession.user_id == user.id,
+            UserPlanSession.overview_item_id == item_id,
             UserPlanSession.event_id == event_id,
         )
     ).first()
@@ -781,6 +936,8 @@ def update_admin_schedule(
         schedule.days = [value.isoformat() for value in data["days"]]
     if data.get("day_start_hour") is not None:
         schedule.day_start_hour = data["day_start_hour"]
+    if data.get("session_color_mode") is not None:
+        schedule.session_color_mode = data["session_color_mode"]
     schedule.updated_at = datetime.now(timezone.utc)
     session.add(schedule)
     session.commit()
@@ -825,9 +982,14 @@ def delete_venue(event_id: str, row_id: int, session: Session = Depends(get_sess
                 ScheduleSession.venue_id == row_id, ScheduleSession.deleted_at.is_(None)
             )
         ).first()
+        or session.exec(
+            select(ScheduleOverviewItem.id).where(
+                ScheduleOverviewItem.venue_id == row_id
+            )
+        ).first()
     ):
         raise HTTPException(
-            status_code=409, detail="Venue is used by rooms or sessions"
+            status_code=409, detail="Venue is used by rooms, sessions or overview items"
         )
     _delete_config_row(session, row)
 
@@ -874,6 +1036,14 @@ def delete_room(event_id: str, row_id: int, session: Session = Depends(get_sessi
     if secondary_use:
         raise HTTPException(
             status_code=409, detail="Item is used by one or more sessions"
+        )
+    if session.exec(
+        select(ScheduleOverviewItemRoom.id).where(
+            ScheduleOverviewItemRoom.room_id == row_id
+        )
+    ).first():
+        raise HTTPException(
+            status_code=409, detail="Item is used by one or more overview items"
         )
     for link in session.exec(
         select(ScheduleSessionRoom).where(ScheduleSessionRoom.room_id == row_id)
@@ -951,6 +1121,14 @@ def delete_activity_type(
 ):
     schedule = _schedule_for_event(session, event_id)
     row = _row_for_schedule(session, ScheduleActivityType, row_id, schedule.id)
+    if session.exec(
+        select(ScheduleOverviewItem.id).where(
+            ScheduleOverviewItem.activity_type_id == row_id
+        )
+    ).first():
+        raise HTTPException(
+            status_code=409, detail="Item is used by one or more overview items"
+        )
     _delete_if_unused(session, row, ScheduleSession.activity_type_id == row_id)
 
 
@@ -1139,6 +1317,114 @@ def duplicate_session(
     return _session_response(session, row)
 
 
+def _overview_item_for_schedule(
+    session: Session, schedule: EventSchedule, item_id: UUID
+) -> ScheduleOverviewItem:
+    row = session.get(ScheduleOverviewItem, item_id)
+    if row is None or row.schedule_id != schedule.id:
+        raise HTTPException(status_code=404, detail="Overview item not found")
+    return row
+
+
+def _validated_overview_data(
+    session: Session,
+    schedule: EventSchedule,
+    data: dict,
+    item_id: UUID | None = None,
+) -> dict:
+    data["start"] = to_utc(data["start"])
+    data["end"] = to_utc(data["end"])
+    if data["end"] <= data["start"]:
+        raise HTTPException(status_code=422, detail="End time must be after start time")
+    _validated_reference(session, ScheduleVenue, data.get("venue_id"), schedule.id)
+    _validated_reference(
+        session, ScheduleActivityType, data.get("activity_type_id"), schedule.id
+    )
+    parent_id = data.get("parent_id")
+    if parent_id is not None:
+        parent = _overview_item_for_schedule(session, schedule, parent_id)
+        if parent.parent_id is not None or parent.id == item_id:
+            raise HTTPException(
+                status_code=422, detail="Moments can only be nested one level deep"
+            )
+        if (
+            item_id is not None
+            and session.exec(
+                select(ScheduleOverviewItem.id).where(
+                    ScheduleOverviewItem.parent_id == item_id
+                )
+            ).first()
+        ):
+            raise HTTPException(
+                status_code=422, detail="An item with moments cannot become a moment"
+            )
+    return data
+
+
+def _overview_item_response(session: Session, row: ScheduleOverviewItem) -> dict:
+    return overview_item_snapshot(
+        row, overview_room_ids_by_item(session, [row.id]).get(row.id)
+    )
+
+
+@admin_router.post(
+    "/overview-items",
+    response_model=ScheduleOverviewItemResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_overview_item(
+    event_id: str,
+    body: ScheduleOverviewItemRequest,
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    data = body.model_dump()
+    room_ids = _validated_room_ids(session, schedule, data.pop("room_ids"))
+    data = _validated_overview_data(session, schedule, data)
+    row = ScheduleOverviewItem(schedule_id=schedule.id, **data)
+    session.add(row)
+    session.flush()
+    replace_overview_item_rooms(session, row, room_ids)
+    session.commit()
+    session.refresh(row)
+    return _overview_item_response(session, row)
+
+
+@admin_router.put(
+    "/overview-items/{item_id}", response_model=ScheduleOverviewItemResponse
+)
+def update_overview_item(
+    event_id: str,
+    item_id: UUID,
+    body: ScheduleOverviewItemRequest,
+    session: Session = Depends(get_session),
+):
+    schedule = _schedule_for_event(session, event_id)
+    row = _overview_item_for_schedule(session, schedule, item_id)
+    data = body.model_dump()
+    room_ids = _validated_room_ids(session, schedule, data.pop("room_ids"))
+    data = _validated_overview_data(session, schedule, data, item_id=row.id)
+    _apply(row, data)
+    row.updated_at = datetime.now(timezone.utc)
+    session.add(row)
+    replace_overview_item_rooms(session, row, room_ids)
+    session.commit()
+    session.refresh(row)
+    return _overview_item_response(session, row)
+
+
+@admin_router.delete(
+    "/overview-items/{item_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def remove_overview_item(
+    event_id: str, item_id: UUID, session: Session = Depends(get_session)
+):
+    schedule = _schedule_for_event(session, event_id)
+    row = _overview_item_for_schedule(session, schedule, item_id)
+    delete_overview_item(session, row)
+    session.commit()
+
+
 @admin_router.get("/issues")
 def get_schedule_issues(event_id: str, session: Session = Depends(get_session)):
     schedule = _schedule_for_event(session, event_id)
@@ -1169,7 +1455,8 @@ def get_schedule_planners(event_id: str, session: Session = Depends(get_session)
     publication = latest_publication(session, schedule.id)
     current_sessions = {
         row["id"]: row
-        for row in (publication.snapshot.get("sessions", []) if publication else [])
+        for key in ("sessions", "overview_items")
+        for row in (publication.snapshot.get(key, []) if publication else [])
     }
     plans = session.exec(
         select(UserPlanSession).where(UserPlanSession.event_id == event_id)
@@ -1203,20 +1490,21 @@ def get_schedule_planners(event_id: str, session: Session = Depends(get_session)
                 sessions=[
                     {
                         "session_id": plan.session_id,
+                        "overview_item_id": plan.overview_item_id,
                         "title": current_sessions.get(
-                            str(plan.session_id), plan.last_known_session
+                            plan_target_id(plan), plan.last_known_session
                         ).get("title", "Session"),
                         "start": current_sessions.get(
-                            str(plan.session_id), plan.last_known_session
+                            plan_target_id(plan), plan.last_known_session
                         )["start"],
                         "end": current_sessions.get(
-                            str(plan.session_id), plan.last_known_session
+                            plan_target_id(plan), plan.last_known_session
                         )["end"],
                         "status": (
                             "removed"
-                            if str(plan.session_id) not in current_sessions
+                            if plan_target_id(plan) not in current_sessions
                             else "cancelled"
-                            if current_sessions[str(plan.session_id)].get(
+                            if current_sessions[plan_target_id(plan)].get(
                                 "is_cancelled"
                             )
                             else "active"
@@ -1225,7 +1513,7 @@ def get_schedule_planners(event_id: str, session: Session = Depends(get_session)
                     for plan in sorted(
                         plans_by_user[user.id],
                         key=lambda row: current_sessions.get(
-                            str(row.session_id), row.last_known_session
+                            plan_target_id(row), row.last_known_session
                         )["start"],
                     )
                 ],

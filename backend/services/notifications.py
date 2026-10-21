@@ -94,6 +94,13 @@ EVENT_REMOVED = "event_removed"
 EVENT_CANCELLED = "event_cancelled"
 # An admin made the recipient an event's organizer (or a verified organizer).
 ORGANIZER_ASSIGNED = "organizer_assigned"
+OVERVIEW_GROUP_PREFIX = "overview:"
+
+
+def plan_group_key(plan: UserPlanSession) -> str:
+    if plan.overview_item_id is not None:
+        return f"{OVERVIEW_GROUP_PREFIX}{plan.overview_item_id}"
+    return str(plan.session_id)
 
 
 def reconcile_plan_activity_notifications(
@@ -190,7 +197,7 @@ def reconcile_plan_activity_notifications(
             row.pushed_at = None
             row.instant_emailed_at = None
             record_delivery(session, row.id, "app")
-        row.group_key = str(latest.session_id)
+        row.group_key = plan_group_key(latest)
         row.context = latest_title[:200]
         row.description = description
         session.add(row)
@@ -298,10 +305,20 @@ def notify_planned_session_changes(
     previous: dict,
     current: dict,
 ) -> list[Notification]:
-    previous_sessions = {row["id"]: row for row in previous.get("sessions", [])}
-    current_sessions = {row["id"]: row for row in current.get("sessions", [])}
+    # Overview items are plannable like sessions; ids are UUIDs so one map holds both.
+    previous_sessions = {
+        row["id"]: row
+        for key in ("sessions", "overview_items")
+        for row in previous.get(key, [])
+    }
+    current_sessions = {
+        row["id"]: row
+        for key in ("sessions", "overview_items")
+        for row in current.get(key, [])
+    }
     relevant_fields = {
         "title",
+        "subtitle",
         "instructors",
         "start",
         "end",
@@ -338,14 +355,17 @@ def notify_planned_session_changes(
     plan_rows = session.exec(
         select(UserPlanSession).where(
             UserPlanSession.event_id == event_id,
-            col(UserPlanSession.session_id).in_(changed_session_ids),
+            or_(
+                col(UserPlanSession.session_id).in_(changed_session_ids),
+                col(UserPlanSession.overview_item_id).in_(changed_session_ids),
+            ),
         )
     ).all()
     changes_by_user: dict[
         UUID, list[tuple[UserPlanSession, dict, dict | None, list[str]]]
     ] = {}
     for plan in plan_rows:
-        session_id = str(plan.session_id)
+        session_id = str(plan.overview_item_id or plan.session_id)
         before = previous_sessions.get(session_id, plan.last_known_session)
         after = current_sessions.get(session_id)
         changes = []
@@ -397,7 +417,7 @@ def notify_planned_session_changes(
             kind=PLANNED_SESSION_CHANGED,
             event_id=event_id,
             subject_key=f"publication:{version}",
-            group_key=str(single_plan.session_id) if single_plan else None,
+            group_key=plan_group_key(single_plan) if single_plan else None,
             context=(
                 plan_changes[0][1].get("title")
                 or (plan_changes[0][2] or {}).get("title")

@@ -1,6 +1,6 @@
 import type { ProgramExport, ProgramExportSession, ScheduleRoom } from '../../types';
 import { formatDayLabel, minuteOfProgramDay, roomColumnRuns, sessionRoomIds } from '../../utils/schedule';
-import { roomColor } from './RoomPill';
+import { scheduleColor, sessionCellColors } from '../../utils/scheduleColors';
 
 interface Props {
     program: ProgramExport;
@@ -92,7 +92,7 @@ function PrintableSheet({ program, groups, range, eyebrow }: { program: ProgramE
                         );
                     })}
                     {columns.map(({ day, room }, index) => {
-                        const color = roomColor(room?.color ?? 'slate');
+                        const color = scheduleColor(room?.color ?? 'slate');
                         return <div key={`${day}-${room?.id ?? 'event-wide'}`} className={`flex min-w-0 items-center justify-center border-b border-r border-line px-2 text-center text-[10px] font-bold ${color.header}`} style={{ gridColumn: index + 2, gridRow: 2 }}><span className="truncate">{room?.name ?? 'Event-wide'}</span></div>;
                     })}
 
@@ -124,7 +124,11 @@ function PrintableSheet({ program, groups, range, eyebrow }: { program: ProgramE
                         const runs: Array<[number, number]> = roomIds.length
                             ? roomColumnRuns(roomIds, columns.map((column) => column.day === session.program_day && column.room ? column.room.id : -1))
                             : [[eventWideIndex, eventWideIndex + 1]];
-                        const color = roomColor(room?.color ?? 'slate');
+                        const color = sessionCellColors(
+                            program.session_color_mode,
+                            room,
+                            program.activity_types.find((item) => item.id === session.activity_type_id),
+                        );
                         const sessionStart = Math.max(range.start, minuteOfProgramDay(session.start, program.timezone, program.day_start_hour));
                         const sessionEnd = Math.min(range.end, sessionEndMinute(session, program));
                         const firstRow = Math.floor((sessionStart - range.start) / SLOT_MINUTES) + 3;
@@ -132,10 +136,11 @@ function PrintableSheet({ program, groups, range, eyebrow }: { program: ProgramE
                         return runs.map(([startIndex, endIndex], runIndex) => (
                             <article
                                 key={`${session.id}-${runIndex}`}
-                                className={`program-calendar-session z-10 m-0.5 min-w-0 border px-1.5 py-1 ${color.cell} ${session.is_cancelled ? 'opacity-60' : ''}`}
+                                className={`program-calendar-session relative z-10 m-0.5 min-w-0 overflow-hidden border px-1.5 py-1 ${color.cell} ${color.stripe ? 'pl-2.5' : ''} ${session.is_cancelled ? 'opacity-60' : ''}`}
                                 style={{ gridColumn: `${startIndex + 2} / ${endIndex + 2}`, gridRow: `${firstRow} / span ${span}` }}
                                 data-room={room ? program.rooms.filter((item) => roomIds.includes(item.id)).map((item) => item.name).join(' + ') : 'Event-wide'}
                             >
+                                {color.stripe ? <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${color.stripe}`} /> : null}
                                 <div className="flex min-w-0 items-start gap-1">
                                     <p className={`min-w-0 flex-1 whitespace-normal text-[10px] font-bold leading-3 ${session.is_cancelled ? 'line-through' : ''}`}>{session.title}</p>
                                     {fullLevelLabel ? <span className="program-calendar-level-full shrink-0 text-[8px] font-semibold leading-3 text-action">{fullLevelLabel}</span> : null}

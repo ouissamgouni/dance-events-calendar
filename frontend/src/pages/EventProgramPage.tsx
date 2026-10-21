@@ -1,23 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Download, Pencil } from 'lucide-react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchSessionAttendanceSummary, fetchSingleSessionAttendanceSummary, removeFromMyPlan, updateMyPlanAudience, type ShareAudience } from '../api';
+import { addOverviewItemToMyPlan, addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchOverviewItemAttendanceSummary, fetchSessionAttendanceSummary, fetchSingleSessionAttendanceSummary, removeFromMyPlan, removeOverviewItemFromMyPlan, updateMyPlanAudience, type ShareAudience } from '../api';
 import MyPlanUtilityMenu from '../components/MyPlanUtilityMenu';
 import ScheduleGrid from '../components/program/ScheduleGrid';
+import ProgramOverview from '../components/program/ProgramOverview';
 import MyPlanList from '../components/program/MyPlanList';
 import PlanAudienceSheet from '../components/program/PlanAudienceSheet';
 import { AttendeeProgramFilters, ProgramDayPicker } from '../components/program/ProgramControls';
-import { PlanAttendanceFeedbackSheet, RoomDetailsSheet, SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
+import { OverviewItemSheet, PlanAttendanceFeedbackSheet, RoomDetailsSheet, SessionDetailsSheet, TimeSlotSheet } from '../components/program/SessionSheets';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { useSignIn } from '../context/SignInSheetContext';
 import { useFeatureFlags, useFeatureFlagsReady } from '../context/FeatureFlagsContext';
 import { useSetMyPlanCount } from '../context/MyPlanCountContext';
 import { usePwaInstall } from '../context/PwaInstallContext';
-import type { CalendarEvent, EventSchedule, MyPlanEntry, PlanAudience, ScheduleRoom, ScheduleSession, SessionAttendanceSummary } from '../types';
+import type { CalendarEvent, EventSchedule, MyPlanEntry, OverviewItemAttendanceSummary, PlanAudience, ScheduleOverviewItem, ScheduleRoom, ScheduleSession, SessionAttendanceSummary } from '../types';
 import { defaultRsvpAudienceFor } from '../utils/audiencePreference';
 import { programInstallDismissedKey, programPushOptInKey } from '../utils/installPromptStorage';
-import { filterScheduleSessions, firstDayWithSessions, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
+import { filterScheduleSessions, firstDayWithSessions, planEntryId, programDayOf, sessionsAtHour, sessionsForDay, type ScheduleFilters } from '../utils/schedule';
 import { trackProgramViewed } from '../utils/tracking';
 
 const EMPTY_FILTERS: ScheduleFilters = { instructor: '', levelIds: [], activityTypeIds: [] };
@@ -54,6 +55,7 @@ export default function EventProgramPage() {
     const [selectedSession, setSelectedSession] = useState<ScheduleSession | null>(null);
     const [selectedHour, setSelectedHour] = useState<number | null>(null);
     const [selectedRoom, setSelectedRoom] = useState<ScheduleRoom | null>(null);
+    const [selectedOverviewItem, setSelectedOverviewItem] = useState<ScheduleOverviewItem | null>(null);
     const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS);
     const [positionRequest, setPositionRequest] = useState(0);
     const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,8 @@ export default function EventProgramPage() {
     const [attendanceFeedbackBusy, setAttendanceFeedbackBusy] = useState(false);
     const [attendanceFeedbackError, setAttendanceFeedbackError] = useState<string | null>(null);
     const [attendanceSummaries, setAttendanceSummaries] = useState<Map<string, SessionAttendanceSummary>>(new Map());
-    const [selectedAttendance, setSelectedAttendance] = useState<SessionAttendanceSummary | null>(null);
+    const [overviewAttendanceSummaries, setOverviewAttendanceSummaries] = useState<Map<string, OverviewItemAttendanceSummary>>(new Map());
+    const [selectedAttendance, setSelectedAttendance] = useState<SessionAttendanceSummary | OverviewItemAttendanceSummary | null>(null);
     const [selectedAttendanceLoading, setSelectedAttendanceLoading] = useState(false);
     const trackedProgramEventId = useRef<string | null>(null);
 
@@ -85,7 +88,12 @@ export default function EventProgramPage() {
                     ? today
                     : stored && scheduleValue.days.includes(stored)
                         ? stored
-                        : scheduleValue.days[0] ?? '';
+                        : firstDayWithSessions(
+                            scheduleValue.days,
+                            [...scheduleValue.sessions, ...(scheduleValue.overview_items ?? []).filter((item) => !item.parent_id)],
+                            scheduleValue.timezone,
+                            scheduleValue.day_start_hour,
+                        ) ?? scheduleValue.days[0] ?? '';
             setSelectedDay(nextDay);
             try {
                 const storedFilters = sessionStorage.getItem(`program:${eventId}:filters`);
@@ -93,6 +101,12 @@ export default function EventProgramPage() {
             } catch { setFilters(EMPTY_FILTERS); }
             const sessionId = initialSearchParams.current.get('session');
             if (sessionId) setSelectedSession(scheduleValue.sessions.find((item) => item.id === sessionId) ?? null);
+            const itemId = initialSearchParams.current.get('item');
+            const linkedItem = itemId ? scheduleValue.overview_items?.find((item) => item.id === itemId) : undefined;
+            if (linkedItem) {
+                setSelectedOverviewItem(linkedItem);
+                if (!queryDay) setSelectedDay(programDayOf(linkedItem.start, scheduleValue.timezone, scheduleValue.day_start_hour));
+            }
         }).catch((reason: unknown) => {
             if (!cancelled) setError(reason instanceof Error ? reason.message : 'Program unavailable');
         });
@@ -131,38 +145,50 @@ export default function EventProgramPage() {
     useEffect(() => {
         if (!eventId || authLoading || !user || preview || !programGridAttendeePreviewEnabled) {
             setAttendanceSummaries(new Map());
+            setOverviewAttendanceSummaries(new Map());
             return;
         }
         let cancelled = false;
         fetchSessionAttendanceSummary(eventId)
             .then((value) => {
-                if (!cancelled) setAttendanceSummaries(new Map(value.sessions.map((item) => [item.session_id, item])));
+                if (cancelled) return;
+                setAttendanceSummaries(new Map(value.sessions.map((item) => [item.session_id, item])));
+                setOverviewAttendanceSummaries(new Map((value.overview_items ?? []).map((item) => [item.overview_item_id, item])));
             })
-            .catch(() => { if (!cancelled) setAttendanceSummaries(new Map()); });
+            .catch(() => {
+                if (cancelled) return;
+                setAttendanceSummaries(new Map());
+                setOverviewAttendanceSummaries(new Map());
+            });
         return () => { cancelled = true; };
     }, [authLoading, eventId, preview, programGridAttendeePreviewEnabled, user]);
 
+    const selectedPlannableItem = selectedOverviewItem?.allow_plan && !selectedOverviewItem.parent_id ? selectedOverviewItem : null;
     useEffect(() => {
-        if (!eventId || authLoading || !user || preview || !selectedSession) {
+        const target = selectedSession
+            ? { id: selectedSession.id, cached: attendanceSummaries.get(selectedSession.id), load: fetchSingleSessionAttendanceSummary }
+            : selectedPlannableItem
+                ? { id: selectedPlannableItem.id, cached: overviewAttendanceSummaries.get(selectedPlannableItem.id), load: fetchOverviewItemAttendanceSummary }
+                : null;
+        if (!eventId || authLoading || !user || preview || !target) {
             setSelectedAttendance(null);
             setSelectedAttendanceLoading(false);
             return;
         }
-        const cached = attendanceSummaries.get(selectedSession.id);
-        if (cached) {
-            setSelectedAttendance(cached);
+        if (target.cached) {
+            setSelectedAttendance(target.cached);
             setSelectedAttendanceLoading(false);
             return;
         }
         let cancelled = false;
         setSelectedAttendance(null);
         setSelectedAttendanceLoading(true);
-        fetchSingleSessionAttendanceSummary(eventId, selectedSession.id)
+        target.load(eventId, target.id)
             .then((value) => { if (!cancelled) setSelectedAttendance(value); })
             .catch(() => { if (!cancelled) setSelectedAttendance(null); })
             .finally(() => { if (!cancelled) setSelectedAttendanceLoading(false); });
         return () => { cancelled = true; };
-    }, [attendanceSummaries, authLoading, eventId, preview, selectedSession, user]);
+    }, [attendanceSummaries, authLoading, eventId, overviewAttendanceSummaries, preview, selectedPlannableItem, selectedSession, user]);
 
     useEffect(() => {
         if (activeTab !== 'program') {
@@ -174,7 +200,7 @@ export default function EventProgramPage() {
         trackProgramViewed();
     }, [activeTab, eventId, preview, schedule]);
 
-    const plannedIds = useMemo(() => new Set(user ? plan.filter((entry) => entry.status !== 'removed').map((entry) => entry.session_id) : []), [plan, user]);
+    const plannedIds = useMemo(() => new Set(user ? plan.filter((entry) => entry.status !== 'removed').map(planEntryId) : []), [plan, user]);
     const filteredSessions = useMemo(
         () => schedule ? filterScheduleSessions(schedule.sessions, filters) : [],
         [filters, schedule],
@@ -189,6 +215,20 @@ export default function EventProgramPage() {
     const hourSessions = schedule && selectedHour != null
         ? sessionsAtHour(daySessions, selectedHour, schedule.timezone, schedule.day_start_hour)
         : [];
+    const hasOverview = Boolean(schedule?.overview_items?.some((item) => !item.parent_id));
+    const hasSessions = Boolean(schedule?.sessions.length);
+    const requestedView = searchParams.get('view');
+    const programView: 'overview' | 'schedule' = hasOverview && (!hasSessions || requestedView !== 'schedule') ? 'overview' : 'schedule';
+    const focusItemId = programView === 'schedule' ? searchParams.get('focus') : null;
+    const focusItem = focusItemId ? schedule?.overview_items?.find((item) => item.id === focusItemId) : undefined;
+    const focusWindow = useMemo(
+        () => focusItem ? { start: focusItem.start, end: focusItem.end, token: `${focusItem.id}:${location.key}` } : null,
+        [focusItem, location.key],
+    );
+    const dayContent = useMemo(
+        () => programView === 'overview' ? (schedule?.overview_items ?? []).filter((item) => !item.parent_id) : filteredSessions,
+        [filteredSessions, programView, schedule],
+    );
 
     const selectDay = (day: string) => {
         setSelectedDay(day);
@@ -222,6 +262,44 @@ export default function EventProgramPage() {
         const next = new URLSearchParams(searchParams);
         next.delete('session');
         setSearchParams(next, { replace: true });
+    };
+    const openOverviewDetails = (item: ScheduleOverviewItem) => {
+        setSelectedOverviewItem(item);
+        const next = new URLSearchParams(searchParams);
+        next.set('item', item.id);
+        setSearchParams(next, { replace: true });
+    };
+    const closeOverviewDetails = () => {
+        setSelectedOverviewItem(null);
+        const next = new URLSearchParams(searchParams);
+        next.delete('item');
+        setSearchParams(next, { replace: true });
+    };
+    const closeSheets = () => {
+        setSelectedSession(null);
+        setSelectedOverviewItem(null);
+        const next = new URLSearchParams(searchParams);
+        next.delete('session');
+        next.delete('item');
+        setSearchParams(next, { replace: true });
+    };
+    const switchProgramView = (view: 'overview' | 'schedule') => {
+        const next = new URLSearchParams(searchParams);
+        next.set('view', view);
+        next.delete('focus');
+        setSearchParams(next, { replace: true });
+    };
+    const openOverviewInSchedule = (item: ScheduleOverviewItem) => {
+        if (!schedule) return;
+        const day = programDayOf(item.start, schedule.timezone, schedule.day_start_hour);
+        setSelectedDay(day);
+        if (eventId) sessionStorage.setItem(`program:${eventId}:day`, day);
+        const next = new URLSearchParams(searchParams);
+        next.set('view', 'schedule');
+        next.set('day', day);
+        next.set('focus', item.id);
+        // Pushed (not replaced) so Back returns to the Overview.
+        navigate({ search: `?${next}` }, { state: location.state });
     };
     const requestProgramInstallInvitation = () => {
         if (!eventId || !user?.user_id || localStorage.getItem(programInstallDismissedKey(user.user_id, eventId))) return;
@@ -258,14 +336,14 @@ export default function EventProgramPage() {
             const audience = defaultRsvpAudienceFor(user);
             const markedGoing = await toggleAttending(eventId, audience).catch(() => false);
             if (markedGoing) {
-                closeSession();
+                closeSheets();
                 setAttendanceFeedback({ audience, inviteAfterClose });
                 return;
             }
         }
         if (inviteAfterClose) {
             requestProgramInstallInvitation();
-            closeSession();
+            closeSheets();
         }
     };
     const persistPlanAudience = async (audience: PlanAudience) => {
@@ -293,29 +371,33 @@ export default function EventProgramPage() {
             // Error is rendered in the sheet.
         }
     };
-    const togglePlan = async (session: ScheduleSession) => {
+    const togglePlanEntry = async (
+        id: string,
+        optimistic: MyPlanEntry,
+        add: () => Promise<MyPlanEntry>,
+        remove: () => Promise<void>,
+    ) => {
         if (!eventId) return;
-        const existing = plan.find((entry) => entry.session_id === session.id);
+        const existing = plan.find((entry) => planEntryId(entry) === id);
         const previous = plan;
         if (existing) {
-            setPlan((rows) => rows.filter((entry) => entry.session_id !== session.id));
+            setPlan((rows) => rows.filter((entry) => planEntryId(entry) !== id));
             try {
-                await removeFromMyPlan(eventId, session.id);
+                await remove();
             } catch (reason) {
                 setPlan(previous);
                 throw reason;
             }
         } else {
-            const optimistic: MyPlanEntry = { session_id: session.id, status: 'active', session };
             setPlan((rows) => [...rows, optimistic]);
             try {
-                const saved = await addToMyPlan(eventId, session.id);
-                setPlan((rows) => rows.map((entry) => entry.session_id === session.id ? saved : entry));
+                const saved = await add();
+                setPlan((rows) => rows.map((entry) => planEntryId(entry) === id ? saved : entry));
                 const inviteAfterClose = Boolean(user?.user_id && !localStorage.getItem(programInstallDismissedKey(user.user_id, eventId)));
                 if (planAudienceLoaded && planAudience === null) {
                     setPendingPostAdd({ inviteAfterClose });
                     setPlanAudiencePrompt(true);
-                    closeSession();
+                    closeSheets();
                     return;
                 }
                 await continueAfterPlanAudience(inviteAfterClose);
@@ -325,15 +407,50 @@ export default function EventProgramPage() {
             }
         }
     };
-    const removePlanEntry = async (sessionId: string) => {
+    const togglePlan = async (session: ScheduleSession) => {
         if (!eventId) return;
+        await togglePlanEntry(
+            session.id,
+            { session_id: session.id, status: 'active', session },
+            () => addToMyPlan(eventId, session.id),
+            () => removeFromMyPlan(eventId, session.id),
+        );
+    };
+    const toggleOverviewPlan = async (item: ScheduleOverviewItem) => {
+        if (!eventId) return;
+        await togglePlanEntry(
+            item.id,
+            { kind: 'overview_item', overview_item_id: item.id, status: 'active', overview_item: item },
+            () => addOverviewItemToMyPlan(eventId, item.id),
+            () => removeOverviewItemFromMyPlan(eventId, item.id),
+        );
+    };
+    const toggleOverviewPlanRef = useRef(toggleOverviewPlan);
+    useEffect(() => {
+        toggleOverviewPlanRef.current = toggleOverviewPlan;
+    });
+    const toggleOverviewPlanFromCard = async (item: ScheduleOverviewItem) => {
+        if (!user) {
+            openSignIn('my_plans', { onSignedIn: () => { toggleOverviewPlanRef.current(item).catch(() => undefined); } });
+            return;
+        }
+        await toggleOverviewPlan(item);
+    };
+    const removePlanEntry = async (entry: MyPlanEntry) => {
+        if (!eventId) return;
+        const id = planEntryId(entry);
         const previous = plan;
-        setPlan((rows) => rows.filter((entry) => entry.session_id !== sessionId));
+        setPlan((rows) => rows.filter((row) => planEntryId(row) !== id));
         try {
-            await removeFromMyPlan(eventId, sessionId);
+            if (entry.kind === 'overview_item') await removeOverviewItemFromMyPlan(eventId, id);
+            else await removeFromMyPlan(eventId, id);
         } catch {
             setPlan(previous);
         }
+    };
+    const openPlanEntry = (entry: MyPlanEntry) => {
+        if (entry.kind === 'overview_item') openOverviewDetails(entry.overview_item);
+        else openSession(entry.session);
     };
     const backToEvent = () => {
         if (inOverlay && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) setLeaving(true);
@@ -375,19 +492,33 @@ export default function EventProgramPage() {
                     <ProgramTab active={activeTab === 'program'} onClick={() => navigateProgramTab(`/event/${event.event_id}/program${searchParams.toString() ? `?${searchParams}` : ''}`)}>Program</ProgramTab>
                     <ProgramTab active={activeTab === 'plan'} onClick={() => navigateProgramTab(`/event/${event.event_id}/program/plan${searchParams.toString() ? `?${searchParams}` : ''}`)}>My Plan{plan.length ? ` (${plan.length})` : ''}</ProgramTab>
                 </div> : null}
-                {activeTab === 'program' ? <AttendeeProgramFilters schedule={schedule} filters={filters} onChange={updateFilters} /> : null}
-                {activeTab === 'program' ? <ProgramDayPicker schedule={schedule} sessions={filteredSessions} selectedDay={selectedDay} filtersActive={Boolean(filters.instructor || filters.levelIds.length || filters.activityTypeIds.length)} softSelection onSelect={selectDay} /> : null}
+                {activeTab === 'program' && hasOverview && hasSessions ? (
+                    <div className="mx-auto flex max-w-5xl gap-4 pt-2" role="tablist" aria-label="Program view">
+                        <ViewTab active={programView === 'overview'} onClick={() => switchProgramView('overview')}>Overview</ViewTab>
+                        <ViewTab active={programView === 'schedule'} onClick={() => switchProgramView('schedule')}>Full schedule</ViewTab>
+                    </div>
+                ) : null}
+                {activeTab === 'program' && programView === 'schedule' ? <AttendeeProgramFilters schedule={schedule} filters={filters} onChange={updateFilters} /> : null}
+                {activeTab === 'program' ? <ProgramDayPicker schedule={schedule} sessions={dayContent} selectedDay={selectedDay} filtersActive={programView === 'schedule' && Boolean(filters.instructor || filters.levelIds.length || filters.activityTypeIds.length)} softSelection onSelect={selectDay} /> : null}
             </div>
 
             <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col">
-                {activeTab === 'program' ? (
-                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} compactHeader attendeeSummaries={attendanceSummaries} onRoomClick={setSelectedRoom} />
+                {activeTab === 'program' && programView === 'overview' ? (
+                    <ProgramOverview
+                        schedule={schedule}
+                        day={selectedDay}
+                        onOpenSchedule={openOverviewInSchedule}
+                        onOpenDetails={openOverviewDetails}
+                        plan={preview ? undefined : { plannedIds, onToggle: toggleOverviewPlanFromCard, attendeeSummaries: overviewAttendanceSummaries }}
+                    />
+                ) : activeTab === 'program' ? (
+                    <ScheduleGrid schedule={filteredSchedule ?? schedule} day={selectedDay} plannedSessionIds={plannedIds} onSessionClick={openSession} onTimeClick={setSelectedHour} positionRequest={positionRequest} compactHeader attendeeSummaries={attendanceSummaries} onRoomClick={setSelectedRoom} focusWindow={focusWindow} />
                 ) : user ? (
                     <div className="flex min-h-0 flex-1 flex-col">
                         {plan.length ? <div className="shrink-0 border-b border-line bg-surface px-4 py-2 text-right">
                             <MyPlanUtilityMenu eventId={event.event_id} audience={planAudience} onAudienceChange={persistPlanAudience} />
                         </div> : null}
-                        <MyPlanList schedule={schedule} entries={plan} onOpen={openSession} onRemove={removePlanEntry} onProgram={() => navigateProgramTab(`/event/${event.event_id}/program`)} />
+                        <MyPlanList schedule={schedule} entries={plan} onOpen={openPlanEntry} onRemove={removePlanEntry} onProgram={() => navigateProgramTab(`/event/${event.event_id}/program`)} />
                     </div>
                 ) : (
                     <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -408,6 +539,18 @@ export default function EventProgramPage() {
                 />
             ) : null}
             {selectedRoom ? <RoomDetailsSheet schedule={schedule} room={selectedRoom} onClose={() => setSelectedRoom(null)} /> : null}
+            {selectedOverviewItem ? (
+                <OverviewItemSheet
+                    schedule={schedule}
+                    item={selectedOverviewItem}
+                    onClose={closeOverviewDetails}
+                    planned={plannedIds.has(selectedOverviewItem.id)}
+                    onTogglePlan={preview ? undefined : toggleOverviewPlan}
+                    attendanceSummary={selectedPlannableItem ? selectedAttendance : null}
+                    attendanceLoading={selectedAttendanceLoading}
+                    eventId={event.event_id}
+                />
+            ) : null}
             {selectedSession ? (
                 <SessionDetailsSheet schedule={schedule} session={selectedSession} planned={plannedIds.has(selectedSession.id)} preview={preview} onClose={closeSession} onTogglePlan={togglePlan} attendanceSummary={selectedAttendance} attendanceLoading={selectedAttendanceLoading} eventId={event.event_id} />
             ) : null}
@@ -435,6 +578,10 @@ export default function EventProgramPage() {
 
 function ProgramTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
     return <button type="button" onClick={onClick} className={`rounded-field px-3 py-2 text-sm font-semibold ${active ? 'bg-action/10 text-action' : 'text-ink-soft'}`}>{children}</button>;
+}
+
+function ViewTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+    return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`border-b-2 px-1 py-2 text-sm font-semibold ${active ? 'border-action text-action' : 'border-transparent text-ink-soft'}`}>{children}</button>;
 }
 
 function ProgramState({ title, detail, onBack }: { title: string; detail?: string; onBack: () => void }) {

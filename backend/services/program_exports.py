@@ -176,6 +176,7 @@ def build_program_projection(
         "program_url": f"{app_url}/event/{quote(event.event_id, safe='')}/program",
         "timezone": timezone_name,
         "day_start_hour": day_start_hour,
+        "session_color_mode": snapshot.get("session_color_mode", "room"),
         "available_days": available_days,
         "selected_days": selected_days,
         "venues": snapshot.get("venues", []),

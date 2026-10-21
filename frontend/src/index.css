@@ -81,6 +81,22 @@
   animation: fade-in 0.2s ease-out;
 }
 
+@keyframes session-flash {
+
+  0%,
+  60% {
+    box-shadow: 0 0 0 3px var(--color-action);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@utility animate-session-flash {
+  animation: session-flash 1.6s ease-out;
+}
+
 /* ── Design-system tokens (Light theme) ────────────────
    Tailwind v4 CSS-first theme. Emits utilities like bg-brand,
    text-ink, border-line, rounded-card, etc. Semantic names map

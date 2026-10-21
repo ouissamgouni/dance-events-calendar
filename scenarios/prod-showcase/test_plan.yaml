@@ -237,3 +237,16 @@ test_plan:
         Each past weekender shows five of Elena's
         photos in Memories. Her friends see the photos; strangers do not.
       verification: "Ticket PDFs and images open in the viewer and memories respect friends visibility."
+
+    - id: 21
+      title: "Browse a festival Overview and drill down"
+      description: |
+        Open Brussels Latin Weekender > Program. Browse Friday to Sunday on the
+        Overview, tap Saturday's Workshops, go Back, then tap Registration desk.
+      expected: |
+        The Overview opens first with festival-style blocks per day (Registration
+        desk, Welcome Party, Workshops, Afternoon Social, Saturday Night with a
+        Shows moment, Farewell Social with Closing announcements). Workshops opens
+        the Full schedule at 12:00 with the nine Saturday workshops briefly
+        highlighted; Back returns to the Overview. Registration desk opens an info sheet.
+      verification: "Overview, Full schedule and My Plan stay consistent for the same event."

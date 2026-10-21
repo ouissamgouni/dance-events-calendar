@@ -1266,6 +1266,7 @@ def test_schedule_diff_ignores_fields_missing_from_older_publications():
         "sessions": [{"id": "session-1", "title": "Workshop", "room_id": 1}],
     }
     current = {
+        "session_color_mode": "room",
         "rooms": [{"id": 1, "name": "Grand Hall", "details": None}],
         "sessions": [
             {
@@ -1276,9 +1277,375 @@ def test_schedule_diff_ignores_fields_missing_from_older_publications():
                 "description": None,
             }
         ],
+        "overview_items": [],
     }
 
     assert compute_change_details(current, previous) == []
+
+
+def _overview_document(overview_items):
+    document = {
+        "schema_version": 2,
+        "event_id": "back-2-mambo-2026",
+        "timezone": "Europe/Zagreb",
+        "day_start_hour": 7,
+        "days": ["2026-11-27"],
+        "rooms": [{"external_id": "salsa", "name": "Salsa Room", "sort_order": 0}],
+        "activity_types": [
+            {"external_id": "registration", "name": "Registration"},
+            {"external_id": "workshop", "name": "Workshop"},
+            {"external_id": "party", "name": "Party"},
+            {"external_id": "show", "name": "Show"},
+        ],
+        "sessions": [
+            {
+                "external_id": "fri-turns",
+                "title": "Turn Technique",
+                "start": "2026-11-27T14:00:00",
+                "end": "2026-11-27T15:00:00",
+                "room_external_ids": ["salsa"],
+                "activity_type_external_id": "workshop",
+            }
+        ],
+    }
+    if overview_items is not None:
+        document["overview_items"] = overview_items
+    return document
+
+
+FRIDAY_OVERVIEW = [
+    {
+        "external_id": "fri-registration",
+        "title": "Registration & Open Office Hours",
+        "start": "2026-11-27T13:00:00",
+        "end": "2026-11-27T20:30:00",
+        "activity_type_external_id": "registration",
+    },
+    {
+        "external_id": "fri-workshops",
+        "title": "Workshops",
+        "start": "2026-11-27T13:00:00",
+        "end": "2026-11-27T17:00:00",
+        "activity_type_external_id": "workshop",
+        "url": "https://example.com/workshops",
+        "opens_detail": True,
+    },
+    {
+        "external_id": "fri-party",
+        "title": "Friday Party",
+        "subtitle": "All I want for Christmas is ... Salsa!",
+        "start": "2026-11-27T22:30:00",
+        "end": "2026-11-28T05:00:00",
+        "activity_type_external_id": "party",
+        "room_external_ids": ["salsa"],
+        "opens_detail": True,
+    },
+    {
+        "external_id": "fri-shows",
+        "parent_external_id": "fri-party",
+        "title": "Artists presentation & Shows",
+        "start": "2026-11-28T00:00:00",
+        "end": "2026-11-28T00:30:00",
+        "activity_type_external_id": "show",
+    },
+    {
+        "external_id": "fri-artist-hour",
+        "parent_external_id": "fri-party",
+        "title": "Artist hour",
+        "start": "2026-11-28T04:30:00",
+        "end": "2026-11-28T05:30:00",
+    },
+]
+
+
+def test_schedule_overview_items_import_export_and_publish(client, schedule_event):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    client.post(base, json={"timezone": "Europe/Zagreb", "days": ["2026-11-27"]})
+
+    imported = client.post(
+        f"{base}/import",
+        json={"mode": "replace", "document": _overview_document(FRIDAY_OVERVIEW)},
+    )
+    assert imported.status_code == 200, imported.text
+
+    draft = client.get(base).json()
+    items = {row["external_id"]: row for row in draft["overview_items"]}
+    assert len(items) == 5
+    assert items["fri-shows"]["parent_id"] == items["fri-party"]["id"]
+    assert items["fri-party"]["room_ids"] == [draft["rooms"][0]["id"]]
+    assert items["fri-workshops"]["start"] == "2026-11-27T12:00:00Z"
+    issues = {
+        (issue["code"], tuple(issue["overview_item_ids"])) for issue in draft["issues"]
+    }
+    assert ("overview_no_sessions_in_window", (items["fri-party"]["id"],)) in issues
+    assert (
+        "overview_moment_outside_parent",
+        (items["fri-artist-hour"]["id"],),
+    ) in issues
+    assert not any(
+        code == "overview_no_sessions_in_window" and items["fri-workshops"]["id"] in ids
+        for code, ids in issues
+    )
+
+    exported = client.get(f"{base}/export").json()
+    assert exported["overview_items"][3]["parent_external_id"] == "fri-party"
+    repeated = client.post(
+        f"{base}/import", json={"mode": "merge", "document": exported}
+    )
+    assert repeated.json()["operations"]["updated"] == 0
+
+    untouched = client.post(
+        f"{base}/import",
+        json={"mode": "replace", "document": _overview_document(None)},
+    )
+    assert untouched.json()["operations"]["removed"] == 0
+    assert len(client.get(base).json()["overview_items"]) == 5
+
+    publish = client.post(f"{base}/publish", json={})
+    assert publish.status_code == 200
+    public = client.get("/api/events/back-2-mambo-2026/schedule").json()
+    assert [row["title"] for row in public["overview_items"]][:2] == [
+        "Registration & Open Office Hours",
+        "Workshops",
+    ]
+
+    cleared = client.post(
+        f"{base}/import",
+        json={"mode": "replace", "document": _overview_document([])},
+    )
+    assert cleared.json()["operations"]["removed"] == 5
+    changes = client.get(base).json()["diff"]["changes"]
+    assert {
+        change["operation"]
+        for change in changes
+        if change["entity_type"] == "overview_item"
+    } == {"remove"}
+
+    nested_too_deep = _overview_document(
+        [
+            {**FRIDAY_OVERVIEW[2]},
+            {**FRIDAY_OVERVIEW[3]},
+            {
+                **FRIDAY_OVERVIEW[4],
+                "parent_external_id": "fri-shows",
+            },
+        ]
+    )
+    assert (
+        client.post(
+            f"{base}/import-preview",
+            json={"mode": "merge", "document": nested_too_deep},
+        ).status_code
+        == 422
+    )
+
+
+def test_schedule_overview_item_admin_crud_and_validation(client, schedule_event):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    schedule = client.post(
+        base, json={"timezone": "Europe/Zagreb", "days": ["2026-11-27"]}
+    ).json()
+    party_type = next(
+        row["id"] for row in schedule["activity_types"] if row["name"] == "Party"
+    )
+    party = client.post(
+        f"{base}/overview-items",
+        json={
+            "title": "Friday Party",
+            "start": "2026-11-27T21:30:00Z",
+            "end": "2026-11-28T04:00:00Z",
+            "activity_type_id": party_type,
+            "opens_detail": True,
+        },
+    )
+    assert party.status_code == 201, party.text
+    party_id = party.json()["id"]
+    moment = client.post(
+        f"{base}/overview-items",
+        json={
+            "parent_id": party_id,
+            "title": "Show performances",
+            "start": "2026-11-27T22:30:00Z",
+            "end": "2026-11-27T23:15:00Z",
+        },
+    )
+    assert moment.status_code == 201
+    moment_id = moment.json()["id"]
+
+    def body(**overrides):
+        return {
+            "title": "Bad",
+            "start": "2026-11-27T22:30:00Z",
+            "end": "2026-11-27T23:00:00Z",
+            **overrides,
+        }
+
+    assert (
+        client.post(
+            f"{base}/overview-items", json=body(parent_id=moment_id)
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            f"{base}/overview-items", json=body(parent_id=party_id, opens_detail=True)
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            f"{base}/overview-items", json=body(url="javascript:alert(1)")
+        ).status_code
+        == 422
+    )
+    assert (
+        client.put(
+            f"{base}/overview-items/{party_id}",
+            json=body(parent_id=moment_id),
+        ).status_code
+        == 422
+    )
+    assert client.delete(f"{base}/activity-types/{party_type}").status_code == 409
+
+    renamed = client.put(
+        f"{base}/overview-items/{party_id}",
+        json={**party.json(), "title": "Friday Gala"},
+    )
+    assert renamed.status_code == 200
+    assert renamed.json()["title"] == "Friday Gala"
+
+    assert client.delete(f"{base}/overview-items/{party_id}").status_code == 204
+    assert client.get(base).json()["overview_items"] == []
+
+
+def test_overview_item_my_plan_lifecycle_and_color_mode(client, schedule_event):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    schedule = client.post(
+        base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+    ).json()
+    bootcamp_type = next(
+        row["id"] for row in schedule["activity_types"] if row["name"] == "Bootcamp"
+    )
+    assert (
+        client.post(
+            f"{base}/rooms", json={"name": "Hall", "color": "chartreuse"}
+        ).status_code
+        == 422
+    )
+    assert client.patch(base, json={"session_color_mode": "rainbow"}).status_code == 422
+    patched = client.patch(base, json={"session_color_mode": "activity_type_stripe"})
+    assert patched.json()["session_color_mode"] == "activity_type_stripe"
+
+    workshop = client.post(
+        f"{base}/sessions",
+        json={
+            "title": "Turn Technique",
+            "start": "2026-10-16T12:00:00Z",
+            "end": "2026-10-16T13:00:00Z",
+        },
+    ).json()
+
+    def overview(**overrides):
+        return {
+            "title": "Partnerwork Bootcamp",
+            "start": "2026-10-16T12:30:00Z",
+            "end": "2026-10-16T14:00:00Z",
+            "activity_type_id": bootcamp_type,
+            "allow_plan": True,
+            **overrides,
+        }
+
+    bootcamp = client.post(f"{base}/overview-items", json=overview()).json()
+    registration = client.post(
+        f"{base}/overview-items",
+        json=overview(title="Registration", allow_plan=False),
+    ).json()
+    assert (
+        client.post(
+            f"{base}/overview-items",
+            json=overview(parent_id=bootcamp["id"], title="Break"),
+        ).status_code
+        == 422
+    )
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+    public = client.get("/api/events/back-2-mambo-2026/schedule").json()
+    assert public["session_color_mode"] == "activity_type_stripe"
+
+    _login(client, "dancer@example.com")
+    plan_base = "/api/events/back-2-mambo-2026/my-plan"
+    assert (
+        client.put(f"{plan_base}/overview-items/{registration['id']}").status_code
+        == 409
+    )
+    assert client.put(f"{plan_base}/overview-items/{uuid4()}").status_code == 404
+    added = client.put(f"{plan_base}/overview-items/{bootcamp['id']}")
+    assert added.status_code == 201
+    assert added.json()["kind"] == "overview_item"
+    assert added.json()["overview_item"]["title"] == "Partnerwork Bootcamp"
+    assert client.put(f"{plan_base}/{workshop['id']}").status_code == 201
+    entries = client.get(plan_base).json()["entries"]
+    assert [entry["kind"] for entry in entries] == ["overview_item", "session"]
+    assert client.post(
+        "/api/my-plan/counts", json={"event_ids": ["back-2-mambo-2026"]}
+    ).json() == [{"event_id": "back-2-mambo-2026", "plan_count": 2}]
+    assert f"UID:{bootcamp['id']}@program.joinmovida.com" in (
+        client.get(f"{plan_base}/ics").text
+    )
+    summary = client.get(
+        "/api/events/back-2-mambo-2026/schedule/attendance-summary"
+    ).json()
+    assert summary["overview_items"] == [
+        {
+            "overview_item_id": bootcamp["id"],
+            "visible_count": 1,
+            "preview_attendees": summary["overview_items"][0]["preview_attendees"],
+        }
+    ]
+    assert (
+        client.get(
+            f"/api/events/back-2-mambo-2026/schedule/overview-items/{bootcamp['id']}/attendance-summary"
+        ).json()["visible_count"]
+        == 1
+    )
+
+    _login(client, "admin@example.com")
+    planners = client.get(f"{base}/planners").json()
+    assert planners[0]["planned_session_count"] == 2
+    assert planners[0]["sessions"][1]["overview_item_id"] == bootcamp["id"]
+    moved = client.put(
+        f"{base}/overview-items/{bootcamp['id']}",
+        json={**bootcamp, "start": "2026-10-16T13:00:00Z"},
+    )
+    assert moved.status_code == 200
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+
+    _login(client, "dancer@example.com")
+    notice = next(
+        row
+        for row in client.get("/api/notifications").json()["items"]
+        if row["kind"] == "planned_session_changed"
+    )
+    assert notice["schedule_overview_item_id"] == bootcamp["id"]
+    assert notice["schedule_session_id"] is None
+    assert "has a new time" in notice["description"]
+
+    _login(client, "admin@example.com")
+    assert client.delete(f"{base}/overview-items/{bootcamp['id']}").status_code == 204
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+
+    _login(client, "dancer@example.com")
+    entries = client.get(plan_base).json()["entries"]
+    assert entries[0]["status"] == "removed"
+    assert entries[0]["overview_item"]["title"] == "Partnerwork Bootcamp"
+    assert (
+        client.delete(f"{plan_base}/overview-items/{bootcamp['id']}").status_code == 204
+    )
+    assert [entry["kind"] for entry in client.get(plan_base).json()["entries"]] == [
+        "session"
+    ]
 
 
 def test_schedule_json_import_rejects_unknown_reference_without_writes(

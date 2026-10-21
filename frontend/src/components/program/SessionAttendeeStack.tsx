@@ -26,7 +26,7 @@ export default function SessionAttendeeStack({
     max = 2,
     size = 'md',
 }: {
-    summary: SessionAttendanceSummary;
+    summary: Pick<SessionAttendanceSummary, 'visible_count' | 'preview_attendees'>;
     max?: number;
     size?: 'sm' | 'md';
 }) {

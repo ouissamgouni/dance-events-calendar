@@ -11,6 +11,7 @@ from backend.db.models import (
     ScheduleActivityType,
     ScheduleContributor,
     ScheduleLevel,
+    ScheduleOverviewItem,
     ScheduleRoom,
     ScheduleSession,
     ScheduleSessionContributor,
@@ -19,7 +20,10 @@ from backend.db.models import (
 from backend.services.schedules import (
     build_snapshot,
     effective_room_ids,
+    overview_room_ids_by_item,
+    replace_overview_item_rooms,
     replace_session_rooms,
+    schedule_overview_items,
     session_room_ids_by_session,
     utc_isoformat,
     validate_timezone,
@@ -37,6 +41,7 @@ def build_schedule_import_example(schedule: EventSchedule) -> dict:
         "event_id": schedule.event_id,
         "timezone": schedule.timezone,
         "day_start_hour": schedule.day_start_hour,
+        "session_color_mode": schedule.session_color_mode,
         "days": [day],
         "venues": [
             {
@@ -111,6 +116,44 @@ def build_schedule_import_example(schedule: EventSchedule) -> dict:
                 "is_cancelled": False,
             }
         ],
+        "overview_items": [
+            {
+                "external_id": "sample-workshops-block",
+                "parent_external_id": None,
+                "title": "Workshops",
+                "subtitle": None,
+                "description": None,
+                "url": None,
+                "url_label": None,
+                "start": f"{day}T10:00:00",
+                "end": f"{day}T12:00:00",
+                "activity_type_external_id": "sample-workshop",
+                "venue_external_id": "sample-main-venue",
+                "room_external_ids": [],
+                "opens_detail": True,
+                "allow_plan": False,
+                "is_cancelled": False,
+                "sort_order": 0,
+            },
+            {
+                "external_id": "sample-bootcamp",
+                "parent_external_id": None,
+                "title": "Sample Bootcamp",
+                "subtitle": "Separate ticket",
+                "description": None,
+                "url": None,
+                "url_label": None,
+                "start": f"{day}T13:00:00",
+                "end": f"{day}T15:00:00",
+                "activity_type_external_id": "sample-workshop",
+                "venue_external_id": "sample-main-venue",
+                "room_external_ids": ["sample-grand-room"],
+                "opens_detail": False,
+                "allow_plan": True,
+                "is_cancelled": False,
+                "sort_order": 1,
+            },
+        ],
     }
 
 
@@ -176,6 +219,11 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
     rooms_by_session = session_room_ids_by_session(
         session, [row.id for row in sessions]
     )
+    overview_items = schedule_overview_items(session, schedule.id)
+    rooms_by_item = overview_room_ids_by_item(
+        session, [row.id for row in overview_items]
+    )
+    overview_refs = {row.id: _external_id(row, "overview") for row in overview_items}
     zone = ZoneInfo(schedule.timezone)
 
     def local_iso(value: datetime) -> str:
@@ -187,6 +235,7 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
         "event_id": schedule.event_id,
         "timezone": schedule.timezone,
         "day_start_hour": schedule.day_start_hour,
+        "session_color_mode": schedule.session_color_mode,
         "days": schedule.days,
         "venues": [
             {
@@ -266,6 +315,31 @@ def export_schedule_document(session: Session, schedule: EventSchedule) -> dict:
             }
             for row in sessions
         ],
+        "overview_items": [
+            {
+                "external_id": overview_refs[row.id],
+                "parent_external_id": overview_refs.get(row.parent_id),
+                "title": row.title,
+                "subtitle": row.subtitle,
+                "description": row.description,
+                "url": row.url,
+                "url_label": row.url_label,
+                "start": local_iso(row.start),
+                "end": local_iso(row.end),
+                "activity_type_external_id": type_refs.get(row.activity_type_id),
+                "venue_external_id": venue_refs.get(row.venue_id),
+                "room_external_ids": [
+                    room_refs[room_id]
+                    for room_id in rooms_by_item.get(row.id, [])
+                    if room_id in room_refs
+                ],
+                "opens_detail": row.opens_detail,
+                "allow_plan": row.allow_plan,
+                "is_cancelled": row.is_cancelled,
+                "sort_order": row.sort_order,
+            }
+            for row in overview_items
+        ],
     }
 
 
@@ -309,6 +383,108 @@ def _upsert_named(
     return result, created, updated, unchanged
 
 
+def _import_overview_items(
+    session: Session,
+    schedule: EventSchedule,
+    items: list,
+    zone: ZoneInfo,
+    mode: str,
+    *,
+    rooms: dict,
+    venues: dict,
+    activity_types: dict,
+) -> tuple[int, int, int, int]:
+    for label, refs, values in (
+        ("room", {ref for item in items for ref in item.room_external_ids}, rooms),
+        (
+            "venue",
+            {item.venue_external_id for item in items if item.venue_external_id},
+            venues,
+        ),
+        (
+            "activity type",
+            {
+                item.activity_type_external_id
+                for item in items
+                if item.activity_type_external_id
+            },
+            activity_types,
+        ),
+    ):
+        missing = refs - values.keys()
+        if missing:
+            raise ValueError(f"Unknown {label} external_id: {sorted(missing)[0]}")
+    existing_rows = schedule_overview_items(session, schedule.id)
+    existing = {row.external_id or f"overview-{row.id}": row for row in existing_rows}
+    existing_rooms = overview_room_ids_by_item(
+        session, [row.id for row in existing_rows]
+    )
+    created = updated = unchanged = removed = 0
+    imported: dict[str, ScheduleOverviewItem] = {}
+    for item in sorted(items, key=lambda item: item.parent_external_id is not None):
+        item_rooms = {rooms[ref].id: rooms[ref] for ref in item.room_external_ids}
+        room_ids = [
+            room.id
+            for room in sorted(
+                item_rooms.values(), key=lambda room: (room.sort_order, room.id)
+            )
+        ]
+        values = {
+            "parent_id": imported[item.parent_external_id].id
+            if item.parent_external_id
+            else None,
+            "title": item.title,
+            "subtitle": item.subtitle,
+            "description": item.description,
+            "url": item.url,
+            "url_label": item.url_label,
+            "start": _to_utc(item.start, zone),
+            "end": _to_utc(item.end, zone),
+            "activity_type_id": activity_types[item.activity_type_external_id].id
+            if item.activity_type_external_id
+            else None,
+            "venue_id": venues[item.venue_external_id].id
+            if item.venue_external_id
+            else None,
+            "opens_detail": item.opens_detail,
+            "allow_plan": item.allow_plan,
+            "is_cancelled": item.is_cancelled,
+            "sort_order": item.sort_order,
+        }
+        row = existing.get(item.external_id)
+        if row is None:
+            row = ScheduleOverviewItem(
+                schedule_id=schedule.id, external_id=item.external_id, **values
+            )
+            session.add(row)
+            session.flush()
+            created += 1
+        else:
+            changed = (
+                row.external_id != item.external_id
+                or any(getattr(row, key) != value for key, value in values.items())
+                or existing_rooms.get(row.id, []) != room_ids
+            )
+            row.external_id = item.external_id
+            for key, value in values.items():
+                setattr(row, key, value)
+            row.updated_at = datetime.now(timezone.utc)
+            session.add(row)
+            updated += int(changed)
+            unchanged += int(not changed)
+        replace_overview_item_rooms(session, row, room_ids)
+        imported[item.external_id] = row
+    if mode == "replace":
+        stale = [row for key, row in existing.items() if key not in imported]
+        for row in sorted(stale, key=lambda row: row.parent_id is None):
+            replace_overview_item_rooms(session, row, [])
+            session.delete(row)
+            session.flush()
+            removed += 1
+    session.flush()
+    return created, updated, unchanged, removed
+
+
 def apply_import_document(
     session: Session,
     schedule: EventSchedule,
@@ -320,6 +496,8 @@ def apply_import_document(
     validate_timezone(document.timezone)
     schedule.timezone = document.timezone
     schedule.day_start_hour = document.day_start_hour
+    if document.session_color_mode is not None:
+        schedule.session_color_mode = document.session_color_mode
     schedule.days = [day.isoformat() for day in document.days]
     schedule.updated_at = datetime.now(timezone.utc)
     session.add(schedule)
@@ -601,6 +779,21 @@ def apply_import_document(
                 )
 
     removed = 0
+    if document.overview_items is not None:
+        oc, ou, on, orm = _import_overview_items(
+            session,
+            schedule,
+            document.overview_items,
+            zone,
+            mode,
+            rooms=rooms,
+            venues=venues,
+            activity_types=activity_types,
+        )
+        created += oc
+        updated += ou
+        unchanged += on
+        removed += orm
     if mode == "replace":
         for external_id, row in existing_sessions.items():
             if external_id not in imported_ids and row.deleted_at is None:

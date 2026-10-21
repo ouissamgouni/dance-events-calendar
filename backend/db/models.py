@@ -520,6 +520,10 @@ class EventSchedule(SQLModel, table=True):
             "day_start_hour >= 0 AND day_start_hour <= 23",
             name="ck_event_schedules_day_start_hour",
         ),
+        CheckConstraint(
+            "session_color_mode IN ('room', 'activity_type', 'activity_type_stripe')",
+            name="ck_event_schedules_session_color_mode",
+        ),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -528,6 +532,7 @@ class EventSchedule(SQLModel, table=True):
     )
     timezone: str = Field(max_length=64, nullable=False)
     day_start_hour: int = Field(default=6, nullable=False)
+    session_color_mode: str = Field(default="room", max_length=24, nullable=False)
     days: list = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -735,6 +740,66 @@ class ScheduleSessionRoom(SQLModel, table=True):
     position: int = Field(default=0, nullable=False)
 
 
+class ScheduleOverviewItem(SQLModel, table=True):
+    """High-level program block; `parent_id` nests one level of moments inside a block."""
+
+    __tablename__ = "schedule_overview_items"
+    __table_args__ = (
+        CheckConstraint(
+            '"end" > "start"', name="ck_schedule_overview_items_valid_time"
+        ),
+        Index("ix_schedule_overview_items_schedule_start", "schedule_id", "start"),
+        UniqueConstraint(
+            "schedule_id", "external_id", name="uq_schedule_overview_item_external_id"
+        ),
+    )
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    external_id: Optional[str] = Field(default=None, max_length=120, index=True)
+    schedule_id: int = Field(
+        foreign_key="event_schedules.id", index=True, nullable=False
+    )
+    parent_id: Optional[UUID] = Field(
+        default=None, foreign_key="schedule_overview_items.id", index=True
+    )
+    title: str = Field(max_length=200, nullable=False)
+    subtitle: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    url: Optional[str] = Field(default=None, max_length=500)
+    url_label: Optional[str] = Field(default=None, max_length=80)
+    start: datetime
+    end: datetime
+    activity_type_id: Optional[int] = Field(
+        default=None, foreign_key="schedule_activity_types.id", index=True
+    )
+    venue_id: Optional[int] = Field(
+        default=None, foreign_key="schedule_venues.id", index=True
+    )
+    opens_detail: bool = Field(default=False, nullable=False)
+    allow_plan: bool = Field(default=False, nullable=False)
+    is_cancelled: bool = Field(default=False, nullable=False)
+    sort_order: int = Field(default=0, nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ScheduleOverviewItemRoom(SQLModel, table=True):
+    __tablename__ = "schedule_overview_item_rooms"
+    __table_args__ = (
+        UniqueConstraint("item_id", "room_id", name="uq_schedule_overview_item_room"),
+        UniqueConstraint(
+            "item_id", "position", name="uq_schedule_overview_item_room_position"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    item_id: UUID = Field(
+        foreign_key="schedule_overview_items.id", index=True, nullable=False
+    )
+    room_id: int = Field(foreign_key="schedule_rooms.id", index=True, nullable=False)
+    position: int = Field(default=0, nullable=False)
+
+
 class SchedulePublication(SQLModel, table=True):
     __tablename__ = "schedule_publications"
     __table_args__ = (
@@ -756,17 +821,28 @@ class SchedulePublication(SQLModel, table=True):
 
 
 class UserPlanSession(SQLModel, table=True):
+    """A My Plan entry: targets either a session or a top-level overview item."""
+
     __tablename__ = "user_plan_sessions"
     __table_args__ = (
         UniqueConstraint("user_id", "session_id", name="uq_user_plan_session"),
+        UniqueConstraint(
+            "user_id", "overview_item_id", name="uq_user_plan_overview_item"
+        ),
+        CheckConstraint(
+            "(session_id IS NULL) <> (overview_item_id IS NULL)",
+            name="ck_user_plan_sessions_one_target",
+        ),
         Index("ix_user_plan_sessions_user_event", "user_id", "event_id"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
-    session_id: UUID = Field(
-        foreign_key="schedule_sessions.id", index=True, nullable=False
+    session_id: Optional[UUID] = Field(
+        default=None, foreign_key="schedule_sessions.id", index=True
     )
+    # No FK: overview items are hard-deleted; the entry then shows as "removed".
+    overview_item_id: Optional[UUID] = Field(default=None, index=True)
     event_id: str = Field(
         foreign_key="cached_events.event_id", index=True, nullable=False
     )

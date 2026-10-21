@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { ChevronLeft, ChevronRight, ListFilter, Search, X } from 'lucide-react';
 import type { EventSchedule, ScheduleSession } from '../../types';
 import { filterScheduleSessions, formatDayLabel, programDayOf, scheduleContributorOptions, sessionsForDay, type ScheduleFilters } from '../../utils/schedule';
+import { scheduleColor } from '../../utils/scheduleColors';
 import BottomSheet from '../BottomSheet';
 
 const EMPTY_FILTERS: ScheduleFilters = { instructor: '', levelIds: [], activityTypeIds: [] };
@@ -72,9 +73,14 @@ export function ProgramFilters({ schedule, filters, onChange }: FilterProps) {
         </div>
         <div className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {schedule.levels.map((level) => <button key={`level-${level.id}`} type="button" aria-pressed={filters.levelIds.includes(level.id)} onClick={() => toggle('levelIds', level.id)} className={`shrink-0 rounded-field border px-2.5 py-1.5 text-xs font-semibold ${filters.levelIds.includes(level.id) ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft'}`}>{level.label}</button>)}
-            {schedule.activity_types.map((type) => <button key={`type-${type.id}`} type="button" aria-pressed={filters.activityTypeIds.includes(type.id)} onClick={() => toggle('activityTypeIds', type.id)} className={`shrink-0 rounded-field border px-2.5 py-1.5 text-xs font-semibold ${filters.activityTypeIds.includes(type.id) ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft'}`}>{type.name}</button>)}
+            {schedule.activity_types.map((type) => <button key={`type-${type.id}`} type="button" aria-pressed={filters.activityTypeIds.includes(type.id)} onClick={() => toggle('activityTypeIds', type.id)} className={`flex shrink-0 items-center gap-1.5 rounded-field border px-2.5 py-1.5 text-xs font-semibold ${filters.activityTypeIds.includes(type.id) ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink-soft'}`}><TypeDot color={type.color} />{type.name}</button>)}
         </div>
     </div>;
+}
+
+function TypeDot({ color }: { color: string }) {
+    // eslint-disable-next-line no-restricted-syntax -- legend dot is intentionally circular
+    return <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${scheduleColor(color).accent}`} />;
 }
 
 export function AttendeeProgramFilters({ schedule, filters, onChange, cancelledFilter }: FilterProps) {
@@ -182,7 +188,8 @@ export function AttendeeProgramFilters({ schedule, filters, onChange, cancelledF
                                 <legend className="mb-2 text-sm font-semibold text-ink">Activity type</legend>
                                 <div className="flex flex-wrap gap-2">
                                     {activityTypes.map((type) => (
-                                        <button key={type.id} type="button" aria-pressed={draftFilters.activityTypeIds.includes(type.id)} onClick={() => toggleDraft('activityTypeIds', type.id)} className={`min-h-11 rounded-field border px-3 py-2 text-sm font-medium ${draftFilters.activityTypeIds.includes(type.id) ? 'border-action bg-action/10 text-action' : 'border-line bg-surface text-ink-soft'}`}>
+                                        <button key={type.id} type="button" aria-pressed={draftFilters.activityTypeIds.includes(type.id)} onClick={() => toggleDraft('activityTypeIds', type.id)} className={`flex min-h-11 items-center gap-2 rounded-field border px-3 py-2 text-sm font-medium ${draftFilters.activityTypeIds.includes(type.id) ? 'border-action bg-action/10 text-action' : 'border-line bg-surface text-ink-soft'}`}>
+                                            <TypeDot color={type.color} />
                                             {type.name}
                                         </button>
                                     ))}
@@ -235,7 +242,7 @@ function ContributorOption({ contributor, selected, onSelect }: { contributor: {
 
 interface DayPickerProps {
     schedule: EventSchedule;
-    sessions: ScheduleSession[];
+    sessions: Array<Pick<ScheduleSession, 'start'>>;
     selectedDay: string;
     includeAll?: boolean;
     filtersActive?: boolean;

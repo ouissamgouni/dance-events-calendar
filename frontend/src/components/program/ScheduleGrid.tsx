@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Info } from 'lucide-react';
 import type { EventSchedule, ScheduleRoom, ScheduleSession, SessionAttendanceSummary } from '../../types';
-import { formatTime, isSessionActive, minuteOfProgramDay, programDayOf, roomColumnRuns, sessionRoomIds, sessionsForDay } from '../../utils/schedule';
-import { roomColor } from './RoomPill';
+import { formatTime, isSessionActive, minuteOfProgramDay, programDayOf, roomColumnRuns, sessionRoomIds, sessionsForDay, sessionsInOverviewWindow } from '../../utils/schedule';
+import { scheduleColor, sessionCellColors } from '../../utils/scheduleColors';
 import SessionAttendeeStack from './SessionAttendeeStack';
 
 interface Props {
@@ -15,15 +15,19 @@ interface Props {
     compactHeader?: boolean;
     attendeeSummaries?: Map<string, SessionAttendanceSummary>;
     onRoomClick?: (room: ScheduleRoom) => void;
+    /** Scrolls to `start` and briefly highlights sessions starting in the window; a new token re-triggers. */
+    focusWindow?: { start: string; end: string; token: string } | null;
 }
 
 const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 24;
 
-export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0, compactHeader = false, attendeeSummaries, onRoomClick }: Props) {
+export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0, compactHeader = false, attendeeSummaries, onRoomClick, focusWindow }: Props) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const positionedDays = useRef(new Set<string>());
     const handledPositionRequest = useRef(0);
+    const handledFocusToken = useRef<string | null>(null);
+    const [flashIds, setFlashIds] = useState<Set<string>>(() => new Set());
     const [now, setNow] = useState(() => new Date());
     useEffect(() => {
         const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -71,6 +75,22 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
         scrollRef.current.scrollLeft = 0;
         handledPositionRequest.current = positionRequest;
     }, [axisStart, positionRequest, schedule.day_start_hour, schedule.timezone, sessions]);
+
+    useEffect(() => {
+        if (!focusWindow || !scrollRef.current || handledFocusToken.current === focusWindow.token) return;
+        handledFocusToken.current = focusWindow.token;
+        positionedDays.current.add(day);
+        const minute = minuteOfProgramDay(focusWindow.start, schedule.timezone, schedule.day_start_hour);
+        scrollRef.current.scrollTop = Math.max(0, ((minute - axisStart) / SLOT_MINUTES) * SLOT_HEIGHT - 48);
+        scrollRef.current.scrollLeft = 0;
+        setFlashIds(new Set(sessionsInOverviewWindow(sessions, focusWindow).map((session) => session.id)));
+    }, [axisStart, day, focusWindow, schedule.day_start_hour, schedule.timezone, sessions]);
+
+    useEffect(() => {
+        if (!flashIds.size) return;
+        const timer = window.setTimeout(() => setFlashIds(new Set()), 1600);
+        return () => window.clearTimeout(timer);
+    }, [flashIds]);
 
     const roomColumns = (session: ScheduleSession): string[] => {
         const runs = roomColumnRuns(sessionRoomIds(session), columnRoomIds);
@@ -143,7 +163,11 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                         ?.map((assignment) => contributorNames.get(assignment.contributor_id))
                         .filter((name): name is string => Boolean(name))
                         .join(', ') || session.instructors;
-                    const color = roomColor(room?.color ?? 'slate');
+                    const color = sessionCellColors(
+                        schedule.session_color_mode,
+                        room,
+                        schedule.activity_types.find((item) => item.id === session.activity_type_id),
+                    );
                     const activeNow = showNow && isSessionActive(session, now);
                     const attendance = attendeeSummaries?.get(session.id);
                     const hasDescription = Boolean(session.description?.trim());
@@ -153,17 +177,14 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                             type="button"
                             onClick={() => onSessionClick(session)}
                             aria-current={activeNow ? 'time' : undefined}
-                            className={`relative z-10 m-0.5 min-h-11 overflow-hidden rounded-field border px-2 py-2 text-left shadow-sm ${color.cell} ${activeNow ? 'ring-2 ring-action ring-inset' : ''} ${session.is_cancelled ? 'opacity-60' : ''}`}
+                            className={`relative z-10 m-0.5 min-h-11 overflow-hidden rounded-field border px-2 py-2 text-left shadow-sm ${color.cell} ${color.stripe ? 'pl-3' : ''} ${hasDescription ? 'pb-6' : ''} ${activeNow ? 'ring-2 ring-action ring-inset' : ''} ${session.is_cancelled ? 'opacity-60' : ''} ${flashIds.has(session.id) ? 'animate-session-flash' : ''}`}
                             style={{ gridColumn, gridRow: sessionRow(session) }}
                         >
+                            {color.stripe ? <span aria-hidden="true" data-testid="session-type-stripe" className={`absolute inset-y-0 left-0 w-1 ${color.stripe}`} /> : null}
                             <span className={`block line-clamp-2 text-xs font-semibold leading-4 text-ink ${session.is_cancelled ? 'line-through' : ''}`}>{session.title}</span>
                             {contributors ? <span className="mt-0.5 block whitespace-normal text-xs leading-4 text-ink-soft">{contributors}</span> : null}
-                            {level || hasDescription ? (
-                                <span className="mt-1 flex min-w-0 items-center gap-1 text-xs font-medium text-action">
-                                    {level ? <span className="truncate">{level.label}</span> : null}
-                                    {hasDescription ? <Info size={14} aria-hidden="true" className="shrink-0 text-ink-soft" data-testid="session-details-icon" /> : null}
-                                </span>
-                            ) : null}
+                            {level ? <span className="mt-1 block truncate text-xs font-medium text-action">{level.label}</span> : null}
+                            {hasDescription ? <Info size={14} aria-hidden="true" className="absolute bottom-1.5 right-2 text-ink-soft" data-testid="session-details-icon" /> : null}
                             {hasDescription ? <span className="sr-only">Has details</span> : null}
                             {activeNow ? <span className="mt-1 inline-block bg-action px-1.5 py-0.5 text-xs font-bold text-white">Now</span> : null}
                             {attendance?.visible_count ? (
@@ -181,7 +202,7 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
 }
 
 function RoomHeader({ room, column, onClick }: { room: ScheduleRoom; column: number; onClick?: (room: ScheduleRoom) => void }) {
-    const color = roomColor(room.color);
+    const color = scheduleColor(room.color);
     const className = `sticky top-0 z-20 flex min-w-0 flex-col items-center justify-center border-b border-line px-2 text-center text-xs font-semibold ${color.header}`;
     const content = (
         <>

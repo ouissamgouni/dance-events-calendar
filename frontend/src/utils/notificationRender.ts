@@ -137,7 +137,7 @@ export function resolveNotificationDestination(item: NotificationItem): string {
         case 'event_message_reported':
             return `/event/${item.event_id}#messages`;
         case 'planned_session_changed':
-            return `/event/${item.event_id}/program/plan${item.schedule_session_id ? `?session=${item.schedule_session_id}` : ''}`;
+            return `/event/${item.event_id}/program/plan${item.schedule_session_id ? `?session=${item.schedule_session_id}` : item.schedule_overview_item_id ? `?item=${item.schedule_overview_item_id}` : ''}`;
         case 'event_changed':
         case 'suggestion_approved':
         case 'suggestion_declined':
@@ -159,7 +159,7 @@ export function resolveNotificationDestination(item: NotificationItem): string {
         case 'interest_profile_updated':
             return '/saved-searches';
         case 'plan_session_added':
-            return `/event/${item.event_id}/program${item.schedule_session_id ? `?session=${item.schedule_session_id}` : ''}`;
+            return `/event/${item.event_id}/program${item.schedule_session_id ? `?session=${item.schedule_session_id}` : item.schedule_overview_item_id ? `?view=overview&item=${item.schedule_overview_item_id}` : ''}`;
         case 'schedule_program_available':
         case 'schedule_program_updated':
             return `/event/${item.event_id}/program`;

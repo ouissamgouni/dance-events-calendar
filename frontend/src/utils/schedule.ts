@@ -1,4 +1,4 @@
-import type { EventSchedule, MyPlanEntry, ScheduleSession } from '../types';
+import type { EventSchedule, MyPlanEntry, ScheduleOverviewItem, ScheduleSession } from '../types';
 
 interface LocalParts {
     year: number;
@@ -116,18 +116,18 @@ export function scheduleContributorOptions(schedule: EventSchedule): Array<{ id:
     return scheduleInstructors(schedule.sessions).map((label) => ({ id: null, label }));
 }
 
-export function sessionsForDay(
-    sessions: ScheduleSession[],
+export function sessionsForDay<Item extends Pick<ScheduleSession, 'start'>>(
+    sessions: Item[],
     day: string,
     timeZone: string,
     dayStartHour: number,
-): ScheduleSession[] {
+): Item[] {
     return sessions.filter((session) => programDayOf(session.start, timeZone, dayStartHour) === day);
 }
 
 export function firstDayWithSessions(
     days: string[],
-    sessions: ScheduleSession[],
+    sessions: Array<Pick<ScheduleSession, 'start'>>,
     timeZone: string,
     dayStartHour: number,
 ): string | null {
@@ -136,12 +136,12 @@ export function firstDayWithSessions(
     )) ?? null;
 }
 
-export function sessionRoomIds(session: Pick<ScheduleSession, 'room_id' | 'room_ids'>): number[] {
+export function sessionRoomIds(session: { room_id?: number | null; room_ids?: number[] }): number[] {
     if (session.room_ids?.length) return session.room_ids;
     return session.room_id == null ? [] : [session.room_id];
 }
 
-export function sessionRooms<Room extends { id: number }>(rooms: Room[], session: Pick<ScheduleSession, 'room_id' | 'room_ids'>): Room[] {
+export function sessionRooms<Room extends { id: number }>(rooms: Room[], session: { room_id?: number | null; room_ids?: number[] }): Room[] {
     return sessionRoomIds(session).flatMap((id) => rooms.find((room) => room.id === id) ?? []);
 }
 
@@ -179,9 +179,18 @@ export function filterScheduleSessions<Session extends Pick<ScheduleSession, 'in
     ));
 }
 
-export function isSessionActive(session: ScheduleSession, now: Date): boolean {
+export function isSessionActive(session: Pick<ScheduleSession, 'start' | 'end'>, now: Date): boolean {
     const timestamp = now.getTime();
     return new Date(session.start).getTime() <= timestamp && timestamp < new Date(session.end).getTime();
+}
+
+export function planEntryId(entry: MyPlanEntry): string {
+    return entry.kind === 'overview_item' ? entry.overview_item_id : entry.session_id;
+}
+
+/** The planned session or overview item; both carry title, time, rooms and activity type. */
+export function planEntryItem(entry: MyPlanEntry): ScheduleSession | ScheduleOverviewItem {
+    return entry.kind === 'overview_item' ? entry.overview_item : entry.session;
 }
 
 export function focusedPlanEntry(
@@ -190,10 +199,10 @@ export function focusedPlanEntry(
 ): { entry: MyPlanEntry; status: 'now' | 'next' } | null {
     const eligible = entries
         .filter((entry) => entry.status === 'active')
-        .sort((left, right) => left.session.start.localeCompare(right.session.start));
-    const active = eligible.find((entry) => isSessionActive(entry.session, now));
+        .sort((left, right) => planEntryItem(left).start.localeCompare(planEntryItem(right).start));
+    const active = eligible.find((entry) => isSessionActive(planEntryItem(entry), now));
     if (active) return { entry: active, status: 'now' };
-    const upcoming = eligible.find((entry) => new Date(entry.session.start).getTime() > now.getTime());
+    const upcoming = eligible.find((entry) => new Date(planEntryItem(entry).start).getTime() > now.getTime());
     return upcoming ? { entry: upcoming, status: 'next' } : null;
 }
 
@@ -212,7 +221,7 @@ export function sessionsAtHour(
     });
 }
 
-export function sessionsOverlap(left: ScheduleSession, right: ScheduleSession): boolean {
+export function sessionsOverlap(left: Pick<ScheduleSession, 'start' | 'end'>, right: Pick<ScheduleSession, 'start' | 'end'>): boolean {
     return new Date(left.start).getTime() < new Date(right.end).getTime()
         && new Date(right.start).getTime() < new Date(left.end).getTime();
 }
@@ -222,13 +231,65 @@ export function findPlanConflicts(entries: MyPlanEntry[]): Map<string, string[]>
     const conflicts = new Map<string, string[]>();
     for (let leftIndex = 0; leftIndex < active.length; leftIndex += 1) {
         const left = active[leftIndex];
+        const leftId = planEntryId(left);
+        const leftItem = planEntryItem(left);
         for (let rightIndex = leftIndex + 1; rightIndex < active.length; rightIndex += 1) {
             const right = active[rightIndex];
-            if (sessionsOverlap(left.session, right.session)) {
-                conflicts.set(left.session_id, [...(conflicts.get(left.session_id) ?? []), right.session.title]);
-                conflicts.set(right.session_id, [...(conflicts.get(right.session_id) ?? []), left.session.title]);
+            const rightId = planEntryId(right);
+            const rightItem = planEntryItem(right);
+            if (sessionsOverlap(leftItem, rightItem)) {
+                conflicts.set(leftId, [...(conflicts.get(leftId) ?? []), rightItem.title]);
+                conflicts.set(rightId, [...(conflicts.get(rightId) ?? []), leftItem.title]);
             }
         }
     }
     return conflicts;
+}
+
+export interface OverviewDayEntry {
+    item: ScheduleOverviewItem;
+    moments: ScheduleOverviewItem[];
+}
+
+const byOverviewOrder = (left: ScheduleOverviewItem, right: ScheduleOverviewItem) => (
+    new Date(left.start).getTime() - new Date(right.start).getTime()
+    || left.sort_order - right.sort_order
+    || left.title.localeCompare(right.title)
+);
+
+/** Top-level overview items of a program day, each with its moments in time order. */
+export function overviewItemsForDay(
+    items: ScheduleOverviewItem[] | undefined,
+    day: string,
+    timeZone: string,
+    dayStartHour: number,
+): OverviewDayEntry[] {
+    const all = items ?? [];
+    return sessionsForDay(all.filter((item) => !item.parent_id), day, timeZone, dayStartHour)
+        .sort(byOverviewOrder)
+        .map((item) => ({
+            item,
+            moments: all.filter((moment) => moment.parent_id === item.id).sort(byOverviewOrder),
+        }));
+}
+
+/** Detailed sessions that start inside the item's [start, end) window. */
+export function sessionsInOverviewWindow<Session extends Pick<ScheduleSession, 'start' | 'is_cancelled'>>(
+    sessions: Session[],
+    item: Pick<ScheduleOverviewItem, 'start' | 'end'>,
+): Session[] {
+    const start = new Date(item.start).getTime();
+    const end = new Date(item.end).getTime();
+    return sessions.filter((session) => {
+        const value = new Date(session.start).getTime();
+        return !session.is_cancelled && value >= start && value < end;
+    });
+}
+
+export function overviewItemOpensSchedule(item: ScheduleOverviewItem, sessions: ScheduleSession[]): boolean {
+    return item.opens_detail && !item.parent_id && sessionsInOverviewWindow(sessions, item).length > 0;
+}
+
+export function overviewItemHasDetails(item: ScheduleOverviewItem): boolean {
+    return Boolean(item.description?.trim() || item.url);
 }

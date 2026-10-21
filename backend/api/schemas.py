@@ -150,6 +150,12 @@ class ScheduleRoomResponse(BaseModel):
     sort_order: int = 0
 
 
+ScheduleColor = Literal[
+    "blue", "amber", "pink", "brown", "violet", "emerald", "indigo", "orange", "slate"
+]
+ScheduleSessionColorMode = Literal["room", "activity_type", "activity_type_stripe"]
+
+
 class ScheduleLevelResponse(BaseModel):
     id: int
     external_id: Optional[str] = None
@@ -208,10 +214,31 @@ class ScheduleSessionResponse(BaseModel):
         return self
 
 
+class ScheduleOverviewItemResponse(BaseModel):
+    id: UUID
+    external_id: Optional[str] = None
+    parent_id: Optional[UUID] = None
+    title: str
+    subtitle: Optional[str] = None
+    description: Optional[str] = None
+    url: Optional[str] = None
+    url_label: Optional[str] = None
+    start: datetime
+    end: datetime
+    activity_type_id: Optional[int] = None
+    venue_id: Optional[int] = None
+    room_ids: list[int] = []
+    opens_detail: bool = False
+    allow_plan: bool = False
+    is_cancelled: bool = False
+    sort_order: int = 0
+
+
 class EventScheduleResponse(BaseModel):
     event_id: str
     timezone: str
     day_start_hour: int
+    session_color_mode: ScheduleSessionColorMode = "room"
     days: list[date]
     venues: list[ScheduleVenueResponse]
     rooms: list[ScheduleRoomResponse]
@@ -219,6 +246,7 @@ class EventScheduleResponse(BaseModel):
     activity_types: list[ScheduleActivityTypeResponse]
     contributors: list[ScheduleContributorResponse] = []
     sessions: list[ScheduleSessionResponse]
+    overview_items: list[ScheduleOverviewItemResponse] = []
     version: Optional[int] = None
     published_at: Optional[datetime] = None
 
@@ -228,6 +256,7 @@ class ScheduleIssueResponse(BaseModel):
     severity: Literal["warning", "error"]
     message: str
     session_ids: list[UUID] = []
+    overview_item_ids: list[UUID] = []
 
 
 class ScheduleFieldChangeResponse(BaseModel):
@@ -245,6 +274,7 @@ class ScheduleChangeResponse(BaseModel):
         "activity_type",
         "contributor",
         "session",
+        "overview_item",
     ]
     operation: Literal["create", "update", "remove"]
     entity_id: str
@@ -314,6 +344,7 @@ class ProgramExportResponse(BaseModel):
     program_url: str
     timezone: str
     day_start_hour: int
+    session_color_mode: ScheduleSessionColorMode = "room"
     available_days: list[date]
     selected_days: list[date]
     venues: list[ScheduleVenueResponse]
@@ -365,7 +396,7 @@ class ScheduleImportRoom(BaseModel):
         description="Short line shown under the room name, e.g. floor or pass access.",
     )
     venue_external_id: Optional[str] = Field(default=None, max_length=120)
-    color: str = Field(default="blue", max_length=24)
+    color: ScheduleColor = "blue"
     sort_order: int = 0
 
 
@@ -387,7 +418,7 @@ class ScheduleImportActivityType(BaseModel):
         description="Stable import key, unique among activity types and preserved across reimports.",
     )
     name: str = Field(min_length=1, max_length=80)
-    color: str = Field(default="blue", max_length=24)
+    color: ScheduleColor = "blue"
     sort_order: int = 0
 
 
@@ -431,6 +462,62 @@ class ScheduleImportSession(BaseModel):
     is_cancelled: bool = False
 
 
+def _validate_link_url(value: Optional[str]) -> Optional[str]:
+    if value is None or not value.strip():
+        return None
+    if not value.strip().lower().startswith(("http://", "https://")):
+        raise ValueError("url must start with http:// or https://")
+    return value.strip()
+
+
+class ScheduleImportOverviewItem(BaseModel):
+    external_id: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Stable import key, unique among overview items and preserved across reimports.",
+    )
+    parent_external_id: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description="Nests this item as a moment inside a top-level overview item.",
+    )
+    title: str = Field(min_length=1, max_length=200)
+    subtitle: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    url: Optional[str] = Field(default=None, max_length=500)
+    url_label: Optional[str] = Field(default=None, max_length=80)
+    start: datetime
+    end: datetime
+    activity_type_external_id: Optional[str] = Field(default=None, max_length=120)
+    venue_external_id: Optional[str] = Field(default=None, max_length=120)
+    room_external_ids: list[str] = []
+    opens_detail: bool = Field(
+        default=False,
+        description="Tapping the item opens the full schedule at its start time.",
+    )
+    allow_plan: bool = Field(
+        default=False,
+        description="Attendees can add this top-level item to My Plan.",
+    )
+    is_cancelled: bool = False
+    sort_order: int = 0
+
+    @model_validator(mode="after")
+    def validate_item(self):
+        self.url = _validate_link_url(self.url)
+        if self.end <= self.start:
+            raise ValueError(f"Overview item {self.external_id} ends before it starts")
+        if self.parent_external_id and self.opens_detail:
+            raise ValueError(
+                f"Overview moment {self.external_id} cannot open the full schedule"
+            )
+        if self.parent_external_id and self.allow_plan:
+            raise ValueError(
+                f"Overview moment {self.external_id} cannot be added to My Plan"
+            )
+        return self
+
+
 class ScheduleImportDocument(BaseModel):
     """Reviewed schedule import using stable external keys rather than database IDs."""
 
@@ -438,6 +525,10 @@ class ScheduleImportDocument(BaseModel):
     event_id: Optional[str] = None
     timezone: str = Field(min_length=1, max_length=64)
     day_start_hour: int = Field(default=6, ge=0, le=23)
+    session_color_mode: Optional[ScheduleSessionColorMode] = Field(
+        default=None,
+        description="How grid session cells are colored. Omit to keep the current setting.",
+    )
     days: list[date]
     venues: list[ScheduleImportVenue] = []
     rooms: list[ScheduleImportRoom] = []
@@ -445,6 +536,10 @@ class ScheduleImportDocument(BaseModel):
     activity_types: list[ScheduleImportActivityType] = []
     contributors: list[ScheduleImportContributor] = []
     sessions: list[ScheduleImportSession] = []
+    overview_items: Optional[list[ScheduleImportOverviewItem]] = Field(
+        default=None,
+        description="High-level program blocks. Omit to leave existing overview items untouched.",
+    )
 
     @model_validator(mode="after")
     def validate_external_ids(self):
@@ -455,10 +550,24 @@ class ScheduleImportDocument(BaseModel):
             ("activity type", self.activity_types),
             ("contributor", self.contributors),
             ("session", self.sessions),
+            ("overview item", self.overview_items or []),
         ):
             values = [row.external_id for row in rows]
             if len(values) != len(set(values)):
                 raise ValueError(f"Duplicate {label} external_id")
+        overview_by_id = {row.external_id: row for row in self.overview_items or []}
+        for item in self.overview_items or []:
+            if not item.parent_external_id:
+                continue
+            parent = overview_by_id.get(item.parent_external_id)
+            if parent is None:
+                raise ValueError(
+                    f"Unknown overview parent_external_id: {item.parent_external_id}"
+                )
+            if parent.parent_external_id:
+                raise ValueError(
+                    f"Overview item {item.external_id} is nested more than one level"
+                )
         if self.schema_version == 2:
             contributor_ids = {row.external_id for row in self.contributors}
             for schedule_session in self.sessions:
@@ -499,7 +608,8 @@ class ScheduleImportPreviewResponse(BaseModel):
 
 
 class SchedulePlannerSessionResponse(BaseModel):
-    session_id: UUID
+    session_id: Optional[UUID] = None
+    overview_item_id: Optional[UUID] = None
     title: str
     start: datetime
     end: datetime
@@ -563,6 +673,7 @@ class EventScheduleUpdateRequest(BaseModel):
     timezone: Optional[str] = None
     days: Optional[list[date]] = None
     day_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
+    session_color_mode: Optional[ScheduleSessionColorMode] = None
 
 
 class ScheduleVenueRequest(BaseModel):
@@ -575,7 +686,7 @@ class ScheduleRoomRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     details: Optional[str] = Field(default=None, max_length=160)
     venue_id: Optional[int] = None
-    color: str = Field(default="blue", max_length=24)
+    color: ScheduleColor = "blue"
     sort_order: int = 0
 
 
@@ -587,7 +698,7 @@ class ScheduleLevelRequest(BaseModel):
 
 class ScheduleActivityTypeRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    color: str = Field(default="blue", max_length=24)
+    color: ScheduleColor = "blue"
     sort_order: int = 0
 
 
@@ -635,10 +746,40 @@ class ScheduleSessionUpdateRequest(BaseModel):
     is_cancelled: Optional[bool] = None
 
 
+class ScheduleOverviewItemRequest(BaseModel):
+    parent_id: Optional[UUID] = None
+    title: str = Field(min_length=1, max_length=200)
+    subtitle: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    url: Optional[str] = Field(default=None, max_length=500)
+    url_label: Optional[str] = Field(default=None, max_length=80)
+    start: datetime
+    end: datetime
+    activity_type_id: Optional[int] = None
+    venue_id: Optional[int] = None
+    room_ids: list[int] = []
+    opens_detail: bool = False
+    allow_plan: bool = False
+    is_cancelled: bool = False
+    sort_order: int = 0
+
+    @model_validator(mode="after")
+    def validate_item(self):
+        self.url = _validate_link_url(self.url)
+        if self.parent_id is not None and self.opens_detail:
+            raise ValueError("Moments cannot open the full schedule")
+        if self.parent_id is not None and self.allow_plan:
+            raise ValueError("Moments cannot be added to My Plan")
+        return self
+
+
 class MyPlanEntryResponse(BaseModel):
-    session_id: UUID
+    kind: Literal["session", "overview_item"] = "session"
+    session_id: Optional[UUID] = None
+    overview_item_id: Optional[UUID] = None
     status: Literal["active", "cancelled", "removed"]
-    session: ScheduleSessionResponse
+    session: Optional[ScheduleSessionResponse] = None
+    overview_item: Optional[ScheduleOverviewItemResponse] = None
 
 
 class MyPlanResponse(BaseModel):
@@ -668,8 +809,15 @@ class SessionAttendanceSummaryResponse(BaseModel):
     preview_attendees: list[SessionPlanAttendeeResponse] = []
 
 
+class OverviewItemAttendanceSummaryResponse(BaseModel):
+    overview_item_id: UUID
+    visible_count: int = 0
+    preview_attendees: list[SessionPlanAttendeeResponse] = []
+
+
 class SessionAttendanceSummaryBatchResponse(BaseModel):
     sessions: list[SessionAttendanceSummaryResponse] = []
+    overview_items: list[OverviewItemAttendanceSummaryResponse] = []
 
 
 class UpdateMyPlanAudienceRequest(BaseModel):
@@ -4024,6 +4172,7 @@ class NotificationItem(BaseModel):
 
     subject_key: Optional[str] = None
     schedule_session_id: Optional[UUID] = None
+    schedule_overview_item_id: Optional[UUID] = None
     # Optional narrative field for kinds that benefit from additional context
     # beyond name/context. Used in milestone notifications.
     description: Optional[str] = None

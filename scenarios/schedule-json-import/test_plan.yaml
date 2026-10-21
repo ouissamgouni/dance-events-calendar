@@ -32,7 +32,8 @@ test_plan:
       description: "Click Apply to draft after the preview completes."
       expected: >
         The private draft refreshes with Kulturhaus, two rooms, Open Level, Workshop,
-        and two Friday sessions. Nothing is public yet.
+        Registration and Party types, two Friday sessions and four Overview items
+        (Registration, Workshops, Friday Party with a Teacher demo moment). Nothing is public yet.
 
     - id: 4
       title: "Verify idempotent merge"
@@ -87,6 +88,33 @@ test_plan:
         attendees. The manual second send creates no duplicate in-app rows and reports
         already sent where applicable. Resend attempts enabled external channels again
         while still respecting opt-outs.
+
+    - id: 12
+      title: "Omitting overview_items leaves the Overview untouched"
+      description: >
+        In Settings, delete the whole "overview_items" key from the JSON text, choose
+        Replace missing sessions, preview and apply. Open the Overview section.
+      expected: >
+        Preview reports no Overview removals and the four Overview items are still
+        there. Only an explicit list replaces the Overview.
+
+    - id: 13
+      title: "An explicit empty list clears the Overview"
+      description: >
+        Set "overview_items": [] with Replace missing sessions, preview, then cancel
+        without applying.
+      expected: >
+        Preview reports four removals (the moment is removed with its party) and the
+        change list shows overview_item removals. Cancelling leaves the draft unchanged.
+
+    - id: 14
+      title: "Invalid nesting is rejected without writes"
+      description: >
+        Change Teacher demo's parent_external_id to "fri-missing" and preview. Then set it
+        back, add "opens_detail": true to Teacher demo and preview again.
+      expected: >
+        Both previews fail with a clear validation message (unknown overview parent,
+        moments cannot open the full schedule) and nothing is written.
 
     - id: 11
       title: "Verify attendee entry points"

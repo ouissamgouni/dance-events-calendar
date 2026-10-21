@@ -9,6 +9,9 @@ test_plan:
     bootcamps, combined-hall socials/shows, cross-midnight night parties, a
     roomless Monday afterparty and one cancelled session. The draft changes
     the first workshop title so publication isolation is visible immediately.
+    Back 2 Mambo also has a high-level Overview level (Registration, Workshops &
+    Bootcamps, socials, Mambo Nights with Shows/Artist hour moments) that opens by
+    default and drills down into the full schedule.
     Additional fixtures cover a published compact program, an admin-only draft,
     and an event without a schedule, with Going, planner and notification-opt-out users.
 
@@ -20,7 +23,8 @@ test_plan:
     - id: 1
       title: "Open and filter the published mobile program"
       description: >
-        Open Back 2 Mambo 2026 and choose Program. Select Friday 16 October,
+        Open Back 2 Mambo 2026 and choose Program, then the Full schedule tab.
+        Select Friday 16 October,
         then open Filter schedule and inspect the Level, Activity type and
         Instructor controls. Open the Instructor picker, search for a name,
         select it, close and reopen the filter sheet, and try a combination
@@ -77,8 +81,9 @@ test_plan:
       description: "Sign in as Dev Admin and open the event Schedule editor."
       expected: >
         The draft grid shows "Shines / Partnerwork – Updated draft" and the
-        Publish action reports one changed session. Preview as attendee displays
-        the draft banner and updated title while the normal attendee route does not.
+        Publish action reports two changes (one session and the renamed Saturday
+        overview item "Workshops, Bootcamps & Pilates"). Preview as attendee displays
+        the draft banner and updated titles while the normal attendee route does not.
 
     - id: 7
       title: "Create a warning without blocking save"
@@ -132,7 +137,8 @@ test_plan:
       description: "Select a timezone from Event timezone, save it, then open Preview."
       expected: >
         Timezones are searchable/selectable IANA values. The embedded preview
-        begins at filters and date pills without the full app header or tabs.
+        begins at the Overview / Full schedule tabs and date pills without the
+        full app header or Program/My Plan tabs.
 
     - id: 14
       title: "Check remove actions and back navigation"
@@ -148,3 +154,65 @@ test_plan:
       expected: >
         No Scheduling conflict appears because Crazy Partnerwork ends exactly
         when Latin Salsa Fusion starts; real overlaps still produce a warning.
+
+    - id: 16
+      title: "Overview opens by default and reads like the festival website"
+      description: >
+        As Maya, open Back 2 Mambo 2026 → Program and select Friday 16 October.
+        Switch to Saturday, then back to Friday.
+      expected: >
+        The Overview tab is selected (Full schedule is next to it). Friday lists, in time
+        order: Registration & Info Desk (12:00–21:00), Welcome coffee, Workshops & Bootcamps
+        (14:00–00:00), Afternoon Social Party (15:00–20:00) and Mambo Night (00:00–07:00,
+        "Shows + party till dawn") with its Shows and Artist hour moments listed inside the
+        card. Category chips (All, then Workshop, Social, Show, Party, Afterparty, Other,
+        Registration — the types used by top-level items) filter the top-level items only;
+        moments always stay inside their party.
+
+    - id: 17
+      title: "Drill down into the full schedule and come back"
+      description: >
+        On Friday's Overview, tap Workshops & Bootcamps. Then use the browser/phone Back.
+        Repeat with Mambo Night.
+      expected: >
+        Linked cards show a chevron and a session count. Tapping opens the Full schedule on
+        Friday scrolled to 14:00 and the sessions starting in that window briefly flash, then
+        the grid looks normal (nothing stays dimmed). The URL contains view=schedule and
+        focus=…. Back returns to the Overview on the same day. Mambo Night lands at 00:00
+        with Shows and Mambo Night Party flashing.
+
+    - id: 18
+      title: "Non-linked items, moments and cancellation"
+      description: >
+        Tap Registration & Info Desk, the Artist hour moment, Thursday's Registration,
+        Friday's Welcome coffee and Sunday's Sunday brunch meetup.
+      expected: >
+        Registration & Info Desk and Artist hour open an info sheet (description, day,
+        time, venue). Thursday's Registration and Welcome coffee are static rows with no
+        tap affordance (Welcome coffee is linked but no session starts in its window).
+        Sunday brunch meetup is struck through with a Cancelled label and opens its sheet
+        with the cancellation notice.
+
+    - id: 19
+      title: "Edit the Overview in the admin editor"
+      description: >
+        As Dev Admin open the Schedule editor. The Overview section opens first. Inspect
+        Friday, add a moment to Mambo Night with "+ Add moment", edit Welcome coffee and
+        try to delete Mambo Night.
+      expected: >
+        Rows look like the attendee Overview with admin badges: "→ N sessions in full
+        schedule" on linked items and an amber warning on Welcome coffee ("no sessions
+        start in its time window"). Add moment pre-selects Mambo Night in "Part of",
+        pre-fills its start and hides "Has detailed schedule". The editor shows a live
+        "N sessions start in this window" hint. Deleting Mambo Night asks to confirm
+        and mentions its moments.
+
+    - id: 20
+      title: "Publish Overview changes"
+      description: >
+        Open Publish and review the change list, publish, then refresh the attendee
+        Overview for Saturday.
+      expected: >
+        The change list includes the renamed overview item and any moment you added.
+        After publishing, Saturday's attendee Overview shows "Workshops, Bootcamps &
+        Pilates". Planners are not notified about Overview-only changes.

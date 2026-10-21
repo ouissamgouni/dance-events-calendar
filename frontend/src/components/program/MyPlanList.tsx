@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CalendarPlus, X } from 'lucide-react';
-import type { EventSchedule, MyPlanEntry, ScheduleSession } from '../../types';
-import { findPlanConflicts, focusedPlanEntry, formatDayLabel, formatTimeRange, programDayOf, sessionRooms } from '../../utils/schedule';
+import type { EventSchedule, MyPlanEntry } from '../../types';
+import { findPlanConflicts, focusedPlanEntry, formatDayLabel, formatTimeRange, planEntryId, planEntryItem, programDayOf, sessionRooms } from '../../utils/schedule';
+import { scheduleColor } from '../../utils/scheduleColors';
 import RoomPill from './RoomPill';
 
 interface Props {
     schedule: EventSchedule;
     entries: MyPlanEntry[];
-    onOpen?: (session: ScheduleSession) => void;
-    onRemove?: (sessionId: string) => void;
+    onOpen?: (entry: MyPlanEntry) => void;
+    onRemove?: (entry: MyPlanEntry) => void;
     onProgram?: () => void;
 }
 
@@ -24,7 +25,7 @@ export default function MyPlanList({ schedule, entries, onOpen, onRemove, onProg
     useEffect(() => {
         if (!focus || positionedSessionId.current !== null || !focusRef.current) return;
         focusRef.current.scrollIntoView?.({ block: 'center' });
-        positionedSessionId.current = focus.entry.session_id;
+        positionedSessionId.current = planEntryId(focus.entry);
     }, [focus]);
     if (!entries.length) {
         return (
@@ -38,8 +39,8 @@ export default function MyPlanList({ schedule, entries, onOpen, onRemove, onProg
     }
     const conflicts = findPlanConflicts(entries);
     const grouped = new Map<string, MyPlanEntry[]>();
-    for (const entry of [...entries].sort((left, right) => left.session.start.localeCompare(right.session.start))) {
-        const day = programDayOf(entry.session.start, schedule.timezone, schedule.day_start_hour);
+    for (const entry of [...entries].sort((left, right) => planEntryItem(left).start.localeCompare(planEntryItem(right).start))) {
+        const day = programDayOf(planEntryItem(entry).start, schedule.timezone, schedule.day_start_hour);
         grouped.set(day, [...(grouped.get(day) ?? []), entry]);
     }
     return (
@@ -50,29 +51,34 @@ export default function MyPlanList({ schedule, entries, onOpen, onRemove, onProg
                         <h2 className="mb-3 text-base font-bold text-ink">{formatDayLabel(day, true)}</h2>
                         <div className="space-y-3">
                             {dayEntries.map((entry) => {
-                                const rooms = sessionRooms(schedule.rooms, entry.session);
-                                const venue = schedule.venues.find((item) => item.id === (entry.session.venue_id ?? rooms[0]?.venue_id));
-                                const overlap = conflicts.get(entry.session_id);
-                                const focused = focus?.entry.session_id === entry.session_id;
+                                const entryId = planEntryId(entry);
+                                const item = planEntryItem(entry);
+                                const rooms = sessionRooms(schedule.rooms, item);
+                                const venue = schedule.venues.find((row) => row.id === (item.venue_id ?? rooms[0]?.venue_id));
+                                const activityType = schedule.activity_types.find((row) => row.id === item.activity_type_id);
+                                const overlap = conflicts.get(entryId);
+                                const focused = focus ? planEntryId(focus.entry) === entryId : false;
+                                const byline = entry.kind === 'overview_item' ? entry.overview_item.subtitle : entry.session.instructors;
                                 const sessionContent = (
                                     <>
                                         <RoomPill rooms={rooms} venue={venue} compact />
-                                        {entry.session.instructors ? <p className="mt-2 font-bold text-ink">{entry.session.instructors}</p> : null}
-                                        <p className="text-sm text-ink">{entry.session.title}</p>
+                                        {byline ? <p className="mt-2 font-bold text-ink">{byline}</p> : null}
+                                        <p className="text-sm text-ink">{item.title}</p>
                                     </>
                                 );
                                 return (
-                                    <article ref={focused ? focusRef : undefined} key={entry.session_id} aria-current={focus?.status === 'now' && focused ? 'time' : undefined} className={`rounded-card border bg-surface p-4 shadow-sm ${focused ? 'border-action ring-2 ring-action/20' : 'border-card-line'} ${entry.status !== 'active' ? 'opacity-70' : ''}`}>
-                                        {focused ? <p className="mb-2 text-xs font-bold uppercase text-action">{focus.status === 'now' ? 'Now' : 'Next'}</p> : null}
+                                    <article ref={focused ? focusRef : undefined} key={entryId} aria-current={focus?.status === 'now' && focused ? 'time' : undefined} className={`relative overflow-hidden rounded-card border bg-surface p-4 shadow-sm ${focused ? 'border-action ring-2 ring-action/20' : 'border-card-line'} ${entry.status !== 'active' ? 'opacity-70' : ''}`}>
+                                        {activityType ? <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${scheduleColor(activityType.color).accent}`} /> : null}
+                                        {focused ? <p className="mb-2 text-xs font-bold uppercase text-action">{focus?.status === 'now' ? 'Now' : 'Next'}</p> : null}
                                         <div className="flex gap-3">
-                                            <p className="w-20 shrink-0 text-sm font-semibold text-ink">{formatTimeRange(entry.session, schedule.timezone)}</p>
+                                            <p className="w-20 shrink-0 text-sm font-semibold text-ink">{formatTimeRange(item, schedule.timezone)}</p>
                                             {onOpen
-                                                ? <button type="button" onClick={() => onOpen(entry.session)} className="min-w-0 flex-1 text-left">{sessionContent}</button>
+                                                ? <button type="button" onClick={() => onOpen(entry)} className="min-w-0 flex-1 text-left">{sessionContent}</button>
                                                 : <div className="min-w-0 flex-1 text-left">{sessionContent}</div>}
-                                            {onRemove ? <button type="button" aria-label={`Remove ${entry.session.title} from My Plan`} onClick={() => onRemove(entry.session_id)} className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft hover:text-danger"><X size={20} /></button> : null}
+                                            {onRemove ? <button type="button" aria-label={`Remove ${item.title} from My Plan`} onClick={() => onRemove(entry)} className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft hover:text-danger"><X size={20} /></button> : null}
                                         </div>
                                         {overlap?.length ? <p className="mt-2 inline-flex max-w-full items-start gap-1 rounded-field bg-amber-50 px-2 py-1 text-xs font-medium leading-4 text-amber-900"><AlertTriangle size={12} className="mt-0.5 shrink-0" /><span><span className="font-semibold">Time conflict</span> with {overlap.join(', ')}</span></p> : null}
-                                        {entry.status !== 'active' ? <p className="mt-3 text-xs font-medium text-danger">This session was {entry.status} by the organizer.{onRemove ? ' Remove it when you are ready.' : ''}</p> : null}
+                                        {entry.status !== 'active' ? <p className="mt-3 text-xs font-medium text-danger">This {entry.kind === 'overview_item' ? 'item' : 'session'} was {entry.status} by the organizer.{onRemove ? ' Remove it when you are ready.' : ''}</p> : null}
                                     </article>
                                 );
                             })}
