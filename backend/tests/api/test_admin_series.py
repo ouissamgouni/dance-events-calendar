@@ -124,6 +124,8 @@ class TestAuthGate:
             ("post", "/api/admin/series/1/add"),
             ("patch", "/api/admin/series/1"),
             ("get", "/api/admin/events/evt-aaa/series"),
+            ("get", "/api/admin/series/settings"),
+            ("put", "/api/admin/series/settings"),
         ],
     )
     def test_requires_admin(self, client, session, method, path):
@@ -132,9 +134,43 @@ class TestAuthGate:
             r = client.post(path, json={})
         elif method == "patch":
             r = client.patch(path, json={})
+        elif method == "put":
+            r = client.put(path, json={})
         else:
             r = client.get(path)
         assert r.status_code == 403
+
+
+@pytest.mark.unit
+class TestDetectionSettings:
+    def test_defaults_then_update_round_trip(self, client, session):
+        _login(client, "admin@example.com")
+
+        r = client.get("/api/admin/series/settings")
+        assert r.status_code == 200, r.text
+        assert r.json()["title_similarity_pct"] == 72
+        assert r.json()["cross_calendar_enabled"] is True
+
+        r = client.put(
+            "/api/admin/series/settings",
+            json={
+                "title_similarity_pct": 90,
+                "cross_calendar_enabled": False,
+                "generic_title_words": [" Salsa ", "FESTIVAL", ""],
+            },
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["title_similarity_pct"] == 90
+        assert body["cross_calendar_enabled"] is False
+        assert body["generic_title_words"] == ["salsa", "festival"]
+        assert body["max_gap_days"] == 395
+        assert client.get("/api/admin/series/settings").json() == body
+
+    def test_rejects_out_of_range_threshold(self, client, session):
+        _login(client, "admin@example.com")
+        r = client.put("/api/admin/series/settings", json={"title_similarity_pct": 10})
+        assert r.status_code == 422
 
 
 @pytest.mark.unit

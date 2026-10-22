@@ -1,33 +1,32 @@
 test_plan:
-  name: "Event schedule – Program, My Plan and admin publishing"
+  name: "Program – attendee view, Overview and My Plan"
   description: >
-    Covers the mobile attendee program and the full admin schedule workflow
-    across four events. The primary fixture uses the real five-day Back 2
-    Mambo 2026 first-weekend program (66
-    sessions transcribed from the official poster). The published attendee
-    snapshot has three simultaneous Friday 14:00 workshops, multi-hour
-    bootcamps, combined-hall socials/shows, cross-midnight night parties, a
-    roomless Monday afterparty and one cancelled session. The draft changes
-    the first workshop title so publication isolation is visible immediately.
-    Back 2 Mambo also has a high-level Overview level (Registration, Workshops &
-    Bootcamps, socials, Mambo Nights with Shows/Artist hour moments) that opens by
-    default and drills down into the full schedule.
-    Additional fixtures cover a published compact program, an admin-only draft,
-    and an event without a schedule, with Going, planner and notification-opt-out users.
+    Everything an attendee sees in an event program. Back 2 Mambo 2026 uses the
+    real five-day first-weekend program (66 sessions transcribed from the official
+    poster): simultaneous Friday 14:00 workshops, multi-hour bootcamps, combined-hall
+    socials/shows, cross-midnight night parties, a roomless Monday afterparty and one
+    cancelled session. Its draft renames the first workshop so publication isolation
+    is visible. Salsa Grand 2026 (Zagreb) is seeded from
+    docs/programs/salsa-grand-2026.schedule.json with both levels: the Overview
+    transcribed from salsagrand.com/program and the Full schedule (35 sessions in 4
+    rooms). Live Overview Social is an Overview-only program seeded relative to the
+    start time for the Now badge and default-day checks. Prague Salsa Weekender,
+    Brno Bachata Lab (draft only) and Vienna Social Night (no program) cover the
+    program states. Editor, publishing and organizer checks live in program-admin.
 
   preconditions:
-    - "task start:scenario SCENARIO=event-schedule"
-    - "Sign in as Maya Dancer for attendee checks or Dev Admin for admin checks."
+    - "Run: SCENARIO=program task start:scenario RESET_BROWSER=1"
+    - "Sign in as Maya Dancer unless a step says otherwise."
+    - "Use a phone-sized viewport first, then repeat key steps on desktop."
 
   steps:
     - id: 1
       title: "Open and filter the published mobile program"
       description: >
         Open Back 2 Mambo 2026 and choose Program, then the Full schedule tab.
-        Select Friday 16 October,
-        then open Filter schedule and inspect the Level, Activity type and
-        Instructor controls. Open the Instructor picker, search for a name,
-        select it, close and reopen the filter sheet, and try a combination
+        Select Friday 16 October, then open Filter schedule and inspect the Level,
+        Activity type and Instructor controls. Open the Instructor picker, search for
+        a name, select it, close and reopen the filter sheet, and try a combination
         with no matching sessions.
       expected: >
         Program and My Plan are above a compact Filter schedule bar, followed
@@ -62,7 +61,7 @@ test_plan:
 
     - id: 4
       title: "Inspect seeded conflicts and cancellation"
-      description: "Switch to My Plan while signed in as Maya Dancer."
+      description: "Switch to My Plan."
       expected: >
         Friday's two 14:00 workshops show a subtle overlap warning. Saturday's
         cancelled Groovy ChaCha Partnerwork (Rumen & Yulia, Nyx 20:00) remains
@@ -73,146 +72,122 @@ test_plan:
       description: "Return to Friday's Program and scroll past midnight."
       expected: >
         Shows (00:00) and Mambo Night Party (01:00–07:00) remain grouped under
-        Friday because the schedule day cutoff is 06:00. The grid extends into
-        Saturday morning. Shows Rehearsals cannot be added to My Plan.
+        Friday because the schedule day cutoff is 06:00. Mambo Night Party keeps
+        its full six-hour height and notes that it ends on Saturday. The grid
+        extends into Saturday morning. Shows Rehearsals cannot be added to My Plan.
 
     - id: 6
-      title: "Inspect the unpublished admin draft"
-      description: "Sign in as Dev Admin and open the event Schedule editor."
+      title: "Program states across events"
+      description: "Open Prague Salsa Weekender, Brno Bachata Lab and Vienna Social Night."
       expected: >
-        The draft grid shows "Shines / Partnerwork – Updated draft" and the
-        Publish action reports two changes (one session and the renamed Saturday
-        overview item "Workshops, Bootcamps & Pilates"). Preview as attendee displays
-        the draft banner and updated titles while the normal attendee route does not.
+        Prague has a distinct published Program (sign in as Lina Weekender to see
+        her plan). Brno's program is still a private draft and Vienna has none, so
+        neither shows a Program action.
 
     - id: 7
-      title: "Create a warning without blocking save"
-      description: "Create a session overlapping an existing Grand Hall session."
-      expected: >
-        The editor warns about the room conflict and offers Cancel or Save anyway.
-        Saving intentionally is allowed and the issue appears in the publish review.
-
-    - id: 8
-      title: "Publish reviewed changes"
-      description: "Open Publish, leave the broad Going update unchecked, review the diff and confirm. Refresh the attendee Program."
-      expected: >
-        A new publication version is created and the attendee route now shows
-        the updated title and any intentionally saved overlapping session.
-        Impacted planners are notified automatically, while other Going users
-        receive no broad update unless the checkbox is selected before publishing.
-
-    - id: 9
-      title: "Inspect planners"
-      description: "Open Program Settings and expand People with plans."
-      expected: >
-        Maya and Noor appear with plan counts and expandable session titles.
-        Maya is marked Going; Noor demonstrates that a planner need not be Going.
-        Leo, Sara and Omar do not appear because they have no planned sessions.
-
-    - id: 10
-      title: "Check session list tools"
-      description: "Open Sessions, choose a date, filter by instructor, level and type, then clear the filters."
-      expected: >
-        The same controls as the calendar are available. The first table column
-        contains weekday and date, only matching rows remain, and the calendar
-        and list advance to the earliest day with a result when necessary.
-
-    - id: 11
-      title: "Check calendar positioning and autocomplete"
-      description: "Scroll late in a day, then change a date or filter and choose an instructor suggestion."
-      expected: >
-        The grid positions the first matching session instead of retaining the
-        previous late timeslot. Instructor search offers names from the program.
-
-    - id: 12
-      title: "Check schedule states across events"
-      description: "Open Prague Salsa Weekender, Brno Bachata Lab and Vienna Social Night as attendee and admin."
-      expected: >
-        Prague has a distinct published Program and Lina has a plan. Brno has
-        an editable draft but no attendee Program action. Vienna offers Create
-        schedule to admin and has no attendee Program action.
-
-    - id: 13
-      title: "Check Settings and preview"
-      description: "Select a timezone from Event timezone, save it, then open Preview."
-      expected: >
-        Timezones are searchable/selectable IANA values. The embedded preview
-        begins at the Overview / Full schedule tabs and date pills without the
-        full app header or Program/My Plan tabs.
-
-    - id: 14
       title: "Check remove actions and back navigation"
-      description: "Remove a My Plan row with its cross, inspect the session-sheet remove action, and navigate Event → Program → Event → Back."
+      description: >
+        Remove a My Plan row with its cross, inspect the session-sheet remove action,
+        and navigate Event → Program → Event → Back.
       expected: >
         The row uses a cross rather than a menu. The sheet action has subtle red
         text and border. Back returns through Event to the original surface and
         never loops between Event and Program.
 
-    - id: 15
-      title: "Check adjacent session boundaries"
-      description: "Edit Latin Salsa Fusion and compare it with Crazy Partnerwork."
+    - id: 8
+      title: "Share the program from the view tabs"
+      description: >
+        Open Back 2 Mambo 2026 → Program, pick Saturday in Full schedule, and tap
+        Share (Copy link on desktop). Then open Prague Salsa Weekender → Program.
       expected: >
-        No Scheduling conflict appears because Crazy Partnerwork ends exactly
-        when Latin Salsa Fusion starts; real overlaps still produce a warning.
+        Share sits on the same line as the Overview / Full schedule tabs, aligned
+        right, with the same share icon as My Plan's "Share & export"; the header
+        no longer has it. The link opens the same view and day
+        (…/program?view=schedule&day=2026-10-17) and carries Maya's referral code.
+        Prague has no Overview tabs, and Share still sits right-aligned above the
+        day pills.
+
+    - id: 9
+      title: "Overview opens by default"
+      description: "Open Salsa Grand 2026 > Program and select Fri 27."
+      expected: >
+        Overview and Full schedule tabs appear above the day pills with Overview selected.
+        Friday lists, in time order: Registration & Open Office Hours (13:00–20:30),
+        Workshops (13:00–17:00), Bootcamp part 1/3 (14:00–16:00, "6-hour class with stage
+        performance"), Afternoon social dancing (17:00–20:00), Bootcamp part 2/3, the
+        night Registration (22:30–02:00) and Friday Party (22:30–05:00, "All I want for
+        Christmas is ... Salsa!") with Artists presentation & Shows (00:00) and Artist hour
+        (02:00) listed inside the party card.
+
+    - id: 10
+      title: "Category chips filter top-level blocks only"
+      description: "Tap Registration, then Party, then All."
+      expected: >
+        Registration shows only the two registration rows. Party shows only Friday
+        Party, still with its two moments. All restores the full day.
+
+    - id: 11
+      title: "Drill down from Workshops"
+      description: "Tap Workshops (13:00–17:00)."
+      expected: >
+        The card shows "3 sessions" with a chevron. Tapping opens Full schedule on Friday
+        scrolled to 13:00; the three Friday workshops briefly flash and then look normal.
+        The URL contains view=schedule&focus=…. Phone/browser Back returns to the Overview.
+
+    - id: 12
+      title: "Drill down from a party"
+      description: "On Saturday tap Saturday Grand Gala Night, then Back."
+      expected: >
+        The grid opens on Saturday at 22:30 with Gala Salsa & Mambo Night flashing. The
+        Gala's moments (Show performances 23:30, Artist hour 02:00) stay on Saturday's
+        Overview even though they are after midnight (day starts at 07:00).
+
+    - id: 13
+      title: "Blocks without a detailed schedule"
+      description: >
+        Tap a Bootcamp part, Friday's Artist hour moment, a Registration row and
+        Artists presentation & Shows.
+      expected: >
+        Bootcamp opens an info sheet with day, time, venue, a "Bootcamp details"
+        link that opens salsagrand.com in a new tab and an "In My Plan · Remove" footer
+        (part 1/3 is pre-planned). Artist hour opens a sheet with
+        "Catch your favorite artist on the dance floor!" and "Part of Friday Party".
+        Registration rows and Artists presentation & Shows are static (no tap
+        affordance) because they have no description, link or detailed schedule.
+
+    - id: 14
+      title: "Full schedule filters show socials and parties"
+      description: "Switch to Full schedule and open Filter schedule."
+      expected: >
+        Activity type chips include Workshop, Social and Party. Switching tabs keeps
+        the selected day.
+
+    - id: 15
+      title: "Overview-only program"
+      description: "Open Live Overview Social > Program."
+      expected: >
+        No Overview/Full schedule tabs and no Filter schedule bar are shown; Share is
+        alone on the right. Today is selected. Doors & registration shows a Now badge
+        and opens its info sheet. Riverside Salsa Night lists Live band set and Last
+        dance inside its card; Live band set opens its sheet. Tomorrow shows Recovery
+        picnic with a "Picnic map" link.
 
     - id: 16
-      title: "Overview opens by default and reads like the festival website"
-      description: >
-        As Maya, open Back 2 Mambo 2026 → Program and select Friday 16 October.
-        Switch to Saturday, then back to Friday.
+      title: "Bootcamp parts in My Plan"
+      description: "Open Salsa Grand 2026 > Program on Fri 27, then open My Plan."
       expected: >
-        The Overview tab is selected (Full schedule is next to it). Friday lists, in time
-        order: Registration & Info Desk (12:00–21:00), Welcome coffee, Workshops & Bootcamps
-        (14:00–00:00), Afternoon Social Party (15:00–20:00) and Mambo Night (00:00–07:00,
-        "Shows + party till dawn") with its Shows and Artist hour moments listed inside the
-        card. Category chips (All, then Workshop, Social, Show, Party, Afterparty, Other,
-        Registration — the types used by top-level items) filter the top-level items only;
-        moments always stay inside their party.
+        Each Bootcamp card has a bookmark button; part 1/3 shows it filled (pressed) and a
+        Bootcamp Buddy avatar under the card. Part 2/3 can be added with one tap (no sheet).
+        My Plan lists Bootcamp part 1/3 (subtitle "6-hour class with stage performance",
+        brown Bootcamp left stripe) next to Salsa Romantica, both with a "Time conflict" warning.
+        Workshops, parties and registration cards have no bookmark button.
 
     - id: 17
-      title: "Drill down into the full schedule and come back"
+      title: "Friends and calendar export"
       description: >
-        On Friday's Overview, tap Workshops & Bootcamps. Then use the browser/phone Back.
-        Repeat with Mambo Night.
+        Open Bootcamp part 1/3, tap the Who's attending row, go back; then in My Plan open the
+        share/export menu and download the calendar.
       expected: >
-        Linked cards show a chevron and a session count. Tapping opens the Full schedule on
-        Friday scrolled to 14:00 and the sessions starting in that window briefly flash, then
-        the grid looks normal (nothing stays dimmed). The URL contains view=schedule and
-        focus=…. Back returns to the Overview on the same day. Mambo Night lands at 00:00
-        with Shows and Mambo Night Party flashing.
-
-    - id: 18
-      title: "Non-linked items, moments and cancellation"
-      description: >
-        Tap Registration & Info Desk, the Artist hour moment, Thursday's Registration,
-        Friday's Welcome coffee and Sunday's Sunday brunch meetup.
-      expected: >
-        Registration & Info Desk and Artist hour open an info sheet (description, day,
-        time, venue). Thursday's Registration and Welcome coffee are static rows with no
-        tap affordance (Welcome coffee is linked but no session starts in its window).
-        Sunday brunch meetup is struck through with a Cancelled label and opens its sheet
-        with the cancellation notice.
-
-    - id: 19
-      title: "Edit the Overview in the admin editor"
-      description: >
-        As Dev Admin open the Schedule editor. The Overview section opens first. Inspect
-        Friday, add a moment to Mambo Night with "+ Add moment", edit Welcome coffee and
-        try to delete Mambo Night.
-      expected: >
-        Rows look like the attendee Overview with admin badges: "→ N sessions in full
-        schedule" on linked items and an amber warning on Welcome coffee ("no sessions
-        start in its time window"). Add moment pre-selects Mambo Night in "Part of",
-        pre-fills its start and hides "Has detailed schedule". The editor shows a live
-        "N sessions start in this window" hint. Deleting Mambo Night asks to confirm
-        and mentions its moments.
-
-    - id: 20
-      title: "Publish Overview changes"
-      description: >
-        Open Publish and review the change list, publish, then refresh the attendee
-        Overview for Saturday.
-      expected: >
-        The change list includes the renamed overview item and any moment you added.
-        After publishing, Saturday's attendee Overview shows "Workshops, Bootcamps &
-        Pilates". Planners are not notified about Overview-only changes.
+        The attendee list shows Bootcamp Buddy. The .ics contains the bootcamp part with its
+        Overview time (14:00–16:00 Zagreb) alongside the planned session. Removing part 1/3
+        from My Plan clears the conflict on Salsa Romantica.

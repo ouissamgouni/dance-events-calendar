@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Download, Pencil } from 'lucide-react';
+import { ChevronLeft, Download, Pencil, Share2 } from 'lucide-react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { addOverviewItemToMyPlan, addToMyPlan, fetchAdminEventSchedule, fetchEvent, fetchEventSchedule, fetchEventScheduleEditorAccess, fetchMyPlan, fetchOverviewItemAttendanceSummary, fetchSessionAttendanceSummary, fetchSingleSessionAttendanceSummary, removeFromMyPlan, removeOverviewItemFromMyPlan, updateMyPlanAudience, type ShareAudience } from '../api';
 import MyPlanUtilityMenu from '../components/MyPlanUtilityMenu';
+import ShareButton from '../components/ShareButton';
 import ScheduleGrid from '../components/program/ScheduleGrid';
 import ProgramOverview from '../components/program/ProgramOverview';
 import MyPlanList from '../components/program/MyPlanList';
@@ -22,6 +23,12 @@ import { filterScheduleSessions, firstDayWithSessions, planEntryId, programDayOf
 import { trackProgramViewed } from '../utils/tracking';
 
 const EMPTY_FILTERS: ScheduleFilters = { instructor: '', levelIds: [], activityTypeIds: [] };
+
+function programShareUrl(eventId: string, view: string, day: string): string {
+    const params = new URLSearchParams({ view });
+    if (day) params.set('day', day);
+    return `${window.location.origin}/event/${encodeURIComponent(eventId)}/program?${params}`;
+}
 
 export default function EventProgramPage() {
     const { eventId } = useParams<{ eventId: string }>();
@@ -52,6 +59,7 @@ export default function EventProgramPage() {
     const [planAudienceError, setPlanAudienceError] = useState<string | null>(null);
     const [pendingPostAdd, setPendingPostAdd] = useState<{ inviteAfterClose: boolean } | null>(null);
     const [selectedDay, setSelectedDay] = useState('');
+    const [underWork, setUnderWork] = useState(false);
     const [selectedSession, setSelectedSession] = useState<ScheduleSession | null>(null);
     const [selectedHour, setSelectedHour] = useState<number | null>(null);
     const [selectedRoom, setSelectedRoom] = useState<ScheduleRoom | null>(null);
@@ -107,8 +115,13 @@ export default function EventProgramPage() {
                 setSelectedOverviewItem(linkedItem);
                 if (!queryDay) setSelectedDay(programDayOf(linkedItem.start, scheduleValue.timezone, scheduleValue.day_start_hour));
             }
-        }).catch((reason: unknown) => {
-            if (!cancelled) setError(reason instanceof Error ? reason.message : 'Program unavailable');
+        }).catch(async (reason: unknown) => {
+            if (cancelled) return;
+            // A 404 while unpublished should explain itself, like the event page does.
+            const eventValue = preview ? null : await fetchEvent(eventId).catch(() => null);
+            if (cancelled) return;
+            if (eventValue?.schedule_under_work) setUnderWork(true);
+            else setError(reason instanceof Error ? reason.message : 'Program unavailable');
         });
         return () => { cancelled = true; };
     }, [eventId, flagsReady, preview, unavailable]);
@@ -471,6 +484,7 @@ export default function EventProgramPage() {
 
     if (unavailable) return shell(<ProgramState title="Program unavailable" detail="The event program is not available." onBack={backToEvent} />);
     if (error) return shell(<ProgramState title="Program unavailable" detail={error} onBack={backToEvent} />);
+    if (underWork) return shell(<ProgramState title="Program under work" detail="The organizers are updating the schedule. Check back soon." onBack={backToEvent} />);
     if (!event || !schedule) return shell(<ProgramState title="Loading program…" onBack={backToEvent} />);
 
     return shell(
@@ -480,10 +494,12 @@ export default function EventProgramPage() {
                 <div className="mx-auto flex max-w-5xl items-center gap-3">
                     <button type="button" onClick={backToEvent} aria-label="Back to event" className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft"><ChevronLeft size={24} /></button>
                     <h1 className="min-w-0 truncate text-base font-bold text-ink">{event.title}</h1>
-                    {canEdit ? <div className="ml-auto flex shrink-0 items-center gap-1">
-                        <button type="button" onClick={() => navigate(`/event/${event.event_id}/program/export`)} aria-label="Export published program" className="flex min-h-10 items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink"><Download size={16} /><span className="hidden sm:inline">Export</span></button>
-                        <button type="button" onClick={() => navigate(`/event/${event.event_id}/program/edit`)} aria-label="Edit program" className="flex min-h-10 items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink"><Pencil size={16} /><span className="hidden sm:inline">Edit program</span></button>
-                    </div> : null}
+                    <div className="ml-auto flex shrink-0 items-center gap-1">
+                        {canEdit ? <>
+                            <button type="button" onClick={() => navigate(`/event/${event.event_id}/program/export`)} aria-label="Export published program" className="flex min-h-10 items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink"><Download size={16} /><span className="hidden sm:inline">Export</span></button>
+                            <button type="button" onClick={() => navigate(`/event/${event.event_id}/program/edit`)} aria-label="Edit program" className="flex min-h-10 items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink"><Pencil size={16} /><span className="hidden sm:inline">Edit program</span></button>
+                        </> : null}
+                    </div>
                 </div>
             </header> : null}
 
@@ -492,10 +508,13 @@ export default function EventProgramPage() {
                     <ProgramTab active={activeTab === 'program'} onClick={() => navigateProgramTab(`/event/${event.event_id}/program${searchParams.toString() ? `?${searchParams}` : ''}`)}>Program</ProgramTab>
                     <ProgramTab active={activeTab === 'plan'} onClick={() => navigateProgramTab(`/event/${event.event_id}/program/plan${searchParams.toString() ? `?${searchParams}` : ''}`)}>My Plan{plan.length ? ` (${plan.length})` : ''}</ProgramTab>
                 </div> : null}
-                {activeTab === 'program' && hasOverview && hasSessions ? (
-                    <div className="mx-auto flex max-w-5xl gap-4 pt-2" role="tablist" aria-label="Program view">
-                        <ViewTab active={programView === 'overview'} onClick={() => switchProgramView('overview')}>Overview</ViewTab>
-                        <ViewTab active={programView === 'schedule'} onClick={() => switchProgramView('schedule')}>Full schedule</ViewTab>
+                {activeTab === 'program' && ((hasOverview && hasSessions) || !preview) ? (
+                    <div className="mx-auto flex max-w-5xl items-center gap-4 pt-2">
+                        {hasOverview && hasSessions ? <div className="flex gap-4" role="tablist" aria-label="Program view">
+                            <ViewTab active={programView === 'overview'} onClick={() => switchProgramView('overview')}>Overview</ViewTab>
+                            <ViewTab active={programView === 'schedule'} onClick={() => switchProgramView('schedule')}>Full schedule</ViewTab>
+                        </div> : null}
+                        {!preview ? <ShareButton eventId={event.event_id} title={`${event.title} · Program`} url={programShareUrl(event.event_id, programView, selectedDay)} icon={<Share2 size={16} aria-hidden="true" />} className="ml-auto flex min-h-9 shrink-0 items-center gap-1.5 rounded-field px-2 text-sm font-semibold text-ink-soft hover:bg-canvas hover:text-ink" /> : null}
                     </div>
                 ) : null}
                 {activeTab === 'program' && programView === 'schedule' ? <AttendeeProgramFilters schedule={schedule} filters={filters} onChange={updateFilters} /> : null}

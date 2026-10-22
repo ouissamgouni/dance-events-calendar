@@ -1,179 +1,252 @@
 test_plan:
   name: "Event Series — detection, grouping & display"
   description: >
-    End-to-end coverage of the event-series feature, functionally:
-      - Detection: the admin "Scan now" fuzzy scan groups recurring
-        occurrences of the same event within one calendar (title + location
-        similarity, occurrence gap), and never groups across calendars.
-      - Manual grouping: pairs the similarity check can't catch are grouped
-        by hand via the bulk "Group as Series" action.
-      - Approve / dismiss: approving resolves a group WITHOUT hiding or
-        blocking any member (unlike duplicate resolution); dismissing marks a
-        group "not a series" and is sticky across future scans.
-      - Removal: a single occurrence can be split off a group; the event
-        itself stays visible and bookable.
-      - Add: an event can be added to an existing (including already-resolved)
-        series either from the event side-panel's "Add to series" search or
-        from the bulk "Add to Series" action.
-      - New occurrence of a resolved series: because an event belongs to at
-        most one series and a resolved series is never disturbed by detection,
-        a fresh matching occurrence is NOT auto-added by a scan — an admin
-        adds it by hand.
-      - Display: the admin event side-panel shows the event id and the series
-        membership; in the user app, an event that belongs to a resolved
-        series shows a "This event belongs to the … series" link that opens
-        the series page.
+    End-to-end coverage of the event-series feature:
+      - Detection settings: the Series panel's Settings tab edits the
+        thresholds used by "Scan now" (title similarity, max gap, venue
+        radius, distance cutoff, cross-calendar matching, joining approved
+        series, generic title words).
+      - Detection: "Scan now" groups occurrences of the same event —
+        weekly socials and yearly editions — including across calendars and
+        with already-ended past editions. Titles are compared without years,
+        edition markers ("2nd Edition") and generic words ("Dance Festival");
+        locations match on venue coordinates, the same city, or the address
+        text, never more than 50 km apart.
+      - Guards: the same occurrence cross-posted on another calendar, the
+        same brand in a far-away city, different brands sharing only generic
+        words, occurrences more than 395 days apart, hidden events, and
+        location-less events on different calendars are never grouped.
+      - Existing series: a new occurrence joins an approved series and
+        reopens it for review; a dismissed series is never touched; an event
+        removed from a series is not re-added by later scans.
+      - Manual grouping / add: pairs the scan can't catch are grouped by hand;
+        events can be added to an existing (also approved) series.
+      - Display: admin side-panel shows series membership; the user app
+        links an event to its series page.
 
-    Data is seeded directly (calendar_service=mock) — the scenario opens with
-    every event already present, no manual sync required. Two calendars are
-    used: "tango-collective" (the recurring organizer feed) and
-    "other-calendar" (a decoy proving grouping never crosses calendars).
-    Seeded events:
-      - series-a-w1/w2/w3: 3 weekly occurrences, identical title and venue,
-        same calendar — auto-detectable by the fuzzy scan.
-      - series-a-decoy-other-calendar: same title/venue as Series A but in a
-        different calendar — must NEVER be grouped with Series A.
-      - series-a-w4 / series-a-w5: two later occurrences whose titles start
-        deliberately dissimilar so the scan ignores them; used to exercise the
-        manual "add to series" (panel search) and bulk "Add to Series" paths.
-      - manual-b1 / manual-b2: the same recurring event 7 days apart, but with
-        titles too dissimilar for the automatic check — only groupable via the
-        bulk "Group as Series" action.
-      - unique-solo: a one-off event — must never appear in any group.
+    Data is seeded directly (calendar_service=mock). Two calendars:
+    "riverside-dance" (the organizer) and "city-aggregator" (cross-posts and
+    other editions). Places are fictional: Riverton (Studio Nine, Old Mill
+    Hall, Harbour Arena, Harbor Club), Pinewood (~280 km away) and Farport
+    (~500 km away). Seeded events (see db-events.yaml for details):
+      - weekly-w1/w2/w3 "Riverside Thursday Social" — weekly, same venue.
+      - xpost-weekly-w1 — the same night as weekly-w1 on city-aggregator.
+      - weekly-w4/w5/w6 — later weekly nights with unrelated titles.
+      - manual-b1/manual-b2 — same recurring night, unrelated titles.
+      - fest-prev (ended, city-aggregator, "Old Mill Hall") / fest-next
+        (riverside-dance, full address) "Northern Lights Mambo Weekend
+        2025/2026"; fest-far-copy — same title in Farport.
+      - congress-prev ("Riverton, France", city-centre geocode) /
+        congress-next (Harbour Arena) "Lakeside Salsa Congress".
+      - pinewood-2nd/3rd "Pinewood Bachata Days 2nd/3rd Edition".
+      - summit-spring/autumn "Summit Salsa Marathon - Spring/Autumn
+        Edition", ~7 months apart.
+      - aurora-fest / zephyr-fest — two brands at Old Mill Hall.
+      - gala-old / gala-next "Maple Social Gala", 62 weeks apart.
+      - rooftop-w1/w2 (same calendar) and footwork-own/footwork-aggregator
+        (different calendars) — no location at all.
+      - harbor-prev1/prev2 + harbor-next — seeded APPROVED series "Harbor
+        Night Social" and a new occurrence.
+      - garden-prev1/prev2 + garden-next — seeded DISMISSED series "Garden
+        Salsa Picnic" and a new occurrence.
+      - velvet-hidden (hidden by admin) / velvet-visible.
+      - unique-solo — a one-off.
 
   preconditions:
     - "task start:scenario SCENARIO=event-series"
     - "task db:up && task db:migrate"
-    - "settings.yaml seeds series_auto_detect_enabled: false — series are only found via the manual 'Scan now' action or manual grouping, never automatically."
+    - "settings.yaml seeds series_auto_detect_enabled: false — series are only found via 'Scan now' or manual grouping."
     - "Signed in as admin (Dev Mock)."
 
   steps:
-    # ── Detection ───────────────────────────────────────────────────────
+    # ── Starting state ──────────────────────────────────────────────────
     - id: 1
-      title: "The 9 events are present with no series groups yet"
+      title: "Only the seeded series exist"
       description: >
-        Open the admin events list, then open the "Series" panel from the
-        action bar.
+        Open the admin events list, then the "Series" panel from the action
+        bar. Check the Pending and Resolved tabs.
       expected: >
-        GET /api/events returns 9 upcoming events. The "Series" button shows
-        no pending-count badge and the Pending tab is empty.
+        No pending-count badge; the Pending tab is empty. The Resolved tab
+        lists "Harbor Night Social" (2 events: harbor-prev1, harbor-prev2).
 
+    # ── Detection settings ──────────────────────────────────────────────
     - id: 2
-      title: "'Scan now' groups the 3 Series A occurrences only"
-      description: "In the Series panel, click 'Scan now'."
+      title: "Settings tab shows the defaults and validates input"
+      description: >
+        Open the Settings tab. Type 20 in "Title similarity (%)".
       expected: >
-        One pending group appears in the Pending tab containing all three
-        "Friday Night Milonga at Session Latina" occurrences (series-a-w1/w2/w3),
-        sorted by start date. series-a-decoy-other-calendar is NOT in it
-        (different calendar). manual-b1, manual-b2 and unique-solo do not
-        appear in any group. The Series button badge shows "1".
+        Defaults: auto-detect off, title similarity 72, max gap 395 days,
+        venue radius 300 m, never match beyond 50 km, match across calendars
+        on, add to approved series on, a list of generic words (salsa,
+        bachata, dance, festival, ...). With 20 the field shows "Enter a
+        whole number between 50 and 100" and "Save settings" is disabled.
+        Restore 72.
 
     - id: 3
-      title: "History tab logs the scan"
-      description: "Switch to the History tab."
+      title: "Scan with cross-calendar matching turned off"
+      description: >
+        Untick "Match events across calendars", click "Save settings"
+        ("Saved" appears), then click "Scan now" and open the Pending tab.
       expected: >
-        The most recent entry shows scan type "full", status "completed",
-        candidates found / groups created counts, and a finished timestamp.
+        5 pending groups (badge "5"):
+          - "Riverside Thursday Social": weekly-w1, weekly-w2, weekly-w3
+          - "Pinewood Bachata Days": pinewood-2nd, pinewood-3rd
+          - "Summit Salsa Marathon - Autumn Edition": summit-spring, summit-autumn
+          - "Rooftop Practice Hour": rooftop-w1, rooftop-w2
+          - "Harbor Night Social" (reopened, see step 7)
+        "Northern Lights Mambo Weekend" and "Lakeside Salsa Congress" are
+        NOT grouped — their editions are on different calendars.
 
-    # ── Approve resolves the group without hiding members ───────────────
     - id: 4
-      title: "'Approve series' resolves the group and keeps every occurrence visible"
-      description: "In the Pending tab, click 'Approve series' on the Series A group."
+      title: "Turn cross-calendar matching back on and re-scan"
+      description: >
+        In Settings tick "Match events across calendars", Save, click
+        "Scan now", open the Pending tab.
       expected: >
-        The group moves to the Resolved tab with status "resolved". All three
-        occurrences remain visible and unblocked in GET /api/events —
-        approving a series never hides or blocks a member. The badge drops to
-        "0".
+        7 pending groups (badge "7"); the 5 from step 3 are unchanged plus:
+          - "Northern Lights Mambo Weekend": fest-prev (already ended, other
+            calendar, short venue name) + fest-next — matched on venue
+            coordinates; the series title has no year.
+          - "Lakeside Salsa Congress": congress-prev + congress-next —
+            matched on the shared city although the past edition was
+            geocoded to the city centre (~2 km away).
 
     - id: 5
-      title: "Re-scanning does not recreate the resolved group"
-      description: "Click 'Scan now' again."
+      title: "Titles drop years and edition markers"
+      description: "Look at the new group titles."
       expected: >
-        The Pending tab stays empty — the resolved Series A is not recreated.
-        The History tab shows a second "full" scan entry.
+        "Northern Lights Mambo Weekend" (no 2025/2026) and "Pinewood Bachata
+        Days" (no "2nd/3rd Edition"). "Summit Salsa Marathon - Autumn
+        Edition" keeps its suffix (not a numbered edition) and can be renamed
+        before approving.
 
-    # ── Manual grouping (bulk) + removal + dismiss ──────────────────────
     - id: 6
-      title: "Bulk 'Group as Series' catches the dissimilar-title pair"
-      description: >
-        In the admin events list, select manual-b1 ("Kizomba Fusion Night -
-        Session Latina") and manual-b2 ("Monthly Kiz and Afro Social"), click
-        "Group as Series", enter a title (e.g. "Kizomba/Afro Social") and
-        confirm.
+      title: "Nothing that shouldn't match was grouped"
+      description: "Search the Pending tab / check each event's side-panel Series section."
       expected: >
-        A new series group is created (source manual, status pending)
-        containing both events and appears in the Series panel's Pending tab.
+        Not in any group:
+          - xpost-weekly-w1 (same night as weekly-w1, just cross-posted)
+          - fest-far-copy (same title, Farport is ~500 km away)
+          - aurora-fest / zephyr-fest (only "Dance Festival" in common)
+          - gala-old / gala-next (62 weeks apart, beyond 395 days)
+          - footwork-own / footwork-aggregator (no location, different calendars)
+          - velvet-visible (its only match, velvet-hidden, is hidden)
+          - weekly-w4/w5/w6, manual-b1, manual-b2, unique-solo
 
+    # ── Existing series ─────────────────────────────────────────────────
     - id: 7
-      title: "'Remove' splits a single occurrence off the group"
-      description: >
-        On the manual "Kizomba/Afro Social" group in the Pending tab, click
-        "Remove" next to manual-b2.
+      title: "A new occurrence reopened the approved series"
+      description: "Open the reopened 'Harbor Night Social' group in the Pending tab."
       expected: >
-        manual-b2 is removed from the group (only manual-b1 remains).
-        manual-b2 is NOT deleted or hidden — it stays a normal visible event
-        in GET /api/events, just no longer in any series.
+        It contains harbor-prev1, harbor-prev2 and the new harbor-next, and
+        is pending again (no longer in the Resolved tab) so an admin can
+        re-confirm it.
 
     - id: 8
-      title: "'Not a series — dismiss' keeps the remaining event untouched"
-      description: "On the remaining group (just manual-b1), click 'Not a series — dismiss'."
+      title: "A dismissed series is never joined"
+      description: "Open garden-next in the admin event side-panel."
       expected: >
-        The group's status becomes "dismissed" and it moves to the Resolved
-        tab. manual-b1 remains visible in GET /api/events. A later 'Scan now'
-        never recreates this dismissed group (sticky).
+        garden-next is not in any series. The dismissed "Garden Salsa
+        Picnic" still has only garden-prev1 and garden-prev2, and no new
+        group was created for garden-next.
 
-    # ── New occurrence of a resolved series is NOT auto-added ────────────
+    # ── Remove is sticky ────────────────────────────────────────────────
     - id: 9
-      title: "A re-titled new occurrence is NOT auto-added to the resolved series"
+      title: "A removed occurrence is not re-added by the next scan"
       description: >
-        Open series-a-w4 ("Guest DJ Takeover Night") in the admin event
-        side-panel, edit its title to "Friday Night Milonga at Session Latina"
-        (matching resolved Series A) and save. Then click 'Scan now'.
+        On the pending "Riverside Thursday Social" group click "Remove" next
+        to weekly-w3, then click "Scan now".
       expected: >
-        series-a-w4 is NOT added to Series A — a resolved series is never
-        disturbed by detection. Series A still shows exactly its 3 members and
-        series-a-w4 stays a normal visible event with no series membership.
+        weekly-w3 leaves the group (weekly-w1, weekly-w2 remain) and stays a
+        normal visible event. After the scan it is still NOT in the group.
 
-    # ── Add to an existing (resolved) series ────────────────────────────
+    # ── Approve ─────────────────────────────────────────────────────────
     - id: 10
-      title: "Add the occurrence to the resolved series via the panel search"
+      title: "Approve keeps every occurrence visible; re-scan changes nothing"
       description: >
-        In series-a-w4's side-panel Series section, click "Add to series",
-        type part of the resolved series title (e.g. "Milonga") and Search.
+        Click "Approve series" on "Riverside Thursday Social", then
+        "Scan now".
       expected: >
-        The resolved Series A appears in the search results (a RESOLVED series
-        is searchable here, not only pending ones). Selecting it adds
-        series-a-w4 to Series A (now 4 members). The series stays "resolved".
-        All members remain visible in GET /api/events.
+        The group moves to the Resolved tab. weekly-w1/w2 remain visible in
+        GET /api/events. The re-scan creates nothing new; the History tab
+        shows the "full" scans with candidates / groups counts.
 
+    # ── Manual grouping, remove, dismiss ────────────────────────────────
     - id: 11
+      title: "Bulk 'Group as Series' catches the dissimilar-title pair"
+      description: >
+        In the admin events list select manual-b1 ("Kizomba Night at Studio
+        Nine") and manual-b2 ("Monthly Kiz and Afro Social"), click "Group as
+        Series", enter "Studio Nine Kizomba" and confirm.
+      expected: >
+        A new pending series (source manual) with both events appears in the
+        Pending tab.
+
+    - id: 12
+      title: "Removing below two members dissolves the group"
+      description: "On 'Studio Nine Kizomba' click 'Remove' next to manual-b2."
+      expected: >
+        The group is dissolved (a series of one is meaningless). Both events
+        stay visible in GET /api/events.
+
+    - id: 13
+      title: "'Not a series — dismiss' is sticky"
+      description: >
+        On the pending "Rooftop Practice Hour" group click "Not a series —
+        dismiss", then "Scan now".
+      expected: >
+        The group is dismissed; the scan does not recreate it.
+
+    # ── New occurrence of an approved series ────────────────────────────
+    - id: 14
+      title: "A re-titled occurrence joins the approved series and reopens it"
+      description: >
+        Open weekly-w4 ("Guest DJ Takeover Night") in the admin event
+        side-panel, change its title to "Riverside Thursday Social", save,
+        then click "Scan now".
+      expected: >
+        weekly-w4 is added to "Riverside Thursday Social" (now weekly-w1,
+        weekly-w2, weekly-w4), which moves back to the Pending tab for
+        review. Approve it again.
+
+    # ── Add to an existing series ───────────────────────────────────────
+    - id: 15
+      title: "Add an occurrence via the side-panel search"
+      description: >
+        In weekly-w5's side-panel Series section click "Add to series", type
+        "Riverside" and pick the approved series.
+      expected: >
+        weekly-w5 is added (approved series are searchable here). The series
+        stays resolved. All members remain visible.
+
+    - id: 16
       title: "Bulk 'Add to Series' adds another occurrence"
       description: >
-        In the admin events list, select series-a-w5 ("Late Practica and
-        Social"), click "Add to Series", search the Series A title and pick it.
-      expected: >
-        series-a-w5 is added to the resolved Series A (now 5 members) and stays
-        visible in GET /api/events.
+        In the admin events list select weekly-w6 ("Open Floor Evening"),
+        click "Add to Series", search "Riverside" and pick it.
+      expected: "weekly-w6 is added to the series and stays visible."
 
-    # ── Display: admin side-panel ───────────────────────────────────────
-    - id: 12
+    - id: 17
+      title: "An event removed earlier can be added back by hand"
+      description: "Add weekly-w3 back with the side-panel 'Add to series' search."
+      expected: >
+        weekly-w3 is added back. A later 'Scan now' keeps it in the series.
+
+    # ── Display ─────────────────────────────────────────────────────────
+    - id: 18
       title: "Admin side-panel shows the event id and series membership"
-      description: "Open any Series A member (e.g. series-a-w1) in the admin event side-panel."
+      description: "Open weekly-w1 in the admin event side-panel."
       expected: >
-        The header shows the event id under the event name. The Series section
-        lists the resolved "Friday Night Milonga at Session Latina" membership
-        with a "Remove from series" action; clicking it removes that occurrence
-        while the event stays visible in GET /api/events.
+        The header shows the event id under the event name. The Series
+        section lists the resolved "Riverside Thursday Social" membership
+        with a "Remove from series" action.
 
-    # ── Display: user app ───────────────────────────────────────────────
-    - id: 13
+    - id: 19
       title: "User app links an event to its series"
       description: >
-        As a signed-in user, open a Series A member (e.g. series-a-w2) in the
-        calendar event modal, then open its event page (/event/{id}).
+        As a signed-in user open weekly-w2 in the calendar event modal, then
+        its event page (/event/{id}).
       expected: >
-        Both the modal and the event page show "This event belongs to the
-        Friday Night Milonga at Session Latina series", where the series name
-        is a link to /series/{id}. Clicking it opens the series page
-        (cross-edition roll-up). An event not in a resolved series shows no
-        such link.
+        Both show "This event belongs to the Riverside Thursday Social
+        series", linking to /series/{id}. Clicking it opens the series page.
+        An event not in a resolved series (e.g. unique-solo) shows no link.

@@ -567,34 +567,50 @@ def send_event_memories_prompt_email(
     )
 
 
-def send_schedule_program_available_email(user, event, session_count: int) -> bool:
+def send_schedule_program_available_email(
+    user,
+    event,
+    session_count: int,
+    headline: str | None = None,
+    note: str | None = None,
+    program_live: bool = True,
+) -> bool:
     if not user.email:
         return False
     app = get_public_app_url()
-    event_url = f"{app}/event/{escape(str(event.event_id))}/program"
+    event_path = f"/event/{escape(str(event.event_id))}"
+    event_url = f"{app}{event_path}/program" if program_live else f"{app}{event_path}"
     title = escape(event.title or "the event")
-    session_copy = (
-        f" Browse {session_count} sessions and build your plan."
-        if session_count
-        else " Browse the schedule and build your plan."
+    if note:
+        session_copy = escape(note).replace("\n", "<br>")
+    elif session_count:
+        session_copy = f"Browse {session_count} sessions and build your plan."
+    else:
+        session_copy = "Browse the schedule and build your plan."
+    lead = (
+        f"<p>The program for <strong>{title}</strong> is now available.</p>"
+        if not headline
+        else f"<p><strong>{title}</strong></p>"
     )
     body = f"""
-    <p>The program for <strong>{title}</strong> is now available.</p>
+    {lead}
     <p style="color:#374151;margin:8px 0">{session_copy}</p>
     <p style="margin:20px 0">
       <a href="{event_url}"
          style="background:#3b82f6;color:#fff;text-decoration:none;
                 padding:10px 18px;display:inline-block">
-        View program
+        {"View program" if program_live else "View event"}
       </a>
     </p>
     {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "schedule_updates", "program updates")
-    html = _email_shell("Program now available", body, footer)
+    html = _email_shell(
+        escape(headline) if headline else "Program now available", body, footer
+    )
     return _send_email(
         user.email,
-        f"{event.title or 'Event'}: program now available",
+        f"{event.title or 'Event'}: {headline or 'program now available'}",
         html,
         "program available",
     )

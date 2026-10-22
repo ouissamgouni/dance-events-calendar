@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addScheduleEditor, applyScheduleImport, createAdminEventSchedule, createScheduleOverviewItem, exportEventSchedule, fetchAdminEventSchedule, fetchAdminUsers, fetchEvent, fetchEventScheduleEditorAccess, fetchOptionalAdminEventSchedule, fetchScheduleEditors, fetchScheduleImportSchema, fetchSchedulePlanners, previewScheduleImport, publishEventSchedule, removeScheduleEditor, updateAdminEventSchedule, updateScheduleOverviewItem, updateScheduleSession, type AdminUserRow } from '../api';
+import { addScheduleEditor, applyScheduleImport, createAdminEventSchedule, createScheduleOverviewItem, exportEventSchedule, fetchAdminEventSchedule, fetchAdminUsers, fetchEvent, fetchEventScheduleEditorAccess, fetchOptionalAdminEventSchedule, fetchScheduleEditors, fetchScheduleImportSchema, fetchSchedulePlanners, notifyProgram, fetchProgramNotifyCandidates, fetchSchedulePublishPreview, previewScheduleImport, publishEventSchedule, removeScheduleEditor, revertScheduleChange, unpublishEventSchedule, updateAdminEventSchedule, updateScheduleOverviewItem, updateScheduleSession, type AdminUserRow } from '../api';
 import type { AdminEventSchedule, CalendarEvent } from '../types';
 import AdminEventSchedulePage from './AdminEventSchedulePage';
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, addScheduleEditor: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), createScheduleOverviewItem: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchAdminUsers: vi.fn(), fetchEvent: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleEditors: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn(), removeScheduleEditor: vi.fn(), updateAdminEventSchedule: vi.fn(), updateScheduleOverviewItem: vi.fn(), updateScheduleSession: vi.fn() };
+    return { ...actual, addScheduleEditor: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), createScheduleOverviewItem: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchAdminUsers: vi.fn(), fetchEvent: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleEditors: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn(), fetchProgramNotifyCandidates: vi.fn(), fetchSchedulePublishPreview: vi.fn(), notifyProgram: vi.fn(), unpublishEventSchedule: vi.fn(), revertScheduleChange: vi.fn(), removeScheduleEditor: vi.fn(), updateAdminEventSchedule: vi.fn(), updateScheduleOverviewItem: vi.fn(), updateScheduleSession: vi.fn() };
 });
 
 const event: CalendarEvent = {
@@ -69,6 +69,8 @@ describe('AdminEventSchedulePage', () => {
             version: 2,
             notification_summary: { impacted_planners: 1, going_attendees_notified: 2, in_app_created: 3, going_attendees: 3 },
         });
+        vi.mocked(fetchProgramNotifyCandidates).mockResolvedValue([]);
+        vi.mocked(fetchSchedulePublishPreview).mockResolvedValue({ impacted_user_ids: [], sample_message: null });
     });
 
     it('offers to create a program when the event has no schedule', async () => {
@@ -210,8 +212,10 @@ describe('AdminEventSchedulePage', () => {
         fireEvent.click(screen.getByText('View 1 change detail'));
         expect(screen.getByText('Sample Session')).toBeInTheDocument();
         expect(apply).toBeEnabled();
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Apply create Sample Session' }));
+        expect(screen.getByText('1 change will be skipped.')).toBeInTheDocument();
         fireEvent.click(apply);
-        await waitFor(() => expect(applyScheduleImport).toHaveBeenCalledWith(event.event_id, 'merge', expect.any(Object)));
+        await waitFor(() => expect(applyScheduleImport).toHaveBeenCalledWith(event.event_id, 'merge', expect.any(Object), [expect.objectContaining({ entity_id: 'sample-session', operation: 'create' })]));
         await waitFor(() => expect(fetchAdminEventSchedule).toHaveBeenCalledTimes(1));
     });
 
@@ -243,6 +247,11 @@ describe('AdminEventSchedulePage', () => {
 
         expect(screen.getByText('Draft title')).toBeInTheDocument();
         expect(screen.getAllByText('Musicality')).toHaveLength(2);
+
+        vi.mocked(revertScheduleChange).mockResolvedValue(schedule);
+        fireEvent.click(screen.getByRole('button', { name: 'Revert Draft title' }));
+        await waitFor(() => expect(revertScheduleChange).toHaveBeenCalledWith(event.event_id, expect.objectContaining({ entity_id: 'session-1', operation: 'update' })));
+        expect(await screen.findByText('No content changes.')).toBeInTheDocument();
     });
 
     it('loads a standalone example and can reset to the current draft', async () => {
@@ -366,7 +375,81 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.getByText('Musicality')).toBeInTheDocument();
     });
 
-    it('offers one optional broad update before publishing', async () => {
+    it('marks room conflicts in the grid and lists them for the day', async () => {
+        const footwork = { ...schedule.sessions[0], id: 'session-2', title: 'Footwork', start: '2026-10-16T12:30:00Z', end: '2026-10-16T13:30:00Z' };
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({
+            ...schedule,
+            sessions: [schedule.sessions[0], footwork],
+            issues: [{ code: 'room_overlap', severity: 'warning', message: 'Musicality overlaps Footwork in the same room', session_ids: ['session-1', 'session-2'] }],
+        });
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByText('1 room conflict')).toBeInTheDocument();
+        expect(screen.getAllByTestId('session-conflict-icon')).toHaveLength(2);
+        fireEvent.click(screen.getByRole('button', { name: 'Musicality ↔ Footwork' }));
+        expect(screen.getByRole('dialog', { name: 'Edit session' })).toBeInTheDocument();
+    });
+
+    it('publishes and notifies from one sheet, with personal plan updates kept separate', async () => {
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({
+            ...schedule,
+            diff: {
+                added_session_ids: [],
+                removed_session_ids: [],
+                changed_sessions: { 'session-1': ['start'] },
+                configuration_changed: false,
+                changes: [{ entity_type: 'session', operation: 'update', entity_id: 'session-1', label: 'Musicality', fields: [{ field: 'start', before: '12:00', after: '14:00' }] }],
+            },
+        });
+        vi.mocked(fetchProgramNotifyCandidates).mockResolvedValue([
+            { user_id: 'planner', email: 'planner@example.com', name: null, handle: null, email_enabled: true, push_enabled: true, has_push_subscription: false, already_notified: false, is_going: true, has_plan: true },
+            { user_id: 'going', email: 'going@example.com', name: null, handle: null, email_enabled: false, push_enabled: false, has_push_subscription: false, already_notified: false, is_going: true, has_plan: false },
+            { user_id: 'impacted', email: 'impacted@example.com', name: null, handle: null, email_enabled: true, push_enabled: true, has_push_subscription: false, already_notified: false, is_going: true, has_plan: true },
+        ]);
+        vi.mocked(fetchSchedulePublishPreview).mockResolvedValue({ impacted_user_ids: ['impacted'], sample_message: 'Musicality: has a new time.' });
+        vi.mocked(notifyProgram).mockResolvedValue({ emailed: 1, pushed: 0, in_app_created: 2, results: [{ user_id: 'planner', email: 'planner@example.com', status: 'sent', email_status: 'sent', push_status: 'unavailable' }, { user_id: 'going', email: 'going@example.com', status: 'sent', email_status: 'disabled', push_status: 'disabled' }] });
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Publish (1)' }));
+        expect(screen.getByRole('switch', { name: 'Notify attendees' })).toBeChecked();
+        expect(await screen.findByText('3 people · 1 personal plan update')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
+        expect(screen.getByRole('button', { name: 'Plans affected · 1' })).toHaveAttribute('aria-pressed', 'true');
+        const others = screen.getByRole('button', { name: 'Everyone else going · 2' });
+        expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Program updated');
+        expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Changed: Musicality (time).');
+        expect(screen.getByText(/1 turned off program emails and push/)).toBeInTheDocument();
+        expect(screen.getByText(/e\.g\. "Musicality: has a new time\."/)).toBeInTheDocument();
+        fireEvent.click(others);
+        expect(screen.getByRole('button', { name: 'Publish & notify 1' })).toBeInTheDocument();
+        fireEvent.click(others);
+        fireEvent.click(screen.getByRole('button', { name: 'Publish & notify 3' }));
+
+        await waitFor(() => expect(publishEventSchedule).toHaveBeenCalledWith(event.event_id, { notifyImpactedPlanners: true }));
+        await waitFor(() => expect(notifyProgram).toHaveBeenCalledWith(event.event_id, {
+            user_ids: ['planner', 'going'],
+            reason: 'updated',
+            title: 'Program updated',
+            message: 'Changed: Musicality (time).',
+        }));
+        expect(await screen.findByRole('dialog', { name: 'Version 2 is live' })).toBeInTheDocument();
+        expect(screen.getByText('Sent to 2 people.')).toBeInTheDocument();
+        expect(screen.getByText('1 person gets a personal "Your plan changed" message.')).toBeInTheDocument();
+    });
+
+    it('publishes without notifying anyone when the switch is off', async () => {
+        vi.mocked(fetchProgramNotifyCandidates).mockResolvedValue([
+            { user_id: 'going', email: 'going@example.com', name: null, handle: null, email_enabled: true, push_enabled: true, has_push_subscription: false, already_notified: false, is_going: true, has_plan: false },
+        ]);
+        vi.mocked(publishEventSchedule).mockResolvedValue({ ...schedule, version: 2, notification_summary: { impacted_planners: 0, going_attendees_notified: 0, in_app_created: 0, going_attendees: 1 } });
         render(
             <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
                 <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
@@ -374,13 +457,42 @@ describe('AdminEventSchedulePage', () => {
         );
 
         fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
-        fireEvent.click(screen.getByRole('checkbox', { name: /Also notify all Going attendees/ }));
-        fireEvent.click(screen.getByRole('dialog', { name: 'Publish schedule' }).querySelector('button.bg-action') as HTMLButtonElement);
+        expect(await screen.findByRole('button', { name: 'Publish & notify 1' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('switch', { name: 'Notify attendees' }));
+        expect(screen.getByText('Nobody will be notified')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('dialog', { name: 'Publish program' }).querySelector('button.bg-action') as HTMLButtonElement);
 
-        await waitFor(() => expect(publishEventSchedule).toHaveBeenCalledWith(event.event_id, true));
-        expect(await screen.findByText('1 impacted planner notified')).toBeInTheDocument();
-        expect(screen.getByText('2 additional Going attendees notified')).toBeInTheDocument();
-        expect(screen.getByText('3 in-app · email and push are sent in the background')).toBeInTheDocument();
+        await waitFor(() => expect(publishEventSchedule).toHaveBeenCalledWith(event.event_id, { notifyImpactedPlanners: false }));
+        expect(await screen.findByText('Nobody was notified.')).toBeInTheDocument();
+        expect(notifyProgram).not.toHaveBeenCalled();
+    });
+
+    it('unpublishes and sends the under-work notice from one sheet', async () => {
+        vi.mocked(unpublishEventSchedule).mockResolvedValue({ unpublished_at: '2026-10-21T10:00:00Z' });
+        vi.mocked(fetchProgramNotifyCandidates).mockResolvedValue([
+            { user_id: 'going', email: 'going@example.com', name: null, handle: null, email_enabled: true, push_enabled: true, has_push_subscription: false, already_notified: false, is_going: true, has_plan: false },
+        ]);
+        vi.mocked(notifyProgram).mockResolvedValue({ emailed: 1, pushed: 0, in_app_created: 1, results: [{ user_id: 'going', email: 'going@example.com', status: 'sent', email_status: 'sent', push_status: 'unavailable' }] });
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Unpublish' }));
+        expect(unpublishEventSchedule).not.toHaveBeenCalled();
+        expect(screen.getByRole('dialog', { name: 'Unpublish program?' })).toBeInTheDocument();
+        fireEvent.click(await screen.findByRole('button', { name: 'Unpublish & notify 1' }));
+
+        await waitFor(() => expect(unpublishEventSchedule).toHaveBeenCalledWith(event.event_id));
+        await waitFor(() => expect(notifyProgram).toHaveBeenCalledWith(event.event_id, {
+            user_ids: ['going'],
+            reason: 'under_work',
+            title: 'Program under work',
+            message: "The program is being updated. We'll let you know when it's back.",
+        }));
+        expect(await screen.findByRole('dialog', { name: 'Program unpublished' })).toBeInTheDocument();
+        expect(screen.getByText('Sent to 1 person.')).toBeInTheDocument();
     });
 
     it('announces the first publication without offering a broad-update option', async () => {
@@ -395,8 +507,9 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.getByRole('heading', { name: 'Export options' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Preview PDF' })).toBeEnabled();
         expect(screen.queryByRole('button', { name: 'Download calendar (.ics)' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Notify attendees' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
-        expect(screen.getByText(/Publishing makes this program visible and announces it/)).toBeInTheDocument();
+        expect(screen.getByText(/Publishing makes this program visible to attendees/)).toBeInTheDocument();
         expect(screen.queryByRole('checkbox', { name: /Also notify all Going attendees/ })).not.toBeInTheDocument();
     });
 

@@ -534,6 +534,9 @@ class EventSchedule(SQLModel, table=True):
     day_start_hour: int = Field(default=6, nullable=False)
     session_color_mode: str = Field(default="room", max_length=24, nullable=False)
     days: list = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    # Set while the program is unpublished: publications are kept, but the
+    # public program is hidden and the event page shows "Program under work".
+    unpublished_at: Optional[datetime] = Field(default=None, nullable=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -992,6 +995,20 @@ class EventSeriesMember(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     series_id: int = Field(foreign_key="event_series.id", index=True)
     event_id: str = Field(foreign_key="cached_events.event_id")
+
+
+class EventSeriesExclusion(SQLModel, table=True):
+    """An event an admin removed from a series; auto-detection won't re-add it."""
+
+    __tablename__ = "event_series_exclusions"
+    __table_args__ = (
+        UniqueConstraint("series_id", "event_id", name="uq_series_exclusion"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    series_id: int = Field(foreign_key="event_series.id", index=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventSeriesScanLog(SQLModel, table=True):

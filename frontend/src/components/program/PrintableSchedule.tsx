@@ -1,5 +1,5 @@
 import type { ProgramExport, ProgramExportSession, ScheduleRoom } from '../../types';
-import { formatDayLabel, minuteOfProgramDay, roomColumnRuns, sessionRoomIds } from '../../utils/schedule';
+import { formatDayLabel, minuteOfProgramDay, roomColumnRuns, sessionRoomIds, sessionSpan } from '../../utils/schedule';
 import { scheduleColor, sessionCellColors } from '../../utils/scheduleColors';
 
 interface Props {
@@ -188,8 +188,5 @@ function formatMinute(minute: number, dayStartHour: number): string {
 }
 
 function sessionEndMinute(session: ProgramExportSession, program: ProgramExport): number {
-    const start = minuteOfProgramDay(session.start, program.timezone, program.day_start_hour);
-    let end = minuteOfProgramDay(session.end, program.timezone, program.day_start_hour);
-    if (end <= start) end += 24 * 60;
-    return end;
+    return sessionSpan(session, program.timezone, program.day_start_hour).end;
 }

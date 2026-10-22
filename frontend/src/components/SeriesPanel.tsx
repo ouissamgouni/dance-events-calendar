@@ -12,6 +12,7 @@ import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import type { SeriesGroup, SeriesScanLogEntry } from '../types';
 import SeriesGroupCard from './SeriesGroupCard';
 import SeriesDetailPanel from './SeriesDetailPanel';
+import SeriesDetectionSettingsForm from './SeriesDetectionSettingsForm';
 
 interface Props {
     isOpen: boolean;
@@ -19,7 +20,7 @@ interface Props {
     onOpenEvent?: (eventId: string) => void;
 }
 
-const TABS = ['pending', 'resolved', 'history'] as const;
+const TABS = ['pending', 'resolved', 'history', 'settings'] as const;
 type Tab = typeof TABS[number];
 const PAGE_SIZE = 25;
 
@@ -43,6 +44,7 @@ export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
     }, [q]);
 
     const load = (offset = 0, append = false) => {
+        if (activeTab === 'settings') return;
         setLoading(true);
         setError(null);
         if (activeTab === 'history') {
@@ -187,7 +189,7 @@ export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
                     ))}
                 </div>
 
-                {activeTab !== 'history' && (
+                {(activeTab === 'pending' || activeTab === 'resolved') && (
                     <div className="px-4 py-2 border-b border-card-line">
                         <input
                             type="text"
@@ -206,7 +208,9 @@ export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
                 )}
 
                 <div className="flex-1 overflow-y-auto">
-                    {loading ? (
+                    {activeTab === 'settings' ? (
+                        <SeriesDetectionSettingsForm />
+                    ) : loading ? (
                         <div className="p-6 text-center text-xs text-muted">Loading…</div>
                     ) : activeTab === 'history' ? (
                         history.length === 0 ? (

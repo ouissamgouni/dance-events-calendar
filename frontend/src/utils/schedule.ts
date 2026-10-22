@@ -1,4 +1,4 @@
-import type { EventSchedule, MyPlanEntry, ScheduleOverviewItem, ScheduleSession } from '../types';
+import type { EventSchedule, MyPlanEntry, ScheduleChange, ScheduleOverviewItem, ScheduleSession } from '../types';
 
 interface LocalParts {
     year: number;
@@ -50,6 +50,13 @@ export function minuteOfProgramDay(
     let minute = parts.hour * 60 + parts.minute - dayStartHour * 60;
     if (minute < 0) minute += 24 * 60;
     return minute;
+}
+
+/** Program-day minutes of a session; the end comes from the duration so spans past the day boundary keep their length. */
+export function sessionSpan(session: Pick<ScheduleSession, 'start' | 'end'>, timeZone: string, dayStartHour: number): { start: number; end: number } {
+    const start = minuteOfProgramDay(session.start, timeZone, dayStartHour);
+    const durationMinutes = Math.max(0, (new Date(session.end).getTime() - new Date(session.start).getTime()) / 60_000);
+    return { start, end: start + durationMinutes };
 }
 
 export function formatTime(value: string | Date, timeZone: string): string {
@@ -214,9 +221,7 @@ export function sessionsAtHour(
 ): ScheduleSession[] {
     const hourEnd = hourStartMinute + 60;
     return sessions.filter((session) => {
-        const start = minuteOfProgramDay(session.start, timeZone, dayStartHour);
-        let end = minuteOfProgramDay(session.end, timeZone, dayStartHour);
-        if (end <= start) end += 24 * 60;
+        const { start, end } = sessionSpan(session, timeZone, dayStartHour);
         return start < hourEnd && end > hourStartMinute;
     });
 }
@@ -292,4 +297,44 @@ export function overviewItemOpensSchedule(item: ScheduleOverviewItem, sessions: 
 
 export function overviewItemHasDetails(item: ScheduleOverviewItem): boolean {
     return Boolean(item.description?.trim() || item.url);
+}
+
+const TIME_FIELDS = new Set(['start', 'end']);
+const PLACE_FIELDS = new Set(['room_id', 'room_ids', 'venue_id']);
+
+/** Attendee-facing summary of a publish review, e.g. "New: A, B. Changed: C (time)." */
+export function programUpdateMessage(changes: ScheduleChange[], maxLength = 255): string {
+    const groups: Array<[string, string[]]> = [['New', []], ['Changed', []], ['Cancelled', []], ['Removed', []]];
+    const [added, changed, cancelled, removed] = groups.map(([, items]) => items);
+    for (const change of changes) {
+        if (change.entity_type !== 'session' && change.entity_type !== 'overview_item') continue;
+        if (change.operation === 'create') added.push(change.label);
+        else if (change.operation === 'remove') removed.push(change.label);
+        else if (change.fields.some((field) => field.field === 'is_cancelled' && field.after === true)) cancelled.push(change.label);
+        else {
+            const fields = change.fields.map((field) => field.field);
+            const aspects = [
+                fields.some((field) => TIME_FIELDS.has(field)) ? 'time' : null,
+                fields.some((field) => PLACE_FIELDS.has(field)) ? 'room' : null,
+                fields.some((field) => !TIME_FIELDS.has(field) && !PLACE_FIELDS.has(field)) ? 'details' : null,
+            ].filter(Boolean);
+            changed.push(aspects.length ? `${change.label} (${aspects.join(', ')})` : change.label);
+        }
+    }
+    const items = groups.flatMap(([heading, list]) => list.map((text) => ({ heading, text })));
+    if (!items.length) return 'Program details were updated. Review the latest schedule.';
+    const render = (count: number) => {
+        const parts: string[] = [];
+        for (const [heading] of groups) {
+            const shown = items.slice(0, count).filter((item) => item.heading === heading).map((item) => item.text);
+            if (shown.length) parts.push(`${heading}: ${shown.join(', ')}.`);
+        }
+        if (count < items.length) parts.push(`+${items.length - count} more.`);
+        return parts.join(' ');
+    };
+    for (let count = items.length; count > 0; count -= 1) {
+        const text = render(count);
+        if (text.length <= maxLength) return text;
+    }
+    return `${items.length} program changes. Review the latest schedule.`;
 }

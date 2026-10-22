@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { BadgeCheck, Flag, MessageSquare, MoreHorizontal, PencilLine, Ticket, Wrench } from 'lucide-react';
+import { useLocation, useNavigate, type Location } from 'react-router-dom';
+import { BadgeCheck, CalendarDays, Flag, MessageSquare, MoreHorizontal, PencilLine, Ticket, Wrench } from 'lucide-react';
 import type { CalendarEvent } from '../../types';
 import BottomSheet from '../BottomSheet';
 import GoingButton from '../GoingButton';
@@ -12,6 +13,7 @@ import { useFeatureFlags } from '../../context/FeatureFlagsContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTicketAction } from '../../hooks/useTicketAction';
 import useOrganizerClaimAction from '../../hooks/useOrganizerClaimAction';
+import { useProgramEditorAccess } from '../../hooks/useProgramEditorAccess';
 import { reportMailto } from '../../utils/report';
 import { isPromoSectionVisible } from '../../utils/sectionVisibility';
 
@@ -33,6 +35,8 @@ interface Props {
     onAdminEdit?: () => void;
     /** Called after the viewer submits a promo code from the ••• menu. */
     onPromoAdded?: () => void;
+    /** Called before leaving for the event or program editor (closes the modal). */
+    onNavigate?: () => void;
 }
 
 /**
@@ -53,11 +57,15 @@ export default function EventActions({
     onSuggestEdit,
     onAdminEdit,
     onPromoAdded,
+    onNavigate,
 }: Props) {
     const { showRatings, promoCodesEnabled } = useFeatureFlags();
     const { user } = useAuth();
     const ticket = useTicketAction(event);
     const organizerClaim = useOrganizerClaimAction(event);
+    const { isOrganizer, canEditProgram } = useProgramEditorAccess(event);
+    const navigate = useNavigate();
+    const location = useLocation();
     const [ticketOpen, setTicketOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [promoOpen, setPromoOpen] = useState(false);
@@ -68,11 +76,17 @@ export default function EventActions({
     const canAddPromo = Boolean(user) && !isPast && !cancelled && isPromoSectionVisible(event, promoCodesEnabled);
     const menuItem = 'flex min-h-12 w-full items-center gap-3 px-2 text-left text-base text-ink transition hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent';
     const menuIcon = 'h-5 w-5 shrink-0 text-ink-soft';
+    const openEditor = (path: string, state?: { backgroundLocation: Location }) => {
+        setMenuOpen(false);
+        onNavigate?.();
+        navigate(path, { state });
+    };
+    const backgroundLocation = (location.state as { backgroundLocation?: Location } | null)?.backgroundLocation ?? location;
 
     return (
         <div className="flex w-full min-w-0 flex-nowrap items-center gap-1">
             {!isPast && <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" disabled={cancelled} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />}
-            <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} ticketLikely={event.ticket_likely} cancelled={cancelled} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
+            <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} ticketLikely={event.ticket_likely && !isOrganizer} cancelled={cancelled} className="shrink-0 border border-line" labelClassName="hidden min-[375px]:inline" />
             {!isPast && (
                 <ShareButton
                     eventId={event.event_id}
@@ -169,7 +183,17 @@ export default function EventActions({
                                     Add promo code
                                 </button>
                             )}
-                            {onSuggestEdit && (
+                            {isOrganizer ? (
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => openEditor(`/event/${event.event_id}/suggest-change`, { backgroundLocation })}
+                                    className={menuItem}
+                                >
+                                    <PencilLine className={menuIcon} aria-hidden="true" />
+                                    Edit event
+                                </button>
+                            ) : onSuggestEdit && (
                                 <button
                                     type="button"
                                     role="menuitem"
@@ -179,6 +203,17 @@ export default function EventActions({
                                 >
                                     <PencilLine className={menuIcon} aria-hidden="true" />
                                     Suggest an edit
+                                </button>
+                            )}
+                            {canEditProgram && (
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => openEditor(`/event/${event.event_id}/program/edit`)}
+                                    className={menuItem}
+                                >
+                                    <CalendarDays className={menuIcon} aria-hidden="true" />
+                                    Edit program
                                 </button>
                             )}
                             {organizerClaim.available && (

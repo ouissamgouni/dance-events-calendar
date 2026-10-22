@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { CalendarEvent } from '../types';
 import { renderWithProviders } from '../test/render';
 import { FeatureFlagsContext, FeatureFlagsProvider, defaultFlags } from '../context/FeatureFlagsContext';
 import EventActionDock from './EventActionDock';
 import EventActions from './event-summary/EventActions';
+import { useProgramEditorAccess } from '../hooks/useProgramEditorAccess';
+
+vi.mock('../hooks/useProgramEditorAccess', () => ({ useProgramEditorAccess: vi.fn(() => ({ isOrganizer: false, canEditProgram: false })) }));
 
 const EVENT = {
     event_id: 'evt-actions',
@@ -131,6 +134,41 @@ describe('organizer claim action', () => {
 
         await user.click(screen.getByRole('button', { name: 'More actions' }));
         expect(screen.queryByRole('menuitem', { name: 'I organize this event' })).toBeNull();
+    });
+});
+
+describe('organizer and program editor actions', () => {
+    afterEach(() => {
+        vi.mocked(useProgramEditorAccess).mockReturnValue({ isOrganizer: false, canEditProgram: false });
+    });
+
+    it('gives the organizer Edit event and Edit program in the modal menu', async () => {
+        vi.mocked(useProgramEditorAccess).mockReturnValue({ isOrganizer: true, canEditProgram: true });
+        const { user } = renderActionBar(<EventActions {...commonProps} isPast={false} canReviewInline={false} onSuggestEdit={vi.fn()} />);
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        expect(screen.getByRole('menuitem', { name: 'Edit event' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'Edit program' })).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: 'Suggest an edit' })).toBeNull();
+    });
+
+    it('gives a delegated editor only Edit program', async () => {
+        vi.mocked(useProgramEditorAccess).mockReturnValue({ isOrganizer: false, canEditProgram: true });
+        const { user } = renderActionBar(<EventActions {...commonProps} isPast={false} canReviewInline={false} />);
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        expect(screen.getByRole('menuitem', { name: 'Edit program' })).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: 'Edit event' })).toBeNull();
+    });
+
+    it('keeps Cancel event out of the page dock', async () => {
+        vi.mocked(useProgramEditorAccess).mockReturnValue({ isOrganizer: true, canEditProgram: true });
+        const { user } = renderActionBar(<EventActionDock {...commonProps} isPast={false} />);
+
+        expect(screen.getByRole('button', { name: 'Edit program' })).toHaveClass('hidden', 'lg:flex');
+        await user.click(screen.getByRole('button', { name: 'More actions' }));
+        expect(screen.getByRole('menuitem', { name: 'Edit program' })).toBeInTheDocument();
+        expect(screen.queryByText(/Cancel event/)).toBeNull();
     });
 });
 

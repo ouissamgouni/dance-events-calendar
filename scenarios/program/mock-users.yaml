@@ -29,3 +29,7 @@ users:
     name: Omar Observer
     handle: omar-observer
     account_visibility: public
+  - email: friend@example.com
+    name: Bootcamp Buddy
+    handle: bootcamp-buddy
+    account_visibility: public

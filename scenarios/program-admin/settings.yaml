@@ -1,0 +1,5 @@
+settings:
+  event_schedule_enabled: true
+  # Olive's approved claim only shows as the event organizer while claims are on.
+  organizer_claims_enabled: true
+  event_tickets_enabled: true

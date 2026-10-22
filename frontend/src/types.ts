@@ -116,6 +116,8 @@ export interface CalendarEvent {
     /** Distinct savers (UserSavedEvent rows). 0 when not surfaced by the endpoint. */
     saved_count?: number;
     schedule_published?: boolean;
+    /** True while a previously published program is unpublished for editing. */
+    schedule_under_work?: boolean;
     /**
      * Commitment-weighted, time-decayed popularity score. Set by the server
      * when ``trending_enabled`` is on; otherwise 0. Use this (not
@@ -357,6 +359,7 @@ export interface ScheduleChange {
     entity_type: 'schedule' | 'venue' | 'room' | 'level' | 'activity_type' | 'contributor' | 'session' | 'overview_item';
     operation: 'create' | 'update' | 'remove';
     entity_id: string;
+    external_id?: string | null;
     label: string;
     fields: ScheduleFieldChange[];
 }
@@ -372,6 +375,7 @@ export interface ScheduleDiff {
 export interface AdminEventSchedule extends EventSchedule {
     issues: ScheduleIssue[];
     diff: ScheduleDiff;
+    unpublished_at?: string | null;
 }
 
 export type MyPlanEntryStatus = 'active' | 'cancelled' | 'removed';
@@ -734,6 +738,17 @@ export interface SeriesScanLogEntry {
 export interface SeriesScanLogListResponse {
     items: SeriesScanLogEntry[];
     total: number;
+}
+
+export interface SeriesDetectionSettings {
+    auto_detect_enabled: boolean;
+    title_similarity_pct: number;
+    max_gap_days: number;
+    venue_radius_m: number;
+    max_distance_km: number;
+    cross_calendar_enabled: boolean;
+    join_resolved_enabled: boolean;
+    generic_title_words: string[];
 }
 
 export interface CalendarSetting {

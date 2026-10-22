@@ -55,6 +55,42 @@ def _trending_settings(session: Session) -> tuple[bool, int, int]:
     return enabled, window_days, floor_going
 
 
+def organizer_minis_by_event(
+    session: Session, events: Iterable[CachedEvent]
+) -> dict[str, EventOrganizerMini]:
+    """Map event_id -> approved organizer; empty while organizer claims are off."""
+    events_list = list(events)
+    organizer_claims_enabled = False
+    try:
+        row = session.get(SiteSetting, "organizer_claims_enabled")
+        if row and row.value.lower() == "true":
+            organizer_claims_enabled = True
+    except Exception:
+        pass
+
+    organizer_by_event: dict[str, EventOrganizerMini] = {}
+    if organizer_claims_enabled:
+        organizer_user_ids = {
+            e.organizer_user_id for e in events_list if e.organizer_user_id
+        }
+        if organizer_user_ids:
+            users = session.exec(
+                select(User).where(User.id.in_(organizer_user_ids))
+            ).all()
+            user_by_id = {u.id: u for u in users}
+            for ev in events_list:
+                if ev.organizer_user_id and ev.organizer_user_id in user_by_id:
+                    u = user_by_id[ev.organizer_user_id]
+                    organizer_by_event[ev.event_id] = EventOrganizerMini(
+                        user_id=u.id,
+                        handle=u.handle,
+                        display_name=u.display_name,
+                        avatar_url=resolve_user_avatar(u),
+                        is_verified_organizer=u.is_verified_organizer,
+                    )
+    return organizer_by_event
+
+
 def serialize_events(
     session: Session, events: Iterable[CachedEvent]
 ) -> list[EventResponse]:
@@ -142,34 +178,7 @@ def serialize_events(
         ).all()
         events_with_promos = {row for row in promo_rows}
 
-    organizer_claims_enabled = False
-    try:
-        row = session.get(SiteSetting, "organizer_claims_enabled")
-        if row and row.value.lower() == "true":
-            organizer_claims_enabled = True
-    except Exception:
-        pass
-
-    organizer_by_event: dict[str, EventOrganizerMini] = {}
-    if organizer_claims_enabled:
-        organizer_user_ids = {
-            e.organizer_user_id for e in events_list if e.organizer_user_id
-        }
-        if organizer_user_ids:
-            users = session.exec(
-                select(User).where(User.id.in_(organizer_user_ids))
-            ).all()
-            user_by_id = {u.id: u for u in users}
-            for ev in events_list:
-                if ev.organizer_user_id and ev.organizer_user_id in user_by_id:
-                    u = user_by_id[ev.organizer_user_id]
-                    organizer_by_event[ev.event_id] = EventOrganizerMini(
-                        user_id=u.id,
-                        handle=u.handle,
-                        display_name=u.display_name,
-                        avatar_url=resolve_user_avatar(u),
-                        is_verified_organizer=u.is_verified_organizer,
-                    )
+    organizer_by_event = organizer_minis_by_event(session, events_list)
 
     ticket_hours = event_assets.ticket_min_hours(session)
     return [

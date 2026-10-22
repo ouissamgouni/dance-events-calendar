@@ -695,7 +695,7 @@ export default function SuggestEventWizard({ onClose, suggestionId, changeEventI
                                 imagesAllowed={imagesAllowed}
                             />
                         ) : (
-                            <Step3Publish {...stepProps} signedIn={Boolean(user)} editing={editing && !changing} changing={changing} canOrganize={canOrganize} promoEnabled={settings?.promo_codes_enabled === true} />
+                            <Step3Publish {...stepProps} signedIn={Boolean(user)} editing={editing && !changing} changing={changing} canOrganize={canOrganize} promoEnabled={settings?.promo_codes_enabled === true} cancelEvent={organizer && changeBase ? { eventId: changeBase.event_id, eventTitle: changeBase.title, cancelled: Boolean(changeBase.is_cancelled) } : undefined} />
                         )}
 
                         {submitError && !subPageOpen ? (

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { BadgeCheck, CalendarX, MessageSquare, MoreHorizontal, PencilLine, Ticket, Wrench } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BadgeCheck, CalendarDays, MessageSquare, MoreHorizontal, PencilLine, Ticket, Wrench } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import BottomSheet from './BottomSheet';
 import GoingButton from './GoingButton';
@@ -10,8 +11,8 @@ import TicketSheet from './TicketSheet';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useTicketAction } from '../hooks/useTicketAction';
 import useOrganizerClaimAction from '../hooks/useOrganizerClaimAction';
+import { useProgramEditorAccess } from '../hooks/useProgramEditorAccess';
 import { useAuth } from '../context/AuthContext';
-import CancelEventSheet from './CancelEventSheet';
 import EventPromoCodeDialog from './EventPromoCodeDialog';
 import { isPromoSectionVisible } from '../utils/sectionVisibility';
 import type { RatingEntryPoint } from '../utils/tracking';
@@ -60,9 +61,9 @@ export default function EventActionDock({
     const ticket = useTicketAction(event);
     const organizerClaim = useOrganizerClaimAction(event);
     const { user } = useAuth();
-    const isOrganizer = Boolean(user && event.organizer?.user_id === user.user_id);
-    const cancelLabel = event.is_cancelled ? 'Restore event' : 'Cancel event';
-    const [cancelOpen, setCancelOpen] = useState(false);
+    const { isOrganizer, canEditProgram } = useProgramEditorAccess(event);
+    const navigate = useNavigate();
+    const editProgram = () => navigate(`/event/${event.event_id}/program/edit`);
     const [ticketOpen, setTicketOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [promoOpen, setPromoOpen] = useState(false);
@@ -79,7 +80,7 @@ export default function EventActionDock({
         <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-offset,0px)+env(safe-area-inset-bottom))] transition-[bottom] xl:bottom-0 z-30 border-t border-blue-100 bg-blue-50 shadow-[0_-2px_10px_rgba(15,23,42,0.06)] lg:sticky lg:inset-auto lg:top-6 lg:z-10 lg:w-fit lg:rounded-card lg:border lg:p-4 lg:shadow-sm">
             <div className="mx-auto flex max-w-[480px] flex-nowrap items-center gap-2 px-3 pt-3 pb-3 xl:pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:mx-0 lg:w-max lg:flex-col lg:items-stretch lg:px-0 lg:py-0 lg:pb-0">
                 {!isPast && <SaveEventButton eventId={event.event_id} eventTitle={event.title} appearance="pill" disabled={cancelled} className="shrink-0 border border-line lg:w-full" labelClassName="hidden min-[375px]:inline" />}
-                <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} ticketLikely={event.ticket_likely} cancelled={cancelled} className="shrink-0 border border-line lg:w-full" labelClassName="hidden min-[375px]:inline" />
+                <GoingButton eventId={event.event_id} eventTitle={event.title} appearance="pill" isPast={isPast} ticketLikely={event.ticket_likely && !isOrganizer} cancelled={cancelled} className="shrink-0 border border-line lg:w-full" labelClassName="hidden min-[375px]:inline" />
                 {reviewInline && (
                     <RateEventButton
                         eventId={event.event_id}
@@ -163,10 +164,10 @@ export default function EventActionDock({
                         I organize this event
                     </button>
                 )}
-                {isOrganizer && (
-                    <button type="button" onClick={() => setCancelOpen(true)} className={desktopButton}>
-                        <CalendarX className="h-4 w-4" aria-hidden="true" />
-                        {cancelLabel}
+                {canEditProgram && (
+                    <button type="button" onClick={editProgram} className={desktopButton}>
+                        <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                        Edit program
                     </button>
                 )}
                 {onAdminEdit && (
@@ -268,15 +269,15 @@ export default function EventActionDock({
                                         I organize this event
                                     </button>
                                 )}
-                                {isOrganizer && (
+                                {canEditProgram && (
                                     <button
                                         type="button"
                                         role="menuitem"
-                                        onClick={() => { setMenuOpen(false); setCancelOpen(true); }}
-                                        className="flex min-h-12 w-full items-center gap-3 px-2 text-left text-base text-danger transition hover:bg-canvas"
+                                        onClick={() => { setMenuOpen(false); editProgram(); }}
+                                        className={menuItem}
                                     >
-                                        <CalendarX className="h-5 w-5 shrink-0" aria-hidden="true" />
-                                        {cancelLabel}
+                                        <CalendarDays className={menuIcon} aria-hidden="true" />
+                                        Edit program
                                     </button>
                                 )}
                                 {onAdminEdit && (
@@ -304,14 +305,6 @@ export default function EventActionDock({
                 />
             )}
             {organizerClaim.sheet}
-            {cancelOpen && (
-                <CancelEventSheet
-                    eventId={event.event_id}
-                    eventTitle={event.title}
-                    cancelled={event.is_cancelled}
-                    onClose={() => setCancelOpen(false)}
-                />
-            )}
         </div>
     );
 }

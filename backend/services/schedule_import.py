@@ -12,9 +12,11 @@ from backend.db.models import (
     ScheduleContributor,
     ScheduleLevel,
     ScheduleOverviewItem,
+    ScheduleOverviewItemRoom,
     ScheduleRoom,
     ScheduleSession,
     ScheduleSessionContributor,
+    ScheduleSessionRoom,
     ScheduleVenue,
 )
 from backend.services.schedules import (
@@ -28,6 +30,41 @@ from backend.services.schedules import (
     utc_isoformat,
     validate_timezone,
 )
+
+_MODEL_LABELS = {
+    ScheduleVenue: "venue",
+    ScheduleRoom: "room",
+    ScheduleLevel: "level",
+    ScheduleActivityType: "activity type",
+    ScheduleContributor: "contributor",
+}
+
+
+def _usage_checker(session: Session, model):
+    """Return a predicate telling whether a config row is referenced anywhere (deleted sessions included)."""
+    references = {
+        ScheduleVenue: (
+            ScheduleRoom.venue_id,
+            ScheduleSession.venue_id,
+            ScheduleOverviewItem.venue_id,
+        ),
+        ScheduleRoom: (
+            ScheduleSession.room_id,
+            ScheduleSessionRoom.room_id,
+            ScheduleOverviewItemRoom.room_id,
+        ),
+        ScheduleLevel: (ScheduleSession.level_id,),
+        ScheduleActivityType: (
+            ScheduleSession.activity_type_id,
+            ScheduleOverviewItem.activity_type_id,
+        ),
+        ScheduleContributor: (ScheduleSessionContributor.contributor_id,),
+    }[model]
+    return lambda row_id: any(
+        session.exec(select(column).where(column == row_id).limit(1)).first()
+        is not None
+        for column in references
+    )
 
 
 def _external_id(row, prefix: str) -> str:
@@ -349,7 +386,12 @@ def _to_utc(value: datetime, zone: ZoneInfo) -> datetime:
 
 
 def _upsert_named(
-    session, model, schedule_id: int, rows, values, identity_field: str | None = None
+    session,
+    model,
+    schedule_id: int,
+    rows,
+    values,
+    identity_field: str | None = None,
 ):
     existing_rows = session.exec(
         select(model).where(model.schedule_id == schedule_id)
@@ -359,18 +401,42 @@ def _upsert_named(
     existing_by_identity = {
         getattr(row, identity_field).casefold(): row for row in existing_rows
     }
+    claimed_ids = {item.external_id for item in rows}
+    kind = _MODEL_LABELS.get(model, "item")
+    in_use = _usage_checker(session, model)
     result = {}
     created = updated = unchanged = 0
     for item in rows:
         row = existing.get(item.external_id)
         data = values(item)
+        identity = data[identity_field].casefold()
         if row is None:
-            row = existing_by_identity.get(data[identity_field].casefold())
+            row = existing_by_identity.get(identity)
+        holder = existing_by_identity.get(identity)
+        if row is not None and holder is not None and holder is not row:
+            # Renaming this row would collide with another row's unique name.
+            if holder.external_id in claimed_ids:
+                raise ValueError(
+                    f"Two {kind}s would both be named '{data[identity_field]}'. "
+                    "Give them different names in the JSON."
+                )
+            if in_use(holder.id):
+                raise ValueError(
+                    f"{kind.capitalize()} '{item.external_id}' is renamed to "
+                    f"'{data[identity_field]}', but another {kind} already has that name "
+                    "and is used in the program. Rename or merge that one first, "
+                    f"or set its external_id to '{item.external_id}'."
+                )
+            # An unused duplicate (e.g. a seeded default) just makes way.
+            existing_by_identity.pop(identity, None)
+            session.delete(holder)
+            session.flush()
         if row is None:
             row = model(schedule_id=schedule_id, external_id=item.external_id, **data)
             session.add(row)
             created += 1
         else:
+            existing_by_identity.pop(getattr(row, identity_field).casefold(), None)
             row.external_id = item.external_id
             changed = any(getattr(row, key) != value for key, value in data.items())
             for key, value in data.items():
@@ -378,6 +444,7 @@ def _upsert_named(
             session.add(row)
             updated += int(changed)
             unchanged += int(not changed)
+        existing_by_identity[identity] = row
         session.flush()
         result[item.external_id] = row
     return result, created, updated, unchanged
@@ -801,6 +868,23 @@ def apply_import_document(
                 session.add(row)
                 removed += 1
     session.flush()
+    if mode == "replace":
+        # Replace the whole program: drop configuration the document no longer lists, when nothing uses it.
+        for model, imported_rows in (
+            (ScheduleRoom, rooms),
+            (ScheduleVenue, venues),
+            (ScheduleLevel, levels),
+            (ScheduleActivityType, activity_types),
+        ):
+            kept_ids = {row.id for row in imported_rows.values()}
+            in_use = _usage_checker(session, model)
+            for row in session.exec(
+                select(model).where(model.schedule_id == schedule.id)
+            ).all():
+                if row.id not in kept_ids and not in_use(row.id):
+                    session.delete(row)
+                    session.flush()
+                    removed += 1
     if mode == "replace" and document.schema_version == 2:
         imported_contributor_ids = {row.external_id for row in document.contributors}
         referenced_contributor_ids = set(

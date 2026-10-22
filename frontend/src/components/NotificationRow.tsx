@@ -611,7 +611,8 @@ export default function NotificationRow({
         body = (
             <>
                 <p className={specialTitle}>
-                    <span className="font-medium text-ink">{item.kind === 'schedule_program_available' ? 'Program now available' : 'Program updated'}</span>
+                    {/* Editor-sent notices store their title in context; publication rows store a session count. */}
+                    <span className="font-medium text-ink">{item.context && !/^\d+$/.test(item.context) ? item.context : item.kind === 'schedule_program_available' ? 'Program now available' : 'Program updated'}</span>
                     {item.event_title && <span className="text-ink-soft"> · {item.event_title}</span>}
                 </p>
                 {item.description && <p className={descClass}>{item.description}</p>}

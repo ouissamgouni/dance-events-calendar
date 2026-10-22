@@ -2,3 +2,6 @@ calendars:
   - id: "back-2-mambo"
     name: "Back 2 Mambo"
     color: "#a22e43"
+  - id: program-overview
+    name: Program Overview Lab
+    color: "#7f1d35"

@@ -297,14 +297,13 @@ def notification_is_privacy_safe(session: Session, notification: Notification) -
     return bool(filter_privacy_safe_notifications(session, [notification]))
 
 
-def notify_planned_session_changes(
+def planned_session_changes(
     session: Session,
-    actor: User,
     event_id: str,
-    version: int,
     previous: dict,
     current: dict,
-) -> list[Notification]:
+) -> dict[UUID, list[tuple[UserPlanSession, dict, dict | None, list[str]]]]:
+    """Per planner, the planned sessions that differ between two snapshots. Read-only."""
     # Overview items are plannable like sessions; ids are UUIDs so one map holds both.
     previous_sessions = {
         row["id"]: row
@@ -350,7 +349,7 @@ def notify_planned_session_changes(
         != rooms_of(current_sessions[session_id])
     )
     if not changed_ids:
-        return []
+        return {}
     changed_session_ids = [UUID(session_id) for session_id in changed_ids]
     plan_rows = session.exec(
         select(UserPlanSession).where(
@@ -393,23 +392,47 @@ def notify_planned_session_changes(
         changes_by_user.setdefault(plan.user_id, []).append(
             (plan, before, after, changes)
         )
-        if after is not None:
-            plan.last_known_session = after
-            session.add(plan)
+    return changes_by_user
+
+
+def planned_change_description(
+    plan_changes: list[tuple[UserPlanSession, dict, dict | None, list[str]]],
+) -> str:
+    details = [
+        f"{before.get('title') or (after or {}).get('title')}: {', '.join(changes)}"
+        for _plan, before, after, changes in plan_changes
+    ]
+    description = (
+        f"{details[0]}."
+        if len(details) == 1
+        else f"{len(details)} sessions in your plan changed: "
+        + "; ".join(details)
+        + "."
+    )
+    return description[:255]
+
+
+def notify_planned_session_changes(
+    session: Session,
+    actor: User,
+    event_id: str,
+    version: int,
+    previous: dict,
+    current: dict,
+    *,
+    notify: bool = True,
+) -> list[Notification]:
+    changes_by_user = planned_session_changes(session, event_id, previous, current)
+    for plan_changes in changes_by_user.values():
+        for plan, _before, after, _changes in plan_changes:
+            if after is not None:
+                plan.last_known_session = after
+                session.add(plan)
+    if not notify:
+        return []
 
     notifications: list[Notification] = []
     for user_id, plan_changes in changes_by_user.items():
-        details = [
-            f"{before.get('title') or (after or {}).get('title')}: {', '.join(changes)}"
-            for _plan, before, after, changes in plan_changes
-        ]
-        description = (
-            f"{details[0]}."
-            if len(details) == 1
-            else f"{len(details)} sessions in your plan changed: "
-            + "; ".join(details)
-            + "."
-        )
         single_plan = plan_changes[0][0] if len(plan_changes) == 1 else None
         notification = Notification(
             recipient_user_id=user_id,
@@ -424,7 +447,7 @@ def notify_planned_session_changes(
                 if len(plan_changes) == 1
                 else f"{len(plan_changes)} planned sessions"
             ),
-            description=description[:255],
+            description=planned_change_description(plan_changes),
         )
         session.add(notification)
         session.flush()

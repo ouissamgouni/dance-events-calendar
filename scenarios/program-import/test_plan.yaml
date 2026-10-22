@@ -3,12 +3,13 @@ test_plan:
   description: >
     Starts with an empty private schedule draft. The checked-in schedule-import.json
     exercises examples, default taxonomies, preview, merge, replace, stable external
-    IDs, separate publishing, and selected-attendee Program announcements.
+    IDs and separate publishing. Publishing and notification choices are covered in
+    depth by the program-admin scenario.
 
   preconditions:
-    - "Run: SCENARIO=schedule-json-import task start:scenario RESET_BROWSER=1"
+    - "Run: SCENARIO=program-import task start:scenario RESET_BROWSER=1"
     - "Sign in as Dev Admin and open Schedule Import Lab > Schedule > Settings."
-    - "Use scenarios/schedule-json-import/schedule-import.json as the upload file."
+    - "Use scenarios/program-import/schedule-import.json as the upload file."
 
   steps:
     - id: 1
@@ -43,22 +44,25 @@ test_plan:
     - id: 5
       title: "Verify replace semantics"
       description: >
-        Remove fri-partnerwork from the JSON text, choose Replace missing sessions,
+        Remove fri-partnerwork from the JSON text, choose Replace program,
         preview, then apply.
       expected: >
-        Preview reports one removal. Applying soft-deletes Partnerwork Lab while
-        preserving configuration rows such as Studio Two and Open Level.
+        The mode hint says the draft becomes exactly the JSON. Preview reports the
+        Partnerwork Lab removal plus the unused seeded taxonomy the JSON does not
+        list (for example Bootcamp and Beginner). Applying soft-deletes Partnerwork
+        Lab while keeping every row the JSON still lists, such as Studio Two and
+        Open Level, with the same identity.
 
     - id: 6
-      title: "Publish and choose the notification audience"
+      title: "Publish the imported program"
       description: >
-        Open Publish, review the diff, and confirm publication. Review the delivery
-        result, then choose Notify all Going attendees.
+        Open Publish, review the diff, keep "Notify attendees" on and tap
+        "Publish & notify".
       expected: >
         A new immutable publication is created only now. The attendee Program shows
-        the imported draft state, with Berlin local wall-clock times preserved.
-        Impacted planners are reported as notified automatically; the second action
-        sends the publication announcement only to remaining signed-in Going attendees.
+        the imported draft state, with Berlin local wall-clock times preserved. The
+        default message is "The program is live: N sessions over N days. Build your
+        plan." and does not repeat the event name.
 
     - id: 7
       title: "Preview the attendee Program in place"
@@ -67,33 +71,11 @@ test_plan:
         The draft Program renders inside the modal without a blocked-content message.
         Open in new tab remains available as a fallback.
 
-    - id: 9
-      title: "Announce the published Program"
-      description: >
-        In Settings > Announce program, select Import Preview Dancer and Quiet Program
-        Dancer, then click Notify 2 attendees.
-      expected: >
-        Two in-app notifications are created. Import Preview Dancer is eligible for
-        email; Quiet Program Dancer reports email and push disabled. No preference is bypassed.
-
-    - id: 10
-      title: "Verify impacted-only and idempotent delivery"
-      description: >
-        Publish a change to a session in Import Preview Dancer's My Plan and choose
-        Done in the result. Reopen the manual Announce program tool and send to both
-        attendees again without Resend, then enable Resend and send once more.
-      expected: >
-        The impacted planner receives one aggregated in-app, email, and push attempt
-        automatically for that publication. Done sends nothing to remaining Going
-        attendees. The manual second send creates no duplicate in-app rows and reports
-        already sent where applicable. Resend attempts enabled external channels again
-        while still respecting opt-outs.
-
     - id: 12
       title: "Omitting overview_items leaves the Overview untouched"
       description: >
         In Settings, delete the whole "overview_items" key from the JSON text, choose
-        Replace missing sessions, preview and apply. Open the Overview section.
+        Replace program, preview and apply. Open the Overview section.
       expected: >
         Preview reports no Overview removals and the four Overview items are still
         there. Only an explicit list replaces the Overview.
@@ -101,7 +83,7 @@ test_plan:
     - id: 13
       title: "An explicit empty list clears the Overview"
       description: >
-        Set "overview_items": [] with Replace missing sessions, preview, then cancel
+        Set "overview_items": [] with Replace program, preview, then cancel
         without applying.
       expected: >
         Preview reports four removals (the moment is removed with its party) and the
@@ -124,3 +106,26 @@ test_plan:
       expected: >
         The notification opens the Program directly. Published events show Program actions
         in all three surfaces; a currently running event remains in Next up and says Happening now.
+
+    - id: 15
+      title: "Renaming onto an existing name is explained, not a crash"
+      description: >
+        Run right after step 4 (before Replace removes the seeded taxonomy). Reset to
+        current draft, rename the "party" activity type to "Workshop" and preview. Then
+        rename it to "Bootcamp" and preview again.
+      expected: >
+        "Workshop" fails with a clear message that two activity types would share the
+        name; nothing is written and there is no "Failed to fetch". "Bootcamp" (a seeded
+        default no session uses) previews fine: the unused default makes way and the
+        imported type keeps its identity, so sessions using it are unaffected.
+
+    - id: 16
+      title: "Skip individual changes before applying"
+      description: >
+        Edit two session titles in the JSON, preview, open the change details and untick
+        one of them, then Apply to draft.
+      expected: >
+        Each change has a checkbox; the unticked one is struck through and the hint says
+        "1 change will be skipped". After applying, only the ticked title changed. Skipping
+        a new room that a ticked session still uses fails with a clear message instead of
+        leaving a broken draft.

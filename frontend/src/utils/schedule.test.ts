@@ -1,6 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayDateLabel, formatDayLabel, isSessionActive, minuteOfProgramDay, overviewItemOpensSchedule, overviewItemsForDay, programDayOf, roomColumnRuns, scheduleInstructors, sessionRoomIds, sessionsInOverviewWindow, sessionsOverlap, toZonedInput, zonedInputToIso } from './schedule';
-import type { MyPlanEntry, ScheduleOverviewItem, ScheduleSession } from '../types';
+import { filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayDateLabel, formatDayLabel, isSessionActive, minuteOfProgramDay, overviewItemOpensSchedule, overviewItemsForDay, programDayOf, programUpdateMessage, roomColumnRuns, scheduleInstructors, sessionRoomIds, sessionSpan, sessionsInOverviewWindow, sessionsOverlap, toZonedInput, zonedInputToIso } from './schedule';
+import type { MyPlanEntry, ScheduleChange, ScheduleOverviewItem, ScheduleSession } from '../types';
+
+describe('programUpdateMessage', () => {
+    const change = (label: string, operation: ScheduleChange['operation'], fields: string[] = [], after: unknown = 'x'): ScheduleChange => ({
+        entity_type: 'session', operation, entity_id: label, label, fields: fields.map((field) => ({ field, before: null, after })),
+    });
+
+    it('groups session changes without naming the event', () => {
+        expect(programUpdateMessage([
+            change('Musicality', 'create'),
+            change('Salsa On2', 'update', ['start', 'end', 'room_ids']),
+            change('Afro', 'update', ['is_cancelled'], true),
+            change('Kizomba', 'remove'),
+            { ...change('Main Hall', 'update', ['name']), entity_type: 'room' },
+        ])).toBe('New: Musicality. Changed: Salsa On2 (time, room). Cancelled: Afro. Removed: Kizomba.');
+    });
+
+    it('stays within the limit and counts what it left out', () => {
+        const message = programUpdateMessage(Array.from({ length: 30 }, (_, index) => change(`Workshop number ${index + 1}`, 'create')), 120);
+        expect(message.length).toBeLessThanOrEqual(120);
+        expect(message).toMatch(/^New: Workshop number 1, .* \+\d+ more\.$/);
+    });
+
+    it('falls back when only configuration changed', () => {
+        expect(programUpdateMessage([])).toBe('Program details were updated. Review the latest schedule.');
+    });
+});
 
 const session = (id: string, start: string, end: string): ScheduleSession => ({
     id,
@@ -70,6 +96,13 @@ describe('schedule time helpers', () => {
     it('keeps early-morning sessions on the previous program day', () => {
         expect(programDayOf('2026-10-17T00:30:00Z', 'Europe/Prague', 6)).toBe('2026-10-16');
         expect(minuteOfProgramDay('2026-10-17T00:30:00Z', 'Europe/Prague', 6)).toBe(20 * 60 + 30);
+    });
+
+    it('keeps the duration of sessions that end after midnight', () => {
+        // 22:00 to 00:00 Prague time: 2h long, ending on the next wall-clock day.
+        expect(sessionSpan(session('late', '2026-10-16T20:00:00Z', '2026-10-16T22:00:00Z'), 'Europe/Prague', 6)).toEqual({ start: 16 * 60, end: 18 * 60 });
+        // Same-day session keeps its own end.
+        expect(sessionSpan(session('day', '2026-10-16T10:00:00Z', '2026-10-16T12:00:00Z'), 'Europe/Prague', 6)).toEqual({ start: 6 * 60, end: 8 * 60 });
     });
 
     it('reports overlaps without treating touching sessions as conflicts', () => {

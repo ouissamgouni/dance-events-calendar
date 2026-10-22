@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -402,6 +402,90 @@ def test_session_attendance_is_filtered_by_plan_audience(
         ).status_code
         == 404
     )
+
+
+def test_event_organizer_edits_the_program_without_a_grant(
+    client, engine, schedule_event
+):
+    _login(client, "organizer@example.com")
+    with Session(engine) as session:
+        organizer = session.exec(
+            select(User).where(User.email == "organizer@example.com")
+        ).one()
+        event = session.get(CachedEvent, "back-2-mambo-2026")
+        event.organizer_user_id = organizer.id
+        session.add(event)
+        session.commit()
+
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    access_url = "/api/events/back-2-mambo-2026/schedule/editor-access"
+    assert client.get(access_url).json() == {"can_edit": True}
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+    assert client.post(f"{base}/unpublish").status_code == 200
+    assert client.get(access_url).json() == {"can_edit": True}
+    assert client.get(f"{base}/editors").status_code == 403
+
+    _login(client, "admin@example.com")
+    [listed] = client.get(f"{base}/editors").json()
+    assert listed["email"] == "organizer@example.com"
+    assert listed["is_organizer"] is True
+
+    _login(client, "outsider@example.com")
+    assert client.get(access_url).json() == {"can_edit": False}
+
+
+def test_admin_deletes_program_after_typing_the_event_title(
+    client, engine, schedule_event
+):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    room = client.post(f"{base}/rooms", json={"name": "Hall"}).json()
+    created = client.post(
+        f"{base}/sessions",
+        json={
+            "title": "Workshop",
+            "start": "2026-10-16T12:00:00Z",
+            "end": "2026-10-16T13:00:00Z",
+            "room_id": room["id"],
+        },
+    ).json()
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+    with Session(engine) as session:
+        admin = session.exec(
+            select(User).where(User.email == "admin@example.com")
+        ).one()
+        session.add(
+            UserPlanSession(
+                user_id=admin.id,
+                session_id=UUID(created["id"]),
+                event_id="back-2-mambo-2026",
+                last_known_session={"id": created["id"], "title": "Workshop"},
+            )
+        )
+        session.commit()
+
+    assert client.delete(base, params={"confirm_title": "wrong"}).status_code == 422
+    assert (
+        client.delete(base, params={"confirm_title": " back 2 mambo 2026 "}).status_code
+        == 204
+    )
+    assert client.get(base).status_code == 404
+    assert client.get("/api/events/back-2-mambo-2026").status_code == 200
+    with Session(engine) as session:
+        assert not session.exec(select(UserPlanSession)).all()
+        assert not session.exec(select(SchedulePublication)).all()
 
 
 def test_event_schedule_editor_grants_are_scoped_and_revocable(
@@ -972,11 +1056,19 @@ def test_schedule_json_import_preview_merge_and_replace(client, schedule_event):
         json={"mode": "replace", "document": without_sessions},
     )
     assert replaced.status_code == 200
-    assert replaced.json()["operations"]["removed"] == 1
-    removed_change = next(
+    removed_changes = [
         change
         for change in replaced.json()["changes"]
         if change["operation"] == "remove"
+    ]
+    # Replace drops the unused seeded taxonomy too; the room stays (a removed session still references it).
+    assert {change["entity_type"] for change in removed_changes} <= {
+        "session",
+        "activity_type",
+        "level",
+    }
+    removed_change = next(
+        change for change in removed_changes if change["entity_type"] == "session"
     )
     assert removed_change["entity_type"] == "session"
     assert removed_change["label"] == "Shines / Partnerwork"
@@ -1258,6 +1350,352 @@ def test_schedule_room_details_descriptions_and_multi_room_sessions(
     assert public_social["room_ids"] == [salsa, seminar]
     assert public_social["description"] == "Open floor for everyone."
     assert public["rooms"][0]["details"] == "Ground floor · Grand Pass only"
+
+
+def test_schedule_flags_sessions_longer_than_twelve_hours(client, schedule_event):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    long_session = client.post(
+        f"{base}/sessions",
+        json={
+            "title": "Marathon Social",
+            "start": "2026-10-16T20:00:00Z",
+            "end": "2026-10-17T14:00:00Z",
+        },
+    )
+    assert long_session.status_code == 201
+    short_session = client.post(
+        f"{base}/sessions",
+        json={
+            "title": "Short Workshop",
+            "start": "2026-10-16T10:00:00Z",
+            "end": "2026-10-16T12:00:00Z",
+        },
+    )
+    assert short_session.status_code == 201
+
+    issues = [
+        issue
+        for issue in client.get(base).json()["issues"]
+        if issue["code"] == "long_duration"
+    ]
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "warning"
+    assert issues[0]["session_ids"] == [long_session.json()["id"]]
+
+
+def test_room_overlap_ignores_cancelled_sessions(client, schedule_event):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-18"]}
+        ).status_code
+        == 201
+    )
+    room = client.post(f"{base}/rooms", json={"name": "Room 5"}).json()
+    ids = {}
+    for title, start, end in (
+        ("Mambo Fusion", "2026-10-18T09:00:00Z", "2026-10-18T11:00:00Z"),
+        ("Body Movement", "2026-10-18T10:00:00Z", "2026-10-18T11:00:00Z"),
+    ):
+        ids[title] = client.post(
+            f"{base}/sessions",
+            json={"title": title, "start": start, "end": end, "room_id": room["id"]},
+        ).json()["id"]
+
+    def overlaps():
+        return [
+            i for i in client.get(base).json()["issues"] if i["code"] == "room_overlap"
+        ]
+
+    assert len(overlaps()) == 1
+    assert (
+        client.patch(
+            f"{base}/sessions/{ids['Mambo Fusion']}", json={"is_cancelled": True}
+        ).status_code
+        == 200
+    )
+    assert overlaps() == []
+
+
+def test_unpublish_hides_program_and_republish_restores_it(client, schedule_event):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            f"{base}/sessions",
+            json={
+                "title": "Workshop",
+                "start": "2026-10-16T12:00:00Z",
+                "end": "2026-10-16T13:00:00Z",
+            },
+        ).status_code
+        == 201
+    )
+
+    # Nothing published yet: there is nothing to unpublish or republish.
+    assert client.post(f"{base}/unpublish").status_code == 409
+    assert client.post(f"{base}/republish").status_code == 409
+
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+    assert client.get("/api/events/back-2-mambo-2026/schedule").status_code == 200
+
+    unpublished = client.post(f"{base}/unpublish")
+    assert unpublished.status_code == 200
+    assert unpublished.json()["unpublished_at"] is not None
+    assert client.get(base).json()["unpublished_at"] is not None
+    assert client.get("/api/events/back-2-mambo-2026/schedule").status_code == 404
+
+    event = client.get("/api/events/back-2-mambo-2026").json()
+    assert event["schedule_published"] is False
+    assert event["schedule_under_work"] is True
+    listed = next(
+        row
+        for row in client.get("/api/events").json()
+        if row["event_id"] == "back-2-mambo-2026"
+    )
+    assert listed["schedule_published"] is False
+
+    assert client.post(f"{base}/republish").status_code == 200
+    assert client.get(base).json()["unpublished_at"] is None
+    assert client.get("/api/events/back-2-mambo-2026/schedule").status_code == 200
+    event = client.get("/api/events/back-2-mambo-2026").json()
+    assert event["schedule_published"] is True
+    assert event["schedule_under_work"] is False
+
+
+def test_publishing_while_unpublished_makes_program_live_again(client, schedule_event):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+    assert client.post(f"{base}/unpublish").status_code == 200
+    assert client.get("/api/events/back-2-mambo-2026/schedule").status_code == 404
+
+    republished = client.post(f"{base}/publish", json={})
+    assert republished.status_code == 200
+    assert republished.json()["version"] == 2
+    assert client.get("/api/events/back-2-mambo-2026/schedule").status_code == 200
+    assert client.get(base).json()["unpublished_at"] is None
+
+
+def _change(payload: dict, entity_type: str, operation: str) -> dict:
+    return next(
+        change
+        for change in payload["diff"]["changes"]
+        if change["entity_type"] == entity_type and change["operation"] == operation
+    )
+
+
+def test_import_rename_onto_an_existing_name_is_resolved_or_explained(
+    client, schedule_event
+):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    document = {
+        "schema_version": 1,
+        "event_id": "back-2-mambo-2026",
+        "timezone": "Europe/Prague",
+        "days": ["2026-10-16"],
+        "activity_types": [{"external_id": "party", "name": "Social & Party"}],
+    }
+    assert (
+        client.post(
+            f"{base}/import", json={"mode": "merge", "document": document}
+        ).status_code
+        == 200
+    )
+
+    # The seeded, unused "Party" type makes way for the renamed imported one.
+    document["activity_types"][0]["name"] = "Party"
+    renamed = client.post(
+        f"{base}/import", json={"mode": "merge", "document": document}
+    )
+    assert renamed.status_code == 200
+    names = [row["name"] for row in client.get(base).json()["activity_types"]]
+    assert names.count("Party") == 1
+
+    # A used duplicate is explained instead of crashing.
+    social = next(
+        row
+        for row in client.get(base).json()["activity_types"]
+        if row["name"] == "Social"
+    )
+    assert (
+        client.post(
+            f"{base}/sessions",
+            json={
+                "title": "Social night",
+                "start": "2026-10-16T20:00:00Z",
+                "end": "2026-10-16T23:00:00Z",
+                "activity_type_id": social["id"],
+            },
+        ).status_code
+        == 201
+    )
+    document["activity_types"][0]["name"] = "Social"
+    conflict = client.post(
+        f"{base}/import-preview", json={"mode": "merge", "document": document}
+    )
+    assert conflict.status_code == 422
+    assert "already has that name" in conflict.json()["detail"]
+
+
+def test_revert_change_restores_published_session_state(client, schedule_event):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    kept = client.post(
+        f"{base}/sessions",
+        json={
+            "title": "Keys for Social Dancing",
+            "start": "2026-10-16T20:00:00Z",
+            "end": "2026-10-16T22:00:00Z",
+        },
+    ).json()
+    removed = client.post(
+        f"{base}/sessions",
+        json={
+            "title": "Body Movement",
+            "start": "2026-10-16T10:00:00Z",
+            "end": "2026-10-16T11:00:00Z",
+        },
+    ).json()
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+
+    assert (
+        client.patch(
+            f"{base}/sessions/{kept['id']}", json={"end": "2026-10-17T21:00:00Z"}
+        ).status_code
+        == 200
+    )
+    assert client.delete(f"{base}/sessions/{removed['id']}").status_code == 204
+    added = client.post(
+        f"{base}/sessions",
+        json={
+            "title": "Late addition",
+            "start": "2026-10-16T12:00:00Z",
+            "end": "2026-10-16T13:00:00Z",
+        },
+    ).json()
+    draft = client.get(base).json()
+    update = _change(draft, "session", "update")
+
+    stale = {**update, "fields": [{"field": "end", "before": "x", "after": "y"}]}
+    assert client.post(f"{base}/revert-change", json=stale).status_code == 409
+
+    reverted = client.post(f"{base}/revert-change", json=update)
+    assert reverted.status_code == 200
+    restored = next(
+        row for row in reverted.json()["sessions"] if row["id"] == kept["id"]
+    )
+    assert restored["end"].startswith("2026-10-16T22:00:00")
+
+    reverted = client.post(
+        f"{base}/revert-change", json=_change(reverted.json(), "session", "remove")
+    )
+    assert reverted.status_code == 200
+    assert removed["id"] in {row["id"] for row in reverted.json()["sessions"]}
+
+    reverted = client.post(
+        f"{base}/revert-change", json=_change(reverted.json(), "session", "create")
+    )
+    assert reverted.status_code == 200
+    assert added["id"] not in {row["id"] for row in reverted.json()["sessions"]}
+    assert reverted.json()["diff"]["changes"] == []
+
+
+def test_import_apply_skips_excluded_changes(client, schedule_event):
+    _login(client, "admin@example.com")
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    document = {
+        "schema_version": 1,
+        "event_id": "back-2-mambo-2026",
+        "timezone": "Europe/Prague",
+        "day_start_hour": 6,
+        "days": ["2026-10-16"],
+        "rooms": [{"external_id": "grand", "name": "Grand Hall"}],
+        "sessions": [
+            {
+                "external_id": "keep",
+                "title": "Keep me",
+                "start": "2026-10-16T14:00:00",
+                "end": "2026-10-16T15:00:00",
+            },
+            {
+                "external_id": "skip",
+                "title": "Skip me",
+                "start": "2026-10-16T16:00:00",
+                "end": "2026-10-16T17:00:00",
+                "room_external_id": "grand",
+            },
+        ],
+    }
+    preview = client.post(
+        f"{base}/import-preview", json={"mode": "merge", "document": document}
+    ).json()
+    skipped = [
+        change
+        for change in preview["changes"]
+        if change["external_id"] in {"skip", "grand"}
+    ]
+    assert len(skipped) == 2
+
+    applied = client.post(
+        f"{base}/import",
+        json={"mode": "merge", "document": document, "exclude": skipped},
+    )
+    assert applied.status_code == 200
+    assert (
+        applied.json()["operations"]["created"] == preview["operations"]["created"] - 2
+    )
+    draft = client.get(base).json()
+    assert [row["title"] for row in draft["sessions"]] == ["Keep me"]
+    assert draft["rooms"] == []
+
+    # A room that a kept session still uses cannot be skipped on its own.
+    only_room = [change for change in skipped if change["external_id"] == "grand"]
+    document["sessions"][0]["room_external_id"] = "grand"
+    conflict = client.post(
+        f"{base}/import",
+        json={"mode": "merge", "document": document, "exclude": only_room},
+    )
+    assert conflict.status_code == 409
 
 
 def test_schedule_diff_ignores_fields_missing_from_older_publications():
@@ -1787,6 +2225,296 @@ def test_publish_announces_first_program_and_optionally_broadcasts_updates(
         row["kind"] == "schedule_program_updated"
         for row in notifications.json()["items"]
     )
+
+
+def test_publish_preview_and_opting_out_of_plan_change_messages(
+    client, engine, schedule_event, monkeypatch, run_jobs
+):
+    pushed: list[dict] = []
+    monkeypatch.setattr(
+        "backend.services.email.send_schedule_plan_changed_email",
+        lambda user, event, changes: True,
+    )
+    monkeypatch.setattr(
+        "backend.services.push_service.send_push",
+        lambda user_id, **kwargs: pushed.append(kwargs) or 1,
+    )
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    _login(client, "admin@example.com")
+    client.post(base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]})
+    session_id = client.post(
+        f"{base}/sessions",
+        json={
+            "title": "Musicality",
+            "start": "2026-10-16T12:00:00Z",
+            "end": "2026-10-16T13:00:00Z",
+        },
+    ).json()["id"]
+    assert client.get(f"{base}/publish-preview").json() == {
+        "impacted_user_ids": [],
+        "sample_message": None,
+    }
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+
+    _login(client, "dancer@example.com")
+    assert (
+        client.put(f"/api/events/back-2-mambo-2026/my-plan/{session_id}").status_code
+        == 201
+    )
+    with Session(engine) as session:
+        dancer_id = session.exec(
+            select(User.id).where(User.email == "dancer@example.com")
+        ).one()
+
+    _login(client, "admin@example.com")
+    client.patch(
+        f"{base}/sessions/{session_id}",
+        json={"start": "2026-10-16T14:00:00Z", "end": "2026-10-16T15:00:00Z"},
+    )
+    preview = client.get(f"{base}/publish-preview")
+    assert preview.status_code == 200
+    assert preview.json() == {
+        "impacted_user_ids": [str(dancer_id)],
+        "sample_message": "Musicality: has a new time.",
+    }
+
+    quiet = client.post(f"{base}/publish", json={"notify_impacted_planners": False})
+    assert quiet.json()["notification_summary"]["impacted_planners"] == 0
+    with Session(engine) as session:
+        assert not session.exec(
+            select(Notification).where(Notification.kind == "planned_session_changed")
+        ).all()
+        plan = session.exec(
+            select(UserPlanSession).where(UserPlanSession.user_id == dancer_id)
+        ).one()
+        assert plan.last_known_session["start"] == "2026-10-16T14:00:00Z"
+    assert client.get(f"{base}/publish-preview").json()["impacted_user_ids"] == []
+
+    client.patch(f"{base}/sessions/{session_id}", json={"title": "Musicality Lab"})
+    loud = client.post(f"{base}/publish", json={})
+    assert loud.json()["notification_summary"]["impacted_planners"] == 1
+    run_jobs()
+    assert pushed[-1]["title"] == "Your plan changed · Back 2 Mambo 2026"
+    assert pushed[-1]["body"] == "Musicality: has updated details."
+
+
+def test_notify_program_uses_custom_title_and_message(
+    client, engine, schedule_event, monkeypatch
+):
+    sent: list[dict] = []
+    monkeypatch.setattr(
+        "backend.services.email.send_schedule_program_available_email",
+        lambda user, event, session_count, headline=None, note=None: (
+            sent.append({"email": user.email, "headline": headline, "note": note})
+            or True
+        ),
+    )
+    monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
+
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    _login(client, "admin@example.com")
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            f"{base}/sessions",
+            json={
+                "title": "Workshop",
+                "start": "2026-10-16T12:00:00Z",
+                "end": "2026-10-16T13:00:00Z",
+            },
+        ).status_code
+        == 201
+    )
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+
+    _login(client, "dancer@example.com")
+    with Session(engine) as session:
+        dancer = session.exec(
+            select(User).where(User.email == "dancer@example.com")
+        ).one()
+        session.add(
+            UserEventAttendance(
+                device_id="dancer-device",
+                event_id="back-2-mambo-2026",
+                user_id=dancer.id,
+            )
+        )
+        session.commit()
+        dancer_id = str(dancer.id)
+
+    _login(client, "admin@example.com")
+    notify_url = f"{base}/notify-program"
+    assert (
+        client.post(
+            notify_url, json={"user_ids": [dancer_id], "title": "x" * 121}
+        ).status_code
+        == 422
+    )
+
+    response = client.post(
+        notify_url,
+        json={
+            "user_ids": [dancer_id],
+            "title": "  Keys open  ",
+            "message": "Line one\nLine <b>two</b>",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["emailed"] == 1
+    assert sent == [
+        {
+            "email": "dancer@example.com",
+            "headline": "Keys open",
+            "note": "Line one\nLine <b>two</b>",
+        }
+    ]
+    with Session(engine) as session:
+        row = session.exec(
+            select(Notification).where(
+                Notification.kind == "schedule_program_available"
+            )
+        ).one()
+        assert row.description == "Line one\nLine <b>two</b>"
+
+    assert client.post(f"{base}/unpublish").status_code == 200
+    assert client.post(notify_url, json={"user_ids": [dancer_id]}).status_code == 409
+    assert client.post(f"{base}/republish").status_code == 200
+
+
+def test_notify_program_includes_plan_holders_who_are_not_going(
+    client, engine, schedule_event, monkeypatch
+):
+    sent: list[dict] = []
+    monkeypatch.setattr(
+        "backend.services.email.send_schedule_program_available_email",
+        lambda user, event, session_count, headline=None, note=None: (
+            sent.append(user.email) or True
+        ),
+    )
+    monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
+
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    _login(client, "admin@example.com")
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    assert client.post(f"{base}/publish", json={}).status_code == 200
+
+    _login(client, "dancer@example.com")
+    overview_item_id = uuid4()
+    with Session(engine) as session:
+        dancer = session.exec(
+            select(User).where(User.email == "dancer@example.com")
+        ).one()
+        session.add(
+            UserPlanSession(
+                user_id=dancer.id,
+                overview_item_id=overview_item_id,
+                event_id="back-2-mambo-2026",
+                last_known_session={"id": str(overview_item_id), "title": "Keys"},
+            )
+        )
+        session.commit()
+        dancer_id = str(dancer.id)
+
+    _login(client, "admin@example.com")
+    candidates = client.get(f"{base}/notify-program-candidates")
+    assert candidates.status_code == 200
+    [candidate] = [c for c in candidates.json() if c["user_id"] == dancer_id]
+    assert candidate["has_plan"] is True
+    assert candidate["is_going"] is False
+
+    response = client.post(f"{base}/notify-program", json={"user_ids": [dancer_id]})
+    assert response.status_code == 200
+    assert response.json()["emailed"] == 1
+    assert sent == ["dancer@example.com"]
+
+
+def test_notify_dialog_reasons_create_a_fresh_notification_per_send(
+    client, engine, schedule_event, monkeypatch
+):
+    sent: list[dict] = []
+    monkeypatch.setattr(
+        "backend.services.email.send_schedule_program_available_email",
+        lambda user, event, session_count, **kwargs: sent.append(kwargs) or True,
+    )
+    monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
+
+    base = "/api/admin/events/back-2-mambo-2026/schedule"
+    _login(client, "admin@example.com")
+    assert (
+        client.post(
+            base, json={"timezone": "Europe/Prague", "days": ["2026-10-16"]}
+        ).status_code
+        == 201
+    )
+    _login(client, "dancer@example.com")
+    with Session(engine) as session:
+        dancer = session.exec(
+            select(User).where(User.email == "dancer@example.com")
+        ).one()
+        session.add(
+            UserEventAttendance(
+                device_id="dancer-device",
+                event_id="back-2-mambo-2026",
+                user_id=dancer.id,
+            )
+        )
+        session.commit()
+        dancer_id = str(dancer.id)
+
+    _login(client, "admin@example.com")
+    assert (
+        client.post(f"{base}/publish", json={"auto_announce": False}).status_code == 200
+    )
+    with Session(engine) as session:
+        assert not session.exec(select(Notification)).all()
+
+    notify_url = f"{base}/notify-program"
+    for _ in range(2):
+        response = client.post(
+            notify_url, json={"user_ids": [dancer_id], "reason": "updated"}
+        )
+        assert response.status_code == 200
+        assert response.json()["emailed"] == 1
+    assert (
+        client.post(
+            notify_url, json={"user_ids": [dancer_id], "reason": "under_work"}
+        ).status_code
+        == 409
+    )
+
+    assert client.post(f"{base}/unpublish").status_code == 200
+    response = client.post(
+        notify_url,
+        json={
+            "user_ids": [dancer_id],
+            "reason": "under_work",
+            "title": "Program under work",
+        },
+    )
+    assert response.status_code == 200
+    assert sent[-1]["program_live"] is False
+    assert sent[-1]["headline"] == "Program under work"
+
+    with Session(engine) as session:
+        rows = session.exec(
+            select(Notification).where(Notification.kind == "schedule_program_updated")
+        ).all()
+        assert len(rows) == 3
+        assert len({row.subject_key for row in rows}) == 3
+        assert {row.context for row in rows} == {
+            "Program updated",
+            "Program under work",
+        }
 
 
 def test_tick_sweep_delivers_a_lost_publication_job_once(
