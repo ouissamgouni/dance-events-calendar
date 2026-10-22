@@ -22,7 +22,7 @@
  *   OG_FALLBACK_IMAGE — full URL to the branded 1200×630 fallback image
  *                       used when an event has no specific image. Defaults
  *                       to `${PUBLIC_BASE}/og-card.jpg` (`frontend/public/og-card.jpg`,
- *                       a compressed copy of og-fallback.png — chat apps skip
+ *                       a compressed copy of og-card.png — chat apps skip
  *                       preview images much over ~300 KB).
  */
 
