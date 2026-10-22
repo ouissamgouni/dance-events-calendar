@@ -9,7 +9,7 @@ export const onRequestGet: PagesFunction<OgEnv> = async ({ request, env, params,
     const publicBase = publicBaseFor(request, env);
     return renderCard({
         title: "You're invited to Movida 💃🕺",
-        description: "Salsa, bachata, kizomba & zouk socials and festivals in one place. Join your friends and see who's going.",
+        description: "Discover dance events, see who's going and make plans together. Get the details, community feedback and updates in one place.",
         url: `${publicBase}/r/${encodeURIComponent(code)}`,
         image: fallbackImage(publicBase, env),
     });
