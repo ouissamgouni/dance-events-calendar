@@ -1,6 +1,0 @@
-# Mutual follow = friends, so Bootcamp Buddy's friends-audience plan shows on the dancer's Overview.
-follows:
-  - follower: dancer@example.com
-    followee: friend@example.com
-  - follower: friend@example.com
-    followee: dancer@example.com
