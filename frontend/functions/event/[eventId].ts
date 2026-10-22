@@ -21,8 +21,8 @@
  *                 back to the request origin when unset.
  *   OG_FALLBACK_IMAGE — full URL to the branded 1200×630 fallback image
  *                       used when an event has no specific image. Defaults
- *                       to `${PUBLIC_BASE}/og-card.png` (`frontend/public/og-card.png`,
- *                       a compressed copy of og-fallback.png — chat apps skip
+ *                       to `${PUBLIC_BASE}/og-card.jpg` (`frontend/public/og-card.jpg`,
+ *                       a compressed copy of og-card.png — chat apps skip
  *                       preview images much over ~300 KB).
  */
 
@@ -136,7 +136,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const publicBase = env.PUBLIC_BASE ?? `${url.protocol}//${url.host}`;
     const canonicalUrl = `${publicBase}/event/${encodeURIComponent(eventId)}`;
     const fallbackImage =
-        env.OG_FALLBACK_IMAGE ?? `${publicBase}/og-card.png`;
+        env.OG_FALLBACK_IMAGE ?? `${publicBase}/og-card.jpg`;
 
     let meta: OgMeta | null = null;
     try {

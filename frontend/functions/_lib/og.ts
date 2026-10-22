@@ -51,7 +51,7 @@ export function publicBaseFor(request: Request, env: OgEnv): string {
 }
 
 export function fallbackImage(publicBase: string, env: OgEnv): string {
-    return env.OG_FALLBACK_IMAGE ?? `${publicBase}/og-card.png`;
+    return env.OG_FALLBACK_IMAGE ?? `${publicBase}/og-card.jpg`;
 }
 
 export async function fetchJson<T>(url: string): Promise<T | null> {
