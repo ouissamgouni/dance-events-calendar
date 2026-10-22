@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayDateLabel, formatDayLabel, isSessionActive, minuteOfProgramDay, overviewItemOpensSchedule, overviewItemsForDay, programDayOf, programUpdateMessage, roomColumnRuns, scheduleInstructors, sessionRoomIds, sessionSpan, sessionsInOverviewWindow, sessionsOverlap, toZonedInput, zonedInputToIso } from './schedule';
+import { draftStatuses, filterScheduleSessions, findPlanConflicts, firstDayWithSessions, focusedPlanEntry, formatDayDateLabel, formatDayLabel, isSessionActive, minuteOfProgramDay, overlapLanes, overviewItemOpensSchedule, overviewItemsForDay, programDayOf, programUpdateMessage, roomColumnRuns, scheduleInstructors, sessionRoomIds, sessionSpan, sessionsInOverviewWindow, sessionsOverlap, toZonedInput, zonedInputToIso } from './schedule';
 import type { MyPlanEntry, ScheduleChange, ScheduleOverviewItem, ScheduleSession } from '../types';
 
 describe('programUpdateMessage', () => {
@@ -7,20 +7,35 @@ describe('programUpdateMessage', () => {
         entity_type: 'session', operation, entity_id: label, label, fields: fields.map((field) => ({ field, before: null, after })),
     });
 
-    it('groups session changes without naming the event', () => {
+    it('puts each kind of change on its own line with the new time and room', () => {
+        const moved: ScheduleChange = {
+            entity_type: 'session', operation: 'update', entity_id: 'on2', label: 'Salsa On2', fields: [
+                { field: 'start', before: '2026-07-10T10:00:00Z', after: '2026-07-11T13:00:00Z' },
+                { field: 'room_ids', before: 'Room A', after: 'Room B' },
+                { field: 'level_id', before: 1, after: 2 },
+            ]
+        };
         expect(programUpdateMessage([
             change('Musicality', 'create'),
-            change('Salsa On2', 'update', ['start', 'end', 'room_ids']),
+            moved,
+            { ...change('Shines & Styling', 'update'), fields: [{ field: 'title', before: 'Shines', after: 'Shines & Styling' }] },
             change('Afro', 'update', ['is_cancelled'], true),
             change('Kizomba', 'remove'),
             { ...change('Main Hall', 'update', ['name']), entity_type: 'room' },
-        ])).toBe('New: Musicality. Changed: Salsa On2 (time, room). Cancelled: Afro. Removed: Kizomba.');
+        ], 'UTC')).toBe([
+            'New: Musicality',
+            `Moved: Salsa On2 → ${new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date('2026-07-11T13:00:00Z'))} · Room B`,
+            'Renamed: Shines → Shines & Styling',
+            'Updated: Salsa On2 (level)',
+            'Cancelled: Afro',
+            'Removed: Kizomba',
+        ].join('\n'));
     });
 
     it('stays within the limit and counts what it left out', () => {
-        const message = programUpdateMessage(Array.from({ length: 30 }, (_, index) => change(`Workshop number ${index + 1}`, 'create')), 120);
+        const message = programUpdateMessage(Array.from({ length: 30 }, (_, index) => change(`Workshop number ${index + 1}`, 'create')), 'UTC', 120);
         expect(message.length).toBeLessThanOrEqual(120);
-        expect(message).toMatch(/^New: Workshop number 1, .* \+\d+ more\.$/);
+        expect(message).toMatch(/^New: Workshop number 1, .*\n\+\d+ more$/);
     });
 
     it('falls back when only configuration changed', () => {
@@ -47,6 +62,37 @@ const overviewItem = (id: string, start: string, end: string, extra: Partial<Sch
     id, parent_id: null, title: id, subtitle: null, description: null, url: null, url_label: null,
     start, end, activity_type_id: null, venue_id: null, room_ids: [], opens_detail: false, is_cancelled: false, sort_order: 0,
     ...extra,
+});
+
+describe('editor markers', () => {
+    const diff = {
+        added_session_ids: ['new'], removed_session_ids: ['gone'], changed_sessions: { moved: ['start', 'end', 'room_id', 'room_ids', 'sort_order'] }, configuration_changed: false, changes: [
+            { entity_type: 'overview_item' as const, operation: 'update' as const, entity_id: 'party', label: 'Party', fields: [{ field: 'subtitle', before: null, after: 'Late' }] },
+        ]
+    };
+
+    it('marks new and edited items with readable field names, but not before the first publish', () => {
+        const statuses = draftStatuses({ version: 2, diff });
+        expect(statuses.get('new')).toEqual({ status: 'new', fields: [] });
+        expect(statuses.get('moved')).toEqual({ status: 'edited', fields: ['time', 'room'] });
+        expect(statuses.get('party')).toEqual({ status: 'edited', fields: ['subtitle'] });
+        expect(statuses.has('gone')).toBe(false);
+        expect(draftStatuses({ version: null, diff }).size).toBe(0);
+    });
+
+    it('puts overlapping sessions of the same room side by side', () => {
+        const inRoom = (id: string, start: string, end: string, roomIds: number[]) => ({ ...session(id, start, end), room_ids: roomIds });
+        const lanes = overlapLanes([
+            inRoom('a', '2026-10-16T10:00:00Z', '2026-10-16T12:00:00Z', [1]),
+            inRoom('b', '2026-10-16T11:00:00Z', '2026-10-16T13:00:00Z', [1]),
+            inRoom('c', '2026-10-16T12:00:00Z', '2026-10-16T13:00:00Z', [1]),
+            inRoom('d', '2026-10-16T10:00:00Z', '2026-10-16T12:00:00Z', [2]),
+        ], [1, 2]);
+        expect(lanes.get('a')).toEqual({ lane: 0, lanes: 2 });
+        expect(lanes.get('b')).toEqual({ lane: 1, lanes: 2 });
+        expect(lanes.get('c')).toEqual({ lane: 0, lanes: 2 });
+        expect(lanes.get('d')).toEqual({ lane: 0, lanes: 1 });
+    });
 });
 
 describe('overview helpers', () => {

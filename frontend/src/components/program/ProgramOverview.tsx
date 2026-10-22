@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BookmarkCheck, BookmarkPlus, ChevronRight, Info, Plus } from 'lucide-react';
 import type { EventSchedule, OverviewItemAttendanceSummary, ScheduleIssue, ScheduleOverviewItem } from '../../types';
-import { formatTimeRange, isSessionActive, overviewItemHasDetails, overviewItemOpensSchedule, overviewItemsForDay, sessionsInOverviewWindow } from '../../utils/schedule';
+import { formatTimeRange, isSessionActive, overviewItemHasDetails, overviewItemOpensSchedule, overviewItemsForDay, sessionsInOverviewWindow, type DraftStatus } from '../../utils/schedule';
 import { scheduleColor } from '../../utils/scheduleColors';
 import RoomPill from './RoomPill';
+import { DraftPill } from './ScheduleGrid';
 import SessionAttendeeStack from './SessionAttendeeStack';
 
 interface AdminProps {
     issues: ScheduleIssue[];
+    drafts?: Map<string, DraftStatus>;
     onEdit: (item: ScheduleOverviewItem) => void;
     onAddMoment: (parent: ScheduleOverviewItem) => void;
 }
@@ -118,6 +120,7 @@ function OverviewCard({ schedule, item, moments, now, onOpenSchedule, onOpenDeta
     const opensSchedule = !admin && overviewItemOpensSchedule(item, schedule.sessions);
     const opensDetails = !admin && !opensSchedule && (overviewItemHasDetails(item) || plannable);
     const active = !item.is_cancelled && isSessionActive(item, now);
+    const draft = admin?.drafts?.get(item.id);
     const togglePlan = async () => {
         if (!plan) return;
         setPlanBusy(true);
@@ -139,6 +142,7 @@ function OverviewCard({ schedule, item, moments, now, onOpenSchedule, onOpenDeta
     const content = (
         <>
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-ink-soft">
+                {draft ? <span title={draft.fields.length ? `Edited: ${draft.fields.join(', ')}` : 'Not published yet'}><DraftPill status={draft.status} /></span> : null}
                 <span className="tabular-nums">{formatTimeRange(item, schedule.timezone)}</span>
                 {activityType ? <span className={`rounded-field px-1.5 py-0.5 font-medium ${scheduleColor(activityType.color).pill}`}>{activityType.name}</span> : null}
                 {active ? <span className="bg-action px-1.5 py-0.5 font-bold text-white">Now</span> : null}
@@ -156,7 +160,7 @@ function OverviewCard({ schedule, item, moments, now, onOpenSchedule, onOpenDeta
         </>
     );
     return (
-        <li className="flex overflow-hidden rounded-card border border-card-line bg-surface">
+        <li className={`flex overflow-hidden rounded-card border bg-surface ${draft?.status === 'new' ? 'border-dashed border-action' : 'border-card-line'}`}>
             <span aria-hidden="true" className={`w-1 shrink-0 ${scheduleColor(activityType?.color ?? 'slate').accent}`} />
             <div className="min-w-0 flex-1">
                 <div className="flex items-start">
@@ -205,12 +209,13 @@ function OverviewCard({ schedule, item, moments, now, onOpenSchedule, onOpenDeta
 
 function MomentRow({ schedule, moment, now, onOpenDetails, admin, issues }: { schedule: EventSchedule; moment: ScheduleOverviewItem; now: Date; onOpenDetails?: (item: ScheduleOverviewItem) => void; admin?: AdminProps; issues: ScheduleIssue[] }) {
     const active = !moment.is_cancelled && isSessionActive(moment, now);
+    const draft = admin?.drafts?.get(moment.id);
     const onClick = admin ? () => admin.onEdit(moment) : overviewItemHasDetails(moment) ? () => onOpenDetails?.(moment) : undefined;
     const content = (
         <>
             <span className="w-24 shrink-0 text-xs font-semibold tabular-nums text-ink-soft">{formatTimeRange(moment, schedule.timezone)}</span>
             <span className="min-w-0 flex-1">
-                <span className={`block text-sm font-medium text-ink ${moment.is_cancelled ? 'line-through' : ''}`}>{moment.title}</span>
+                <span className={`block text-sm font-medium text-ink ${moment.is_cancelled ? 'line-through' : ''}`}>{draft ? <DraftPill status={draft.status} /> : null}{moment.title}</span>
                 {moment.subtitle ? <span className="block text-xs text-ink-soft">{moment.subtitle}</span> : null}
                 {admin && issues.length ? <IssueList issues={issues} /> : null}
             </span>

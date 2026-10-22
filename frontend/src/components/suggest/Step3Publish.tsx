@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Banknote, CalendarX, Mail, Percent, User } from 'lucide-react';
+import { Banknote, Mail, Percent, User } from 'lucide-react';
 import { Switch } from '../ToggleRow';
-import CancelEventSheet from '../CancelEventSheet';
 import Row from './Row';
 import PricingPage from './PricingPage';
 import PromoCodePage from './PromoCodePage';
@@ -33,8 +32,6 @@ interface Props {
     promoEnabled?: boolean;
     /** Lets the shell hide its header and footer while a sub-page is open. */
     onSubPageChange: (open: boolean) => void;
-    /** The organizer editing their own event can request its cancellation here. */
-    cancelEvent?: { eventId: string; eventTitle: string; cancelled: boolean };
 }
 
 const AUDIENCES: GoingAudience[] = ['friends', 'public', 'private'];
@@ -60,24 +57,7 @@ function promoSummary(state: SuggestFormState): string | undefined {
     return undefined;
 }
 
-function CancelEventSection({ eventId, eventTitle, cancelled }: { eventId: string; eventTitle: string; cancelled: boolean }) {
-    const [open, setOpen] = useState(false);
-    return (
-        <section className="mt-6 border-t border-line pt-4">
-            <h3 className="text-sm font-semibold text-ink">{cancelled ? 'This event is cancelled' : 'Cancel this event'}</h3>
-            <p className="mt-1 text-xs text-ink-soft">
-                {cancelled ? 'Ask our team to restore it if it is happening after all.' : 'Our team reviews the request, then people who saved it or are going are told.'}
-            </p>
-            <button type="button" onClick={() => setOpen(true)} className="mt-3 inline-flex items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-danger hover:bg-canvas">
-                <CalendarX size={16} aria-hidden="true" />
-                {cancelled ? 'Request restore' : 'Request cancellation'}
-            </button>
-            {open ? <CancelEventSheet eventId={eventId} eventTitle={eventTitle} cancelled={cancelled} onClose={() => setOpen(false)} /> : null}
-        </section>
-    );
-}
-
-export default function Step3Publish({ state, patch, error, signedIn, editing = false, changing = false, canOrganize = false, promoEnabled = true, onSubPageChange, cancelEvent }: Props) {
+export default function Step3Publish({ state, patch, error, signedIn, editing = false, changing = false, canOrganize = false, promoEnabled = true, onSubPageChange }: Props) {
     const [page, setPage] = useState<'none' | 'pricing' | 'promo'>('none');
     const [nowMs] = useState(() => Date.now());
     const endAt = parseLocal(state.end);
@@ -151,7 +131,6 @@ export default function Step3Publish({ state, patch, error, signedIn, editing = 
             <div className="space-y-3">
                 {pricingRow}
                 {promoRow}
-                {cancelEvent ? <CancelEventSection {...cancelEvent} /> : null}
             </div>
         );
     }

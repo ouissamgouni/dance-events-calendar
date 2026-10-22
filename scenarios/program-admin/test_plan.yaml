@@ -32,7 +32,8 @@ test_plan:
       title: "Create a warning without blocking save"
       description: "Create a session overlapping an existing Grand Hall session."
       expected: >
-        The editor warns about the room conflict and offers Cancel or Save anyway.
+        The editor warns about the room conflict in a strip pinned just above Cancel /
+        Save anyway (it stays visible while the form scrolls).
         Saving intentionally is allowed: both cells get an amber outline and
         warning icon, a "1 room conflict" bar lists the pair above the grid, and
         the issue appears in the publish review. Marking either session cancelled
@@ -149,19 +150,19 @@ test_plan:
       title: "Publish and notify from one sheet"
       description: >
         In the same Publish sheet look at the "Notify attendees" row, open Customize,
-        untick and re-tick "Plans affected", then tap "Publish & notify 4".
+        untick and re-tick "Plan changed", then tap "Publish & notify 4".
       expected: >
         Notify attendees is on by default and reads "4 people · 1 personal plan
-        update". Customize expands in place: chips on one row, "Plans affected · 1"
+        update". Customize expands in place: toggle chips on one row, "Plan changed · 1"
         and "Everyone else going · 3"; "1 turned off program emails and push". Title
         is "Program updated" and the message lists the change ("Changed: Keys for
         Social Dancing …") without the event name. The preview shows the event name,
         title and message, plus "Email subject: Winter Salsa Fest 2026: Program
-        updated", and a sample personal message ("Keys for Social Dancing: has
-        updated details."). Unticking Plans affected turns the second chip into
-        "Everyone going · 4". After publishing the sheet reads "Version 2 is live",
-        "Sent to 3 people" and "1 person gets a personal "Your plan changed"
-        message". Maya's inbox has one "Your plan changed" notification and no
+        updated", and the personal version ("Plan changed: “Keys for Social Dancing: has
+        updated details.”"). Unticking Plan changed turns the second chip into
+        "Everyone going · 4"; unticking Everyone else going hides title and message.
+        After publishing the sheet reads "Version 2 published" and
+        "4 people notified · 1 plan update". Maya's inbox has one "Your plan changed" notification and no
         general "Program updated" one; push titles end with "· Winter Salsa Fest 2026".
 
     - id: 15
@@ -228,14 +229,6 @@ test_plan:
         a ticket). Maya sees no strip and still gets the "Add ticket?" prompt on this
         multi-day international event.
 
-    - id: 21
-      title: "Request cancellation from the event editor"
-      description: "As Olive tap Edit event and go to the last step."
-      expected: >
-        A "Cancel this event" section sits at the bottom with a red "Request
-        cancellation" button that opens the cancellation sheet (reviewed by an admin).
-        Nothing changes until the request is sent.
-
     - id: 22
       title: "A delegated editor only gets Edit program"
       description: >
@@ -246,6 +239,74 @@ test_plan:
         editor. The ••• menu offers Edit program but not Edit event.
 
     - id: 23
+      title: "Status strip and draft labels"
+      description: >
+        As Dev Admin open the Back 2 Mambo program editor. Look under the header,
+        then at the Schedule grid, the Sessions list and the Overview.
+      expected: >
+        A strip under the header reads "Version N · X unpublished changes" with a
+        breakdown (new / edited / removed) and a Review link that opens the Publish
+        sheet. Sessions changed since the last publish carry an "Edited" label
+        (hover lists the changed fields), new ones a "New" label with a dashed
+        border, in the grid, the Sessions list and on Overview cards. Nothing is
+        labelled on a never-published program; the strip says "Draft · not visible
+        to attendees until you publish" instead.
+
+    - id: 24
+      title: "Overlapping sessions sit side by side"
+      description: >
+        Edit a session so it overlaps another one in the same room and save
+        anyway, then look at that day in the grid.
+      expected: >
+        Both sessions are visible next to each other in the room column (the
+        column widens) and each opens its own editor. Both show the warning icon,
+        the strip shows "N warnings"; tapping it opens Sessions with the
+        "Issues" filter on, rows tinted with the warning text under the title.
+
+    - id: 25
+      title: "Update message lists what changed"
+      description: "Open Publish → Customize."
+      expected: >
+        The default message has one line per kind of change, e.g.
+        "New: …", "Moved: Salsa On2 → Sat 15:00 · Room B", "Renamed: A → B",
+        "Updated: X (level, instructors)", "Cancelled: …", ending with "+N more"
+        when it exceeds 255 characters (counter under the field). The audience shows
+        the "Plan changed · N" and "Everyone else going · N" toggle chips when a
+        planned session changed, otherwise "Everyone going · N". People without email and push show as "N in-app only"
+        behind an info button. After publishing, the in-app notification shows
+        the message on several lines.
+
+    - id: 26
+      title: "Settings save on their own"
+      description: >
+        In Settings change "Color sessions in the grid", then the day cutoff, then
+        pick another timezone.
+      expected: >
+        Each select saves immediately ("Saved to draft"); the
+        Publish count goes up. Picking a timezone asks to confirm because local
+        session times shift; "Keep …" restores the old value without saving.
+
+    - id: 27
+      title: "Mobile editor"
+      description: >
+        On a phone-sized window open the editor, then a session.
+      expected: >
+        The header shows Back, the title, Publish and a ••• menu (Preview as
+        attendee, Notify attendees, Unpublish). The session editor is a bottom
+        sheet: its title bar and Cancel / Save bar stay put while the form
+        scrolls; Duplicate and Delete live in the ••• menu of the sheet, Delete
+        asks for confirmation in the footer. Contributor role selects wrap under
+        the name. All editor sheets (publish, notify, unpublish, rooms, taxonomy)
+        keep their action bar visible.
+
+    - id: 28
+      title: "Attendee preview without app chrome"
+      description: "Open Preview as attendee."
+      expected: >
+        A phone-sized frame shows the draft program without the Movida app header,
+        banners or bottom navigation; "Open in new tab" stays visible below.
+
+    - id: 29
       title: "Delete the program"
       description: >
         As Dev Admin open Settings → Delete program. Type a wrong title, then

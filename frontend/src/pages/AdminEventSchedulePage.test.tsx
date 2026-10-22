@@ -340,7 +340,7 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.getByTitle('Draft attendee preview')).toHaveAttribute('src', '/event/movida-2026/program?preview=draft&embed=program');
     });
 
-    it('saves the grid session color mode with the schedule settings', async () => {
+    it('saves the grid session color mode as soon as it changes', async () => {
         vi.mocked(updateAdminEventSchedule).mockResolvedValue({ ...schedule, session_color_mode: 'activity_type_stripe' });
         render(
             <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
@@ -352,9 +352,10 @@ describe('AdminEventSchedulePage', () => {
         const mode = screen.getByRole('combobox', { name: /Color sessions in the grid/ });
         expect(mode).toHaveValue('room');
         fireEvent.change(mode, { target: { value: 'activity_type_stripe' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
 
-        await waitFor(() => expect(updateAdminEventSchedule).toHaveBeenCalledWith(event.event_id, expect.objectContaining({ session_color_mode: 'activity_type_stripe' })));
+        await waitFor(() => expect(updateAdminEventSchedule).toHaveBeenCalledWith(event.event_id, { session_color_mode: 'activity_type_stripe' }));
+        expect(await screen.findByText('Saved to draft')).toBeInTheDocument();
+        expect(mode).toHaveValue('activity_type_stripe');
     });
 
     it('shows users who added sessions to their plans', async () => {
@@ -375,7 +376,7 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.getByText('Musicality')).toBeInTheDocument();
     });
 
-    it('marks room conflicts in the grid and lists them for the day', async () => {
+    it('marks sessions with warnings in the grid and lists them in the sessions view', async () => {
         const footwork = { ...schedule.sessions[0], id: 'session-2', title: 'Footwork', start: '2026-10-16T12:30:00Z', end: '2026-10-16T13:30:00Z' };
         vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({
             ...schedule,
@@ -388,13 +389,45 @@ describe('AdminEventSchedulePage', () => {
             </MemoryRouter>,
         );
 
-        expect(await screen.findByText('1 room conflict')).toBeInTheDocument();
-        expect(screen.getAllByTestId('session-conflict-icon')).toHaveLength(2);
-        fireEvent.click(screen.getByRole('button', { name: 'Musicality ↔ Footwork' }));
+        expect(await screen.findAllByTestId('session-issue-icon')).toHaveLength(2);
+        fireEvent.click(screen.getByRole('button', { name: '1 warning' }));
+        expect(screen.getByRole('button', { name: 'Issues · 2' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getAllByText('Musicality overlaps Footwork in the same room')).toHaveLength(2);
+        fireEvent.click(screen.getByText('Footwork'));
         expect(screen.getByRole('dialog', { name: 'Edit session' })).toBeInTheDocument();
     });
 
-    it('publishes and notifies from one sheet, with personal plan updates kept separate', async () => {
+    it('labels new and edited sessions and summarizes unpublished changes', async () => {
+        const footwork = { ...schedule.sessions[0], id: 'session-2', title: 'Footwork', start: '2026-10-16T14:00:00Z', end: '2026-10-16T15:00:00Z' };
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({
+            ...schedule,
+            sessions: [schedule.sessions[0], footwork],
+            diff: {
+                added_session_ids: ['session-2'],
+                removed_session_ids: [],
+                changed_sessions: { 'session-1': ['start', 'end'] },
+                configuration_changed: false,
+                changes: [
+                    { entity_type: 'session', operation: 'create', entity_id: 'session-2', label: 'Footwork', fields: [] },
+                    { entity_type: 'session', operation: 'update', entity_id: 'session-1', label: 'Musicality', fields: [{ field: 'start', before: null, after: null }] },
+                ],
+            },
+        });
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        const status = await screen.findByTestId('program-status');
+        expect(status).toHaveTextContent('Version 1 · 2 unpublished changes');
+        expect(screen.getByText('New')).toBeInTheDocument();
+        expect(screen.getByText('Edited')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+        expect(screen.getByRole('dialog', { name: 'Publish program' })).toBeInTheDocument();
+    });
+
+    it('publishes and notifies from one sheet, with planners whose sessions changed getting a personal version', async () => {
         vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({
             ...schedule,
             diff: {
@@ -422,15 +455,23 @@ describe('AdminEventSchedulePage', () => {
         expect(screen.getByRole('switch', { name: 'Notify attendees' })).toBeChecked();
         expect(await screen.findByText('3 people · 1 personal plan update')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
-        expect(screen.getByRole('button', { name: 'Plans affected · 1' })).toHaveAttribute('aria-pressed', 'true');
-        const others = screen.getByRole('button', { name: 'Everyone else going · 2' });
+        const planChip = screen.getByRole('button', { name: 'Plan changed · 1' });
+        expect(planChip).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: 'Everyone else going · 2' })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Program updated');
-        expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Changed: Musicality (time).');
+        expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Moved: Musicality → new time');
+        expect(screen.queryByText(/turned off program emails and push/)).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '1 in-app only' }));
         expect(screen.getByText(/1 turned off program emails and push/)).toBeInTheDocument();
-        expect(screen.getByText(/e\.g\. "Musicality: has a new time\."/)).toBeInTheDocument();
-        fireEvent.click(others);
+        expect(screen.getByText('Plan changed: “Musicality: has a new time.”')).toBeInTheDocument();
+        fireEvent.click(planChip);
+        expect(screen.getByRole('button', { name: 'Everyone going · 3' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Publish & notify 3' })).toBeInTheDocument();
+        fireEvent.click(planChip);
+        fireEvent.click(screen.getByRole('button', { name: 'Everyone else going · 2' }));
+        expect(screen.queryByRole('textbox', { name: 'Message' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Publish & notify 1' })).toBeInTheDocument();
-        fireEvent.click(others);
+        fireEvent.click(screen.getByRole('button', { name: 'Everyone else going · 2' }));
         fireEvent.click(screen.getByRole('button', { name: 'Publish & notify 3' }));
 
         await waitFor(() => expect(publishEventSchedule).toHaveBeenCalledWith(event.event_id, { notifyImpactedPlanners: true }));
@@ -438,11 +479,10 @@ describe('AdminEventSchedulePage', () => {
             user_ids: ['planner', 'going'],
             reason: 'updated',
             title: 'Program updated',
-            message: 'Changed: Musicality (time).',
+            message: 'Moved: Musicality → new time',
         }));
-        expect(await screen.findByRole('dialog', { name: 'Version 2 is live' })).toBeInTheDocument();
-        expect(screen.getByText('Sent to 2 people.')).toBeInTheDocument();
-        expect(screen.getByText('1 person gets a personal "Your plan changed" message.')).toBeInTheDocument();
+        expect(await screen.findByRole('dialog', { name: 'Version 2 published' })).toBeInTheDocument();
+        expect(screen.getByText(/3 people notified\s+· 1 plan update/)).toBeInTheDocument();
     });
 
     it('publishes without notifying anyone when the switch is off', async () => {
@@ -492,7 +532,7 @@ describe('AdminEventSchedulePage', () => {
             message: "The program is being updated. We'll let you know when it's back.",
         }));
         expect(await screen.findByRole('dialog', { name: 'Program unpublished' })).toBeInTheDocument();
-        expect(screen.getByText('Sent to 1 person.')).toBeInTheDocument();
+        expect(screen.getByText(/1 person notified/)).toBeInTheDocument();
     });
 
     it('announces the first publication without offering a broad-update option', async () => {

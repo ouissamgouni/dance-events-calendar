@@ -1,4 +1,4 @@
-import type { EventSchedule, MyPlanEntry, ScheduleChange, ScheduleOverviewItem, ScheduleSession } from '../types';
+import type { AdminEventSchedule, EventSchedule, MyPlanEntry, ScheduleChange, ScheduleIssue, ScheduleOverviewItem, ScheduleSession } from '../types';
 
 interface LocalParts {
     year: number;
@@ -299,42 +299,152 @@ export function overviewItemHasDetails(item: ScheduleOverviewItem): boolean {
     return Boolean(item.description?.trim() || item.url);
 }
 
-const TIME_FIELDS = new Set(['start', 'end']);
-const PLACE_FIELDS = new Set(['room_id', 'room_ids', 'venue_id']);
+const FIELD_LABELS: Record<string, string> = {
+    title: 'title',
+    subtitle: 'subtitle',
+    start: 'time',
+    end: 'time',
+    room_id: 'room',
+    room_ids: 'room',
+    venue_id: 'venue',
+    level_id: 'level',
+    activity_type_id: 'type',
+    contributors: 'instructors',
+    instructors: 'instructors',
+    description: 'description',
+    attendee_note: 'note',
+    allow_plan: 'My Plan',
+    is_cancelled: 'cancelled',
+    url: 'link',
+    url_label: 'link',
+    opens_detail: 'detail link',
+    parent_id: 'parent',
+};
+// Shown to attendees under "Updated"; time, room, title and cancellation get their own lines.
+const DETAIL_FIELDS = new Set(['subtitle', 'level_id', 'activity_type_id', 'contributors', 'instructors', 'description', 'attendee_note', 'url', 'url_label']);
 
-/** Attendee-facing summary of a publish review, e.g. "New: A, B. Changed: C (time)." */
-export function programUpdateMessage(changes: ScheduleChange[], maxLength = 255): string {
-    const groups: Array<[string, string[]]> = [['New', []], ['Changed', []], ['Cancelled', []], ['Removed', []]];
-    const [added, changed, cancelled, removed] = groups.map(([, items]) => items);
+const unique = (values: string[]) => [...new Set(values)];
+
+/** Human names of changed fields, e.g. ["time", "room", "level"]. */
+export function changedFieldLabels(fields: string[]): string[] {
+    return unique(fields.filter((field) => field !== 'sort_order' && field !== 'external_id').map((field) => FIELD_LABELS[field] ?? field.replaceAll('_', ' ')));
+}
+
+const UPDATE_HEADINGS = ['New', 'Moved', 'Renamed', 'Updated', 'Cancelled', 'Back on', 'Removed'] as const;
+
+/**
+ * Attendee-facing summary of a publish review, one line per kind of change, e.g.
+ * "New: A, B\nMoved: C → Sat 15:00 · Room B\nUpdated: D (level)".
+ */
+export function programUpdateMessage(changes: ScheduleChange[], timeZone = 'UTC', maxLength = 255): string {
+    const entries: Array<{ heading: typeof UPDATE_HEADINGS[number]; text: string }> = [];
+    const when = new Intl.DateTimeFormat(undefined, { timeZone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
     for (const change of changes) {
         if (change.entity_type !== 'session' && change.entity_type !== 'overview_item') continue;
-        if (change.operation === 'create') added.push(change.label);
-        else if (change.operation === 'remove') removed.push(change.label);
-        else if (change.fields.some((field) => field.field === 'is_cancelled' && field.after === true)) cancelled.push(change.label);
-        else {
-            const fields = change.fields.map((field) => field.field);
-            const aspects = [
-                fields.some((field) => TIME_FIELDS.has(field)) ? 'time' : null,
-                fields.some((field) => PLACE_FIELDS.has(field)) ? 'room' : null,
-                fields.some((field) => !TIME_FIELDS.has(field) && !PLACE_FIELDS.has(field)) ? 'details' : null,
-            ].filter(Boolean);
-            changed.push(aspects.length ? `${change.label} (${aspects.join(', ')})` : change.label);
-        }
+        if (change.operation === 'create') { entries.push({ heading: 'New', text: change.label }); continue; }
+        if (change.operation === 'remove') { entries.push({ heading: 'Removed', text: change.label }); continue; }
+        const field = (name: string) => change.fields.find((row) => row.field === name);
+        const cancelled = field('is_cancelled');
+        if (cancelled?.after === true) { entries.push({ heading: 'Cancelled', text: change.label }); continue; }
+        if (cancelled?.after === false) entries.push({ heading: 'Back on', text: change.label });
+        const title = field('title');
+        if (title) entries.push({ heading: 'Renamed', text: `${String(title.before)} → ${change.label}` });
+        const start = field('start')?.after;
+        const end = field('end')?.after;
+        const validDate = (value: unknown) => typeof value === 'string' && !Number.isNaN(Date.parse(value));
+        const time = validDate(start) ? when.format(new Date(start as string)) : validDate(end) ? `ends ${formatTime(end as string, timeZone)}` : (field('start') || field('end')) ? 'new time' : null;
+        const rooms = field('room_ids');
+        const place = rooms?.after ? String(rooms.after) : (rooms || field('room_id') || field('venue_id')) ? 'new location' : null;
+        if (time || place) entries.push({ heading: 'Moved', text: `${change.label} → ${[time, place].filter(Boolean).join(' · ')}` });
+        const details = changedFieldLabels(change.fields.map((row) => row.field).filter((name) => DETAIL_FIELDS.has(name)));
+        if (details.length) entries.push({ heading: 'Updated', text: `${change.label} (${details.join(', ')})` });
     }
-    const items = groups.flatMap(([heading, list]) => list.map((text) => ({ heading, text })));
-    if (!items.length) return 'Program details were updated. Review the latest schedule.';
+    if (!entries.length) return 'Program details were updated. Review the latest schedule.';
     const render = (count: number) => {
-        const parts: string[] = [];
-        for (const [heading] of groups) {
-            const shown = items.slice(0, count).filter((item) => item.heading === heading).map((item) => item.text);
-            if (shown.length) parts.push(`${heading}: ${shown.join(', ')}.`);
+        const lines: string[] = [];
+        for (const heading of UPDATE_HEADINGS) {
+            const shown = entries.slice(0, count).filter((entry) => entry.heading === heading).map((entry) => entry.text);
+            if (shown.length) lines.push(`${heading}: ${shown.join(', ')}`);
         }
-        if (count < items.length) parts.push(`+${items.length - count} more.`);
-        return parts.join(' ');
+        if (count < entries.length) lines.push(`+${entries.length - count} more`);
+        return lines.join('\n');
     };
-    for (let count = items.length; count > 0; count -= 1) {
+    for (let count = entries.length; count > 0; count -= 1) {
         const text = render(count);
         if (text.length <= maxLength) return text;
     }
-    return `${items.length} program changes. Review the latest schedule.`;
+    return `${entries.length} program changes. Review the latest schedule.`;
+}
+
+export interface DraftStatus {
+    status: 'new' | 'edited';
+    fields: string[];
+}
+
+/** Unpublished state of each session and overview item; empty before the first publish. */
+export function draftStatuses(schedule: Pick<AdminEventSchedule, 'version' | 'diff'>): Map<string, DraftStatus> {
+    const statuses = new Map<string, DraftStatus>();
+    if (schedule.version == null) return statuses;
+    for (const id of schedule.diff.added_session_ids) statuses.set(id, { status: 'new', fields: [] });
+    for (const [id, fields] of Object.entries(schedule.diff.changed_sessions)) {
+        const labels = changedFieldLabels(fields);
+        if (labels.length) statuses.set(id, { status: 'edited', fields: labels });
+    }
+    for (const change of schedule.diff.changes ?? []) {
+        if (change.entity_type !== 'overview_item' || change.operation === 'remove') continue;
+        const labels = changedFieldLabels(change.fields.map((row) => row.field));
+        if (change.operation === 'create') statuses.set(change.entity_id, { status: 'new', fields: [] });
+        else if (labels.length) statuses.set(change.entity_id, { status: 'edited', fields: labels });
+    }
+    return statuses;
+}
+
+/** Issues keyed by every session and overview item they mention. */
+export function issuesByItem(issues: ScheduleIssue[]): Map<string, ScheduleIssue[]> {
+    const map = new Map<string, ScheduleIssue[]>();
+    for (const issue of issues) {
+        for (const id of [...issue.session_ids, ...(issue.overview_item_ids ?? [])]) map.set(id, [...(map.get(id) ?? []), issue]);
+    }
+    return map;
+}
+
+export interface OverlapLane {
+    lane: number;
+    lanes: number;
+}
+
+/**
+ * Side-by-side lanes for sessions that overlap in time and share a grid column, so each stays visible.
+ * Sessions without a room in `columnRoomIds` span every column.
+ */
+export function overlapLanes(sessions: ScheduleSession[], columnRoomIds: number[]): Map<string, OverlapLane> {
+    const columnsOf = (session: ScheduleSession) => {
+        const ids = sessionRoomIds(session).filter((id) => columnRoomIds.includes(id));
+        return ids.length ? ids : columnRoomIds;
+    };
+    const sorted = [...sessions].sort((left, right) => left.start.localeCompare(right.start) || right.end.localeCompare(left.end));
+    const columns = new Map(sorted.map((session) => [session.id, new Set(columnsOf(session))]));
+    const clash = (left: ScheduleSession, right: ScheduleSession) => sessionsOverlap(left, right)
+        && [...(columns.get(left.id) ?? [])].some((id) => columns.get(right.id)?.has(id));
+    const parent = new Map(sorted.map((session) => [session.id, session.id]));
+    const root = (id: string): string => {
+        const next = parent.get(id) ?? id;
+        return next === id ? id : root(next);
+    };
+    for (let left = 0; left < sorted.length; left += 1) {
+        for (let right = left + 1; right < sorted.length; right += 1) {
+            if (clash(sorted[left], sorted[right])) parent.set(root(sorted[right].id), root(sorted[left].id));
+        }
+    }
+    const laneOf = new Map<string, number>();
+    const clusterLanes = new Map<string, number>();
+    for (const session of sorted) {
+        const placed = sorted.filter((other) => laneOf.has(other.id) && clash(other, session));
+        let lane = 0;
+        while (placed.some((other) => laneOf.get(other.id) === lane)) lane += 1;
+        laneOf.set(session.id, lane);
+        const cluster = root(session.id);
+        clusterLanes.set(cluster, Math.max(clusterLanes.get(cluster) ?? 0, lane + 1));
+    }
+    return new Map(sorted.map((session) => [session.id, { lane: laneOf.get(session.id) ?? 0, lanes: clusterLanes.get(root(session.id)) ?? 1 }]));
 }

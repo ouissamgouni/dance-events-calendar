@@ -164,6 +164,17 @@ test_plan:
         cards show a "Cancelled" chip, and Dev User gets "Event updated ·
         Cancelled: Venue flooded".
 
+    - id: 20
+      title: "Request cancellation from the event editor"
+      description: |
+        As Carl, open evt-organizer-002 → ••• → "Edit event". On the first
+        step tap "Request cancellation", then send the request and tap Done.
+      expected: |
+        A red "Request cancellation" button sits under the first step's
+        fields (no section around it) and opens the cancellation sheet.
+        After Done the editor closes too. Nothing changes on the event
+        until an admin applies the request.
+
     - id: 19
       title: "Admin assigns an organizer directly"
       description: |

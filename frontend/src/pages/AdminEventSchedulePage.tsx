@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import useBackToClose from '../hooks/useBackToClose';
-import { AlertTriangle, Bell, ChevronDown, ChevronLeft, ChevronUp, ExternalLink, Eye, Plus, Search, Send, Trash2, Users, X } from 'lucide-react';
+import { AlertTriangle, Bell, Check, ChevronDown, ChevronLeft, ChevronUp, ExternalLink, Eye, EyeOff, Info, MoreHorizontal, Plus, Search, Send, Trash2, Users, X } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
     addScheduleEditor,
@@ -59,13 +59,13 @@ import {
     type SchedulePublishPreview,
 } from '../api';
 import { Switch } from '../components/ToggleRow';
-import ScheduleGrid from '../components/program/ScheduleGrid';
+import ScheduleGrid, { DraftPill, type SessionMark } from '../components/program/ScheduleGrid';
 import ProgramOverview from '../components/program/ProgramOverview';
 import ProgramExportPanel from '../components/program/ProgramExportPanel';
 import { ProgramDayPicker, ProgramFilters } from '../components/program/ProgramControls';
 import { SCHEDULE_COLORS, SESSION_COLOR_MODES, scheduleColor } from '../utils/scheduleColors';
 import type { AdminEventSchedule, CalendarEvent, ProgramExport, ScheduleActivityType, ScheduleChange, ScheduleContributor, ScheduleContributorRole, ScheduleImportDocument, ScheduleImportPreview, ScheduleLevel, ScheduleOverviewItem, ScheduleRoom, ScheduleSession, ScheduleVenue, SessionColorMode } from '../types';
-import { filterScheduleSessions, firstDayWithSessions, formatDayDateLabel, formatTime, formatTimeRange, programDayOf, programUpdateMessage, sessionRoomIds, sessionRooms, sessionsForDay, sessionsInOverviewWindow, sessionsOverlap, toZonedInput, zonedInputToIso, type ScheduleFilters } from '../utils/schedule';
+import { draftStatuses, filterScheduleSessions, firstDayWithSessions, formatDayDateLabel, formatTime, formatTimeRange, issuesByItem, programDayOf, programUpdateMessage, sessionRoomIds, sessionRooms, sessionsForDay, sessionsInOverviewWindow, sessionsOverlap, toZonedInput, zonedInputToIso, type ScheduleFilters } from '../utils/schedule';
 
 type Section = 'overview' | 'schedule' | 'sessions' | 'locations' | 'taxonomy' | 'export' | 'settings';
 type ConfigEntity = ScheduleVenue | ScheduleRoom | ScheduleLevel | ScheduleActivityType | ScheduleContributor;
@@ -138,6 +138,7 @@ export default function AdminEventSchedulePage() {
     const [positionRequest, setPositionRequest] = useState(0);
     const [visibilityAction, setVisibilityAction] = useState<'unpublish' | 'republish' | null>(null);
     const [notifyOpen, setNotifyOpen] = useState(false);
+    const [issuesOnly, setIssuesOnly] = useState(false);
 
     const reload = async () => {
         if (!eventId) return;
@@ -208,16 +209,31 @@ export default function AdminEventSchedulePage() {
         );
     }
 
-    const changeCount = schedule.diff.added_session_ids.length + schedule.diff.removed_session_ids.length + Object.keys(schedule.diff.changed_sessions).length + (schedule.diff.configuration_changed ? 1 : 0);
+    const changeCount = schedule.diff.changes?.length ?? schedule.diff.added_session_ids.length + schedule.diff.removed_session_ids.length + Object.keys(schedule.diff.changed_sessions).length + (schedule.diff.configuration_changed ? 1 : 0);
     const filteredSessions = filterScheduleSessions(schedule.sessions, filters);
     const filteredSchedule = { ...schedule, sessions: filteredSessions };
-    const sessionsById = new Map(schedule.sessions.map((session) => [session.id, session]));
-    const overlapPairs = schedule.issues
-        .filter((issue) => issue.code === 'room_overlap')
-        .map((issue) => issue.session_ids.map((id) => sessionsById.get(id)).filter((session): session is ScheduleSession => Boolean(session)))
-        .filter((pair) => pair.length === 2);
-    const conflictIds = new Set(overlapPairs.flat().map((session) => session.id));
-    const dayOverlaps = overlapPairs.filter((pair) => pair.some((session) => programDayOf(session.start, schedule.timezone, schedule.day_start_hour) === selectedDay));
+    const drafts = draftStatuses(schedule);
+    const itemIssues = issuesByItem(schedule.issues);
+    const sessionMarks = new Map<string, SessionMark>();
+    for (const session of schedule.sessions) {
+        const draft = drafts.get(session.id);
+        const issues = itemIssues.get(session.id)?.map((issue) => issue.message) ?? [];
+        if (draft || issues.length) sessionMarks.set(session.id, { draft, issues });
+    }
+    const sessionsWithIssues = filteredSessions.filter((session) => itemIssues.has(session.id));
+    const listSchedule = issuesOnly ? { ...filteredSchedule, sessions: sessionsWithIssues } : filteredSchedule;
+    const showIssues = () => {
+        setSection('sessions');
+        setSessionsDay('');
+        setIssuesOnly(true);
+    };
+    const headerMenu = [
+        { label: 'Preview as attendee', icon: <Eye size={17} aria-hidden="true" />, onSelect: () => setShowPreview(true) },
+        ...(schedule.version != null && !schedule.unpublished_at ? [{ label: 'Notify attendees', icon: <Bell size={17} aria-hidden="true" />, onSelect: () => setNotifyOpen(true) }] : []),
+        ...(schedule.version != null ? [schedule.unpublished_at
+            ? { label: 'Republish', icon: <Eye size={17} aria-hidden="true" />, onSelect: () => setVisibilityAction('republish') }
+            : { label: 'Unpublish', icon: <EyeOff size={17} aria-hidden="true" />, onSelect: () => setVisibilityAction('unpublish') }] : []),
+    ];
     const selectDay = (day: string) => {
         setSelectedDay(day);
         setPositionRequest((value) => value + 1);
@@ -233,19 +249,23 @@ export default function AdminEventSchedulePage() {
     };
     return (
         <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col bg-canvas">
-            <header className="shrink-0 border-b border-line bg-surface px-4 py-3">
-                <div className="flex items-center gap-3">
-                    <button type="button" onClick={() => navigate(isAdminRoute ? '/admin' : `/event/${event.event_id}/program`)} aria-label={isAdminRoute ? 'Back to admin' : 'Back to program'} className="flex h-11 w-11 items-center justify-center text-ink-soft"><ChevronLeft /></button>
+            <header className="shrink-0 border-b border-line bg-surface px-2 py-2 sm:px-4 sm:py-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <button type="button" onClick={() => navigate(isAdminRoute ? '/admin' : `/event/${event.event_id}/program`)} aria-label={isAdminRoute ? 'Back to admin' : 'Back to program'} className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-soft"><ChevronLeft /></button>
                     <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold uppercase text-ink-soft">Event schedule</p>
-                        <h1 className="truncate text-lg font-bold text-ink">{event.title}</h1>
+                        <h1 className="truncate text-base font-bold text-ink sm:text-lg">{event.title}</h1>
                     </div>
-                    <button type="button" onClick={() => setShowPreview(true)} className="hidden items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink sm:flex"><Eye size={17} />Preview</button>
-                    {schedule.version != null && !schedule.unpublished_at ? <button type="button" onClick={() => setNotifyOpen(true)} aria-label="Notify attendees" className="flex items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas"><Bell size={17} /><span className="hidden sm:inline">Notify</span></button> : null}
-                    {schedule.version != null && (schedule.unpublished_at ? <button type="button" onClick={() => setVisibilityAction('republish')} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink">Republish</button> : <button type="button" onClick={() => setVisibilityAction('unpublish')} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink">Unpublish</button>)}
-                    <button type="button" onClick={() => setShowPublish(true)} className="flex items-center gap-2 rounded-field bg-action px-3 py-2 text-sm font-semibold text-white"><Send size={17} />Publish{changeCount ? ` (${changeCount})` : ''}</button>
+                    <div className="hidden items-center gap-2 sm:flex">
+                        <button type="button" onClick={() => setShowPreview(true)} className="flex items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas"><Eye size={17} />Preview</button>
+                        {schedule.version != null && !schedule.unpublished_at ? <button type="button" onClick={() => setNotifyOpen(true)} aria-label="Notify attendees" className="flex items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas"><Bell size={17} />Notify</button> : null}
+                        {schedule.version != null && (schedule.unpublished_at ? <button type="button" onClick={() => setVisibilityAction('republish')} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Republish</button> : <button type="button" onClick={() => setVisibilityAction('unpublish')} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Unpublish</button>)}
+                    </div>
+                    <button type="button" onClick={() => setShowPublish(true)} className="flex shrink-0 items-center gap-2 rounded-field bg-action px-3 py-2 text-sm font-semibold text-white hover:opacity-90"><Send size={17} />Publish{changeCount ? ` (${changeCount})` : ''}</button>
+                    <div className="sm:hidden"><OverflowMenu label="Program actions" items={headerMenu} /></div>
                 </div>
             </header>
+            <ProgramStatusStrip schedule={schedule} changeCount={changeCount} onReview={() => setShowPublish(true)} onShowIssues={showIssues} />
             <div className="flex min-h-0 flex-1 flex-col md:flex-row">
                 <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface p-2 md:w-48 md:flex-col md:border-b-0 md:border-r md:p-3">
                     {(['overview', 'schedule', 'sessions', 'locations', 'taxonomy', 'export', 'settings'] as Section[]).map((item) => (
@@ -259,29 +279,21 @@ export default function AdminEventSchedulePage() {
                             <div className="shrink-0 border-b border-line bg-surface px-3">
                                 <ProgramDayPicker schedule={schedule} sessions={(schedule.overview_items ?? []).filter((item) => !item.parent_id)} selectedDay={selectedDay} onSelect={setSelectedDay} endSlot={<button type="button" onClick={() => setEditingOverview({ item: null })} className="ml-auto flex shrink-0 items-center gap-2 rounded-field bg-action px-3 py-2 text-xs font-semibold text-white"><Plus size={15} />Add item</button>} />
                             </div>
-                            <ProgramOverview schedule={schedule} day={selectedDay} admin={{ issues: schedule.issues, onEdit: (item) => setEditingOverview({ item }), onAddMoment: (parent) => setEditingOverview({ item: null, parent }) }} />
+                            <ProgramOverview schedule={schedule} day={selectedDay} admin={{ issues: schedule.issues, drafts, onEdit: (item) => setEditingOverview({ item }), onAddMoment: (parent) => setEditingOverview({ item: null, parent }) }} />
                         </>
                     ) : null}
                     {section === 'schedule' || section === 'sessions' ? (
                         <div className="shrink-0 border-b border-line bg-surface px-3">
                             <ProgramFilters schedule={schedule} filters={filters} onChange={updateFilters} />
-                            <ProgramDayPicker schedule={schedule} sessions={filteredSessions} selectedDay={section === 'sessions' ? sessionsDay : selectedDay} includeAll={section === 'sessions'} filtersActive={Boolean(filters.instructor || filters.levelIds.length || filters.activityTypeIds.length)} onSelect={section === 'sessions' ? setSessionsDay : selectDay} endSlot={section === 'schedule' ? <button type="button" onClick={() => setEditingSession('new')} className="ml-auto flex shrink-0 items-center gap-2 rounded-field bg-action px-3 py-2 text-xs font-semibold text-white"><Plus size={15} />Add session</button> : undefined} />
+                            <ProgramDayPicker schedule={schedule} sessions={filteredSessions} selectedDay={section === 'sessions' ? sessionsDay : selectedDay} includeAll={section === 'sessions'} filtersActive={Boolean(filters.instructor || filters.levelIds.length || filters.activityTypeIds.length)} onSelect={section === 'sessions' ? setSessionsDay : selectDay} endSlot={section === 'schedule' ? <button type="button" onClick={() => setEditingSession('new')} className="ml-auto flex shrink-0 items-center gap-2 rounded-field bg-action px-3 py-2 text-xs font-semibold text-white"><Plus size={15} />Add session</button> : sessionsWithIssues.length || issuesOnly ? <button type="button" aria-pressed={issuesOnly} onClick={() => setIssuesOnly(!issuesOnly)} className={`ml-auto flex shrink-0 items-center gap-1.5 rounded-field border px-3 py-2 text-xs font-semibold ${issuesOnly ? 'border-action bg-action text-white' : 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100'}`}><AlertTriangle size={14} aria-hidden="true" />Issues · {sessionsWithIssues.length}</button> : undefined} />
                         </div>
                     ) : null}
                     {section === 'schedule' ? (
                         <>
-                            {dayOverlaps.length ? (
-                                <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-line bg-amber-50 px-3 py-2" data-testid="room-conflicts">
-                                    <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-amber-900"><AlertTriangle size={14} aria-hidden="true" />{dayOverlaps.length} room {dayOverlaps.length === 1 ? 'conflict' : 'conflicts'}</span>
-                                    {dayOverlaps.map(([first, second]) => (
-                                        <button key={`${first.id}-${second.id}`} type="button" onClick={() => setEditingSession(first)} className="shrink-0 rounded-field border border-amber-200 bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-canvas">{first.title} ↔ {second.title}</button>
-                                    ))}
-                                </div>
-                            ) : null}
-                            <ScheduleGrid schedule={filteredSchedule} day={selectedDay} onSessionClick={setEditingSession} onTimeClick={() => setEditingSession('new')} positionRequest={positionRequest} conflictIds={conflictIds} />
+                            <ScheduleGrid schedule={filteredSchedule} day={selectedDay} onSessionClick={setEditingSession} onTimeClick={() => setEditingSession('new')} positionRequest={positionRequest} marks={sessionMarks} />
                         </>
                     ) : null}
-                    {section === 'sessions' ? <SessionsTable schedule={filteredSchedule} day={sessionsDay} onEdit={setEditingSession} /> : null}
+                    {section === 'sessions' ? <SessionsTable schedule={listSchedule} day={sessionsDay} marks={sessionMarks} onEdit={setEditingSession} /> : null}
                     {section === 'locations' ? <ConfigLists schedule={schedule} kinds={['venue', 'room']} onEdit={(kind, item) => setEditingConfig({ kind, item })} /> : null}
                     {section === 'taxonomy' ? <TaxonomyPanel schedule={schedule} onEdit={(kind, item) => setEditingConfig({ kind, item })} /> : null}
                     {section === 'export' ? <div className="min-h-0 flex-1 overflow-y-auto p-4"><div className="mx-auto max-w-4xl"><ProgramExportPanel program={draftProgramExport(event, schedule)} eyebrow="Draft program" showCalendarDownloads={false} /></div></div> : null}
@@ -301,7 +313,7 @@ export default function AdminEventSchedulePage() {
     );
 }
 
-function SessionsTable({ schedule, day, onEdit }: { schedule: AdminEventSchedule; day: string; onEdit: (session: ScheduleSession) => void }) {
+function SessionsTable({ schedule, day, marks, onEdit }: { schedule: AdminEventSchedule; day: string; marks: Map<string, SessionMark>; onEdit: (session: ScheduleSession) => void }) {
     const sessions = (day ? sessionsForDay(schedule.sessions, day, schedule.timezone, schedule.day_start_hour) : [...schedule.sessions])
         .sort((left, right) => left.start.localeCompare(right.start));
     return (
@@ -309,20 +321,46 @@ function SessionsTable({ schedule, day, onEdit }: { schedule: AdminEventSchedule
             <div className="mx-auto max-w-5xl overflow-hidden rounded-card border border-card-line bg-surface">
                 <table className="w-full min-w-[720px] text-left text-sm">
                     <thead className="bg-canvas text-xs uppercase text-ink-soft"><tr><th className="p-3">Date</th><th className="p-3">Time</th><th className="p-3">Room</th><th className="p-3">Title</th><th className="p-3">Artists & instructors</th><th className="p-3">Type</th></tr></thead>
-                    <tbody>{sessions.map((session) => (
-                        <tr key={session.id} onClick={() => onEdit(session)} className="cursor-pointer border-t border-card-line hover:bg-canvas">
-                            <td className="p-3 text-ink-soft">{formatDayDateLabel(programDayOf(session.start, schedule.timezone, schedule.day_start_hour))}</td>
+                    <tbody>{sessions.map((session) => {
+                        const mark = marks.get(session.id);
+                        const issues = mark?.issues ?? [];
+                        return <tr key={session.id} onClick={() => onEdit(session)} className={`cursor-pointer border-t border-card-line hover:bg-canvas ${issues.length ? 'bg-amber-50/60' : ''}`}>
+                            <td className={`p-3 text-ink-soft ${issues.length ? 'border-l-4 border-l-amber-500' : ''}`}>{formatDayDateLabel(programDayOf(session.start, schedule.timezone, schedule.day_start_hour))}</td>
                             <td className="p-3 font-medium text-ink">{formatTimeRange(session, schedule.timezone)}</td>
                             <td className="p-3 text-ink-soft">{sessionRooms(schedule.rooms, session).map((room) => room.name).join(' + ') || 'Event-wide'}</td>
-                            <td className="p-3 font-semibold text-ink">{session.title}</td>
+                            <td className="p-3">
+                                <span className={`font-semibold text-ink ${session.is_cancelled ? 'line-through' : ''}`} title={mark?.draft?.status === 'edited' ? `Edited: ${mark.draft.fields.join(', ')}` : undefined}>{mark?.draft ? <DraftPill status={mark.draft.status} /> : null}{session.title}</span>
+                                {mark?.draft?.status === 'edited' ? <span className="mt-0.5 block text-xs text-ink-soft">Changed: {mark.draft.fields.join(', ')}</span> : null}
+                                {issues.map((message) => <span key={message} className="mt-1 flex items-start gap-1 text-xs font-medium text-amber-800"><AlertTriangle size={13} aria-hidden="true" className="mt-0.5 shrink-0" />{message}</span>)}
+                            </td>
                             <td className="p-3 text-ink-soft">{session.contributors?.map((assignment) => schedule.contributors?.find((contributor) => contributor.id === assignment.contributor_id)?.display_name).filter(Boolean).join(', ') || session.instructors || '—'}</td>
                             <td className="p-3 text-ink-soft">{schedule.activity_types.find((type) => type.id === session.activity_type_id)?.name ?? '—'}</td>
-                        </tr>
-                    ))}{!sessions.length ? <tr><td colSpan={6} className="p-8 text-center text-sm text-ink-soft">No sessions match this date and filter.</td></tr> : null}</tbody>
+                        </tr>;
+                    })}{!sessions.length ? <tr><td colSpan={6} className="p-8 text-center text-sm text-ink-soft">No sessions match this date and filter.</td></tr> : null}</tbody>
                 </table>
             </div>
         </div>
     );
+}
+
+function ProgramStatusStrip({ schedule, changeCount, onReview, onShowIssues }: { schedule: AdminEventSchedule; changeCount: number; onReview: () => void; onShowIssues: () => void }) {
+    const firstPublish = schedule.version == null;
+    const pending = !firstPublish && changeCount > 0;
+    const state = firstPublish
+        ? { tone: 'border-blue-100 bg-blue-50', dot: 'bg-action', text: 'Draft · not visible to attendees until you publish' }
+        : schedule.unpublished_at
+            ? { tone: 'border-amber-200 bg-amber-50', dot: 'bg-amber-500', text: 'Hidden · attendees see "Program under work"' }
+            : pending
+                ? { tone: 'border-blue-100 bg-blue-50', dot: 'bg-action', text: `Version ${schedule.version} · ${changeCount} unpublished ${changeCount === 1 ? 'change' : 'changes'}` }
+                : { tone: 'border-line bg-surface', dot: 'bg-success', text: `Version ${schedule.version} · up to date` };
+    return <div role="status" data-testid="program-status" className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 text-xs ${state.tone}`}>
+        <span className="flex min-w-0 items-center gap-2 font-semibold text-ink">
+            {/* eslint-disable-next-line no-restricted-syntax -- status dot is intentionally circular */}
+            <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${state.dot}`} />{state.text}
+        </span>
+        {pending ? <button type="button" onClick={onReview} className="font-semibold text-action hover:underline">Review</button> : null}
+        {schedule.issues.length ? <button type="button" onClick={onShowIssues} className="ml-auto flex items-center gap-1 font-semibold text-amber-900 hover:underline"><AlertTriangle size={14} aria-hidden="true" />{schedule.issues.length} {schedule.issues.length === 1 ? 'warning' : 'warnings'}</button> : null}
+    </div>;
 }
 
 function ConfigLists({ schedule, kinds, onEdit }: { schedule: AdminEventSchedule; kinds: ConfigKind[]; onEdit: (kind: ConfigKind, item?: ConfigEntity) => void }) {
@@ -378,18 +416,35 @@ function TaxonomyPanel({ schedule, onEdit }: { schedule: AdminEventSchedule; onE
 
 function SettingsPanel({ schedule, eventId, eventTitle, canManageEditors, onSaved, onDeleted }: { schedule: AdminEventSchedule; eventId: string; eventTitle: string; canManageEditors: boolean; onSaved: (value: AdminEventSchedule) => void; onDeleted: () => void }) {
     const [timezone, setTimezone] = useState(schedule.timezone);
-    const [cutoff, setCutoff] = useState(schedule.day_start_hour);
-    const [colorMode, setColorMode] = useState<SessionColorMode>(schedule.session_color_mode ?? 'room');
-    const [busy, setBusy] = useState(false);
+    const [pendingTimezone, setPendingTimezone] = useState<string | null>(null);
+    const [saveState, setSaveState] = useState<{ status: 'idle' | 'saving' | 'saved' } | { status: 'error'; message: string }>({ status: 'idle' });
     const timezoneOptions = supportedTimezones(schedule.timezone);
+    const persist = async (patch: { timezone?: string; day_start_hour?: number; session_color_mode?: SessionColorMode }) => {
+        setSaveState({ status: 'saving' });
+        try {
+            onSaved(await updateAdminEventSchedule(eventId, patch));
+            setSaveState({ status: 'saved' });
+        } catch (reason) {
+            setSaveState({ status: 'error', message: reason instanceof Error ? reason.message : 'Could not save settings' });
+        }
+    };
     return <div className="mx-auto w-full max-w-2xl space-y-8 overflow-y-auto p-6">
-        <form className="space-y-5" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { onSaved(await updateAdminEventSchedule(eventId, { timezone, day_start_hour: cutoff, session_color_mode: colorMode })); } finally { setBusy(false); } }}>
-            <h2 className="text-lg font-bold text-ink">Schedule settings</h2>
-            <TimezoneCombobox value={timezone} options={timezoneOptions} onChange={setTimezone} />
-            <label className="block text-sm font-semibold text-ink">Program day changes at<select value={cutoff} onChange={(event) => setCutoff(Number(event.target.value))} className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 font-normal">{Array.from({ length: 12 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}</select></label>
-            <label className="block text-sm font-semibold text-ink">Color sessions in the grid<select value={colorMode} onChange={(event) => setColorMode(event.target.value as SessionColorMode)} className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 font-normal">{SESSION_COLOR_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select><span className="mt-1 block text-xs font-normal text-ink-soft">Sessions without an activity type keep their room color.</span></label>
-            <button disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save settings'}</button>
-        </form>
+        <section className="space-y-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <h2 className="text-lg font-bold text-ink">Schedule settings</h2>
+                <p aria-live="polite" className={`text-xs font-medium ${saveState.status === 'error' ? 'text-danger' : saveState.status === 'saved' ? 'text-success' : 'text-ink-soft'}`}>{saveState.status === 'saving' ? 'Saving…' : saveState.status === 'saved' ? 'Saved to draft' : saveState.status === 'error' ? saveState.message : 'Changes save automatically'}</p>
+            </div>
+            <TimezoneCombobox value={timezone} options={timezoneOptions} onChange={setTimezone} onSelect={(value) => setPendingTimezone(value === schedule.timezone ? null : value)} />
+            {pendingTimezone ? <div className="border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <p>Switch to <strong>{pendingTimezone}</strong>? Sessions keep their exact moment, so their local times shift.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => { setTimezone(schedule.timezone); setPendingTimezone(null); }} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Keep {schedule.timezone}</button>
+                    <button type="button" onClick={() => { const value = pendingTimezone; setPendingTimezone(null); void persist({ timezone: value }); }} className="rounded-field bg-action px-3 py-2 text-sm font-semibold text-white hover:opacity-90">Change timezone</button>
+                </div>
+            </div> : null}
+            <label className="block text-sm font-semibold text-ink">Program day changes at<select value={schedule.day_start_hour} disabled={saveState.status === 'saving'} onChange={(event) => void persist({ day_start_hour: Number(event.target.value) })} className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 font-normal disabled:opacity-50">{Array.from({ length: 12 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}</select></label>
+            <label className="block text-sm font-semibold text-ink">Color sessions in the grid<select value={schedule.session_color_mode ?? 'room'} disabled={saveState.status === 'saving'} onChange={(event) => void persist({ session_color_mode: event.target.value as SessionColorMode })} className="mt-2 w-full rounded-field border border-line bg-surface px-3 py-2 font-normal disabled:opacity-50">{SESSION_COLOR_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select><span className="mt-1 block text-xs font-normal text-ink-soft">Sessions without an activity type keep their room color.</span></label>
+        </section>
         {canManageEditors ? <ProgramEditorsPanel eventId={eventId} /> : null}
         <PlannerRoster eventId={eventId} schedule={schedule} />
         <ScheduleImportPanel eventId={eventId} onApplied={async () => onSaved(await fetchAdminEventSchedule(eventId))} />
@@ -507,7 +562,7 @@ function ProgramEditorsPanel({ eventId }: { eventId: string }) {
     </section>;
 }
 
-function TimezoneCombobox({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
+function TimezoneCombobox({ value, options, onChange, onSelect }: { value: string; options: string[]; onChange: (value: string) => void; onSelect?: (value: string) => void }) {
     const inputId = useId();
     const listId = useId();
     const [open, setOpen] = useState(false);
@@ -515,7 +570,7 @@ function TimezoneCombobox({ value, options, onChange }: { value: string; options
     const [activeIndex, setActiveIndex] = useState(0);
     const query = value.trim().toLocaleLowerCase();
     const matches = filtering ? options.filter((option) => !query || option.toLocaleLowerCase().includes(query)) : options;
-    const select = (option: string) => { onChange(option); setFiltering(false); setOpen(false); };
+    const select = (option: string) => { onChange(option); onSelect?.(option); setFiltering(false); setOpen(false); };
     return <div>
         <label htmlFor={inputId} className="block text-sm font-semibold text-ink">Event timezone</label>
         <div className="relative mt-2" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
@@ -536,15 +591,6 @@ function TimezoneCombobox({ value, options, onChange }: { value: string; options
 
 function PlannerRoster({ eventId, schedule }: { eventId: string; schedule: AdminEventSchedule }) {
     const [open, setOpen] = useState(false);
-    return <section className="flex items-center gap-4 border-t border-line pt-6">
-        <Users size={20} className="shrink-0 text-ink-soft" />
-        <div className="min-w-0 flex-1"><h2 className="text-base font-bold text-ink">People with plans</h2><p className="mt-1 text-sm text-ink-soft">Review attendees who added sessions from this program.</p></div>
-        <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="shrink-0 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:border-action hover:text-action">View people</button>
-        {open ? <PlannerRosterDialog eventId={eventId} schedule={schedule} onClose={() => setOpen(false)} /> : null}
-    </section>;
-}
-
-function PlannerRosterDialog({ eventId, schedule, onClose }: { eventId: string; schedule: AdminEventSchedule; onClose: () => void }) {
     const [planners, setPlanners] = useState<SchedulePlanner[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -556,6 +602,15 @@ function PlannerRosterDialog({ eventId, schedule, onClose }: { eventId: string; 
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [eventId]);
+    return <section className="flex items-center gap-4 border-t border-line pt-6">
+        <Users size={20} className="shrink-0 text-ink-soft" />
+        <div className="min-w-0 flex-1"><h2 className="text-base font-bold text-ink">People with plans{loading || error ? '' : ` · ${planners.length}`}</h2><p className="mt-1 text-sm text-ink-soft">Review attendees who added sessions from this program.</p></div>
+        <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="shrink-0 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:border-action hover:text-action">View people</button>
+        {open ? <PlannerRosterDialog planners={planners} loading={loading} error={error} schedule={schedule} onClose={() => setOpen(false)} /> : null}
+    </section>;
+}
+
+function PlannerRosterDialog({ planners, loading, error, schedule, onClose }: { planners: SchedulePlanner[]; loading: boolean; error: string | null; schedule: AdminEventSchedule; onClose: () => void }) {
     return <Modal title="People with plans" onClose={onClose} sheetOnMobile><div>
         <p className="text-sm text-ink-soft">People who added at least one session from this program.</p>
         {loading ? <p className="py-8 text-center text-sm text-ink-soft">Loading planners…</p> : null}
@@ -658,6 +713,7 @@ function SessionEditor({ schedule, day, session, eventId, onClose, onSaved, onEr
     const [form, setForm] = useState({ title: session?.title ?? '', description: session?.description ?? '', contributors: session?.contributors ?? [], start: initialStart, end: initialEnd, room_ids: session ? sessionRoomIds(session) : [] as number[], venue_id: session?.venue_id?.toString() ?? '', level_id: session?.level_id?.toString() ?? '', activity_type_id: session?.activity_type_id?.toString() ?? '', attendee_note: session?.attendee_note ?? '', allow_plan: session?.allow_plan ?? true, is_cancelled: session?.is_cancelled ?? false });
     const [busy, setBusy] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const formId = useId();
     const startIso = form.start ? zonedInputToIso(form.start, schedule.timezone) : '';
     const endIso = form.end ? zonedInputToIso(form.end, schedule.timezone) : '';
     const draftSession = { ...session, id: session?.id ?? 'draft', start: startIso, end: endIso } as ScheduleSession;
@@ -683,9 +739,18 @@ function SessionEditor({ schedule, day, session, eventId, onClose, onSaved, onEr
         const body: ScheduleSessionInput = { title: form.title, instructors: null, description: form.description.trim() || null, contributors: form.contributors.map(({ contributor_id, role }) => ({ contributor_id, role })), start: startIso, end: endIso, room_id: orderedRoomIds[0] ?? null, room_ids: orderedRoomIds, venue_id: form.venue_id ? Number(form.venue_id) : null, level_id: form.level_id ? Number(form.level_id) : null, activity_type_id: form.activity_type_id ? Number(form.activity_type_id) : null, attendee_note: form.attendee_note || null, allow_plan: form.allow_plan, is_cancelled: form.is_cancelled };
         try { if (session) await updateScheduleSession(eventId, session.id, body); else await createScheduleSession(eventId, body); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not save session'); } finally { setBusy(false); }
     };
-    return <Modal title={session ? 'Edit session' : 'Add session'} onClose={onClose}><form onSubmit={submit} className="space-y-4">
+    const removeSession = async () => { if (!session) return; try { await deleteScheduleSession(eventId, session.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not delete session'); } };
+    const duplicateSession = async () => { if (!session) return; try { await duplicateScheduleSession(eventId, session.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not duplicate session'); } };
+    const footer = confirmDelete
+        ? <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">Delete this session?</p><div className="flex gap-2"><button type="button" onClick={() => setConfirmDelete(false)} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Keep</button><button type="button" onClick={() => void removeSession()} className="rounded-field bg-danger px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Delete session</button></div></div>
+        : <>
+            {conflicts.length ? <div role="status" className="mb-3 flex items-start gap-2 rounded-field border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900"><AlertTriangle size={16} aria-hidden="true" className="mt-0.5 shrink-0" /><p><strong>Scheduling conflict.</strong> This overlaps {conflicts.map((item) => item.title).join(', ')} in the same room. You may still save intentionally.</p></div> : null}
+            <div className="flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button><button type="submit" form={formId} disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Saving…' : conflicts.length ? 'Save anyway' : 'Save'}</button></div>
+        </>;
+    const menu = session ? <OverflowMenu label="Session actions" items={[{ label: 'Duplicate', onSelect: () => void duplicateSession() }, { label: 'Delete session', danger: true, onSelect: () => setConfirmDelete(true) }]} /> : null;
+    return <Modal title={session ? 'Edit session' : 'Add session'} onClose={onClose} headerAction={menu} footer={footer}><form id={formId} onSubmit={submit} className="space-y-4">
         <Field label="Title"><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={FIELD_CLASS} /></Field>
-        <Field label="Artists & instructors"><div className="space-y-2">{form.contributors.map((assignment, index) => <div key={`${assignment.contributor_id}-${index}`} className="grid grid-cols-[1fr_8rem_auto_auto_auto] gap-2"><select aria-label={`Contributor ${index + 1}`} value={assignment.contributor_id} onChange={(event) => setForm({ ...form, contributors: form.contributors.map((item, itemIndex) => itemIndex === index ? { ...item, contributor_id: Number(event.target.value) } : item) })} className={FIELD_CLASS}>{(schedule.contributors ?? []).map((contributor) => <option key={contributor.id} value={contributor.id}>{contributor.display_name}</option>)}</select><select aria-label={`Contributor ${index + 1} role`} value={assignment.role} onChange={(event) => setForm({ ...form, contributors: form.contributors.map((item, itemIndex) => itemIndex === index ? { ...item, role: event.target.value as ScheduleContributorRole } : item) })} className={FIELD_CLASS}>{(['instructor', 'dj', 'performer', 'host', 'other'] as ScheduleContributorRole[]).map((role) => <option key={role} value={role}>{role}</option>)}</select><button type="button" disabled={index === 0} aria-label={`Move contributor ${index + 1} up`} onClick={() => moveContributor(index, -1)} className="flex h-11 w-11 items-center justify-center text-ink-soft disabled:text-muted"><ChevronUp size={17} /></button><button type="button" disabled={index === form.contributors.length - 1} aria-label={`Move contributor ${index + 1} down`} onClick={() => moveContributor(index, 1)} className="flex h-11 w-11 items-center justify-center text-ink-soft disabled:text-muted"><ChevronDown size={17} /></button><button type="button" aria-label={`Remove contributor ${index + 1}`} onClick={() => setForm({ ...form, contributors: form.contributors.filter((_, itemIndex) => itemIndex !== index) })} className="flex h-11 w-11 items-center justify-center text-danger"><X size={17} /></button></div>)}<button type="button" disabled={!(schedule.contributors?.some((item) => !form.contributors.some((assignment) => assignment.contributor_id === item.id)))} onClick={() => { const contributor = schedule.contributors?.find((item) => !form.contributors.some((assignment) => assignment.contributor_id === item.id)); if (contributor) setForm({ ...form, contributors: [...form.contributors, { contributor_id: contributor.id, role: 'instructor', position: form.contributors.length }] }); }} className="flex min-h-11 items-center gap-2 text-sm font-semibold text-action disabled:text-muted"><Plus size={16} />Add artist or instructor</button></div></Field>
+        <Field label="Artists & instructors"><div className="space-y-2">{form.contributors.map((assignment, index) => <div key={`${assignment.contributor_id}-${index}`} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 sm:grid-cols-[1fr_8rem_auto_auto_auto]"><select aria-label={`Contributor ${index + 1}`} value={assignment.contributor_id} onChange={(event) => setForm({ ...form, contributors: form.contributors.map((item, itemIndex) => itemIndex === index ? { ...item, contributor_id: Number(event.target.value) } : item) })} className={FIELD_CLASS}>{(schedule.contributors ?? []).map((contributor) => <option key={contributor.id} value={contributor.id}>{contributor.display_name}</option>)}</select><select aria-label={`Contributor ${index + 1} role`} value={assignment.role} onChange={(event) => setForm({ ...form, contributors: form.contributors.map((item, itemIndex) => itemIndex === index ? { ...item, role: event.target.value as ScheduleContributorRole } : item) })} className={`${FIELD_CLASS} col-span-4 row-start-2 sm:col-span-1 sm:row-start-auto`}>{(['instructor', 'dj', 'performer', 'host', 'other'] as ScheduleContributorRole[]).map((role) => <option key={role} value={role}>{role}</option>)}</select><button type="button" disabled={index === 0} aria-label={`Move contributor ${index + 1} up`} onClick={() => moveContributor(index, -1)} className="flex h-11 w-11 items-center justify-center text-ink-soft disabled:text-muted"><ChevronUp size={17} /></button><button type="button" disabled={index === form.contributors.length - 1} aria-label={`Move contributor ${index + 1} down`} onClick={() => moveContributor(index, 1)} className="flex h-11 w-11 items-center justify-center text-ink-soft disabled:text-muted"><ChevronDown size={17} /></button><button type="button" aria-label={`Remove contributor ${index + 1}`} onClick={() => setForm({ ...form, contributors: form.contributors.filter((_, itemIndex) => itemIndex !== index) })} className="flex h-11 w-11 items-center justify-center text-danger"><X size={17} /></button></div>)}<button type="button" disabled={!(schedule.contributors?.some((item) => !form.contributors.some((assignment) => assignment.contributor_id === item.id)))} onClick={() => { const contributor = schedule.contributors?.find((item) => !form.contributors.some((assignment) => assignment.contributor_id === item.id)); if (contributor) setForm({ ...form, contributors: [...form.contributors, { contributor_id: contributor.id, role: 'instructor', position: form.contributors.length }] }); }} className="flex min-h-11 items-center gap-2 text-sm font-semibold text-action disabled:text-muted"><Plus size={16} />Add artist or instructor</button></div></Field>
         <div className="grid grid-cols-2 gap-3"><Field label="Start"><input required type="datetime-local" value={form.start} onChange={(event) => setForm({ ...form, start: event.target.value })} className={FIELD_CLASS} /></Field><Field label="End"><input required type="datetime-local" value={form.end} onChange={(event) => setForm({ ...form, end: event.target.value })} className={FIELD_CLASS} /></Field></div>
         <fieldset><legend className="text-sm font-semibold text-ink">Rooms</legend><div className="mt-1 flex flex-wrap gap-2">{schedule.rooms.map((room) => <label key={room.id} className="flex min-h-9 items-center gap-2 rounded-field border border-line px-3 text-sm text-ink"><input type="checkbox" checked={form.room_ids.includes(room.id)} onChange={(event) => toggleRoom(room.id, event.target.checked)} />{room.name}</label>)}</div><p className="mt-1 text-xs text-ink-soft">No room selected means event-wide. Several rooms make the session span those columns.</p></fieldset>
         <Field label="Venue"><select value={form.venue_id} onChange={(event) => setForm({ ...form, venue_id: event.target.value })} className={FIELD_CLASS}><option value="">No venue</option>{schedule.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></Field>
@@ -694,8 +759,6 @@ function SessionEditor({ schedule, day, session, eventId, onClose, onSaved, onEr
         <Field label="Attendee note"><textarea maxLength={500} value={form.attendee_note} onChange={(event) => setForm({ ...form, attendee_note: event.target.value })} className={`${FIELD_CLASS} min-h-20`} /></Field>
         <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={form.allow_plan} onChange={(event) => setForm({ ...form, allow_plan: event.target.checked })} />Attendees may add this to My Plan</label>
         {session ? <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={form.is_cancelled} onChange={(event) => setForm({ ...form, is_cancelled: event.target.checked })} />Mark session cancelled</label> : null}
-        {conflicts.length ? <div className="border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>Scheduling conflict.</strong> This overlaps {conflicts.map((item) => item.title).join(', ')} in the same room. You may still save intentionally.</div> : null}
-        <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4">{session ? <div className="flex gap-2"><button type="button" onClick={async () => { await duplicateScheduleSession(eventId, session.id); await onSaved(); }} className="rounded-field border border-line px-3 py-2 text-sm">Duplicate</button><button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await deleteScheduleSession(eventId, session.id); await onSaved(); }} className="rounded-field px-3 py-2 text-sm font-semibold text-danger">{confirmDelete ? 'Confirm delete' : 'Delete'}</button></div> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : conflicts.length ? 'Save anyway' : 'Save'}</button></div></div>
     </form></Modal>;
 }
 
@@ -723,6 +786,7 @@ function OverviewItemEditor({ schedule, day, item, parent, eventId, onClose, onS
     const startIso = form.start ? zonedInputToIso(form.start, tz) : '';
     const endIso = form.end ? zonedInputToIso(form.end, tz) : '';
     const formDay = startIso ? programDayOf(startIso, tz, schedule.day_start_hour) : day;
+    const formId = useId();
     const allItems = schedule.overview_items ?? [];
     const moments = item ? allItems.filter((row) => row.parent_id === item.id) : [];
     const parentOptions = allItems.filter((row) => !row.parent_id && row.id !== item?.id && programDayOf(row.start, tz, schedule.day_start_hour) === formDay);
@@ -753,7 +817,8 @@ function OverviewItemEditor({ schedule, day, item, parent, eventId, onClose, onS
         if (!item) return;
         try { await deleteScheduleOverviewItem(eventId, item.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not delete overview item'); }
     };
-    return <Modal title={item ? (isMoment ? 'Edit moment' : 'Edit overview item') : isMoment ? 'Add moment' : 'Add overview item'} onClose={onClose}><form onSubmit={submit} className="space-y-4">
+    const footer = <div className="flex flex-wrap justify-between gap-2">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="rounded-field px-3 py-2 text-sm font-semibold text-danger">{confirmDelete ? (moments.length ? `Confirm delete (and ${moments.length} ${moments.length === 1 ? 'moment' : 'moments'})` : 'Confirm delete') : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button><button type="submit" form={formId} disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button></div></div>;
+    return <Modal title={item ? (isMoment ? 'Edit moment' : 'Edit overview item') : isMoment ? 'Add moment' : 'Add overview item'} onClose={onClose} footer={footer}><form id={formId} onSubmit={submit} className="space-y-4">
         <Field label="Title"><input required maxLength={200} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={FIELD_CLASS} placeholder={isMoment ? 'Show performances' : 'Workshops'} /></Field>
         <Field label="Subtitle"><input maxLength={200} value={form.subtitle} onChange={(event) => setForm({ ...form, subtitle: event.target.value })} className={FIELD_CLASS} placeholder="Tagline shown under the title" /></Field>
         <Field label="Part of"><select value={form.parent_id} disabled={moments.length > 0} onChange={(event) => setForm({ ...form, parent_id: event.target.value, opens_detail: event.target.value ? false : form.opens_detail, allow_plan: event.target.value ? false : form.allow_plan })} className={FIELD_CLASS}><option value="">Top-level item</option>{parentOptions.map((row) => <option key={row.id} value={row.id}>{row.title} · {formatTimeRange(row, tz)}</option>)}</select>{moments.length ? <p className="mt-1 text-xs font-normal text-ink-soft">This item has moments, so it stays top-level.</p> : null}</Field>
@@ -765,7 +830,6 @@ function OverviewItemEditor({ schedule, day, item, parent, eventId, onClose, onS
         <Field label="Description"><textarea maxLength={2000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className={`${FIELD_CLASS} min-h-24`} /></Field>
         <div className="grid grid-cols-[2fr_1fr] gap-3"><Field label="Link"><input type="url" maxLength={500} value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} className={FIELD_CLASS} placeholder="https://" /></Field><Field label="Link label"><input maxLength={80} value={form.url_label} onChange={(event) => setForm({ ...form, url_label: event.target.value })} className={FIELD_CLASS} placeholder="More info" /></Field></div>
         {item ? <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={form.is_cancelled} onChange={(event) => setForm({ ...form, is_cancelled: event.target.checked })} />Mark cancelled</label> : null}
-        <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="rounded-field px-3 py-2 text-sm font-semibold text-danger">{confirmDelete ? (moments.length ? `Confirm delete (and ${moments.length} ${moments.length === 1 ? 'moment' : 'moments'})` : 'Confirm delete') : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button></div></div>
     </form></Modal>;
 }
 
@@ -788,10 +852,11 @@ function ConfigEditor({ schedule, eventId, kind, item, onClose, onSaved, onError
         } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not save item'); }
     };
     const remove = async () => { if (!item) return; try { if (kind === 'venue') await deleteScheduleVenue(eventId, item.id); if (kind === 'room') await deleteScheduleRoom(eventId, item.id); if (kind === 'level') await deleteScheduleLevel(eventId, item.id); if (kind === 'activity') await deleteScheduleActivityType(eventId, item.id); if (kind === 'contributor') await deleteScheduleContributor(eventId, item.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not delete item'); } };
-    return <Modal title={`${item ? 'Edit' : 'Add'} ${kind === 'activity' ? 'activity type' : kind}`} onClose={onClose}><div className="space-y-4"><Field label={kind === 'level' ? 'Label' : 'Name'}><input value={name} onChange={(event) => setName(event.target.value)} className={FIELD_CLASS} /></Field>{kind === 'venue' ? <Field label="Address"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} /></Field> : null}{kind === 'level' ? <Field label="Notation"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} placeholder="*, **, ***" /></Field> : null}{kind === 'room' ? <Field label="Details"><input maxLength={160} value={details} onChange={(event) => setDetails(event.target.value)} className={FIELD_CLASS} placeholder="Ground floor · Grand Pass only" /></Field> : null}{kind === 'room' ? <Field label="Venue"><select value={venueId} onChange={(event) => setVenueId(event.target.value)} className={FIELD_CLASS}><option value="">No venue</option>{schedule.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></Field> : null}{kind === 'room' || kind === 'activity' ? <Field label="Color"><div className="flex flex-wrap gap-2">{Object.keys(SCHEDULE_COLORS).map((value) => <button key={value} type="button" aria-label={value} onClick={() => setColor(value)} className={`h-9 w-9 border-2 ${scheduleColor(value).header} ${color === value ? 'border-action' : 'border-transparent'}`} />)}</div></Field> : null}<div className="flex justify-between border-t border-line pt-4">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-danger"><Trash2 size={16} />{confirmDelete ? 'Confirm delete' : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line px-3 py-2 text-sm">Cancel</button><button type="button" onClick={save} disabled={!name.trim()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save</button></div></div></div></Modal>;
+    const footer = <div className="flex justify-between gap-2">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-danger"><Trash2 size={16} />{confirmDelete ? 'Confirm delete' : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button><button type="button" onClick={save} disabled={!name.trim()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">Save</button></div></div>;
+    return <Modal title={`${item ? 'Edit' : 'Add'} ${kind === 'activity' ? 'activity type' : kind}`} onClose={onClose} footer={footer}><div className="space-y-4"><Field label={kind === 'level' ? 'Label' : 'Name'}><input value={name} onChange={(event) => setName(event.target.value)} className={FIELD_CLASS} /></Field>{kind === 'venue' ? <Field label="Address"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} /></Field> : null}{kind === 'level' ? <Field label="Notation"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} placeholder="*, **, ***" /></Field> : null}{kind === 'room' ? <Field label="Details"><input maxLength={160} value={details} onChange={(event) => setDetails(event.target.value)} className={FIELD_CLASS} placeholder="Ground floor · Grand Pass only" /></Field> : null}{kind === 'room' ? <Field label="Venue"><select value={venueId} onChange={(event) => setVenueId(event.target.value)} className={FIELD_CLASS}><option value="">No venue</option>{schedule.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></Field> : null}{kind === 'room' || kind === 'activity' ? <Field label="Color"><div className="flex flex-wrap gap-2">{Object.keys(SCHEDULE_COLORS).map((value) => <button key={value} type="button" aria-label={value} onClick={() => setColor(value)} className={`h-9 w-9 border-2 ${scheduleColor(value).header} ${color === value ? 'border-action' : 'border-transparent'}`} />)}</div></Field> : null}</div></Modal>;
 }
 
-function PublishDialog({ schedule, eventId, eventTitle, onClose, onPublished, onReverted }: { schedule: AdminEventSchedule; eventId: string; eventTitle: string; onClose: () => void; onPublished: () => Promise<void>; onReverted: (next: AdminEventSchedule) => void }) {
+function PublishDialog({ schedule: current, eventId, eventTitle, onClose, onPublished, onReverted }: { schedule: AdminEventSchedule; eventId: string; eventTitle: string; onClose: () => void; onPublished: () => Promise<void>; onReverted: (next: AdminEventSchedule) => void }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [revertingKey, setRevertingKey] = useState<string | null>(null);
@@ -800,12 +865,18 @@ function PublishDialog({ schedule, eventId, eventTitle, onClose, onPublished, on
     const [published, setPublished] = useState<SchedulePublishResponse | null>(null);
     const [pending, setPending] = useState<NotifyJob | null>(null);
     const [result, setResult] = useState<{ version: number; personal: number; totals: NotifyTotals | null } | null>(null);
+    // Keep showing the reviewed draft after publish reloads the (now empty) diff.
+    const [frozen, setFrozen] = useState<AdminEventSchedule | null>(null);
+    const schedule = frozen ?? current;
     const firstPublish = schedule.version == null;
     const changes = schedule.diff.changes;
+    const countOf = (operation: ScheduleChange['operation'], fallback: number) => changes
+        ? changes.filter((change) => change.operation === operation && (change.entity_type === 'session' || change.entity_type === 'overview_item')).length
+        : fallback;
     const liveSessions = schedule.sessions.filter((session) => !session.is_cancelled).length;
     const defaultMessage = firstPublish
-        ? liveSessions ? `The program is live: ${liveSessions} ${liveSessions === 1 ? 'session' : 'sessions'} over ${schedule.days.length} ${schedule.days.length === 1 ? 'day' : 'days'}. Build your plan.` : 'The program is live. Browse it and build your plan.'
-        : programUpdateMessage(changes ?? []);
+        ? liveSessions ? `${liveSessions} ${liveSessions === 1 ? 'session' : 'sessions'} over ${schedule.days.length} ${schedule.days.length === 1 ? 'day' : 'days'}. Build your plan.` : 'Browse the program and build your plan.'
+        : programUpdateMessage(changes ?? [], schedule.timezone);
     const draft = useNotifyDraft(eventId, firstPublish ? 'available' : 'updated', defaultMessage, firstPublish ? [] : preview?.impacted_user_ids ?? null);
     useEffect(() => {
         if (firstPublish || published) return;
@@ -824,9 +895,10 @@ function PublishDialog({ schedule, eventId, eventTitle, onClose, onPublished, on
     const publish = async () => {
         const job = pending ?? notifyJob(draft);
         setPending(job); setBusy(true); setError(null);
+        let value = published;
         try {
-            let value = published;
             if (!value) {
+                setFrozen(schedule);
                 value = await publishEventSchedule(eventId, { notifyImpactedPlanners: job.personal > 0 });
                 setPublished(value);
                 await onPublished();
@@ -834,26 +906,27 @@ function PublishDialog({ schedule, eventId, eventTitle, onClose, onPublished, on
             const totals = job.userIds.length ? await sendProgramNotification(eventId, job) : null;
             setResult({ version: value.version ?? 1, personal: value.notification_summary.impacted_planners, totals });
         } catch (reason) {
+            if (!value) setFrozen(null);
             setError(reason instanceof Error ? reason.message : published ? 'Could not send the notification' : 'Publish failed');
         } finally {
             setBusy(false);
         }
     };
-    if (result) return <Modal title={`Version ${result.version} is live`} onClose={onClose} sheetOnMobile><NotifyResult totals={result.totals} personal={result.personal} onClose={onClose} /></Modal>;
+    if (result) return <Modal title={`Version ${result.version} published`} onClose={onClose} footer={<DoneFooter onClose={onClose} />}><NotifyResult totals={result.totals} personal={result.personal} /></Modal>;
     const notifying = draft.enabled && draft.total > 0;
     const label = published ? (busy ? 'Sending…' : 'Retry sending') : busy ? 'Publishing…' : notifying ? `Publish & notify ${draft.total}` : 'Publish';
-    return <Modal title="Publish program" onClose={onClose} sheetOnMobile><div className="space-y-4">
+    const footer = <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">{published ? 'Close' : 'Cancel'}</button>
+        <button type="button" disabled={busy || (!published && !draft.canSend)} onClick={() => void publish()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{label}</button>
+    </div>;
+    return <Modal title="Publish program" onClose={onClose} footer={footer}><div className="space-y-4">
         <p className="text-sm text-ink-soft">{firstPublish ? 'Publishing makes this program visible to attendees.' : 'Publishing replaces the attendee program with this reviewed draft.'}</p>
-        <div className="grid grid-cols-3 gap-2 text-center"><DiffCount value={schedule.diff.added_session_ids.length} label="Added" /><DiffCount value={schedule.diff.removed_session_ids.length} label="Removed" /><DiffCount value={Object.keys(schedule.diff.changed_sessions).length} label="Changed" /></div>
+        <div className="grid grid-cols-3 gap-2 text-center"><DiffCount value={countOf('create', schedule.diff.added_session_ids.length)} label="Added" /><DiffCount value={countOf('remove', schedule.diff.removed_session_ids.length)} label="Removed" /><DiffCount value={countOf('update', Object.keys(schedule.diff.changed_sessions).length)} label="Changed" /></div>
         <ChangeDetails changes={changes ?? []} onRevert={firstPublish || published ? undefined : (change) => void revert(change)} revertingKey={revertingKey} />
         {revertError ? <p className="text-sm text-danger">{revertError}</p> : null}
         {schedule.issues.length ? <div><h3 className="text-sm font-bold text-ink">Warnings</h3><ul className="mt-2 space-y-2">{schedule.issues.map((issue, index) => <li key={`${issue.code}-${index}`} className="border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{issue.message}</li>)}</ul></div> : <p className="text-sm font-medium text-success">No schedule warnings.</p>}
-        {published ? <p className="text-sm font-medium text-success">Version {published.version} is live.</p> : <NotifyRow draft={draft} eventTitle={eventTitle} sample={preview?.sample_message} />}
+        {published ? <p className="text-sm font-medium text-success">Version {published.version} published.</p> : <NotifyRow draft={draft} eventTitle={eventTitle} sample={preview?.sample_message} />}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
-        <div className="flex justify-end gap-2 border-t border-line pt-4">
-            <button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">{published ? 'Close' : 'Cancel'}</button>
-            <button type="button" disabled={busy || (!published && !draft.canSend)} onClick={() => void publish()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{label}</button>
-        </div>
     </div></Modal>;
 }
 
@@ -892,8 +965,6 @@ function useNotifyDraft(eventId: string, reason: ProgramNotifyReason, defaultMes
     const [candidates, setCandidates] = useState<ProgramNotifyCandidate[] | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [enabled, setEnabled] = useState(true);
-    const [includeImpacted, setIncludeImpacted] = useState(true);
-    const [includeOthers, setIncludeOthers] = useState(true);
     const [customTitle, setCustomTitle] = useState<string | null>(null);
     const [customMessage, setCustomMessage] = useState<string | null>(null);
     useEffect(() => {
@@ -904,18 +975,20 @@ function useNotifyDraft(eventId: string, reason: ProgramNotifyReason, defaultMes
         return () => { cancelled = true; };
     }, [eventId]);
     const impacted = new Set(impactedIds ?? []);
-    const splitImpacted = includeImpacted && impacted.size > 0;
+    const [personalOn, setPersonalOn] = useState(true);
+    const [broadcastOn, setBroadcastOn] = useState(true);
+    const splitPersonal = personalOn && impacted.size > 0;
     // Planners whose sessions changed get a personal message instead of the broadcast.
-    const audience = (candidates ?? []).filter((row) => !splitImpacted || !impacted.has(row.user_id));
-    const recipients = enabled && includeOthers ? audience : [];
-    const personal = enabled && splitImpacted ? impacted.size : 0;
+    const audience = (candidates ?? []).filter((row) => !splitPersonal || !impacted.has(row.user_id));
+    const recipients = enabled && broadcastOn ? audience : [];
+    const personal = enabled && splitPersonal ? impacted.size : 0;
     const title = customTitle ?? NOTIFY_TITLES[reason];
     const message = (customMessage ?? defaultMessage).slice(0, NOTIFY_MAX_MESSAGE);
     const ready = Boolean(candidates) && impactedIds !== null;
     return {
         reason, loadError, ready, enabled, setEnabled,
-        impactedCount: impacted.size, includeImpacted, setIncludeImpacted, includeOthers, setIncludeOthers,
-        audience, recipients, personal, total: recipients.length + personal,
+        impactedCount: impacted.size, audienceCount: audience.length, personalOn, setPersonalOn, broadcastOn, setBroadcastOn,
+        recipients, personal, total: recipients.length + personal,
         title, setTitle: setCustomTitle, message, setMessage: setCustomMessage,
         canSend: !enabled || (ready && (!recipients.length || Boolean(title.trim() && message.trim()))),
     };
@@ -947,37 +1020,52 @@ function NotifyRow({ draft, eventTitle, sample }: { draft: NotifyDraft; eventTit
 }
 
 function NotifyComposer({ draft, eventTitle, sample }: { draft: NotifyDraft; eventTitle: string; sample?: string | null }) {
+    const [showOptedOut, setShowOptedOut] = useState(false);
     const optedOut = draft.recipients.filter((row) => !row.email_enabled && !row.push_enabled).length;
-    const chip = (active: boolean) => `flex min-h-9 shrink-0 items-center rounded-field border px-3 text-sm font-semibold ${active ? 'border-action bg-action text-white' : 'border-line bg-surface text-ink hover:bg-canvas'}`;
+    const everyoneLabel = `${draft.personalOn && draft.impactedCount ? 'Everyone else going' : 'Everyone going'} · ${draft.audienceCount}`;
     return <div className="mt-4 space-y-4">
-        {draft.impactedCount ? <div className="flex flex-wrap gap-2" role="group" aria-label="Audience">
-            <button type="button" aria-pressed={draft.includeImpacted} onClick={() => draft.setIncludeImpacted(!draft.includeImpacted)} className={chip(draft.includeImpacted)}>Plans affected · {draft.impactedCount}</button>
-            <button type="button" aria-pressed={draft.includeOthers} onClick={() => draft.setIncludeOthers(!draft.includeOthers)} className={chip(draft.includeOthers)}>{draft.includeImpacted ? 'Everyone else going' : 'Everyone going'} · {draft.audience.length}</button>
-        </div> : <p className="text-sm font-semibold text-ink">Everyone going · {draft.audience.length}</p>}
-        {optedOut ? <p className="text-xs text-ink-soft">{optedOut} turned off program emails and push, so they only get the in-app notification.</p> : null}
+        <div>
+            <div className="flex items-center justify-between gap-2">
+                {draft.impactedCount ? <div className="flex flex-wrap gap-2">
+                    <AudienceChip label={`Plan changed · ${draft.impactedCount}`} pressed={draft.personalOn} onToggle={() => draft.setPersonalOn(!draft.personalOn)} />
+                    <AudienceChip label={everyoneLabel} pressed={draft.broadcastOn} onToggle={() => draft.setBroadcastOn(!draft.broadcastOn)} />
+                </div> : <p className="text-sm font-semibold text-ink">{everyoneLabel}</p>}
+                {optedOut ? <button type="button" aria-expanded={showOptedOut} onClick={() => setShowOptedOut(!showOptedOut)} className="flex min-h-9 shrink-0 items-center gap-1 rounded-field px-2 text-xs font-semibold text-ink-soft hover:bg-canvas"><Info size={14} aria-hidden="true" />{optedOut} in-app only</button> : null}
+            </div>
+            {showOptedOut ? <p className="mt-1 text-xs text-ink-soft">{optedOut} turned off program emails and push, so they only get the in-app notification.</p> : null}
+        </div>
         {draft.recipients.length ? <>
             <Field label="Title"><input required maxLength={120} value={draft.title} onChange={(event) => draft.setTitle(event.target.value)} className={FIELD_CLASS} /></Field>
-            <Field label="Message"><textarea required maxLength={NOTIFY_MAX_MESSAGE} value={draft.message} onChange={(event) => draft.setMessage(event.target.value)} className={`${FIELD_CLASS} min-h-24`} placeholder="What should attendees know?" /></Field>
+            <Field label="Message"><textarea required maxLength={NOTIFY_MAX_MESSAGE} rows={6} value={draft.message} onChange={(event) => draft.setMessage(event.target.value)} className={`${FIELD_CLASS} min-h-32`} placeholder="What should attendees know?" /></Field>
+            <p className="-mt-3 text-right text-xs text-ink-soft">{draft.message.length}/{NOTIFY_MAX_MESSAGE}</p>
             <div className="rounded-card bg-canvas p-3" data-testid="notify-preview">
                 <p className="text-xs font-semibold uppercase text-ink-soft">Preview</p>
                 <p className="mt-2 text-sm font-semibold text-ink">{eventTitle}</p>
                 <p className="text-sm font-semibold text-ink">{draft.title || NOTIFY_TITLES[draft.reason]}</p>
                 <p className="whitespace-pre-line text-sm text-ink-soft">{draft.message}</p>
                 <p className="mt-2 text-xs text-ink-soft">Email subject: {eventTitle}: {draft.title}</p>
+                {draft.personal && sample ? <p className="mt-2 text-xs text-ink-soft">Plan changed: “{sample}”</p> : null}
             </div>
-        </> : null}
-        {draft.personal ? <p className="text-xs text-ink-soft">People whose plans changed get "Your plan changed" with their own sessions{sample ? `, e.g. "${sample}"` : ''}.</p> : null}
+        </> : draft.personal && sample ? <p className="rounded-card bg-canvas p-3 text-xs text-ink-soft" data-testid="notify-preview">Plan changed: “{sample}”</p> : null}
     </div>;
 }
 
-function NotifyResult({ totals, personal, onClose }: { totals: NotifyTotals | null; personal: number; onClose: () => void }) {
+function AudienceChip({ label, pressed, onToggle }: { label: string; pressed: boolean; onToggle: () => void }) {
+    return <button type="button" aria-pressed={pressed} onClick={onToggle} className={`flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-semibold ${pressed ? 'border-action bg-action/10 text-action' : 'border-line bg-surface text-ink-soft hover:bg-canvas'}`}>
+        {pressed ? <Check size={15} aria-hidden="true" /> : null}{label}
+    </button>;
+}
+
+function NotifyResult({ totals, personal }: { totals: NotifyTotals | null; personal: number }) {
+    const sent = (totals?.delivered ?? 0) + personal;
     return <div className="space-y-4">
-        {totals ? <p className="text-sm text-success">Sent to {totals.delivered} {totals.delivered === 1 ? 'person' : 'people'}.</p> : null}
-        {personal ? <p className="text-sm text-ink-soft">{personal} {personal === 1 ? 'person gets' : 'people get'} a personal "Your plan changed" message.</p> : null}
-        {totals ? <p className="text-sm text-ink-soft">{totals.emailed} {totals.emailed === 1 ? 'email' : 'emails'} · {totals.pushed} push · everyone also gets an in-app notification.{totals.skipped ? ` ${totals.skipped} skipped.` : ''}</p> : null}
-        {!totals && !personal ? <p className="text-sm text-ink-soft">Nobody was notified.</p> : null}
-        <div className="flex justify-end border-t border-line pt-4"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Done</button></div>
+        {sent ? <p className="text-sm text-success"> {sent} {sent === 1 ? 'person' : 'people'} notified {personal ? ` · ${personal} plan update` : ''}.</p> : <p className="text-sm text-ink-soft">Nobody was notified.</p>}
+        {totals ? <p className="text-sm text-ink-soft">{totals.emailed} {totals.emailed === 1 ? 'email' : 'emails'} · {totals.pushed} push · {totals.delivered} in-app.{totals.skipped ? ` ${totals.skipped} skipped.` : ''}</p> : null}
     </div>;
+}
+
+function DoneFooter({ onClose }: { onClose: () => void }) {
+    return <div className="flex justify-end"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Done</button></div>;
 }
 
 function ProgramNotifyDialog({ eventId, eventTitle, onClose }: { eventId: string; eventTitle: string; onClose: () => void }) {
@@ -995,17 +1083,17 @@ function ProgramNotifyDialog({ eventId, eventTitle, onClose }: { eventId: string
             setBusy(false);
         }
     };
-    if (sent) return <Modal title="Notify attendees" onClose={onClose} sheetOnMobile><NotifyResult totals={sent} personal={0} onClose={onClose} /></Modal>;
-    return <Modal title="Notify attendees" onClose={onClose} sheetOnMobile><div className="space-y-4">
+    if (sent) return <Modal title="Notify attendees" onClose={onClose} footer={<DoneFooter onClose={onClose} />}><NotifyResult totals={sent} personal={0} /></Modal>;
+    const footer = <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button>
+        <button type="button" disabled={busy || !draft.recipients.length || !draft.title.trim() || !draft.message.trim()} onClick={() => void send()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Sending…' : `Send to ${draft.recipients.length}`}</button>
+    </div>;
+    return <Modal title="Notify attendees" onClose={onClose} footer={footer}><div className="space-y-4">
         <p className="text-sm text-ink-soft">Send a message to people who plan to attend.</p>
         {draft.loadError ? <p className="text-sm text-danger">{draft.loadError}</p> : null}
         {!draft.ready && !draft.loadError ? <p className="text-sm text-ink-soft">Loading recipients…</p> : null}
         {draft.ready ? <NotifyComposer draft={draft} eventTitle={eventTitle} /> : null}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
-        <div className="flex justify-end gap-2 border-t border-line pt-4">
-            <button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button>
-            <button type="button" disabled={busy || !draft.recipients.length || !draft.title.trim() || !draft.message.trim()} onClick={() => void send()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Sending…' : `Send to ${draft.recipients.length}`}</button>
-        </div>
     </div></Modal>;
 }
 
@@ -1032,20 +1120,38 @@ function VisibilityDialog({ action, eventId, eventTitle, onClose, onChange }: { 
             setBusy(false);
         }
     };
-    if (result) return <Modal title={copy.done} onClose={onClose} sheetOnMobile><NotifyResult totals={result.totals} personal={0} onClose={onClose} /></Modal>;
+    if (result) return <Modal title={copy.done} onClose={onClose} footer={<DoneFooter onClose={onClose} />}><NotifyResult totals={result.totals} personal={0} /></Modal>;
     const label = changed ? (busy ? 'Sending…' : 'Retry sending') : busy ? copy.busy : draft.enabled && draft.total ? `${copy.verb} & notify ${draft.total}` : copy.verb;
-    return <Modal title={copy.heading} onClose={onClose} sheetOnMobile><div className="space-y-4">
+    const footer = <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">{changed ? 'Close' : 'Cancel'}</button>
+        <button type="button" disabled={busy || (!changed && !draft.canSend)} onClick={() => void confirm()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{label}</button>
+    </div>;
+    return <Modal title={copy.heading} onClose={onClose} footer={footer}><div className="space-y-4">
         <p className="text-sm text-ink-soft">{copy.intro}</p>
         {changed ? <p className="text-sm font-medium text-success">{copy.done}.</p> : <NotifyRow draft={draft} eventTitle={eventTitle} />}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
-        <div className="flex justify-end gap-2 border-t border-line pt-4">
-            <button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">{changed ? 'Close' : 'Cancel'}</button>
-            <button type="button" disabled={busy || (!changed && !draft.canSend)} onClick={() => void confirm()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{label}</button>
-        </div>
     </div></Modal>;
 }
 
-function PreviewDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) { const url = `/event/${eventId}/program?preview=draft&embed=program`; return <Modal title="Preview as attendee" onClose={onClose} wide><div className="flex flex-col items-center gap-3"><iframe title="Draft attendee preview" src={url} className="h-[68vh] w-[390px] max-w-full border border-line bg-surface" /><a href={`/event/${eventId}/program?preview=draft`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-semibold text-action">Open in new tab <ExternalLink size={15} /></a></div></Modal>; }
+function PreviewDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) {
+    const url = `/event/${eventId}/program?preview=draft&embed=program`;
+    return <Modal title="Preview as attendee" onClose={onClose} wide footer={<a href={`/event/${eventId}/program?preview=draft`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-1 text-sm font-semibold text-action">Open in new tab <ExternalLink size={15} /></a>}>
+        <div className="flex justify-center"><iframe title="Draft attendee preview" src={url} className="h-[70dvh] w-[390px] max-w-full rounded-card border-4 border-ink bg-surface sm:h-[72vh]" /></div>
+    </Modal>;
+}
+
+function OverflowMenu({ label, items }: { label: string; items: Array<{ label: string; onSelect: () => void; danger?: boolean; icon?: React.ReactNode }> }) {
+    const [open, setOpen] = useState(false);
+    return <div className="relative">
+        <button type="button" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} className="flex h-11 w-11 items-center justify-center rounded-field text-ink-soft hover:bg-canvas"><MoreHorizontal size={20} /></button>
+        {open ? <>
+            <button type="button" aria-hidden="true" tabIndex={-1} className="fixed inset-0 z-[11001] cursor-default" onClick={() => setOpen(false)} />
+            <div role="menu" aria-label={label} className="absolute right-0 top-full z-[11002] mt-1 min-w-48 overflow-hidden rounded-card border border-card-line bg-surface py-1 shadow-xl">
+                {items.map((item) => <button key={item.label} type="button" role="menuitem" onClick={() => { setOpen(false); item.onSelect(); }} className={`flex min-h-11 w-full items-center gap-2 px-4 text-left text-sm font-semibold hover:bg-canvas ${item.danger ? 'text-danger' : 'text-ink'}`}>{item.icon}{item.label}</button>)}
+            </div>
+        </> : null}
+    </div>;
+}
 
 const changeKey = (change: ScheduleChange) => `${change.entity_type}-${change.operation}-${change.entity_id}`;
 
@@ -1064,8 +1170,20 @@ function supportedTimezones(current: string): string[] {
     return [...new Set(['UTC', current, ...values])].sort((left, right) => left.localeCompare(right));
 }
 
-function Modal({ title, onClose, wide = false, sheetOnMobile = false, children }: { title: string; onClose: () => void; wide?: boolean; sheetOnMobile?: boolean; children: React.ReactNode }) { useBackToClose(onClose); return <div className={`fixed inset-0 z-[11000] flex bg-black/50 ${sheetOnMobile ? 'items-end justify-center p-0 sm:items-center sm:p-4' : 'items-center justify-center p-4'}`} onClick={onClose}><div role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()} className={`${sheetOnMobile ? 'max-h-[85dvh] rounded-t-card sm:max-h-[92vh] sm:rounded-card' : 'max-h-[92vh] rounded-card'} overflow-y-auto bg-surface p-5 shadow-2xl ${wide ? 'w-auto max-w-4xl' : 'w-full max-w-xl'}`}><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-bold text-ink">{title}</h2><button type="button" onClick={onClose} className="h-11 w-11 text-ink-soft" aria-label="Close">×</button></div>{children}</div></div>; }
+function Modal({ title, onClose, wide = false, sheetOnMobile = true, headerAction, footer, children }: { title: string; onClose: () => void; wide?: boolean; sheetOnMobile?: boolean; headerAction?: React.ReactNode; footer?: React.ReactNode; children: React.ReactNode }) {
+    useBackToClose(onClose);
+    return <div className={`fixed inset-0 z-[11000] flex bg-black/50 ${sheetOnMobile ? 'items-end justify-center p-0 sm:items-center sm:p-4' : 'items-center justify-center p-4'}`} onClick={onClose}>
+        <div role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()} className={`flex flex-col overflow-hidden bg-surface shadow-2xl ${sheetOnMobile ? 'max-h-[92dvh] rounded-t-card sm:max-h-[92vh] sm:rounded-card' : 'max-h-[92vh] rounded-card'} ${wide ? 'w-full max-w-4xl sm:w-auto' : 'w-full max-w-xl'}`}>
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line py-2 pl-5 pr-2">
+                <h2 className="min-w-0 truncate text-lg font-bold text-ink">{title}</h2>
+                <div className="flex shrink-0 items-center">{headerAction}<button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center text-ink-soft" aria-label="Close"><X size={20} /></button></div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+            {footer ? <div className="shrink-0 border-t border-line bg-surface px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3">{footer}</div> : null}
+        </div>
+    </div>;
+}
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block text-sm font-semibold text-ink">{label}<div className="mt-1">{children}</div></label>; }
-function DiffCount({ value, label }: { value: number; label: string }) { return <div className="bg-canvas p-3"><p className="text-xl font-bold text-ink">{value}</p><p className="text-xs text-ink-soft">{label}</p></div>; }
+function DiffCount({ value, label }: { value: number; label: string }) { return <div className="bg-canvas px-3 py-2 text-sm text-ink-soft"><span className="font-bold text-ink">{value}</span> {label}</div>; }
 function AdminState({ text }: { text: string }) { return <div className="flex min-h-full items-center justify-center bg-canvas p-6 text-sm text-ink-soft">{text}</div>; }
 function ProgramEditorAccessDenied({ onBack }: { onBack: () => void }) { return <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-canvas p-6 text-center"><h1 className="text-lg font-bold text-ink">Program editor access required</h1><p className="text-sm text-ink-soft">You no longer have permission to edit this event program.</p><button type="button" onClick={onBack} className="text-sm font-semibold text-action">Back to program</button></div>; }
