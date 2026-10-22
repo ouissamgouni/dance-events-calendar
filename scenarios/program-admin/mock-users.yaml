@@ -3,6 +3,12 @@ users:
     name: Dev Admin
     handle: admin
     account_visibility: public
+  - email: organizer@example.com
+    name: Olive Organizer
+    handle: olive
+    bio: Runs Winter Salsa Fest.
+    instagram_url: https://instagram.com/olive
+    account_visibility: public
   - email: dancer@example.com
     name: Maya Dancer
     handle: maya

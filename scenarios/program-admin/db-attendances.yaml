@@ -16,3 +16,16 @@ attendances:
   - event_id: prague-salsa-weekender
     email: weekender-planner@example.com
     share_audience: public
+
+  # Going with a plan.
+  - event_id: winter-salsa-fest-2026
+    email: dancer@example.com
+    share_audience: public
+  # Going without a plan.
+  - event_id: winter-salsa-fest-2026
+    email: going-no-plan@example.com
+    share_audience: public
+  # Going, but program emails and push are turned off.
+  - event_id: winter-salsa-fest-2026
+    email: quiet-going@example.com
+    share_audience: public

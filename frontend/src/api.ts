@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanCount, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleContributor, ScheduleSession, ScheduleOverviewItem, ScheduleImportDocument, ScheduleImportPreview, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee, OverviewItemAttendanceSummary, SessionColorMode } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesDetectionSettings, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse, EventSchedule, AdminEventSchedule, MyPlanCount, MyPlanEntry, MyPlanResponse, ProgramExport, ScheduleVenue, ScheduleRoom, ScheduleLevel, ScheduleActivityType, ScheduleContributor, ScheduleSession, ScheduleOverviewItem, ScheduleImportDocument, ScheduleImportPreview, ScheduleChange, SessionAttendanceSummary, SessionAttendanceSummaryBatch, SessionPlanAttendee, OverviewItemAttendanceSummary, SessionColorMode } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 import type { AdminEventNotificationStats, SharedMyPlanResponse } from './types';
 import type { ReviewHomePrompt, ReviewSentiment, SimilarEvents } from './types';
@@ -430,8 +430,59 @@ export interface SchedulePublishResponse extends EventSchedule {
     };
 }
 
-export async function publishEventSchedule(eventId: string, notifyAllGoing = false): Promise<SchedulePublishResponse> {
-    return scheduleRequest<SchedulePublishResponse>(eventId, '/publish', 'POST', { notify_all_going: notifyAllGoing });
+export async function publishEventSchedule(eventId: string, options: { notifyImpactedPlanners?: boolean } = {}): Promise<SchedulePublishResponse> {
+    return scheduleRequest<SchedulePublishResponse>(eventId, '/publish', 'POST', { auto_announce: false, notify_impacted_planners: options.notifyImpactedPlanners ?? true });
+}
+
+export interface SchedulePublishPreview {
+    impacted_user_ids: string[];
+    sample_message: string | null;
+}
+
+export async function fetchSchedulePublishPreview(eventId: string): Promise<SchedulePublishPreview> {
+    return scheduleRequest<SchedulePublishPreview>(eventId, '/publish-preview', 'GET');
+}
+
+export interface ProgramNotifyCandidate {
+    user_id: string;
+    email: string;
+    name: string | null;
+    handle: string | null;
+    email_enabled: boolean;
+    push_enabled: boolean;
+    has_push_subscription: boolean;
+    already_notified: boolean;
+    is_going: boolean;
+    has_plan: boolean;
+}
+
+export type ProgramNotifyReason = 'available' | 'updated' | 'under_work' | 'back' | 'custom';
+
+export interface ProgramNotifyResponse {
+    emailed: number;
+    pushed: number;
+    in_app_created: number;
+    results: Array<{ user_id: string; email: string; status: string; email_status: string; push_status: string }>;
+}
+
+export async function fetchProgramNotifyCandidates(eventId: string): Promise<ProgramNotifyCandidate[]> {
+    return scheduleRequest<ProgramNotifyCandidate[]>(eventId, '/notify-program-candidates', 'GET');
+}
+
+export async function notifyProgram(eventId: string, body: { user_ids: string[]; reason: ProgramNotifyReason; title: string; message: string }): Promise<ProgramNotifyResponse> {
+    return scheduleRequest<ProgramNotifyResponse>(eventId, '/notify-program', 'POST', body);
+}
+
+export async function unpublishEventSchedule(eventId: string): Promise<{ unpublished_at: string | null }> {
+    return scheduleRequest<{ unpublished_at: string | null }>(eventId, '/unpublish', 'POST');
+}
+
+export async function deleteEventSchedule(eventId: string, confirmTitle: string): Promise<void> {
+    return scheduleRequest<void>(eventId, `?confirm_title=${encodeURIComponent(confirmTitle)}`, 'DELETE');
+}
+
+export async function republishEventSchedule(eventId: string): Promise<{ unpublished_at: string | null }> {
+    return scheduleRequest<{ unpublished_at: string | null }>(eventId, '/republish', 'POST');
 }
 
 export interface SchedulePlanner {
@@ -460,7 +511,8 @@ export interface EventScheduleEditor {
     email: string;
     name: string | null;
     handle: string | null;
-    granted_at: string;
+    granted_at: string | null;
+    is_organizer?: boolean;
 }
 
 export async function fetchScheduleEditors(eventId: string): Promise<EventScheduleEditor[]> {
@@ -579,17 +631,27 @@ export async function previewScheduleImport(eventId: string, mode: 'merge' | 're
     return scheduleRequest<ScheduleImportPreview>(eventId, '/import-preview', 'POST', { mode, document });
 }
 
-export async function applyScheduleImport(eventId: string, mode: 'merge' | 'replace', document: ScheduleImportDocument): Promise<ScheduleImportPreview> {
-    return scheduleRequest<ScheduleImportPreview>(eventId, '/import', 'POST', { mode, document });
+export async function applyScheduleImport(eventId: string, mode: 'merge' | 'replace', document: ScheduleImportDocument, exclude: ScheduleChange[] = []): Promise<ScheduleImportPreview> {
+    return scheduleRequest<ScheduleImportPreview>(eventId, '/import', 'POST', { mode, document, exclude });
+}
+
+export async function revertScheduleChange(eventId: string, change: ScheduleChange): Promise<AdminEventSchedule> {
+    return scheduleRequest<AdminEventSchedule>(eventId, '/revert-change', 'POST', change);
 }
 
 async function scheduleRequest<T>(eventId: string, path: string, method: string, body?: object): Promise<T> {
-    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/schedule${path}`, {
-        method,
-        credentials: 'include',
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
-        body: body ? JSON.stringify(body) : undefined,
-    });
+    let res: Response;
+    try {
+        res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/schedule${path}`, {
+            method,
+            credentials: 'include',
+            headers: body ? { 'Content-Type': 'application/json' } : undefined,
+            body: body ? JSON.stringify(body) : undefined,
+        });
+    } catch {
+        // Unhandled server errors arrive without CORS headers, so the browser reports them as network failures.
+        throw new Error('The server did not respond. Check your connection and try again; if it keeps failing, report it with the JSON you used.');
+    }
     return parseJsonResponse<T>(res, 'Schedule update failed');
 }
 
@@ -6163,6 +6225,25 @@ export async function triggerSeriesScan(): Promise<SeriesScanLogEntry> {
         credentials: 'include',
     });
     return parseJsonResponse<SeriesScanLogEntry>(res, 'Failed to trigger series scan');
+}
+
+export async function fetchSeriesDetectionSettings(): Promise<SeriesDetectionSettings> {
+    const res = await fetch(`${BASE}/admin/series/settings`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<SeriesDetectionSettings>(res, 'Failed to fetch detection settings');
+}
+
+export async function updateSeriesDetectionSettings(
+    updates: Partial<SeriesDetectionSettings>,
+): Promise<SeriesDetectionSettings> {
+    const res = await fetch(`${BASE}/admin/series/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(updates),
+    });
+    return parseJsonResponse<SeriesDetectionSettings>(res, 'Failed to save detection settings');
 }
 
 export async function groupEventsAsSeries(

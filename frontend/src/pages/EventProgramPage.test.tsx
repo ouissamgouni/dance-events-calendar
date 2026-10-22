@@ -33,7 +33,7 @@ vi.mock('../context/PwaInstallContext', () => ({
     usePwaInstall: () => ({ requestInstallInvitation }),
 }));
 vi.mock('../utils/download', () => ({ saveDownload: vi.fn() }));
-vi.mock('../utils/tracking', () => ({ trackProgramViewed: vi.fn() }));
+vi.mock('../utils/tracking', () => ({ trackProgramViewed: vi.fn(), trackLink: vi.fn(), trackShareAction: vi.fn() }));
 
 const event: CalendarEvent = {
     event_id: 'movida-2026', calendar_id: 'calendar-1', title: 'Movida 2026', description: null,
@@ -473,6 +473,28 @@ describe('EventProgramPage', () => {
         expect(screen.queryByRole('button', { name: 'Back to event' })).not.toBeInTheDocument();
         expect(screen.queryByText(/Draft preview/)).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'My Plan' })).not.toBeInTheDocument();
+    });
+
+    it('explains an unpublished program instead of a generic error', async () => {
+        vi.mocked(fetchEventSchedule).mockRejectedValue(new Error('Published schedule not found'));
+        vi.mocked(fetchEvent).mockResolvedValue({ ...event, schedule_under_work: true });
+        renderPage('/event/movida-2026/program');
+
+        expect(await screen.findByText('Program under work')).toBeInTheDocument();
+        expect(screen.queryByText('Published schedule not found')).not.toBeInTheDocument();
+    });
+
+    it('shares a link to the current program view and day', async () => {
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+        renderPage('/event/movida-2026/program');
+
+        const share = await screen.findByRole('button', { name: 'Copy link' });
+        expect(share).toHaveClass('ml-auto');
+        expect(screen.queryByRole('banner')?.contains(share) ?? false).toBe(false);
+        fireEvent.click(share);
+
+        await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\/event\/movida-2026\/program\?view=schedule&day=\d{4}-\d{2}-\d{2}$/)));
     });
 
     it('offers editor navigation only to an authorized signed-in user', async () => {

@@ -4,6 +4,7 @@ import type { CalendarEvent } from '../types';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import EventSummary, { type EventDetailTab } from './EventSummary';
 import EventActions from './event-summary/EventActions';
+import OrganizerStrip from './OrganizerStrip';
 import ProgramAction from './ProgramAction';
 import TicketAction from './TicketAction';
 
@@ -123,6 +124,7 @@ export default function EventDetailsPanel({
                 />
             </div>
             <div className="border-t border-card-line bg-surface">
+                <OrganizerStrip event={event} onNavigate={onClose} className="mx-3 mt-3 sm:mx-4" />
                 <div className="flex flex-nowrap items-center gap-2 px-3 py-3 sm:px-4">
                     {eventScheduleEnabled && event.schedule_published ? (
                         <ProgramAction event={event} variant="full" onNavigate={onClose} />
@@ -146,6 +148,7 @@ export default function EventDetailsPanel({
                         shareUrl={shareUrl}
                         onPostMessage={() => goToTab('discussion')}
                         onAdminEdit={onEdit ? () => onEdit(event) : undefined}
+                        onNavigate={onClose}
                     />
                 </div>
             </div>

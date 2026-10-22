@@ -70,22 +70,20 @@ export default function SummaryHeader({ event, variant }: Props) {
                     {event.organizer && (
                         <a
                             href={event.organizer.handle ? `/u/${event.organizer.handle}` : undefined}
-                            className="inline-flex max-w-full items-center gap-1.5 bg-canvas px-2 py-1 text-xs text-ink hover:bg-line"
+                            className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-xs text-ink hover:underline"
                             data-testid="event-organizer-pill"
                         >
-                            {event.organizer.avatar_url && (
-                                // eslint-disable-next-line no-restricted-syntax -- circular avatar
-                                <img src={event.organizer.avatar_url} alt="" className="h-4 w-4 shrink-0 rounded-full object-cover" />
-                            )}
-                            <span className="min-w-0 truncate">
-                                Organized by{' '}
-                                <span className="font-semibold">
-                                    {event.organizer.handle ? `@${event.organizer.handle}` : event.organizer.display_name ?? 'organizer'}
-                                </span>
-                            </span>
                             {event.organizer.is_verified_organizer && (
                                 <img src="/orga.png" alt="Verified organizer" title="Verified organizer" className="h-3.5 w-3.5 shrink-0 object-contain" />
                             )}
+                            <span className="shrink-0 whitespace-nowrap">Organized by</span>
+                            {event.organizer.avatar_url && (
+                                // eslint-disable-next-line no-restricted-syntax -- circular avatar
+                                <img src={event.organizer.avatar_url} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                            )}
+                            <span className="min-w-0 truncate font-semibold">
+                                {event.organizer.display_name ?? (event.organizer.handle ? `@${event.organizer.handle}` : 'organizer')}
+                            </span>
                         </a>
                     )}
                 </div>

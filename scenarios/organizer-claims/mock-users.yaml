@@ -4,6 +4,7 @@ users:
   - email: organizer@example.com
     name: Olive Organizer
     handle: olive
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Olive%20Organizer
     bio: Festival organiser & DJ. Running socials across EU since 2018.
     instagram_url: https://instagram.com/olive
     facebook_url: https://facebook.com/olive

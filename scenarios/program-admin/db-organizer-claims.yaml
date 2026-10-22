@@ -1,0 +1,12 @@
+# Olive is the verified organizer of Winter Salsa Fest, so she edits its program without an explicit grant.
+organizer_claims:
+  - submitter_email: organizer@example.com
+    kind: badge
+    grant_badge: true
+    status: approved
+  - submitter_email: organizer@example.com
+    kind: events
+    status: approved
+    events:
+      - event_id: winter-salsa-fest-2026
+        decision: approved

@@ -915,3 +915,32 @@ def test_hosting_lists_organized_events(client, session, events, flag_on):
     public = client.get("/api/social/users/olive/hosting")
     assert public.status_code == 200, public.text
     assert public.json()["total"] == 1
+
+
+@pytest.mark.unit
+def test_event_lists_expose_approved_organizer(client, session, events, flag_on):
+    """Explorer list and search-overlay modals render from these payloads."""
+    session.add(CalendarSetting(calendar_id="cal-1", name="Cal 1", enabled=True))
+    assert _login(client, email="org@example.com").status_code == 200
+    user = _set_profile(session, "org@example.com", verified=True)
+    user.handle = "olive"
+    session.add(user)
+    events[0].organizer_user_id = user.id
+    session.add(events[0])
+    session.commit()
+
+    by_ids = client.post(
+        "/api/events/by-ids",
+        json={"event_ids": [events[0].event_id, events[1].event_id]},
+    )
+    assert by_ids.status_code == 200, by_ids.text
+    rows = {e["event_id"]: e for e in by_ids.json()}
+    assert rows[events[0].event_id]["organizer"]["user_id"] == str(user.id)
+    assert rows[events[0].event_id]["organizer"]["handle"] == "olive"
+    assert rows[events[1].event_id]["organizer"] is None
+
+    listing = client.get("/api/events")
+    assert listing.status_code == 200, listing.text
+    rows = {e["event_id"]: e for e in listing.json()}
+    assert rows[events[0].event_id]["organizer"]["user_id"] == str(user.id)
+    assert rows[events[1].event_id]["organizer"] is None

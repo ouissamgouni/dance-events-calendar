@@ -175,4 +175,45 @@ describe('SeriesPanel', () => {
 
         expect(await screen.findByText(/3 candidates found, 1 group created/)).toBeInTheDocument()
     })
+
+    it('edits detection settings in the settings tab', async () => {
+        const settings = {
+            auto_detect_enabled: false,
+            title_similarity_pct: 72,
+            max_gap_days: 395,
+            venue_radius_m: 300,
+            max_distance_km: 50,
+            cross_calendar_enabled: true,
+            join_resolved_enabled: true,
+            generic_title_words: ['salsa', 'festival'],
+        }
+        let saved: Record<string, unknown> | null = null
+        server.use(
+            http.get('*/api/admin/series', () => HttpResponse.json({ items: [], total: 0 })),
+            http.get('*/api/admin/series/settings', () => HttpResponse.json(settings)),
+            http.put('*/api/admin/series/settings', async ({ request }) => {
+                saved = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json({ ...settings, ...saved, generic_title_words: ['salsa'] })
+            }),
+        )
+
+        const user = userEvent.setup()
+        render(<SeriesPanel isOpen onClose={vi.fn()} />)
+
+        await user.click(screen.getByRole('button', { name: 'settings' }))
+        const threshold = await screen.findByLabelText('Title similarity (%)')
+
+        await user.clear(threshold)
+        await user.type(threshold, '20')
+        expect(screen.getByText('Enter a whole number between 50 and 100')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled()
+
+        await user.clear(threshold)
+        await user.type(threshold, '85')
+        await user.click(screen.getByLabelText('Match events across calendars'))
+        await user.click(screen.getByRole('button', { name: 'Save settings' }))
+
+        expect(await screen.findByText('Saved')).toBeInTheDocument()
+        expect(saved).toMatchObject({ title_similarity_pct: 85, cross_calendar_enabled: false })
+    })
 })

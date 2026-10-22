@@ -559,7 +559,7 @@ export default function NotificationRow({
         body = (
             <>
                 <p className={specialTitle}>
-                    <span className="font-medium text-ink">Program update</span>
+                    <span className="font-medium text-ink">Your plan changed</span>
                     {item.event_title && <span className="text-ink-soft"> · {item.event_title}</span>}
                 </p>
                 {item.description && <p className={descClass}>{item.description}</p>}
@@ -611,10 +611,11 @@ export default function NotificationRow({
         body = (
             <>
                 <p className={specialTitle}>
-                    <span className="font-medium text-ink">{item.kind === 'schedule_program_available' ? 'Program now available' : 'Program updated'}</span>
+                    {/* Editor-sent notices store their title in context; publication rows store a session count. */}
+                    <span className="font-medium text-ink">{item.context && !/^\d+$/.test(item.context) ? item.context : item.kind === 'schedule_program_available' ? 'Program now available' : 'Program updated'}</span>
                     {item.event_title && <span className="text-ink-soft"> · {item.event_title}</span>}
                 </p>
-                {item.description && <p className={descClass}>{item.description}</p>}
+                {item.description && <p className={`${descClass} whitespace-pre-line`}>{item.description}</p>}
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
             </>
         );

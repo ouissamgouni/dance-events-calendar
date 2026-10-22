@@ -12,6 +12,7 @@ blocks any member — every occurrence stays independently visible.
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -23,6 +24,8 @@ from backend.api.schemas import (
     ManualSeriesGroupRequest,
     SeriesAddMembersRequest,
     SeriesApproveRequest,
+    SeriesDetectionSettings,
+    SeriesDetectionSettingsUpdate,
     SeriesEventSummary,
     SeriesGroupListResponse,
     SeriesGroupResponse,
@@ -46,8 +49,10 @@ from backend.services.series_detection import (
     create_manual_series,
     dismiss_series,
     get_series_for_event,
+    load_config,
     rename_series,
     run_full_scan,
+    save_config,
     split_member,
 )
 
@@ -156,6 +161,24 @@ def list_series_scan_history(
         for row in rows
     ]
     return SeriesScanLogListResponse(items=items, total=len(items))
+
+
+@router.get("/series/settings", response_model=SeriesDetectionSettings)
+def get_series_detection_settings(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    return SeriesDetectionSettings(**asdict(load_config(session)))
+
+
+@router.put("/series/settings", response_model=SeriesDetectionSettings)
+def update_series_detection_settings(
+    body: SeriesDetectionSettingsUpdate,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    cfg = save_config(session, body.model_dump(exclude_none=True))
+    return SeriesDetectionSettings(**asdict(cfg))
 
 
 @router.post("/series/scan", response_model=SeriesScanLogEntry)

@@ -23,6 +23,7 @@ from backend.api.schemas import (
     EventSearchDateScope,
     EventSearchResponse,
 )
+from backend.api.event_serializer import organizer_minis_by_event
 from backend.api.routes.tags import get_event_tags
 from backend.db.database import get_session
 from backend.db.models import (
@@ -55,7 +56,10 @@ from backend.services.event_visibility import (
 )
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
 from backend.services.profile_geography import profile_contains_point
-from backend.services.schedules import published_schedule_event_ids
+from backend.services.schedules import (
+    published_schedule_event_ids,
+    unpublished_schedule_event_ids,
+)
 from backend.services.user_avatars import resolve_user_avatar
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -937,6 +941,7 @@ def get_events(
         "ticket_likely_min_hours", feature_settings.get("ticket_likely_min_hours")
     )
     series_keys = _series_keys(session, events)
+    organizer_by_event = organizer_minis_by_event(session, events)
     data = [
         EventResponse(
             event_id=e.event_id,
@@ -955,6 +960,7 @@ def get_events(
             longitude=e.longitude,
             color=color_map.get(e.calendar_id),
             series_key=series_keys.get(e.event_id),
+            organizer=organizer_by_event.get(e.event_id),
             view_count=view_counts.get(e.event_id, 0),
             going_count=going_counts.get(e.event_id, 0),
             saved_count=saved_counts.get(e.event_id, 0),
@@ -1324,6 +1330,7 @@ def get_events_by_ids(
         ).all()
         events_with_promos = {row for row in promo_rows}
 
+    organizer_by_event = organizer_minis_by_event(session, events)
     ticket_hours = event_assets.ticket_min_hours(session)
     return [
         EventResponse(
@@ -1364,6 +1371,7 @@ def get_events_by_ids(
             **event_assets.ticket_fields(e, ticket_hours),
             schedule_published=e.event_id in published_schedule_ids,
             review_status=e.review_status,
+            organizer=organizer_by_event.get(e.event_id),
             owner_preview=is_private(e),
         )
         for e in events
@@ -1463,6 +1471,9 @@ def get_event(
         )
 
     schedule_published = event_id in published_schedule_event_ids(session, [event_id])
+    schedule_under_work = event_id in unpublished_schedule_event_ids(
+        session, [event_id]
+    )
 
     data = EventResponse(
         event_id=event.event_id,
@@ -1497,6 +1508,7 @@ def get_event(
         **event_assets.ticket_fields(event, event_assets.ticket_min_hours(session)),
         has_active_promo_codes=has_active_promo_codes,
         schedule_published=schedule_published,
+        schedule_under_work=schedule_under_work,
         owner_preview=owner_preview,
         is_owner=viewer_id is not None and event.owner_user_id == viewer_id,
     )

@@ -1,11 +1,11 @@
-# Series detection only ever groups events within the SAME calendar (unlike
-# duplicate detection, which spans all calendars) — a recurring event is
-# assumed to come from one organizer's feed. "other-calendar" exists purely
-# to prove a same-titled event in a different calendar is never grouped.
+# Series detection matches across calendars (a festival's yearly editions are
+# often listed by different organizers/aggregators). "city-aggregator" holds
+# cross-posted copies and other editions to prove both matching across
+# calendars and the guards around it (same occurrence, no location).
 calendars:
-  - id: "tango-collective"
-    name: "Tango Collective"
+  - id: "riverside-dance"
+    name: "Riverside Dance"
     color: "#7c3aed"
-  - id: "other-calendar"
-    name: "Other Organizer"
+  - id: "city-aggregator"
+    name: "City Aggregator"
     color: "#0ea5e9"

@@ -61,7 +61,7 @@ def get_shared_my_plan(
     if schedule is None or event is None or event.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Shared plan not found")
     publication = latest_publication(session, schedule.id)
-    if publication is None:
+    if publication is None or schedule.unpublished_at is not None:
         raise HTTPException(status_code=404, detail="Published schedule not found")
     owner = session.get(User, share.user_id)
     owner_display_name = None

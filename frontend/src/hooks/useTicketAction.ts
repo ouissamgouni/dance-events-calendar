@@ -38,6 +38,8 @@ export function useTicketAction(event: CalendarEvent, summary?: EventAssetSummar
         : cached === null && going ? NO_ASSETS : cached;
     if (!active || !going || !entry) return null;
     if (now >= new Date(event.end).getTime()) return null;
+    // Organizers don't need a ticket for their own event.
+    if (event.organizer?.user_id === user?.user_id) return null;
 
     const hasTicket = entry.ticket_count > 0;
     const likely = event.ticket_likely ?? entry.ticket_likely ?? false;

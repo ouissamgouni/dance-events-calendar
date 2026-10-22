@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Info } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { AlertTriangle, Info } from 'lucide-react';
 import type { EventSchedule, ScheduleRoom, ScheduleSession, SessionAttendanceSummary } from '../../types';
-import { formatTime, isSessionActive, minuteOfProgramDay, programDayOf, roomColumnRuns, sessionRoomIds, sessionsForDay, sessionsInOverviewWindow } from '../../utils/schedule';
+import { formatDayLabel, formatTime, isSessionActive, minuteOfProgramDay, overlapLanes, programDayOf, roomColumnRuns, sessionRoomIds, sessionsForDay, sessionSpan, sessionsInOverviewWindow, type DraftStatus } from '../../utils/schedule';
 import { scheduleColor, sessionCellColors } from '../../utils/scheduleColors';
 import SessionAttendeeStack from './SessionAttendeeStack';
 
@@ -17,12 +17,21 @@ interface Props {
     onRoomClick?: (room: ScheduleRoom) => void;
     /** Scrolls to `start` and briefly highlights sessions starting in the window; a new token re-triggers. */
     focusWindow?: { start: string; end: string; token: string } | null;
+    /** Editor-only: unpublished state and warnings per session. */
+    marks?: Map<string, SessionMark>;
+}
+
+export interface SessionMark {
+    draft?: DraftStatus;
+    issues: string[];
 }
 
 const SLOT_MINUTES = 15;
 const SLOT_HEIGHT = 24;
+const COLUMN_WIDTH = 144;
+const LANE_WIDTH = 96;
 
-export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0, compactHeader = false, attendeeSummaries, onRoomClick, focusWindow }: Props) {
+export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessionClick, onTimeClick, positionRequest = 0, compactHeader = false, attendeeSummaries, onRoomClick, focusWindow, marks }: Props) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const positionedDays = useRef(new Set<string>());
     const handledPositionRequest = useRef(0);
@@ -44,15 +53,15 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
     const usedRoomIds = new Set(sessions.flatMap(sessionRoomIds));
     const rooms = schedule.rooms.filter((room) => usedRoomIds.has(room.id));
     const columnRoomIds = rooms.map((room) => room.id);
+    const lanes = overlapLanes(sessions, columnRoomIds);
+    const laneCount = (roomId?: number) => Math.max(1, ...sessions
+        .filter((session) => roomId == null || !sessionRoomIds(session).some((id) => columnRoomIds.includes(id)) || sessionRoomIds(session).includes(roomId))
+        .map((session) => lanes.get(session.id)?.lanes ?? 1));
+    const columnWidths = (rooms.length ? rooms.map((room) => laneCount(room.id)) : [laneCount()]).map((count) => Math.max(COLUMN_WIDTH, count * LANE_WIDTH));
     const hasRoomDetails = rooms.some((room) => room.details);
     const headerHeight = (compactHeader ? 40 : 48) + (hasRoomDetails ? 16 : 0);
-    const startMinutes = sessions.map((session) => minuteOfProgramDay(session.start, schedule.timezone, schedule.day_start_hour));
-    const endMinutes = sessions.map((session) => {
-        const start = minuteOfProgramDay(session.start, schedule.timezone, schedule.day_start_hour);
-        let end = minuteOfProgramDay(session.end, schedule.timezone, schedule.day_start_hour);
-        if (end <= start) end += 24 * 60;
-        return end;
-    });
+    const startMinutes = sessions.map((session) => sessionSpan(session, schedule.timezone, schedule.day_start_hour).start);
+    const endMinutes = sessions.map((session) => sessionSpan(session, schedule.timezone, schedule.day_start_hour).end);
     const axisStart = Math.max(0, Math.floor((Math.min(...startMinutes, 8 * 60) - 30) / 60) * 60);
     const axisEnd = Math.max(axisStart + 8 * 60, Math.ceil((Math.max(...endMinutes, 18 * 60) + 30) / 60) * 60);
     const rowCount = Math.ceil((axisEnd - axisStart) / SLOT_MINUTES);
@@ -98,9 +107,7 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
         return runs.map(([start, end]) => `${start + 2} / ${end + 2}`);
     };
     const sessionRow = (session: ScheduleSession): string => {
-        const start = minuteOfProgramDay(session.start, schedule.timezone, schedule.day_start_hour);
-        let end = minuteOfProgramDay(session.end, schedule.timezone, schedule.day_start_hour);
-        if (end <= start) end += 24 * 60;
+        const { start, end } = sessionSpan(session, schedule.timezone, schedule.day_start_hour);
         const first = Math.floor((start - axisStart) / SLOT_MINUTES) + 2;
         const span = Math.max(2, Math.ceil((end - start) / SLOT_MINUTES));
         return `${first} / span ${span}`;
@@ -111,9 +118,9 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
             <div
                 className="relative grid min-w-max"
                 style={{
-                    gridTemplateColumns: `48px repeat(${Math.max(rooms.length, 1)}, minmax(144px, 1fr))`,
+                    gridTemplateColumns: `48px ${columnWidths.map((width) => `minmax(${width}px, 1fr)`).join(' ')}`,
                     gridTemplateRows: `${headerHeight}px repeat(${rowCount}, ${SLOT_HEIGHT}px)`,
-                    minWidth: `${48 + Math.max(rooms.length, 1) * 144}px`,
+                    minWidth: `${48 + columnWidths.reduce((total, width) => total + width, 0)}px`,
                 }}
             >
                 <div className="sticky left-0 top-0 z-30 border-b border-r border-line bg-surface" />
@@ -169,21 +176,38 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
                         schedule.activity_types.find((item) => item.id === session.activity_type_id),
                     );
                     const activeNow = showNow && isSessionActive(session, now);
+                    const endProgramDay = programDayOf(session.end, schedule.timezone, schedule.day_start_hour);
+                    const endsOnLaterDay = endProgramDay !== day;
                     const attendance = attendeeSummaries?.get(session.id);
                     const hasDescription = Boolean(session.description?.trim());
+                    const mark = marks?.get(session.id);
+                    const hasIssue = Boolean(mark?.issues.length);
+                    const draft = mark?.draft;
+                    const lane = lanes.get(session.id) ?? { lane: 0, lanes: 1 };
+                    const laneStyle: CSSProperties = lane.lanes > 1
+                        ? { justifySelf: 'start', width: `calc(${100 / lane.lanes}% - 4px)`, marginLeft: `calc(${(100 * lane.lane) / lane.lanes}% + 2px)` }
+                        : {};
+                    const hint = [draft ? (draft.status === 'new' ? 'New, not published yet' : `Edited: ${draft.fields.join(', ')}`) : null, ...(mark?.issues ?? [])].filter(Boolean).join('\n');
                     return roomColumns(session).map((gridColumn, runIndex) => (
                         <button
                             key={`${session.id}-${runIndex}`}
                             type="button"
                             onClick={() => onSessionClick(session)}
                             aria-current={activeNow ? 'time' : undefined}
-                            className={`relative z-10 m-0.5 min-h-11 overflow-hidden rounded-field border px-2 py-2 text-left shadow-sm ${color.cell} ${color.stripe ? 'pl-3' : ''} ${hasDescription ? 'pb-6' : ''} ${activeNow ? 'ring-2 ring-action ring-inset' : ''} ${session.is_cancelled ? 'opacity-60' : ''} ${flashIds.has(session.id) ? 'animate-session-flash' : ''}`}
-                            style={{ gridColumn, gridRow: sessionRow(session) }}
+                            title={hint || undefined}
+                            className={`relative z-10 m-0.5 min-h-11 overflow-hidden rounded-field border px-2 py-2 text-left shadow-sm ${color.cell} ${color.stripe ? 'pl-3' : ''} ${hasDescription ? 'pb-6' : ''} ${draft?.status === 'new' ? 'border-dashed' : ''} ${hasIssue ? 'pr-6 outline outline-2 outline-amber-500' : ''} ${activeNow ? 'ring-2 ring-action ring-inset' : ''} ${session.is_cancelled ? 'opacity-60' : ''} ${flashIds.has(session.id) ? 'animate-session-flash' : ''}`}
+                            style={{ gridColumn, gridRow: sessionRow(session), ...laneStyle }}
                         >
                             {color.stripe ? <span aria-hidden="true" data-testid="session-type-stripe" className={`absolute inset-y-0 left-0 w-1 ${color.stripe}`} /> : null}
-                            <span className={`block line-clamp-2 text-xs font-semibold leading-4 text-ink ${session.is_cancelled ? 'line-through' : ''}`}>{session.title}</span>
+                            {hasIssue ? <AlertTriangle size={14} aria-hidden="true" data-testid="session-issue-icon" className="absolute right-1.5 top-1.5 text-amber-700" /> : null}
+                            {hasIssue ? <span className="sr-only">{mark?.issues.join('. ')}</span> : null}
+                            <span className={`block line-clamp-2 text-xs font-semibold leading-4 text-ink ${session.is_cancelled ? 'line-through' : ''}`}>
+                                {draft ? <DraftPill status={draft.status} /> : null}
+                                {session.title}
+                            </span>
                             {contributors ? <span className="mt-0.5 block whitespace-normal text-xs leading-4 text-ink-soft">{contributors}</span> : null}
                             {level ? <span className="mt-1 block truncate text-xs font-medium text-action">{level.label}</span> : null}
+                            {endsOnLaterDay ? <span className="mt-1 block truncate text-xs font-medium text-ink-soft" data-testid="session-ends-later-day">Ends {formatDayLabel(endProgramDay)}</span> : null}
                             {hasDescription ? <Info size={14} aria-hidden="true" className="absolute bottom-1.5 right-2 text-ink-soft" data-testid="session-details-icon" /> : null}
                             {hasDescription ? <span className="sr-only">Has details</span> : null}
                             {activeNow ? <span className="mt-1 inline-block bg-action px-1.5 py-0.5 text-xs font-bold text-white">Now</span> : null}
@@ -199,6 +223,12 @@ export default function ScheduleGrid({ schedule, day, plannedSessionIds, onSessi
             </div>
         </div>
     );
+}
+
+export function DraftPill({ status }: { status: DraftStatus['status'] }) {
+    return status === 'new'
+        ? <span className="mr-1 inline-block bg-action px-1 align-[1px] text-[11px] font-bold uppercase leading-4 text-white">New</span>
+        : <span className="mr-1 inline-block border border-action bg-surface px-1 align-[1px] text-[11px] font-bold uppercase leading-[14px] text-action">Edited</span>;
 }
 
 function RoomHeader({ room, column, onClick }: { room: ScheduleRoom; column: number; onClick?: (room: ScheduleRoom) => void }) {

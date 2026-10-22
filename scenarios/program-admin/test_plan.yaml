@@ -1,0 +1,318 @@
+test_plan:
+  name: "Program admin – editor, publishing, notifications and organizer actions"
+  description: >
+    The editor side of event programs. Back 2 Mambo 2026 (66 sessions plus an
+    Overview) has unpublished draft edits: a renamed first workshop and the Saturday
+    overview item renamed to "Workshops, Bootcamps & Pilates". Prague Salsa
+    Weekender is published, Brno Bachata Lab is a private draft and Vienna Social
+    Night has no program. Winter Salsa Fest 2026 has a published program with two
+    unpublished edits (Keys for Social Dancing renamed, which is in Maya's plan, and
+    a typo on Shines Lab), a real Friday room conflict (Salsa Foundations vs Shines
+    Lab), a cross-midnight Friday Social and a cancelled Mambo Fusion that must not
+    count as a conflict. Olive Organizer is its verified organizer.
+    Audience for Winter Salsa Fest: Maya (Going + plan), Noor (plan only), Leo (Going),
+    Sara (Going, program emails and push off), Omar (unrelated).
+
+  preconditions:
+    - "Run: SCENARIO=program-admin task start:scenario RESET_BROWSER=1"
+    - "Sign in as Dev Admin unless a step says otherwise."
+    - "Organizer claims and event tickets are on, so Olive shows as organizer."
+
+  steps:
+    - id: 1
+      title: "Inspect the unpublished admin draft"
+      description: "Open Back 2 Mambo 2026 → Program → Edit program."
+      expected: >
+        The draft grid shows "Shines / Partnerwork – Updated draft" and the
+        Publish action reports two changes (one session and the renamed Saturday
+        overview item "Workshops, Bootcamps & Pilates"). Preview as attendee displays
+        the draft banner and updated titles while the normal attendee route does not.
+
+    - id: 2
+      title: "Create a warning without blocking save"
+      description: "Create a session overlapping an existing Grand Hall session."
+      expected: >
+        The editor warns about the room conflict in a strip pinned just above Cancel /
+        Save anyway (it stays visible while the form scrolls).
+        Saving intentionally is allowed: both cells get an amber outline and
+        warning icon, a "1 room conflict" bar lists the pair above the grid, and
+        the issue appears in the publish review. Marking either session cancelled
+        clears the conflict.
+
+    - id: 3
+      title: "Check session list tools"
+      description: "Open Sessions, choose a date, filter by instructor, level and type, then clear the filters."
+      expected: >
+        The same controls as the calendar are available. The first table column
+        contains weekday and date, only matching rows remain, and the calendar
+        and list advance to the earliest day with a result when necessary.
+
+    - id: 4
+      title: "Check calendar positioning and autocomplete"
+      description: "Scroll late in a day, then change a date or filter and choose an instructor suggestion."
+      expected: >
+        The grid positions the first matching session instead of retaining the
+        previous late timeslot. Instructor search offers names from the program.
+
+    - id: 5
+      title: "Check adjacent session boundaries"
+      description: "Edit Latin Salsa Fusion and compare it with Crazy Partnerwork."
+      expected: >
+        No Scheduling conflict appears because Crazy Partnerwork ends exactly
+        when Latin Salsa Fusion starts; real overlaps still produce a warning.
+
+    - id: 6
+      title: "Check Settings, planners and preview"
+      description: >
+        In Settings select a timezone from Event timezone and save it, expand People
+        with plans, then open Preview.
+      expected: >
+        Timezones are searchable/selectable IANA values. Maya and Noor appear with
+        plan counts and expandable session titles; Maya is marked Going, Noor shows
+        that a planner need not be Going. The embedded preview begins at the
+        Overview / Full schedule tabs and date pills without the full app header or
+        Program/My Plan tabs.
+
+    - id: 7
+      title: "Grid colors"
+      description: >
+        In Settings change "Color sessions in the grid" to Activity type stripe, then
+        By activity type, then By room, previewing after each.
+      expected: >
+        Activity type stripe keeps room-tinted cells with a colored left stripe per
+        activity type; By activity type tints whole cells by type; By room restores
+        room tints. Filter chips and Overview category chips show matching color dots
+        and the printable export follows the same mode.
+
+    - id: 8
+      title: "Edit the Overview"
+      description: >
+        Open the Overview section. Inspect Friday, add a moment to Mambo Night with
+        "+ Add moment", edit Welcome coffee, set an invalid end before start on
+        Workshops & Bootcamps, and try to delete Mambo Night.
+      expected: >
+        Rows look like the attendee Overview with admin badges: "→ N sessions in full
+        schedule" on linked items and an amber warning on Welcome coffee ("no sessions
+        start in its time window"). Add moment pre-selects Mambo Night in "Part of",
+        pre-fills its start and hides "Has detailed schedule". The editor shows a live
+        "N sessions start in this window" hint. An invalid range shows an error and keeps
+        the dialog open. Deleting Mambo Night asks to confirm and mentions its moments.
+
+    - id: 9
+      title: "Publish Overview changes"
+      description: >
+        Open Publish, review the change list, and publish with Notify attendees on.
+        Then check the attendee Overview for Saturday.
+      expected: >
+        The change list includes the renamed overview item and any moment you added.
+        No "Plans affected" chip appears because no planned session changed. After
+        publishing, Saturday's attendee Overview shows "Workshops, Bootcamps & Pilates".
+
+    - id: 10
+      title: "Program editor states across events"
+      description: "Open the editor for Prague Salsa Weekender, Brno Bachata Lab and Vienna Social Night."
+      expected: >
+        Prague and Brno open their editors (Brno has never been published, so Publish
+        says "Publishing makes this program visible to attendees"). Vienna offers
+        Create schedule.
+
+    - id: 11
+      title: "Room conflicts are visible in the editor grid"
+      description: >
+        Open Winter Salsa Fest 2026 → Program → Edit program and stay on the
+        Schedule section for Friday 4 December. Then switch to Saturday.
+      expected: >
+        Friday shows an amber "1 room conflict" bar above the grid with a
+        "Salsa Foundations ↔ Shines Lab" chip. Both cells have an amber outline
+        and a warning icon. Tapping the chip opens the Salsa Foundations editor.
+        Saturday shows no conflict bar: Mambo Fusion is cancelled (struck
+        through, faded) so it does not conflict with Body Movement.
+
+    - id: 12
+      title: "Cross-midnight sessions keep their real length"
+      description: "On Friday, scroll down to Friday Social."
+      expected: >
+        Friday Social spans 21:00 to 03:00 (six hours tall) in Main Hall and
+        stays under Friday because the program day starts at 06:00.
+
+    - id: 13
+      title: "Revert one change from the publish review"
+      description: >
+        Tap Publish (2), open "View 2 change details" and tap Revert on
+        "Shines Lab – typo draft".
+      expected: >
+        The Shines Lab change disappears; only the Keys for Social Dancing
+        rename remains and the header shows Publish (1). The grid shows
+        "Shines Lab" again. Reverting a change that was edited meanwhile in
+        another tab shows "This change was edited since you opened the review".
+
+    - id: 14
+      title: "Publish and notify from one sheet"
+      description: >
+        In the same Publish sheet look at the "Notify attendees" row, open Customize,
+        untick and re-tick "Plan changed", then tap "Publish & notify 4".
+      expected: >
+        Notify attendees is on by default and reads "4 people · 1 personal plan
+        update". Customize expands in place: toggle chips on one row, "Plan changed · 1"
+        and "Everyone else going · 3"; "1 turned off program emails and push". Title
+        is "Program updated" and the message lists the change ("Changed: Keys for
+        Social Dancing …") without the event name. The preview shows the event name,
+        title and message, plus "Email subject: Winter Salsa Fest 2026: Program
+        updated", and the personal version ("Plan changed: “Keys for Social Dancing: has
+        updated details.”"). Unticking Plan changed turns the second chip into
+        "Everyone going · 4"; unticking Everyone else going hides title and message.
+        After publishing the sheet reads "Version 2 published" and
+        "4 people notified · 1 plan update". Maya's inbox has one "Your plan changed" notification and no
+        general "Program updated" one; push titles end with "· Winter Salsa Fest 2026".
+
+    - id: 15
+      title: "Publish without notifying"
+      description: >
+        Move Salsa Foundations (in Maya's plan) by 30 minutes, open Publish, switch
+        Notify attendees off and tap Publish.
+      expected: >
+        The row reads "Nobody will be notified" and the button just "Publish". After
+        publishing the sheet says "Nobody was notified". Maya gets no notification, but
+        her My Plan shows the new time.
+
+    - id: 16
+      title: "Notify attendees on demand"
+      description: "Tap the bell (Notify) in the editor header."
+      expected: >
+        "Notify attendees" opens with a single "Everyone going · 4" line (no chips), title
+        "Program update" and an empty message; Send stays disabled until a message
+        is typed. On a phone the dialog is a bottom sheet.
+
+    - id: 17
+      title: "Unpublish shows Program under work"
+      description: >
+        Tap Unpublish, keep Notify attendees on and tap "Unpublish & notify 4". Sign
+        in as Maya, open the event page, the program URL, and the notifications inbox.
+      expected: >
+        Nothing changes before confirming. The default message is "The program is being
+        updated. We'll let you know when it's back." Afterwards the sheet reads "Program
+        unpublished". Maya's event page shows a "Program under work" card instead of the
+        program section, /event/winter-salsa-fest-2026/program shows "Program under work"
+        (not an error), and the inbox shows a "Program under work" notification whose
+        email button says View event.
+
+    - id: 18
+      title: "The organizer edits without a grant"
+      description: >
+        Sign in as Olive Organizer and open
+        /event/winter-salsa-fest-2026/program/edit while the program is
+        unpublished. Then, as Dev Admin, open the admin editor → Settings.
+      expected: >
+        Olive gets the full editor (no access-denied screen) and can Republish,
+        but sees no Program editors or Delete program sections. In the admin
+        Settings, Olive is listed first as "Organizer · automatic" with no
+        Remove button.
+
+    - id: 19
+      title: "Republish"
+      description: "Tap Republish and confirm with Notify attendees on."
+      expected: >
+        "Republish program?" explains no new version is created; the button reads
+        "Republish & notify 4" and the default title is "Program is back". Attendees
+        see the program again.
+
+    - id: 20
+      title: "Organizer actions on the event"
+      description: >
+        As Olive open Winter Salsa Fest 2026 from Explorer (modal), open the ••• menu,
+        then open the full event page. Repeat as Maya.
+      expected: >
+        For Olive the modal footer and the page (under the header) show "You organize
+        this event" with Edit event and Edit program. The ••• menu lists Edit event and
+        Edit program, with no Cancel event and no Suggest an edit. Olive sees no ticket
+        prompt (no "Add ticket?" / "My ticket", and marking Going doesn't suggest saving
+        a ticket). Maya sees no strip and still gets the "Add ticket?" prompt on this
+        multi-day international event.
+
+    - id: 22
+      title: "A delegated editor only gets Edit program"
+      description: >
+        As Dev Admin open Settings → Program editors and add Leo Going. Sign in as Leo
+        and open Winter Salsa Fest 2026 (modal and page).
+      expected: >
+        The strip reads "Program editor" with only Edit program, which opens the
+        editor. The ••• menu offers Edit program but not Edit event.
+
+    - id: 23
+      title: "Status strip and draft labels"
+      description: >
+        As Dev Admin open the Back 2 Mambo program editor. Look under the header,
+        then at the Schedule grid, the Sessions list and the Overview.
+      expected: >
+        A strip under the header reads "Version N · X unpublished changes" with a
+        breakdown (new / edited / removed) and a Review link that opens the Publish
+        sheet. Sessions changed since the last publish carry an "Edited" label
+        (hover lists the changed fields), new ones a "New" label with a dashed
+        border, in the grid, the Sessions list and on Overview cards. Nothing is
+        labelled on a never-published program; the strip says "Draft · not visible
+        to attendees until you publish" instead.
+
+    - id: 24
+      title: "Overlapping sessions sit side by side"
+      description: >
+        Edit a session so it overlaps another one in the same room and save
+        anyway, then look at that day in the grid.
+      expected: >
+        Both sessions are visible next to each other in the room column (the
+        column widens) and each opens its own editor. Both show the warning icon,
+        the strip shows "N warnings"; tapping it opens Sessions with the
+        "Issues" filter on, rows tinted with the warning text under the title.
+
+    - id: 25
+      title: "Update message lists what changed"
+      description: "Open Publish → Customize."
+      expected: >
+        The default message has one line per kind of change, e.g.
+        "New: …", "Moved: Salsa On2 → Sat 15:00 · Room B", "Renamed: A → B",
+        "Updated: X (level, instructors)", "Cancelled: …", ending with "+N more"
+        when it exceeds 255 characters (counter under the field). The audience shows
+        the "Plan changed · N" and "Everyone else going · N" toggle chips when a
+        planned session changed, otherwise "Everyone going · N". People without email and push show as "N in-app only"
+        behind an info button. After publishing, the in-app notification shows
+        the message on several lines.
+
+    - id: 26
+      title: "Settings save on their own"
+      description: >
+        In Settings change "Color sessions in the grid", then the day cutoff, then
+        pick another timezone.
+      expected: >
+        Each select saves immediately ("Saved to draft"); the
+        Publish count goes up. Picking a timezone asks to confirm because local
+        session times shift; "Keep …" restores the old value without saving.
+
+    - id: 27
+      title: "Mobile editor"
+      description: >
+        On a phone-sized window open the editor, then a session.
+      expected: >
+        The header shows Back, the title, Publish and a ••• menu (Preview as
+        attendee, Notify attendees, Unpublish). The session editor is a bottom
+        sheet: its title bar and Cancel / Save bar stay put while the form
+        scrolls; Duplicate and Delete live in the ••• menu of the sheet, Delete
+        asks for confirmation in the footer. Contributor role selects wrap under
+        the name. All editor sheets (publish, notify, unpublish, rooms, taxonomy)
+        keep their action bar visible.
+
+    - id: 28
+      title: "Attendee preview without app chrome"
+      description: "Open Preview as attendee."
+      expected: >
+        A phone-sized frame shows the draft program without the Movida app header,
+        banners or bottom navigation; "Open in new tab" stays visible below.
+
+    - id: 29
+      title: "Delete the program"
+      description: >
+        As Dev Admin open Settings → Delete program. Type a wrong title, then
+        "Winter Salsa Fest 2026", and delete.
+      expected: >
+        The red Delete program button stays disabled until the title matches.
+        After deleting, the editor offers "Create Winter Salsa Fest 2026's
+        program", the event page still exists without a program section, and
+        Maya's plan for this event is gone.

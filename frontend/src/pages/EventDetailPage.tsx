@@ -16,6 +16,7 @@ import ShareButton from '../components/ShareButton';
 import EventSummary, { type EventDetailTab } from '../components/EventSummary';
 import EventDetailTabsBar from '../components/EventDetailTabsBar';
 import SummaryHeader from '../components/event-summary/SummaryHeader';
+import OrganizerStrip from '../components/OrganizerStrip';
 import PastEventBanner from '../components/event-summary/PastEventBanner';
 import EventActionDock from '../components/EventActionDock';
 import EventMemoriesTab from '../components/EventMemoriesTab';
@@ -333,6 +334,7 @@ export default function EventDetailPage() {
     const isPast = end.getTime() < Date.now();
     const showMemoriesTab = Boolean(user) && eventMemoriesEnabled && start.getTime() <= nowMs;
     const hasProgram = eventScheduleEnabled && Boolean(event.schedule_published);
+    const programUnderWork = eventScheduleEnabled && Boolean(event.schedule_under_work);
     const requestedTab: EventDetailTab = location.hash === '#memories' ? 'memories' : activeTab;
     const showDeals = !isPast && isPromoSectionVisible(event, promoCodesEnabled) && (event.has_active_promo_codes || dealsAdded);
     const tab: EventDetailTab = (requestedTab === 'memories' && !showMemoriesTab) || (requestedTab === 'deals' && !showDeals) ? 'overview' : requestedTab;
@@ -451,6 +453,7 @@ export default function EventDetailPage() {
                     ) : (
                         <>
                             <SummaryHeader event={event} variant="page" />
+                            <OrganizerStrip event={event} className="mt-3" />
                             {isPast && <div className="mt-3"><PastEventBanner event={event} /></div>}
                             {event.owner_preview ? (
                                 <div className="mt-3 rounded-card border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-ink">
@@ -484,6 +487,13 @@ export default function EventDetailPage() {
                                     </button>
                                 )}
                             </div>
+
+                            {programUnderWork && (
+                                <div data-testid="program-under-work" className="mt-4 rounded-field border border-line bg-canvas p-3 text-sm text-ink-soft">
+                                    <p className="font-semibold text-ink">Program under work</p>
+                                    <p>The organizers are updating the schedule. Check back soon.</p>
+                                </div>
+                            )}
 
                             <div className="mt-4 lg:mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8">
                                 <div className="min-w-0">

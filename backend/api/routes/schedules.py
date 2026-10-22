@@ -37,6 +37,7 @@ from backend.api.schemas import (
     ScheduleActivityTypeResponse,
     ScheduleContributorRequest,
     ScheduleContributorResponse,
+    ScheduleChangeRef,
     ScheduleImportDocument,
     ScheduleImportPreviewResponse,
     ScheduleImportRequest,
@@ -45,6 +46,7 @@ from backend.api.schemas import (
     ScheduleProgramNotifyResponse,
     ScheduleProgramNotifyResult,
     SchedulePlannerResponse,
+    SchedulePublishPreviewResponse,
     SchedulePublishRequest,
     SchedulePublishResponse,
     ScheduleLevelRequest,
@@ -94,6 +96,7 @@ from backend.services.schedules import (
     default_schedule_days,
     delete_overview_item,
     latest_publication,
+    normalize_snapshot,
     ordered_room_ids,
     overview_item_snapshot,
     overview_room_ids_by_item,
@@ -117,6 +120,8 @@ from backend.services.schedule_import import (
 )
 from backend.services.notifications import (
     notify_planned_session_changes,
+    planned_change_description,
+    planned_session_changes,
     reconcile_plan_activity_notifications,
 )
 from backend.services.program_exports import (
@@ -135,12 +140,36 @@ _PUBLICATION_KINDS = (
     "schedule_program_available",
     "schedule_program_updated",
 )
+_NOTIFY_REASON_TITLES = {
+    "available": "Program now available",
+    "updated": "Program updated",
+    "under_work": "Program under work",
+    "back": "Program is back",
+    "custom": "Program update",
+}
+_NOTIFY_REASON_MESSAGES = {
+    "available": "The program is live. Browse sessions and build your plan.",
+    "updated": "The event program has changed. Review the latest schedule.",
+    "under_work": "The program is being updated. We'll let you know when it's back.",
+    "back": "The program is available again. Check what's new.",
+    "custom": "There is news about the program.",
+}
+
+
+def _organizer_id(session: Session, event_id: str) -> UUID | None:
+    return session.exec(
+        select(CachedEvent.organizer_user_id).where(
+            CachedEvent.event_id == event_id, CachedEvent.deleted_at.is_(None)
+        )
+    ).first()
 
 
 def _can_edit_schedule(session: Session, event_id: str, user: User | None) -> bool:
     if user is None:
         return False
     if is_admin_user(user):
+        return True
+    if _organizer_id(session, event_id) == user.id:
         return True
     schedule_id = session.exec(
         select(EventSchedule.id).where(EventSchedule.event_id == event_id)
@@ -170,10 +199,29 @@ def require_schedule_editor(
     return user
 
 
+def require_live_program(
+    event_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> None:
+    """Public program routes 404 while the program is unpublished."""
+    # Editors must still reach the editor while the program is offline.
+    if request.url.path.endswith("/schedule/editor-access"):
+        return
+    unpublished_at = session.exec(
+        select(EventSchedule.unpublished_at).where(EventSchedule.event_id == event_id)
+    ).first()
+    if unpublished_at is not None:
+        raise HTTPException(status_code=404, detail="Published schedule not found")
+
+
 public_router = APIRouter(
     prefix="/api/events/{event_id}",
     tags=["event-schedules"],
-    dependencies=[Depends(require_flag("event_schedule_enabled"))],
+    dependencies=[
+        Depends(require_flag("event_schedule_enabled")),
+        Depends(require_live_program),
+    ],
 )
 my_plan_router = APIRouter(
     prefix="/api/my-plan",
@@ -253,6 +301,7 @@ def _admin_payload(session: Session, schedule: EventSchedule) -> dict:
     draft = build_snapshot(session, schedule)
     publication = latest_publication(session, schedule.id)
     draft["version"] = publication.version if publication else None
+    draft["unpublished_at"] = schedule.unpublished_at
     draft["published_at"] = publication.published_at if publication else None
     draft["issues"] = compute_issues(session, schedule)
     draft["diff"] = compute_diff(draft, publication.snapshot if publication else None)
@@ -270,18 +319,297 @@ def _import_result(
     except ValueError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        session.rollback()
+        logger.warning("Schedule import conflict for %s: %s", schedule.event_id, exc)
+        raise HTTPException(
+            status_code=409,
+            detail="The JSON conflicts with existing program items (duplicate names or external IDs).",
+        ) from exc
+    snapshot = result["snapshot"]
+    operations = {
+        key: result[key] for key in ("created", "updated", "removed", "unchanged")
+    }
+    if request.exclude:
+        for ref in sorted(request.exclude, key=_revert_order):
+            entity_id = ref.entity_id
+            if ref.operation == "create":
+                entity_id = _created_entity_id(snapshot, ref)
+            _revert_entity(
+                session,
+                schedule,
+                previous_snapshot,
+                ref.entity_type,
+                entity_id,
+                ref.operation,
+            )
+            operations[f"{ref.operation}d"] -= 1
+            operations["unchanged"] += 1
+        session.flush()
+        snapshot = build_snapshot(session, schedule)
     publication = latest_publication(session, schedule.id)
     return {
         "document": export_schedule_document(session, schedule),
-        "operations": {
-            key: result[key] for key in ("created", "updated", "removed", "unchanged")
-        },
-        "changes": compute_change_details(result["snapshot"], previous_snapshot),
+        "operations": {key: max(0, value) for key, value in operations.items()},
+        "changes": compute_change_details(snapshot, previous_snapshot),
         "issues": compute_issues(session, schedule),
-        "diff": compute_diff(
-            result["snapshot"], publication.snapshot if publication else None
-        ),
+        "diff": compute_diff(snapshot, publication.snapshot if publication else None),
     }
+
+
+_CONFIG_MODELS = {
+    "venue": ScheduleVenue,
+    "room": ScheduleRoom,
+    "level": ScheduleLevel,
+    "activity_type": ScheduleActivityType,
+    "contributor": ScheduleContributor,
+}
+_SNAPSHOT_KEYS = {
+    "venue": "venues",
+    "room": "rooms",
+    "level": "levels",
+    "activity_type": "activity_types",
+    "contributor": "contributors",
+    "session": "sessions",
+    "overview_item": "overview_items",
+}
+_ENTITY_ORDER = (
+    "venue",
+    "room",
+    "level",
+    "activity_type",
+    "contributor",
+    "overview_item",
+    "session",
+)
+_STALE_CHANGE = (
+    "This change was edited since you opened the review. Refresh and try again."
+)
+
+
+def _revert_order(ref) -> tuple[int, int]:
+    position = (
+        _ENTITY_ORDER.index(ref.entity_type) if ref.entity_type in _ENTITY_ORDER else -1
+    )
+    # Recreate referenced config before sessions; drop sessions before the config they use.
+    if ref.operation == "remove":
+        return (0, position)
+    if ref.operation == "update":
+        return (1, position)
+    return (2, -position)
+
+
+def _created_entity_id(snapshot: dict, ref) -> str:
+    rows = snapshot.get(_SNAPSHOT_KEYS.get(ref.entity_type, ""), [])
+    match = next(
+        (
+            row
+            for row in rows
+            if ref.external_id and row.get("external_id") == ref.external_id
+        ),
+        None,
+    )
+    if match is None:
+        raise HTTPException(status_code=409, detail=_STALE_CHANGE)
+    return str(match["id"])
+
+
+def _parse_snapshot_time(value: str) -> datetime:
+    return to_utc(datetime.fromisoformat(value.replace("Z", "+00:00")))
+
+
+def _revert_entity(
+    session: Session,
+    schedule: EventSchedule,
+    baseline: dict,
+    entity_type: str,
+    entity_id: str,
+    operation: str,
+) -> None:
+    """Make one entity match `baseline` again. Flushes, never commits."""
+    baseline = normalize_snapshot(baseline)
+    if entity_type == "schedule":
+        for field in ("timezone", "day_start_hour", "session_color_mode", "days"):
+            setattr(schedule, field, baseline.get(field))
+        schedule.updated_at = datetime.now(timezone.utc)
+        session.add(schedule)
+        session.flush()
+        return
+    key = _SNAPSHOT_KEYS[entity_type]
+    original = next(
+        (row for row in baseline.get(key, []) if str(row["id"]) == entity_id), None
+    )
+    if operation == "create":
+        _drop_entity(session, schedule, entity_type, entity_id)
+    elif original is None:
+        raise HTTPException(status_code=409, detail=_STALE_CHANGE)
+    elif entity_type == "session":
+        _restore_session(session, schedule, original)
+    elif entity_type == "overview_item":
+        _restore_overview_item(session, schedule, original)
+    else:
+        model = _CONFIG_MODELS[entity_type]
+        row = session.get(model, int(entity_id))
+        if row is not None and row.schedule_id != schedule.id:
+            raise HTTPException(status_code=404, detail="Item not found")
+        if row is None:
+            row = model(id=int(entity_id), schedule_id=schedule.id)
+        _apply(
+            row, {field: value for field, value in original.items() if field != "id"}
+        )
+        session.add(row)
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Could not undo this change: a conflicting item exists",
+        ) from exc
+
+
+def _drop_entity(
+    session: Session, schedule: EventSchedule, entity_type: str, entity_id: str
+) -> None:
+    if entity_type == "session":
+        row = session.get(ScheduleSession, UUID(entity_id))
+        if row is None or row.schedule_id != schedule.id:
+            raise HTTPException(status_code=409, detail=_STALE_CHANGE)
+        row.deleted_at = row.updated_at = datetime.now(timezone.utc)
+        session.add(row)
+        return
+    if entity_type == "overview_item":
+        delete_overview_item(
+            session, _overview_item_for_schedule(session, schedule, UUID(entity_id))
+        )
+        return
+    row = session.get(_CONFIG_MODELS[entity_type], int(entity_id))
+    if row is None or row.schedule_id != schedule.id:
+        raise HTTPException(status_code=409, detail=_STALE_CHANGE)
+    session.flush()
+    if _config_in_use(build_snapshot(session, schedule), entity_type, row.id):
+        label = (
+            getattr(row, "name", None)
+            or getattr(row, "label", None)
+            or getattr(row, "display_name", None)
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=f"{label or 'This item'} is still used in the draft. Undo the changes that use it first.",
+        )
+    session.delete(row)
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This item is still used in the draft. Undo the changes that use it first.",
+        ) from exc
+
+
+def _config_in_use(snapshot: dict, entity_type: str, row_id: int) -> bool:
+    sessions = snapshot.get("sessions", [])
+    items = snapshot.get("overview_items", [])
+    if entity_type == "venue":
+        return any(
+            row.get("venue_id") == row_id
+            for row in [*snapshot.get("rooms", []), *sessions, *items]
+        )
+    if entity_type == "room":
+        return any(row_id in (row.get("room_ids") or []) for row in [*sessions, *items])
+    if entity_type == "level":
+        return any(row.get("level_id") == row_id for row in sessions)
+    if entity_type == "activity_type":
+        return any(row.get("activity_type_id") == row_id for row in [*sessions, *items])
+    return any(
+        item.get("contributor_id") == row_id
+        for row in sessions
+        for item in row.get("contributors") or []
+    )
+
+
+def _restore_session(session: Session, schedule: EventSchedule, original: dict) -> None:
+    row = session.get(ScheduleSession, UUID(original["id"]))
+    if row is None:
+        row = ScheduleSession(
+            id=UUID(original["id"]), schedule_id=schedule.id, title=""
+        )
+    elif row.schedule_id != schedule.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    data = {
+        field: original.get(field)
+        for field in (
+            "external_id",
+            "title",
+            "description",
+            "room_id",
+            "venue_id",
+            "level_id",
+            "activity_type_id",
+            "attendee_note",
+            "allow_plan",
+            "is_cancelled",
+        )
+    }
+    data["start"] = _parse_snapshot_time(original["start"])
+    data["end"] = _parse_snapshot_time(original["end"])
+    _apply(row, _validated_session_data(session, schedule, data))
+    row.deleted_at = None
+    row.updated_at = datetime.now(timezone.utc)
+    session.add(row)
+    session.flush()
+    replace_session_rooms(
+        session,
+        row,
+        _validated_room_ids(session, schedule, original.get("room_ids") or []),
+    )
+    _replace_session_contributors(
+        session,
+        schedule,
+        row,
+        [
+            {"contributor_id": item["contributor_id"], "role": item["role"]}
+            for item in original.get("contributors") or []
+        ],
+    )
+    row.instructors = original.get("instructors")
+
+
+def _restore_overview_item(
+    session: Session, schedule: EventSchedule, original: dict
+) -> None:
+    row = session.get(ScheduleOverviewItem, UUID(original["id"]))
+    if row is None:
+        row = ScheduleOverviewItem(id=UUID(original["id"]), schedule_id=schedule.id)
+    elif row.schedule_id != schedule.id:
+        raise HTTPException(status_code=404, detail="Overview item not found")
+    data = {
+        field: original.get(field)
+        for field in (
+            "external_id",
+            "title",
+            "subtitle",
+            "description",
+            "url",
+            "url_label",
+            "activity_type_id",
+            "venue_id",
+            "opens_detail",
+            "allow_plan",
+            "is_cancelled",
+            "sort_order",
+        )
+    }
+    data["parent_id"] = (
+        UUID(original["parent_id"]) if original.get("parent_id") else None
+    )
+    data["start"] = _parse_snapshot_time(original["start"])
+    data["end"] = _parse_snapshot_time(original["end"])
+    _apply(row, data)
+    session.add(row)
+    session.flush()
+    replace_overview_item_rooms(session, row, original.get("room_ids") or [])
 
 
 @public_router.get("/schedule", response_model=EventScheduleResponse)
@@ -819,7 +1147,23 @@ def list_schedule_editors(
         )
         .order_by(User.email)
     ).all()
-    return [_editor_response(grant, user) for grant, user in rows]
+    editors = [_editor_response(grant, user) for grant, user in rows]
+    organizer_id = _organizer_id(session, event_id)
+    organizer = session.get(User, organizer_id) if organizer_id else None
+    if organizer is not None and organizer.deleted_at is None:
+        editors = [row for row in editors if row["user_id"] != organizer.id]
+        editors.insert(
+            0,
+            {
+                "user_id": organizer.id,
+                "email": organizer.email,
+                "name": organizer.display_name,
+                "handle": organizer.handle,
+                "granted_at": None,
+                "is_organizer": True,
+            },
+        )
+    return editors
 
 
 @admin_router.post(
@@ -911,6 +1255,83 @@ def create_admin_schedule(
     session.commit()
     session.refresh(schedule)
     return _admin_payload(session, schedule)
+
+
+@admin_router.delete("", status_code=status.HTTP_204_NO_CONTENT)
+def delete_admin_schedule(
+    event_id: str,
+    confirm_title: str = Query(..., max_length=300),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Delete the program, its publications and attendee plans. The event itself stays."""
+    schedule = _schedule_for_event(session, event_id)
+    event = session.get(CachedEvent, event_id)
+    if (
+        event is None
+        or confirm_title.strip().casefold() != (event.title or "").strip().casefold()
+    ):
+        raise HTTPException(status_code=422, detail="Type the event title to confirm")
+    session_ids = list(
+        session.exec(
+            select(ScheduleSession.id).where(ScheduleSession.schedule_id == schedule.id)
+        ).all()
+    )
+    items = session.exec(
+        select(ScheduleOverviewItem).where(
+            ScheduleOverviewItem.schedule_id == schedule.id
+        )
+    ).all()
+    dependents = [
+        *session.exec(
+            select(UserPlanSession).where(UserPlanSession.event_id == event_id)
+        ).all(),
+        *session.exec(
+            select(MyPlanShareToken).where(MyPlanShareToken.event_id == event_id)
+        ).all(),
+    ]
+    if session_ids:
+        dependents += [
+            *session.exec(
+                select(ScheduleSessionContributor).where(
+                    ScheduleSessionContributor.session_id.in_(session_ids)
+                )
+            ).all(),
+            *session.exec(
+                select(ScheduleSessionRoom).where(
+                    ScheduleSessionRoom.session_id.in_(session_ids)
+                )
+            ).all(),
+        ]
+    if items:
+        dependents += session.exec(
+            select(ScheduleOverviewItemRoom).where(
+                ScheduleOverviewItemRoom.item_id.in_([row.id for row in items])
+            )
+        ).all()
+    for row in dependents:
+        session.delete(row)
+    session.flush()
+    for row in sorted(items, key=lambda row: row.parent_id is None):
+        session.delete(row)
+        session.flush()
+    for model in (
+        ScheduleSession,
+        ScheduleRoom,
+        ScheduleVenue,
+        ScheduleLevel,
+        ScheduleActivityType,
+        ScheduleContributor,
+        SchedulePublication,
+        EventScheduleEditor,
+    ):
+        for row in session.exec(
+            select(model).where(model.schedule_id == schedule.id)
+        ).all():
+            session.delete(row)
+        session.flush()
+    session.delete(schedule)
+    session.commit()
 
 
 @admin_router.patch("", response_model=AdminEventScheduleResponse)
@@ -1440,6 +1861,42 @@ def get_schedule_diff(event_id: str, session: Session = Depends(get_session)):
     )
 
 
+@admin_router.post("/revert-change", response_model=AdminEventScheduleResponse)
+def revert_schedule_change(
+    event_id: str, body: ScheduleChangeRef, session: Session = Depends(get_session)
+):
+    schedule = _schedule_for_event(session, event_id)
+    publication = latest_publication(session, schedule.id)
+    if publication is None:
+        raise HTTPException(status_code=409, detail="Nothing published to revert to")
+    current = next(
+        (
+            change
+            for change in compute_diff(
+                build_snapshot(session, schedule), publication.snapshot
+            )["changes"]
+            if change["entity_type"] == body.entity_type
+            and change["entity_id"] == body.entity_id
+            and change["operation"] == body.operation
+        ),
+        None,
+    )
+    if current is None or current["fields"] != [
+        field.model_dump() for field in body.fields
+    ]:
+        raise HTTPException(status_code=409, detail=_STALE_CHANGE)
+    _revert_entity(
+        session,
+        schedule,
+        publication.snapshot,
+        body.entity_type,
+        body.entity_id,
+        body.operation,
+    )
+    session.commit()
+    return _admin_payload(session, schedule)
+
+
 @admin_router.get("/import-schema")
 def get_schedule_import_schema(event_id: str, session: Session = Depends(get_session)):
     schedule = _schedule_for_event(session, event_id)
@@ -1524,6 +1981,25 @@ def get_schedule_planners(event_id: str, session: Session = Depends(get_session)
     )
 
 
+def _going_user_ids(session: Session, event_id: str, user_ids=None) -> set:
+    statement = select(UserEventAttendance.user_id).where(
+        UserEventAttendance.event_id == event_id,
+        UserEventAttendance.user_id.is_not(None),
+    )
+    if user_ids is not None:
+        statement = statement.where(UserEventAttendance.user_id.in_(user_ids))
+    return set(session.exec(statement).all())
+
+
+def _plan_user_ids(session: Session, event_id: str, user_ids=None) -> set:
+    statement = select(UserPlanSession.user_id).where(
+        UserPlanSession.event_id == event_id
+    )
+    if user_ids is not None:
+        statement = statement.where(UserPlanSession.user_id.in_(user_ids))
+    return set(session.exec(statement).all())
+
+
 @admin_router.get(
     "/notify-program-candidates", response_model=list[ScheduleProgramCandidate]
 )
@@ -1531,14 +2007,9 @@ def get_program_notification_candidates(
     event_id: str, session: Session = Depends(get_session)
 ):
     _schedule_for_event(session, event_id)
-    attendee_ids = set(
-        session.exec(
-            select(UserEventAttendance.user_id).where(
-                UserEventAttendance.event_id == event_id,
-                UserEventAttendance.user_id.is_not(None),
-            )
-        ).all()
-    )
+    going_ids = _going_user_ids(session, event_id)
+    plan_ids = _plan_user_ids(session, event_id)
+    attendee_ids = going_ids | plan_ids
     if not attendee_ids:
         return []
     users = session.exec(
@@ -1571,6 +2042,8 @@ def get_program_notification_candidates(
                 push_enabled=user.push_schedule_updates_enabled,
                 has_push_subscription=user.id in push_ids,
                 already_notified=user.id in notified_ids,
+                is_going=user.id in going_ids,
+                has_plan=user.id in plan_ids,
             )
             for user in users
         ],
@@ -1594,6 +2067,15 @@ def notify_program_available(
         raise HTTPException(
             status_code=409, detail="Publish the program before notifying attendees"
         )
+    if schedule.unpublished_at is not None and body.reason != "under_work":
+        raise HTTPException(
+            status_code=409, detail="Republish the program before notifying attendees"
+        )
+    if schedule.unpublished_at is None and body.reason == "under_work":
+        raise HTTPException(
+            status_code=409,
+            detail="Unpublish the program before sending an under-work notice",
+        )
     event = session.get(CachedEvent, event_id)
     if event is None or event.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -1602,13 +2084,8 @@ def notify_program_available(
         user.id: user
         for user in session.exec(select(User).where(User.id.in_(body.user_ids))).all()
     }
-    attendee_ids = set(
-        session.exec(
-            select(UserEventAttendance.user_id).where(
-                UserEventAttendance.event_id == event_id,
-                UserEventAttendance.user_id.in_(body.user_ids),
-            )
-        ).all()
+    attendee_ids = _going_user_ids(session, event_id, body.user_ids) | _plan_user_ids(
+        session, event_id, body.user_ids
     )
     push_ids = set(
         session.exec(
@@ -1617,18 +2094,52 @@ def notify_program_available(
             )
         ).all()
     )
-    existing = {
-        row.recipient_user_id: row
-        for row in session.exec(
-            select(Notification).where(
-                Notification.kind == "schedule_program_available",
-                Notification.event_id == event_id,
-                Notification.recipient_user_id.in_(body.user_ids),
-            )
-        ).all()
-    }
+    reason = body.reason
+    kind = (
+        "schedule_program_updated"
+        if reason and reason != "available"
+        else "schedule_program_available"
+    )
+    existing = (
+        {}
+        if reason
+        else {
+            row.recipient_user_id: row
+            for row in session.exec(
+                select(Notification).where(
+                    Notification.kind == "schedule_program_available",
+                    Notification.event_id == event_id,
+                    Notification.recipient_user_id.in_(body.user_ids),
+                )
+            ).all()
+        }
+    )
+    # Planners whose sessions changed in this publication already got "Your plan changed".
+    impacted_ids = (
+        set(
+            session.exec(
+                select(Notification.recipient_user_id).where(
+                    Notification.kind == "planned_session_changed",
+                    Notification.event_id == event_id,
+                    Notification.subject_key == f"publication:{publication.version}",
+                    Notification.recipient_user_id.in_(body.user_ids),
+                )
+            ).all()
+        )
+        if reason in ("available", "updated")
+        else set()
+    )
     session_count = len(publication.snapshot.get("sessions", []))
+    headline = (body.title or "").strip() or None
+    note = (body.message or "").strip() or None
+    if reason:
+        headline = headline or _NOTIFY_REASON_TITLES[reason]
+    description = note or _NOTIFY_REASON_MESSAGES.get(
+        reason or "available", _NOTIFY_REASON_MESSAGES["available"]
+    )
     stamp_now = datetime.now(timezone.utc)
+    subject_key = f"notify:{reason}:{stamp_now:%Y%m%dT%H%M%S%f}" if reason else None
+    program_live = reason != "under_work"
     emailed = pushed = in_app_created = 0
     results: list[ScheduleProgramNotifyResult] = []
 
@@ -1645,12 +2156,16 @@ def notify_program_available(
                 )
             )
             continue
-        if user_id not in attendee_ids:
+        if user_id not in attendee_ids or user_id in impacted_ids:
             results.append(
                 ScheduleProgramNotifyResult(
                     user_id=user_id,
                     email=user.email,
-                    status="skipped_not_attending",
+                    status=(
+                        "skipped_plan_changed"
+                        if user_id in impacted_ids
+                        else "skipped_not_in_audience"
+                    ),
                     email_status="not_attempted",
                     push_status="not_attempted",
                 )
@@ -1663,10 +2178,11 @@ def notify_program_available(
             notification = Notification(
                 recipient_user_id=user_id,
                 actor_user_id=user_id,
-                kind="schedule_program_available",
+                kind=kind,
                 event_id=event_id,
-                context=str(session_count),
-                description="The program is live. Browse sessions and build your plan.",
+                subject_key=subject_key,
+                context=headline if reason else str(session_count),
+                description=description,
             )
             session.add(notification)
             session.flush()
@@ -1674,11 +2190,25 @@ def notify_program_available(
             in_app_created += 1
 
         did_send = False
+        notification.description = description
         if not user.email_schedule_updates_enabled:
             email_status = "disabled"
         elif notification.emailed_at is not None and not body.resend:
             email_status = "already_sent"
-        elif send_schedule_program_available_email(user, event, session_count):
+        elif (
+            send_schedule_program_available_email(
+                user,
+                event,
+                session_count,
+                headline=headline,
+                note=description,
+                program_live=program_live,
+            )
+            if reason
+            else send_schedule_program_available_email(
+                user, event, session_count, headline=headline, note=note
+            )
+        ):
             notification.emailed_at = stamp_now
             record_delivery(
                 session,
@@ -1703,9 +2233,14 @@ def notify_program_available(
         else:
             delivered = send_push(
                 user_id,
-                title="Program now available",
-                body=f"The program for {event.title} is live. Build your plan.",
-                url=f"/event/{event_id}/program",
+                title=f"{headline or 'Program now available'} · {event.title}",
+                body=(description if reason else note)
+                or "The program is live. Build your plan.",
+                url=(
+                    f"/event/{event_id}/program"
+                    if program_live
+                    else f"/event/{event_id}"
+                ),
                 tag=f"schedule-program:{event_id}",
             )
             if delivered:
@@ -1851,6 +2386,22 @@ def import_schedule(
     return result
 
 
+@admin_router.get("/publish-preview", response_model=SchedulePublishPreviewResponse)
+def preview_publish(event_id: str, session: Session = Depends(get_session)):
+    schedule = _schedule_for_event(session, event_id)
+    latest = latest_publication(session, schedule.id)
+    if latest is None:
+        return SchedulePublishPreviewResponse(impacted_user_ids=[])
+    changes = planned_session_changes(
+        session, event_id, latest.snapshot, build_snapshot(session, schedule)
+    )
+    sample = next(iter(changes.values()), None)
+    return SchedulePublishPreviewResponse(
+        impacted_user_ids=list(changes),
+        sample_message=planned_change_description(sample) if sample else None,
+    )
+
+
 @admin_router.post("/publish", response_model=SchedulePublishResponse)
 def publish_schedule(
     event_id: str,
@@ -1873,6 +2424,9 @@ def publish_schedule(
         published_by_user_id=editor.id,
     )
     session.add(publication)
+    # Publishing a new version always makes the program live again.
+    schedule.unpublished_at = None
+    session.add(schedule)
     impacted_notifications = []
     if latest is not None:
         impacted_notifications = notify_planned_session_changes(
@@ -1882,6 +2436,7 @@ def publish_schedule(
             version,
             latest.snapshot,
             snapshot,
+            notify=body.notify_impacted_planners,
         )
     session.commit()
 
@@ -1896,7 +2451,7 @@ def publish_schedule(
     broad_result = ScheduleProgramNotifyResponse(
         emailed=0, pushed=0, in_app_created=0, results=[]
     )
-    if version == 1 or body.notify_all_going:
+    if body.auto_announce and (version == 1 or body.notify_all_going):
         broad_result = _notify_publication_going_attendees(
             event_id, version, session, deliver=False
         )
@@ -1911,6 +2466,43 @@ def publish_schedule(
         "going_attendees": len(going_ids),
     }
     return snapshot
+
+
+@admin_router.post("/unpublish")
+def unpublish_schedule(
+    event_id: str,
+    session: Session = Depends(get_session),
+):
+    """Hide the public program. Publications are kept; republish restores them."""
+    schedule = _schedule_for_event(session, event_id)
+    if latest_publication(session, schedule.id) is None:
+        raise HTTPException(status_code=409, detail="Nothing published to unpublish")
+    if schedule.unpublished_at is None:
+        now = datetime.now(timezone.utc)
+        schedule.unpublished_at = now
+        schedule.updated_at = now
+        session.add(schedule)
+        session.commit()
+    return {"unpublished_at": schedule.unpublished_at}
+
+
+@admin_router.post("/republish")
+def republish_schedule(
+    event_id: str,
+    session: Session = Depends(get_session),
+):
+    """Make the latest publication public again without creating a new version."""
+    schedule = _schedule_for_event(session, event_id)
+    if latest_publication(session, schedule.id) is None:
+        raise HTTPException(
+            status_code=409, detail="Publish the program before republishing"
+        )
+    if schedule.unpublished_at is not None:
+        schedule.unpublished_at = None
+        schedule.updated_at = datetime.now(timezone.utc)
+        session.add(schedule)
+        session.commit()
+    return {"unpublished_at": None}
 
 
 def _deliver_publication(key: str) -> None:
@@ -1988,18 +2580,18 @@ def _deliver_publication(key: str) -> None:
                     )
             if notification.pushed_at is None and user.push_schedule_updates_enabled:
                 if kind == "planned_session_changed":
-                    title = "Your plan changed"
-                    body = f"The program for {event.title} changed. Review My Plan."
+                    title = f"Your plan changed · {event.title}"
+                    body = notification.description or "Review My Plan."
                     url = f"/event/{event_id}/program/plan"
                     tag = f"schedule-plan:{event_id}:{version}"
                 elif kind == "schedule_program_available":
-                    title = "Program now available"
-                    body = f"The program for {event.title} is live. Build your plan."
+                    title = f"Program now available · {event.title}"
+                    body = "The program is live. Build your plan."
                     url = f"/event/{event_id}/program"
                     tag = f"schedule-program:{event_id}:{version}"
                 else:
-                    title = "Program updated"
-                    body = f"The program for {event.title} changed. Review the latest schedule."
+                    title = f"Program updated · {event.title}"
+                    body = "The program changed. Review the latest schedule."
                     url = f"/event/{event_id}/program"
                     tag = f"schedule-program:{event_id}:{version}"
                 try:
@@ -2167,13 +2759,14 @@ def _notify_publication_going_attendees(
             try:
                 delivered = send_push(
                     user.id,
-                    title="Program now available"
-                    if version == 1
-                    else "Program updated",
+                    title=(
+                        "Program now available" if version == 1 else "Program updated"
+                    )
+                    + f" · {event.title}",
                     body=(
-                        f"The program for {event.title} is live. Build your plan."
+                        "The program is live. Build your plan."
                         if version == 1
-                        else f"The program for {event.title} changed. Review the latest schedule."
+                        else "The program changed. Review the latest schedule."
                     ),
                     url=f"/event/{event_id}/program",
                     tag=f"schedule-program:{event_id}:{version}",

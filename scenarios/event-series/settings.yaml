@@ -1,5 +1,7 @@
 # Auto-detection is intentionally OFF so the scenario exercises the manual
-# "Scan now" action in the Series panel. Flip to true to instead observe a
-# series being auto-grouped as part of the sync in step 1.
+# "Scan now" action in the Series panel. The detection thresholds are left
+# at their defaults (title 72%, 395 days, 300 m venue radius, 50 km cutoff,
+# cross-calendar on, approved series reopened on a new occurrence) and are
+# edited from the Series panel's Settings tab during the test plan.
 settings:
   series_auto_detect_enabled: false

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import useBackToClose from '../../hooks/useBackToClose';
-import { Check, ChevronLeft, X } from 'lucide-react';
+import { Check, CalendarX, ChevronLeft, X } from 'lucide-react';
 import type { SimilarEvent, SiteSettings } from '../../api';
 import { fetchEvent, fetchOwnSuggestion, fetchSettings, fetchSimilarEvents, fetchTagGroups, proposeEventChange, submitEventPromoCode, submitSuggestion, updateOwnSuggestion } from '../../api';
 import type { CalendarEvent, EventChangeCreate, TagGroup } from '../../types';
 import EventModal from '../EventModal';
+import CancelEventSheet from '../CancelEventSheet';
 import { useAuth } from '../../context/AuthContext';
 import Step1Event from './Step1Event';
 import Step2Details from './Step2Details';
@@ -144,6 +145,7 @@ export default function SuggestEventWizard({ onClose, suggestionId, changeEventI
     const [similar, setSimilar] = useState<SimilarEvent[] | null>(null);
     const [sentPublic, setSentPublic] = useState(false);
     const [preview, setPreview] = useState<CalendarEvent | null>(null);
+    const [cancelSheet, setCancelSheet] = useState<'open' | 'sent' | null>(null);
     const checkedSimilarFor = useRef<string | null>(null);
     const onCloseRef = useRef(onClose);
     useEffect(() => {
@@ -306,11 +308,11 @@ export default function SuggestEventWizard({ onClose, suggestionId, changeEventI
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             // Sub-pages handle their own Escape first.
-            if (e.key === 'Escape' && !subPageOpen && !preview) requestClose();
+            if (e.key === 'Escape' && !subPageOpen && !preview && !cancelSheet) requestClose();
         };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
-    }, [subPageOpen, preview, requestClose]);
+    }, [subPageOpen, preview, cancelSheet, requestClose]);
 
     const goNext = async () => {
         const invalid = validateStep(step, state, requiredDance, requiredReach);
@@ -685,7 +687,15 @@ export default function SuggestEventWizard({ onClose, suggestionId, changeEventI
                                 </ul>
                             </div>
                         ) : step === 1 ? (
-                            <Step1Event {...stepProps} allowRepeat={!changing} />
+                            <>
+                                <Step1Event {...stepProps} allowRepeat={!changing} />
+                                {organizer && changeBase ? (
+                                    <button type="button" onClick={() => setCancelSheet('open')} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-danger hover:bg-canvas">
+                                        <CalendarX size={16} aria-hidden="true" />
+                                        {changeBase.is_cancelled ? 'Request restore' : 'Request cancellation'}
+                                    </button>
+                                ) : null}
+                            </>
                         ) : step === 2 ? (
                             <Step2Details
                                 {...stepProps}
@@ -752,6 +762,15 @@ export default function SuggestEventWizard({ onClose, suggestionId, changeEventI
             </section>
 
             {preview ? <EventModal event={preview} onClose={() => setPreview(null)} source="suggest-similar" /> : null}
+            {cancelSheet && changeBase ? (
+                <CancelEventSheet
+                    eventId={changeBase.event_id}
+                    eventTitle={changeBase.title}
+                    cancelled={Boolean(changeBase.is_cancelled)}
+                    onSent={() => setCancelSheet('sent')}
+                    onClose={() => (cancelSheet === 'sent' ? onClose() : setCancelSheet(null))}
+                />
+            ) : null}
 
             {confirmingClose ? (
                 <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 p-4">

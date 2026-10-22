@@ -1,30 +1,34 @@
 """Recurring-event ("series") detection for CachedEvent rows.
 
 An event *series* is a cluster of CachedEvent rows suspected of being
-different occurrences of the same recurring event — e.g. a weekly milonga
-that gets synced from Google Calendar as a separate row per week (this repo
-has no ``recurringEventId``/iCalUID captured during sync, so series
-identity is inferred, not structural).
+different occurrences of the same recurring event — a weekly social, or the
+yearly editions of a festival (this repo has no ``recurringEventId``/iCalUID
+captured during sync, so series identity is inferred, not structural).
 
-Two-step algorithm, mirroring ``backend.services.duplicate_detection``
-(same SQLite/Postgres portability constraint — no trigram extension):
+Two-step algorithm (same SQLite/Postgres portability constraint as
+``backend.services.duplicate_detection`` — no trigram extension):
 
-  1. An indexed SQL query narrows the search to active events in the SAME
-     calendar within a generous date window of the target event's start.
-  2. The (small) candidate set from step 1 is compared in Python:
-     ``difflib.SequenceMatcher`` on normalized titles (and, when both
-     events have one, normalized locations) must clear their respective
-     thresholds. Candidates whose start times are within
-     ``MIN_OCCURRENCE_SEPARATION_HOURS`` of the target are skipped — those
-     are near-duplicate territory (same occurrence, not a different one),
-     handled instead by ``duplicate_detection``.
+  1. An indexed SQL query narrows candidates to active events — upcoming or
+     already ended — whose start is within ``max_gap_days`` of the target's.
+     Calendars may differ (a festival's yearly editions are often listed by
+     different organizers/aggregators).
+  2. Each candidate is compared in Python (``_is_match``):
+       - start gap of at least ``MIN_OCCURRENCE_SEPARATION_HOURS`` (closer
+         starts are the same occurrence — duplicate detection's territory);
+       - title similarity on normalized titles with years/edition markers
+         and generic words ("salsa", "festival", ...) removed;
+       - location: same place_id, within ``venue_radius_m``, same city, or a
+         textual match; never more than ``max_distance_km`` apart. With no
+         location data at all, only same-calendar events can match.
 
-Detected pairs are grouped via the same union-find-by-membership scheme as
-duplicate detection: if a matched event already belongs to an existing
-pending series, the new event joins that series; otherwise a new series is
-created. Once two events have ever been recorded together in a series
-(pending, resolved, or dismissed), the scan won't recreate a group for that
-same pair — an admin's "Approve" / "Not a series" decision is sticky.
+Detected pairs are grouped by membership: if the matched event already
+belongs to a pending series the new event joins it; a resolved series is
+joined and reopened as pending (when ``join_resolved_enabled``) so an admin
+re-confirms; dismissed series and events an admin removed from a series
+(``EventSeriesExclusion``) are never touched. Once two events have been
+recorded together, the scan won't regroup that pair.
+
+Thresholds are admin-tunable site settings (``load_config``).
 
 Unlike duplicate resolution, approving/dismissing a series never hides or
 blocks any member event — every occurrence stays independently visible.
@@ -32,8 +36,12 @@ blocks any member event — every occurrence stays independently visible.
 
 from __future__ import annotations
 
+import bisect
 import difflib
+import math
 import re
+import unicodedata
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
@@ -41,31 +49,67 @@ from sqlmodel import Session, select
 from backend.db.models import (
     CachedEvent,
     EventSeries,
+    EventSeriesExclusion,
     EventSeriesMember,
     EventSeriesScanLog,
     SiteSetting,
 )
-
-# Candidate window: how far apart two events' start times may be to still
-# be considered as different occurrences of the same series. Generous
-# enough to catch monthly/biweekly cadences, not just weekly.
-CANDIDATE_WINDOW_DAYS = 120
 
 # Two events whose starts are closer together than this are treated as the
 # same occurrence (near-duplicate territory), not different occurrences of
 # a series — skip them here so the two features don't overlap.
 MIN_OCCURRENCE_SEPARATION_HOURS = 20
 
-# Minimum difflib.SequenceMatcher ratio (0-1) on normalized titles for a
-# pair to be flagged as a likely series match.
-TITLE_SIMILARITY_THRESHOLD = 0.72
-
-# Minimum ratio on normalized locations when BOTH events have one set.
-# When either event has no location, the location check is skipped
-# (title + calendar + cadence alone still has to clear the bar).
+# Minimum ratio on normalized location text (fallback when coordinates and
+# city don't decide).
 LOCATION_SIMILARITY_THRESHOLD = 0.6
 
+DEFAULT_GENERIC_TITLE_WORDS = (
+    "salsa", "bachata", "kizomba", "zouk", "mambo", "tango", "son", "cha",
+    "rueda", "semba", "kompa", "latin", "latino", "afro", "sensual", "dance",
+    "dancing", "festival", "fest", "congress", "weekend", "marathon",
+    "social", "night", "party", "workshop", "workshops", "bootcamp",
+    "edition", "official", "event", "international", "int", "world", "the",
+    "and", "of", "at", "in", "by", "with", "a", "de", "la", "le", "el", "y",
+    "et", "du", "des", "en",
+)  # fmt: skip
+
+SETTING_KEYS = {
+    "auto_detect_enabled": "series_auto_detect_enabled",
+    "title_similarity_pct": "series_title_similarity_pct",
+    "max_gap_days": "series_max_gap_days",
+    "venue_radius_m": "series_venue_radius_m",
+    "max_distance_km": "series_max_distance_km",
+    "cross_calendar_enabled": "series_cross_calendar_enabled",
+    "join_resolved_enabled": "series_join_resolved_enabled",
+    "generic_title_words": "series_generic_title_words",
+}
+
+
+@dataclass(frozen=True)
+class SeriesDetectionConfig:
+    auto_detect_enabled: bool = False
+    title_similarity_pct: int = 72
+    max_gap_days: int = 395  # a yearly edition plus a month of drift
+    venue_radius_m: int = 300
+    max_distance_km: int = 50
+    cross_calendar_enabled: bool = True
+    join_resolved_enabled: bool = True
+    generic_title_words: tuple[str, ...] = DEFAULT_GENERIC_TITLE_WORDS
+
+
+DEFAULT_CONFIG = SeriesDetectionConfig()
+
 _WHITESPACE_RE = re.compile(r"\s+")
+_YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
+_EDITION_RE = re.compile(
+    r"\b\d+\s*(?:st|nd|rd|th)?\s*edition\b|\bedition\s*\d+\b|\b\d+(?:st|nd|rd|th)\b",
+    re.IGNORECASE,
+)
+_HEAD_SPLIT_RE = re.compile(r"\s[-|\u2013\u2014:]\s|\s\(|\*")
+_NON_WORD_RE = re.compile(r"[^\w\s]+")
+_EMPTY_PARENS_RE = re.compile(r"\(\s*\)|\[\s*\]")
+_EDGE_PUNCT = " -|\u2013\u2014:,*"
 
 
 class SeriesMembershipConflict(ValueError):
@@ -75,6 +119,48 @@ class SeriesMembershipConflict(ValueError):
     def __init__(self, conflicts: dict[str, int]) -> None:
         self.conflicts = conflicts  # event_id -> existing series_id
         super().__init__("One or more events already belong to a series")
+
+
+def _parse_words(raw: str) -> tuple[str, ...]:
+    return tuple(w for w in (p.strip().lower() for p in raw.split(",")) if w)
+
+
+def load_config(session: Session) -> SeriesDetectionConfig:
+    values: dict = {}
+    for field, key in SETTING_KEYS.items():
+        row = session.get(SiteSetting, key)
+        if row is None:
+            continue
+        default = getattr(DEFAULT_CONFIG, field)
+        if isinstance(default, bool):
+            values[field] = row.value.lower() == "true"
+        elif isinstance(default, int):
+            if row.value.isdigit():
+                values[field] = int(row.value)
+        else:
+            values[field] = _parse_words(row.value)
+    return SeriesDetectionConfig(**values)
+
+
+def save_config(session: Session, updates: dict) -> SeriesDetectionConfig:
+    for field, value in updates.items():
+        if value is None or field not in SETTING_KEYS:
+            continue
+        if isinstance(value, bool):
+            stored = str(value).lower()
+        elif isinstance(value, int):
+            stored = str(value)
+        else:
+            stored = ",".join(_parse_words(",".join(value)))
+        key = SETTING_KEYS[field]
+        row = session.get(SiteSetting, key)
+        if row:
+            row.value = stored
+        else:
+            row = SiteSetting(key=key, value=stored)
+        session.add(row)
+    session.commit()
+    return load_config(session)
 
 
 def _series_ids_for_events(session: Session, event_ids: list[str]) -> dict[str, int]:
@@ -104,6 +190,123 @@ def _normalize(text: str) -> str:
 
 def _similarity(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, _normalize(a), _normalize(b)).ratio()
+
+
+def _strip_editions(title: str) -> str:
+    text = unicodedata.normalize("NFKC", title or "")
+    text = _YEAR_RE.sub(" ", text)
+    return _EDITION_RE.sub(" ", text)
+
+
+def _title_tokens(text: str) -> list[str]:
+    return [w for w in _NON_WORD_RE.sub(" ", text.lower()).split() if not w.isdigit()]
+
+
+def _token_score(a: list[str], b: list[str], generic: frozenset[str]) -> float:
+    if not a or not b:
+        return 0.0
+    da = [w for w in a if w not in generic]
+    db = [w for w in b if w not in generic]
+    if not da and not db:
+        # Nothing distinctive ("Salsa Marathon" vs "Salsa Weekend"): exact words only.
+        return 1.0 if set(a) == set(b) else 0.0
+    if not da or not db:
+        return 0.0
+    in_order = difflib.SequenceMatcher(None, " ".join(da), " ".join(db)).ratio()
+    any_order = difflib.SequenceMatcher(
+        None, " ".join(sorted(da)), " ".join(sorted(db))
+    ).ratio()
+    return max(in_order, any_order)
+
+
+def _title_score(a: str, b: str, generic: frozenset[str]) -> float:
+    """Best similarity between the full titles and between their heads (the
+    part before " - ", "(" or "|"), ignoring years, editions and generic words."""
+    sa, sb = _strip_editions(a), _strip_editions(b)
+    full = _token_score(_title_tokens(sa), _title_tokens(sb), generic)
+    head = _token_score(
+        _title_tokens(_HEAD_SPLIT_RE.split(sa)[0]),
+        _title_tokens(_HEAD_SPLIT_RE.split(sb)[0]),
+        generic,
+    )
+    return max(full, head)
+
+
+def canonical_series_title(title: str) -> str:
+    text = _EMPTY_PARENS_RE.sub(" ", _strip_editions(title))
+    text = _WHITESPACE_RE.sub(" ", text).strip(_EDGE_PUNCT)
+    return text or title
+
+
+def _distance_km(a: CachedEvent, b: CachedEvent) -> float | None:
+    if None in (a.latitude, a.longitude, b.latitude, b.longitude):
+        return None
+    p1, p2 = math.radians(a.latitude), math.radians(b.latitude)
+    dp = p2 - p1
+    dl = math.radians(b.longitude - a.longitude)
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 6371 * 2 * math.asin(math.sqrt(h))
+
+
+def _location_text_match(a: str, b: str) -> bool:
+    a, b = _normalize(a), _normalize(b)
+    return (
+        a in b
+        or b in a
+        or a.split(",")[0].strip() == b.split(",")[0].strip()
+        or _similarity(a, b) >= LOCATION_SIMILARITY_THRESHOLD
+    )
+
+
+def _locations_match(
+    a: CachedEvent, b: CachedEvent, cfg: SeriesDetectionConfig
+) -> bool | None:
+    """True/False when location data decides, None when there's none to compare.
+    Coordinates are often city-level geocodes, so city and text also count."""
+    distance = _distance_km(a, b)
+    if distance is not None and distance > cfg.max_distance_km:
+        return False
+    if a.place_id and a.place_id == b.place_id:
+        return True
+    if distance is not None and distance * 1000 <= cfg.venue_radius_m:
+        return True
+    if (
+        a.city
+        and b.city
+        and _normalize(a.city) == _normalize(b.city)
+        and (a.country_code or "").lower() == (b.country_code or "").lower()
+    ):
+        return True
+    if a.location and b.location:
+        return _location_text_match(a.location, b.location)
+    if distance is not None:
+        return False
+    return None
+
+
+def _is_match(
+    target: CachedEvent, candidate: CachedEvent, cfg: SeriesDetectionConfig
+) -> bool:
+    if candidate.event_id == target.event_id:
+        return False
+    gap = abs(candidate.start - target.start)
+    if gap < timedelta(hours=MIN_OCCURRENCE_SEPARATION_HOURS):
+        return False
+    if gap > timedelta(days=cfg.max_gap_days):
+        return False
+    same_calendar = candidate.calendar_id == target.calendar_id
+    if not same_calendar and not cfg.cross_calendar_enabled:
+        return False
+    # A shared city name alone doesn't make two titles the same event.
+    cities = {w for e in (target, candidate) if e.city for w in _title_tokens(e.city)}
+    generic = frozenset(cfg.generic_title_words) | cities
+    score = _title_score(target.title, candidate.title, generic)
+    if score < cfg.title_similarity_pct / 100:
+        return False
+    location = _locations_match(target, candidate, cfg)
+    if location is None:
+        return same_calendar
+    return location
 
 
 def _is_auto_detect_enabled(session: Session) -> bool:
@@ -139,82 +342,106 @@ def _existing_pair_recorded(session: Session, event_id_a: str, event_id_b: str) 
     return bool(series_ids_a & series_ids_b)
 
 
-def find_candidate_matches(
-    session: Session, event: CachedEvent, *, now: datetime | None = None
-) -> list[CachedEvent]:
-    """Active events in the same calendar, within ``CANDIDATE_WINDOW_DAYS``
-    of ``event.start``, with a similar title (and location, when both are
-    set) and a start time far enough away to not be a near-duplicate."""
-    now = now or datetime.now(timezone.utc)
-    window = timedelta(days=CANDIDATE_WINDOW_DAYS)
+def _is_excluded(session: Session, series_id: int, event_id: str) -> bool:
+    return (
+        session.exec(
+            select(EventSeriesExclusion.id).where(
+                EventSeriesExclusion.series_id == series_id,
+                EventSeriesExclusion.event_id == event_id,
+            )
+        ).first()
+        is not None
+    )
+
+
+def _occurrence_taken(session: Session, series_id: int, event_id: str) -> bool:
+    """True if the series already has a member for this event's occurrence
+    (e.g. the same night cross-posted on another calendar)."""
+    event = session.get(CachedEvent, event_id)
     min_gap = timedelta(hours=MIN_OCCURRENCE_SEPARATION_HOURS)
-
-    narrowed = session.exec(
-        select(CachedEvent).where(
-            CachedEvent.event_id != event.event_id,
-            CachedEvent.calendar_id == event.calendar_id,
-            CachedEvent.deleted_at == None,  # noqa: E711
-            CachedEvent.is_hidden == False,  # noqa: E712
-            CachedEvent.end > now,
-            CachedEvent.start >= event.start - window,
-            CachedEvent.start <= event.start + window,
-        )
+    members = session.exec(
+        select(CachedEvent)
+        .join(EventSeriesMember, EventSeriesMember.event_id == CachedEvent.event_id)
+        .where(EventSeriesMember.series_id == series_id)
     ).all()
+    return any(abs(m.start - event.start) < min_gap for m in members)
 
-    matches = []
-    for c in narrowed:
-        if abs(c.start - event.start) < min_gap:
-            continue
-        if _similarity(event.title, c.title) < TITLE_SIMILARITY_THRESHOLD:
-            continue
-        if event.location and c.location:
-            if _similarity(event.location, c.location) < LOCATION_SIMILARITY_THRESHOLD:
-                continue
-        matches.append(c)
-    return matches
+
+def _candidate_query(event: CachedEvent, cfg: SeriesDetectionConfig):
+    window = timedelta(days=cfg.max_gap_days)
+    query = select(CachedEvent).where(
+        CachedEvent.event_id != event.event_id,
+        CachedEvent.deleted_at == None,  # noqa: E711
+        CachedEvent.is_hidden == False,  # noqa: E712
+        CachedEvent.start >= event.start - window,
+        CachedEvent.start <= event.start + window,
+    )
+    if not cfg.cross_calendar_enabled:
+        query = query.where(CachedEvent.calendar_id == event.calendar_id)
+    return query
+
+
+def find_candidate_matches(
+    session: Session,
+    event: CachedEvent,
+    cfg: SeriesDetectionConfig | None = None,
+) -> list[CachedEvent]:
+    """Active events (upcoming or ended) that look like another occurrence of
+    ``event`` — see the module docstring for the matching rules."""
+    cfg = cfg or load_config(session)
+    narrowed = session.exec(_candidate_query(event, cfg)).all()
+    return [c for c in narrowed if _is_match(event, c, cfg)]
 
 
 def _add_to_series_or_create(
     session: Session,
     event_id: str,
     matched_event_id: str,
-    canonical_title: str,
+    title: str,
     *,
     source: str,
+    cfg: SeriesDetectionConfig = DEFAULT_CONFIG,
 ) -> EventSeries | None:
     """Ensure event_id and matched_event_id are recorded together in a
-    pending series. Returns the (possibly newly created) series, or None
-    if this pair was already recorded (skipped)."""
+    series. Returns the joined/created series, or None when skipped."""
     if _existing_pair_recorded(session, event_id, matched_event_id):
         return None
 
     series_a = _series_of(session, event_id)
     series_b = _series_of(session, matched_event_id)
 
-    # Single-membership invariant: an event belongs to at most one series,
-    # so never span two series or disturb a resolved/dismissed membership.
+    # Single-membership invariant: an event belongs to at most one series.
     if series_a is not None and series_b is not None:
         return None
 
-    series: EventSeries | None = None
-    if series_a is not None and series_a.status == "pending":
-        series = series_a
-    elif series_b is not None and series_b.status == "pending":
-        series = series_b
-    elif series_a is not None or series_b is not None:
-        return None
+    existing = series_a or series_b
+    if existing is not None:
+        newcomer = matched_event_id if series_a is not None else event_id
+        if (
+            existing.status == "dismissed"
+            or _is_excluded(session, existing.id, newcomer)
+            or _occurrence_taken(session, existing.id, newcomer)
+        ):
+            return None
+        if existing.status == "resolved":
+            if not cfg.join_resolved_enabled:
+                return None
+            existing.status = "pending"
+            existing.resolved_at = None
+            existing.resolved_by_admin = None
+            session.add(existing)
+        session.add(EventSeriesMember(series_id=existing.id, event_id=newcomer))
+        session.flush()
+        return existing
 
-    if series is None:
-        series = EventSeries(
-            status="pending", source=source, canonical_title=canonical_title
-        )
-        session.add(series)
-        session.flush()  # assign series.id
-
+    series = EventSeries(
+        status="pending", source=source, canonical_title=canonical_series_title(title)
+    )
+    session.add(series)
+    session.flush()  # assign series.id
     for eid in (event_id, matched_event_id):
-        if _series_of(session, eid) is None:
-            session.add(EventSeriesMember(series_id=series.id, event_id=eid))
-
+        session.add(EventSeriesMember(series_id=series.id, event_id=eid))
+    session.flush()
     return series
 
 
@@ -239,6 +466,7 @@ def detect_series_for_event(
     groups_created = 0
     candidates_found = 0
     try:
+        cfg = load_config(session)
         event = session.get(CachedEvent, event_id)
         if (
             event is not None
@@ -246,11 +474,16 @@ def detect_series_for_event(
             and not event.is_hidden
             and event.end > datetime.now(timezone.utc)
         ):
-            matches = find_candidate_matches(session, event)
+            matches = find_candidate_matches(session, event, cfg)
             candidates_found = len(matches)
             for match in matches:
                 series = _add_to_series_or_create(
-                    session, event.event_id, match.event_id, event.title, source="auto"
+                    session,
+                    event.event_id,
+                    match.event_id,
+                    event.title,
+                    source="auto",
+                    cfg=cfg,
                 )
                 if series is not None:
                     groups_created += 1
@@ -288,28 +521,43 @@ def run_full_scan(
     groups_created = 0
     candidates_found = 0
     try:
+        cfg = load_config(session)
         now = datetime.now(timezone.utc)
-        events = session.exec(
+        window = timedelta(days=cfg.max_gap_days)
+        active = (
+            CachedEvent.deleted_at == None,  # noqa: E711
+            CachedEvent.is_hidden == False,  # noqa: E712
+        )
+        targets = session.exec(
             select(CachedEvent)
-            .where(
-                CachedEvent.deleted_at == None,  # noqa: E711
-                CachedEvent.is_hidden == False,  # noqa: E712
-                CachedEvent.end > now,
-            )
-            .order_by(CachedEvent.start)
+            .where(*active, CachedEvent.end > now)
+            .order_by(CachedEvent.start, CachedEvent.event_id)
         ).all()
+        # One in-memory pool instead of a query per target.
+        pool = session.exec(
+            select(CachedEvent)
+            .where(*active, CachedEvent.start >= now - window)
+            .order_by(CachedEvent.start, CachedEvent.event_id)
+        ).all()
+        pool_starts = [e.start for e in pool]
 
         seen_pairs: set[tuple[str, str]] = set()
-        for event in events:
-            matches = find_candidate_matches(session, event, now=now)
-            for match in matches:
+        for event in targets:
+            lo = bisect.bisect_left(pool_starts, event.start - window)
+            hi = bisect.bisect_right(pool_starts, event.start + window)
+            for match in pool[lo:hi]:
                 pair = tuple(sorted((event.event_id, match.event_id)))
-                if pair in seen_pairs:
+                if pair in seen_pairs or not _is_match(event, match, cfg):
                     continue
                 seen_pairs.add(pair)
                 candidates_found += 1
                 series = _add_to_series_or_create(
-                    session, event.event_id, match.event_id, event.title, source="auto"
+                    session,
+                    event.event_id,
+                    match.event_id,
+                    event.title,
+                    source="auto",
+                    cfg=cfg,
                 )
                 if series is not None:
                     groups_created += 1
@@ -377,6 +625,13 @@ def add_events_to_series(
     conflicts = _series_ids_for_events(session, event_ids)
     if conflicts:
         raise SeriesMembershipConflict(conflicts)
+    for exclusion in session.exec(
+        select(EventSeriesExclusion).where(
+            EventSeriesExclusion.series_id == series_id,
+            EventSeriesExclusion.event_id.in_(event_ids),
+        )
+    ).all():
+        session.delete(exclusion)
     for event_id in event_ids:
         session.add(EventSeriesMember(series_id=series.id, event_id=event_id))
     session.commit()
@@ -439,9 +694,10 @@ def dismiss_series(
 
 def split_member(session: Session, series_id: int, event_id: str) -> EventSeries | None:
     """Remove a single occurrence from a series ("Split off"/"Remove"). The
-    event itself is untouched, only its series membership is removed. When
-    fewer than two members remain the series is hard-deleted (a series of
-    one is meaningless); returns None in that case, else the series."""
+    event itself is untouched, only its series membership is removed, and
+    auto-detection won't re-add it. When fewer than two members remain the
+    series is hard-deleted (a series of one is meaningless); returns None in
+    that case, else the series."""
     series = session.get(EventSeries, series_id)
     if series is None:
         raise ValueError("Series not found")
@@ -459,12 +715,19 @@ def split_member(session: Session, series_id: int, event_id: str) -> EventSeries
         select(EventSeriesMember).where(EventSeriesMember.series_id == series_id)
     ).all()
     if len(remaining) < 2:
-        for row in remaining:
+        exclusions = session.exec(
+            select(EventSeriesExclusion).where(
+                EventSeriesExclusion.series_id == series_id
+            )
+        ).all()
+        for row in [*remaining, *exclusions]:
             session.delete(row)
-        session.flush()  # remove member rows before the parent series (FK)
+        session.flush()  # remove child rows before the parent series (FK)
         session.delete(series)
         session.commit()
         return None
+    if not _is_excluded(session, series_id, event_id):
+        session.add(EventSeriesExclusion(series_id=series_id, event_id=event_id))
     session.commit()
     session.refresh(series)
     return series

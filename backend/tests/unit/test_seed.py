@@ -1468,3 +1468,30 @@ class TestDatabaseSeeder:
                 assert (scenario_dir / "event-assets" / filename).exists() or (
                     SCENARIOS_DIR / "default" / "event-assets" / filename
                 ).exists(), f"{assets_path}: missing file {filename}"
+
+
+@pytest.mark.unit
+def test_schedule_fixture_sessions_have_plausible_durations():
+    import yaml
+
+    from backend.db.seed import SCENARIOS_DIR
+
+    def parse(value) -> datetime | None:
+        if isinstance(value, datetime):
+            return value
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None  # relative "wN Day HH:MM" values are resolved at seed time
+
+    for path in SCENARIOS_DIR.glob("*/db-schedules.yaml"):
+        data = yaml.safe_load(path.read_text()) or {}
+        for schedule in data.get("schedules") or []:
+            # Overview items are broad windows (e.g. a day of workshops), so only sessions are checked.
+            for row in schedule.get("sessions") or []:
+                start, end = parse(row.get("start")), parse(row.get("end"))
+                if start is None or end is None:
+                    continue
+                label = f"{path}: {row.get('title')}"
+                assert end > start, f"{label} ends before it starts"
+                assert end - start <= timedelta(hours=12), f"{label} lasts over 12h"

@@ -26,6 +26,8 @@ from backend.db.models import (
 from backend.services.user_avatars import resolve_user_avatar
 
 
+LONG_SESSION_DURATION = timedelta(hours=12)
+
 DEFAULT_ACTIVITY_TYPES = (
     ("Workshop", "blue"),
     ("Bootcamp", "violet"),
@@ -336,7 +338,30 @@ def published_schedule_event_ids(session: Session, event_ids: list[str]) -> set[
                 SchedulePublication,
                 SchedulePublication.schedule_id == EventSchedule.id,
             )
-            .where(EventSchedule.event_id.in_(event_ids))
+            .where(
+                EventSchedule.event_id.in_(event_ids),
+                EventSchedule.unpublished_at.is_(None),
+            )
+            .distinct()
+        ).all()
+    )
+
+
+def unpublished_schedule_event_ids(session: Session, event_ids: list[str]) -> set[str]:
+    """Events whose program was published and then unpublished."""
+    if not event_ids:
+        return set()
+    return set(
+        session.exec(
+            select(EventSchedule.event_id)
+            .join(
+                SchedulePublication,
+                SchedulePublication.schedule_id == EventSchedule.id,
+            )
+            .where(
+                EventSchedule.event_id.in_(event_ids),
+                EventSchedule.unpublished_at.is_not(None),
+            )
             .distinct()
         ).all()
     )
@@ -669,6 +694,15 @@ def compute_issues(session: Session, schedule: EventSchedule) -> list[dict]:
                     row.id,
                 )
             )
+        elif row.end - row.start > LONG_SESSION_DURATION:
+            issues.append(
+                _issue(
+                    "long_duration",
+                    "warning",
+                    f"{row.title} lasts more than 12 hours",
+                    row.id,
+                )
+            )
         if (
             allowed_days
             and program_day_for(
@@ -710,6 +744,8 @@ def compute_issues(session: Session, schedule: EventSchedule) -> list[dict]:
     )
     by_room: dict[int, list[ScheduleSession]] = {}
     for row in sessions:
+        if row.is_cancelled:
+            continue
         for room_id in effective_room_ids(row, rooms_by_session.get(row.id)):
             by_room.setdefault(room_id, []).append(row)
     reported_pairs: set[tuple[UUID, UUID]] = set()
@@ -971,6 +1007,7 @@ def compute_change_details(current: dict, previous: dict | None) -> list[dict]:
                     "entity_type": entity_type,
                     "operation": "create",
                     "entity_id": entity_id,
+                    "external_id": row.get("external_id"),
                     "label": row[label_field],
                     "fields": [],
                 }

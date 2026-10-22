@@ -125,6 +125,9 @@ class EventResponse(BaseModel):
     is_cancelled: bool = False
     cancellation_note: Optional[str] = None
     schedule_published: bool = False
+    # True when the event has a program that was published and is now
+    # unpublished ("Program under work"). Never true when schedule_published is.
+    schedule_under_work: bool = False
     # True when the viewer only sees this event because they submitted it and
     # it is still awaiting review.
     owner_preview: bool = False
@@ -278,7 +281,27 @@ class ScheduleChangeResponse(BaseModel):
     ]
     operation: Literal["create", "update", "remove"]
     entity_id: str
+    external_id: Optional[str] = None
     label: str
+    fields: list[ScheduleFieldChangeResponse] = []
+
+
+class ScheduleChangeRef(BaseModel):
+    """One change from a review list that the editor wants undone."""
+
+    entity_type: Literal[
+        "schedule",
+        "venue",
+        "room",
+        "level",
+        "activity_type",
+        "contributor",
+        "session",
+        "overview_item",
+    ]
+    operation: Literal["create", "update", "remove"]
+    entity_id: str = Field(max_length=64)
+    external_id: Optional[str] = Field(default=None, max_length=120)
     fields: list[ScheduleFieldChangeResponse] = []
 
 
@@ -293,6 +316,7 @@ class ScheduleDiffResponse(BaseModel):
 class AdminEventScheduleResponse(EventScheduleResponse):
     issues: list[ScheduleIssueResponse] = []
     diff: ScheduleDiffResponse
+    unpublished_at: Optional[datetime] = None
 
 
 class EventScheduleEditorAccessResponse(BaseModel):
@@ -308,7 +332,9 @@ class EventScheduleEditorResponse(BaseModel):
     email: str
     name: Optional[str] = None
     handle: Optional[str] = None
-    granted_at: datetime
+    granted_at: Optional[datetime] = None
+    # The event's verified organizer edits the program without an explicit grant.
+    is_organizer: bool = False
 
 
 class ProgramExportSessionResponse(BaseModel):
@@ -370,6 +396,15 @@ class SchedulePublishResponse(EventScheduleResponse):
 
 class SchedulePublishRequest(BaseModel):
     notify_all_going: bool = False
+    # False when the editor picks recipients in the notify dialog after publishing.
+    auto_announce: bool = True
+    # Personal "Your plan changed" messages for planners whose sessions changed.
+    notify_impacted_planners: bool = True
+
+
+class SchedulePublishPreviewResponse(BaseModel):
+    impacted_user_ids: list[UUID]
+    sample_message: Optional[str] = None
 
 
 class ScheduleImportVenue(BaseModel):
@@ -590,6 +625,11 @@ class ScheduleImportDocument(BaseModel):
 class ScheduleImportRequest(BaseModel):
     mode: Literal["merge", "replace"] = "merge"
     document: ScheduleImportDocument
+    exclude: list[ScheduleChangeRef] = Field(
+        default=[],
+        max_length=1000,
+        description="Previewed changes to skip; matched by external_id for creates.",
+    )
 
 
 class ScheduleImportOperations(BaseModel):
@@ -635,11 +675,19 @@ class ScheduleProgramCandidate(BaseModel):
     push_enabled: bool = True
     has_push_subscription: bool = False
     already_notified: bool = False
+    is_going: bool = False
+    has_plan: bool = False
 
 
 class ScheduleProgramNotifyRequest(BaseModel):
     user_ids: list[UUID] = Field(..., min_length=1, max_length=200)
     resend: bool = False
+    title: Optional[str] = Field(default=None, max_length=120)
+    message: Optional[str] = Field(default=None, max_length=255)
+    # Set by the notify dialog: every send creates a fresh notification.
+    reason: Optional[
+        Literal["available", "updated", "under_work", "back", "custom"]
+    ] = None
 
     @model_validator(mode="after")
     def validate_unique_user_ids(self):
@@ -3359,6 +3407,28 @@ class SeriesRenameRequest(BaseModel):
 class SeriesSplitResponse(BaseModel):
     dissolved: bool = False
     series: Optional[SeriesGroupResponse] = None
+
+
+class SeriesDetectionSettings(BaseModel):
+    auto_detect_enabled: bool
+    title_similarity_pct: int
+    max_gap_days: int
+    venue_radius_m: int
+    max_distance_km: int
+    cross_calendar_enabled: bool
+    join_resolved_enabled: bool
+    generic_title_words: list[str]
+
+
+class SeriesDetectionSettingsUpdate(BaseModel):
+    auto_detect_enabled: Optional[bool] = None
+    title_similarity_pct: Optional[int] = Field(default=None, ge=50, le=100)
+    max_gap_days: Optional[int] = Field(default=None, ge=1, le=730)
+    venue_radius_m: Optional[int] = Field(default=None, ge=0, le=5000)
+    max_distance_km: Optional[int] = Field(default=None, ge=1, le=1000)
+    cross_calendar_enabled: Optional[bool] = None
+    join_resolved_enabled: Optional[bool] = None
+    generic_title_words: Optional[list[str]] = Field(default=None, max_length=200)
 
 
 class FilterOption(BaseModel):
