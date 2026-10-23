@@ -3,12 +3,11 @@
  *
  * Reuses the friend-of-friend suggestions endpoint. Renders a compact
  * horizontally-scrollable row of small cards (avatar, name, reason,
- * Follow). The refresh control fetches a fresh batch in place; "See all"
- * routes to the full discovery surface. The component renders nothing
- * when there are no suggestions.
+ * Follow). The refresh control fetches a fresh batch in place. The
+ * component renders nothing when there are no suggestions.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { fetchMySuggestions, followUser, type FoFSuggestionItem } from '../api';
 import ScrollDotsIndicator from './ScrollDots';
 import { useScrollDots } from '../hooks/useScrollDots';
@@ -16,7 +15,6 @@ import { useScrollDots } from '../hooks/useScrollDots';
 const BATCH = 12;
 
 export default function SuggestionsCarousel() {
-    const navigate = useNavigate();
     const [items, setItems] = useState<FoFSuggestionItem[] | null>(null);
     const [total, setTotal] = useState(0);
     const [offset, setOffset] = useState(0);
@@ -81,29 +79,20 @@ export default function SuggestionsCarousel() {
         <section aria-label="Suggestions for you" className="mb-5">
             <div className="mb-2 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-ink">Suggestions for you</h2>
-                <div className="flex items-center gap-3">
-                    <button
-                        type="button"
-                        onClick={() => void onRefresh()}
-                        disabled={refreshing}
-                        aria-label="Refresh suggestions"
-                        title="Refresh suggestions"
-                        className="text-ink-soft hover:text-ink disabled:opacity-50"
-                    >
-                        <RefreshIcon spinning={refreshing} />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => navigate('/tribe/discover')}
-                        className="text-xs font-medium text-action hover:underline"
-                    >
-                        See all
-                    </button>
-                </div>
+                <button
+                    type="button"
+                    onClick={() => void onRefresh()}
+                    disabled={refreshing}
+                    aria-label="Refresh suggestions"
+                    title="Refresh suggestions"
+                    className="text-ink-soft hover:text-ink disabled:opacity-50"
+                >
+                    <RefreshIcon spinning={refreshing} />
+                </button>
             </div>
             <div
                 ref={railRef}
-                className="flex gap-3 overflow-x-auto scrollbar-none scroll-smooth"
+                className="flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth"
             >
                 {items === null
                     ? Array.from({ length: 4 }, (_, i) => (

@@ -1,0 +1,189 @@
+test_plan:
+  name: "People discovery — Build your tribe trail, Home people sheet, joined notifications"
+  description: >
+    For You shows "Build your tribe" right after "You might like" for small
+    circles (friends ≤ 9 by default) and at the bottom otherwise, with up to 5
+    people, "See all" when there are more, and a "Not interested" ✕ that
+    removes the person (for 90 days, everywhere) and backfills the slot. A
+    disposable Home bottom sheet reuses the same cards; its cadence depends on
+    the friend count (≤ 2 friends: every 48h, ≤ 9: weekly, more: never), it
+    pauses after 3 dismissals in a row, and it never stacks on top of the Home
+    review prompt (one Home sheet per session by default; install/push banners
+    stay hidden while a sheet is open). New members who share connections
+    with you trigger "joined Movida" notifications (in-app + one batched push
+    per day): 1 shared regular member, or 2 when curators/organizers are among
+    them; private and hidden-from-suggestions members never trigger it. Digest
+    emails always carry the people section, with a "New on Movida" subsection
+    and "See all". Admin Config > Notifications has a "People discovery" card
+    with settings, 30-day stats, and force tools.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - >-
+      Start scenario:
+      `SCENARIO=people-discovery RESET=1 task start:scenario`
+    - "Use a mobile viewport (e.g. iPhone 14) for the For You / sheet checks."
+    - "Sign out between users so each starts a fresh browser session (the sheet is checked once per session)."
+
+  cast:
+    - "Dana — 0 friends, follows curators cur1 + cur2."
+    - "Gina — 0 friends, attended Paris Salsa Saturday last week and hasn't reviewed it."
+    - "Eli — 5 friends (f1..f5)."
+    - "Fay — 12 friends (f1..f12)."
+    - "newbie1 (Nina) — joined yesterday, friends with f1."
+    - "newbie2 (Noah) — joined yesterday, follows cur1 only."
+    - "newbie3 (Nora) — joined yesterday, follows cur1 + cur2."
+    - "newbie4 — joined yesterday, private account, follows f1."
+    - "newbie5 — joined yesterday, 'Suggest my profile to others' off, follows f1."
+    - "Admin — admin@example.com."
+
+  steps:
+    - id: 1
+      title: "Small circle: sheet opens, trail sits under You might like"
+      description: "Sign in as Dana and open For You (`/`). Wait ~2s."
+      expected: >
+        A bottom sheet titled "Build your tribe" ("Follow a few dancers to see
+        where they are going.") shows horizontally scrollable cards for cur3,
+        cur4, org1, org2 (badges for curators/organizers), each with Follow and
+        ✕, plus "See all" and "Done" in the footer. Behind it, the "Build your
+        tribe" trail sits right after "You might like". No install/push banner
+        is visible while the sheet is open.
+
+    - id: 2
+      title: "Follow from the sheet refills the slot"
+      description: "In the sheet, tap Follow on org1, then tap Done."
+      expected: >
+        org1 disappears from both the sheet and the trail; the trail refetches.
+        After Done the sheet closes. Reloading the page (same session) does not
+        reopen the sheet.
+
+    - id: 3
+      title: "Cooldown for tier 1"
+      description: "Sign out, sign back in as Dana, open For You."
+      expected: "No sheet (tier 1 cooldown is 48h). The trail is still at the top."
+
+    - id: 4
+      title: "Review prompt wins the session"
+      description: "Sign in as Gina and open For You. Close the review wizard with 'Not now'."
+      expected: >
+        The review wizard for Paris Salsa Saturday opens first. After closing
+        it, the people sheet does NOT open in this session (one Home sheet per
+        session). The trail is still shown at the top.
+
+    - id: 5
+      title: "Mid circle: trail on top with See all, Not interested backfills"
+      description: >
+        Sign in as Eli and dismiss the sheet with ✕ (tier 2 sheet shows on the
+        first visit). On the trail, tap ✕ ("Not interested") on Fay.
+      expected: >
+        The trail is right after "You might like", shows 5 people (Fay with
+        "Followed by @f1 + 4 more", Nina, curators/organizers) and a "See all"
+        link to /tribe/network. After ✕, Fay disappears and the next candidate
+        slides in. Fay no longer appears on /tribe/network → Suggestions either.
+
+    - id: 6
+      title: "Big circle: trail at the bottom, no sheet"
+      description: "Sign in as Fay and open For You."
+      expected: >
+        No sheet. The "Build your tribe" trail is the last section of the page
+        (after "Share your experience" when present).
+
+    - id: 7
+      title: "Joined notifications are created"
+      description: "`SCENARIO=people-discovery task notify:trigger:scenario`"
+      expected: >
+        The CLI prints a `people_joined : {'created': N, 'pushed': N}` line
+        with N > 0 (and `suggestion_images : {'skipped':
+        'storage_not_configured'}` instead of a traceback). In-app rows of kind
+        suggested_person_joined exist for: Eli, Fay, newbie4 and newbie5
+        (actor Nina — they all share f1); Dana (actor Nora, 2 curator
+        connections). None with Noah as actor (only 1 shared curator) and none
+        with newbie4 (private) or newbie5 (hidden) as actors. Running the
+        trigger again creates nothing new.
+
+    - id: 8
+      title: "In-app row + Follow"
+      description: "Sign in as Eli, open the bell, then Notifications → People."
+      expected: >
+        "Nina Newbie joined Movida · 1 mutual connection" with a Follow
+        button; it also appears under Tribe → Activity. Tapping Follow flips
+        it to "✓ Following"; tapping the row opens /u/newbie1.
+
+    - id: 9
+      title: "Push is batched once per day"
+      description: >
+        With push enabled for Eli (Settings → Notifications → "People you may
+        know" push ON and browser subscribed), trigger another tick after
+        seeding a new joiner via the admin tool (step 12).
+      expected: >
+        At most one "… joined Movida" push per recipient per 24h; later
+        joiners stay in-app until the next day. Turning the push toggle off
+        stops pushes but keeps in-app rows.
+
+    - id: 10
+      title: "Digest: people section always present"
+      description: >
+        `SCENARIO=people-discovery task notify:trigger:scenario -- --immediate-emails`,
+        then open Eli's digest in Mailpit.
+      expected: >
+        The digest ends with "👤 People you may want to follow" (up to 5; Fay
+        is absent because Eli dismissed her), then a "✨ New on Movida"
+        subsection listing Nina Newbie (recent joiners are pulled out of the
+        top list into this subsection, up to 3, never listed twice), and a
+        "See all →" link to /tribe/network. With
+        Settings → Notifications → "People you may know" email OFF, the next
+        digest has no people section.
+
+    - id: 11
+      title: "Admin card: settings and stats"
+      description: "Sign in as Admin → Admin → Config → Notifications → People discovery."
+      expected: >
+        Both toggles and every number field load with defaults (tier 1: 2
+        friends / 48h, tier 2: 9 / 168h, trail top ≤ 9, sheets per session 1,
+        Not interested 90 days, join window 14 days, min mutual 1 regular / 2
+        with curators, 50 recipients, push 1–24h here via config.env). "Last
+        30 days" shows sheet shown/dismissed/followed counts from steps 1–6
+        and joined notified/pushed/followed-back counts from steps 7–8.
+        Changing "Trail on top: max friends" to 12 moves Fay's trail to the
+        top on her next visit.
+
+    - id: 12
+      title: "Admin: force the people sheet"
+      description: >
+        In "Force people sheet", click "Pick users", search "dana", tick Dana
+        (and Eli), click Done, Preview, then Confirm. Sign in as Dana in a new
+        session and open For You. Then tick "All users" and Preview only.
+      expected: >
+        Preview lists each picked user with friend count, suggestion total and
+        the handles the sheet would show; Confirm reports "forced for 2
+        user(s)". Dana's sheet opens despite the 48h cooldown, then the force
+        is consumed (next session: no sheet). The "All users" preview shows
+        how many users would be targeted (the picker is hidden while ticked).
+
+    - id: 13
+      title: "Admin: send joined notification with dry run"
+      description: >
+        In "Send joined notification", pick newbie2 (Noah) and newbie4,
+        Preview; then pick only Nina, untick Push, Preview. Finally tick "All
+        recent joiners" and Preview.
+      expected: >
+        The preview groups candidates per member: Noah lists Dana and Nora as
+        "below threshold" (1 curator); newbie4 shows "Member: private" and
+        lists no one; Confirm stays disabled. Nina's preview lists Eli, Fay,
+        newbie4 and newbie5 as "already notified" (after step 7). "All recent
+        joiners" lists every member who joined in the last 14 days.
+
+    - id: 14
+      title: "Prompts open on any landing route, not only Home"
+      description: >
+        Force the people sheet for Eli (step 12). In a new session sign in as
+        Eli, open /tribe/network directly and wait ~2s. Then repeat with a new
+        force, landing on /event/<any id> from the address bar.
+      expected: >
+        On /tribe/network (a regular page) the sheet opens without
+        navigating. On the event page (a deep link) nothing opens until you
+        navigate within the app or stay ~20s. The sheet never opens on
+        /admin, /login, /onboarding, /suggest, /install, shared links or the
+        event review/ticket/memories pages, nor on top of another open sheet
+        or event modal. Server log shows `people_prompt user=… show=True
+        reason=forced`.

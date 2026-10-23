@@ -29,7 +29,14 @@ describe('useNotificationOpenAttribution', () => {
         renderAt('/notifications?kind=interest_event&via=push&nid=42#top')
 
         expect(await screen.findByText('/notifications?kind=interest_event#top')).toBeInTheDocument()
-        expect(trackNotificationOpen).toHaveBeenCalledExactlyOnceWith(42, 'push')
+        expect(trackNotificationOpen).toHaveBeenCalledExactlyOnceWith(42, 'push', undefined)
+    })
+
+    it('passes the signed email token and strips it from the URL', async () => {
+        renderAt('/event/e1?via=email&nid=7&t=7.sig')
+
+        expect(await screen.findByText('/event/e1')).toBeInTheDocument()
+        expect(trackNotificationOpen).toHaveBeenCalledExactlyOnceWith(7, 'email', '7.sig')
     })
 
     it('ignores unrelated query params', () => {

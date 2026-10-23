@@ -14,6 +14,8 @@ import { rotateDeviceId } from '../utils/deviceId';
 import { clearBrowseSession } from '../utils/browseSession';
 import { clearSharePrompt } from '../hooks/useReferralAttribution';
 import { clearReviewPromptSession } from '../hooks/useHomeReviewPrompt';
+import { clearPeoplePromptSession } from '../hooks/usePeoplePrompt';
+import { clearHomeOverlays } from '../hooks/useHomeOverlays';
 import { clearUmamiBaseContext, setAnalyticsDisabled, setUmamiBaseContext, umamiIdentify } from '../utils/umami';
 import {
     trackLoginCompleted,
@@ -209,6 +211,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearBrowseSession();
         clearSharePrompt();
         clearReviewPromptSession();
+        clearPeoplePromptSession();
+        clearHomeOverlays();
         clearUmamiBaseContext();
         setAnalyticsDisabled(false);
         setUser(null);
@@ -221,6 +225,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearBrowseSession();
         clearSharePrompt();
         clearReviewPromptSession();
+        clearPeoplePromptSession();
+        clearHomeOverlays();
         clearUmamiBaseContext();
         setAnalyticsDisabled(false);
         setUser(null);

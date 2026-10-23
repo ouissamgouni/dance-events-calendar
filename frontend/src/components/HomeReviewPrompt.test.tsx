@@ -23,7 +23,7 @@ const prompt = {
 function renderPrompt(userId = 'user-a') {
     return renderWithProviders(
         <FeatureFlagsProvider>
-            <HomeReviewPrompt userId={userId} blocked={false} onReviewed={() => { }} />
+            <HomeReviewPrompt userId={userId} enabled />
         </FeatureFlagsProvider>,
     )
 }

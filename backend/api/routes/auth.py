@@ -72,6 +72,9 @@ from backend.db.models import (
     PushSubscription,
     ReviewPromptForce,
     ReviewPromptImpression,
+    PeoplePromptForce,
+    PeoplePromptImpression,
+    SuggestionDismissal,
     ShareToken,
     Tag,
     User,
@@ -943,6 +946,8 @@ def get_me(
         "push_suggested_events_enabled": user.push_suggested_events_enabled,
         "email_schedule_updates_enabled": user.email_schedule_updates_enabled,
         "push_schedule_updates_enabled": user.push_schedule_updates_enabled,
+        "email_people_suggestions_enabled": user.email_people_suggestions_enabled,
+        "push_people_suggestions_enabled": user.push_people_suggestions_enabled,
         "digest_email_enabled": user.digest_email_enabled,
         # Legacy aliases derived from the new flags. Kept for one release so
         # older frontend clients still work (Phase G §G.9 step 5 drops them).
@@ -1103,6 +1108,8 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     push_suggested_events_enabled: Optional[bool] = None
     email_schedule_updates_enabled: Optional[bool] = None
     push_schedule_updates_enabled: Optional[bool] = None
+    email_people_suggestions_enabled: Optional[bool] = None
+    push_people_suggestions_enabled: Optional[bool] = None
     digest_email_enabled: Optional[bool] = None
     # Legacy aliases — removed in the cleanup PR (§G.9 step 5).
     reminder_email_enabled: Optional[bool] = None
@@ -1175,6 +1182,8 @@ _NEW_FLAGS: tuple[str, ...] = (
     "push_suggested_events_enabled",
     "email_schedule_updates_enabled",
     "push_schedule_updates_enabled",
+    "email_people_suggestions_enabled",
+    "push_people_suggestions_enabled",
     "digest_email_enabled",
 )
 
@@ -1246,6 +1255,8 @@ def update_notification_preferences(
         "push_suggested_events_enabled": user.push_suggested_events_enabled,
         "email_schedule_updates_enabled": user.email_schedule_updates_enabled,
         "push_schedule_updates_enabled": user.push_schedule_updates_enabled,
+        "email_people_suggestions_enabled": user.email_people_suggestions_enabled,
+        "push_people_suggestions_enabled": user.push_people_suggestions_enabled,
         "digest_email_enabled": user.digest_email_enabled,
         # Legacy mirror (removed in cleanup PR).
         "reminder_email_enabled": user.email_event_reminders_enabled,
@@ -1583,6 +1594,16 @@ def purge_user_account(session: Session, user_id) -> None:
         delete(ReviewPromptImpression).where(ReviewPromptImpression.user_id == user_id)
     )
     session.exec(delete(ReviewPromptForce).where(ReviewPromptForce.user_id == user_id))
+    session.exec(
+        delete(PeoplePromptImpression).where(PeoplePromptImpression.user_id == user_id)
+    )
+    session.exec(delete(PeoplePromptForce).where(PeoplePromptForce.user_id == user_id))
+    session.exec(
+        delete(SuggestionDismissal).where(
+            (SuggestionDismissal.user_id == user_id)
+            | (SuggestionDismissal.dismissed_user_id == user_id)
+        )
+    )
     for message in session.exec(
         select(EventMessage).where(EventMessage.author_user_id == user_id)
     ).all():

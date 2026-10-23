@@ -16,13 +16,14 @@ from typing import Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, or_
 from sqlmodel import Session, col, select
 
 from backend.api.deps import require_user
 from backend.api.schemas import (
     NotificationActor,
+    NotificationEmailClickRequest,
     NotificationEventSummary,
     NotificationItem,
     NotificationListResponse,
@@ -34,6 +35,7 @@ from backend.db.database import get_session
 from backend.db.models import (
     CachedEvent,
     Notification,
+    NotificationDelivery,
     User,
     UserFollow,
     UserEventAttendance,
@@ -104,6 +106,7 @@ VALID_KINDS = {
     "event_cancelled",
     "organizer_assigned",
     "interest_profile_updated",
+    "suggested_person_joined",
 }
 
 
@@ -159,6 +162,7 @@ CATEGORY_KINDS: dict[str, set[str]] = {
         "new_friend",
         "follow_request",
         "follow_request_approved",
+        "suggested_person_joined",
     },
     "reviews": {
         "subscription_review",
@@ -628,11 +632,79 @@ def mark_opened(
         )
         for r in rows:
             r.push_opened_at = now
+            r.read_at = r.read_at or now
             session.add(r)
     elif row.email_clicked_at is None:
         row.email_clicked_at = now
+        row.read_at = row.read_at or now
         session.add(row)
     session.commit()
+
+
+@router.post("/email-click", status_code=204)
+def mark_email_clicked(
+    payload: NotificationEmailClickRequest,
+    session: Session = Depends(get_session),
+):
+    """Attribute an email link click via its signed token (no login needed)."""
+    from backend.services.email_tokens import verify_notification_token
+
+    nid = verify_notification_token(payload.token, "c")
+    row = session.get(Notification, nid) if nid is not None else None
+    if row is not None and row.email_clicked_at is None:
+        now = datetime.now(timezone.utc)
+        row.email_clicked_at = now
+        row.read_at = row.read_at or now
+        session.add(row)
+        session.commit()
+
+
+_PIXEL_GIF = bytes.fromhex(
+    "47494638396101000100800000000000ffffff21f90401000000002c00000000010001000002024401003b"
+)
+
+
+@router.get("/email-open/{token}.gif", include_in_schema=False)
+def mark_email_opened(token: str, session: Session = Depends(get_session)):
+    """Open-tracking pixel: stamps every notification delivered in the same email."""
+    from backend.services.email_tokens import verify_notification_token
+
+    nid = verify_notification_token(token, "o")
+    if nid is not None:
+        batch_id = session.exec(
+            select(NotificationDelivery.batch_id)
+            .where(NotificationDelivery.notification_id == nid)
+            .where(NotificationDelivery.channel == "email")
+            .order_by(col(NotificationDelivery.delivered_at).desc())
+            .limit(1)
+        ).first()
+        ids = (
+            set(
+                session.exec(
+                    select(NotificationDelivery.notification_id).where(
+                        NotificationDelivery.batch_id == batch_id
+                    )
+                ).all()
+            )
+            if batch_id
+            else {nid}
+        )
+        rows = session.exec(
+            select(Notification)
+            .where(col(Notification.id).in_(ids))
+            .where(Notification.email_opened_at.is_(None))
+        ).all()
+        now = datetime.now(timezone.utc)
+        for r in rows:
+            r.email_opened_at = now
+            session.add(r)
+        if rows:
+            session.commit()
+    return Response(
+        content=_PIXEL_GIF,
+        media_type="image/gif",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @router.post("/read-all", response_model=UnreadCountResponse)

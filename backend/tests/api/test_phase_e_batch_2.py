@@ -412,7 +412,12 @@ def test_e4_fof_suggestions_empty_when_viewer_has_no_friends(client, session):
     _login(client, "viewer@example.com")
     r = client.get("/api/social/me/suggestions")
     assert r.status_code == 200
-    assert r.json() == {"items": [], "total": 0}
+    assert r.json() == {
+        "items": [],
+        "total": 0,
+        "friend_count": 0,
+        "trail_position": "top",
+    }
 
 
 def test_e4_suggestions_fall_back_to_curators_without_mutuals(client, session):

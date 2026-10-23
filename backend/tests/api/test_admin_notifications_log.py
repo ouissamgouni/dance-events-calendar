@@ -1,8 +1,8 @@
 """API tests for the admin Notifications activity endpoint.
 
 Covers ``GET /api/admin/notifications/activity``: ``NotificationDelivery``
-rows grouped by (local day, recipient) into outbound messages (a digest is
-one message with N items), plus the per-event notification stats.
+rows rebuilt into outbound sends (a digest is one row with N items), paged
+flat or by (local day, recipient), plus the per-event notification stats.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -69,6 +69,8 @@ def _add_delivery(
     delivered_at: datetime,
     mode: str | None = None,
     source: str | None = None,
+    batch_id: str | None = None,
+    rendered: bool | None = None,
 ) -> None:
     session.add(
         NotificationDelivery(
@@ -77,6 +79,8 @@ def _add_delivery(
             delivered_at=delivered_at,
             mode=mode,
             source=source,
+            batch_id=batch_id,
+            rendered=rendered,
         )
     )
 
@@ -164,51 +168,179 @@ def _seed_digest(engine, sent_at: datetime):
         notifs[0].email_clicked_at = sent_at + timedelta(minutes=5)
         for n in notifs:
             _add_delivery(s, n.id, "app", sent_at - timedelta(hours=3))
-            _add_delivery(s, n.id, "email", sent_at, mode="digest", source="tick")
-            _add_delivery(s, n.id, "push", sent_at, source="tick")
+            _add_delivery(
+                s, n.id, "email", sent_at, mode="digest", source="tick", batch_id="e1"
+            )
+            _add_delivery(s, n.id, "push", sent_at, source="tick", batch_id="p1")
         s.commit()
         return alice.id, bob.id, [n.id for n in notifs]
 
 
 @pytest.mark.unit
 class TestAdminNotificationsActivity:
-    def test_digest_deliveries_merge_into_one_message(self, client, engine):
+    def test_digest_deliveries_merge_into_one_row(self, client, engine):
         sent_at = datetime.now(timezone.utc) - timedelta(minutes=30)
         _seed_digest(engine, sent_at)
 
         resp = client.get(ACTIVITY_URL, params=_window())
         assert resp.status_code == 200
         body = resp.json()
-        assert body["total_groups"] == 1
-        group = body["groups"][0]
-        assert group["user"]["handle"] == "alice"
-        assert group["in_app"] is None
-        [message] = group["messages"]
-        assert message["channels"] == ["email", "push"]
-        assert (message["mode"], message["trigger"]) == ("digest", "auto")
-        assert message["item_count"] == 3
-        assert message["engaged_count"] == 1
-        assert {t["topic"]: t["count"] for t in message["topics"]} == {
+        assert body["total"] == 1 and body["groups"] == []
+        [row] = body["rows"]
+        assert row["user"]["handle"] == "alice"
+        assert row["channels"] == ["email", "push"]
+        assert (row["mode"], row["trigger"]) == ("digest", "auto")
+        assert row["item_count"] == 3
+        assert row["engaged_count"] == 1
+        assert (row["email_clicked"], row["push_opened"]) == (1, 0)
+        assert {t["topic"]: t["count"] for t in row["topics"]} == {
             "friends_going": 2,
             "interest_matches": 1,
         }
-        item = message["items"][0]
-        assert item["app_at"] and item["email_at"] and item["push_at"]
+        item = row["items"][0]
         assert item["latency_seconds"] == pytest.approx(3 * 3600, abs=1)
         summary = body["summary"]
         assert (summary["email_digest"], summary["push"], summary["auto"]) == (1, 1, 1)
         assert (summary["email_items"], summary["email_clicked"]) == (3, 1)
         assert summary["in_app_items"] == 0
 
-    def test_include_in_app_adds_feed_bucket(self, client, engine):
+    def test_include_in_app_adds_one_row_per_feed_delivery(self, client, engine):
         sent_at = datetime.now(timezone.utc) - timedelta(minutes=30)
         _seed_digest(engine, sent_at)
 
         body = client.get(ACTIVITY_URL, params=_window(include_in_app=True)).json()
-        # Feed rows are 3h before the send, so they may fall on the previous day.
-        [in_app] = [g["in_app"] for g in body["groups"] if g["in_app"]]
-        assert in_app["item_count"] == 3
+        assert body["total"] == 4
+        assert [r["channels"] for r in body["rows"]] == [
+            ["email", "push"],
+            ["app"],
+            ["app"],
+            ["app"],
+        ]
+        assert {r["trigger"] for r in body["rows"][1:]} == {"auto"}
+        assert all(r["item_count"] == 1 for r in body["rows"][1:])
         assert body["summary"]["in_app_items"] == 3
+
+    def test_rows_are_time_ordered_across_recipients(self, client, engine):
+        _seed(engine)
+
+        body = client.get(ACTIVITY_URL, params=_window()).json()
+        assert [(r["user"]["handle"], r["channels"]) for r in body["rows"]] == [
+            ("bob", ["push"]),
+            ("alice", ["email"]),
+        ]
+
+    def test_group_by_recipient_pages_whole_recipient_days(self, client, engine):
+        sent_at = datetime(2026, 10, 17, 12, 0, tzinfo=timezone.utc)
+        _, bob_id, _ = _seed_digest(engine, sent_at)
+        with Session(engine) as s:
+            n = Notification(
+                recipient_user_id=bob_id,
+                actor_user_id=bob_id,
+                kind="event_reminder",
+                created_at=sent_at,
+            )
+            s.add(n)
+            s.flush()
+            _add_delivery(s, n.id, "push", sent_at - timedelta(hours=1), source="tick")
+            s.commit()
+        params = {
+            "start": "2026-10-17T00:00:00Z",
+            "end": "2026-10-18T00:00:00Z",
+            "tz": "UTC",
+            "include_in_app": True,
+        }
+
+        flat = client.get(ACTIVITY_URL, params=params).json()
+        assert [r["user"]["handle"] for r in flat["rows"]] == [
+            "alice",
+            "bob",
+            "alice",
+            "alice",
+            "alice",
+        ]
+
+        first = client.get(
+            ACTIVITY_URL, params={**params, "group": "recipient", "limit": 1}
+        ).json()
+        assert first["total"] == 2 and first["rows"] == []
+        [alice] = first["groups"]
+        assert (alice["day"], alice["user"]["handle"]) == ("2026-10-17", "alice")
+        assert [r["channels"] for r in alice["rows"]] == [
+            ["email", "push"],
+            ["app"],
+            ["app"],
+            ["app"],
+        ]
+        second = client.get(
+            ACTIVITY_URL,
+            params={**params, "group": "recipient", "limit": 1, "offset": 1},
+        ).json()
+        assert [g["user"]["handle"] for g in second["groups"]] == ["bob"]
+
+    def test_same_tick_pushes_split_by_batch_and_legacy_topic(self, client, engine):
+        sent_at = datetime.now(timezone.utc) - timedelta(minutes=30)
+        _, _, ids = _seed_digest(engine, sent_at)
+        later = sent_at + timedelta(minutes=10)
+        with Session(engine) as s:
+            # Batched: each item its own push at the same instant.
+            for nid in ids:
+                _add_delivery(s, nid, "push", later, source="tick", batch_id=f"b{nid}")
+            # Legacy (no batch_id): split by topic.
+            for nid in ids:
+                _add_delivery(
+                    s, nid, "push", later + timedelta(minutes=1), source="tick"
+                )
+            s.commit()
+
+        body = client.get(ACTIVITY_URL, params=_window(channel="push")).json()
+        counts = sorted(r["item_count"] for r in body["rows"])
+        # 1 original 3-item push + 3 batched singles + legacy 2 (friends_going) + 1.
+        assert counts == [1, 1, 1, 1, 2, 3]
+
+    def test_engaged_and_unread_filters_keep_summary(self, client, engine):
+        sent_at = datetime.now(timezone.utc) - timedelta(minutes=30)
+        _, _, ids = _seed_digest(engine, sent_at)
+        with Session(engine) as s:
+            _add_delivery(
+                s, ids[1], "push", sent_at + timedelta(minutes=5), source="tick"
+            )
+            n = s.get(Notification, ids[0])
+            n.read_at = sent_at
+            s.add(n)
+            s.commit()
+
+        engaged = client.get(ACTIVITY_URL, params=_window(engaged=True)).json()
+        [row] = engaged["rows"]
+        assert row["item_count"] == 3 and row["engaged_count"] == 1
+        assert engaged["summary"]["push"] == 2
+
+        unread = client.get(ACTIVITY_URL, params=_window(unread=True)).json()
+        assert len(unread["rows"]) == 2
+        assert unread["rows"][1]["read_count"] == 1
+
+    def test_digest_items_cut_from_email_are_hidden(self, client, engine):
+        sent_at = datetime.now(timezone.utc) - timedelta(minutes=30)
+        _, _, ids = _seed_digest(engine, sent_at)
+        with Session(engine) as s:
+            for i, nid in enumerate(ids):
+                _add_delivery(
+                    s,
+                    nid,
+                    "email",
+                    sent_at + timedelta(hours=1),
+                    mode="digest",
+                    source="tick",
+                    batch_id="e2",
+                    rendered=i < 2,
+                )
+            s.commit()
+
+        body = client.get(ACTIVITY_URL, params=_window(channel="email")).json()
+        latest = body["rows"][0]
+        assert latest["item_count"] == 2
+        assert {i["notification_id"] for i in latest["items"]} == {ids[0], ids[1]}
+        assert body["summary"]["email_items"] == 5
+        assert "email_overflow" not in body["summary"]
 
     def test_trigger_filter_keeps_only_forced_messages(self, client, engine):
         sent_at = datetime.now(timezone.utc) - timedelta(minutes=30)
@@ -227,15 +359,18 @@ class TestAdminNotificationsActivity:
         body = client.get(
             ACTIVITY_URL, params=_window(trigger="forced", include_in_app=True)
         ).json()
-        [message] = body["groups"][0]["messages"]
-        assert (message["channels"], message["trigger"]) == (["email"], "forced")
-        assert body["groups"][0]["in_app"] is None
+        [row] = body["rows"]
+        assert (row["channels"], row["trigger"]) == (["email"], "forced")
         assert (body["summary"]["forced"], body["summary"]["auto"]) == (1, 0)
 
     def test_day_bucket_follows_requested_timezone(self, client, engine):
         sent_at = datetime(2026, 10, 17, 23, 30, tzinfo=timezone.utc)
         _seed_digest(engine, sent_at)
-        params = {"start": "2026-10-17T00:00:00Z", "end": "2026-10-19T00:00:00Z"}
+        params = {
+            "start": "2026-10-17T00:00:00Z",
+            "end": "2026-10-19T00:00:00Z",
+            "group": "recipient",
+        }
 
         utc = client.get(ACTIVITY_URL, params={**params, "tz": "UTC"}).json()
         paris = client.get(ACTIVITY_URL, params={**params, "tz": "Europe/Paris"}).json()
@@ -243,18 +378,18 @@ class TestAdminNotificationsActivity:
         assert utc["groups"][0]["day"] == "2026-10-17"
         assert paris["groups"][0]["day"] == "2026-10-18"
 
-    def test_paginates_groups_and_filters_by_user(self, client, engine):
+    def test_paginates_rows_and_filters_by_user(self, client, engine):
         _seed(engine)
         with Session(engine) as s:
             bob_id = s.exec(select(User.id).where(User.handle == "bob")).one()
 
         page = client.get(ACTIVITY_URL, params=_window(limit=1)).json()
-        assert page["total_groups"] == 2
-        assert len(page["groups"]) == 1
+        assert page["total"] == 2
+        assert len(page["rows"]) == 1
 
         only_bob = client.get(ACTIVITY_URL, params=_window(user_id=str(bob_id))).json()
-        assert [g["user"]["handle"] for g in only_bob["groups"]] == ["bob"]
-        assert only_bob["groups"][0]["messages"][0]["trigger"] == "unknown"
+        assert [r["user"]["handle"] for r in only_bob["rows"]] == ["bob"]
+        assert only_bob["rows"][0]["trigger"] == "unknown"
 
     @pytest.mark.parametrize(
         "params",
@@ -263,6 +398,7 @@ class TestAdminNotificationsActivity:
             _window(tz="Mars/Olympus"),
             _window(trigger="sometimes"),
             _window(channel="carrier_pigeon"),
+            _window(group="team"),
         ],
     )
     def test_invalid_params_return_400(self, client, engine, params):
@@ -301,14 +437,28 @@ class TestAdminNotificationsActivity:
             17,
         )
         assert (summary["email_clicked"], summary["push_opened"]) == (3, 4)
-        assert body["total_groups"] > 20
+        assert body["total"] == 26
+        times = [r["sent_at"] for r in body["rows"]]
+        assert times == sorted(times, reverse=True)
         digests = [
-            m
-            for g in body["groups"]
-            for m in g["messages"]
-            if m["mode"] == "digest" and g["user"]["handle"] == "maya"
+            r
+            for r in body["rows"]
+            if r["mode"] == "digest" and r["user"]["handle"] == "maya"
         ]
-        assert [(m["item_count"], m["engaged_count"]) for m in digests] == [(4, 1)]
+        # The 4th item was cut from the email body, so it is hidden.
+        assert [(r["item_count"], r["engaged_count"]) for r in digests] == [(3, 1)]
+
+        with_feed = client.get(
+            ACTIVITY_URL, params={**window, "include_in_app": True}
+        ).json()
+        items = [i for r in with_feed["rows"] for i in r["items"]]
+        assert all(
+            i["read_at"] for i in items if i["email_clicked_at"] or i["push_opened_at"]
+        )
+        grouped = client.get(
+            ACTIVITY_URL, params={**window, "group": "recipient"}
+        ).json()
+        assert sum(len(g["rows"]) for g in grouped["groups"]) == 26
 
 
 @pytest.mark.unit

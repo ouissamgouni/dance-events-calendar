@@ -338,6 +338,12 @@ def _build_response(session: Session) -> SiteSettingsResponse:
             key: app_settings.get_review_home_prompt_int(key, session)
             for key in app_settings.REVIEW_HOME_PROMPT_INT_KEYS
         },
+        people_prompt_enabled=app_settings.get_people_prompt_enabled(session),
+        people_joined_enabled=app_settings.get_people_joined_enabled(session),
+        **{
+            key: app_settings.get_people_discovery_int(key, session)
+            for key in app_settings.PEOPLE_DISCOVERY_INT_KEYS
+        },
         review_mood_headline_min_reviews=app_settings.get_review_mood_headline_min_reviews(
             session
         ),
@@ -989,6 +995,18 @@ def update_settings(
         )
 
     for key in app_settings.REVIEW_HOME_PROMPT_INT_KEYS:
+        value = getattr(body, key)
+        if value is None:
+            continue
+        row = session.get(SiteSetting, key) or SiteSetting(key=key)
+        row.value = str(value)
+        session.add(row)
+
+    for key in ("people_prompt_enabled", "people_joined_enabled"):
+        if getattr(body, key) is not None:
+            _set_bool_setting(session, key, getattr(body, key))
+
+    for key in app_settings.PEOPLE_DISCOVERY_INT_KEYS:
         value = getattr(body, key)
         if value is None:
             continue

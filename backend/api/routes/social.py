@@ -69,6 +69,8 @@ from backend.api.schemas import (
     MutualSubscriberPreview,
     NotificationActor,
     OnboardingSuggestionsResponse,
+    PeoplePromptImpressionRequest,
+    PeoplePromptResponse,
     ProfileCalendarItem,
     ProfileCalendarResponse,
     ProfileEventListResponse,
@@ -129,6 +131,7 @@ from backend.services.follows import (
     ensure_calendar_subscription,
 )
 from backend.services.event_visibility import apply_event_visibility, eligible_event_ids
+from backend.services import app_settings, people_prompt
 from backend.services.user_avatars import delete_user_avatar, resolve_user_avatar
 from backend.api.deps import get_admin_user_id, is_admin_user
 from backend.config.loader import get_current_onboarding_version
@@ -2767,6 +2770,7 @@ def discover_suggested(
     """
     if viewer is None:
         return SuggestedUsersResponse(items=[], total=0)
+    dismissed = people_prompt.dismissed_user_ids(session, viewer.id)
 
     # Viewer's "network" = anyone they follow OR are subscribed to.
     network_ids: set[UUID] = set()
@@ -2787,6 +2791,7 @@ def discover_suggested(
             session,
             viewer,
             limit=_MAX_DISCOVER_POOL,
+            excluded_ids=dismissed,
             exclude_followed=True,
             exclude_subscribed=True,
         )
@@ -2794,7 +2799,7 @@ def discover_suggested(
             session,
             viewer,
             limit=_MAX_DISCOVER_POOL,
-            excluded_ids={u.id for u in organizers},
+            excluded_ids={u.id for u in organizers} | dismissed,
             exclude_followed=True,
             exclude_subscribed=True,
         )
@@ -2821,6 +2826,7 @@ def discover_suggested(
     # (hidden from public discovery).
     excluded: set[UUID] = set(network_ids)
     excluded.add(viewer.id)
+    excluded |= dismissed
     admin_id = get_admin_user_id(session)
     if admin_id is not None:
         excluded.add(admin_id)
@@ -2895,7 +2901,7 @@ def discover_suggested(
     # network yields fewer than a full page of suggestions. Organizers
     # (high-trust) lead, then curators.
     if offset == 0 and len(items) < limit:
-        picked_ids = {u.id for u in candidates}
+        picked_ids = {u.id for u in candidates} | dismissed
         organizers = _organizer_users(
             session,
             viewer,
@@ -4551,13 +4557,12 @@ def onboarding_complete(
 # ---------------------------------------------------------------------------
 
 
-def _build_fof_suggestions(
-    session: Session, viewer: User, limit: int, offset: int = 0
-) -> FoFSuggestionsResponse:
-    """Build ranked network, organizer, and curator suggestions."""
+def _fof_pool(session: Session, viewer: User) -> list[User]:
+    """Ranked network, organizer, and curator suggestion pool."""
     followed_ids = _already_followed_ids(session, viewer.id)
     subscribed_ids = _viewer_subscription_ids(session, viewer)
     excluded: set[UUID] = followed_ids | subscribed_ids
+    excluded |= people_prompt.dismissed_user_ids(session, viewer.id)
     excluded.add(viewer.id)
     admin_id = get_admin_user_id(session)
     if admin_id is not None:
@@ -4631,12 +4636,16 @@ def _build_fof_suggestions(
         exclude_subscribed=True,
     )
     pool = (candidates + organizers + curators)[:_MAX_DISCOVER_POOL]
-    page = pool[offset : offset + limit]
+    return pool
 
+
+def _fof_items(
+    session: Session, viewer: User, users: list[User]
+) -> list[FoFSuggestionItem]:
     viewer_friends = _friend_ids(session, viewer.id)
-    previews = _mutual_friends_previews(session, viewer_friends, [u.id for u in page])
+    previews = _mutual_friends_previews(session, viewer_friends, [u.id for u in users])
     items: list[FoFSuggestionItem] = []
-    for u in page:
+    for u in users:
         mutual_handles = previews.get(u.id, [])
         items.append(
             FoFSuggestionItem(
@@ -4650,8 +4659,20 @@ def _build_fof_suggestions(
                 followers_count=_followers_count(session, u.id),
             )
         )
+    return items
 
-    return FoFSuggestionsResponse(items=items, total=len(pool))
+
+def _build_fof_suggestions(
+    session: Session, viewer: User, limit: int, offset: int = 0
+) -> FoFSuggestionsResponse:
+    pool = _fof_pool(session, viewer)
+    friend_count = _friend_count(session, viewer.id)
+    return FoFSuggestionsResponse(
+        items=_fof_items(session, viewer, pool[offset : offset + limit]),
+        total=len(pool),
+        friend_count=friend_count,
+        trail_position=people_prompt.trail_position(session, friend_count),
+    )
 
 
 @router.get(
@@ -4670,14 +4691,107 @@ def friend_of_friend_suggestions(
     return _build_fof_suggestions(session, viewer, limit, offset)
 
 
+@router.post("/me/suggestions/{handle}/dismiss", status_code=204)
+@limiter.limit("120/hour")
+def dismiss_suggestion(
+    request: Request,
+    handle: str,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    target = _resolve_handle(session, handle)
+    if target.id == viewer.id:
+        raise HTTPException(status_code=400, detail="Cannot dismiss yourself")
+    people_prompt.dismiss(session, viewer.id, target.id)
+    session.commit()
+
+
+@router.delete("/me/suggestions/{handle}/dismiss", status_code=204)
+@limiter.limit("120/hour")
+def undismiss_suggestion(
+    request: Request,
+    handle: str,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    target = _resolve_handle(session, handle)
+    people_prompt.undismiss(session, viewer.id, target.id)
+    session.commit()
+
+
+_PEOPLE_PROMPT_ITEMS = 5
+
+
+def build_people_prompt(session: Session, viewer: User) -> PeoplePromptResponse:
+    pool = _fof_pool(session, viewer)
+    friend_count = _friend_count(session, viewer.id)
+    show, forced, reason = people_prompt.decide(
+        session, viewer, friend_count, len(pool)
+    )
+    logger.info(
+        "people_prompt user=%s show=%s reason=%s friends=%d suggestions=%d",
+        viewer.id,
+        show,
+        reason,
+        friend_count,
+        len(pool),
+    )
+    return PeoplePromptResponse(
+        show=show,
+        forced=forced,
+        friend_count=friend_count,
+        overlays_per_session=app_settings.get_people_discovery_int(
+            "home_overlays_per_session", session
+        ),
+        items=(
+            _fof_items(session, viewer, pool[:_PEOPLE_PROMPT_ITEMS]) if show else []
+        ),
+        total=len(pool),
+    )
+
+
+@router.get("/me/people-prompt", response_model=PeoplePromptResponse)
+@limiter.limit("60/hour")
+def get_people_prompt(
+    request: Request,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    return build_people_prompt(session, viewer)
+
+
+@router.post("/me/people-prompt/impression", status_code=204)
+@limiter.limit("60/hour")
+def post_people_prompt_impression(
+    request: Request,
+    body: PeoplePromptImpressionRequest,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    people_prompt.record_impression(
+        session, viewer, body.outcome, followed_count=body.followed_count
+    )
+    session.commit()
+
+
 def get_people_suggestions_for_email(
-    session: Session, viewer: User, limit: int = 5
-) -> list[FoFSuggestionItem]:
-    """Suggestion rows for the activity-digest email's "people you may
-    want to follow" section — same ranking/fallback as ``/me/suggestions``
-    but callable outside of an HTTP request (no rate-limit context).
+    session: Session, viewer: User, limit: int = 5, new_limit: int = 3
+) -> tuple[list[FoFSuggestionItem], list[FoFSuggestionItem]]:
+    """Digest "people you may want to follow" rows + a deduped "New on Movida"
+    subset (joined within the join window). Recent joiners are pulled into
+    "New on Movida" first; the top list is backfilled from the rest of the pool.
     """
-    return _build_fof_suggestions(session, viewer, limit).items
+    pool = _fof_pool(session, viewer)
+    window = timedelta(
+        days=app_settings.get_people_discovery_int("people_joined_window_days", session)
+    )
+    cutoff = datetime.now(timezone.utc) - window
+    recent = [u for u in pool if u.created_at.replace(tzinfo=timezone.utc) >= cutoff][
+        :new_limit
+    ]
+    recent_ids = {u.id for u in recent}
+    top = [u for u in pool if u.id not in recent_ids][:limit]
+    return _fof_items(session, viewer, top), _fof_items(session, viewer, recent)
 
 
 # ---------------------------------------------------------------------------

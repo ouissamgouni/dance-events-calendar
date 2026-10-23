@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReviewHomePrompt } from '../types';
 import { fetchReviewHomePrompt, postReviewHomePromptImpression } from '../api';
 import { trackRatingModalOpened, trackReviewPromptDismissed, trackReviewPromptShown } from '../utils/tracking';
+import { markHomeOverlayShown } from './useHomeOverlays';
 
 export const REVIEW_PROMPT_SESSION_KEY = 'movida:review-home-prompt-checked';
 const SETTLE_MS = 1200;
@@ -32,6 +33,8 @@ export function clearReviewPromptSession(): void {
  */
 export function useHomeReviewPrompt(enabled: boolean, userId: string) {
     const [prompt, setPrompt] = useState<ReviewHomePrompt | null>(null);
+    // True once this visit has nothing (more) to show, so lower-priority Home prompts may run.
+    const [settled, setSettled] = useState(false);
 
     useEffect(() => {
         if (!enabled || alreadyCheckedThisSession(userId)) return;
@@ -41,13 +44,17 @@ export function useHomeReviewPrompt(enabled: boolean, userId: string) {
                 .then((res) => {
                     if (cancelled) return;
                     markCheckedThisSession(userId);
-                    if (!res.prompt) return;
+                    if (!res.prompt) {
+                        setSettled(true);
+                        return;
+                    }
+                    markHomeOverlayShown(userId);
                     setPrompt(res);
                     postReviewHomePromptImpression(res.prompt.event_id, 'shown').catch(() => { });
                     trackReviewPromptShown(res.forced);
                     trackRatingModalOpened('home-prompt', false);
                 })
-                .catch(() => { /* no prompt this visit */ });
+                .catch(() => setSettled(true));
         }, SETTLE_MS);
         return () => {
             cancelled = true;
@@ -61,9 +68,18 @@ export function useHomeReviewPrompt(enabled: boolean, userId: string) {
             trackReviewPromptDismissed();
         }
         setPrompt(null);
+        setSettled(true);
     }, [prompt]);
 
-    const clear = useCallback(() => setPrompt(null), []);
+    const clear = useCallback(() => {
+        setPrompt(null);
+        setSettled(true);
+    }, []);
 
-    return { prompt, dismiss, clear };
+    return {
+        prompt,
+        dismiss,
+        clear,
+        settled: settled || (enabled && !prompt && alreadyCheckedThisSession(userId)),
+    };
 }

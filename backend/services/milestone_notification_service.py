@@ -49,7 +49,7 @@ from backend.db.models import (
     UserMilestone,
 )
 from backend.services.email import send_milestone_instant_email
-from backend.services.notification_delivery import record_delivery
+from backend.services.notification_delivery import new_batch_id, record_delivery
 from backend.services.notifications import fan_out_milestone
 from backend.services.push_service import send_push
 
@@ -333,13 +333,16 @@ def _dispatch_channels(
 
     emailed = 0
     emailed_ids: list[int] = []
+    batches: dict[tuple[str, int], str] = {}
     for user, milestones in by_email_group.values():
         if send_milestone_instant_email(user, milestones):
             emailed += len(milestones)
+            batch_id = new_batch_id()
             for milestone in milestones:
                 nid = notif_ids.get((user.id, milestone.key))
                 if nid is not None:
                     emailed_ids.append(nid)
+                    batches[("email", nid)] = batch_id
 
     by_push_group: dict = {}
     for user_id, group_key, milestone in to_push:
@@ -364,27 +367,32 @@ def _dispatch_channels(
         )
         pushed += delivered
         if delivered:
+            batch_id = new_batch_id()
             for milestone in milestones:
                 nid = notif_ids.get((user_id, milestone.key))
                 if nid is not None:
                     pushed_ids.append(nid)
+                    batches[("push", nid)] = batch_id
 
     if emailed_ids or pushed_ids:
         if session is not None:
-            _stamp_deliveries(session, emailed_ids, pushed_ids, source)
+            _stamp_deliveries(session, emailed_ids, pushed_ids, source, batches)
             session.commit()
         else:
             with Session(get_engine()) as fresh:
-                _stamp_deliveries(fresh, emailed_ids, pushed_ids, source)
+                _stamp_deliveries(fresh, emailed_ids, pushed_ids, source, batches)
                 fresh.commit()
 
     return emailed, pushed
 
 
-def _stamp_deliveries(session, emailed_ids, pushed_ids, source=None) -> None:
+def _stamp_deliveries(
+    session, emailed_ids, pushed_ids, source=None, batches=None
+) -> None:
     """Stamp ``emailed_at``/``pushed_at`` and log per-channel delivery rows."""
     from sqlmodel import col, update
 
+    batches = batches or {}
     stamp_now = datetime.now(timezone.utc)
     if emailed_ids:
         session.exec(
@@ -394,7 +402,13 @@ def _stamp_deliveries(session, emailed_ids, pushed_ids, source=None) -> None:
         )
         for nid in emailed_ids:
             record_delivery(
-                session, nid, "email", stamp_now, mode="instant", source=source
+                session,
+                nid,
+                "email",
+                stamp_now,
+                mode="instant",
+                source=source,
+                batch_id=batches.get(("email", nid)),
             )
     if pushed_ids:
         session.exec(
@@ -403,4 +417,11 @@ def _stamp_deliveries(session, emailed_ids, pushed_ids, source=None) -> None:
             .values(pushed_at=stamp_now)
         )
         for nid in pushed_ids:
-            record_delivery(session, nid, "push", stamp_now, source=source)
+            record_delivery(
+                session,
+                nid,
+                "push",
+                stamp_now,
+                source=source,
+                batch_id=batches.get(("push", nid)),
+            )

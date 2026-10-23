@@ -14,10 +14,14 @@ from backend.db.models import (
     EventLinkClick,
     EventSave,
     EventView,
+    PeoplePromptForce,
+    PeoplePromptImpression,
     ReviewPromptForce,
     ReviewPromptImpression,
     ShareEvent,
+    SuggestionDismissal,
 )
+from backend.services import app_settings
 
 # Matches the retention stated in the privacy policy.
 ANALYTICS_RETENTION = timedelta(days=365)
@@ -60,6 +64,25 @@ def apply_retention(session: Session, now: datetime | None = None) -> dict:
         delete(ReviewPromptForce).where(ReviewPromptForce.expires_at < now)
     )
     stats[ReviewPromptForce.__tablename__] = result.rowcount or 0
+    result = session.execute(
+        delete(PeoplePromptImpression).where(
+            PeoplePromptImpression.shown_at < now - REVIEW_PROMPT_RETENTION
+        )
+    )
+    stats[PeoplePromptImpression.__tablename__] = result.rowcount or 0
+    result = session.execute(
+        delete(PeoplePromptForce).where(PeoplePromptForce.expires_at < now)
+    )
+    stats[PeoplePromptForce.__tablename__] = result.rowcount or 0
+    ttl_days = app_settings.get_people_discovery_int(
+        "suggestion_dismissal_ttl_days", session
+    )
+    result = session.execute(
+        delete(SuggestionDismissal).where(
+            SuggestionDismissal.dismissed_at < now - timedelta(days=ttl_days)
+        )
+    )
+    stats[SuggestionDismissal.__tablename__] = result.rowcount or 0
     session.commit()
     return stats
 

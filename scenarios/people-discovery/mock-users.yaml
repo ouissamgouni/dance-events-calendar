@@ -1,0 +1,192 @@
+# Everyone except the newbies joined 60 days ago, so only the newbies count
+# as "recently joined" for the joined notification and "New on Movida".
+#
+#   dana  — 0 friends, follows cur1 + cur2 (like after onboarding)
+#   gina  — 0 friends, has an unreviewed event (review prompt wins the session)
+#   eli   — 5 friends (f1..f5)
+#   fay   — 12 friends (f1..f12)
+#   newbie1 — joined yesterday, friends with f1          → eli + fay notified
+#   newbie2 — joined yesterday, follows cur1 only         → nobody (1 curator)
+#   newbie3 — joined yesterday, follows cur1 + cur2       → dana notified (2 curators)
+#   newbie4 — joined yesterday, private, follows f1       → nobody
+#   newbie5 — joined yesterday, hidden from suggestions   → nobody
+users:
+  - {
+      email: admin@example.com,
+      name: Dev Admin,
+      handle: admin,
+      created_days_ago: 60,
+    }
+  - {
+      email: dana@example.com,
+      name: Dana Newcomer,
+      handle: dana,
+      created_days_ago: 60,
+      timezone: Europe/Paris,
+    }
+  - {
+      email: gina@example.com,
+      name: Gina Reviewer,
+      handle: gina,
+      created_days_ago: 60,
+    }
+  - {
+      email: eli@example.com,
+      name: Eli Small Circle,
+      handle: eli,
+      created_days_ago: 60,
+      timezone: Europe/Paris,
+    }
+  - {
+      email: fay@example.com,
+      name: Fay Big Circle,
+      handle: fay,
+      created_days_ago: 60,
+      timezone: Europe/Paris,
+    }
+  - {
+      email: cur1@example.com,
+      name: Salsa Paris Curator,
+      handle: cur1,
+      is_admin_managed: true,
+      created_days_ago: 60,
+    }
+  - {
+      email: cur2@example.com,
+      name: Bachata Paris Curator,
+      handle: cur2,
+      is_admin_managed: true,
+      created_days_ago: 60,
+    }
+  - {
+      email: cur3@example.com,
+      name: Kizomba Paris Curator,
+      handle: cur3,
+      is_admin_managed: true,
+      created_days_ago: 60,
+    }
+  - {
+      email: cur4@example.com,
+      name: Zouk Paris Curator,
+      handle: cur4,
+      is_admin_managed: true,
+      created_days_ago: 60,
+    }
+  - {
+      email: org1@example.com,
+      name: Salsa Club Organizer,
+      handle: org1,
+      is_verified_organizer: true,
+      created_days_ago: 60,
+    }
+  - {
+      email: org2@example.com,
+      name: Bachata Club Organizer,
+      handle: org2,
+      is_verified_organizer: true,
+      created_days_ago: 60,
+    }
+  - {
+      email: f1@example.com,
+      name: Friend One,
+      handle: f1,
+      created_days_ago: 60,
+    }
+  - {
+      email: f2@example.com,
+      name: Friend Two,
+      handle: f2,
+      created_days_ago: 60,
+    }
+  - {
+      email: f3@example.com,
+      name: Friend Three,
+      handle: f3,
+      created_days_ago: 60,
+    }
+  - {
+      email: f4@example.com,
+      name: Friend Four,
+      handle: f4,
+      created_days_ago: 60,
+    }
+  - {
+      email: f5@example.com,
+      name: Friend Five,
+      handle: f5,
+      created_days_ago: 60,
+    }
+  - {
+      email: f6@example.com,
+      name: Friend Six,
+      handle: f6,
+      created_days_ago: 60,
+    }
+  - {
+      email: f7@example.com,
+      name: Friend Seven,
+      handle: f7,
+      created_days_ago: 60,
+    }
+  - {
+      email: f8@example.com,
+      name: Friend Eight,
+      handle: f8,
+      created_days_ago: 60,
+    }
+  - {
+      email: f9@example.com,
+      name: Friend Nine,
+      handle: f9,
+      created_days_ago: 60,
+    }
+  - {
+      email: f10@example.com,
+      name: Friend Ten,
+      handle: f10,
+      created_days_ago: 60,
+    }
+  - {
+      email: f11@example.com,
+      name: Friend Eleven,
+      handle: f11,
+      created_days_ago: 60,
+    }
+  - {
+      email: f12@example.com,
+      name: Friend Twelve,
+      handle: f12,
+      created_days_ago: 60,
+    }
+  - {
+      email: newbie1@example.com,
+      name: Nina Newbie,
+      handle: newbie1,
+      created_days_ago: 1,
+    }
+  - {
+      email: newbie2@example.com,
+      name: Noah Newbie,
+      handle: newbie2,
+      created_days_ago: 1,
+    }
+  - {
+      email: newbie3@example.com,
+      name: Nora Newbie,
+      handle: newbie3,
+      created_days_ago: 1,
+    }
+  - {
+      email: newbie4@example.com,
+      name: Private Newbie,
+      handle: newbie4,
+      created_days_ago: 1,
+      account_visibility: private,
+    }
+  - {
+      email: newbie5@example.com,
+      name: Hidden Newbie,
+      handle: newbie5,
+      created_days_ago: 1,
+      show_in_suggestions: false,
+    }

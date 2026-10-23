@@ -163,6 +163,10 @@ class TestScheduler:
                 return_value={"candidates": 4, "created": 1},
             ),
             patch(
+                "backend.services.people_joined_service.run_once",
+                return_value={"created": 2, "pushed": 1},
+            ),
+            patch(
                 "backend.services.activity_email.run_once",
                 return_value={"digests": 3, "pushed": 2},
             ),
@@ -193,6 +197,7 @@ class TestScheduler:
             "memories_prompt": {"prompts": 0},
             "milestone": {"milestones": 1, "emailed": 1, "pushed": 0},
             "interest": {"candidates": 4, "created": 1},
+            "people_joined": {"created": 2, "pushed": 1},
             "activity": {"digests": 3, "pushed": 2},
             "recurrence": {"series_extended": 1, "occurrences_created": 4},
             "suggestion_images": {"removed": 2},
@@ -231,6 +236,10 @@ class TestScheduler:
                 return_value={"candidates": 0, "created": 0},
             ),
             patch(
+                "backend.services.people_joined_service.run_once",
+                return_value={"created": 0, "pushed": 0},
+            ),
+            patch(
                 "backend.services.activity_email.run_once",
                 return_value={"digests": 1},
             ),
@@ -267,6 +276,7 @@ _DISPATCH_TARGETS = {
     "memories_prompt": "backend.services.event_asset_prompts.run_memories_prompts",
     "milestone": "backend.services.milestone_notification_service.run_once",
     "interest": "backend.services.interest_notification_service.run_once",
+    "people_joined": "backend.services.people_joined_service.run_once",
     "activity": "backend.services.activity_email.run_once",
     "recurrence": "backend.services.recurrence_extension.run_once",
     "suggestion_images": "backend.services.event_images.run_sweep_once",

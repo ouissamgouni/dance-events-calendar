@@ -270,6 +270,45 @@ def get_review_home_prompt_int(key: str, session: Optional[Session] = None) -> i
     return loader.get_review_home_prompt_int(key)
 
 
+def get_people_prompt_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "people_prompt_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return loader.get_people_prompt_enabled()
+
+
+def get_people_joined_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "people_joined_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return loader.get_people_joined_enabled()
+
+
+PEOPLE_DISCOVERY_INT_KEYS = tuple(loader.PEOPLE_DISCOVERY_INT_DEFAULTS)
+
+
+def get_people_discovery_int(key: str, session: Optional[Session] = None) -> int:
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, key)
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return loader.get_people_discovery_int(key)
+
+
 def get_event_message_cta_min_going(session: Optional[Session] = None) -> int:
     s, opened = _open_session(session)
     try:

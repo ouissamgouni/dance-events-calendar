@@ -2183,6 +2183,8 @@ def test_notification_opened_push_marks_combined_push_siblings(client, session):
     assert a.push_opened_at is not None
     assert b.push_opened_at is not None
     assert other.push_opened_at is None
+    assert a.read_at is not None and b.read_at is not None
+    assert other.read_at is None
 
 
 def test_notification_opened_email_is_first_touch_and_recipient_scoped(client, session):
@@ -2209,9 +2211,72 @@ def test_notification_opened_email_is_first_touch_and_recipient_scoped(client, s
     session.refresh(n)
     first = n.email_clicked_at
     assert first is not None
+    assert n.read_at is not None
     client.post(f"/api/notifications/{n.id}/opened", json={"channel": "email"})
     session.refresh(n)
     assert n.email_clicked_at == first
+
+
+def test_email_click_token_works_signed_out_and_rejects_forgery(client, session):
+    from backend.services.notification_delivery import tracked_url
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    _make_event(session, "ev-1")
+    n = _interest_notif(session, bob, "ev-1")
+    url = tracked_url("https://app/event/ev-1#x", n.id, "email")
+    token = url.split("&t=")[1].split("#")[0]
+    assert url.endswith("#x")
+
+    forged = client.post(
+        "/api/notifications/email-click", json={"token": f"{n.id}.bogus"}
+    )
+    assert forged.status_code == 204
+    session.refresh(n)
+    assert n.email_clicked_at is None
+
+    assert (
+        client.post("/api/notifications/email-click", json={"token": token}).status_code
+        == 204
+    )
+    session.refresh(n)
+    assert n.email_clicked_at is not None
+    assert n.read_at is not None
+
+
+def test_email_open_pixel_stamps_whole_email_batch(client, session, monkeypatch):
+    from backend.services.email_tokens import make_notification_token
+    from backend.services.notification_delivery import (
+        email_open_pixel_html,
+        record_delivery,
+    )
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    _make_event(session, "ev-1")
+    _make_event(session, "ev-2")
+    a = _interest_notif(session, bob, "ev-1")
+    b = _interest_notif(session, bob, "ev-2")
+    other = _notif(
+        session, recipient=bob, actor=bob, kind="event_reminder", event_id="ev-1"
+    )
+    for n in (a, b):
+        record_delivery(session, n.id, "email", mode="digest", batch_id="digest1")
+    record_delivery(session, other.id, "email", mode="instant")
+    session.commit()
+
+    assert email_open_pixel_html(a.id) == ""
+    monkeypatch.setenv("EMAIL_OPEN_TRACKING_ENABLED", "true")
+    assert "/api/notifications/email-open/" in email_open_pixel_html(a.id)
+
+    bad = client.get(f"/api/notifications/email-open/{a.id}.forged.gif")
+    assert bad.status_code == 200
+    r = client.get(
+        f"/api/notifications/email-open/{make_notification_token(a.id, 'o')}.gif"
+    )
+    assert r.status_code == 200 and r.headers["content-type"] == "image/gif"
+    for n in (a, b, other):
+        session.refresh(n)
+    assert a.email_opened_at is not None and b.email_opened_at is not None
+    assert other.email_opened_at is None
 
 
 def test_activity_digest_and_push_skip_anonymous_review(session, monkeypatch):
@@ -2739,7 +2804,7 @@ def _patch_digest_senders(monkeypatch) -> list:
         lambda recipient, *a, **k: emails.append((recipient.id, "digest_v2")) or True,
     )
     monkeypatch.setattr(
-        social_module, "get_people_suggestions_for_email", lambda *a, **k: []
+        social_module, "get_people_suggestions_for_email", lambda *a, **k: ([], [])
     )
     return emails
 

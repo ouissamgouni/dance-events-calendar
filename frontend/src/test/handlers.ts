@@ -193,6 +193,16 @@ export const handlers = [
     http.post('*/api/users/me/review-prompt/:eventId/impression', () => new HttpResponse(null, { status: 204 })),
     http.get('*/api/users/me/pending-reviews', () => HttpResponse.json([])),
 
+    // ── People discovery: For You trail + Home people sheet (none by default) ──
+    http.get('*/api/social/me/suggestions', () =>
+        HttpResponse.json({ items: [], total: 0, friend_count: 0, trail_position: 'bottom' }),
+    ),
+    http.get('*/api/social/me/people-prompt', () =>
+        HttpResponse.json({ show: false, forced: false, friend_count: 0, overlays_per_session: 1, items: [], total: 0 }),
+    ),
+    http.post('*/api/social/me/people-prompt/impression', () => new HttpResponse(null, { status: 204 })),
+    http.post('*/api/social/me/suggestions/:handle/dismiss', () => new HttpResponse(null, { status: 204 })),
+
     // ── Suggestion geocode lookup ───────────────────────────────────────────
     http.get('*/api/suggestions/geocode', ({ request }) => {
         const url = new URL(request.url)

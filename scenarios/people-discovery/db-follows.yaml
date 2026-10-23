@@ -1,0 +1,90 @@
+# Friendships (mutual follows) and one-way follows; see mock-users.yaml for the cast.
+# Emits new_follower/new_friend rows so a digest has activity to ship.
+emit_notifications: true
+follows:
+  - follower: eli
+    followee: f1
+  - follower: f1
+    followee: eli
+  - follower: eli
+    followee: f2
+  - follower: f2
+    followee: eli
+  - follower: eli
+    followee: f3
+  - follower: f3
+    followee: eli
+  - follower: eli
+    followee: f4
+  - follower: f4
+    followee: eli
+  - follower: eli
+    followee: f5
+  - follower: f5
+    followee: eli
+  - follower: fay
+    followee: f1
+  - follower: f1
+    followee: fay
+  - follower: fay
+    followee: f2
+  - follower: f2
+    followee: fay
+  - follower: fay
+    followee: f3
+  - follower: f3
+    followee: fay
+  - follower: fay
+    followee: f4
+  - follower: f4
+    followee: fay
+  - follower: fay
+    followee: f5
+  - follower: f5
+    followee: fay
+  - follower: fay
+    followee: f6
+  - follower: f6
+    followee: fay
+  - follower: fay
+    followee: f7
+  - follower: f7
+    followee: fay
+  - follower: fay
+    followee: f8
+  - follower: f8
+    followee: fay
+  - follower: fay
+    followee: f9
+  - follower: f9
+    followee: fay
+  - follower: fay
+    followee: f10
+  - follower: f10
+    followee: fay
+  - follower: fay
+    followee: f11
+  - follower: f11
+    followee: fay
+  - follower: fay
+    followee: f12
+  - follower: f12
+    followee: fay
+  - follower: dana
+    followee: cur1
+  - follower: dana
+    followee: cur2
+  - follower: newbie1
+    followee: f1
+  - follower: f1
+    followee: newbie1
+  - follower: newbie2
+    followee: cur1
+  - follower: newbie3
+    followee: cur1
+  - follower: newbie3
+    followee: cur2
+  - follower: newbie4
+    followee: f1
+  - follower: newbie5
+    followee: f1

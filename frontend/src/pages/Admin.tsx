@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useUpdateFeatureFlag } from '../context/FeatureFlagsContext';
 import SyncProgressCard from '../components/SyncProgressCard';
 import AdminReviewHomePromptSettings from '../components/AdminReviewHomePromptSettings';
+import AdminPeopleDiscoverySettings from '../components/AdminPeopleDiscoverySettings';
 import SyncJobsHistoryTable from '../components/SyncJobsHistoryTable';
 import EventsPanel from '../components/EventsPanel';
 import type { EventsPanelPreset } from '../components/EventsPanel';
@@ -3689,6 +3690,8 @@ export default function Admin() {
                                     ratingsEnabled={showRatings}
                                     onOpenFeatureFlags={() => setActiveConfigTab('feature-flags')}
                                 />
+
+                                <AdminPeopleDiscoverySettings onMessage={setMessage} />
 
                                 {/* Ticket / memories prompts */}
                                 {EVENT_ASSET_PROMPTS.map((prompt) => {

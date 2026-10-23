@@ -53,6 +53,7 @@ const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: strin
     follow_request: { Icon: UserPlus, cls: 'bg-blue-100 text-action' },
     follow_request_approved: { Icon: UserPlus, cls: 'bg-blue-100 text-action' },
     new_friend: { Icon: Users, cls: 'bg-emerald-100 text-emerald-600' },
+    suggested_person_joined: { Icon: UserPlus, cls: 'bg-blue-100 text-action' },
     event_reminder: { Icon: Clock, cls: 'bg-rose-100 text-rose-600' },
     event_review_prompt: { Icon: Star, cls: 'bg-violet-100 text-violet-600' },
     event_ticket_prompt: { Icon: Ticket, cls: 'bg-blue-100 text-action' },
@@ -100,6 +101,7 @@ const AVATAR_KINDS = new Set<NotificationItem['kind']>([
     'follow_request',
     'follow_request_approved',
     'plan_session_added',
+    'suggested_person_joined',
 ]);
 
 const displayNameOf = (a: NotificationActor): string =>
@@ -693,7 +695,7 @@ export default function NotificationRow({
     // Inline affordances that live in the row's trailing slot (page) or inside
     // the row button (panel).
     let actionNode: ReactNode = null;
-    if (item.kind === 'new_follower') {
+    if (item.kind === 'new_follower' || item.kind === 'suggested_person_joined') {
         actionNode = following ? (
             <span className="inline-flex min-h-9 items-center px-3 text-sm border border-line bg-surface text-ink-soft">
                 ✓ Following
@@ -705,7 +707,7 @@ export default function NotificationRow({
                 disabled={followBusy}
                 className="min-h-9 px-3 text-sm bg-action text-white hover:bg-action disabled:opacity-60"
             >
-                {followBusy ? 'Following…' : 'Follow back'}
+                {followBusy ? 'Following…' : item.kind === 'new_follower' ? 'Follow back' : 'Follow'}
             </button>
         );
     } else if (item.kind === 'new_friend') {

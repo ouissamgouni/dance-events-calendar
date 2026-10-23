@@ -9,6 +9,7 @@ import { usePush } from '../hooks/usePush';
 import { reportAppInstalled, updateNotificationPreferences } from '../api';
 import { programInstallDismissedKey, programPushOptInKey } from '../utils/installPromptStorage';
 import { trackInstallPromptViewed } from '../utils/tracking';
+import { useHomeOverlayOpen } from '../hooks/useHomeOverlays';
 
 /**
  * Dismissible "Install app" banner + post-install notification opt-in.
@@ -98,6 +99,7 @@ export default function InstallPrompt() {
     const [enablingPush, setEnablingPush] = useState(false);
     const [pushActionError, setPushActionError] = useState<string | null>(null);
     const [showIosHelp, setShowIosHelp] = useState(false);
+    const homeOverlayOpen = useHomeOverlayOpen();
     const pendingProgramKey = user?.user_id ? programPushOptInKey(user.user_id) : null;
     const programInvitation = invitation?.source === 'program';
     const programContext = invitation?.source === 'program' || Boolean(
@@ -218,6 +220,9 @@ export default function InstallPrompt() {
     // onboarding (or on any /onboarding route) shouldn't be nudged to
     // install/enable push — those prompts belong on the explorer afterwards.
     if (location.pathname.startsWith('/onboarding') || user?.needs_onboarding) return null;
+
+    // Lowest priority on Home: wait until the review / people sheets are closed.
+    if (homeOverlayOpen) return null;
 
     if (showIosHelp) {
         return (

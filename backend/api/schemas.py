@@ -1825,6 +1825,25 @@ class SiteSettingsResponse(BaseModel):
     similar_events_radius_regional_km: int = 150
     similar_events_radius_international_km: int = 1500
     similar_events_limit: int = 6
+    # People discovery: Home "Build your tribe" sheet/trail + "joined" notifications.
+    people_prompt_enabled: bool = True
+    people_joined_enabled: bool = True
+    people_prompt_tier1_max_friends: int = 2
+    people_prompt_tier1_cooldown_hours: int = 48
+    people_prompt_tier2_max_friends: int = 9
+    people_prompt_tier2_cooldown_hours: int = 168
+    people_prompt_fatigue_dismissals: int = 3
+    people_prompt_fatigue_pause_days: int = 30
+    people_prompt_min_suggestions: int = 3
+    people_trail_top_max_friends: int = 9
+    home_overlays_per_session: int = 1
+    suggestion_dismissal_ttl_days: int = 90
+    people_joined_window_days: int = 14
+    people_joined_min_mutual: int = 1
+    people_joined_min_mutual_curators: int = 2
+    people_joined_max_recipients: int = 50
+    people_joined_push_start_hour: int = 10
+    people_joined_push_end_hour: int = 21
     # Minimum reviews before an event/series shows a computed "Overall Mood"
     # headline label; below this the UI shows an "Early feedback" state.
     review_mood_headline_min_reviews: int = 3
@@ -1958,17 +1977,17 @@ class NotificationActivityItem(BaseModel):
     event_title: Optional[str] = None
     actor_display_name: Optional[str] = None
     actor_handle: Optional[str] = None
-    app_at: Optional[datetime] = None
-    email_at: Optional[datetime] = None
-    push_at: Optional[datetime] = None
     read_at: Optional[datetime] = None
     push_opened_at: Optional[datetime] = None
     email_clicked_at: Optional[datetime] = None
+    email_opened_at: Optional[datetime] = None
     latency_seconds: Optional[float] = None
 
 
-class NotificationActivityMessage(BaseModel):
-    # One outbound send; email + push merged when same time, source and items.
+class NotificationActivityRow(BaseModel):
+    # One outbound send (email + push merged when same time, source and items)
+    # or one in-app feed delivery (channels == ["app"]).
+    user: NotificationActivityUser
     channels: list[str]
     mode: Optional[str] = None
     source: Optional[str] = None
@@ -1977,13 +1996,10 @@ class NotificationActivityMessage(BaseModel):
     sent_at: datetime
     item_count: int
     engaged_count: int
-    topics: list[NotificationActivityTopicCount]
-    items: list[NotificationActivityItem]
-
-
-class NotificationActivityInApp(BaseModel):
-    item_count: int
-    read_count: int
+    read_count: int = 0
+    email_clicked: int = 0
+    email_opened: int = 0
+    push_opened: int = 0
     topics: list[NotificationActivityTopicCount]
     items: list[NotificationActivityItem]
 
@@ -1991,9 +2007,7 @@ class NotificationActivityInApp(BaseModel):
 class NotificationActivityGroup(BaseModel):
     day: date
     user: NotificationActivityUser
-    last_at: datetime
-    messages: list[NotificationActivityMessage]
-    in_app: Optional[NotificationActivityInApp] = None
+    rows: list[NotificationActivityRow]
 
 
 class NotificationActivitySummary(BaseModel):
@@ -2007,6 +2021,7 @@ class NotificationActivitySummary(BaseModel):
     unknown: int = 0
     email_items: int = 0
     email_clicked: int = 0
+    email_opened: int = 0
     push_items: int = 0
     push_opened: int = 0
     app_read: int = 0
@@ -2014,8 +2029,10 @@ class NotificationActivitySummary(BaseModel):
 
 class NotificationActivityResponse(BaseModel):
     summary: NotificationActivitySummary
-    groups: list[NotificationActivityGroup]
-    total_groups: int
+    # group="none" fills rows; group="recipient" fills groups. total counts the paged unit.
+    rows: list[NotificationActivityRow] = []
+    groups: list[NotificationActivityGroup] = []
+    total: int
 
 
 class ForceInterestMatchSendResponse(BaseModel):
@@ -2313,6 +2330,28 @@ class SiteSettingsUpdateRequest(BaseModel):
         default=None, ge=1, le=20000
     )
     similar_events_limit: Optional[int] = Field(default=None, ge=1, le=24)
+    people_prompt_enabled: Optional[bool] = None
+    people_joined_enabled: Optional[bool] = None
+    people_prompt_tier1_max_friends: Optional[int] = Field(default=None, ge=1, le=1000)
+    people_prompt_tier1_cooldown_hours: Optional[int] = Field(
+        default=None, ge=1, le=2160
+    )
+    people_prompt_tier2_max_friends: Optional[int] = Field(default=None, ge=1, le=1000)
+    people_prompt_tier2_cooldown_hours: Optional[int] = Field(
+        default=None, ge=1, le=2160
+    )
+    people_prompt_fatigue_dismissals: Optional[int] = Field(default=None, ge=1, le=50)
+    people_prompt_fatigue_pause_days: Optional[int] = Field(default=None, ge=1, le=365)
+    people_prompt_min_suggestions: Optional[int] = Field(default=None, ge=1, le=5)
+    people_trail_top_max_friends: Optional[int] = Field(default=None, ge=1, le=1000)
+    home_overlays_per_session: Optional[int] = Field(default=None, ge=1, le=3)
+    suggestion_dismissal_ttl_days: Optional[int] = Field(default=None, ge=1, le=3650)
+    people_joined_window_days: Optional[int] = Field(default=None, ge=1, le=90)
+    people_joined_min_mutual: Optional[int] = Field(default=None, ge=1, le=50)
+    people_joined_min_mutual_curators: Optional[int] = Field(default=None, ge=1, le=50)
+    people_joined_max_recipients: Optional[int] = Field(default=None, ge=1, le=1000)
+    people_joined_push_start_hour: Optional[int] = Field(default=None, ge=1, le=23)
+    people_joined_push_end_hour: Optional[int] = Field(default=None, ge=1, le=24)
     review_mood_headline_min_reviews: Optional[int] = Field(default=None, ge=1, le=1000)
     event_message_cta_min_going: Optional[int] = Field(default=None, ge=1, le=10000)
     duplicate_auto_detect_enabled: Optional[bool] = None
@@ -4269,6 +4308,10 @@ class NotificationOpenedRequest(BaseModel):
     channel: Literal["push", "email"]
 
 
+class NotificationEmailClickRequest(BaseModel):
+    token: str = Field(max_length=64)
+
+
 class SubscribedEventVia(BaseModel):
     """Attribution for a single (actor, kind) reason this event surfaced."""
 
@@ -4649,6 +4692,36 @@ class FoFSuggestionItem(BaseModel):
 class FoFSuggestionsResponse(BaseModel):
     items: list[FoFSuggestionItem]
     total: int
+    friend_count: int = 0
+    # Where For You places the "Build your tribe" trail (top for small circles).
+    trail_position: str = "bottom"
+
+
+class PeoplePromptResponse(BaseModel):
+    show: bool
+    forced: bool = False
+    friend_count: int = 0
+    overlays_per_session: int = 1
+    items: list[FoFSuggestionItem] = []
+    total: int = 0
+
+
+class PeoplePromptImpressionRequest(BaseModel):
+    outcome: str = Field(pattern="^(shown|dismissed|followed)$")
+    followed_count: int = Field(default=0, ge=0, le=100)
+
+
+class PeoplePromptForceRequest(BaseModel):
+    user_ids: list[UUID] = Field(default_factory=list, max_length=500)
+    all_users: bool = False
+    dry_run: bool = True
+
+
+class PeopleJoinedForceRequest(BaseModel):
+    joiner_user_ids: list[UUID] = Field(default_factory=list, max_length=100)
+    all_recent_joiners: bool = False
+    channels: list[Literal["app", "push"]] = ["app"]
+    dry_run: bool = True
 
 
 # ---------------------------------------------------------------------------

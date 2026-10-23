@@ -1,0 +1,16 @@
+# Gina attended last week's social and hasn't reviewed it, so her Home
+# review prompt takes the session's only Home sheet slot.
+base_week: 0
+events:
+  - id: ev-paris-sat
+    calendar_id: salsa-cal-001
+    title: Paris Salsa Saturday
+    location: "La Bellevilloise, Paris, France"
+    latitude: 48.8686
+    longitude: 2.3925
+    start: w-1 Sat 21:00
+    end: w-1 Sat 23:59
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local

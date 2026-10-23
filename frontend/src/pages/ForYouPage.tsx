@@ -18,8 +18,9 @@ import RailEventCard from '../components/RailEventCard';
 import EventCard from '../components/EventCard';
 import TribeGoingCard from '../components/TribeGoingCard';
 import ShareExperienceCard from '../components/ShareExperienceCard';
-import HomeReviewPrompt from '../components/HomeReviewPrompt';
-import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
+import PeopleSuggestionsTrail from '../components/PeopleSuggestionsTrail';
+import { usePeopleSuggestions } from '../hooks/usePeopleSuggestions';
+import { trackPeopleTrailViewed } from '../utils/tracking';
 import SectionHeading, { type SectionHeadingAction } from '../components/SectionHeading';
 import ScrollDotsIndicator from '../components/ScrollDots';
 import ExploreSearchEntry from '../components/ExploreSearchEntry';
@@ -196,7 +197,7 @@ export function LensTrail(props: LensTrailProps) {
 /**
  * "For you" surface: personalised event shortcuts for a signed-in viewer.
  * Renders five horizontal trails — Your next events, You might like,
- * Friends are going, Build your tribe, New — each independently
+ * Build your tribe (top for small circles), Friends are going, New — each independently
  * paginated / scoped so a slow lens never blocks the others.
  */
 export default function ForYouPage() {
@@ -374,6 +375,16 @@ export default function ForYouPage() {
         setPendingReviews((prev) => prev.filter((r) => r.event_id !== eventId));
     }, []);
 
+    // The app-wide review wizard (AppPrompts) announces submissions.
+    useEffect(() => {
+        const onChanged = (e: Event) => {
+            const eventId = (e as CustomEvent<{ eventId?: string }>).detail?.eventId;
+            if (eventId) handleReviewed(eventId);
+        };
+        window.addEventListener('reviews:changed', onChanged);
+        return () => window.removeEventListener('reviews:changed', onChanged);
+    }, [handleReviewed]);
+
     const shareScrollerRef = useRef<HTMLDivElement>(null);
     const shareDots = useScrollDots(shareScrollerRef, [pendingReviews.length]);
 
@@ -386,6 +397,24 @@ export default function ForYouPage() {
     const handleCloseModal = useCallback(() => {
         setSelectedEvent(null);
     }, []);
+
+    const people = usePeopleSuggestions(!!user);
+    const peopleTrailPosition = people.trailPosition;
+    const onPeopleTrailSeen = useCallback(
+        () => trackPeopleTrailViewed(peopleTrailPosition),
+        [peopleTrailPosition],
+    );
+    const peopleTrail = people.items && people.items.length > 0 ? (
+        <PeopleSuggestionsTrail
+            items={people.items}
+            total={people.total}
+            pending={people.pending}
+            onFollow={(h) => void people.follow(h)}
+            onDismiss={(h) => void people.dismiss(h)}
+            testId="for-you-build-your-tribe"
+            onSeen={onPeopleTrailSeen}
+        />
+    ) : null;
 
     const trendingDecoration = trendingEnabled && showPopularity;
     const firstName = firstNameOf(user?.name, user?.handle);
@@ -462,6 +491,7 @@ export default function ForYouPage() {
                             unseenStateEnabled={unseenStateEnabled}
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
+                        {people.trailPosition === 'top' && peopleTrail}
                         <LensTrail
                             title="Your tribe is going"
                             testId="for-you-tribe-going"
@@ -528,7 +558,7 @@ export default function ForYouPage() {
                                 />
                             </section>
                         )}
-                        <PeopleYouMayKnowCard variant="trail" />
+                        {people.trailPosition === 'bottom' && peopleTrail}
                     </div>
                 )}
             </main>
@@ -538,13 +568,6 @@ export default function ForYouPage() {
                     event={selectedEvent}
                     onClose={handleCloseModal}
                     source="explore"
-                />
-            )}
-            {user && (
-                <HomeReviewPrompt
-                    userId={user.user_id ?? user.email}
-                    blocked={!!selectedEvent}
-                    onReviewed={handleReviewed}
                 />
             )}
         </div>
