@@ -14,6 +14,8 @@ interface Props {
     showClose?: boolean;
     /** When false, backdrop click and Escape don't close the sheet. */
     dismissible?: boolean;
+    /** When false, only backdrop clicks are ignored; Escape and Back still close. */
+    closeOnBackdrop?: boolean;
     /** Tighter spacing, one-line subtitle and no header divider. */
     compact?: boolean;
     /** Sticky footer content, typically a primary confirm button. */
@@ -29,7 +31,7 @@ interface Props {
  * footer clear of the iOS home indicator. The body scrolls independently so the
  * sheet never grows past 85% of the viewport height.
  */
-export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, dismissible = true, compact = false, footer, desktop = 'sheet', children }: Props) {
+export default function BottomSheet({ title, subtitle, titleSize = 'default', onClose, layer = 'modal', variant = 'default', headerLeading, headerAction, showClose = true, dismissible = true, closeOnBackdrop = true, compact = false, footer, desktop = 'sheet', children }: Props) {
     const floating = variant === 'floating';
     const modal = desktop === 'modal';
     const titleClass = titleSize === 'xl' ? 'text-2xl' : titleSize === 'large' ? 'text-lg' : 'text-base';
@@ -53,7 +55,7 @@ export default function BottomSheet({ title, subtitle, titleSize = 'default', on
     return (
         <div
             className={`fixed inset-0 flex items-end justify-center bg-black/50 animate-fade-in ${floating ? 'px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]' : ''} ${modal ? 'sm:items-center sm:p-4' : ''} ${layer === 'transient' ? 'z-[12000]' : 'z-[10000]'}`}
-            onClick={dismissible ? onClose : undefined}
+            onClick={dismissible && closeOnBackdrop ? onClose : undefined}
         >
             <div
                 role="dialog"

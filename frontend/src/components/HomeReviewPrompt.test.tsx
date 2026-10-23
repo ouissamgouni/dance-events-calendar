@@ -72,6 +72,10 @@ describe('HomeReviewPrompt', () => {
         expect(await screen.findByRole('button', { name: 'Not now' }, { timeout: 3000 })).toBeInTheDocument()
         expect(window.sessionStorage.getItem(REVIEW_PROMPT_SESSION_KEY)).toBe('user-a')
 
+        await user.click(screen.getByRole('dialog', { name: 'Rate this event' }).parentElement!)
+        await waitFor(() => expect(outcomes).toEqual(['shown']))
+        expect(screen.getByRole('button', { name: 'Not now' })).toBeInTheDocument()
+
         await user.click(screen.getByRole('button', { name: 'Not now' }))
         await waitFor(() => expect(outcomes).toEqual(['shown', 'dismissed']))
         expect(screen.queryByRole('button', { name: 'Not now' })).not.toBeInTheDocument()

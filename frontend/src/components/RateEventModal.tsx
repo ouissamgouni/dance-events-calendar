@@ -579,7 +579,8 @@ export default function RateEventModal({
         <>
             <div
                 className="fixed inset-0 z-[10500] bg-slate-900/50 flex items-end justify-center sm:items-center sm:p-4"
-                onClick={onClose}
+                // A stray tap mid-wizard would discard the review; close via ✕ / Not now instead.
+                onClick={thanks || mode === 'view' ? onClose : undefined}
             >
                 <div
                     className={`bg-surface shadow-lg w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain border border-line rounded-t-card sm:rounded-card pb-[env(safe-area-inset-bottom)] animate-slide-up ${dragY > 0 ? '' : 'transition-transform'}`}

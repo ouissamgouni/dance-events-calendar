@@ -45,6 +45,7 @@ export default function HomePeoplePrompt({ userId, enabled }: Props) {
             subtitle={subtitle}
             titleSize="large"
             onClose={handleClose}
+            closeOnBackdrop={false}
             desktop="modal"
             footer={(
                 <div className="flex items-center justify-between gap-3">
