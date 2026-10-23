@@ -215,6 +215,7 @@ const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> =
     promo_code_approved: 'others',
     promo_code_rejected: 'others',
     promo_code_added: 'others',
+    promo_code_match: 'matches',
     organizer_claim_decided: 'others',
     event_message: 'plans',
     event_message_reply: 'plans',

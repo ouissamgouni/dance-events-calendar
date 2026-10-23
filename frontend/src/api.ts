@@ -1515,6 +1515,8 @@ export interface AuthUser {
     push_interest_matches_enabled?: boolean;
     email_promo_codes_enabled?: boolean;
     push_promo_codes_enabled?: boolean;
+    email_promo_code_matches_enabled?: boolean;
+    push_promo_code_matches_enabled?: boolean;
     email_review_prompt_enabled?: boolean;
     push_review_prompt_enabled?: boolean;
     email_milestone_unlocked_enabled?: boolean;
@@ -1717,6 +1719,8 @@ export interface NotificationPreferences {
     push_interest_matches_enabled: boolean;
     email_promo_codes_enabled: boolean;
     push_promo_codes_enabled: boolean;
+    email_promo_code_matches_enabled?: boolean;
+    push_promo_code_matches_enabled?: boolean;
     email_review_prompt_enabled: boolean;
     push_review_prompt_enabled: boolean;
     email_ticket_prompt_enabled?: boolean;
@@ -1757,6 +1761,8 @@ export interface UpdateNotificationPreferencesPayload {
     push_interest_matches_enabled?: boolean;
     email_promo_codes_enabled?: boolean;
     push_promo_codes_enabled?: boolean;
+    email_promo_code_matches_enabled?: boolean;
+    push_promo_code_matches_enabled?: boolean;
     email_review_prompt_enabled?: boolean;
     push_review_prompt_enabled?: boolean;
     email_milestone_unlocked_enabled?: boolean;
@@ -2817,6 +2823,7 @@ export type NotificationKind =
     | 'promo_code_approved'
     | 'promo_code_rejected'
     | 'promo_code_added'
+    | 'promo_code_match'
     | 'organizer_claim_decided'
     | 'event_reminder'
     | 'event_review_prompt'
@@ -5830,6 +5837,19 @@ export async function updateAdminPromoCode(
         body: JSON.stringify(body),
     });
     return parseJsonResponse<PromoCodeAdmin>(res, 'Failed to update promo code');
+}
+
+export async function createAdminPromoCode(
+    eventId: string,
+    body: PromoCodeCreate,
+): Promise<PromoCodeAdmin> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/promo-codes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse<PromoCodeAdmin>(res, 'Failed to add promo code');
 }
 
 // --- Organizer claims ------------------------------------------------------

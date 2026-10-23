@@ -366,20 +366,26 @@ EMAIL_MODE_FEATURES = (
     "milestone_unlocked",
     "event_messages",
     "suggested_events",
+    "promo_code_matches",
 )
 
 
 # Self-service nudges that may be digested; ticket prompts digest by default.
 DIGEST_PROMPT_FEATURES = ("ticket_prompt", "memories_prompt", "review_prompt")
+# Instant by default; the admin may also route them into the digest.
+INSTANT_DEFAULT_FEATURES = ("promo_codes",)
 # Time-sensitive features: push + instant email only, never digested.
-INSTANT_ONLY_FEATURES = ("event_reminders", "schedule_updates", "promo_codes")
+INSTANT_ONLY_FEATURES = ("event_reminders", "schedule_updates")
 # Every user-facing notification feature the admin delivery matrix covers.
 NOTIFICATION_FEATURES = (
-    EMAIL_MODE_FEATURES + DIGEST_PROMPT_FEATURES + INSTANT_ONLY_FEATURES
+    EMAIL_MODE_FEATURES
+    + DIGEST_PROMPT_FEATURES
+    + INSTANT_DEFAULT_FEATURES
+    + INSTANT_ONLY_FEATURES
 )
-_INSTANT_BY_DEFAULT = frozenset(DIGEST_PROMPT_FEATURES + INSTANT_ONLY_FEATURES) - {
-    "ticket_prompt"
-}
+_INSTANT_BY_DEFAULT = frozenset(
+    DIGEST_PROMPT_FEATURES + INSTANT_DEFAULT_FEATURES + INSTANT_ONLY_FEATURES
+) - {"ticket_prompt"}
 
 
 def get_feature_email_instant(feature: str, session: Optional[Session] = None) -> bool:

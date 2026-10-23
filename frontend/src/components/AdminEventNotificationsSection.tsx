@@ -17,6 +17,7 @@ const KIND_LABELS: Record<string, string> = {
     event_message: 'Message',
     event_message_reply: 'Message reply',
     promo_code_added: 'Promo code',
+    promo_code_match: 'Deal (interest match)',
 };
 
 type KindRow = AdminEventNotificationStats['by_kind'][number];

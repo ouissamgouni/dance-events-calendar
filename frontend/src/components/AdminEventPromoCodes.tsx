@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
     approveAdminPromoCode,
+    createAdminPromoCode,
     fetchAdminPromoCodes,
     rejectAdminPromoCode,
     updateAdminPromoCode,
@@ -46,6 +47,60 @@ function toEditForm(p: PromoCodeAdmin): EditForm {
     };
 }
 
+const EMPTY_FORM: EditForm = { code: '', description: '', source_url: '', expires_at: '' };
+
+function toPayload(form: EditForm) {
+    return {
+        code: form.code.trim(),
+        description: form.description.trim() || null,
+        source_url: form.source_url.trim() || null,
+        expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
+    };
+}
+
+function PromoFormFields({ form, onChange }: { form: EditForm; onChange: (form: EditForm) => void }) {
+    return (
+        <>
+            <input
+                type="text"
+                aria-label="Code"
+                placeholder="Code"
+                value={form.code}
+                maxLength={64}
+                onChange={(e) => onChange({ ...form, code: e.target.value })}
+                className="border border-line px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-blue-400"
+            />
+            <input
+                type="text"
+                aria-label="Description"
+                placeholder="Description"
+                value={form.description}
+                maxLength={200}
+                onChange={(e) => onChange({ ...form, description: e.target.value })}
+                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+            />
+            <input
+                type="url"
+                aria-label="Source URL"
+                placeholder="Source URL"
+                value={form.source_url}
+                maxLength={500}
+                onChange={(e) => onChange({ ...form, source_url: e.target.value })}
+                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+            />
+            <label className="text-[10px] text-ink-soft flex items-center gap-2">
+                Expires
+                <input
+                    type="date"
+                    value={form.expires_at}
+                    onChange={(e) => onChange({ ...form, expires_at: e.target.value })}
+                    className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
+                />
+            </label>
+        </>
+    );
+}
+
 /**
  * Collapsible, admin-only "Promo codes" section embedded in the per-event
  * side panel. Lists every promo code submitted for this event (any status)
@@ -71,6 +126,8 @@ export default function AdminEventPromoCodes({
     const [rejectNotes, setRejectNotes] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<EditForm | null>(null);
+    const [addForm, setAddForm] = useState<EditForm | null>(null);
+    const [adding, setAdding] = useState(false);
 
     const load = () => {
         setLoading(true);
@@ -124,12 +181,7 @@ export default function AdminEventPromoCodes({
         setActing(id);
         setError(null);
         try {
-            const updated = await updateAdminPromoCode(id, {
-                code: editForm.code.trim(),
-                description: editForm.description.trim() || null,
-                source_url: editForm.source_url.trim() || null,
-                expires_at: editForm.expires_at ? new Date(editForm.expires_at).toISOString() : null,
-            });
+            const updated = await updateAdminPromoCode(id, toPayload(editForm));
             setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
             setEditingId(null);
             setEditForm(null);
@@ -137,6 +189,22 @@ export default function AdminEventPromoCodes({
             setError(e instanceof Error ? e.message : 'Failed to save changes');
         } finally {
             setActing(null);
+        }
+    };
+
+    const saveNew = async () => {
+        if (!addForm || !addForm.code.trim()) return;
+        setAdding(true);
+        setError(null);
+        try {
+            const created = await createAdminPromoCode(eventId, toPayload(addForm));
+            setRows((prev) => [created, ...prev]);
+            setAddForm(null);
+            notifyAdminDataChanged();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to add promo code');
+        } finally {
+            setAdding(false);
         }
     };
 
@@ -164,6 +232,36 @@ export default function AdminEventPromoCodes({
             {expanded && (
                 <div className="border-t border-line bg-surface p-3 space-y-2">
                     {error && <p className="text-[11px] text-danger">{error}</p>}
+                    {addForm ? (
+                        <div className="flex flex-col gap-1.5 border border-line bg-canvas p-2">
+                            <PromoFormFields form={addForm} onChange={setAddForm} />
+                            <div className="flex gap-2 pt-0.5">
+                                <button
+                                    type="button"
+                                    disabled={adding || !addForm.code.trim()}
+                                    onClick={saveNew}
+                                    className="text-[11px] bg-action text-white px-2 py-1 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {adding ? 'Adding…' : 'Add & approve'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAddForm(null)}
+                                    className="text-[11px] text-ink-soft hover:text-ink px-2"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setAddForm(EMPTY_FORM)}
+                            className="text-[11px] border border-line bg-surface text-ink px-2 py-1 hover:bg-canvas"
+                        >
+                            + Add promo code
+                        </button>
+                    )}
                     {loading ? (
                         <p className="text-[11px] text-muted">Loading…</p>
                     ) : rows.length === 0 ? (
@@ -174,38 +272,7 @@ export default function AdminEventPromoCodes({
                                 <li key={p.id} className="py-2">
                                     {editingId === p.id && editForm ? (
                                         <div className="flex flex-col gap-1.5">
-                                            <input
-                                                type="text"
-                                                value={editForm.code}
-                                                maxLength={64}
-                                                onChange={(e) => setEditForm({ ...editForm, code: e.target.value })}
-                                                className="border border-line px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-blue-400"
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="Description"
-                                                value={editForm.description}
-                                                maxLength={200}
-                                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
-                                            />
-                                            <input
-                                                type="url"
-                                                placeholder="Source URL"
-                                                value={editForm.source_url}
-                                                maxLength={500}
-                                                onChange={(e) => setEditForm({ ...editForm, source_url: e.target.value })}
-                                                className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
-                                            />
-                                            <label className="text-[10px] text-ink-soft flex items-center gap-2">
-                                                Expires
-                                                <input
-                                                    type="date"
-                                                    value={editForm.expires_at}
-                                                    onChange={(e) => setEditForm({ ...editForm, expires_at: e.target.value })}
-                                                    className="border border-line px-2 py-1 text-[11px] focus:outline-none focus:border-blue-400"
-                                                />
-                                            </label>
+                                            <PromoFormFields form={editForm} onChange={setEditForm} />
                                             <div className="flex gap-2 pt-0.5">
                                                 <button
                                                     type="button"

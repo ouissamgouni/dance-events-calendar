@@ -515,7 +515,7 @@ def _matching_event_ids(
     dance_ids: list[int],
     events: list[tuple[CachedEvent, set[int]]],
 ) -> set[str]:
-    # Same rule as interest_notification_service._find_matches.
+    # Same rule as interest_notification_service.find_matches.
     if not dance_ids:
         return set()
     wanted = set(dance_ids)

@@ -209,6 +209,9 @@ class User(SQLModel, table=True):
     # ``_fan_out_saved_event_promo_code``).
     email_promo_codes_enabled: bool = Field(default=True, nullable=False)
     push_promo_codes_enabled: bool = Field(default=True, nullable=False)
+    # Promo codes on events matching the user's interest profiles ("Deals").
+    email_promo_code_matches_enabled: bool = Field(default=True, nullable=False)
+    push_promo_code_matches_enabled: bool = Field(default=True, nullable=False)
     # Post-event "how was it?" review nudge (Event Quality Layer Phase 3;
     # see services/review_prompt_service.py).
     email_review_prompt_enabled: bool = Field(default=True, nullable=False)

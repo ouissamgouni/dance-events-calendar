@@ -42,6 +42,7 @@ UNSUBSCRIBE_CATEGORIES: dict[str, tuple[str, ...]] = {
     "friend_milestones": ("email_friend_milestones_enabled",),
     "interest_matches": ("email_interest_matches_enabled",),
     "promo_codes": ("email_promo_codes_enabled",),
+    "promo_code_matches": ("email_promo_code_matches_enabled",),
     "review_prompt": ("email_review_prompt_enabled",),
     "ticket_prompt": ("email_ticket_prompt_enabled",),
     "memories_prompt": ("email_memories_prompt_enabled",),

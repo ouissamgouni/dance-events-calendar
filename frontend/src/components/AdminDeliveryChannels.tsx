@@ -3,7 +3,7 @@ import type { NotificationChannelSettings } from '../api';
 export type DeliveryChannel = keyof NotificationChannelSettings;
 
 // Time-sensitive features: the backend never batches them into the digest.
-const INSTANT_ONLY_FEATURES = new Set(['event_reminders', 'schedule_updates', 'promo_codes']);
+const INSTANT_ONLY_FEATURES = new Set(['event_reminders', 'schedule_updates']);
 
 const CHANNELS: { key: DeliveryChannel; label: string }[] = [
     { key: 'push', label: 'Push' },

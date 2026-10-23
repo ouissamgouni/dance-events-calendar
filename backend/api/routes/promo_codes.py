@@ -19,6 +19,7 @@ from slowapi import Limiter
 from sqlmodel import Session, col, select
 
 from backend.api.deps import (
+    get_admin_user_id,
     get_current_user_optional,
     require_admin,
     require_promo_codes_enabled_for_event,
@@ -59,6 +60,7 @@ limiter = Limiter(key_func=client_ip)
 
 PROMO_CODE_ADDED = "promo_code_added"
 PROMO_CODE_ADDED_JOB = "promo_code_added"
+PROMO_CODE_MATCH = "promo_code_match"
 
 
 # --- helpers ---
@@ -235,6 +237,72 @@ def _fan_out_saved_event_promo_code(
         session.flush()
         record_delivery(session, notif.id, "app")
     return list(recipients)
+
+
+def _fan_out_promo_code_matches(session: Session, promo: EventPromoCode) -> int:
+    """Insert in-app ``promo_code_match`` rows for users whose interest
+    profiles match the event, once per code. Savers, Going users and the
+    submitter are skipped. Email/push ride the activity digest. No commit.
+    """
+    from backend.services.event_visibility import eligible_event_ids
+    from backend.services.interest_notification_service import find_matches
+
+    if promo.event_id not in eligible_event_ids(session, [promo.event_id]):
+        return 0
+    event = session.get(CachedEvent, promo.event_id)
+    if event is None or event.latitude is None or event.longitude is None:
+        return 0
+    start = event.start
+    if start is not None and start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if start is None or start <= datetime.now(timezone.utc):
+        return 0
+
+    matches = find_matches(session, [event])
+    if not matches:
+        return 0
+    excluded = set(
+        session.exec(
+            select(UserSavedEvent.user_id)
+            .where(UserSavedEvent.event_id == promo.event_id)
+            .where(col(UserSavedEvent.user_id).is_not(None))
+        ).all()
+    )
+    excluded |= set(
+        session.exec(
+            select(UserEventAttendance.user_id)
+            .where(UserEventAttendance.event_id == promo.event_id)
+            .where(col(UserEventAttendance.user_id).is_not(None))
+        ).all()
+    )
+    subject_key = f"promo:{promo.id}"
+    excluded |= set(
+        session.exec(
+            select(Notification.recipient_user_id)
+            .where(Notification.kind == PROMO_CODE_MATCH)
+            .where(Notification.subject_key == subject_key)
+        ).all()
+    )
+    excluded.add(promo.submitter_user_id)
+
+    created = 0
+    for (user_id, _event_id), labels in matches.items():
+        if user_id in excluded:
+            continue
+        notif = Notification(
+            recipient_user_id=user_id,
+            actor_user_id=user_id,
+            kind=PROMO_CODE_MATCH,
+            event_id=promo.event_id,
+            subject_key=subject_key,
+            context=promo.code,
+            description=", ".join(dict.fromkeys(labels))[:255],
+        )
+        session.add(notif)
+        session.flush()
+        record_delivery(session, notif.id, "app")
+        created += 1
+    return created
 
 
 def _deliver_promo_code_added(promo_id: str) -> None:
@@ -588,6 +656,7 @@ def admin_approve_promo_code(
     session.add(promo)
     _notify_submitter(session, promo, "promo_code_approved")
     recipient_ids = _fan_out_saved_event_promo_code(session, promo)
+    _fan_out_promo_code_matches(session, promo)
     session.commit()
     session.refresh(promo)
     if recipient_ids:
@@ -676,4 +745,64 @@ def admin_update_promo_code(
         promo,
         submitter or User(id=promo.submitter_user_id, email=""),
         event.title if event else None,
+    )
+
+
+@router.post(
+    "/api/admin/events/{event_id}/promo-codes",
+    response_model=PromoCodeAdminOut,
+    status_code=201,
+)
+def admin_create_promo_code(
+    event_id: str,
+    body: PromoCodeCreate,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    """Admin-added code: approved immediately and fanned out like an approval."""
+    event = session.get(CachedEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    code_norm = body.code.strip()
+    if not code_norm:
+        raise HTTPException(status_code=422, detail="Code cannot be empty")
+    existing = session.exec(
+        select(EventPromoCode)
+        .where(EventPromoCode.event_id == event_id)
+        .where(EventPromoCode.status != "rejected")
+    ).all()
+    if any(row.code.lower() == code_norm.lower() for row in existing):
+        raise HTTPException(
+            status_code=409,
+            detail="A promo code with this value already exists for this event",
+        )
+    admin_user_id = get_admin_user_id(session)
+    if admin_user_id is None:
+        raise HTTPException(status_code=409, detail="Admin user account not found")
+
+    now = datetime.now(timezone.utc)
+    promo = EventPromoCode(
+        event_id=event_id,
+        code=code_norm,
+        description=body.description,
+        source_url=body.source_url,
+        expires_at=body.expires_at,
+        submitter_user_id=admin_user_id,
+        status="approved",
+        reviewed_at=now,
+        reviewed_by=admin.get("email"),
+    )
+    session.add(promo)
+    session.flush()
+    recipient_ids = _fan_out_saved_event_promo_code(session, promo)
+    _fan_out_promo_code_matches(session, promo)
+    session.commit()
+    session.refresh(promo)
+    if recipient_ids:
+        job_queue.enqueue(PROMO_CODE_ADDED_JOB, str(promo.id))
+    submitter = session.get(User, admin_user_id)
+    return _to_admin_out(
+        promo,
+        submitter or User(id=admin_user_id, email=""),
+        event.title,
     )

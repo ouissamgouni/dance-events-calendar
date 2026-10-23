@@ -559,3 +559,147 @@ def test_approve_queues_saver_email_and_push_instead_of_sending_inline(
         d.channel for d in session.exec(select(NotificationDelivery)).all()
     )
     assert channels.count("email") == 1 and channels.count("push") == 1
+
+
+# ── Admin-created codes ──────────────────────────────────────────────
+
+
+@pytest.mark.unit
+def test_admin_create_approves_and_notifies_savers(client, session, event, monkeypatch):
+    from backend.services import job_queue
+
+    queued: list = []
+    monkeypatch.setattr(
+        job_queue, "enqueue", lambda name, key, delay=0: queued.append((name, key))
+    )
+    assert _login(client, email="admin-saver@example.com").status_code == 200
+    saver_id = _user_id(session, "admin-saver@example.com")
+    _save_event(session, user_id=saver_id, event_id=event.event_id, device_id="dev-as")
+    assert _login(client, email="admin@example.com").status_code == 200
+    admin_id = _user_id(session, "admin@example.com")
+
+    resp = client.post(
+        f"/api/admin/events/{event.event_id}/promo-codes",
+        json={"code": "  ADMIN15 ", "description": "15% off"},
+    )
+
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["code"] == "ADMIN15"
+    assert body["status"] == "approved"
+    assert body["reviewed_by"] == "admin@example.com"
+    assert body["submitter"]["user_id"] == str(admin_id)
+    added = session.exec(
+        select(Notification).where(Notification.kind == "promo_code_added")
+    ).all()
+    assert [n.recipient_user_id for n in added] == [saver_id]
+    assert queued == [(promo_codes_module.PROMO_CODE_ADDED_JOB, body["id"])]
+
+
+@pytest.mark.unit
+def test_admin_create_rejects_non_admin_unknown_event_and_duplicate(
+    client, session, event
+):
+    assert _login(client, email="nobody@example.com").status_code == 200
+    resp = client.post(
+        f"/api/admin/events/{event.event_id}/promo-codes", json={"code": "X1"}
+    )
+    assert resp.status_code == 403
+
+    assert _login(client, email="admin@example.com").status_code == 200
+    resp = client.post("/api/admin/events/missing/promo-codes", json={"code": "X1"})
+    assert resp.status_code == 404
+
+    url = f"/api/admin/events/{event.event_id}/promo-codes"
+    assert client.post(url, json={"code": "DUP"}).status_code == 201
+    assert client.post(url, json={"code": "dup"}).status_code == 409
+
+
+# ── Interest-profile fan-out (promo_code_match) ──────────────────────
+
+
+@pytest.fixture
+def geo_event(session):
+    from backend.db.models import CalendarSetting, EventTag, Tag, TagGroup
+
+    session.add(
+        CalendarSetting(calendar_id="cal-geo", name="C", color="#abc", enabled=True)
+    )
+    group = TagGroup(slug="dance", label="Dance")
+    session.add(group)
+    session.commit()
+    session.refresh(group)
+    salsa = Tag(group_id=group.id, slug="salsa", label="Salsa")
+    session.add(salsa)
+    session.commit()
+    session.refresh(salsa)
+    ev = CachedEvent(
+        event_id="evt-geo",
+        calendar_id="cal-geo",
+        title="Madrid Congress",
+        latitude=40.0,
+        longitude=-3.0,
+        start=datetime(2099, 1, 1, 20, 0, 0),
+        end=datetime(2099, 1, 2, 1, 0, 0),
+        review_status="reviewed",
+    )
+    session.add(ev)
+    session.add(EventTag(event_id=ev.event_id, tag_id=salsa.id))
+    session.commit()
+    return ev, salsa
+
+
+def _add_profile(session, user_id, tag, *, label="Madrid", inside=True, enabled=True):
+    from backend.db.models import UserInterestProfile, UserInterestProfileTag
+
+    lat = 40.0 if inside else 50.0
+    profile = UserInterestProfile(
+        user_id=user_id,
+        label=label,
+        area_label=label,
+        min_lat=lat - 0.5,
+        min_lng=-3.5,
+        max_lat=lat + 0.5,
+        max_lng=-2.5,
+        matches_enabled=enabled,
+    )
+    session.add(profile)
+    session.commit()
+    session.refresh(profile)
+    session.add(UserInterestProfileTag(profile_id=profile.id, tag_id=tag.id))
+    session.commit()
+
+
+@pytest.mark.unit
+def test_promo_code_match_notifies_matching_profiles_only(
+    client, session, geo_event, monkeypatch
+):
+    from backend.services import job_queue
+
+    monkeypatch.setattr(job_queue, "enqueue", lambda *a, **k: None)
+    ev, salsa = geo_event
+    ids = {}
+    for name in ("matcher", "saver", "goer", "muted", "far"):
+        assert _login(client, email=f"{name}@example.com").status_code == 200
+        ids[name] = _user_id(session, f"{name}@example.com")
+    for name in ("matcher", "saver", "goer"):
+        _add_profile(session, ids[name], salsa)
+    _add_profile(session, ids["muted"], salsa, enabled=False)
+    _add_profile(session, ids["far"], salsa, inside=False)
+    _save_event(session, user_id=ids["saver"], event_id=ev.event_id, device_id="d-s")
+    _mark_going(session, user_id=ids["goer"], event_id=ev.event_id, device_id="d-g")
+
+    assert _login(client, email="admin@example.com").status_code == 200
+    url = f"/api/admin/events/{ev.event_id}/promo-codes"
+    first = client.post(url, json={"code": "DEAL1"}).json()
+    client.post(url, json={"code": "DEAL2"})
+
+    matches = session.exec(
+        select(Notification).where(Notification.kind == "promo_code_match")
+    ).all()
+    assert {n.recipient_user_id for n in matches} == {ids["matcher"]}
+    assert sorted(n.context for n in matches) == ["DEAL1", "DEAL2"]
+    first_row = next(n for n in matches if n.context == "DEAL1")
+    assert first_row.description == "Madrid"
+    assert first_row.subject_key == f"promo:{first['id']}"
+    assert first_row.emailed_at is None and first_row.pushed_at is None

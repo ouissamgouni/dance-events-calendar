@@ -42,13 +42,14 @@ const TOPIC_LABELS: Record<string, string> = {
     event_reminders: 'Reminders',
     schedule_updates: 'Program & event updates',
     promo_codes: 'Promo codes',
+    promo_code_matches: 'Deals',
     other: 'Other',
 };
 
 // Mirrors the user-facing feed categories in utils/notificationRender.ts.
 const TOPIC_GROUPS: [string, string[]][] = [
     ['Plans', ['event_reminders', 'schedule_updates', 'event_messages', 'ticket_prompt']],
-    ['Matches', ['interest_matches']],
+    ['Matches', ['interest_matches', 'promo_code_matches']],
     ['People', ['friends_going', 'plan_activity', 'social_activity', 'suggested_events']],
     ['Reviews', ['friend_reviews', 'review_prompt', 'memories_prompt']],
     ['Milestones', ['milestone_unlocked', 'friend_milestones']],

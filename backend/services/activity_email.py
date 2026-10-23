@@ -45,6 +45,7 @@ from backend.config.loader import get_public_app_url
 from backend.db.database import get_engine
 from backend.db.models import (
     CachedEvent,
+    EventPromoCode,
     EventRating,
     EventUserAsset,
     Notification,
@@ -90,6 +91,8 @@ ACTIVITY_KINDS = (
     "event_ticket_prompt",
     "event_memories_prompt",
     "event_review_prompt",
+    "promo_code_added",
+    "promo_code_match",
 )
 
 # Kinds created during requests. Their instant email + push are sent by the
@@ -131,6 +134,8 @@ FEATURE_BY_KIND: dict[str, str] = {
     "event_message_reply": "event_messages",
     "plan_session_added": "plan_activity",
     "event_ticket_prompt": "ticket_prompt",
+    "promo_code_added": "promo_codes",
+    "promo_code_match": "promo_code_matches",
     "event_memories_prompt": "memories_prompt",
     "event_review_prompt": "review_prompt",
 }
@@ -149,6 +154,8 @@ CHANNEL_FLAG: dict[tuple[str, str], str] = {
     ("email", "ticket_prompt"): "email_ticket_prompt_enabled",
     ("email", "memories_prompt"): "email_memories_prompt_enabled",
     ("email", "review_prompt"): "email_review_prompt_enabled",
+    ("email", "promo_codes"): "email_promo_codes_enabled",
+    ("email", "promo_code_matches"): "email_promo_code_matches_enabled",
     ("push", "social_activity"): "push_social_activity_enabled",
     ("push", "friends_going"): "push_friends_going_enabled",
     ("push", "plan_activity"): "push_plan_activity_enabled",
@@ -159,6 +166,8 @@ CHANNEL_FLAG: dict[tuple[str, str], str] = {
     ("push", "event_messages"): "push_event_messages_enabled",
     ("push", "suggested_events"): "push_suggested_events_enabled",
     ("push", "ticket_prompt"): "push_ticket_prompt_enabled",
+    ("push", "promo_codes"): "push_promo_codes_enabled",
+    ("push", "promo_code_matches"): "push_promo_code_matches_enabled",
     ("push", "memories_prompt"): "push_memories_prompt_enabled",
     ("push", "review_prompt"): "push_review_prompt_enabled",
 }
@@ -179,6 +188,14 @@ _PROMPT_LINES = {
     "event_review_prompt": ("How was {title}? Rate your experience", "review"),
 }
 _DIGEST_ONLY_FEATURES = frozenset({"milestone_unlocked"}) | _PROMPT_FEATURES
+# Instant email + push sent by promo_codes._deliver_promo_code_added; digest only here.
+_JOB_DELIVERED_FEATURES = frozenset({"promo_codes"})
+_DIGEST_ONLY_FEATURES = _DIGEST_ONLY_FEATURES | _JOB_DELIVERED_FEATURES
+# Pushed in the interest-match slot rather than immediately.
+_INTEREST_PUSH_FEATURES = frozenset({"interest_matches", "promo_code_matches"})
+_PROMO_KINDS = frozenset({"promo_code_added", "promo_code_match"})
+# Digest section key per feature when several features share one section.
+_SECTION_BY_FEATURE = {"promo_codes": "deals", "promo_code_matches": "deals"}
 # Digest drops ticket prompts this close to the start: the reminder carries a ticket line.
 TICKET_DIGEST_MIN_LEAD_HOURS = 24
 _MILESTONE_KINDS = frozenset({"milestone_unlocked", "subscription_milestone"})
@@ -486,6 +503,15 @@ def _render_line(
             f'style="color:#1d4ed8;text-decoration:underline"><strong>{label}</strong></a>'
         )
         return f"{title} matched your {alert} alert"
+    if kind == "promo_code_added":
+        code = escape(context or "a promo code")
+        return f"New promo code <strong>{code}</strong> for {title}, an event you saved"
+    if kind == "promo_code_match":
+        code = escape(context or "a promo code")
+        line = f"New promo code <strong>{code}</strong> for {title}"
+        if description:
+            line += f", matches your <strong>{escape(description)}</strong> alert"
+        return line
     if kind in ("event_message", "event_message_reply"):
         action = _message_action(kind, context)
         line = f"<strong>{who}</strong> {action} {title}"
@@ -560,6 +586,11 @@ def _render_plain(
     if kind == "interest_event":
         label = context or "saved search"
         return f"{title} matched your {label} alert"
+    if kind == "promo_code_added":
+        return f"New promo code {context or ''} for {title}, an event you saved"
+    if kind == "promo_code_match":
+        line = f"New promo code {context or ''} for {title}"
+        return f"{line}, matches your {description} alert" if description else line
     if kind == "event_reminder":
         # actor_user_id == recipient for this kind (no real actor, see
         # reminder_service.py), so "who" is meaningless here.
@@ -637,6 +668,46 @@ def _stale_prompt_ids(
                 stale.add(n.id)
         elif key in has_memory or not event_assets.can_add_memory_now(
             session, event, now
+        ):
+            stale.add(n.id)
+    return stale
+
+
+def _stale_promo_ids(
+    session: Session,
+    notifications: list[Notification],
+    events: dict[str, CachedEvent],
+    now: datetime,
+) -> set:
+    """Promo rows whose code is no longer approved/unexpired or whose event started."""
+    promos = [n for n in notifications if n.kind in _PROMO_KINDS and n.event_id]
+    if not promos:
+        return set()
+    live_codes = {
+        (p.event_id, p.code.lower())
+        for p in session.exec(
+            select(EventPromoCode)
+            .where(col(EventPromoCode.event_id).in_({n.event_id for n in promos}))
+            .where(EventPromoCode.status == "approved")
+        ).all()
+        if p.expires_at is None
+        or (
+            p.expires_at
+            if p.expires_at.tzinfo
+            else p.expires_at.replace(tzinfo=timezone.utc)
+        )
+        > now
+    }
+    stale: set = set()
+    for n in promos:
+        event = events.get(n.event_id)
+        start = event.start if event is not None else None
+        if start is not None and start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        if (
+            (n.event_id, (n.context or "").lower()) not in live_codes
+            or start is None
+            or start <= now
         ):
             stale.add(n.id)
     return stale
@@ -736,10 +807,17 @@ def run_once(
         any_instant = any(
             on for f, on in feat_instant.items() if f not in _DIGEST_ONLY_FEATURES
         )
+        # Job-delivered kinds only matter here when their digest is on.
+        query_kinds = [
+            k
+            for k in (kinds or ACTIVITY_KINDS)
+            if FEATURE_BY_KIND.get(k) not in _JOB_DELIVERED_FEATURES
+            or feat_digest.get(FEATURE_BY_KIND[k])
+        ]
 
         stmt = (
             select(Notification)
-            .where(Notification.kind.in_(kinds or ACTIVITY_KINDS))  # type: ignore[union-attr]
+            .where(Notification.kind.in_(query_kinds))  # type: ignore[union-attr]
             .where(Notification.created_at >= cutoff_old)
             .order_by(Notification.recipient_user_id, Notification.created_at)
         )
@@ -837,6 +915,7 @@ def run_once(
 
         past_event_ids = {eid for eid in events if _event_is_past(session, eid)}
         stale_prompt_ids = _stale_prompt_ids(session, pending, events, now)
+        stale_prompt_ids |= _stale_promo_ids(session, pending, events, now)
 
         def _skip_past(n: Notification) -> bool:
             if n.id in stale_prompt_ids:
@@ -900,7 +979,9 @@ def run_once(
             instant_owned = (
                 feature is not None
                 and (
-                    feature not in _DIGEST_ONLY_FEATURES or feature in _PROMPT_FEATURES
+                    feature not in _DIGEST_ONLY_FEATURES
+                    or feature in _PROMPT_FEATURES
+                    or feature in _JOB_DELIVERED_FEATURES
                 )
                 and bool(feat_instant.get(feature))
             )
@@ -941,7 +1022,7 @@ def run_once(
                 and feat_push.get(feature, True)
             ):
                 if (
-                    feature == "interest_matches"
+                    feature in _INTEREST_PUSH_FEATURES
                     and interest_push_sched is not None
                     and not (force or resend)
                 ):
@@ -1179,25 +1260,30 @@ def run_once(
                 if not getattr(recipient, "digest_email_enabled", True):
                     continue
                 sections: list[dict] = []
+                section_by_key: dict[str, dict] = {}
                 delivered_ids: list = []
                 for feature, notifs in per_feature.items():
                     visible = [n for n in notifs if not _skip_past(n)]
                     if not visible:
                         continue
-                    sections.append(
-                        {
-                            "feature": feature,
-                            "entries": [
-                                _build_entry(group, alert_name)
-                                for group in _digest_groups(feature, visible)
-                                for alert_name in (
-                                    _interest_alert_names(group[-1])
-                                    if feature == "interest_matches"
-                                    else [None]
-                                )
-                            ],
+                    entries = [
+                        _build_entry(group, alert_name)
+                        for group in _digest_groups(feature, visible)
+                        for alert_name in (
+                            _interest_alert_names(group[-1])
+                            if feature == "interest_matches"
+                            else [None]
+                        )
+                    ]
+                    section_key = _SECTION_BY_FEATURE.get(feature, feature)
+                    if section_key in section_by_key:
+                        section_by_key[section_key]["entries"].extend(entries)
+                    else:
+                        section_by_key[section_key] = {
+                            "feature": section_key,
+                            "entries": entries,
                         }
-                    )
+                        sections.append(section_by_key[section_key])
                     delivered_ids.extend(n.id for n in visible)
                 if not sections:
                     continue
@@ -1368,6 +1454,39 @@ def run_once(
                     for n in visible:
                         record_delivery(session, n.id, "push", now, source=source)
                 continue
+            if feature == "promo_code_matches":
+                headline = visible[-1]
+                event = events.get(headline.event_id) if headline.event_id else None
+                event_title = (event.title if event and event.title else "An event")[
+                    :60
+                ]
+                if len(visible) > 1:
+                    title = f"{len(visible)} new deals for you"
+                    body = (
+                        f"{headline.context} · {event_title} +{len(visible) - 1} more"
+                    )
+                    url = "/notifications?kind=promo_code_match"
+                else:
+                    title = f"New promo code: {headline.context}"
+                    body = (
+                        f"{event_title} · matches your {headline.description} alert"
+                        if headline.description
+                        else event_title
+                    )
+                    url = f"/event/{headline.event_id}"
+                delivered = _push(
+                    recipient_id,
+                    visible,
+                    title=title,
+                    body=body,
+                    url=tracked_url(url, headline.id, "push"),
+                    tag=_push_tag_for(feature),
+                )
+                pushed += delivered
+                if delivered:
+                    for n in visible:
+                        record_delivery(session, n.id, "push", now, source=source)
+                continue
             logical_groups = _logical_groups(visible)
             first_group = logical_groups[0]
             first_notification = first_group[-1]
@@ -1425,7 +1544,7 @@ def run_once(
             stamped += 1
             if n.kind in FAST_PUSH_KINDS:
                 fast_pushed += 1
-            if n.kind == "interest_event":
+            if n.kind in ("interest_event", "promo_code_match"):
                 user = users.get(n.recipient_user_id)
                 if user is not None:
                     user.last_interest_push_at = now

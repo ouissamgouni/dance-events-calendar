@@ -1,13 +1,13 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addScheduleEditor, applyScheduleImport, createAdminEventSchedule, createScheduleOverviewItem, exportEventSchedule, fetchAdminEventSchedule, fetchAdminUsers, fetchEvent, fetchEventScheduleEditorAccess, fetchOptionalAdminEventSchedule, fetchScheduleEditors, fetchScheduleImportSchema, fetchSchedulePlanners, notifyProgram, fetchProgramNotifyCandidates, fetchSchedulePublishPreview, previewScheduleImport, publishEventSchedule, removeScheduleEditor, revertScheduleChange, unpublishEventSchedule, updateAdminEventSchedule, updateScheduleOverviewItem, updateScheduleSession, type AdminUserRow } from '../api';
+import { addScheduleEditor, applyScheduleImport, createAdminEventSchedule, createScheduleOverviewItem, createScheduleVenue, exportEventSchedule, fetchAdminEventSchedule, fetchAdminUsers, fetchEvent, fetchEventScheduleEditorAccess, fetchOptionalAdminEventSchedule, fetchScheduleEditors, fetchScheduleImportSchema, fetchSchedulePlanners, notifyProgram, fetchProgramNotifyCandidates, fetchSchedulePublishPreview, previewScheduleImport, publishEventSchedule, removeScheduleEditor, revertScheduleChange, unpublishEventSchedule, updateAdminEventSchedule, updateScheduleOverviewItem, updateScheduleSession, type AdminUserRow } from '../api';
 import type { AdminEventSchedule, CalendarEvent } from '../types';
 import AdminEventSchedulePage from './AdminEventSchedulePage';
 
 vi.mock('../api', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../api')>();
-    return { ...actual, addScheduleEditor: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), createScheduleOverviewItem: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchAdminUsers: vi.fn(), fetchEvent: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleEditors: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn(), fetchProgramNotifyCandidates: vi.fn(), fetchSchedulePublishPreview: vi.fn(), notifyProgram: vi.fn(), unpublishEventSchedule: vi.fn(), revertScheduleChange: vi.fn(), removeScheduleEditor: vi.fn(), updateAdminEventSchedule: vi.fn(), updateScheduleOverviewItem: vi.fn(), updateScheduleSession: vi.fn() };
+    return { ...actual, addScheduleEditor: vi.fn(), applyScheduleImport: vi.fn(), createAdminEventSchedule: vi.fn(), createScheduleOverviewItem: vi.fn(), createScheduleVenue: vi.fn(), exportEventSchedule: vi.fn(), fetchAdminEventSchedule: vi.fn(), fetchAdminUsers: vi.fn(), fetchEvent: vi.fn(), fetchEventScheduleEditorAccess: vi.fn(), fetchOptionalAdminEventSchedule: vi.fn(), fetchScheduleEditors: vi.fn(), fetchScheduleImportSchema: vi.fn(), fetchSchedulePlanners: vi.fn(), previewScheduleImport: vi.fn(), publishEventSchedule: vi.fn(), fetchProgramNotifyCandidates: vi.fn(), fetchSchedulePublishPreview: vi.fn(), notifyProgram: vi.fn(), unpublishEventSchedule: vi.fn(), revertScheduleChange: vi.fn(), removeScheduleEditor: vi.fn(), updateAdminEventSchedule: vi.fn(), updateScheduleOverviewItem: vi.fn(), updateScheduleSession: vi.fn() };
 });
 
 const event: CalendarEvent = {
@@ -176,6 +176,53 @@ describe('AdminEventSchedulePage', () => {
                 { contributor_id: 2, role: 'dj' },
             ],
         })));
+    });
+
+    it('shows a session save error inside the editor dialog', async () => {
+        vi.mocked(updateScheduleSession).mockRejectedValueOnce(new Error('Session overlaps another session'));
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: /Musicality/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        expect(await within(screen.getByRole('dialog', { name: 'Edit session' })).findByRole('alert')).toHaveTextContent('Session overlaps another session');
+    });
+
+    it('shows an overview save error inside the editor dialog', async () => {
+        const workshops = { id: 'workshops', external_id: null, parent_id: null, title: 'Workshops', subtitle: null, description: null, url: null, url_label: null, start: '2026-10-16T10:00:00Z', end: '2026-10-16T14:00:00Z', activity_type_id: 1, venue_id: null, room_ids: [], opens_detail: true, is_cancelled: false, sort_order: 0 };
+        vi.mocked(fetchOptionalAdminEventSchedule).mockResolvedValue({ ...schedule, overview_items: [workshops] });
+        vi.mocked(createScheduleOverviewItem).mockRejectedValueOnce(new Error('Moment overlaps its parent'));
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Add moment' }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: 'Teacher demo' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        expect(await within(screen.getByRole('dialog', { name: 'Add moment' })).findByRole('alert')).toHaveTextContent('Moment overlaps its parent');
+    });
+
+    it('shows a config save error inside the editor dialog', async () => {
+        vi.mocked(createScheduleVenue).mockRejectedValueOnce(new Error('Venue name already exists'));
+        render(
+            <MemoryRouter initialEntries={['/admin/events/movida-2026/schedule']}>
+                <Routes><Route path="/admin/events/:eventId/schedule" element={<AdminEventSchedulePage />} /></Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'locations' }));
+        fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
+        fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Palace' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        expect(await within(screen.getByRole('dialog', { name: 'Add venue' })).findByRole('alert')).toHaveTextContent('Venue name already exists');
     });
 
     it('requires preview before applying imported JSON to the draft', async () => {

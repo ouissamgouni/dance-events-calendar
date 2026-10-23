@@ -190,7 +190,7 @@ def _load_profile_tags(
     return out
 
 
-def _find_matches(
+def find_matches(
     session: Session, events: list[CachedEvent], user_ids: set | None = None
 ) -> dict[tuple, list[str]]:
     """Group-aware match of candidate ``events`` against active profiles.
@@ -286,7 +286,7 @@ def _scan_and_create(
     if not events:
         return {"candidates": 0, "created": 0}
 
-    matches = _find_matches(session, events, user_ids)
+    matches = find_matches(session, events, user_ids)
 
     created = 0
     if matches:
@@ -398,7 +398,7 @@ def preview_matches_for_users(user_ids: set, lookback_hours: int) -> dict:
 
     with Session(get_engine(), expire_on_commit=False) as session:
         events = _candidate_events(session, since, now)
-        matches = _find_matches(session, events, set(user_ids))
+        matches = find_matches(session, events, set(user_ids))
         existing = _existing_notification_pairs(session, matches)
 
     per_user: dict[str, dict] = {
@@ -480,7 +480,7 @@ def interest_reach_for_events(
     for _user_id, event_id in notified:
         out[event_id]["already_notified_users"] += 1
 
-    matches = _find_matches(session, eligible)
+    matches = find_matches(session, eligible)
     if not matches:
         return out
 
