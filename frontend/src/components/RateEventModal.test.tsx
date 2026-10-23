@@ -78,6 +78,24 @@ describe('RateEventModal', () => {
         expect(screen.getByRole('button', { name: /Continue/i })).toBeEnabled()
     })
 
+    it('ignores backdrop clicks mid-wizard but closes via the close button', async () => {
+        server.use(http.get('*/api/tags', () => HttpResponse.json([])))
+        const onClose = vi.fn()
+        const { user } = renderWithProviders(
+            <FeatureFlagsProvider>
+                <RateEventModal eventId="evt-1" initialRating={null} onClose={onClose} onSubmitted={() => { }} />
+            </FeatureFlagsProvider>,
+        )
+
+        await user.click(screen.getByRole('radio', { name: /Amazing/i }))
+        await user.click(screen.getByRole('dialog', { name: 'Rate this event' }).parentElement!)
+        expect(onClose).not.toHaveBeenCalled()
+        expect(screen.getByRole('radio', { name: /Amazing/i })).toBeChecked()
+
+        await user.click(screen.getByRole('button', { name: 'Close' }))
+        expect(onClose).toHaveBeenCalled()
+    })
+
     it('resets aspect selections when the headline mood changes', async () => {
         const aspectGroup = {
             id: 1,
