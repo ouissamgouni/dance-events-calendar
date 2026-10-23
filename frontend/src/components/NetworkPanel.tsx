@@ -322,7 +322,7 @@ export default function NetworkPanel() {
                     <div
                         role="tablist"
                         aria-label="People"
-                        className="sticky top-0 z-10 -mx-4 mb-4 flex gap-5 border-b border-line bg-surface px-4"
+                        className="sticky top-0 z-10 -mx-4 mb-4 flex gap-5 overflow-x-auto border-b border-line bg-surface px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     >
                         {tabDefs.map((t) => {
                             const active = t.key === tab;
@@ -333,7 +333,7 @@ export default function NetworkPanel() {
                                     role="tab"
                                     aria-selected={active}
                                     onClick={() => setParam('tab', t.key)}
-                                    className={`-mb-px shrink-0 border-b-2 py-2 text-sm whitespace-nowrap ${active
+                                    className={`shrink-0 border-b-2 py-2 text-sm whitespace-nowrap ${active
                                         ? 'border-action font-semibold text-ink'
                                         : 'border-transparent font-normal text-ink-soft hover:text-ink'
                                         }`}

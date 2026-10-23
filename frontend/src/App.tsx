@@ -26,6 +26,7 @@ import AppAccessGate from './components/AppAccessGate';
 import SignUpBanner from './components/SignUpBanner';
 import ShareReferralBanner from './components/ShareReferralBanner';
 import InstallPrompt from './components/InstallPrompt';
+import AppPrompts from './components/AppPrompts';
 import Home from './pages/Home';
 // Route-level code-splitting: only Home (the landing / LCP route) is loaded
 // eagerly. Every other route is lazy so its JS (Admin tooling, FullCalendar,
@@ -386,6 +387,7 @@ function AppShell() {
           {!hideBottomNav && <BottomNav />}
           <StatusBar />
         </div>
+        {!isEmbedded && <AppPrompts />}
         {!isEmbedded && <InstallPrompt />}
       </>
     </NotificationsProvider>

@@ -167,6 +167,26 @@ def get_public_app_url() -> str:
     return "http://localhost:5173"
 
 
+def get_public_api_url() -> str:
+    """Public backend base URL (no trailing slash) for links that must hit the API directly."""
+    configured = os.getenv("PUBLIC_API_URL")
+    if configured:
+        return configured.rstrip("/")
+    env_name = (os.getenv("ENV_NAME") or "").strip().lower()
+    if env_name == "staging":
+        return "https://api-develop.joinmovida.com"
+    if env_name in {"prod", "production"}:
+        return "https://api.joinmovida.com"
+    return f"http://localhost:{os.getenv('BACKEND_PORT', '8000')}"
+
+
+def get_email_open_tracking_enabled() -> bool:
+    return os.getenv("EMAIL_OPEN_TRACKING_ENABLED", "false").strip().lower() in (
+        "true",
+        "1",
+    )
+
+
 def get_notification_scheduler_enabled() -> bool:
     """Enable the in-app notification dispatch loop (reminders + digests).
 
@@ -372,6 +392,47 @@ REVIEW_HOME_PROMPT_INT_DEFAULTS: dict[str, int] = {
 
 def get_review_home_prompt_int(key: str) -> int:
     default = REVIEW_HOME_PROMPT_INT_DEFAULTS[key]
+    try:
+        return max(1, int(os.getenv(key.upper(), str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+def get_people_prompt_enabled() -> bool:
+    """Home "Build your tribe" sheet. Default True."""
+    parsed = _parse_bool(os.getenv("PEOPLE_PROMPT_ENABLED"))
+    return True if parsed is None else parsed
+
+
+def get_people_joined_enabled() -> bool:
+    """ "Someone you may know joined" notifications. Default True."""
+    parsed = _parse_bool(os.getenv("PEOPLE_JOINED_ENABLED"))
+    return True if parsed is None else parsed
+
+
+# Env var = key upper-cased.
+PEOPLE_DISCOVERY_INT_DEFAULTS: dict[str, int] = {
+    "people_prompt_tier1_max_friends": 2,
+    "people_prompt_tier1_cooldown_hours": 48,
+    "people_prompt_tier2_max_friends": 9,
+    "people_prompt_tier2_cooldown_hours": 168,
+    "people_prompt_fatigue_dismissals": 3,
+    "people_prompt_fatigue_pause_days": 30,
+    "people_prompt_min_suggestions": 3,
+    "people_trail_top_max_friends": 9,
+    "home_overlays_per_session": 1,
+    "suggestion_dismissal_ttl_days": 90,
+    "people_joined_window_days": 14,
+    "people_joined_min_mutual": 1,
+    "people_joined_min_mutual_curators": 2,
+    "people_joined_max_recipients": 50,
+    "people_joined_push_start_hour": 10,
+    "people_joined_push_end_hour": 21,
+}
+
+
+def get_people_discovery_int(key: str) -> int:
+    default = PEOPLE_DISCOVERY_INT_DEFAULTS[key]
     try:
         return max(1, int(os.getenv(key.upper(), str(default))))
     except (TypeError, ValueError):

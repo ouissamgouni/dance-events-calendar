@@ -493,6 +493,9 @@ function FollowStep({ items, statuses, loadingSuggestions, search, searchResults
                     </div>
                 )}
                 {items === null ? <p className="text-sm text-muted">Loading suggestions…</p> : items.length === 0 ? <p className="text-sm text-ink-soft">No suggestions yet. Search above to find people.</p> : <ul className="divide-y divide-card-line">{items.map((candidate) => <li key={candidate.handle}><FollowRow candidate={candidate} status={statuses[candidate.handle] ?? (candidate.is_followed_by_viewer ? 'followed' : 'idle')} onToggle={() => onToggle(candidate)} /></li>)}</ul>}
+                <p className="mt-3 text-xs text-ink-soft">
+                    People you may know on Movida can be told you joined. Turn off &ldquo;Suggest my profile to others&rdquo; in your account privacy settings to opt out.
+                </p>
             </div>
         </div>
     );

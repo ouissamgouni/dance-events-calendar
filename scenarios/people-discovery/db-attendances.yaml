@@ -1,0 +1,5 @@
+attendances:
+  - event_id: ev-paris-sat
+    email: gina@example.com
+    share_publicly: true
+    share_audience: public

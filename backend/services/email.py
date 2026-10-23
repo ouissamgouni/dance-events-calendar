@@ -6,7 +6,7 @@ from html import escape
 
 from backend.config.loader import get_public_app_url, get_smtp_config
 from backend.services.email_tokens import make_unsubscribe_token
-from backend.services.notification_delivery import tracked_url
+from backend.services.notification_delivery import email_open_pixel_html, tracked_url
 
 logger = logging.getLogger(__name__)
 APP_NAME = "Movida"
@@ -51,7 +51,9 @@ def _send_email(to_addr: str, subject: str, html: str, kind: str) -> bool:
         return False
 
 
-def _email_shell(heading: str, body_html: str, footer_html: str = "") -> str:
+def _email_shell(
+    heading: str, body_html: str, footer_html: str = "", open_nid: int | None = None
+) -> str:
     """Wrap email body in a minimal branded layout shared by user emails."""
     footer = (
         f'<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">'
@@ -65,6 +67,7 @@ def _email_shell(heading: str, body_html: str, footer_html: str = "") -> str:
             <h2 style="color:#3b82f6;margin:0 0 16px">{heading}</h2>
       {body_html}
       {footer}
+      {email_open_pixel_html(open_nid)}
     </div>
     """
 
@@ -300,43 +303,48 @@ def _engagement_ctas_html(*, open_as_button: bool = False) -> str:
     """
 
 
-def _people_suggestions_html(suggestions: list[dict]) -> str:
+def _people_suggestions_html(
+    suggestions: list[dict], new_people: list[dict] | None = None
+) -> str:
     """ "People you may want to follow" section for the activity digest
     email — up to 5 rows sourced from the suggestion service, styled to
     mirror the in-app "People you may know" card: avatar, a mutual-
     friend/follower-count line, and a one-click Follow button/link
     (``?follow=1`` triggers an auto-follow on page load once signed in).
+    ``new_people`` (up to 3, deduped) renders as a "New on Movida" subsection.
     """
-    if not suggestions:
+    if not suggestions and not new_people:
         return ""
     app = get_public_app_url()
-    rows = []
-    for s in suggestions[:5]:
-        handle = escape(s["handle"])
-        name = escape(s.get("display_name") or f"@{handle}")
-        profile_url = f"{app}/u/{handle}"
-        follow_url = f"{profile_url}?follow=1"
-        avatar_url = s.get("avatar_url")
-        mutual = s.get("mutual_friend_count") or 0
-        followers = s.get("followers_count") or 0
-        avatar_html = (
-            f'<img src="{escape(avatar_url)}" alt="" width="40" height="40" '
-            f'style="border-radius:50%;display:block;object-fit:cover">'
-            if avatar_url
-            else (
-                '<div style="width:40px;height:40px;border-radius:50%;'
-                'background:#e5e7eb"></div>'
+
+    def _rows(people: list[dict]) -> str:
+        rows = []
+        for s in people:
+            handle = escape(s["handle"])
+            name = escape(s.get("display_name") or f"@{handle}")
+            profile_url = f"{app}/u/{handle}"
+            follow_url = f"{profile_url}?follow=1"
+            avatar_url = s.get("avatar_url")
+            mutual = s.get("mutual_friend_count") or 0
+            followers = s.get("followers_count") or 0
+            avatar_html = (
+                f'<img src="{escape(avatar_url)}" alt="" width="40" height="40" '
+                f'style="border-radius:50%;display:block;object-fit:cover">'
+                if avatar_url
+                else (
+                    '<div style="width:40px;height:40px;border-radius:50%;'
+                    'background:#e5e7eb"></div>'
+                )
             )
-        )
-        detail_bits = []
-        if mutual > 0:
-            detail_bits.append(
-                f"Friend of {mutual} mutual friend{'s' if mutual != 1 else ''}"
-            )
-        detail_bits.append(f"{followers} follower{'s' if followers != 1 else ''}")
-        detail = " &middot; ".join(detail_bits)
-        rows.append(
-            f"""
+            detail_bits = []
+            if mutual > 0:
+                detail_bits.append(
+                    f"Friend of {mutual} mutual friend{'s' if mutual != 1 else ''}"
+                )
+            detail_bits.append(f"{followers} follower{'s' if followers != 1 else ''}")
+            detail = " &middot; ".join(detail_bits)
+            rows.append(
+                f"""
         <tr>
           <td style="padding:8px 10px 8px 0;width:40px">
             <a href="{profile_url}">{avatar_html}</a>
@@ -354,13 +362,28 @@ def _people_suggestions_html(suggestions: list[dict]) -> str:
           </td>
         </tr>
         """
+            )
+        return (
+            '<table role="presentation" cellpadding="0" cellspacing="0" '
+            f'style="width:100%">{"".join(rows)}</table>'
         )
+
+    new_html = (
+        f"""
+      <h4 style="font-size:15px;color:#111827;margin:16px 0 4px">✨ New on Movida</h4>
+      {_rows(new_people[:3])}
+    """
+        if new_people
+        else ""
+    )
     return f"""
     <div style="margin:20px 0">
             <h3 style="font-size:18px;color:#111827;margin:0 0 8px">👤 People you may want to follow</h3>
-      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%">
-        {"".join(rows)}
-      </table>
+      {_rows(suggestions[:5]) if suggestions else ""}
+      {new_html}
+      <p style="margin:12px 0 0">
+        <a href="{app}/tribe/network" style="color:#1d4ed8;text-decoration:underline">See all &rarr;</a>
+      </p>
     </div>
     """
 
@@ -434,7 +457,9 @@ def send_event_reminder_email(
     {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "reminder", "event reminders")
-    html = _email_shell("See you on the dance floor 💃", body, footer)
+    html = _email_shell(
+        "See you on the dance floor 💃", body, footer, open_nid=notification_id
+    )
     return _send_email(user.email, subject, html, "event reminder")
 
 
@@ -484,7 +509,7 @@ def send_event_review_prompt_email(
     {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "review_prompt", "review prompts")
-    html = _email_shell(heading, body, footer)
+    html = _email_shell(heading, body, footer, open_nid=notification_id)
     return _send_email(user.email, subject, html, "review prompt")
 
 
@@ -526,7 +551,7 @@ def _event_nudge_email(
     {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, category, label)
-    html = _email_shell(heading, body, footer)
+    html = _email_shell(heading, body, footer, open_nid=notification_id)
     return _send_email(user.email, subject, html, log_label)
 
 
@@ -991,7 +1016,9 @@ def send_event_message_instant_email(
     {_engagement_ctas_html()}
     """
     footer = _unsubscribe_footer(user.id, "event_messages", "event message updates")
-    html = _email_shell(f"{heading} on {APP_NAME}", body, footer)
+    html = _email_shell(
+        f"{heading} on {APP_NAME}", body, footer, open_nid=notification_id
+    )
     return _send_email(user.email, subject, html, "event message instant")
 
 
@@ -1002,6 +1029,8 @@ def send_activity_digest_email(
     feature: str = "social_activity",
     discover_more_count: int = 0,
     suggestions: list[dict] | None = None,
+    new_people: list[dict] | None = None,
+    notification_id: int | None = None,
 ) -> bool:
     """Email a user a batched digest of recent activity for one feature.
 
@@ -1067,9 +1096,10 @@ def send_activity_digest_email(
     )
     discover_more_html = ""
     if feature == "interest_matches" and discover_more_count > 0:
+        for_you_href = escape(tracked_url(f"{app}/for-you", notification_id, "email"))
         discover_more_html = f"""
     <p style="margin:12px 0">
-      <a href="{app}/for-you"
+      <a href="{for_you_href}"
                  style="color:#1d4ed8;text-decoration:underline">
         Discover {discover_more_count} more matching event{"s" if discover_more_count != 1 else ""} &rarr;
       </a>
@@ -1079,11 +1109,11 @@ def send_activity_digest_email(
     <p>Here's what happened in your scene:</p>
     <ul style="padding-left:18px;margin:12px 0">{items}</ul>
     {discover_more_html}
-    {_people_suggestions_html(suggestions or [])}
+    {_people_suggestions_html(suggestions or [], new_people)}
     {_engagement_ctas_html(open_as_button=True)}
     """
     footer = _unsubscribe_footer(user.id, footer_category, footer_label)
-    html = _email_shell(heading, body, footer)
+    html = _email_shell(heading, body, footer, open_nid=notification_id)
     return _send_email(user.email, subject, html, f"activity digest ({feature})")
 
 
@@ -1341,6 +1371,7 @@ def send_activity_digest_v2_email(
     per_kind_cap: int = 5,
     max_items: int = 20,
     suggestions: list[dict] | None = None,
+    new_people: list[dict] | None = None,
 ) -> bool:
     """Send the combined, balanced, card-styled activity digest (v2).
 
@@ -1358,12 +1389,26 @@ def send_activity_digest_v2_email(
     app = get_public_app_url()
     blocks: list[str] = []
     card_count = 0
+    open_nid: int | None = None
     for s in section_data:
         cards: list[str] = []
         icon, label, href = _SECTION_META.get(
             s["feature"], ("🔔", "Recent activity", "/notifications")
         )
-        section_href = f"{app}{href}" if href else None
+        section_nid = next(
+            (
+                nid
+                for b in s["buckets"].values()
+                for card in b["entries"]
+                for e in card["entries"]
+                for nid in e.get("notification_ids", [])
+            ),
+            None,
+        )
+        open_nid = open_nid or section_nid
+        section_href = (
+            tracked_url(f"{app}{href}", section_nid, "email") if href else None
+        )
         for kind, b in s["buckets"].items():
             for e in b["entries"]:
                 cards.append(_render_card(e, section_href))
@@ -1401,9 +1446,9 @@ def send_activity_digest_v2_email(
     body = f"""
     <p>Here's what happened in your scene:</p>
     {"".join(blocks)}
-    {_people_suggestions_html(suggestions or [])}
+    {_people_suggestions_html(suggestions or [], new_people)}
     {_engagement_ctas_html(open_as_button=True)}
     """
     footer = _unsubscribe_footer(user.id, "digest", "the activity digest")
-    html = _email_shell("New activity on Movida", body, footer)
+    html = _email_shell("New activity on Movida", body, footer, open_nid=open_nid)
     return _send_email(user.email, subject, html, "activity digest (combined)")

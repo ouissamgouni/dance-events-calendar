@@ -9,6 +9,7 @@ const NO_EVENT_SUFFIX_KINDS = new Set<NotificationItem['kind']>([
     'follow_request_approved',
     'subscription_milestone',
     'milestone_unlocked',
+    'suggested_person_joined',
 ]);
 
 /** True when the generic row should append the event title after the verb. */
@@ -46,6 +47,10 @@ export function getNotificationVerb(item: NotificationItem): string {
             return 'wants to follow you';
         case 'follow_request_approved':
             return 'approved your follow request';
+        case 'suggested_person_joined': {
+            const mutual = Number(item.context || 0);
+            return `joined Movida · ${mutual} mutual connection${mutual === 1 ? '' : 's'}`;
+        }
         case 'event_message':
             switch (item.context) {
                 case 'question':
@@ -113,6 +118,7 @@ export function resolveNotificationDestination(item: NotificationItem): string {
         case 'new_friend':
         case 'follow_request':
         case 'follow_request_approved':
+        case 'suggested_person_joined':
             return `/u/${item.actor.handle}`;
         case 'organizer_claim_decided':
             return '/account#organizer';
@@ -204,6 +210,7 @@ const CATEGORY_BY_KIND: Record<NotificationItem['kind'], NotificationCategory> =
     new_friend: 'people',
     follow_request: 'people',
     follow_request_approved: 'people',
+    suggested_person_joined: 'people',
     subscription_review: 'reviews',
     subscription_memories: 'reviews',
     event_memories_shared: 'reviews',

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 
 // Back closes the topmost overlay: each open overlay owns a same-URL history entry tagged ``__overlay``.
@@ -19,6 +19,23 @@ let seq = Date.now();
 const ownPops: string[] = [];
 let installed = false;
 let nativeReplace: History['replaceState'];
+const stackListeners = new Set<() => void>();
+
+function notifyStack() {
+    stackListeners.forEach((l) => l());
+}
+
+function subscribeStack(listener: () => void) {
+    stackListeners.add(listener);
+    return () => {
+        stackListeners.delete(listener);
+    };
+}
+
+/** True while any back-to-close overlay (modal, sheet) is open. */
+export function useAnyOverlayOpen(): boolean {
+    return useSyncExternalStore(subscribeStack, () => stack.length > 0, () => false);
+}
 
 function currentMarker(): number | undefined {
     return (window.history.state as OverlayState)?.__overlay;
@@ -67,6 +84,7 @@ function onPopState() {
                     stack.push(top);
                 }
             }
+            notifyStack();
             return;
         }
     }
@@ -94,6 +112,7 @@ function install() {
 function remove(entry: Entry) {
     const i = stack.indexOf(entry);
     if (i >= 0) stack.splice(i, 1);
+    notifyStack();
     // Only unwind our entry if it's still current — otherwise the user navigated.
     if (currentMarker() === entry.id) goBack(window.location.href);
 }
@@ -119,6 +138,7 @@ export default function useBackToClose(onClose: () => void, enabled = true) {
             install();
             pushEntry(entry);
             stack.push(entry);
+            notifyStack();
         }
         const current = entry;
         return () => {

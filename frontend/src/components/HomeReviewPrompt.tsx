@@ -1,26 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { EventRating } from '../types';
 import { useUpsertMyRating } from '../context/MyRatingsContext';
 import { useInvalidateRatingAggregate } from '../context/RatingAggregatesContext';
 import { useHomeReviewPrompt } from '../hooks/useHomeReviewPrompt';
+import { useRegisterHomeOverlay } from '../hooks/useHomeOverlays';
 import RateEventModal from './RateEventModal';
 
 interface Props {
     userId: string;
-    /** Hold the prompt while another overlay (e.g. an event modal) is open. */
-    blocked: boolean;
-    onReviewed: (eventId: string) => void;
+    /** Gates the server check only; once open the wizard stays until closed. */
+    enabled: boolean;
+    /** Fires once this visit's review prompt is resolved (none, dismissed or done). */
+    onSettled?: () => void;
 }
 
-/** Uber-style "How was it?" wizard auto-opened on Home; "Rate next" chains inside the modal. */
-export default function HomeReviewPrompt({ userId, blocked, onReviewed }: Props) {
-    const { prompt, dismiss, clear } = useHomeReviewPrompt(!blocked, userId);
+// ForYouPage listens to drop the event from "Share your experience".
+const REVIEWS_CHANGED_EVENT = 'reviews:changed';
+
+function announceReviewed(eventId: string) {
+    window.dispatchEvent(new CustomEvent(REVIEWS_CHANGED_EVENT, { detail: { eventId } }));
+}
+
+/** Uber-style "How was it?" wizard auto-opened app-wide; "Rate next" chains inside the modal. */
+export default function HomeReviewPrompt({ userId, enabled, onSettled }: Props) {
+    const { prompt, dismiss, clear, settled } = useHomeReviewPrompt(enabled, userId);
     const [submitted, setSubmitted] = useState(false);
     const upsertMyRating = useUpsertMyRating();
     const invalidateAggregate = useInvalidateRatingAggregate();
 
     const eventId = prompt?.prompt?.event_id ?? null;
-    if (!eventId || blocked) return null;
+    useRegisterHomeOverlay(!!eventId);
+    useEffect(() => {
+        if (settled) onSettled?.();
+    }, [settled, onSettled]);
+    if (!eventId) return null;
 
     const close = () => {
         if (!submitted) dismiss();
@@ -32,7 +45,7 @@ export default function HomeReviewPrompt({ userId, blocked, onReviewed }: Props)
         upsertMyRating(eventId, rating);
         invalidateAggregate(eventId);
         setSubmitted(true);
-        onReviewed(eventId);
+        announceReviewed(eventId);
     };
 
     return (
@@ -42,7 +55,7 @@ export default function HomeReviewPrompt({ userId, blocked, onReviewed }: Props)
             initialRating={null}
             onClose={close}
             onSubmitted={handleSubmitted}
-            onChainedReviewed={onReviewed}
+            onChainedReviewed={announceReviewed}
             entryPoint="home-prompt"
             prompt={
                 prompt?.prompt

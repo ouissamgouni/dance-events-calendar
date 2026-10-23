@@ -1,15 +1,20 @@
 test_plan:
   name: "Admin Notifications — activity view"
   description: >
-    The admin Notifications tab groups delivery history by day (admin's
-    browser timezone) and recipient. Each user-day card lists outbound
-    messages — one email or push send, with a digest being one message
-    carrying N items; an email and a push with the same items sent at the
-    same instant merge into one row. Each message is tagged by trigger:
-    Auto (scheduler tick/job), User action (sent inside a user request),
-    Forced (admin "Send now") or Unknown (legacy rows without a source).
-    In-app feed rows are hidden by default. History is pre-seeded over six
-    days (db-notifications.yaml `deliveries:`); the scheduler is off.
+    The admin Notifications tab lists outbound sends newest first under day
+    headings (admin's browser timezone). Columns: Time | Recipient | Channel
+    | Feature | Preview | Engagement | Trigger. A row is one send rebuilt
+    from the delivery batch id: a digest is one row carrying N items, and an
+    email and a push with the same items sent at the same instant merge into
+    one row (email icon + muted "+ phone" = also sent by push). Engagement
+    verbs: email "Clicked" (a link) / "Opened" (pixel, off by default),
+    push "Tapped", in-app "Read". Tapping/clicking also marks the
+    notification read. Digest items cut from the email body are not shown.
+    Scheduled sends show no trigger icon. In-app feed rows are hidden by
+    default; when shown, every feed delivery is its own row (Bell icon).
+    "Group by recipient" switches the server to paging whole
+    recipient-days. KPI tiles are clickable filters. History is pre-seeded
+    over six days (db-notifications.yaml `deliveries:`); the scheduler is off.
 
   preconditions:
     - "Run after ~04:00 local time so each seeded day stays on one calendar day."
@@ -17,100 +22,143 @@ test_plan:
     - "Sign in as admin@example.com and open http://localhost:5173/admin/notifications"
 
   cast:
-    - "Maya — D0: 4-item auto digest (first item clicked) + an earlier push for that item, an instant reminder (Email + Push, opened), an in-app-only new friend. D1: review prompt forced (Email + Push). D2: program announcement forced (Email)."
-    - "Leo — D0: push sent on Maya's follow approval (User action). D1: 2-item auto digest."
-    - "Nina — D0: legacy email with no source (Unknown). D2: instant interest match (Email + Push, opened)."
+    - "Maya — D0: auto digest with 3 shown items (first clicked; a 4th was cut from the email) + an earlier push for that first item, an instant reminder (Email + Push, tapped), an in-app-only new friend. D1: review prompt forced (Email + Push). D2: program announcement forced (Email)."
+    - "Leo — D0: push sent on Maya's follow approval (User action), an in-app-only new follower (read). D1: 2-item auto digest (first item read in the feed)."
+    - "Nina — D0: legacy email with no source (Unknown), read in the feed. D2: instant interest match (Email + Push, tapped)."
     - "Omar — D1: ticket prompt (Email + Push, clicked). D3: memories prompt (Push)."
     - "Ines — D3: 3-item digest forced via Send now."
     - "Theo — D4: reminder (Email). D5: promo code approved by a job (Email + Push)."
-    - "Pablo, Rosa, Sami, Yara — routine reminders on three days each (pagination filler)."
+    - "Pablo, Rosa, Sami, Yara — routine reminders on three days each."
 
   steps:
     - id: 1
-      title: "Default view: last 7 days, outbound only"
+      title: "Default view: time-ordered sends"
       description: "Open the tab without touching filters."
       expected: >
-        Header reads "24 user-days". Day headings run Today, Yesterday, then
-        weekday dates. KPI tiles: Emails 20 (3 digest · 17 instant), Push 17,
-        In-app "—" (Hidden), Forced 3 (21 auto · 1 user · 1 unknown), Email
-        clicks 12% (3/26 items), Push opens 24% (4/17 items). No "In-app"
-        rows. 20 cards are shown with a "Load more" button.
+        Header reads "26 rows"; no Load more. Under each day heading
+        ("Today · N sends · N engaged", "Yesterday", weekday dates) rows are
+        strictly newest first across recipients, with the recipient name on
+        every row. KPI tiles: Emails 20 (3 digest · 17 instant), Push 17,
+        In-app "—" (Hidden), Unread "—", Admin sends 3 (21 scheduled ·
+        1 real-time · 1 unknown), Email click rate 12% (3/25 items), Push
+        tap rate 24% (4/17 items). No "cut" / "not in email" wording anywhere.
 
     - id: 2
-      title: "Load more"
-      description: "Click Load more."
-      expected: "Four more cards append (Pablo on D4; Theo, Rosa, Yara on D5); the button disappears."
+      title: "Digest row and expansion without repetition"
+      description: 'Today → Maya''s row with the "Digest" chip; click its preview.'
+      expected: >
+        Collapsed: Mail icon, "Digest" chip + one feature pill + "+2", a
+        preview ending "+2 more", "Clicked 1/3" in green, no trigger icon.
+        Expanded: exactly three items (the carpooling event message is not
+        listed). Each item shows its summary, its own feature pill (the
+        digest mixes topics), "View event ↗" when it has an event, and
+        "Clicked" on Leo's going item only. No recipient, channel icons or
+        send times are repeated inside.
 
     - id: 3
-      title: "Digest expands to its items"
-      description: 'Today → Maya → click the "Digest · 4 items" row.'
+      title: "Single send: inline, not expandable"
+      description: "Today → Maya's reminder row (Bachata Night Montmartre)."
       expected: >
-        Collapsed row shows Email chip, topic breakdown (Friends going 1 ·
-        Interest matches 1 · Follows & friends 1 · Event messages 1),
-        "1 clicked" and an Auto badge. Expanded, four items list with
-        In-app/Email ticks; Leo's "going" item also shows a Push tick and
-        "clicked".
+        One row, not expandable: Mail icon followed by a muted "+ phone"
+        (hover: "Also sent by push"), a Reminders pill, the preview with
+        "View event ↗" on the same line, and "Tapped". Hovering the time
+        shows full date/time, "Scheduled (tick)" and how long after creation
+        it was sent.
 
     - id: 4
-      title: "Merged Email + Push and engagement"
-      description: "Today → Maya → reminder row (Bachata Night Montmartre)."
-      expected: 'One row with Email and Push chips, "1 engaged" and an Auto badge.'
+      title: "Engaged implies read"
+      description: 'Tick "Show in-app feed", then "Engaged only".'
+      expected: >
+        In-app rows appear with a Bell icon (not an envelope). With
+        "Engaged only", every remaining send has Clicked or Tapped and every
+        in-app row shows "Read"; ticking "Has unread" instead never shows a
+        send that is Clicked/Tapped for its only item.
 
     - id: 5
       title: "Trigger filter"
-      description: "Set Trigger = Forced."
+      description: "Reset filters. Set Trigger = Admin (forced)."
       expected: >
-        Only three messages remain: Maya's review prompt (D1, Email + Push),
+        Only three sends remain: Maya's review prompt (D1, Email + push),
         Maya's program announcement (D2, Email) and Ines's 3-item digest
-        (D3). All carry an amber Forced badge; hovering shows "Source: admin".
-        Switch to User action → only Leo's push (D0). Unknown → only Nina's
+        (D3). Each shows an amber lightning icon in the last column;
+        hovering shows "Admin (forced) · source: admin". Real-time (user
+        action) → only Leo's push (D0, person icon). Unknown → only Nina's
         D0 email.
 
     - id: 6
       title: "Topic and channel filters"
       description: "Reset filters. Set Topic = Reminders, then Channel = Push."
       expected: >
-        Reminders: only reminder messages (Maya, Theo, Pablo, Rosa, Sami,
-        Yara). Adding Push drops Theo and Yara (email-only) and the Email
-        chip disappears from the remaining rows.
+        Reminders: only reminder sends (Maya, Theo, Pablo, Rosa, Sami,
+        Yara). Adding Push drops Theo and Yara (email-only); the remaining
+        rows show the phone icon as the main channel.
 
     - id: 7
-      title: "In-app toggle"
-      description: 'Reset filters and tick "Include in-app".'
+      title: "In-app feed rows"
+      description: 'Reset filters and tick "Show in-app feed".'
       expected: >
-        Cards gain a "New in feed · N items" row; Maya's today card includes
-        the new-friend item that has no email/push. KPI strip adds in-app
-        items and reads.
+        Every feed delivery becomes its own Bell row at its own time, so a
+        reminder appears twice (email row + in-app row). Maya's new-friend
+        item and Leo's new follower ("Read") appear only as in-app rows. Day
+        headings add "· N in-app"; the In-app and Unread tiles fill in.
 
     - id: 8
-      title: "Filter by user"
-      description: "Click Maya's name on any card."
+      title: "Clickable KPI tiles"
+      description: "Click Email click rate, then Push tap rate, then Unread, then Unread again."
       expected: >
-        A "User: Maya Duarte (@maya)" chip appears and only Maya's three
-        user-days remain. Clearing the chip restores the full list. Typing
-        "rosa" in the search box narrows to Rosa's cards.
+        Email click rate: tile highlights, only email sends with a click
+        remain (Maya's digest, Omar's ticket prompt, Rosa's reminder); tile
+        numbers do not change. Push tap rate replaces it (one tile active at
+        a time). Unread turns on the in-app feed and keeps rows with unread
+        items. Clicking the active tile again clears the filter.
 
     - id: 9
-      title: "Date range"
-      description: "Pick Today, then 30 days, then Custom with a 40-day span."
+      title: "Group by recipient"
+      description: 'Reset filters and tick "Group by recipient"; then click Load more.'
       expected: >
-        Today shows only D0 cards. 30 days matches the 7-day totals (no
-        older history). A 40-day custom span shows "Pick at most 31 days."
-        and does not query.
+        Header reads "24 recipient-days". Under each day, a grey recipient
+        subheader ("Maya Duarte (@maya) · 3 sends · 2 engaged") lists that
+        person's rows without the Recipient column. Load more appends four
+        whole recipient-days (Pablo on D4; Rosa, Theo, Yara on D5) — no
+        recipient is ever split across pages; the button disappears.
+        Unticking returns to the flat time-ordered list.
 
     - id: 10
-      title: "Timezone bucketing"
-      description: >
-        DevTools → Sensors → Location override with a timezone several hours
-        away (e.g. Asia/Tokyo), reload.
-      expected: "Day headings and the cards under them shift to that timezone's calendar days."
+      title: "Filter by user and search"
+      description: "Click Maya's name in a row."
+      expected: >
+        A "User: Maya Duarte (@maya)" chip appears and only Maya's rows
+        remain. Clearing the chip restores the full list. Typing "rosa" in
+        the search box narrows to Rosa's rows.
 
     - id: 11
+      title: "Date range and timezone"
+      description: >
+        Pick Today, then 30 days, then Custom with a 40-day span. Then
+        DevTools → Sensors → Location override with a timezone several hours
+        away (e.g. Asia/Tokyo), reload.
+      expected: >
+        Today shows only D0 rows. 30 days matches the 7-day totals. A
+        40-day span shows "Pick at most 31 days." and does not query. With
+        the timezone override, day headings and rows shift to that
+        timezone's calendar days (in both flat and grouped modes).
+
+    - id: 12
+      title: "Engagement marks the notification read (product)"
+      description: >
+        Sign in as maya@example.com in another browser. Note the bell
+        count, then open a link carrying ?via=push&nid=<id> for one of her
+        unread notifications (or tap a real push).
+      expected: >
+        The bell count drops by one and that notification shows as read in
+        the feed; in the admin tab its row shows "Tapped".
+
+    - id: 13
       title: "Mobile (375px)"
       description: "DevTools device toolbar → iPhone SE; reload."
       expected: >
-        Search box + "Filters" button on one line; Filters opens a bottom
-        sheet with Reset and "Show N user-days". Cards are full-bleed, KPI
-        tiles in two columns, message rows are at least 44px tall, topic
-        breakdown is hidden until a row is expanded, and nothing scrolls
-        horizontally.
+        Search box + "Filters" button on one line; the Filters sheet
+        includes "Group by recipient" and ends with "Show N rows". KPI
+        tiles scroll horizontally. Each row is two lines: time · recipient
+        · channel icons · trigger, then feature pills + preview with the
+        engagement on the right. The page does not scroll horizontally.

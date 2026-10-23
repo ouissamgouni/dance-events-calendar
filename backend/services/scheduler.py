@@ -339,6 +339,7 @@ def run_notification_dispatch_once(
         event_images,
         interest_notification_service,
         milestone_notification_service,
+        people_joined_service,
         recurrence_extension,
         reminder_service,
         review_prompt_service,
@@ -381,6 +382,11 @@ def run_notification_dispatch_once(
                 "interest",
                 interest_notification_service.run_once,
                 "Interest notification generation failed",
+            ),
+            (
+                "people_joined",
+                functools.partial(people_joined_service.run_once, source=source),
+                "People-joined notification generation failed",
             ),
             (
                 "activity",

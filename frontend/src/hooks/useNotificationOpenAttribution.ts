@@ -13,9 +13,10 @@ export function useNotificationOpenAttribution(): void {
         const via = params.get('via');
         const nid = params.get('nid');
         if (!nid || (via !== 'push' && via !== 'email')) return;
-        if (/^\d+$/.test(nid)) trackNotificationOpen(Number(nid), via);
+        if (/^\d+$/.test(nid)) trackNotificationOpen(Number(nid), via, params.get('t') ?? undefined);
         params.delete('via');
         params.delete('nid');
+        params.delete('t');
         const search = params.toString();
         navigate(
             { pathname: location.pathname, search: search ? `?${search}` : '', hash: location.hash },

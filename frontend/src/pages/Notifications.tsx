@@ -54,6 +54,7 @@ const SOCIAL_KINDS: NotificationKind[] = [
     'new_friend',
     'follow_request',
     'follow_request_approved',
+    'suggested_person_joined',
 ];
 
 /**

@@ -260,7 +260,8 @@ export default function VisibilitySection({ handle }: { handle: string | null })
                                 </span>
                                 <span className="mt-1 block text-xs text-ink-soft">
                                     When enabled, your profile can appear in onboarding, Discover,
-                                    and network suggestions. Search by handle is controlled separately
+                                    and network suggestions, and people you may know can be told
+                                    when you join. Search by handle is controlled separately
                                     by account visibility.
                                 </span>
                             </span>

@@ -1,4 +1,4 @@
-import { trackEventView, trackEventSave, trackEventAttendance, trackLinkClick, trackExport, trackShare, markNotificationOpened } from '../api';
+import { trackEventView, trackEventSave, trackEventAttendance, trackLinkClick, trackExport, trackShare, markNotificationOpened, markNotificationEmailClicked } from '../api';
 import { getDeviceId } from './deviceId';
 import { isAnalyticsDisabled, umamiTrack } from './umami';
 
@@ -101,9 +101,12 @@ export function trackLink(eventId: string, url: string): void {
 }
 
 /** A push was tapped / an email link clicked (`?via=&nid=` deep link). */
-export function trackNotificationOpen(notificationId: number, channel: 'push' | 'email'): void {
+export function trackNotificationOpen(notificationId: number, channel: 'push' | 'email', token?: string): void {
     if (!readConsent().analytics) return;
-    markNotificationOpened(notificationId, channel).catch(() => { });
+    const call = channel === 'email' && token
+        ? markNotificationEmailClicked(token)
+        : markNotificationOpened(notificationId, channel);
+    call.catch(() => { });
     umamiTrack('notification_opened', { channel });
 }
 
@@ -254,6 +257,13 @@ export function trackReviewPromptShown(forced: boolean): void {
 export function trackReviewPromptDismissed(): void {
     if (!readConsent().analytics) return;
     umamiTrack('review_prompt_dismissed');
+}
+
+// ── People discovery (Umami only — sheet funnel counts live in people_prompt_impressions) ──
+
+export function trackPeopleTrailViewed(position: 'top' | 'bottom'): void {
+    if (!readConsent().analytics) return;
+    umamiTrack('people_trail_viewed', { position });
 }
 
 export function trackSimilarEventsSeeMoreClicked(): void {

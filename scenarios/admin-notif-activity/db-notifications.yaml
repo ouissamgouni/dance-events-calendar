@@ -2,12 +2,15 @@
 # minutes_ago day offsets: D0 = 0 · D1 = 1440 · D2 = 2880 · D3 = 4320 ·
 # D4 = 5760 · D5 = 7200. Run the scenario after ~04:00 local so each
 # day's rows stay on the same calendar day.
-# Deliveries sharing channel + mode + source + minutes_ago form ONE message
+# Deliveries sharing channel + mode + source + minutes_ago form ONE send
 # (a digest when mode is digest); email and push with the same items and
-# time merge into one "Email + Push" row.
+# time merge into one row (email icon + "also sent by push").
+# `engaged: true` = clicked (email) / tapped (push) and, like the product,
+# also marks the notification read. `read: true` = read in the in-app feed.
 notifications:
   # ── Maya ─────────────────────────────────────────────────────────────
-  # D0: 4-item auto digest (email at 20m ago); first item clicked and pushed.
+  # D0: auto digest (email at 20m ago) with 3 visible items + 1 cut; the
+  # first item was pushed earlier and its email link clicked.
   - recipient: maya@example.com
     actor: leo@example.com
     kind: subscription_going
@@ -41,7 +44,15 @@ notifications:
     context: "Who's carpooling from Montmartre?"
     minutes_ago: 90
     deliveries:
-      - { channel: email, mode: digest, source: tick, minutes_ago: 20 }
+      # Cut from the email body by the digest caps → hidden from the admin view
+      # (the digest shows 3 items).
+      - {
+          channel: email,
+          mode: digest,
+          source: tick,
+          minutes_ago: 20,
+          rendered: false,
+        }
   # D0: in-app only (shows with "Include in-app").
   - recipient: maya@example.com
     actor: nina@example.com
@@ -81,12 +92,13 @@ notifications:
     minutes_ago: 35
     deliveries:
       - { channel: push, source: request }
-  # D1: 2-item auto digest, not engaged.
+  # D1: 2-item auto digest, not clicked; the first item was read in the feed.
   - recipient: leo@example.com
     actor: maya@example.com
     kind: subscription_going
     event_id: evt-na-paris-social
     minutes_ago: 1740
+    read: true
     deliveries:
       - { channel: email, mode: digest, source: tick, minutes_ago: 1500 }
   - recipient: leo@example.com
@@ -97,14 +109,21 @@ notifications:
     minutes_ago: 1680
     deliveries:
       - { channel: email, mode: digest, source: tick, minutes_ago: 1500 }
+  # D0: in-app only, already read in the feed.
+  - recipient: leo@example.com
+    actor: omar@example.com
+    kind: new_follower
+    minutes_ago: 300
+    read: true
 
   # ── Nina ─────────────────────────────────────────────────────────────
-  # D0: legacy row without mode/source (Unknown trigger).
+  # D0: legacy row without mode/source (Unknown trigger); read in the feed.
   - recipient: nina@example.com
     actor: maya@example.com
     kind: subscription_review
     event_id: evt-na-past-social
     minutes_ago: 70
+    read: true
     deliveries:
       - { channel: email }
   # D2: instant interest match, email + push, push opened.

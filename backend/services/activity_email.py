@@ -58,11 +58,16 @@ from backend.db.models import (
 )
 from backend.services import event_assets
 from backend.services.email import (
+    _balance_sections,
     event_message_action_phrase,
     send_activity_digest_email,
     send_activity_digest_v2_email,
 )
-from backend.services.notification_delivery import record_delivery, tracked_url
+from backend.services.notification_delivery import (
+    new_batch_id,
+    record_delivery,
+    tracked_url,
+)
 from backend.services.notifications import filter_privacy_safe_notifications
 from backend.services.event_visibility import eligible_event_ids
 from backend.services.event_images import resolve_event_image
@@ -1090,6 +1095,24 @@ def run_once(
         # Late import to avoid circular dependency with backend.api.routes.social.
         from backend.api.routes.social import get_people_suggestions_for_email
 
+        def _people_suggestions(recipient: User) -> tuple[list[dict], list[dict]]:
+            if not recipient.email_people_suggestions_enabled:
+                return [], []
+            top, recent = get_people_suggestions_for_email(session, recipient)
+            return tuple(
+                [
+                    {
+                        "handle": item.handle,
+                        "display_name": item.display_name,
+                        "avatar_url": item.avatar_url,
+                        "mutual_friend_count": item.mutual_friend_count,
+                        "followers_count": item.followers_count,
+                    }
+                    for item in items
+                ]
+                for items in (top, recent)
+            )
+
         digest_v2 = get_digest_v2_enabled(session)
         digest_per_kind_cap = get_digest_per_kind_cap(session)
         digest_max_items = get_digest_max_items(session)
@@ -1177,6 +1200,7 @@ def run_once(
                 )
             return {
                 "kind": n.kind,
+                "notification_ids": [item.id for item in group],
                 "primary_html": _render_line(
                     n.kind,
                     actor,
@@ -1287,37 +1311,47 @@ def run_once(
                     delivered_ids.extend(n.id for n in visible)
                 if not sections:
                     continue
-                suggestions = None
-                if "social_activity" in per_feature:
-                    suggestions = [
-                        {
-                            "handle": item.handle,
-                            "display_name": item.display_name,
-                            "avatar_url": resolve_user_avatar(item),
-                            "mutual_friend_count": item.mutual_friend_count,
-                            "followers_count": item.followers_count,
-                        }
-                        for item in get_people_suggestions_for_email(
-                            session, recipient, limit=5
-                        )
-                    ]
+                suggestions, new_people = _people_suggestions(recipient)
                 ok = send_activity_digest_v2_email(
                     recipient,
                     sections,
                     per_kind_cap=digest_per_kind_cap,
                     max_items=digest_max_items,
                     suggestions=suggestions,
+                    new_people=new_people,
                 )
                 sent += 1
                 if ok:
+                    rendered_ids = {
+                        nid
+                        for s in _balance_sections(
+                            sections,
+                            per_kind_cap=digest_per_kind_cap,
+                            max_items=digest_max_items,
+                        )
+                        for b in s["buckets"].values()
+                        for card in b["entries"]
+                        for e in card["entries"]
+                        for nid in e["notification_ids"]
+                    }
+                    batch_id = new_batch_id()
                     for nid in delivered_ids:
                         record_delivery(
-                            session, nid, "email", now, mode="digest", source=source
+                            session,
+                            nid,
+                            "email",
+                            now,
+                            mode="digest",
+                            source=source,
+                            batch_id=batch_id,
+                            rendered=nid in rendered_ids,
                         )
             return sent
 
         def _send_email_groups(groups: dict, mode: str) -> int:
             sent = 0
+            # Separate email per feature here; attach people once per recipient.
+            suggested: set = set()
             for (recipient_id, feature), notifs in groups.items():
                 recipient = users[recipient_id]
                 visible = [n for n in notifs if not _skip_past(n)]
@@ -1352,32 +1386,33 @@ def run_once(
                     )
                     for group in logical_groups
                 ]
-                suggestions = None
-                if feature == "social_activity":
-                    suggestions = [
-                        {
-                            "handle": item.handle,
-                            "display_name": item.display_name,
-                            "avatar_url": resolve_user_avatar(item),
-                            "mutual_friend_count": item.mutual_friend_count,
-                            "followers_count": item.followers_count,
-                        }
-                        for item in get_people_suggestions_for_email(
-                            session, recipient, limit=5
-                        )
-                    ]
+                suggestions, new_people = [], []
+                if mode == "digest" and recipient_id not in suggested:
+                    suggested.add(recipient_id)
+                    suggestions, new_people = _people_suggestions(recipient)
                 ok = send_activity_digest_email(
                     recipient,
                     lines,
                     feature=feature,
                     discover_more_count=discover_more_count,
                     suggestions=suggestions,
+                    new_people=new_people,
+                    notification_id=logical_groups[0][-1].id,
                 )
                 sent += 1
                 if ok:
+                    batch_id = new_batch_id()
+                    rendered_ids = {n.id for n in email_notifs}
                     for n in visible:
                         record_delivery(
-                            session, n.id, "email", now, mode=mode, source=source
+                            session,
+                            n.id,
+                            "email",
+                            now,
+                            mode=mode,
+                            source=source,
+                            batch_id=batch_id,
+                            rendered=n.id in rendered_ids,
                         )
             return sent
 
@@ -1439,6 +1474,7 @@ def run_once(
             visible = [n for n in notifs if not _skip_past(n)]
             if not visible:
                 continue
+            batch_id = new_batch_id()
             if feature == "interest_matches":
                 title, body, url = _interest_push_payload(visible)
                 delivered = _push(
@@ -1452,7 +1488,9 @@ def run_once(
                 pushed += delivered
                 if delivered:
                     for n in visible:
-                        record_delivery(session, n.id, "push", now, source=source)
+                        record_delivery(
+                            session, n.id, "push", now, source=source, batch_id=batch_id
+                        )
                 continue
             if feature == "promo_code_matches":
                 headline = visible[-1]
@@ -1485,7 +1523,9 @@ def run_once(
                 pushed += delivered
                 if delivered:
                     for n in visible:
-                        record_delivery(session, n.id, "push", now, source=source)
+                        record_delivery(
+                            session, n.id, "push", now, source=source, batch_id=batch_id
+                        )
                 continue
             logical_groups = _logical_groups(visible)
             first_group = logical_groups[0]
@@ -1517,7 +1557,9 @@ def run_once(
             pushed += delivered
             if delivered:
                 for n in visible:
-                    record_delivery(session, n.id, "push", now, source=source)
+                    record_delivery(
+                        session, n.id, "push", now, source=source, batch_id=batch_id
+                    )
 
         # Stamp emailed_at on every notification considered for email this
         # run (whether emailed, or suppressed by the recipient's email

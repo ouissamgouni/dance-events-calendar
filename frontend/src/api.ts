@@ -898,6 +898,25 @@ export interface SiteSettings {
     similar_events_radius_regional_km?: number;
     similar_events_radius_international_km?: number;
     similar_events_limit?: number;
+    /** People discovery: Home "Build your tribe" sheet/trail + "joined" notifications. */
+    people_prompt_enabled?: boolean;
+    people_joined_enabled?: boolean;
+    people_prompt_tier1_max_friends?: number;
+    people_prompt_tier1_cooldown_hours?: number;
+    people_prompt_tier2_max_friends?: number;
+    people_prompt_tier2_cooldown_hours?: number;
+    people_prompt_fatigue_dismissals?: number;
+    people_prompt_fatigue_pause_days?: number;
+    people_prompt_min_suggestions?: number;
+    people_trail_top_max_friends?: number;
+    home_overlays_per_session?: number;
+    suggestion_dismissal_ttl_days?: number;
+    people_joined_window_days?: number;
+    people_joined_min_mutual?: number;
+    people_joined_min_mutual_curators?: number;
+    people_joined_max_recipients?: number;
+    people_joined_push_start_hour?: number;
+    people_joined_push_end_hour?: number;
     /** Minimum reviews before an event/series shows a computed "Overall
      * Mood" headline label; below this the UI shows an "Early feedback"
      * state. 1-1000, client default 3. */
@@ -1271,16 +1290,23 @@ export interface NotificationActivityItem {
     event_title: string | null;
     actor_display_name: string | null;
     actor_handle: string | null;
-    app_at: string | null;
-    email_at: string | null;
-    push_at: string | null;
     read_at: string | null;
     push_opened_at: string | null;
     email_clicked_at: string | null;
+    email_opened_at?: string | null;
     latency_seconds: number | null;
 }
 
-export interface NotificationActivityMessage {
+export interface NotificationActivityUser {
+    id: string;
+    email: string;
+    handle: string | null;
+    display_name: string | null;
+}
+
+/** One outbound send (email + push merged) or one in-app feed delivery (channels ['app']). */
+export interface NotificationActivityRow {
+    user: NotificationActivityUser;
     channels: NotificationActivityChannel[];
     mode: 'instant' | 'digest' | null;
     source: string | null;
@@ -1288,21 +1314,18 @@ export interface NotificationActivityMessage {
     sent_at: string;
     item_count: number;
     engaged_count: number;
+    read_count: number;
+    email_clicked: number;
+    email_opened: number;
+    push_opened: number;
     topics: NotificationActivityTopicCount[];
     items: NotificationActivityItem[];
 }
 
 export interface NotificationActivityGroup {
     day: string;
-    user: { id: string; email: string; handle: string | null; display_name: string | null };
-    last_at: string;
-    messages: NotificationActivityMessage[];
-    in_app: {
-        item_count: number;
-        read_count: number;
-        topics: NotificationActivityTopicCount[];
-        items: NotificationActivityItem[];
-    } | null;
+    user: NotificationActivityUser;
+    rows: NotificationActivityRow[];
 }
 
 export interface NotificationActivitySummary {
@@ -1316,6 +1339,7 @@ export interface NotificationActivitySummary {
     unknown: number;
     email_items: number;
     email_clicked: number;
+    email_opened?: number;
     push_items: number;
     push_opened: number;
     app_read: number;
@@ -1323,8 +1347,11 @@ export interface NotificationActivitySummary {
 
 export interface NotificationActivityResponse {
     summary: NotificationActivitySummary;
+    /** Filled when group is 'none'. */
+    rows: NotificationActivityRow[];
+    /** Filled when group is 'recipient'. */
     groups: NotificationActivityGroup[];
-    total_groups: number;
+    total: number;
 }
 
 export interface NotificationActivityParams {
@@ -1337,6 +1364,9 @@ export interface NotificationActivityParams {
     channel?: NotificationActivityChannel;
     trigger?: NotificationActivityTrigger;
     include_in_app?: boolean;
+    engaged?: boolean;
+    unread?: boolean;
+    group?: 'none' | 'recipient';
     limit?: number;
     offset?: number;
 }
@@ -1535,6 +1565,8 @@ export interface AuthUser {
     push_suggested_events_enabled?: boolean;
     email_schedule_updates_enabled?: boolean;
     push_schedule_updates_enabled?: boolean;
+    email_people_suggestions_enabled?: boolean;
+    push_people_suggestions_enabled?: boolean;
     digest_email_enabled?: boolean;
     email_ticket_prompt_enabled?: boolean;
     push_ticket_prompt_enabled?: boolean;
@@ -1743,6 +1775,8 @@ export interface NotificationPreferences {
     push_suggested_events_enabled: boolean;
     email_schedule_updates_enabled: boolean;
     push_schedule_updates_enabled: boolean;
+    email_people_suggestions_enabled?: boolean;
+    push_people_suggestions_enabled?: boolean;
     /** Legacy mirror kept for one release. */
     reminder_email_enabled: boolean;
     activity_email_enabled: boolean;
@@ -1781,6 +1815,8 @@ export interface UpdateNotificationPreferencesPayload {
     push_suggested_events_enabled?: boolean;
     email_schedule_updates_enabled?: boolean;
     push_schedule_updates_enabled?: boolean;
+    email_people_suggestions_enabled?: boolean;
+    push_people_suggestions_enabled?: boolean;
     /** Master opt-out for the combined activity digest email (v2). */
     digest_email_enabled?: boolean;
     email_ticket_prompt_enabled?: boolean;
@@ -2506,6 +2542,9 @@ export interface FoFSuggestionItem {
 export interface FoFSuggestionsResponse {
     items: FoFSuggestionItem[];
     total: number;
+    friend_count?: number;
+    /** Where For You places the "Build your tribe" trail (top for small circles). */
+    trail_position?: 'top' | 'bottom';
 }
 
 export async function fetchMySuggestions(
@@ -2522,6 +2561,145 @@ export async function fetchMySuggestions(
     return parseJsonResponse<FoFSuggestionsResponse>(
         res, 'Failed to load suggestions',
     );
+}
+
+/** "Not interested": hides a suggested person everywhere until the admin TTL lapses. */
+export async function dismissSuggestion(handle: string): Promise<void> {
+    const res = await fetch(
+        `${BASE}/social/me/suggestions/${encodeURIComponent(handle)}/dismiss`,
+        { method: 'POST', credentials: 'include' },
+    );
+    if (!res.ok) throw new Error('Failed to dismiss suggestion');
+}
+
+export interface PeoplePrompt {
+    show: boolean;
+    forced: boolean;
+    friend_count: number;
+    overlays_per_session: number;
+    items: FoFSuggestionItem[];
+    total: number;
+}
+
+export async function fetchPeoplePrompt(): Promise<PeoplePrompt> {
+    const res = await fetch(`${BASE}/social/me/people-prompt`, { credentials: 'include' });
+    return parseJsonResponse<PeoplePrompt>(res, 'Failed to load people prompt');
+}
+
+export async function postPeoplePromptImpression(
+    outcome: 'shown' | 'dismissed' | 'followed',
+    followedCount = 0,
+): Promise<void> {
+    const res = await fetch(`${BASE}/social/me/people-prompt/impression`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ outcome, followed_count: followedCount }),
+    });
+    if (!res.ok) throw new Error('Failed to record people prompt impression');
+}
+
+export interface PeopleDiscoveryStats {
+    days: number;
+    shown: number;
+    dismissed: number;
+    followed: number;
+    follows: number;
+    forced_shown: number;
+    joined_created: number;
+    joined_pushed: number;
+    joined_followed: number;
+}
+
+export async function fetchPeopleDiscoveryStats(days = 30): Promise<PeopleDiscoveryStats> {
+    const res = await fetch(`${BASE}/admin/people-discovery/stats?days=${days}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<PeopleDiscoveryStats>(res, 'Failed to load people discovery stats');
+}
+
+export interface PeoplePromptForceUser {
+    user_id: string;
+    handle: string | null;
+    display_name: string | null;
+    friend_count: number;
+    total: number;
+    items: FoFSuggestionItem[];
+    warning: 'disabled' | 'no_suggestions' | null;
+    forced_until: string | null;
+}
+
+export interface PeoplePromptForceResult {
+    dry_run: boolean;
+    all_users: boolean;
+    warning: 'disabled' | null;
+    targeted: number;
+    forced: number;
+    users: PeoplePromptForceUser[];
+}
+
+export async function forcePeoplePrompt(
+    target: { userIds: string[] } | { allUsers: true },
+    dryRun: boolean,
+): Promise<PeoplePromptForceResult> {
+    const res = await fetch(`${BASE}/admin/people-prompt/force`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(
+            'allUsers' in target
+                ? { all_users: true, dry_run: dryRun }
+                : { user_ids: target.userIds, dry_run: dryRun },
+        ),
+    });
+    return parseJsonResponse<PeoplePromptForceResult>(res, 'Failed to force people prompt');
+}
+
+export interface PeopleJoinedCandidate {
+    user_id: string;
+    handle: string | null;
+    display_name: string | null;
+    regular_mutual: number;
+    curator_mutual: number;
+    reason: 'inactive' | 'already_follows' | 'dismissed' | 'below_threshold' | 'already_notified' | null;
+    push_enabled: boolean;
+}
+
+export interface PeopleJoinedForceJoiner {
+    joiner_user_id: string;
+    joiner_handle: string | null;
+    joiner_display_name: string | null;
+    joiner_warning: string | null;
+    candidates: PeopleJoinedCandidate[];
+    created: number;
+    pushed: number;
+}
+
+export interface PeopleJoinedForceResult {
+    dry_run: boolean;
+    created: number;
+    pushed: number;
+    joiners: PeopleJoinedForceJoiner[];
+}
+
+export async function forcePeopleJoined(
+    target: { joinerUserIds: string[] } | { allRecentJoiners: true },
+    channels: ('app' | 'push')[],
+    dryRun: boolean,
+): Promise<PeopleJoinedForceResult> {
+    const res = await fetch(`${BASE}/admin/people-joined/force`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+            ...('allRecentJoiners' in target
+                ? { all_recent_joiners: true }
+                : { joiner_user_ids: target.joinerUserIds }),
+            channels,
+            dry_run: dryRun,
+        }),
+    });
+    return parseJsonResponse<PeopleJoinedForceResult>(res, 'Failed to send joined notification');
 }
 
 // --- Phase E (E7) — referrals ------------------------------------------
@@ -2848,6 +3026,7 @@ export type NotificationKind =
     | 'event_cancelled'
     | 'organizer_assigned'
     | 'interest_profile_updated'
+    | 'suggested_person_joined'
     | 'plan_session_added'
     | 'schedule_program_available'
     | 'schedule_program_updated';
@@ -3006,6 +3185,14 @@ export async function markNotificationOpened(id: number, channel: 'push' | 'emai
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channel }),
         credentials: 'include',
+    });
+}
+
+export async function markNotificationEmailClicked(token: string): Promise<void> {
+    await fetch(`${BASE}/notifications/email-click`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
     });
 }
 

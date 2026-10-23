@@ -220,6 +220,8 @@ def run_sweep_once() -> dict:
 
     from backend.db.database import get_engine
 
+    if not object_storage.is_configured():
+        return {"skipped": "storage_not_configured"}
     with Session(get_engine()) as session:
         return {"removed": sweep_suggestion_images(session)}
 

@@ -1653,6 +1653,8 @@ class DatabaseSeeder:
                 # Suggested-event approval fan-out toggles.
                 "email_suggested_events_enabled",
                 "push_suggested_events_enabled",
+                "email_people_suggestions_enabled",
+                "push_people_suggestions_enabled",
                 # Dance Passport sharing — passport visibility + per-section
                 # share toggles so scenarios can exercise the profile
                 # "Dance Passport" tab (viewable / friends-only / private) and
@@ -1742,6 +1744,10 @@ class DatabaseSeeder:
             if user_kwargs.get("is_admin_managed") is True:
                 user_kwargs["share_attendance_default"] = True
                 user_kwargs["share_attendance_default_audience"] = "public"
+            if entry.get("created_days_ago") is not None:
+                user_kwargs["created_at"] = datetime.now(timezone.utc) - timedelta(
+                    days=int(entry["created_days_ago"])
+                )
             user_obj = User(**user_kwargs)
             self.session.add(user_obj)
             self._seed_user_preferred_tags(user_obj, entry.get("preferred_tags"))
@@ -2817,6 +2823,7 @@ class DatabaseSeeder:
                     minutes_ago: 10        # optional, defaults to the row's; equal
                                            # values share delivered_at (one message)
                     engaged: true          # optional: sets email_clicked_at / push_opened_at
+                    rendered: false        # optional: digest item cut from the email body
         """
         if not path.exists():
             return
@@ -2958,6 +2965,12 @@ class DatabaseSeeder:
                 sent_at,
                 mode=spec.get("mode"),
                 source=spec.get("source"),
+                # Equal (recipient, channel, sent_at, mode, source) = one seeded send.
+                batch_id=hashlib.md5(
+                    f"{notif.recipient_user_id}|{channel}|{sent_at.isoformat()}"
+                    f"|{spec.get('mode')}|{spec.get('source')}".encode()
+                ).hexdigest(),
+                rendered=spec.get("rendered"),
             )
             if spec.get("engaged"):
                 engaged_at = sent_at + timedelta(minutes=5)
@@ -2965,6 +2978,8 @@ class DatabaseSeeder:
                     notif.email_clicked_at = engaged_at
                 else:
                     notif.push_opened_at = engaged_at
+                # Mirrors the product: a tap or click also marks the notification read.
+                notif.read_at = notif.read_at or engaged_at
 
     def _seed_ratings(self, path: Path) -> None:
         """Pre-seed EventRating rows from db-events.yaml `ratings:` list.

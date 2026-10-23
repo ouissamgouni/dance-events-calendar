@@ -108,3 +108,22 @@ def verify_unsubscribe_token(token: str) -> Optional[tuple[str, str]]:
     if not user_id or category not in UNSUBSCRIBE_CATEGORIES:
         return None
     return user_id, category
+
+
+def _notification_sig(notification_id: int, action: str) -> str:
+    return _sign(f"notif:{action}:{notification_id}".encode("utf-8"))[:22]
+
+
+def make_notification_token(notification_id: int, action: str) -> str:
+    """Signed ``<id>.<sig>`` attributing an email click (``c``) or open (``o``)."""
+    return f"{notification_id}.{_notification_sig(notification_id, action)}"
+
+
+def verify_notification_token(token: str, action: str) -> Optional[int]:
+    nid_text, _, sig = token.partition(".")
+    if not nid_text.isdigit() or not sig:
+        return None
+    nid = int(nid_text)
+    if not hmac.compare_digest(_notification_sig(nid, action), sig):
+        return None
+    return nid

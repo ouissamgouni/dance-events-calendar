@@ -237,6 +237,9 @@ class User(SQLModel, table=True):
     push_suggested_events_enabled: bool = Field(default=True, nullable=False)
     email_schedule_updates_enabled: bool = Field(default=True, nullable=False)
     push_schedule_updates_enabled: bool = Field(default=True, nullable=False)
+    # Someone you may know joined (push) / people section in the digest (email).
+    email_people_suggestions_enabled: bool = Field(default=True, nullable=False)
+    push_people_suggestions_enabled: bool = Field(default=True, nullable=False)
     # Master opt-out for the combined activity digest email (v2). Independent
     # of the per-feature email flags: unchecking it silences the whole digest
     # regardless of which feature sections are enabled. In-app/push unaffected.
@@ -1736,6 +1739,49 @@ class ReviewPromptForce(SQLModel, table=True):
     expires_at: datetime = Field(nullable=False)
 
 
+class SuggestionDismissal(SQLModel, table=True):
+    """'Not interested' on a suggested person; hides them until the TTL lapses."""
+
+    __tablename__ = "suggestion_dismissals"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "dismissed_user_id", name="uq_suggestion_dismissal_pair"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    dismissed_user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    dismissed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class PeoplePromptImpression(SQLModel, table=True):
+    """One Home people-suggestions sheet showing; drives caps and stats."""
+
+    __tablename__ = "people_prompt_impressions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    shown_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
+    outcome: str = Field(default="shown", max_length=16)  # shown | dismissed | followed
+    followed_count: int = Field(default=0, nullable=False)
+    forced: bool = Field(default=False)
+
+
+class PeoplePromptForce(SQLModel, table=True):
+    """Admin override: show the Home people sheet to this user once."""
+
+    __tablename__ = "people_prompt_forces"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, unique=True)
+    forced_by: Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime = Field(nullable=False)
+
+
 class EventRatingAspectScore(SQLModel, table=True):
     """Per-aspect (music/crowd/floor/atmosphere...) star score for one rating.
 
@@ -2159,6 +2205,7 @@ class Notification(SQLModel, table=True):
     # First tap on a push / first click on an email link for this notification.
     push_opened_at: Optional[datetime] = Field(default=None)
     email_clicked_at: Optional[datetime] = Field(default=None)
+    email_opened_at: Optional[datetime] = Field(default=None)
     # Free-text context for kinds that need extra message copy beyond
     # actor/event, e.g. ``interest_event`` stores the matched profile
     # label(s) (comma-joined) so the digest/in-app renderers can say
@@ -2208,6 +2255,10 @@ class NotificationDelivery(SQLModel, table=True):
     delivered_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), index=True
     )
+    # Shared by every row delivered in the same outbound email/push; NULL on legacy rows.
+    batch_id: Optional[str] = Field(default=None, max_length=32, index=True)
+    # Digest email only: False when the item was cut by the email's per-kind/total cap.
+    rendered: Optional[bool] = Field(default=None)
 
 
 class PushSubscription(SQLModel, table=True):

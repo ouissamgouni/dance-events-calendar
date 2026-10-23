@@ -6,36 +6,30 @@
  * + 2 more") plus a Follow button. Hidden when there are no
  * suggestions (e.g. viewer has no friends yet, or has already followed
  * everyone reachable through their network).
- *
- * `variant="trail"` renders the same data as a horizontally scrollable
- * row of cards ("Build your tribe" on the /for-you page) instead of the
- * default vertical list used by the "My network" Suggestions tab.
+ * The /for-you "Build your tribe" trail lives in PeopleSuggestionsTrail.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
 import {
+    dismissSuggestion,
     fetchMySuggestions,
     followUser,
     type FoFSuggestionItem,
 } from '../api';
-import ScrollDotsIndicator from './ScrollDots';
-import { useScrollDots } from '../hooks/useScrollDots';
 
 interface PeopleYouMayKnowCardProps {
-    variant?: 'list' | 'trail';
     /** Called whenever the suggestions list resolves (including empty
      * results), so callers can react to emptiness (e.g. NetworkPanel
      * falling back to a different default tab). */
     onResult?: (items: FoFSuggestionItem[]) => void;
 }
 
-export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: PeopleYouMayKnowCardProps) {
+export default function PeopleYouMayKnowCard({ onResult }: PeopleYouMayKnowCardProps) {
     const [items, setItems] = useState<FoFSuggestionItem[] | null>(null);
     const [total, setTotal] = useState(0);
     const [loadedCount, setLoadedCount] = useState(0);
     const [loadingMore, setLoadingMore] = useState(false);
     const [pending, setPending] = useState<string | null>(null);
-    const pageSize = variant === 'trail' ? 12 : 6;
+    const pageSize = 6;
 
     const load = useCallback(async () => {
         try {
@@ -84,91 +78,22 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
         }
     }, []);
 
-    const scrollerRef = useRef<HTMLDivElement>(null);
-    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [variant, items?.length ?? 0]);
+    const onDismiss = useCallback(async (handle: string) => {
+        setPending(handle);
+        try {
+            await dismissSuggestion(handle);
+            setItems((prev) =>
+                prev ? prev.filter((it) => it.handle !== handle) : prev,
+            );
+            // The server pool shrinks too, so keep the "Show more" offset aligned.
+            setLoadedCount((c) => Math.max(0, c - 1));
+            setTotal((n) => Math.max(0, n - 1));
+        } finally {
+            setPending(null);
+        }
+    }, []);
 
     if (items === null || items.length === 0) return null;
-
-    if (variant === 'trail') {
-        return (
-            <section data-testid="for-you-build-your-tribe">
-                <div className="flex w-full items-center justify-between border-b border-line px-2.5 py-1 text-sm font-semibold text-ink">
-                    <span>Build your tribe</span>
-                </div>
-                <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Build your tribe">
-                    {items.map((it) => {
-                        const name = it.display_name || `@${it.handle}`;
-                        const previewHead = it.mutual_friends_preview[0];
-                        const previewRest = it.mutual_friend_count - (previewHead ? 1 : 0);
-                        return (
-                            <div
-                                key={it.handle}
-                                className="flex w-[140px] shrink-0 flex-col items-center gap-1 border border-line bg-surface px-2 py-2 text-center"
-                            >
-                                <Link to={`/u/${it.handle}`} className="flex flex-col items-center gap-1">
-                                    {it.avatar_url ? (
-                                        <img
-                                            src={it.avatar_url}
-                                            alt=""
-                                            className="h-8 w-8 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="h-8 w-8 rounded-full bg-slate-200" />
-                                    )}
-                                    <span className="flex max-w-[120px] items-center gap-1 truncate text-xs font-medium text-ink">
-                                        {name}
-                                        {it.is_verified_organizer && (
-                                            <img
-                                                src="/orga.png"
-                                                alt=""
-                                                title="Verified organizer"
-                                                aria-label="Verified organizer"
-                                                className="h-3 w-3 shrink-0 object-contain"
-                                            />
-                                        )}
-                                        {it.is_admin_managed && (
-                                            <img
-                                                src="/badge.png"
-                                                alt=""
-                                                title="Curator"
-                                                aria-label="Curator"
-                                                className="h-3 w-3 shrink-0 object-contain"
-                                            />
-                                        )}
-                                    </span>
-                                </Link>
-                                <span className="max-w-[120px] truncate text-xs text-ink-soft">
-                                    {previewHead ? (
-                                        <>
-                                            Followed by @{previewHead}
-                                            {previewRest > 0 && ` + ${previewRest} more`}
-                                        </>
-                                    ) : (
-                                        <>@{it.handle}</>
-                                    )}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => void onFollow(it.handle)}
-                                    disabled={pending === it.handle}
-                                    aria-label={`Follow ${it.handle}`}
-                                    className="w-full bg-action px-2 py-1 text-xs font-medium text-white hover:bg-action disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {pending === it.handle ? '…' : 'Follow'}
-                                </button>
-                            </div>
-                        );
-                    })}
-                </div>
-                <ScrollDotsIndicator
-                    count={dotCount}
-                    activeIndex={activeIndex}
-                    onSelect={scrollToIndex}
-                    label="Build your tribe scroll position"
-                />
-            </section>
-        );
-    }
 
     return (
         <section className="border border-line bg-surface p-6 mb-4">
@@ -237,6 +162,16 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                                 className="bg-action px-3 py-1 text-xs font-medium text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {pending === it.handle ? '…' : 'Follow'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => void onDismiss(it.handle)}
+                                disabled={pending === it.handle}
+                                aria-label={`Not interested in ${it.handle}`}
+                                title="Not interested"
+                                className="flex h-7 w-7 items-center justify-center text-xs text-muted hover:text-ink-soft disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                ✕
                             </button>
                         </li>
                     );

@@ -162,6 +162,8 @@ describe('NotificationSettings', () => {
         push_suggested_events_enabled: false,
         email_schedule_updates_enabled: false,
         push_schedule_updates_enabled: false,
+        email_people_suggestions_enabled: false,
+        push_people_suggestions_enabled: false,
       }),
     )
   })

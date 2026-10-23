@@ -69,6 +69,18 @@ def _credentials() -> tuple[str, str, str]:
     )
 
 
+def is_configured() -> bool:
+    return all(
+        os.getenv(name, "").strip()
+        for name in (
+            "OBJECT_STORAGE_ENDPOINT",
+            "OBJECT_STORAGE_ACCESS_KEY_ID",
+            "OBJECT_STORAGE_SECRET_ACCESS_KEY",
+            "OBJECT_STORAGE_BUCKET_PUBLIC",
+        )
+    )
+
+
 def get_client():
     """Build a boto3 S3 client for the active provider.
 
