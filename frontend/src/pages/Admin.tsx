@@ -3768,6 +3768,8 @@ export default function Admin() {
                                     )}
                                     <fieldset disabled={!promoCodesEnabled} className={promoCodesEnabled ? '' : 'opacity-50'}>
                                         {deliveryChannels('promo_codes', 'Promo codes')}
+                                        <p className="text-[10px] text-muted mt-3">Deals: a promo code is approved for an event matching your saved searches</p>
+                                        {deliveryChannels('promo_code_matches', 'Deals')}
                                     </fieldset>
                                 </div>
 

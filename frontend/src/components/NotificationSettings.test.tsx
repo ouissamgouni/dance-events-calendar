@@ -138,6 +138,8 @@ describe('NotificationSettings', () => {
         push_interest_matches_enabled: false,
         email_promo_codes_enabled: false,
         push_promo_codes_enabled: false,
+        email_promo_code_matches_enabled: false,
+        push_promo_code_matches_enabled: false,
         email_review_prompt_enabled: false,
         push_review_prompt_enabled: false,
         email_ticket_prompt_enabled: false,

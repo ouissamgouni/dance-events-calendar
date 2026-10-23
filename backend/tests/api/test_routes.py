@@ -608,7 +608,17 @@ class TestSettingsEndpoint:
             "email_digest": True,
         }
         assert channels["event_reminders"]["email_digest"] is False
-        assert len(channels) == 15
+        assert channels["promo_codes"] == {
+            "push": True,
+            "email_instant": True,
+            "email_digest": False,
+        }
+        assert channels["promo_code_matches"] == {
+            "push": True,
+            "email_instant": False,
+            "email_digest": True,
+        }
+        assert len(channels) == 16
 
     def test_admin_updates_notification_channels(self, sqlite_client):
         client, engine = sqlite_client

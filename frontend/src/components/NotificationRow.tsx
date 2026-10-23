@@ -59,6 +59,7 @@ const TYPE_ICON: Record<NotificationItem['kind'], { Icon: LucideIcon; cls: strin
     event_memories_prompt: { Icon: Camera, cls: 'bg-violet-100 text-violet-600' },
     interest_event: { Icon: Sparkles, cls: 'bg-blue-100 text-action' },
     promo_code_added: { Icon: Tag, cls: 'bg-amber-100 text-amber-600' },
+    promo_code_match: { Icon: Tag, cls: 'bg-amber-100 text-amber-600' },
     promo_code_approved: { Icon: Tag, cls: 'bg-amber-100 text-amber-600' },
     promo_code_rejected: { Icon: Tag, cls: 'bg-amber-100 text-amber-600' },
     organizer_claim_decided: { Icon: Bell, cls: 'bg-slate-100 text-ink-soft' },
@@ -450,6 +451,24 @@ export default function NotificationRow({
                     <span className="font-medium text-ink">
                         {item.event_title || 'an event'}
                     </span>
+                </p>
+                {item.context && (
+                    <p className={`${subLabelSize} text-amber-600 mt-0.5`}>Code: {item.context}</p>
+                )}
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
+    } else if (item.kind === 'promo_code_match') {
+        body = (
+            <>
+                <p className={specialTitle}>
+                    <span className="text-ink-soft">Deal —</span>{' '}
+                    <span className="font-medium text-ink">
+                        {item.event_title || 'an event'}
+                    </span>
+                    {item.description && (
+                        <span className="text-ink-soft"> matches your {item.description} alert</span>
+                    )}
                 </p>
                 {item.context && (
                     <p className={`${subLabelSize} text-amber-600 mt-0.5`}>Code: {item.context}</p>

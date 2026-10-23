@@ -301,9 +301,9 @@ export default function AdminEventSchedulePage() {
                 </main>
             </div>
 
-            {editingSession ? <SessionEditor schedule={schedule} day={selectedDay} session={editingSession === 'new' ? null : editingSession} eventId={event.event_id} onClose={() => setEditingSession(null)} onSaved={async () => { setEditingSession(null); await reload(); }} onError={setError} /> : null}
-            {editingOverview ? <OverviewItemEditor schedule={schedule} day={selectedDay} item={editingOverview.item} parent={editingOverview.parent} eventId={event.event_id} onClose={() => setEditingOverview(null)} onSaved={async () => { setEditingOverview(null); await reload(); }} onError={setError} /> : null}
-            {editingConfig ? <ConfigEditor schedule={schedule} eventId={event.event_id} kind={editingConfig.kind} item={editingConfig.item} onClose={() => setEditingConfig(null)} onSaved={async () => { setEditingConfig(null); await reload(); }} onError={setError} /> : null}
+            {editingSession ? <SessionEditor schedule={schedule} day={selectedDay} session={editingSession === 'new' ? null : editingSession} eventId={event.event_id} onClose={() => setEditingSession(null)} onSaved={async () => { setEditingSession(null); await reload(); }} /> : null}
+            {editingOverview ? <OverviewItemEditor schedule={schedule} day={selectedDay} item={editingOverview.item} parent={editingOverview.parent} eventId={event.event_id} onClose={() => setEditingOverview(null)} onSaved={async () => { setEditingOverview(null); await reload(); }} /> : null}
+            {editingConfig ? <ConfigEditor schedule={schedule} eventId={event.event_id} kind={editingConfig.kind} item={editingConfig.item} onClose={() => setEditingConfig(null)} onSaved={async () => { setEditingConfig(null); await reload(); }} /> : null}
             {section === 'locations' ? <button type="button" onClick={() => setEditingConfig({ kind: 'venue' })} className="fixed bottom-6 right-6 z-40 flex h-12 items-center gap-2 rounded-field bg-action px-4 text-sm font-semibold text-white shadow-lg"><Plus size={18} />Add</button> : null}
             {showPublish ? <PublishDialog schedule={schedule} eventId={event.event_id} eventTitle={event.title} onClose={() => setShowPublish(false)} onPublished={reload} onReverted={setSchedule} /> : null}
             {visibilityAction ? <VisibilityDialog action={visibilityAction} eventId={event.event_id} eventTitle={event.title} onClose={() => setVisibilityAction(null)} onChange={() => changeVisibility(visibilityAction)} /> : null}
@@ -707,7 +707,9 @@ function ScheduleImportPanel({ eventId, onApplied }: { eventId: string; onApplie
     </section>;
 }
 
-function SessionEditor({ schedule, day, session, eventId, onClose, onSaved, onError }: { schedule: AdminEventSchedule; day: string; session: ScheduleSession | null; eventId: string; onClose: () => void; onSaved: () => void; onError: (message: string | null) => void }) {
+function SessionEditor({ schedule, day, session, eventId, onClose, onSaved }: { schedule: AdminEventSchedule; day: string; session: ScheduleSession | null; eventId: string; onClose: () => void; onSaved: () => void }) {
+    const [error, setError] = useState<string | null>(null);
+    const errorNotice = error ? <p role="alert" className="mb-3 rounded-field bg-danger/10 p-2 text-sm text-danger">{error}</p> : null;
     const initialStart = session ? toZonedInput(session.start, schedule.timezone) : `${day}T10:00`;
     const initialEnd = session ? toZonedInput(session.end, schedule.timezone) : `${day}T11:00`;
     const [form, setForm] = useState({ title: session?.title ?? '', description: session?.description ?? '', contributors: session?.contributors ?? [], start: initialStart, end: initialEnd, room_ids: session ? sessionRoomIds(session) : [] as number[], venue_id: session?.venue_id?.toString() ?? '', level_id: session?.level_id?.toString() ?? '', activity_type_id: session?.activity_type_id?.toString() ?? '', attendee_note: session?.attendee_note ?? '', allow_plan: session?.allow_plan ?? true, is_cancelled: session?.is_cancelled ?? false });
@@ -735,15 +737,16 @@ function SessionEditor({ schedule, day, session, eventId, onClose, onSaved, onEr
         setForm({ ...form, contributors });
     };
     const submit = async (event: React.FormEvent) => {
-        event.preventDefault(); setBusy(true); onError(null);
+        event.preventDefault(); setBusy(true); setError(null);
         const body: ScheduleSessionInput = { title: form.title, instructors: null, description: form.description.trim() || null, contributors: form.contributors.map(({ contributor_id, role }) => ({ contributor_id, role })), start: startIso, end: endIso, room_id: orderedRoomIds[0] ?? null, room_ids: orderedRoomIds, venue_id: form.venue_id ? Number(form.venue_id) : null, level_id: form.level_id ? Number(form.level_id) : null, activity_type_id: form.activity_type_id ? Number(form.activity_type_id) : null, attendee_note: form.attendee_note || null, allow_plan: form.allow_plan, is_cancelled: form.is_cancelled };
-        try { if (session) await updateScheduleSession(eventId, session.id, body); else await createScheduleSession(eventId, body); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not save session'); } finally { setBusy(false); }
+        try { if (session) await updateScheduleSession(eventId, session.id, body); else await createScheduleSession(eventId, body); await onSaved(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save session'); } finally { setBusy(false); }
     };
-    const removeSession = async () => { if (!session) return; try { await deleteScheduleSession(eventId, session.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not delete session'); } };
-    const duplicateSession = async () => { if (!session) return; try { await duplicateScheduleSession(eventId, session.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not duplicate session'); } };
+    const removeSession = async () => { if (!session) return; setError(null); try { await deleteScheduleSession(eventId, session.id); await onSaved(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete session'); } };
+    const duplicateSession = async () => { if (!session) return; setError(null); try { await duplicateScheduleSession(eventId, session.id); await onSaved(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not duplicate session'); } };
     const footer = confirmDelete
-        ? <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">Delete this session?</p><div className="flex gap-2"><button type="button" onClick={() => setConfirmDelete(false)} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Keep</button><button type="button" onClick={() => void removeSession()} className="rounded-field bg-danger px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Delete session</button></div></div>
+        ? <>{errorNotice}<div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">Delete this session?</p><div className="flex gap-2"><button type="button" onClick={() => setConfirmDelete(false)} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Keep</button><button type="button" onClick={() => void removeSession()} className="rounded-field bg-danger px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Delete session</button></div></div></>
         : <>
+            {errorNotice}
             {conflicts.length ? <div role="status" className="mb-3 flex items-start gap-2 rounded-field border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900"><AlertTriangle size={16} aria-hidden="true" className="mt-0.5 shrink-0" /><p><strong>Scheduling conflict.</strong> This overlaps {conflicts.map((item) => item.title).join(', ')} in the same room. You may still save intentionally.</p></div> : null}
             <div className="flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button><button type="submit" form={formId} disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Saving…' : conflicts.length ? 'Save anyway' : 'Save'}</button></div>
         </>;
@@ -762,7 +765,9 @@ function SessionEditor({ schedule, day, session, eventId, onClose, onSaved, onEr
     </form></Modal>;
 }
 
-function OverviewItemEditor({ schedule, day, item, parent, eventId, onClose, onSaved, onError }: { schedule: AdminEventSchedule; day: string; item: ScheduleOverviewItem | null; parent?: ScheduleOverviewItem; eventId: string; onClose: () => void; onSaved: () => void; onError: (message: string | null) => void }) {
+function OverviewItemEditor({ schedule, day, item, parent, eventId, onClose, onSaved }: { schedule: AdminEventSchedule; day: string; item: ScheduleOverviewItem | null; parent?: ScheduleOverviewItem; eventId: string; onClose: () => void; onSaved: () => void }) {
+    const [error, setError] = useState<string | null>(null);
+    const errorNotice = error ? <p role="alert" className="mb-3 rounded-field bg-danger/10 p-2 text-sm text-danger">{error}</p> : null;
     const tz = schedule.timezone;
     const momentDefaultEnd = parent ? new Date(Math.min(Date.parse(parent.end), Date.parse(parent.start) + 60 * 60 * 1000)).toISOString() : '';
     const [form, setForm] = useState({
@@ -793,7 +798,7 @@ function OverviewItemEditor({ schedule, day, item, parent, eventId, onClose, onS
     const isMoment = Boolean(form.parent_id);
     const windowCount = startIso && endIso ? sessionsInOverviewWindow(schedule.sessions, { start: startIso, end: endIso }).length : 0;
     const submit = async (event: React.FormEvent) => {
-        event.preventDefault(); setBusy(true); onError(null);
+        event.preventDefault(); setBusy(true); setError(null);
         const body: ScheduleOverviewItemInput = {
             parent_id: form.parent_id || null,
             title: form.title,
@@ -811,13 +816,14 @@ function OverviewItemEditor({ schedule, day, item, parent, eventId, onClose, onS
             is_cancelled: form.is_cancelled,
             sort_order: item?.sort_order ?? 0,
         };
-        try { if (item) await updateScheduleOverviewItem(eventId, item.id, body); else await createScheduleOverviewItem(eventId, body); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not save overview item'); } finally { setBusy(false); }
+        try { if (item) await updateScheduleOverviewItem(eventId, item.id, body); else await createScheduleOverviewItem(eventId, body); await onSaved(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save overview item'); } finally { setBusy(false); }
     };
     const remove = async () => {
         if (!item) return;
-        try { await deleteScheduleOverviewItem(eventId, item.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not delete overview item'); }
+        setError(null);
+        try { await deleteScheduleOverviewItem(eventId, item.id); await onSaved(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete overview item'); }
     };
-    const footer = <div className="flex flex-wrap justify-between gap-2">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="rounded-field px-3 py-2 text-sm font-semibold text-danger">{confirmDelete ? (moments.length ? `Confirm delete (and ${moments.length} ${moments.length === 1 ? 'moment' : 'moments'})` : 'Confirm delete') : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button><button type="submit" form={formId} disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button></div></div>;
+    const footer = <>{errorNotice}<div className="flex flex-wrap justify-between gap-2">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="rounded-field px-3 py-2 text-sm font-semibold text-danger">{confirmDelete ? (moments.length ? `Confirm delete (and ${moments.length} ${moments.length === 1 ? 'moment' : 'moments'})` : 'Confirm delete') : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button><button type="submit" form={formId} disabled={busy} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button></div></div></>;
     return <Modal title={item ? (isMoment ? 'Edit moment' : 'Edit overview item') : isMoment ? 'Add moment' : 'Add overview item'} onClose={onClose} footer={footer}><form id={formId} onSubmit={submit} className="space-y-4">
         <Field label="Title"><input required maxLength={200} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={FIELD_CLASS} placeholder={isMoment ? 'Show performances' : 'Workshops'} /></Field>
         <Field label="Subtitle"><input maxLength={200} value={form.subtitle} onChange={(event) => setForm({ ...form, subtitle: event.target.value })} className={FIELD_CLASS} placeholder="Tagline shown under the title" /></Field>
@@ -833,7 +839,9 @@ function OverviewItemEditor({ schedule, day, item, parent, eventId, onClose, onS
     </form></Modal>;
 }
 
-function ConfigEditor({ schedule, eventId, kind, item, onClose, onSaved, onError }: { schedule: AdminEventSchedule; eventId: string; kind: ConfigKind; item?: ConfigEntity; onClose: () => void; onSaved: () => void; onError: (message: string | null) => void }) {
+function ConfigEditor({ schedule, eventId, kind, item, onClose, onSaved }: { schedule: AdminEventSchedule; eventId: string; kind: ConfigKind; item?: ConfigEntity; onClose: () => void; onSaved: () => void }) {
+    const [error, setError] = useState<string | null>(null);
+    const errorNotice = error ? <p role="alert" className="mb-3 rounded-field bg-danger/10 p-2 text-sm text-danger">{error}</p> : null;
     const label = item && 'display_name' in item ? item.display_name : item && 'label' in item ? item.label : item && 'name' in item ? item.name : '';
     const [name, setName] = useState(label);
     const [secondary, setSecondary] = useState(item && 'address' in item ? item.address ?? '' : item && 'notation' in item ? item.notation ?? '' : '');
@@ -842,6 +850,7 @@ function ConfigEditor({ schedule, eventId, kind, item, onClose, onSaved, onError
     const [details, setDetails] = useState(item && 'venue_id' in item ? item.details ?? '' : '');
     const [confirmDelete, setConfirmDelete] = useState(false);
     const save = async () => {
+        setError(null);
         try {
             if (kind === 'venue') { const body = { name, address: secondary || null, sort_order: item?.sort_order ?? schedule.venues.length }; if (item) await updateScheduleVenue(eventId, item.id, body); else await createScheduleVenue(eventId, body); }
             if (kind === 'room') { const body = { name, details: details.trim() || null, venue_id: venueId ? Number(venueId) : null, color, sort_order: item?.sort_order ?? schedule.rooms.length }; if (item) await updateScheduleRoom(eventId, item.id, body); else await createScheduleRoom(eventId, body); }
@@ -849,10 +858,10 @@ function ConfigEditor({ schedule, eventId, kind, item, onClose, onSaved, onError
             if (kind === 'activity') { const body = { name, color, sort_order: item?.sort_order ?? schedule.activity_types.length }; if (item) await updateScheduleActivityType(eventId, item.id, body); else await createScheduleActivityType(eventId, body); }
             if (kind === 'contributor') { const body = { display_name: name, sort_order: item?.sort_order ?? schedule.contributors?.length ?? 0 }; if (item) await updateScheduleContributor(eventId, item.id, body); else await createScheduleContributor(eventId, body); }
             await onSaved();
-        } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not save item'); }
+        } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save item'); }
     };
-    const remove = async () => { if (!item) return; try { if (kind === 'venue') await deleteScheduleVenue(eventId, item.id); if (kind === 'room') await deleteScheduleRoom(eventId, item.id); if (kind === 'level') await deleteScheduleLevel(eventId, item.id); if (kind === 'activity') await deleteScheduleActivityType(eventId, item.id); if (kind === 'contributor') await deleteScheduleContributor(eventId, item.id); await onSaved(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Could not delete item'); } };
-    const footer = <div className="flex justify-between gap-2">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-danger"><Trash2 size={16} />{confirmDelete ? 'Confirm delete' : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button><button type="button" onClick={save} disabled={!name.trim()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">Save</button></div></div>;
+    const remove = async () => { if (!item) return; setError(null); try { if (kind === 'venue') await deleteScheduleVenue(eventId, item.id); if (kind === 'room') await deleteScheduleRoom(eventId, item.id); if (kind === 'level') await deleteScheduleLevel(eventId, item.id); if (kind === 'activity') await deleteScheduleActivityType(eventId, item.id); if (kind === 'contributor') await deleteScheduleContributor(eventId, item.id); await onSaved(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete item'); } };
+    const footer = <>{errorNotice}<div className="flex justify-between gap-2">{item ? <button type="button" onClick={async () => { if (!confirmDelete) { setConfirmDelete(true); return; } await remove(); }} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-danger"><Trash2 size={16} />{confirmDelete ? 'Confirm delete' : 'Delete'}</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-field border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas">Cancel</button><button type="button" onClick={save} disabled={!name.trim()} className="rounded-field bg-action px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">Save</button></div></div></>;
     return <Modal title={`${item ? 'Edit' : 'Add'} ${kind === 'activity' ? 'activity type' : kind}`} onClose={onClose} footer={footer}><div className="space-y-4"><Field label={kind === 'level' ? 'Label' : 'Name'}><input value={name} onChange={(event) => setName(event.target.value)} className={FIELD_CLASS} /></Field>{kind === 'venue' ? <Field label="Address"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} /></Field> : null}{kind === 'level' ? <Field label="Notation"><input value={secondary} onChange={(event) => setSecondary(event.target.value)} className={FIELD_CLASS} placeholder="*, **, ***" /></Field> : null}{kind === 'room' ? <Field label="Details"><input maxLength={160} value={details} onChange={(event) => setDetails(event.target.value)} className={FIELD_CLASS} placeholder="Ground floor · Grand Pass only" /></Field> : null}{kind === 'room' ? <Field label="Venue"><select value={venueId} onChange={(event) => setVenueId(event.target.value)} className={FIELD_CLASS}><option value="">No venue</option>{schedule.venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></Field> : null}{kind === 'room' || kind === 'activity' ? <Field label="Color"><div className="flex flex-wrap gap-2">{Object.keys(SCHEDULE_COLORS).map((value) => <button key={value} type="button" aria-label={value} onClick={() => setColor(value)} className={`h-9 w-9 border-2 ${scheduleColor(value).header} ${color === value ? 'border-action' : 'border-transparent'}`} />)}</div></Field> : null}</div></Modal>;
 }
 

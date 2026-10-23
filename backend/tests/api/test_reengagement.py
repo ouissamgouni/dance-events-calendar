@@ -33,6 +33,7 @@ from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
     CachedEvent,
     CalendarSetting,
+    EventPromoCode,
     EventRating,
     Notification,
     PushSubscription,
@@ -1377,6 +1378,105 @@ def test_activity_digest_expands_multi_profile_match_into_alert_groups(
     assert "Salsa · Regional+ · Berlin" in entries["alert:Trip"]["group_header_html"]
 
 
+def _promo_notif(session, user, kind, event_id, code, subject_key=None):
+    n = _notif(
+        session,
+        recipient=user,
+        actor=user,
+        kind=kind,
+        event_id=event_id,
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+    )
+    n.context = code
+    n.subject_key = subject_key
+    if kind == "promo_code_match":
+        n.description = "Home"
+    session.add(n)
+    session.commit()
+    return n
+
+
+def test_activity_digest_deals_section_merges_promo_kinds_and_drops_stale(
+    session, monkeypatch
+):
+    calls: list[list[dict]] = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda _recipient, sections, **_: calls.append(sections) or True,
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+    session.add(SiteSetting(key="promo_codes_email_instant", value="false"))
+    session.add(SiteSetting(key="promo_codes_email_digest", value="true"))
+    bob = _make_user(session, "bob@example.com", "bob")
+    _make_event(session, "ev-deal", title="Deal Social")
+    _make_event(session, "ev-expired", title="Expired Deal")
+    for event_id, code, expires_at in (
+        ("ev-deal", "SAVE10", None),
+        ("ev-deal", "MATCH20", None),
+        ("ev-expired", "OLD", datetime.now(timezone.utc) - timedelta(hours=1)),
+    ):
+        session.add(
+            EventPromoCode(
+                event_id=event_id,
+                code=code,
+                submitter_user_id=bob.id,
+                status="approved",
+                expires_at=expires_at,
+            )
+        )
+    session.commit()
+    _promo_notif(session, bob, "promo_code_added", "ev-deal", "SAVE10")
+    _promo_notif(session, bob, "promo_code_match", "ev-deal", "MATCH20", "promo:a")
+    stale = _promo_notif(
+        session, bob, "promo_code_match", "ev-expired", "OLD", "promo:b"
+    )
+
+    assert activity_email.run_once(force=True)["digests"] == 1
+
+    assert [section["feature"] for section in calls[0]] == ["deals"]
+    entries = calls[0][0]["entries"]
+    assert sorted(e["kind"] for e in entries) == [
+        "promo_code_added",
+        "promo_code_match",
+    ]
+    html = " ".join(e["primary_html"] for e in entries)
+    assert "MATCH20" in html and "Home" in html and "SAVE10" in html
+    assert "OLD" not in html
+    session.refresh(stale)
+    assert stale.emailed_at is not None
+
+
+def test_activity_digest_leaves_saver_promo_to_instant_job_by_default(
+    session, monkeypatch
+):
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda *a, **k: calls.append(a) or True,
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+    bob = _make_user(session, "bob@example.com", "bob")
+    _make_event(session, "ev-deal")
+    session.add(
+        EventPromoCode(
+            event_id="ev-deal",
+            code="SAVE10",
+            submitter_user_id=bob.id,
+            status="approved",
+        )
+    )
+    session.commit()
+    saved = _promo_notif(session, bob, "promo_code_added", "ev-deal", "SAVE10")
+
+    activity_email.run_once(force=True)
+
+    assert calls == []
+    session.refresh(saved)
+    assert saved.emailed_at is None and saved.pushed_at is None
+
+
 def test_activity_digest_groups_friend_milestone_batch(session, monkeypatch):
     email_entries: list[dict] = []
     push_calls: list[dict] = []
@@ -1938,6 +2038,47 @@ def test_interest_push_waits_for_schedule_slot_and_window(session, monkeypatch):
     session.refresh(later)
     assert later.pushed_at is None
     assert len(push_calls) == 1
+
+
+def test_promo_match_push_shares_interest_slot(session, monkeypatch):
+    push_calls: list = []
+    monkeypatch.setattr(
+        activity_email, "send_activity_digest_v2_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(
+        activity_email,
+        "send_push",
+        lambda recipient_id, **kw: push_calls.append(kw) or 1,
+    )
+    monkeypatch.setattr(
+        "backend.services.activity_email.get_interest_match_push_schedule",
+        lambda: "tue @ 19:00",
+    )
+    holder = {"now": datetime(2026, 7, 6, 19, 30, tzinfo=timezone.utc)}  # Monday
+    _freeze_activity_now(monkeypatch, holder)
+
+    bob = _make_user(session, "bob@example.com", "bob", timezone="UTC")
+    _make_event(session, "ev-1")
+    _make_event(session, "ev-2", title="Deal Social")
+    _interest_notif(session, bob, "ev-1")
+    session.add(
+        EventPromoCode(
+            event_id="ev-2", code="DEAL5", submitter_user_id=bob.id, status="approved"
+        )
+    )
+    session.commit()
+    deal = _promo_notif(session, bob, "promo_code_match", "ev-2", "DEAL5", "promo:c")
+
+    assert activity_email.run_once()["interest_push_deferred"] == 2
+    assert push_calls == []
+
+    holder["now"] = datetime(2026, 7, 7, 19, 30, tzinfo=timezone.utc)  # Tuesday in slot
+    assert activity_email.run_once()["pushed"] == 2
+    deal_push = next(c for c in push_calls if c["title"] == "New promo code: DEAL5")
+    assert deal_push["body"] == "Deal Social · matches your Home alert"
+    assert deal_push["url"].startswith("/event/ev-2")
+    session.refresh(deal)
+    assert deal.pushed_at is not None
 
 
 def test_interest_push_force_bypasses_schedule(session, monkeypatch):

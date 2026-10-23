@@ -19,7 +19,7 @@ import {
  * that flips all six channel flags to false in a single PATCH.
  */
 
-type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'plan_activity' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'ticket_prompt' | 'memories_prompt' | 'milestone_unlocked' | 'event_messages' | 'suggested_events' | 'schedule_updates';
+type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'plan_activity' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'promo_code_matches' | 'review_prompt' | 'ticket_prompt' | 'memories_prompt' | 'milestone_unlocked' | 'event_messages' | 'suggested_events' | 'schedule_updates';
 type Channel = 'email' | 'push';
 type FlagKey =
     | 'email_event_reminders_enabled'
@@ -30,6 +30,8 @@ type FlagKey =
     | 'push_interest_matches_enabled'
     | 'email_promo_codes_enabled'
     | 'push_promo_codes_enabled'
+    | 'email_promo_code_matches_enabled'
+    | 'push_promo_code_matches_enabled'
     | 'email_review_prompt_enabled'
     | 'push_review_prompt_enabled'
     | 'email_ticket_prompt_enabled'
@@ -118,6 +120,12 @@ const FEATURES: {
             label: 'Promo codes',
             description: 'When a promo code is approved for an event you saved.',
             anchor: 'notify-promo-codes',
+        },
+        {
+            key: 'promo_code_matches',
+            label: 'Deals',
+            description: 'Promo codes on events matching your saved searches.',
+            anchor: 'notify-promo-code-matches',
         },
         {
             key: 'review_prompt',

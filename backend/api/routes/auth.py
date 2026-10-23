@@ -923,6 +923,8 @@ def get_me(
         "push_interest_matches_enabled": user.push_interest_matches_enabled,
         "email_promo_codes_enabled": user.email_promo_codes_enabled,
         "push_promo_codes_enabled": user.push_promo_codes_enabled,
+        "email_promo_code_matches_enabled": user.email_promo_code_matches_enabled,
+        "push_promo_code_matches_enabled": user.push_promo_code_matches_enabled,
         "email_review_prompt_enabled": user.email_review_prompt_enabled,
         "push_review_prompt_enabled": user.push_review_prompt_enabled,
         "email_milestone_unlocked_enabled": user.email_milestone_unlocked_enabled,
@@ -1077,6 +1079,8 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     push_interest_matches_enabled: Optional[bool] = None
     email_promo_codes_enabled: Optional[bool] = None
     push_promo_codes_enabled: Optional[bool] = None
+    email_promo_code_matches_enabled: Optional[bool] = None
+    push_promo_code_matches_enabled: Optional[bool] = None
     email_review_prompt_enabled: Optional[bool] = None
     push_review_prompt_enabled: Optional[bool] = None
     email_ticket_prompt_enabled: Optional[bool] = None
@@ -1147,6 +1151,8 @@ _NEW_FLAGS: tuple[str, ...] = (
     "push_interest_matches_enabled",
     "email_promo_codes_enabled",
     "push_promo_codes_enabled",
+    "email_promo_code_matches_enabled",
+    "push_promo_code_matches_enabled",
     "email_review_prompt_enabled",
     "push_review_prompt_enabled",
     "email_ticket_prompt_enabled",
@@ -1220,6 +1226,8 @@ def update_notification_preferences(
         "push_interest_matches_enabled": user.push_interest_matches_enabled,
         "email_promo_codes_enabled": user.email_promo_codes_enabled,
         "push_promo_codes_enabled": user.push_promo_codes_enabled,
+        "email_promo_code_matches_enabled": user.email_promo_code_matches_enabled,
+        "push_promo_code_matches_enabled": user.push_promo_code_matches_enabled,
         "email_review_prompt_enabled": user.email_review_prompt_enabled,
         "push_review_prompt_enabled": user.push_review_prompt_enabled,
         "email_milestone_unlocked_enabled": user.email_milestone_unlocked_enabled,

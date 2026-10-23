@@ -1,0 +1,1476 @@
+{
+    "schema_version": 2,
+    "event_id": "ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k",
+    "timezone": "Europe/Bucharest",
+    "day_start_hour": 6,
+    "session_color_mode": "activity_type",
+    "days": [
+        "2026-11-19",
+        "2026-11-20",
+        "2026-11-21",
+        "2026-11-22"
+    ],
+    "venues": [
+        {
+            "external_id": "grand-hotel-napoca",
+            "name": "Grand Hotel Napoca",
+            "address": null,
+            "sort_order": 0
+        }
+    ],
+    "rooms": [
+        {
+            "external_id": "sala-roma",
+            "name": "Roma",
+            "details": null,
+            "venue_external_id": "grand-hotel-napoca",
+            "color": "pink",
+            "sort_order": 0
+        },
+        {
+            "external_id": "sala-atena",
+            "name": "Atena",
+            "details": null,
+            "venue_external_id": "grand-hotel-napoca",
+            "color": "amber",
+            "sort_order": 1
+        },
+        {
+            "external_id": "sala-forum",
+            "name": "Forum",
+            "details": null,
+            "venue_external_id": "grand-hotel-napoca",
+            "color": "violet",
+            "sort_order": 2
+        },
+        {
+            "external_id": "sala-ambasador",
+            "name": "Ambasador",
+            "details": null,
+            "venue_external_id": "grand-hotel-napoca",
+            "color": "indigo",
+            "sort_order": 3
+        }
+    ],
+    "levels": [],
+    "activity_types": [
+        {
+            "external_id": "salsa-workshop",
+            "name": "Salsa Workshop",
+            "color": "pink",
+            "sort_order": 0
+        },
+        {
+            "external_id": "bachata-workshop",
+            "name": "Bachata Workshop",
+            "color": "orange",
+            "sort_order": 1
+        },
+        {
+            "external_id": "kizomba-workshop",
+            "name": "Kizomba Workshop",
+            "color": "amber",
+            "sort_order": 2
+        },
+        {
+            "external_id": "workshop",
+            "name": "Workshop",
+            "color": "blue",
+            "sort_order": 3
+        },
+        {
+            "external_id": "social",
+            "name": "Social",
+            "color": "slate",
+            "sort_order": 4
+        },
+        {
+            "external_id": "registration",
+            "name": "Registration",
+            "color": "brown",
+            "sort_order": 5
+        },
+        {
+            "external_id": "party",
+            "name": "Party",
+            "color": "violet",
+            "sort_order": 6
+        },
+        {
+            "external_id": "show",
+            "name": "Show",
+            "color": "indigo",
+            "sort_order": 7
+        }
+    ],
+    "contributors": [
+        {
+            "external_id": "tzoompy-luky",
+            "display_name": "Tzoompy & Luky",
+            "sort_order": 0
+        },
+        {
+            "external_id": "super-mario-kristina",
+            "display_name": "Super Mario & Kristina",
+            "sort_order": 1
+        },
+        {
+            "external_id": "catalincho-andreea",
+            "display_name": "Catalincho & Andreea",
+            "sort_order": 2
+        },
+        {
+            "external_id": "alexis-iselin",
+            "display_name": "Alexis & Iselin",
+            "sort_order": 3
+        },
+        {
+            "external_id": "panagiotis-myrto",
+            "display_name": "Panagiotis & Myrto",
+            "sort_order": 4
+        },
+        {
+            "external_id": "miguel-sunsire",
+            "display_name": "Miguel & Sunsire",
+            "sort_order": 5
+        },
+        {
+            "external_id": "ady-allisor",
+            "display_name": "Ady & Allisor",
+            "sort_order": 6
+        },
+        {
+            "external_id": "paul-ioana",
+            "display_name": "Paul & Ioana",
+            "sort_order": 7
+        },
+        {
+            "external_id": "radu-judit",
+            "display_name": "Radu & Judit",
+            "sort_order": 8
+        },
+        {
+            "external_id": "jose-nerea",
+            "display_name": "Jose & Nerea",
+            "sort_order": 9
+        },
+        {
+            "external_id": "terry-cecile",
+            "display_name": "Terry & Cecile",
+            "sort_order": 10
+        },
+        {
+            "external_id": "jack-sara",
+            "display_name": "Jack & Sara",
+            "sort_order": 11
+        },
+        {
+            "external_id": "sifu-adelina",
+            "display_name": "Sifu & Adelina",
+            "sort_order": 12
+        },
+        {
+            "external_id": "sifu-alice",
+            "display_name": "Sifu & Alice",
+            "sort_order": 13
+        },
+        {
+            "external_id": "sakis-mia",
+            "display_name": "Sakis & Mia",
+            "sort_order": 14
+        },
+        {
+            "external_id": "samuel-funflow-sasha",
+            "display_name": "Samuel Funflow & Sasha",
+            "sort_order": 15
+        },
+        {
+            "external_id": "nando-margarita",
+            "display_name": "Nando & Margarita",
+            "sort_order": 16
+        },
+        {
+            "external_id": "kristina",
+            "display_name": "Kristina",
+            "sort_order": 17
+        },
+        {
+            "external_id": "eloy-rojas",
+            "display_name": "Eloy Rojas",
+            "sort_order": 18
+        },
+        {
+            "external_id": "farid-ferchach",
+            "display_name": "Farid Ferchach",
+            "sort_order": 19
+        },
+        {
+            "external_id": "karl-bekene",
+            "display_name": "Karl Bekene",
+            "sort_order": 20
+        },
+        {
+            "external_id": "grupo-alafia",
+            "display_name": "Grupo Alafia",
+            "sort_order": 21
+        },
+        {
+            "external_id": "david-grant",
+            "display_name": "David Grant",
+            "sort_order": 22
+        },
+        {
+            "external_id": "radu-manole",
+            "display_name": "Radu Manole",
+            "sort_order": 23
+        },
+        {
+            "external_id": "marius-turcu",
+            "display_name": "Marius Turcu",
+            "sort_order": 24
+        }
+    ],
+    "sessions": [
+        {
+            "external_id": "d1-2130-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "tzoompy-luky",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-19T21:30:00",
+            "end": "2026-11-19T22:30:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d2-1900-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "super-mario-kristina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-20T19:00:00",
+            "end": "2026-11-20T20:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d2-1900-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "catalincho-andreea",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-20T19:00:00",
+            "end": "2026-11-20T20:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d2-1900-ambasador",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "alexis-iselin",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-20T19:00:00",
+            "end": "2026-11-20T20:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d2-2000-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "eloy-rojas",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-20T20:00:00",
+            "end": "2026-11-20T21:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d2-2000-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "farid-ferchach",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-20T20:00:00",
+            "end": "2026-11-20T21:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d2-2000-ambasador",
+            "title": "Kristina – Salsa Bootcamp",
+            "contributors": [
+                {
+                    "contributor_external_id": "kristina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-20T20:00:00",
+            "end": "2026-11-20T21:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "workshop"
+        },
+        {
+            "external_id": "d2-2100-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "panagiotis-myrto",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-20T21:00:00",
+            "end": "2026-11-20T22:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d2-2100-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "miguel-sunsire",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-20T21:00:00",
+            "end": "2026-11-20T22:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d2-2100-ambasador",
+            "title": "Kristina – Salsa Bootcamp",
+            "contributors": [
+                {
+                    "contributor_external_id": "kristina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-20T21:00:00",
+            "end": "2026-11-20T22:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "workshop"
+        },
+        {
+            "external_id": "d3-1200-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "farid-ferchach",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T12:00:00",
+            "end": "2026-11-21T13:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1200-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "ady-allisor",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T12:00:00",
+            "end": "2026-11-21T13:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d3-1200-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "paul-ioana",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T12:00:00",
+            "end": "2026-11-21T13:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1200-ambasador",
+            "title": "Kristina – Salsa Bootcamp",
+            "contributors": [
+                {
+                    "contributor_external_id": "kristina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T12:00:00",
+            "end": "2026-11-21T13:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "workshop"
+        },
+        {
+            "external_id": "d3-1300-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "panagiotis-myrto",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T13:00:00",
+            "end": "2026-11-21T14:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1300-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "miguel-sunsire",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T13:00:00",
+            "end": "2026-11-21T14:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d3-1300-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "karl-bekene",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T13:00:00",
+            "end": "2026-11-21T14:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d3-1300-ambasador",
+            "title": "Kristina – Salsa Bootcamp",
+            "contributors": [
+                {
+                    "contributor_external_id": "kristina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T13:00:00",
+            "end": "2026-11-21T14:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "workshop"
+        },
+        {
+            "external_id": "d3-1400-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "grupo-alafia",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T14:00:00",
+            "end": "2026-11-21T15:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1400-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "eloy-rojas",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T14:00:00",
+            "end": "2026-11-21T15:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1400-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "radu-judit",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T14:00:00",
+            "end": "2026-11-21T15:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d3-1400-ambasador",
+            "title": "Jose, Nerea – Masterclass",
+            "contributors": [
+                {
+                    "contributor_external_id": "jose-nerea",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T14:00:00",
+            "end": "2026-11-21T15:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1500-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "terry-cecile",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T15:00:00",
+            "end": "2026-11-21T16:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1500-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "alexis-iselin",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T15:00:00",
+            "end": "2026-11-21T16:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1500-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "jack-sara",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T15:00:00",
+            "end": "2026-11-21T16:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d3-1500-ambasador",
+            "title": "Kristina – Salsa Bootcamp",
+            "contributors": [
+                {
+                    "contributor_external_id": "kristina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T15:00:00",
+            "end": "2026-11-21T16:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "workshop"
+        },
+        {
+            "external_id": "d3-1600-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "panagiotis-myrto",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T16:00:00",
+            "end": "2026-11-21T17:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1600-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "samuel-funflow-sasha",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T16:00:00",
+            "end": "2026-11-21T17:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1600-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "karl-bekene",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T16:00:00",
+            "end": "2026-11-21T17:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d3-1600-ambasador",
+            "title": "Kristina – Salsa Bootcamp",
+            "contributors": [
+                {
+                    "contributor_external_id": "kristina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T16:00:00",
+            "end": "2026-11-21T17:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "workshop"
+        },
+        {
+            "external_id": "d3-1700-roma",
+            "title": "Social by Day",
+            "contributors": [],
+            "start": "2026-11-21T17:00:00",
+            "end": "2026-11-21T18:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "social"
+        },
+        {
+            "external_id": "d3-1700-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "jose-nerea",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T17:00:00",
+            "end": "2026-11-21T18:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d3-1700-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "sifu-adelina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T17:00:00",
+            "end": "2026-11-21T18:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d3-2100-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "sakis-mia",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T21:00:00",
+            "end": "2026-11-21T22:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d3-2100-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "samuel-funflow-sasha",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-21T21:00:00",
+            "end": "2026-11-21T22:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1200-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "terry-cecile",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T12:00:00",
+            "end": "2026-11-22T13:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1200-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "miguel-sunsire",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T12:00:00",
+            "end": "2026-11-22T13:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d4-1200-forum",
+            "title": "David Grant – Unbreakable Dancer",
+            "contributors": [
+                {
+                    "contributor_external_id": "david-grant",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T12:00:00",
+            "end": "2026-11-22T13:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "workshop"
+        },
+        {
+            "external_id": "d4-1200-ambasador",
+            "title": "Grupo Alafia – Masterclass",
+            "contributors": [
+                {
+                    "contributor_external_id": "grupo-alafia",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T12:00:00",
+            "end": "2026-11-22T13:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1300-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "sakis-mia",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T13:00:00",
+            "end": "2026-11-22T14:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d4-1300-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "radu-manole",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T13:00:00",
+            "end": "2026-11-22T14:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1300-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "sifu-alice",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T13:00:00",
+            "end": "2026-11-22T14:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d4-1300-ambasador",
+            "title": "Super Mario, Kristina – Masterclass",
+            "contributors": [
+                {
+                    "contributor_external_id": "super-mario-kristina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T13:00:00",
+            "end": "2026-11-22T14:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1400-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "jose-nerea",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T14:00:00",
+            "end": "2026-11-22T15:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1400-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "nando-margarita",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T14:00:00",
+            "end": "2026-11-22T15:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1400-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "jack-sara",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T14:00:00",
+            "end": "2026-11-22T15:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d4-1400-ambasador",
+            "title": "Marius Turcu – Bachata Masterclass",
+            "contributors": [
+                {
+                    "contributor_external_id": "marius-turcu",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T14:00:00",
+            "end": "2026-11-22T15:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d4-1500-roma",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "super-mario-kristina",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T15:00:00",
+            "end": "2026-11-22T16:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1500-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "samuel-funflow-sasha",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T15:00:00",
+            "end": "2026-11-22T16:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1500-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "karl-bekene",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T15:00:00",
+            "end": "2026-11-22T16:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d4-1500-ambasador",
+            "title": "Marius Turcu – Bachata Masterclass",
+            "contributors": [
+                {
+                    "contributor_external_id": "marius-turcu",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T15:00:00",
+            "end": "2026-11-22T16:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d4-1600-roma",
+            "title": "Social by Day",
+            "contributors": [],
+            "start": "2026-11-22T16:00:00",
+            "end": "2026-11-22T17:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "social"
+        },
+        {
+            "external_id": "d4-1600-atena",
+            "title": "Sakis, Mia – Bachata Fun",
+            "contributors": [
+                {
+                    "contributor_external_id": "sakis-mia",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T16:00:00",
+            "end": "2026-11-22T17:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d4-1600-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "jack-sara",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T16:00:00",
+            "end": "2026-11-22T17:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d4-1600-ambasador",
+            "title": "Alexis, Iselin – Masterclass",
+            "contributors": [
+                {
+                    "contributor_external_id": "alexis-iselin",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T16:00:00",
+            "end": "2026-11-22T17:00:00",
+            "room_external_ids": [
+                "sala-ambasador"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
+            "external_id": "d4-1700-roma",
+            "title": "Social by Day",
+            "contributors": [],
+            "start": "2026-11-22T17:00:00",
+            "end": "2026-11-22T18:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "social"
+        },
+        {
+            "external_id": "d4-1700-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "ady-allisor",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T17:00:00",
+            "end": "2026-11-22T18:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "bachata-workshop"
+        },
+        {
+            "external_id": "d4-1700-forum",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "radu-judit",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T17:00:00",
+            "end": "2026-11-22T18:00:00",
+            "room_external_ids": [
+                "sala-forum"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "kizomba-workshop"
+        },
+        {
+            "external_id": "d4-2200-atena",
+            "title": " ",
+            "contributors": [
+                {
+                    "contributor_external_id": "nando-margarita",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T22:00:00",
+            "end": "2026-11-22T23:00:00",
+            "room_external_ids": [
+                "sala-atena"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        }
+    ],
+    "overview_items": [
+        {
+            "external_id": "d1-registration",
+            "title": "Registration opening",
+            "start": "2026-11-19T19:00:00",
+            "end": "2026-11-19T21:30:00",
+            "activity_type_external_id": "registration",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 0
+        },
+        {
+            "external_id": "d1-salsa-workshop",
+            "title": "Salsa Workshop",
+            "start": "2026-11-19T21:30:00",
+            "end": "2026-11-19T22:30:00",
+            "activity_type_external_id": "salsa-workshop",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 1
+        },
+        {
+            "external_id": "d1-preparty",
+            "title": "TSF Preparty",
+            "subtitle": "2 rooms",
+            "description": "Dresscode: BRING YOUR OWN STYLE",
+            "start": "2026-11-19T22:30:00",
+            "end": "2026-11-20T04:00:00",
+            "activity_type_external_id": "party",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 2
+        },
+        {
+            "external_id": "d2-registration",
+            "title": "Registration opening",
+            "start": "2026-11-20T15:00:00",
+            "end": "2026-11-20T16:00:00",
+            "activity_type_external_id": "registration",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 0
+        },
+        {
+            "external_id": "d2-social-by-day",
+            "title": "Social by day",
+            "start": "2026-11-20T16:00:00",
+            "end": "2026-11-20T19:00:00",
+            "activity_type_external_id": "social",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 1
+        },
+        {
+            "external_id": "d2-shows-rehearsals",
+            "title": "Shows rehearsals",
+            "start": "2026-11-20T19:00:00",
+            "end": "2026-11-20T21:30:00",
+            "activity_type_external_id": "show",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 2
+        },
+        {
+            "external_id": "d2-workshops",
+            "title": "Workshops in 3 rooms",
+            "start": "2026-11-20T19:00:00",
+            "end": "2026-11-20T22:00:00",
+            "activity_type_external_id": "workshop",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 3
+        },
+        {
+            "external_id": "d2-kristina-bootcamp",
+            "parent_external_id": "d2-workshops",
+            "title": "Kristina Salsa Bootcamp",
+            "start": "2026-11-20T20:00:00",
+            "end": "2026-11-20T22:00:00",
+            "activity_type_external_id": "workshop",
+            "venue_external_id": "grand-hotel-napoca"
+        },
+        {
+            "external_id": "d2-shows",
+            "title": "SHOWS with MC Farid",
+            "start": "2026-11-20T22:30:00",
+            "end": "2026-11-21T00:00:00",
+            "activity_type_external_id": "show",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 4
+        },
+        {
+            "external_id": "d2-party",
+            "title": "PARTY in 3 rooms",
+            "description": "Dresscode: BLOOD & DESIRE",
+            "start": "2026-11-20T23:00:00",
+            "end": "2026-11-21T06:00:00",
+            "activity_type_external_id": "party",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 5
+        },
+        {
+            "external_id": "d2-artist-hour",
+            "title": "Artist hour",
+            "description": "All artists will be on the dancefloor",
+            "start": "2026-11-21T02:00:00",
+            "end": "2026-11-21T03:00:00",
+            "activity_type_external_id": "show",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 6
+        },
+        {
+            "external_id": "d2-afterparty",
+            "title": "Afterparty",
+            "start": "2026-11-21T06:00:00",
+            "end": "2026-11-21T08:00:00",
+            "activity_type_external_id": "party",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 7
+        },
+        {
+            "external_id": "d3-workshops",
+            "title": "Workshops",
+            "start": "2026-11-21T12:00:00",
+            "end": "2026-11-21T18:00:00",
+            "activity_type_external_id": "workshop",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 0
+        },
+        {
+            "external_id": "d3-salsa-social",
+            "title": "Salsa Social",
+            "start": "2026-11-21T17:00:00",
+            "end": "2026-11-21T20:00:00",
+            "activity_type_external_id": "social",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 1
+        },
+        {
+            "external_id": "d3-bachata-kizomba-social",
+            "title": "Bachata & Kizomba Social",
+            "start": "2026-11-21T18:00:00",
+            "end": "2026-11-21T20:00:00",
+            "activity_type_external_id": "social",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 2
+        },
+        {
+            "external_id": "d3-show-rehearsals",
+            "title": "Show rehearsals",
+            "start": "2026-11-21T20:00:00",
+            "end": "2026-11-21T21:30:00",
+            "activity_type_external_id": "show",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 3
+        },
+        {
+            "external_id": "d3-workshops-2-rooms",
+            "title": "Workshops in 2 rooms",
+            "start": "2026-11-21T21:30:00",
+            "end": "2026-11-21T22:30:00",
+            "activity_type_external_id": "workshop",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 4
+        },
+        {
+            "external_id": "d3-shows",
+            "title": "SHOWS with MC Farid",
+            "start": "2026-11-21T22:30:00",
+            "end": "2026-11-22T00:00:00",
+            "activity_type_external_id": "show",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 5
+        },
+        {
+            "external_id": "d3-party",
+            "title": "PARTY in 3 rooms",
+            "description": "Dresscode: BLACK & SPARKLE",
+            "start": "2026-11-21T23:00:00",
+            "end": "2026-11-22T06:00:00",
+            "activity_type_external_id": "party",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 6
+        },
+        {
+            "external_id": "d3-artist-hour",
+            "title": "Artist hour",
+            "description": "All artists will be on the dancefloor",
+            "start": "2026-11-22T02:00:00",
+            "end": "2026-11-22T03:00:00",
+            "activity_type_external_id": "show",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 7
+        },
+        {
+            "external_id": "d3-afterparty",
+            "title": "Afterparty",
+            "start": "2026-11-22T06:00:00",
+            "end": "2026-11-22T08:00:00",
+            "activity_type_external_id": "party",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 8
+        },
+        {
+            "external_id": "d4-workshops",
+            "title": "Workshops",
+            "start": "2026-11-22T12:00:00",
+            "end": "2026-11-22T18:00:00",
+            "activity_type_external_id": "workshop",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 0
+        },
+        {
+            "external_id": "d4-salsa-social",
+            "title": "Salsa Social",
+            "start": "2026-11-22T16:00:00",
+            "end": "2026-11-22T19:00:00",
+            "activity_type_external_id": "social",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 1
+        },
+        {
+            "external_id": "d4-bachata-kizomba-social",
+            "title": "Bachata & Kizomba Social",
+            "start": "2026-11-22T18:00:00",
+            "end": "2026-11-22T19:00:00",
+            "activity_type_external_id": "social",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 2
+        },
+        {
+            "external_id": "d4-party",
+            "title": "PARTY in 3 rooms",
+            "description": "Dresscode: TSF ELEMENTS",
+            "start": "2026-11-22T23:00:00",
+            "end": "2026-11-23T06:00:00",
+            "activity_type_external_id": "party",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 3
+        },
+        {
+            "external_id": "d4-artist-hour",
+            "title": "Artist hour",
+            "description": "All artists will be on the dancefloor",
+            "start": "2026-11-23T02:00:00",
+            "end": "2026-11-23T03:00:00",
+            "activity_type_external_id": "show",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 4
+        },
+        {
+            "external_id": "d4-afterparty",
+            "title": "Afterparty",
+            "start": "2026-11-23T06:00:00",
+            "end": "2026-11-23T08:00:00",
+            "activity_type_external_id": "party",
+            "venue_external_id": "grand-hotel-napoca",
+            "sort_order": 5
+        }
+    ]
+}

@@ -81,6 +81,7 @@ VALID_KINDS = {
     "promo_code_approved",
     "promo_code_rejected",
     "promo_code_added",
+    "promo_code_match",
     "milestone_unlocked",
     "organizer_claim_decided",
     "event_message",
@@ -148,7 +149,7 @@ CATEGORY_KINDS: dict[str, set[str]] = {
         "event_message",
         "event_message_reply",
     },
-    "matches": {"interest_event"},
+    "matches": {"interest_event", "promo_code_match"},
     "people": {
         "subscription_going",
         "subscription_saved",

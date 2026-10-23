@@ -237,6 +237,7 @@ def _unsubscribe_footer(user_id, category: str, label: str) -> str:
         "social_activity": "notify-social-activity",
         "interest_matches": "notify-interest-matches",
         "promo_codes": "notify-promo-codes",
+        "promo_code_matches": "notify-promo-code-matches",
         "review_prompt": "notify-review-prompt",
         "ticket_prompt": "notify-ticket-prompt",
         "memories_prompt": "notify-memories-prompt",
@@ -1043,6 +1044,15 @@ def send_activity_digest_email(
         heading = "New milestone unlocked \U0001f389"
         footer_label = "achievement updates"
         footer_category = "milestone"
+    elif feature in ("promo_codes", "promo_code_matches"):
+        subject = (
+            "1 new deal for you on Movida"
+            if count == 1
+            else f"{count} new deals for you on Movida"
+        )
+        heading = "Deals"
+        footer_label = "promo code alerts"
+        footer_category = feature
     else:
         subject = (
             "You have 1 new notification on Movida"
@@ -1111,6 +1121,8 @@ _CARD_KIND_EMOJI = {
     "event_ticket_prompt": "\U0001f39f\ufe0f",
     "event_memories_prompt": "\U0001f4f8",
     "event_review_prompt": "\u2b50",
+    "promo_code_added": "\U0001f3f7\ufe0f",
+    "promo_code_match": "\U0001f3f7\ufe0f",
 }
 
 # (heading, CTA path) per feature section. A ``None`` path renders no CTA.
@@ -1120,6 +1132,7 @@ _SECTION_META: dict[str, tuple[str, str, str | None]] = {
         "New matches for your saved searches",
         "/saved-searches",
     ),
+    "deals": ("🏷️", "Deals", "/notifications?kind=promo_code_match"),
     "friends_going": ("🕺", "Friends going out", "/notifications"),
     "milestone_unlocked": ("🏆", "Your achievements", "/mine/passport"),
     "social_activity": ("👥", "Your social activity", "/notifications"),
@@ -1134,6 +1147,7 @@ _SECTION_META: dict[str, tuple[str, str, str | None]] = {
 
 _SECTION_ORDER = (
     "interest_matches",
+    "deals",
     "friends_going",
     "milestone_unlocked",
     "social_activity",

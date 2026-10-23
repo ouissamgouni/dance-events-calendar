@@ -140,6 +140,10 @@ describe('notificationCategory', () => {
         expect(notificationCategory('milestone_unlocked')).toBe('milestones');
     });
 
+    it('maps interest-matched deals to "matches"', () => {
+        expect(notificationCategory('promo_code_match')).toBe('matches');
+    });
+
     it('maps promo/claim kinds to "others"', () => {
         expect(notificationCategory('promo_code_added')).toBe('others');
         expect(notificationCategory('organizer_claim_decided')).toBe('others');
