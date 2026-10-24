@@ -27,8 +27,8 @@ describe('AdminPeopleDiscoverySettings', () => {
         const onMessage = vi.fn()
         render(<AdminPeopleDiscoverySettings onMessage={onMessage} />)
 
-        expect(await screen.findByText(/Sheet: shown 4 · dismissed 2 · followed 2 \(50%\)/)).toBeInTheDocument()
-        expect(screen.getByText(/Joined: notified 5 in-app · pushes sent 1 \(1 failed\) · followed back 2/)).toBeInTheDocument()
+        expect(await screen.findByText(/Last 30 days: shown 4 · dismissed 2 · followed 2 \(50%\)/)).toBeInTheDocument()
+        expect(screen.getByText(/Last 30 days: notified 5 in-app · pushes sent 1 \(1 failed\) · followed back 2/)).toBeInTheDocument()
 
         const [allUsers] = screen.getAllByRole('checkbox', { name: 'All users' })
         await userEvent.click(allUsers)

@@ -67,6 +67,12 @@ const INT_FIELDS: { key: IntKey; label: string; help: string; fallback: number; 
     { key: 'people_joined_push_end_hour', label: 'Joined push: until (local hour)', help: 'Push stops at this local hour', fallback: 21, max: 24 },
 ];
 
+type Section = 'shared' | 'sheet' | 'joined';
+const SHARED_KEYS = new Set<IntKey>(['people_trail_max_items', 'people_trail_top_max_friends', 'suggestion_dismissal_ttl_days']);
+const sectionOf = (key: IntKey): Section =>
+    SHARED_KEYS.has(key) ? 'shared' : key.startsWith('people_joined_') ? 'joined' : 'sheet';
+const SECTION_TITLE = 'block text-[11px] font-semibold text-ink';
+
 const JOINED_REASONS: Record<string, string> = {
     inactive: 'inactive/curator',
     already_follows: 'already connected',
@@ -181,64 +187,66 @@ export default function AdminPeopleDiscoverySettings({ onMessage }: { onMessage:
         0,
     ) ?? 0;
 
+    const toggleRow = (t: (typeof TOGGLES)[number]) => (
+        <div key={t.key} className="flex items-center justify-between gap-3">
+            <div>
+                <span className="text-[11px] font-medium text-ink">{t.label}</span>
+                <p className="text-[10px] text-muted">{t.help}</p>
+            </div>
+            <button
+                onClick={() => toggle(t)}
+                aria-label={`Toggle ${t.label}`}
+                aria-pressed={toggles[t.key]}
+                // eslint-disable-next-line no-restricted-syntax -- toggle switch is circular by design
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${toggles[t.key] ? 'bg-success' : 'bg-gray-300'}`}
+            >
+                {/* eslint-disable-next-line no-restricted-syntax -- toggle knob is circular by design */}
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${toggles[t.key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+        </div>
+    );
+
+    const fields = (section: Section) =>
+        INT_FIELDS.filter((f) => sectionOf(f.key) === section).map((field) => (
+            <div key={field.key} className="flex items-center justify-between border-t border-card-line pt-2.5">
+                <div>
+                    <span className="text-[11px] font-medium text-ink">{field.label}</span>
+                    <p className="text-[10px] text-muted">{field.help} (1–{field.max})</p>
+                </div>
+                <input
+                    type="number"
+                    min={1}
+                    max={field.max}
+                    value={values[field.key]}
+                    onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: Number(e.target.value) }))}
+                    onBlur={(e) => save(field, Number(e.target.value))}
+                    onKeyDown={(e) => e.key === 'Enter' && save(field, values[field.key])}
+                    className="w-16 text-right text-[11px] border border-line px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
+                    aria-label={field.label}
+                />
+            </div>
+        ));
+
     return (
         <div className="border border-card-line p-3 space-y-3" data-testid="admin-people-discovery">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-ink">People discovery</span>
-            {TOGGLES.map((t) => (
-                <div key={t.key} className="flex items-center justify-between gap-3">
-                    <div>
-                        <span className="text-[11px] font-medium text-ink">{t.label}</span>
-                        <p className="text-[10px] text-muted">{t.help}</p>
-                    </div>
-                    <button
-                        onClick={() => toggle(t)}
-                        aria-label={`Toggle ${t.label}`}
-                        aria-pressed={toggles[t.key]}
-                        // eslint-disable-next-line no-restricted-syntax -- toggle switch is circular by design
-                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${toggles[t.key] ? 'bg-success' : 'bg-gray-300'}`}
-                    >
-                        {/* eslint-disable-next-line no-restricted-syntax -- toggle knob is circular by design */}
-                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${toggles[t.key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                    </button>
-                </div>
-            ))}
-            {INT_FIELDS.map((field) => (
-                <div key={field.key} className="flex items-center justify-between border-t border-card-line pt-2.5">
-                    <div>
-                        <span className="text-[11px] font-medium text-ink">{field.label}</span>
-                        <p className="text-[10px] text-muted">{field.help} (1–{field.max})</p>
-                    </div>
-                    <input
-                        type="number"
-                        min={1}
-                        max={field.max}
-                        value={values[field.key]}
-                        onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: Number(e.target.value) }))}
-                        onBlur={(e) => save(field, Number(e.target.value))}
-                        onKeyDown={(e) => e.key === 'Enter' && save(field, values[field.key])}
-                        className="w-16 text-right text-[11px] border border-line px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
-                        aria-label={field.label}
-                    />
-                </div>
-            ))}
-
-            <div className="border-t border-card-line pt-2.5 space-y-1.5">
-                <span className="text-[11px] font-medium text-ink">Last 30 days</span>
-                {stats ? (
-                    <>
-                        <p className="text-[11px] text-ink-soft">
-                            Sheet: shown {stats.shown} · dismissed {stats.dismissed} · followed {stats.followed}
-                            {conversion != null && ` (${conversion}%)`} · {stats.follows} follows · forced {stats.forced_shown}
-                        </p>
-                        <p className="text-[11px] text-ink-soft">
-                            Joined: notified {stats.joined_created} in-app · pushes sent {stats.joined_pushed}
-                            {stats.joined_push_failed > 0 && ` (${stats.joined_push_failed} failed)`} · followed back {stats.joined_followed}
-                        </p>
-                    </>
-                ) : (
-                    <p className="text-[10px] text-muted">No stats yet.</p>
-                )}
+            <div className="space-y-2.5">
+                <span className={SECTION_TITLE}>Suggestions (all surfaces)</span>
+                {fields('shared')}
             </div>
+
+            <div className="border-t border-card-line pt-3 space-y-2.5">
+                <span className={SECTION_TITLE}>Home &ldquo;Build your tribe&rdquo; sheet</span>
+                {toggleRow(TOGGLES[0])}
+                {fields('sheet')}
+                <p className="border-t border-card-line pt-2.5 text-[11px] text-ink-soft">
+                    {stats ? (
+                        <>
+                            Last 30 days: shown {stats.shown} · dismissed {stats.dismissed} · followed {stats.followed}
+                            {conversion != null && ` (${conversion}%)`} · {stats.follows} follows · forced {stats.forced_shown}
+                        </>
+                    ) : 'No stats yet.'}
+                </p>
 
             <div className="border-t border-card-line pt-2.5 space-y-1.5">
                 <span className="text-[11px] font-medium text-ink">Force people sheet</span>
@@ -285,6 +293,21 @@ export default function AdminPeopleDiscoverySettings({ onMessage }: { onMessage:
                     </div>
                 )}
             </div>
+
+            </div>
+
+            <div className="border-t border-card-line pt-3 space-y-2.5">
+                <span className={SECTION_TITLE}>&ldquo;Someone you may know joined&rdquo;</span>
+                {toggleRow(TOGGLES[1])}
+                {fields('joined')}
+                <p className="border-t border-card-line pt-2.5 text-[11px] text-ink-soft">
+                    {stats ? (
+                        <>
+                            Last 30 days: notified {stats.joined_created} in-app · pushes sent {stats.joined_pushed}
+                            {stats.joined_push_failed > 0 && ` (${stats.joined_push_failed} failed)`} · followed back {stats.joined_followed}
+                        </>
+                    ) : 'No stats yet.'}
+                </p>
 
             <div className="border-t border-card-line pt-2.5 space-y-1.5">
                 <span className="text-[11px] font-medium text-ink">Send &ldquo;joined&rdquo; notification</span>
@@ -339,6 +362,7 @@ export default function AdminPeopleDiscoverySettings({ onMessage }: { onMessage:
                         ))}
                     </div>
                 )}
+            </div>
             </div>
         </div>
     );

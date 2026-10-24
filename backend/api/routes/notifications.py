@@ -128,6 +128,8 @@ COLLAPSIBLE_KINDS = {
 }
 MILESTONE_KINDS = {"milestone_unlocked", "subscription_milestone"}
 RELATIONSHIP_KINDS = {"new_follower", "new_friend"}
+# "Someone you may know joined" rows collapse per recipient-local day.
+JOINED_KIND = "suggested_person_joined"
 # How many distinct actors to preview in an aggregated row.
 ACTOR_PREVIEW_CAP = 12
 # Upper bound of raw rows scanned per list request before aggregation. The
@@ -215,10 +217,14 @@ def _apply_visibility(statement, session: Session, viewer_id=None):
 
 
 def _aggregation_key(
-    notification: Notification, interest_tz: Optional[tzinfo] = None
+    notification: Notification,
+    interest_tz: Optional[tzinfo] = None,
+    joined_tz: Optional[tzinfo] = None,
 ) -> tuple:
     if notification.kind in COLLAPSIBLE_KINDS and notification.event_id is not None:
         return ("__event__", notification.kind, notification.event_id)
+    if notification.kind == JOINED_KIND and joined_tz is not None:
+        return ("__joined__", _local_date(notification, joined_tz))
     if notification.kind == "interest_event" and interest_tz is not None:
         return ("__interest__", _local_date(notification, interest_tz))
     if notification.kind in MILESTONE_KINDS:
@@ -238,6 +244,7 @@ def _hydrate(
     *,
     viewer_id=None,
     interest_tz: Optional[tzinfo] = None,
+    joined_tz: Optional[tzinfo] = None,
 ) -> list[NotificationItem]:
     if not rows:
         return []
@@ -307,7 +314,7 @@ def _hydrate(
     order: list[tuple] = []
     groups: dict[tuple, dict] = {}
     for r in rows:
-        key = _aggregation_key(r, interest_tz)
+        key = _aggregation_key(r, interest_tz, joined_tz)
         g = groups.get(key)
         if g is None:
             g = {
@@ -331,6 +338,12 @@ def _hydrate(
         g = groups[key]
         rep = g["rep"]
         e = events.get(rep.event_id)
+        if key[0] == "__joined__":
+            mutual = {
+                m.actor_user_id: int(m.context) if (m.context or "").isdigit() else 0
+                for m in g["members"]
+            }
+            g["actor_ids"].sort(key=lambda aid: -mutual.get(aid, 0))
         preview = [
             _make_actor(actors.get(aid)) for aid in g["actor_ids"][:ACTOR_PREVIEW_CAP]
         ]
@@ -474,7 +487,7 @@ def list_notifications(
         session, list(session.exec(unread_statement).all())
     )
 
-    grouped_unread = len({_aggregation_key(row, tz) for row in unread_rows})
+    grouped_unread = len({_aggregation_key(row, tz, tz) for row in unread_rows})
 
     # Flat interest matches never aggregate, so page in SQL past the window.
     if kind == "interest_event" or category == "matches" or day is not None:
@@ -508,7 +521,9 @@ def list_notifications(
     # Interest matches collapse per local day only in the unfiltered feed;
     # the Matches pill / ?kind= deep link list them one per row.
     group_tz = tz if kind is None and category is None else None
-    aggregated = _hydrate(session, rows, viewer_id=user.id, interest_tz=group_tz)
+    aggregated = _hydrate(
+        session, rows, viewer_id=user.id, interest_tz=group_tz, joined_tz=tz
+    )
     grouped_total = len(aggregated)
     page = aggregated[offset : offset + limit]
 
@@ -536,7 +551,9 @@ def unread_count(
         session, list(session.exec(statement).all())
     )
     tz = _user_tz(user)
-    return UnreadCountResponse(count=len({_aggregation_key(row, tz) for row in rows}))
+    return UnreadCountResponse(
+        count=len({_aggregation_key(row, tz, tz) for row in rows})
+    )
 
 
 @router.post("/{notification_id}/read", response_model=NotificationItem)
@@ -582,7 +599,7 @@ def mark_read(
             .where(Notification.event_id == row.event_id)
             .where(Notification.read_at.is_(None))
         ).all()
-    elif row.kind == "interest_event":
+    elif row.kind in ("interest_event", JOINED_KIND):
         tz = _user_tz(user)
         day = _local_date(row, tz)
         siblings = [

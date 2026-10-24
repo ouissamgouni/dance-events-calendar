@@ -118,8 +118,9 @@ export function resolveNotificationDestination(item: NotificationItem): string {
         case 'new_friend':
         case 'follow_request':
         case 'follow_request_approved':
-        case 'suggested_person_joined':
             return `/u/${item.actor.handle}`;
+        case 'suggested_person_joined':
+            return (item.actor_count ?? 1) > 1 ? '/tribe/network' : `/u/${item.actor.handle}`;
         case 'organizer_claim_decided':
             return '/account#organizer';
         case 'event_review_prompt':
