@@ -46,4 +46,21 @@ describe('DiscoverPeoplePage', () => {
         await waitFor(() => expect(screen.queryByText('P1')).not.toBeInTheDocument())
         expect(screen.getByText('P25')).toBeInTheDocument()
     })
+
+    it('searches people and replaces suggestions with results', async () => {
+        server.use(
+            http.get('*/api/social/me/suggestions', () => HttpResponse.json({ items: [item('p1')], total: 1 })),
+            http.get('*/api/social/search/users', ({ request }) => {
+                const term = new URL(request.url).searchParams.get('q')
+                return HttpResponse.json({ items: [{ ...item(`found-${term}`), is_followed_by_viewer: false }] })
+            }),
+        )
+        const { user } = renderWithProviders(<DiscoverPeoplePage />)
+
+        expect(await screen.findByText('P1')).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: /Invite a friend/ })).toHaveAttribute('href', '/invite')
+        await user.type(screen.getByRole('searchbox', { name: 'Search by name or handle' }), 'ana')
+        expect(await screen.findByText('FOUND-ANA')).toBeInTheDocument()
+        expect(screen.queryByText('P1')).not.toBeInTheDocument()
+    })
 })

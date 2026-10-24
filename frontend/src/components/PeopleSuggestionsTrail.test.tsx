@@ -74,37 +74,47 @@ afterEach(() => {
 })
 
 describe('PeopleSuggestionsTrail', () => {
-    it('caps to the trail size with See more, and backfills after Not interested', async () => {
+    it('caps to the trail size with Discover people, and backfills after Not interested', async () => {
         server.use(...poolHandlers(8))
         const { user } = renderWithProviders(<Trail />)
 
         expect(await screen.findByText('POP5')).toBeInTheDocument()
         expect(screen.queryByText('POP6')).not.toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'See all' })).toHaveAttribute('href', '/people/discover')
-        expect(screen.getByRole('link', { name: /See more/ })).toHaveAttribute('href', '/people/discover')
+        expect(screen.getByRole('link', { name: /Discover people/ })).toHaveAttribute('href', '/people/discover')
 
         await user.click(screen.getByRole('button', { name: 'Not interested in pop1' }))
         await waitFor(() => expect(screen.getByText('POP6')).toBeInTheDocument())
         expect(screen.queryByText('POP1')).not.toBeInTheDocument()
     })
 
-    it('refresh rotates to the next batch', async () => {
-        server.use(...poolHandlers(7))
+    it('shuffle refetches with a seed', async () => {
+        const seeds: (string | null)[] = []
+        server.use(
+            http.get('*/api/social/me/suggestions', ({ request }) => {
+                const seed = new URL(request.url).searchParams.get('seed')
+                seeds.push(seed)
+                const handles = seed ? ['pop7', 'pop6', 'pop5', 'pop4', 'pop3'] : ['pop1', 'pop2', 'pop3', 'pop4', 'pop5']
+                return HttpResponse.json({ items: handles.map(item), total: 7, trail_size: TRAIL_SIZE })
+            }),
+        )
         const { user } = renderWithProviders(<Trail />)
 
         expect(await screen.findByText('POP1')).toBeInTheDocument()
-        await user.click(screen.getByRole('button', { name: 'Refresh suggestions' }))
-        await waitFor(() => expect(screen.getByText('POP6')).toBeInTheDocument())
+        await user.click(screen.getByRole('button', { name: 'Shuffle suggestions' }))
+        await waitFor(() => expect(screen.getByText('POP7')).toBeInTheDocument())
         expect(screen.queryByText('POP1')).not.toBeInTheDocument()
+        expect(seeds[0]).toBeNull()
+        expect(seeds.at(-1)).toMatch(/^\d+$/)
     })
 
-    it('hides See more and refresh when the pool fits in one batch', async () => {
+    it('keeps Discover people but hides shuffle when the pool fits in one batch', async () => {
         server.use(...poolHandlers(3))
         renderWithProviders(<Trail />)
 
         expect(await screen.findByText('POP3')).toBeInTheDocument()
-        expect(screen.queryByRole('link', { name: /See more/ })).not.toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'Refresh suggestions' })).not.toBeInTheDocument()
+        expect(screen.getByRole('link', { name: /Discover people/ })).toHaveAttribute('href', '/people/discover')
+        expect(screen.queryByRole('button', { name: 'Shuffle suggestions' })).not.toBeInTheDocument()
     })
 })
 

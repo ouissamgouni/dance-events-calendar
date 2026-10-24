@@ -11,7 +11,7 @@ import useBackToClose from '../hooks/useBackToClose';
  * keep the typical typing burst well under that.
  *
  * Pressing Enter on a result navigates to the public profile; Enter on the
- * input alone routes to ``/tribe/discover?q=…`` so the user gets a richer page.
+ * input alone routes to ``/people/discover?q=…`` so the user gets a richer page.
  */
 export default function UserSearchBox() {
     const [q, setQ] = useState('');
@@ -126,7 +126,7 @@ export default function UserSearchBox() {
                 navigate(`/u/${menuRows[activeIdx].handle}`);
                 reset();
             } else if (q.trim()) {
-                navigate(`/tribe/discover?q=${encodeURIComponent(q.trim())}`);
+                navigate(`/people/discover?q=${encodeURIComponent(q.trim())}`);
                 reset();
             }
         }
@@ -170,7 +170,7 @@ export default function UserSearchBox() {
         <div id={`${idPrefix}-listbox`} role="listbox">
             {term.length === 0 && (
                 <Link
-                    to="/tribe/discover"
+                    to="/people/discover"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={reset}
                     className="block px-3 py-2 hover:bg-canvas"
@@ -216,7 +216,7 @@ export default function UserSearchBox() {
             )}
             {term.length >= 2 && (
                 <Link
-                    to={`/tribe/discover?q=${encodeURIComponent(term)}`}
+                    to={`/people/discover?q=${encodeURIComponent(term)}`}
                     onClick={reset}
                     className="block border-t border-card-line px-3 py-2 text-xs text-action hover:bg-canvas"
                 >
