@@ -228,12 +228,17 @@
             "external_id": "marius-turcu",
             "display_name": "Marius Turcu",
             "sort_order": 24
+        },
+        {
+            "external_id": "margarita",
+            "display_name": "Margarita",
+            "sort_order": 25
         }
     ],
     "sessions": [
         {
             "external_id": "d1-2130-roma",
-            "title": " ",
+            "title": "Bloody Playful Salsa On2",
             "contributors": [
                 {
                     "contributor_external_id": "tzoompy-luky",
@@ -250,7 +255,7 @@
         },
         {
             "external_id": "d2-1900-atena",
-            "title": " ",
+            "title": "Social Moves On 2",
             "contributors": [
                 {
                     "contributor_external_id": "super-mario-kristina",
@@ -267,7 +272,7 @@
         },
         {
             "external_id": "d2-1900-forum",
-            "title": " ",
+            "title": "Quality in PW On1",
             "contributors": [
                 {
                     "contributor_external_id": "catalincho-andreea",
@@ -284,7 +289,7 @@
         },
         {
             "external_id": "d2-1900-ambasador",
-            "title": " ",
+            "title": "Switch the Beat: On1 to On2",
             "contributors": [
                 {
                     "contributor_external_id": "alexis-iselin",
@@ -301,7 +306,7 @@
         },
         {
             "external_id": "d2-2000-atena",
-            "title": " ",
+            "title": "Body Movement On 2",
             "contributors": [
                 {
                     "contributor_external_id": "eloy-rojas",
@@ -318,7 +323,7 @@
         },
         {
             "external_id": "d2-2000-forum",
-            "title": " ",
+            "title": "Fun Bachata",
             "contributors": [
                 {
                     "contributor_external_id": "farid-ferchach",
@@ -352,7 +357,7 @@
         },
         {
             "external_id": "d2-2100-atena",
-            "title": " ",
+            "title": "Crazy PW On 2",
             "contributors": [
                 {
                     "contributor_external_id": "panagiotis-myrto",
@@ -369,7 +374,7 @@
         },
         {
             "external_id": "d2-2100-forum",
-            "title": " ",
+            "title": "M&S Breaks and Preparations",
             "contributors": [
                 {
                     "contributor_external_id": "miguel-sunsire",
@@ -403,7 +408,7 @@
         },
         {
             "external_id": "d3-1200-roma",
-            "title": " ",
+            "title": "Spinning",
             "contributors": [
                 {
                     "contributor_external_id": "farid-ferchach",
@@ -420,7 +425,7 @@
         },
         {
             "external_id": "d3-1200-atena",
-            "title": " ",
+            "title": "Connection in Bachata",
             "contributors": [
                 {
                     "contributor_external_id": "ady-allisor",
@@ -437,7 +442,7 @@
         },
         {
             "external_id": "d3-1200-forum",
-            "title": " ",
+            "title": "On2 Flow in PW",
             "contributors": [
                 {
                     "contributor_external_id": "paul-ioana",
@@ -471,7 +476,7 @@
         },
         {
             "external_id": "d3-1300-roma",
-            "title": " ",
+            "title": "PW Experience On 2",
             "contributors": [
                 {
                     "contributor_external_id": "panagiotis-myrto",
@@ -488,7 +493,7 @@
         },
         {
             "external_id": "d3-1300-atena",
-            "title": " ",
+            "title": "M&S Signature Moves",
             "contributors": [
                 {
                     "contributor_external_id": "miguel-sunsire",
@@ -505,7 +510,7 @@
         },
         {
             "external_id": "d3-1300-forum",
-            "title": " ",
+            "title": "Urban Kiz Steps",
             "contributors": [
                 {
                     "contributor_external_id": "karl-bekene",
@@ -539,10 +544,10 @@
         },
         {
             "external_id": "d3-1400-roma",
-            "title": " ",
+            "title": "Musicality in PW On 1",
             "contributors": [
                 {
-                    "contributor_external_id": "grupo-alafia",
+                    "contributor_external_id": "terry-cecile",
                     "role": "instructor"
                 }
             ],
@@ -556,7 +561,7 @@
         },
         {
             "external_id": "d3-1400-atena",
-            "title": " ",
+            "title": "Pachanga",
             "contributors": [
                 {
                     "contributor_external_id": "eloy-rojas",
@@ -573,7 +578,7 @@
         },
         {
             "external_id": "d3-1400-forum",
-            "title": " ",
+            "title": "Urban Kiz: Power of Magnetism",
             "contributors": [
                 {
                     "contributor_external_id": "radu-judit",
@@ -607,10 +612,10 @@
         },
         {
             "external_id": "d3-1500-roma",
-            "title": " ",
+            "title": "Bailafia PW On 2",
             "contributors": [
                 {
-                    "contributor_external_id": "terry-cecile",
+                    "contributor_external_id": "grupo-alafia",
                     "role": "instructor"
                 }
             ],
@@ -624,10 +629,10 @@
         },
         {
             "external_id": "d3-1500-atena",
-            "title": " ",
+            "title": "Spice Your Salsa On1",
             "contributors": [
                 {
-                    "contributor_external_id": "alexis-iselin",
+                    "contributor_external_id": "samuel-funflow-sasha",
                     "role": "instructor"
                 }
             ],
@@ -641,7 +646,7 @@
         },
         {
             "external_id": "d3-1500-forum",
-            "title": " ",
+            "title": "Tarraxo Foundations & Connection",
             "contributors": [
                 {
                     "contributor_external_id": "jack-sara",
@@ -675,7 +680,7 @@
         },
         {
             "external_id": "d3-1600-roma",
-            "title": " ",
+            "title": "Shines Battle On 2",
             "contributors": [
                 {
                     "contributor_external_id": "panagiotis-myrto",
@@ -692,10 +697,10 @@
         },
         {
             "external_id": "d3-1600-atena",
-            "title": " ",
+            "title": "Cha Cha Fun",
             "contributors": [
                 {
-                    "contributor_external_id": "samuel-funflow-sasha",
+                    "contributor_external_id": "jose-nerea",
                     "role": "instructor"
                 }
             ],
@@ -709,7 +714,7 @@
         },
         {
             "external_id": "d3-1600-forum",
-            "title": " ",
+            "title": "Urban Kiz Steps",
             "contributors": [
                 {
                     "contributor_external_id": "karl-bekene",
@@ -755,10 +760,10 @@
         },
         {
             "external_id": "d3-1700-atena",
-            "title": " ",
+            "title": "Salsa Dance History",
             "contributors": [
                 {
-                    "contributor_external_id": "jose-nerea",
+                    "contributor_external_id": "alexis-iselin",
                     "role": "instructor"
                 }
             ],
@@ -772,7 +777,7 @@
         },
         {
             "external_id": "d3-1700-forum",
-            "title": " ",
+            "title": "Leg Tricks Combos",
             "contributors": [
                 {
                     "contributor_external_id": "sifu-adelina",
@@ -789,7 +794,7 @@
         },
         {
             "external_id": "d3-2100-atena",
-            "title": " ",
+            "title": "Bachazouk Flow",
             "contributors": [
                 {
                     "contributor_external_id": "sakis-mia",
@@ -806,7 +811,7 @@
         },
         {
             "external_id": "d3-2100-forum",
-            "title": " ",
+            "title": "Crazy PW On 2",
             "contributors": [
                 {
                     "contributor_external_id": "samuel-funflow-sasha",
@@ -823,7 +828,7 @@
         },
         {
             "external_id": "d4-1200-roma",
-            "title": " ",
+            "title": "Terrific PW On 2",
             "contributors": [
                 {
                     "contributor_external_id": "terry-cecile",
@@ -840,7 +845,7 @@
         },
         {
             "external_id": "d4-1200-atena",
-            "title": " ",
+            "title": "Rotisserie Combo and Progression",
             "contributors": [
                 {
                     "contributor_external_id": "miguel-sunsire",
@@ -891,7 +896,7 @@
         },
         {
             "external_id": "d4-1300-roma",
-            "title": " ",
+            "title": "Bachazouk Signature Moves",
             "contributors": [
                 {
                     "contributor_external_id": "sakis-mia",
@@ -908,7 +913,7 @@
         },
         {
             "external_id": "d4-1300-atena",
-            "title": " ",
+            "title": "Shines & Body Movement On2",
             "contributors": [
                 {
                     "contributor_external_id": "radu-manole",
@@ -925,7 +930,7 @@
         },
         {
             "external_id": "d4-1300-forum",
-            "title": " ",
+            "title": "Playing with Directions and Styling",
             "contributors": [
                 {
                     "contributor_external_id": "sifu-alice",
@@ -959,7 +964,7 @@
         },
         {
             "external_id": "d4-1400-roma",
-            "title": " ",
+            "title": "Leading & Following On 2",
             "contributors": [
                 {
                     "contributor_external_id": "jose-nerea",
@@ -976,10 +981,10 @@
         },
         {
             "external_id": "d4-1400-atena",
-            "title": " ",
+            "title": "Body Movement",
             "contributors": [
                 {
-                    "contributor_external_id": "nando-margarita",
+                    "contributor_external_id": "margarita",
                     "role": "instructor"
                 }
             ],
@@ -993,7 +998,7 @@
         },
         {
             "external_id": "d4-1400-forum",
-            "title": " ",
+            "title": "Tarraxo Tools & Flow",
             "contributors": [
                 {
                     "contributor_external_id": "jack-sara",
@@ -1027,7 +1032,7 @@
         },
         {
             "external_id": "d4-1500-roma",
-            "title": " ",
+            "title": "Cool Patterns in PW On 2",
             "contributors": [
                 {
                     "contributor_external_id": "super-mario-kristina",
@@ -1044,7 +1049,7 @@
         },
         {
             "external_id": "d4-1500-atena",
-            "title": " ",
+            "title": "Musicality in PW On 2",
             "contributors": [
                 {
                     "contributor_external_id": "samuel-funflow-sasha",
@@ -1061,7 +1066,7 @@
         },
         {
             "external_id": "d4-1500-forum",
-            "title": " ",
+            "title": "Urban Kiz Steps",
             "contributors": [
                 {
                     "contributor_external_id": "karl-bekene",
@@ -1107,7 +1112,7 @@
         },
         {
             "external_id": "d4-1600-atena",
-            "title": "Sakis, Mia – Bachata Fun",
+            "title": "Bachazouk Tilted Turn",
             "contributors": [
                 {
                     "contributor_external_id": "sakis-mia",
@@ -1124,7 +1129,7 @@
         },
         {
             "external_id": "d4-1600-forum",
-            "title": " ",
+            "title": "Tarraxo Softness & Musicality",
             "contributors": [
                 {
                     "contributor_external_id": "jack-sara",
@@ -1170,7 +1175,7 @@
         },
         {
             "external_id": "d4-1700-atena",
-            "title": " ",
+            "title": "Hips Movement in Bachata",
             "contributors": [
                 {
                     "contributor_external_id": "ady-allisor",
@@ -1187,7 +1192,7 @@
         },
         {
             "external_id": "d4-1700-forum",
-            "title": " ",
+            "title": "Musical Patterns",
             "contributors": [
                 {
                     "contributor_external_id": "radu-judit",
@@ -1203,8 +1208,25 @@
             "activity_type_external_id": "kizomba-workshop"
         },
         {
+            "external_id": "d4-2200-roma",
+            "title": "Cha Cha Fun",
+            "contributors": [
+                {
+                    "contributor_external_id": "grupo-alafia",
+                    "role": "instructor"
+                }
+            ],
+            "start": "2026-11-22T22:00:00",
+            "end": "2026-11-22T23:00:00",
+            "room_external_ids": [
+                "sala-roma"
+            ],
+            "venue_external_id": "grand-hotel-napoca",
+            "activity_type_external_id": "salsa-workshop"
+        },
+        {
             "external_id": "d4-2200-atena",
-            "title": " ",
+            "title": "Romantic Salsa PW On 2",
             "contributors": [
                 {
                     "contributor_external_id": "nando-margarita",
@@ -1372,8 +1394,8 @@
         {
             "external_id": "d3-workshops-2-rooms",
             "title": "Workshops in 2 rooms",
-            "start": "2026-11-21T21:30:00",
-            "end": "2026-11-21T22:30:00",
+            "start": "2026-11-21T21:00:00",
+            "end": "2026-11-21T22:00:00",
             "activity_type_external_id": "workshop",
             "venue_external_id": "grand-hotel-napoca",
             "sort_order": 4
