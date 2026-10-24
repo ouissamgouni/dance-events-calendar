@@ -2623,6 +2623,7 @@ export interface PeopleDiscoveryStats {
     forced_shown: number;
     joined_created: number;
     joined_pushed: number;
+    joined_push_failed: number;
     joined_followed: number;
 }
 

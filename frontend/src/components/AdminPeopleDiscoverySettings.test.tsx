@@ -7,7 +7,7 @@ import AdminPeopleDiscoverySettings from './AdminPeopleDiscoverySettings'
 
 const stats = {
     days: 30, shown: 4, dismissed: 2, followed: 2, follows: 3, forced_shown: 1,
-    joined_created: 5, joined_pushed: 1, joined_followed: 2,
+    joined_created: 5, joined_pushed: 1, joined_push_failed: 1, joined_followed: 2,
 }
 
 describe('AdminPeopleDiscoverySettings', () => {
@@ -28,7 +28,7 @@ describe('AdminPeopleDiscoverySettings', () => {
         render(<AdminPeopleDiscoverySettings onMessage={onMessage} />)
 
         expect(await screen.findByText(/Sheet: shown 4 · dismissed 2 · followed 2 \(50%\)/)).toBeInTheDocument()
-        expect(screen.getByText(/Joined: notified 5 · pushed 1 · followed back 2/)).toBeInTheDocument()
+        expect(screen.getByText(/Joined: notified 5 in-app · pushes sent 1 \(1 failed\) · followed back 2/)).toBeInTheDocument()
 
         const [allUsers] = screen.getAllByRole('checkbox', { name: 'All users' })
         await userEvent.click(allUsers)
