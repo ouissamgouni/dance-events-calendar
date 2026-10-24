@@ -249,6 +249,7 @@ export default function EventProgramPage() {
         if (eventId) sessionStorage.setItem(`program:${eventId}:day`, day);
         const next = new URLSearchParams(searchParams);
         next.set('day', day);
+        next.delete('focus');
         setSearchParams(next, { replace: true });
     };
     const updateFilters = (next: ScheduleFilters) => {
