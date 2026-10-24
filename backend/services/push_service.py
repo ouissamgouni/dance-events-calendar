@@ -30,6 +30,7 @@ from backend.config.loader import get_vapid_config
 from backend.services.app_settings import get_web_push_enabled
 from backend.db.database import get_engine
 from backend.db.models import PushSubscription
+from backend.services.notification_delivery import note_send_failure
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ def send_push(
     but hit a retryable failure (429/5xx/network) raises
     :class:`PushTransientError` so the caller can retry later.
     """
+    note_send_failure("push", None)
     if not webpush_configured():
         return 0
     try:
@@ -91,6 +93,7 @@ def send_push(
     delivered = 0
     transient = 0
     stale: list[int] = []
+    errors: set[str] = set()
 
     with Session(get_engine()) as session:
         subs = session.exec(
@@ -121,10 +124,12 @@ def send_push(
                 else:
                     if status is None or status == 429 or status >= 500:
                         transient += 1
+                    errors.add(f"HTTP {status}" if status else "no response")
                     logger.warning("Push failed (status=%s): %s", status, exc)
                     logger.exception("FULL PUSH ERROR")
             except Exception as exc:  # noqa: BLE001 — never let push break a worker
                 transient += 1
+                errors.add(type(exc).__name__)
                 logger.warning("Push error: %s", exc)
 
         if stale:
@@ -137,4 +142,11 @@ def send_push(
     logger.info("Push delivered count: %s", delivered)
     if raise_on_transient and delivered == 0 and transient:
         raise PushTransientError(f"{transient} endpoint(s) failed transiently")
+    if subs and not delivered:
+        note_send_failure(
+            "push",
+            "Device unsubscribed (endpoint gone)"
+            if len(stale) == len(subs)
+            else "Push error: " + ", ".join(sorted(errors)),
+        )
     return delivered

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import BottomSheet from './BottomSheet';
-import PeopleSuggestionsTrail from './PeopleSuggestionsTrail';
+import PeopleSuggestionsTrail, { DISCOVER_PEOPLE_PATH, PeopleRefreshButton } from './PeopleSuggestionsTrail';
 import { usePeoplePrompt } from '../hooks/usePeoplePrompt';
 import { usePeopleSuggestions } from '../hooks/usePeopleSuggestions';
 import { useRegisterHomeOverlay } from '../hooks/useHomeOverlays';
@@ -47,9 +47,12 @@ export default function HomePeoplePrompt({ userId, enabled }: Props) {
             onClose={handleClose}
             closeOnBackdrop={false}
             desktop="modal"
+            headerAction={people.refresh && (
+                <PeopleRefreshButton onRefresh={() => void people.refresh?.()} refreshing={people.refreshing} />
+            )}
             footer={(
                 <div className="flex items-center justify-between gap-3">
-                    <Link to="/tribe/network" onClick={handleClose} className="text-sm font-semibold text-action hover:underline">
+                    <Link to={DISCOVER_PEOPLE_PATH} onClick={handleClose} className="text-sm font-semibold text-action hover:underline">
                         See all
                     </Link>
                     <button
@@ -70,6 +73,8 @@ export default function HomePeoplePrompt({ userId, enabled }: Props) {
                 onDismiss={(h) => void onDismiss(h)}
                 showHeader={false}
                 testId="home-people-prompt"
+                refreshing={people.refreshing}
+                onSeeMore={handleClose}
             />
         </BottomSheet>
     );

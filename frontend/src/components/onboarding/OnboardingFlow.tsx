@@ -96,6 +96,7 @@ function OnboardingFlowContent({ profileStepEnabledAtMount }: { profileStepEnabl
     const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
     const [userSearching, setUserSearching] = useState(false);
     const initialPrefsRef = useRef(prefs);
+    const firstOnboardingRef = useRef(!user?.onboarded_at);
     const followLoadedRequestRef = useRef(-1);
 
     const danceGroup = useMemo(() => tagGroups.find((group) => group.slug === 'dance-style' && group.enabled !== false) ?? null, [tagGroups]);
@@ -114,7 +115,8 @@ function OnboardingFlowContent({ profileStepEnabledAtMount }: { profileStepEnabl
                 if (active) {
                     setDanceIds(active.dance_tag_ids);
                     setArea({ label: active.area_label, min_lat: active.min_lat, min_lng: active.min_lng, max_lat: active.max_lat, max_lng: active.max_lng });
-                    setInternationalAlerts(active.matches_enabled);
+                    // The signup bootstrap profile has alerts off; first-time onboarding defaults them on.
+                    setInternationalAlerts(active.matches_enabled || firstOnboardingRef.current);
                     setInternationalNameManuallyEdited(true);
                 } else if (loadedDanceGroup) {
                     setDanceIds(loadedDanceGroup.tags.filter((tag) => initialPrefsRef.current.tagIds.includes(tag.id)).map((tag) => tag.id));

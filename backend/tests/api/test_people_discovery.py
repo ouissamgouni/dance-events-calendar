@@ -161,6 +161,19 @@ def test_people_prompt_shows_then_respects_cooldown(client, session):
     assert client.get("/api/social/me/people-prompt").json()["show"] is False
 
 
+def test_trail_size_setting_caps_trail_and_sheet(client, session, monkeypatch):
+    monkeypatch.setenv("PEOPLE_TRAIL_MAX_ITEMS", "2")
+    viewer = _user(session, "viewer")
+    _curators(session, 4)
+    _login(client, viewer)
+
+    body = client.get("/api/social/me/suggestions?trail=true&limit=10").json()
+    assert len(body["items"]) == 2
+    assert body["total"] == 4 and body["trail_size"] == 2
+    assert len(client.get("/api/social/me/suggestions?limit=10").json()["items"]) == 4
+    assert len(client.get("/api/social/me/people-prompt").json()["items"]) == 2
+
+
 def test_people_prompt_skipped_for_large_circle_and_min_suggestions(session):
     viewer = _user(session, "viewer")
     assert people_prompt.should_show(session, viewer, 10, 5) == (False, False)

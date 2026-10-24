@@ -1230,7 +1230,11 @@ _TOPIC_BY_EXTRA_KIND = {
     "event_changed": "schedule_updates",
     "event_cancelled": "schedule_updates",
     "event_removed": "schedule_updates",
+    "install_app_invitation": "install_invite",
 }
+# Summaries for deliveries logged without a Notification row.
+_UNLINKED_SUMMARIES = {"install_app_invitation": "Invitation to install the app"}
+_OUTCOMES = ("delivered", "push_failed", "email_failed", "digest_skipped")
 _TRIGGER_BY_SOURCE = {
     "tick": "auto",
     "job": "auto",
@@ -1246,6 +1250,71 @@ def _notification_topic(kind: str) -> str:
     return activity_email.FEATURE_BY_KIND.get(kind) or _TOPIC_BY_EXTRA_KIND.get(
         kind, "other"
     )
+
+
+def _digest_section_rank(topic: str) -> int:
+    """Position of ``topic``'s section in the digest email."""
+    from backend.services.activity_email import _SECTION_BY_FEATURE
+    from backend.services.email import _SECTION_ORDER
+
+    section = _SECTION_BY_FEATURE.get(topic, topic)
+    return (
+        _SECTION_ORDER.index(section)
+        if section in _SECTION_ORDER
+        else len(_SECTION_ORDER)
+    )
+
+
+# Kinds the push/digest renderer (_render_plain) has no copy for.
+_ADMIN_SUMMARY_TEMPLATES = {
+    "subscription_saved": "{who} is interested in {title}",
+    "event_memories_shared": "New memories were shared from {title}",
+    "event_message_reported": "{who} reported a message on {title}",
+    "promo_code_approved": "Your promo code {context} for {title} was approved",
+    "promo_code_rejected": "Your promo code {context} for {title} was rejected",
+    "schedule_program_available": "Program available for {title}",
+    "schedule_program_updated": "Program updated for {title}",
+    "planned_session_changed": "A session in your plan for {title} changed",
+    "event_changed": "{title} was updated",
+    "event_cancelled": "{title} was cancelled",
+    "event_removed": "{title} was removed",
+    "suggestion_approved": "Your submitted event {title} was approved",
+    "suggestion_declined": "Your submitted event {title} was kept private",
+    "suggestion_rejected": "Your submitted event {title} was removed",
+    "suggestion_change_applied": "Your edit to {title} was applied",
+    "suggestion_change_discarded": "Your edit to {title} was not accepted",
+    "event_change_applied": "Your suggested change to {title} was applied",
+    "event_change_declined": "Your suggested change to {title} was not applied",
+    "event_change_reverted": "Your change to {title} was reverted",
+    "organizer_assigned": "You were made the organizer of {title}",
+    "organizer_claim_decided": "Your organizer claim was {context}",
+    "interest_profile_updated": "An admin updated your saved search",
+}
+
+
+def _admin_item_summary(
+    n: Notification, actor: Optional[User], event: Optional[CachedEvent]
+) -> str:
+    from backend.services.activity_email import _PROMPT_LINES, _render_plain
+
+    title = event.title if event and event.title else "an event"
+    who = (
+        (actor.display_name or (f"@{actor.handle}" if actor.handle else "Someone"))
+        if actor is not None
+        else "Someone"
+    )
+    if n.kind in _PROMPT_LINES:
+        return _PROMPT_LINES[n.kind][0].format(title=title)
+    if n.kind == "suggested_person_joined":
+        mutual = int(n.context) if (n.context or "").isdigit() else 0
+        return f"{who} joined Movida · {mutual} mutual connection{'s' if mutual != 1 else ''}"
+    template = _ADMIN_SUMMARY_TEMPLATES.get(n.kind)
+    if template is None:
+        return _render_plain(n.kind, actor, event, n.context, description=n.description)
+    text = " ".join(
+        template.format(who=who, title=title, context=n.context or "").split()
+    )
+    return f"{text} · {n.description}" if n.description else text
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -1279,6 +1348,7 @@ def admin_notifications_activity(
     include_in_app: bool = Query(default=False),
     engaged: bool = Query(default=False),
     unread: bool = Query(default=False),
+    outcome: str = Query(default="delivered"),
     group: str = Query(default="none"),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -1296,12 +1366,11 @@ def admin_notifications_activity(
     ``group="none"`` pages rows; ``group="recipient"`` pages whole
     (day in ``tz``, recipient) groups so a recipient's day never splits.
     ``engaged`` keeps clicked/tapped sends and read feed rows; ``unread``
-    keeps rows with unread items.
+    keeps rows with unread items. ``outcome`` switches to unsent rows
+    (push/email errors, digests skipped by the master opt-out).
     """
     from collections import Counter
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
-    from backend.services.activity_email import _render_plain
 
     try:
         zone = ZoneInfo(tz)
@@ -1317,10 +1386,20 @@ def admin_notifications_activity(
         raise HTTPException(status_code=400, detail=f"Unknown trigger: {trigger}")
     if group not in ("none", "recipient"):
         raise HTTPException(status_code=400, detail=f"Unknown group: {group}")
+    if outcome not in _OUTCOMES:
+        raise HTTPException(status_code=400, detail=f"Unknown outcome: {outcome}")
 
+    recipient_col = func.coalesce(
+        Notification.recipient_user_id, NotificationDelivery.recipient_user_id
+    )
     stmt = (
         select(
+            NotificationDelivery.id,
             NotificationDelivery.notification_id,
+            NotificationDelivery.status,
+            NotificationDelivery.detail,
+            NotificationDelivery.recipient_user_id,
+            NotificationDelivery.kind,
             NotificationDelivery.channel,
             NotificationDelivery.mode,
             NotificationDelivery.source,
@@ -1334,7 +1413,9 @@ def admin_notifications_activity(
             Notification.email_clicked_at,
             Notification.email_opened_at,
         )
-        .join(Notification, Notification.id == NotificationDelivery.notification_id)
+        .outerjoin(
+            Notification, Notification.id == NotificationDelivery.notification_id
+        )
         .where(NotificationDelivery.delivered_at >= start)
         .where(NotificationDelivery.delivered_at < end)
     )
@@ -1343,10 +1424,10 @@ def admin_notifications_activity(
     elif not include_in_app:
         stmt = stmt.where(NotificationDelivery.channel != "app")
     if user_id is not None:
-        stmt = stmt.where(Notification.recipient_user_id == user_id)
+        stmt = stmt.where(recipient_col == user_id)
     if q:
         needle = f"%{q.strip().lower()}%"
-        stmt = stmt.join(User, User.id == Notification.recipient_user_id).where(
+        stmt = stmt.join(User, User.id == recipient_col).where(
             or_(
                 func.lower(User.handle).like(needle),
                 func.lower(User.display_name).like(needle),
@@ -1357,8 +1438,15 @@ def admin_notifications_activity(
     # item info tuple: (kind, read_at, push_opened_at, email_clicked_at, email_opened_at)
     sends: dict[tuple, dict] = {}
     raw_rows: list[dict] = []
+    # Negative delivery id -> kind, for items without a Notification row.
+    unlinked: dict[int, str] = {}
     for (
+        delivery_id,
         nid,
+        status,
+        detail,
+        unlinked_recipient_id,
+        unlinked_kind,
         ch,
         mode,
         source,
@@ -1373,6 +1461,10 @@ def admin_notifications_activity(
         email_opened_at,
     ) in session.exec(stmt).all():
         delivered_at = _as_utc(delivered_at)
+        if nid is None:
+            nid, kind = -delivery_id, unlinked_kind or "other"
+            recipient_id = unlinked_recipient_id
+            unlinked[nid] = kind
         info = (kind, read_at, opened_at, clicked_at, email_opened_at)
         if ch == "app":
             raw_rows.append(
@@ -1383,6 +1475,8 @@ def admin_notifications_activity(
                     "mode": None,
                     "channels": ["app"],
                     "items": {nid: info},
+                    "status": None,
+                    "detail": None,
                 }
             )
             continue
@@ -1392,13 +1486,23 @@ def admin_notifications_activity(
         batch_key = batch_id or (
             None if mode == "digest" else _notification_topic(kind)
         )
-        sends.setdefault((recipient_id, delivered_at, source, ch, mode, batch_key), {})[
-            nid
-        ] = info
+        sends.setdefault(
+            (recipient_id, delivered_at, source, ch, mode, batch_key, status, detail),
+            {},
+        )[nid] = info
 
     merged: dict[tuple, dict] = {}
-    for (recipient_id, sent_at, source, ch, mode, _batch), items in sends.items():
-        key = (recipient_id, sent_at, source, frozenset(items))
+    for (
+        recipient_id,
+        sent_at,
+        source,
+        ch,
+        mode,
+        _batch,
+        status,
+        detail,
+    ), items in sends.items():
+        key = (recipient_id, sent_at, source, status, frozenset(items))
         if key in merged:
             merged[key]["channels"] = sorted([*merged[key]["channels"], ch])
             merged[key]["mode"] = merged[key]["mode"] or mode
@@ -1410,8 +1514,17 @@ def admin_notifications_activity(
                 "mode": mode,
                 "channels": [ch],
                 "items": items,
+                "status": status,
+                "detail": detail,
             }
     raw_rows.extend(merged.values())
+
+    def _outcome(row: dict) -> str:
+        if row["status"] is None:
+            return "delivered"
+        if row["status"] == "skipped":
+            return "digest_skipped"
+        return "push_failed" if "push" in row["channels"] else "email_failed"
 
     def _trigger(row: dict) -> str:
         # Feed deliveries mostly carry no source: they land when the notification is created.
@@ -1437,6 +1550,12 @@ def admin_notifications_activity(
             _notification_topic(i[0]) == topic for i in infos
         ):
             continue
+        row_outcome = _outcome(row)
+        if row_outcome != "delivered":
+            setattr(summary, row_outcome, getattr(summary, row_outcome) + 1)
+            if row_outcome == outcome:
+                kept.append(row)
+            continue
         # Summary ignores engaged/unread so the KPI tiles stay stable when toggled.
         if ch == ["app"]:
             summary.in_app_items += 1
@@ -1455,6 +1574,8 @@ def admin_notifications_activity(
             summary.push += 1
             summary.push_items += len(infos)
             summary.push_opened += sum(1 for i in infos if i[2])
+        if outcome != "delivered":
+            continue
         if engaged and not any(_engaged(row, i) for i in infos):
             continue
         if unread and all(i[1] for i in infos):
@@ -1488,7 +1609,9 @@ def admin_notifications_activity(
         {
             n.id: n
             for n in session.exec(
-                select(Notification).where(col(Notification.id).in_(shown_ids))
+                select(Notification).where(
+                    col(Notification.id).in_([i for i in shown_ids if i > 0])
+                )
             ).all()
         }
         if shown_ids
@@ -1518,6 +1641,14 @@ def admin_notifications_activity(
     )
 
     def _item(nid: int, sent_at: datetime) -> NotificationActivityItem:
+        if nid in unlinked:
+            kind = unlinked[nid]
+            return NotificationActivityItem(
+                kind=kind,
+                topic=_notification_topic(kind),
+                summary=_UNLINKED_SUMMARIES.get(kind, kind.replace("_", " ")),
+                created_at=sent_at,
+            )
         n = notifs[nid]
         actor = users.get(n.actor_user_id)
         event = events.get(n.event_id) if n.event_id else None
@@ -1525,7 +1656,7 @@ def admin_notifications_activity(
             notification_id=n.id,
             kind=n.kind,
             topic=_notification_topic(n.kind),
-            summary=_render_plain(n.kind, actor, event, n.context),
+            summary=_admin_item_summary(n, actor, event),
             created_at=n.created_at,
             event_id=n.event_id,
             event_title=event.title if event else None,
@@ -1538,12 +1669,11 @@ def admin_notifications_activity(
             latency_seconds=_delivery_latency_seconds(n.created_at, sent_at),
         )
 
-    def _topics(infos) -> list[NotificationActivityTopicCount]:
-        counts = Counter(_notification_topic(i[0]) for i in infos)
-        return [
-            NotificationActivityTopicCount(topic=t, count=c)
-            for t, c in counts.most_common()
-        ]
+    def _topics(infos, digest: bool) -> list[NotificationActivityTopicCount]:
+        counts = Counter(_notification_topic(i[0]) for i in infos).most_common()
+        if digest:
+            counts.sort(key=lambda tc: _digest_section_rank(tc[0]))
+        return [NotificationActivityTopicCount(topic=t, count=c) for t, c in counts]
 
     def _user(recipient_id) -> NotificationActivityUser:
         recipient = users[recipient_id]
@@ -1557,6 +1687,14 @@ def admin_notifications_activity(
     def _row(row: dict) -> NotificationActivityRow:
         infos = list(row["items"].values())
         ch = row["channels"]
+        digest = row["mode"] == "digest"
+        shown = _shown(row["items"])
+        if digest:
+            shown.sort(
+                key=lambda nid: _digest_section_rank(
+                    _notification_topic(row["items"][nid][0])
+                )
+            )
         return NotificationActivityRow(
             user=_user(row["recipient_id"]),
             channels=ch,
@@ -1570,12 +1708,14 @@ def admin_notifications_activity(
             email_clicked=sum(1 for i in infos if i[3]) if "email" in ch else 0,
             email_opened=sum(1 for i in infos if i[4]) if "email" in ch else 0,
             push_opened=sum(1 for i in infos if i[2]) if "push" in ch else 0,
-            topics=_topics(infos),
+            topics=_topics(infos, digest),
             items=[
                 _item(nid, row["sent_at"])
-                for nid in _shown(row["items"])
-                if nid in notifs
+                for nid in shown
+                if nid in notifs or nid in unlinked
             ],
+            status=row["status"],
+            detail=row["detail"],
         )
 
     if group == "recipient":
@@ -3703,6 +3843,7 @@ def get_admin_event_notification_stats(
             NotificationDelivery.notification_id == Notification.id,
         )
         .where(Notification.event_id == event_id)
+        .where(col(NotificationDelivery.status).is_(None))
         .group_by(Notification.kind, NotificationDelivery.channel)
     ).all()
     by_kind: dict[str, dict[str, int]] = {}

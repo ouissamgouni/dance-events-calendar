@@ -10,6 +10,7 @@ import type {
     NotificationActivityChannel,
     NotificationActivityGroup,
     NotificationActivityItem,
+    NotificationActivityOutcome,
     NotificationActivityRow,
     NotificationActivitySummary,
     NotificationActivityTopicCount,
@@ -47,6 +48,8 @@ const TOPIC_LABELS: Record<string, string> = {
     schedule_updates: 'Program & event updates',
     promo_codes: 'Promo codes',
     promo_code_matches: 'Deals',
+    people_suggestions: 'People suggestions',
+    install_invite: 'Install invite',
     other: 'Other',
 };
 
@@ -54,10 +57,10 @@ const TOPIC_LABELS: Record<string, string> = {
 const TOPIC_GROUPS: [string, string[]][] = [
     ['Plans', ['event_reminders', 'schedule_updates', 'event_messages', 'ticket_prompt']],
     ['Matches', ['interest_matches', 'promo_code_matches']],
-    ['People', ['friends_going', 'plan_activity', 'social_activity', 'suggested_events']],
+    ['People', ['friends_going', 'plan_activity', 'social_activity', 'suggested_events', 'people_suggestions']],
     ['Reviews', ['friend_reviews', 'review_prompt', 'memories_prompt']],
     ['Milestones', ['milestone_unlocked', 'friend_milestones']],
-    ['Others', ['promo_codes', 'other']],
+    ['Others', ['promo_codes', 'install_invite', 'other']],
 ];
 
 const TOPIC_GROUP_BY_TOPIC: Record<string, string> = Object.fromEntries(
@@ -99,8 +102,15 @@ interface Filters {
     includeInApp: boolean;
     engaged: boolean;
     unread: boolean;
+    outcome: NotificationActivityOutcome;
     byRecipient: boolean;
 }
+
+const UNSENT_PILLS: [Exclude<NotificationActivityOutcome, 'delivered'>, string][] = [
+    ['push_failed', 'Push failed'],
+    ['email_failed', 'Email failed'],
+    ['digest_skipped', 'Digest skipped'],
+];
 
 interface UserFilter {
     id: string;
@@ -143,6 +153,7 @@ const DEFAULT_FILTERS: Filters = {
     includeInApp: false,
     engaged: false,
     unread: false,
+    outcome: 'delivered',
     byRecipient: false,
 };
 
@@ -203,7 +214,7 @@ function userLabel(user: NotificationActivityUser): string {
 }
 
 function rowKey(row: NotificationActivityRow): string {
-    return `${row.user.id}|${row.sent_at}|${row.channels.join('+')}|${row.items[0]?.notification_id ?? ''}`;
+    return `${row.user.id}|${row.sent_at}|${row.channels.join('+')}|${row.items[0]?.notification_id ?? ''}|${row.status ?? ''}`;
 }
 
 function isSend(row: NotificationActivityRow): boolean {
@@ -235,18 +246,20 @@ function AlsoSentBy({ channels }: { channels: NotificationActivityChannel[] }) {
     );
 }
 
-function FeaturePill({ topic }: { topic: string }) {
+function FeaturePill({ topic, count }: { topic: string; count?: number }) {
     const cls = GROUP_PILL[TOPIC_GROUP_BY_TOPIC[topic] ?? 'Others'];
     return (
         <span className={`inline-flex shrink-0 items-center whitespace-nowrap px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>
             {topicLabel(topic)}
+            {count != null && <span className="ml-1 tabular-nums opacity-75">{count}</span>}
         </span>
     );
 }
 
 function FeaturePills({ topics, digest }: { topics: NotificationActivityTopicCount[]; digest: boolean }) {
-    const shown = topics.slice(0, digest ? 1 : 2);
-    const rest = topics.length - shown.length;
+    // Digest rows list every feature in the preview column instead.
+    const shown = digest ? [] : topics.slice(0, 2);
+    const rest = digest ? 0 : topics.length - shown.length;
     return (
         <span
             className="flex min-w-0 shrink-0 items-center gap-1"
@@ -319,8 +332,8 @@ function ItemList({ row }: { row: NotificationActivityRow }) {
     const mixed = row.topics.length > 1;
     return (
         <ul className="ml-4 space-y-1.5 border-l-2 border-line pb-3 pl-3 pr-3 text-xs sm:ml-[18rem]">
-            {row.items.map((item: NotificationActivityItem) => (
-                <li key={item.notification_id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {row.items.map((item: NotificationActivityItem, i) => (
+                <li key={item.notification_id ?? `unlinked-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-ink">{item.summary}</span>
                     {mixed && <FeaturePill topic={item.topic} />}
                     {item.event_id && <EventLink eventId={item.event_id} />}
@@ -359,7 +372,11 @@ function ActivityRow({ row, showRecipient, onSelectUser }: {
         : '';
     const timeTitle = `${fmtDateTime(row.sent_at)} · ${trigger.label}${row.source ? ` (${row.source})` : ''}${latency}`;
     const label = userLabel(row.user);
-    const preview = (
+    const preview = row.mode === 'digest' ? (
+        <span className="flex min-w-0 flex-wrap items-center gap-1">
+            {row.topics.map((t) => <FeaturePill key={t.topic} topic={t.topic} count={t.count} />)}
+        </span>
+    ) : (
         <>
             <span className="min-w-0 truncate text-ink">{first?.summary ?? ''}</span>
             {n > 1 && <span className="shrink-0 whitespace-nowrap text-ink-soft">+{n - 1} more</span>}
@@ -391,6 +408,14 @@ function ActivityRow({ row, showRecipient, onSelectUser }: {
                     <FeaturePills topics={row.topics} digest={row.mode === 'digest'} />
                 </span>
                 <span className="flex min-w-0 flex-1 items-center gap-2 sm:order-5">
+                    {row.status && (
+                        <span
+                            title={row.detail ?? undefined}
+                            className={`min-w-0 max-w-[50%] shrink-0 truncate px-1.5 py-0.5 text-[10px] font-medium ${row.status === 'failed' ? 'bg-red-50 text-danger' : 'bg-slate-100 text-ink-soft'}`}
+                        >
+                            {row.status === 'failed' ? 'Failed' : 'Skipped'}{row.detail ? ` · ${row.detail}` : ''}
+                        </span>
+                    )}
                     {n > 1 ? (
                         <button
                             type="button"
@@ -452,8 +477,8 @@ function RecipientGroup({ group, onSelectUser }: { group: NotificationActivityGr
     );
 }
 
-type TileFilter = Pick<Filters, 'channel' | 'trigger' | 'engaged' | 'unread'>;
-const TILE_DEFAULTS: TileFilter = { channel: '', trigger: '', engaged: false, unread: false };
+type TileFilter = Pick<Filters, 'channel' | 'trigger' | 'engaged' | 'unread' | 'outcome'>;
+const TILE_DEFAULTS: TileFilter = { channel: '', trigger: '', engaged: false, unread: false, outcome: 'delivered' };
 
 function tileActive(filters: Filters, tile: Partial<TileFilter>): boolean {
     return (Object.keys(TILE_DEFAULTS) as (keyof TileFilter)[])
@@ -523,6 +548,32 @@ function KpiStrip({ summary, includeInApp, filters, onChange }: {
                         <span className="block text-[11px] font-medium uppercase tracking-wide text-ink-soft">{label}</span>
                         <span className="block text-lg font-semibold text-ink">{value}</span>
                         <span className="block truncate text-[11px] text-ink-soft">{hint}</span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+// Unsent rows are hidden unless one of these is on.
+function UnsentPills({ summary, outcome, onChange }: {
+    summary: NotificationActivitySummary;
+    outcome: NotificationActivityOutcome;
+    onChange: (patch: Partial<Filters>) => void;
+}) {
+    return (
+        <div role="group" aria-label="Unsent notifications" className="flex flex-wrap items-center gap-1 text-xs">
+            {UNSENT_PILLS.map(([key, label]) => {
+                const active = outcome === key;
+                return (
+                    <button
+                        key={key}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => onChange({ outcome: active ? 'delivered' : key })}
+                        className={`min-h-11 border px-3 sm:min-h-0 sm:px-2 sm:py-1 ${active ? 'border-danger bg-red-50 text-danger' : 'border-line bg-surface text-ink hover:bg-canvas'}`}
+                    >
+                        {label} <span className="tabular-nums text-ink-soft">{summary[key] ?? 0}</span>
                     </button>
                 );
             })}
@@ -652,6 +703,7 @@ export default function AdminNotificationsTab() {
             include_in_app: filters.includeInApp,
             engaged: filters.engaged,
             unread: filters.unread,
+            outcome: filters.outcome === 'delivered' ? undefined : filters.outcome,
             group: filters.byRecipient ? 'recipient' : undefined,
             limit: filters.byRecipient ? GROUP_PAGE_SIZE : ROW_PAGE_SIZE,
             offset,
@@ -708,6 +760,7 @@ export default function AdminNotificationsTab() {
         + (filters.includeInApp ? 1 : 0)
         + (filters.engaged ? 1 : 0)
         + (filters.unread ? 1 : 0)
+        + (filters.outcome !== 'delivered' ? 1 : 0)
         + (filters.range !== DEFAULT_FILTERS.range ? 1 : 0);
 
     const days: { day: string; rows: NotificationActivityRow[]; groups: NotificationActivityGroup[] }[] = [];
@@ -797,6 +850,7 @@ export default function AdminNotificationsTab() {
                     onChange={patchFilters}
                 />
             )}
+            {summary && <UnsentPills summary={summary} outcome={filters.outcome} onChange={patchFilters} />}
 
             <div className={isMobile ? '-mx-4 space-y-4' : 'space-y-4'}>
                 {!loading && !error && shown === 0 && (

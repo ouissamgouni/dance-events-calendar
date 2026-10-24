@@ -6,7 +6,11 @@ from html import escape
 
 from backend.config.loader import get_public_app_url, get_smtp_config
 from backend.services.email_tokens import make_unsubscribe_token
-from backend.services.notification_delivery import email_open_pixel_html, tracked_url
+from backend.services.notification_delivery import (
+    email_open_pixel_html,
+    note_send_failure,
+    tracked_url,
+)
 
 logger = logging.getLogger(__name__)
 APP_NAME = "Movida"
@@ -24,6 +28,7 @@ def _send_email(to_addr: str, subject: str, html: str, kind: str) -> bool:
     Skips silently (returns False) if SMTP is not configured or the send
     fails, so callers never raise into request/loop paths.
     """
+    note_send_failure("email", None)
     config = get_smtp_config()
     if not config["host"] or not config["from_addr"]:
         logger.info("SMTP not configured, skipping %s email", kind)
@@ -46,8 +51,9 @@ def _send_email(to_addr: str, subject: str, html: str, kind: str) -> bool:
             server.send_message(msg)
         logger.info("%s email sent to %s", kind, to_addr)
         return True
-    except Exception:
+    except Exception as exc:
         logger.warning("Failed to send %s email", kind, exc_info=True)
+        note_send_failure("email", f"{type(exc).__name__}: {exc}")
         return False
 
 

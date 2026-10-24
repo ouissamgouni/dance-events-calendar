@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     dismissSuggestion,
     fetchMySuggestions,
@@ -6,44 +6,61 @@ import {
     type FoFSuggestionItem,
 } from '../api';
 
-export const PEOPLE_TRAIL_SIZE = 5;
-
 /**
- * Top "people you may know" for the For You trail and Home sheet. Fetches one
- * extra row so "See all" knows there is more; after a follow or "Not
- * interested" the server-side pool already excludes that person, so a plain
- * refetch backfills the gap with the next candidate.
+ * "People you may know" trail (For You, Home sheet, People page). The server
+ * caps each page to the admin trail size; `refresh` reshuffles the pool.
+ * After a follow or "Not interested" the server-side pool already excludes
+ * that person, so a plain refetch backfills the gap with the next candidate.
  */
 export function usePeopleSuggestions(enabled: boolean) {
     const [items, setItems] = useState<FoFSuggestionItem[] | null>(null);
     const [total, setTotal] = useState(0);
+    const [trailSize, setTrailSize] = useState(0);
     const [trailPosition, setTrailPosition] = useState<'top' | 'bottom'>('bottom');
     const [pending, setPending] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const seedRef = useRef<number | undefined>(undefined);
+    const requestRef = useRef(0);
+
+    const load = useCallback(async (seed: number | undefined) => {
+        const id = ++requestRef.current;
+        const r = await fetchMySuggestions({ trail: true, seed });
+        if (id !== requestRef.current) return;
+        seedRef.current = seed;
+        setItems(r.items);
+        setTotal(r.total);
+        setTrailSize(r.trail_size ?? r.items.length);
+        setTrailPosition(r.trail_position ?? 'bottom');
+    }, []);
 
     useEffect(() => {
         if (!enabled) return;
-        let cancelled = false;
-        const refresh = () => {
-            fetchMySuggestions({ limit: PEOPLE_TRAIL_SIZE + 1 })
-                .then((r) => {
-                    if (cancelled) return;
-                    setItems(r.items);
-                    setTotal(r.total);
-                    setTrailPosition(r.trail_position ?? 'bottom');
-                })
-                .catch(() => {
-                    if (cancelled) return;
-                    setItems([]);
-                    setTotal(0);
-                });
+        const refetch = () => {
+            load(seedRef.current).catch(() => {
+                setItems([]);
+                setTotal(0);
+            });
         };
-        refresh();
-        window.addEventListener('network:changed', refresh);
+        refetch();
+        window.addEventListener('network:changed', refetch);
         return () => {
-            cancelled = true;
-            window.removeEventListener('network:changed', refresh);
+            requestRef.current += 1;
+            window.removeEventListener('network:changed', refetch);
         };
-    }, [enabled]);
+    }, [enabled, load]);
+
+    const canRefresh = trailSize > 0 && total > trailSize;
+    const refresh = useCallback(async () => {
+        if (!canRefresh || refreshing) return;
+        setRefreshing(true);
+        try {
+            await load(Math.floor(Math.random() * 2 ** 31));
+        } catch {
+            /* keep the current page on failure */
+        } finally {
+            setRefreshing(false);
+        }
+    }, [canRefresh, refreshing, load]);
 
     const remove = useCallback(
         async (handle: string, action: (h: string) => Promise<unknown>) => {
@@ -71,11 +88,13 @@ export function usePeopleSuggestions(enabled: boolean) {
     }, [remove]);
 
     return {
-        items: items?.slice(0, PEOPLE_TRAIL_SIZE) ?? null,
+        items,
         total,
         trailPosition,
         pending,
         follow,
         dismiss,
+        refresh: canRefresh ? refresh : undefined,
+        refreshing,
     };
 }

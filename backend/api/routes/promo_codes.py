@@ -49,7 +49,7 @@ from backend.services.email import (
     send_promo_code_added_email,
     send_promo_code_notification,
 )
-from backend.services.notification_delivery import record_delivery
+from backend.services.notification_delivery import record_delivery, record_unsent
 from backend.services.event_visibility import event_is_user_facing
 from backend.services.user_avatars import resolve_user_avatar
 
@@ -354,6 +354,8 @@ def _deliver_promo_code_added(promo_id: str) -> None:
             ):
                 notif.emailed_at = stamp_now
                 record_delivery(session, notif.id, "email", stamp_now, source="job")
+            else:
+                record_unsent(session, [notif.id], "email", stamp_now, source="job")
             if push_on and notif.pushed_at is None and user.push_promo_codes_enabled:
                 delivered = send_push(
                     user.id,
@@ -365,6 +367,8 @@ def _deliver_promo_code_added(promo_id: str) -> None:
                 if delivered:
                     notif.pushed_at = stamp_now
                     record_delivery(session, notif.id, "push", stamp_now, source="job")
+                else:
+                    record_unsent(session, [notif.id], "push", stamp_now, source="job")
             session.add(notif)
         session.commit()
 

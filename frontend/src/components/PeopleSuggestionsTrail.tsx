@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { Shuffle } from 'lucide-react';
 import type { FoFSuggestionItem } from '../api';
 import ScrollDotsIndicator from './ScrollDots';
 import { useScrollDots } from '../hooks/useScrollDots';
@@ -15,17 +16,49 @@ interface Props {
     testId?: string;
     /** Fires once when the trail first scrolls into view. */
     onSeen?: () => void;
+    title?: string;
+    /** Shows a control that reshuffles the batch. */
+    onRefresh?: () => void;
+    refreshing?: boolean;
+    /** Called when "Discover people"/"See all" is clicked (e.g. to close a sheet). */
+    onSeeMore?: () => void;
+}
+
+export const DISCOVER_PEOPLE_PATH = '/people/discover';
+
+export function PeopleRefreshButton({ onRefresh, refreshing = false }: { onRefresh: () => void; refreshing?: boolean }) {
+    return (
+        <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label="Shuffle suggestions"
+            title="Shuffle suggestions"
+            className="flex h-7 w-7 items-center justify-center text-ink-soft hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+        >
+            <Shuffle size={16} aria-hidden="true" className={refreshing ? 'animate-pulse' : ''} />
+        </button>
+    );
 }
 
 /**
- * Horizontally scrollable "Build your tribe" cards, shared by the For You
- * trail and the Home people sheet.
+ * Horizontally scrollable people cards, shared by the For You trail, the Home
+ * people sheet and the People page. Always ends with a "Discover people" card.
  */
-export default function PeopleSuggestionsTrail({ items, total, pending, onFollow, onDismiss, showHeader = true, testId, onSeen }: Props) {
+export default function PeopleSuggestionsTrail({
+    items, total, pending, onFollow, onDismiss, showHeader = true, testId, onSeen,
+    title = 'Build your tribe', onRefresh, refreshing = false, onSeeMore,
+}: Props) {
     const sectionRef = useRef<HTMLElement>(null);
     const scrollerRef = useRef<HTMLDivElement>(null);
-    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [items.length]);
     const hasMore = total > items.length;
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [items.length]);
+    const wasRefreshing = useRef(false);
+
+    useEffect(() => {
+        if (wasRefreshing.current && !refreshing) scrollerRef.current?.scrollTo?.({ left: 0 });
+        wasRefreshing.current = refreshing;
+    }, [refreshing]);
 
     useEffect(() => {
         const el = sectionRef.current;
@@ -44,15 +77,18 @@ export default function PeopleSuggestionsTrail({ items, total, pending, onFollow
         <section ref={sectionRef} data-testid={testId}>
             {showHeader && (
                 <div className="flex w-full items-center justify-between border-b border-line px-2.5 py-1 text-sm font-semibold text-ink">
-                    <span>Build your tribe</span>
-                    {hasMore && (
-                        <Link to="/tribe/network" className="text-xs font-semibold text-action hover:underline">
-                            See all
-                        </Link>
-                    )}
+                    <span>{title}</span>
+                    <div className="flex items-center gap-2">
+                        {onRefresh && <PeopleRefreshButton onRefresh={onRefresh} refreshing={refreshing} />}
+                        {hasMore && (
+                            <Link to={DISCOVER_PEOPLE_PATH} onClick={onSeeMore} className="text-xs font-semibold text-action hover:underline">
+                                See all
+                            </Link>
+                        )}
+                    </div>
                 </div>
             )}
-            <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Build your tribe">
+            <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label={title}>
                 {items.map((it) => {
                     const name = it.display_name || `@${it.handle}`;
                     const previewHead = it.mutual_friends_preview[0];
@@ -124,12 +160,20 @@ export default function PeopleSuggestionsTrail({ items, total, pending, onFollow
                         </div>
                     );
                 })}
+                <Link
+                    to={DISCOVER_PEOPLE_PATH}
+                    onClick={onSeeMore}
+                    className="flex w-[140px] shrink-0 flex-col items-center justify-center gap-1 border border-line bg-surface px-2 py-2 text-center text-sm font-semibold text-action hover:bg-canvas"
+                >
+                    <span aria-hidden="true" className="text-lg leading-none">→</span>
+                    Discover people
+                </Link>
             </div>
             <ScrollDotsIndicator
                 count={dotCount}
                 activeIndex={activeIndex}
                 onSelect={scrollToIndex}
-                label="Build your tribe scroll position"
+                label={`${title} scroll position`}
             />
         </section>
     );

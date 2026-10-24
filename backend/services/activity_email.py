@@ -5,6 +5,8 @@ notifications that have not yet been emailed, groups them per recipient
 **and per feature bucket** (social activity vs interest matches), and sends
 a single digest per (recipient, feature). Each emailed notification is
 stamped with ``emailed_at`` to keep delivery idempotent across loop ticks.
+Rows cut from the combined digest ("and N more") stay unstamped and roll
+into the next digest.
 
 Only friend/event *activity* kinds are emailed here. ``event_reminder`` rows
 are emailed inline by ``reminder_service`` and are never selected.
@@ -66,6 +68,7 @@ from backend.services.email import (
 from backend.services.notification_delivery import (
     new_batch_id,
     record_delivery,
+    record_unsent,
     tracked_url,
 )
 from backend.services.notifications import filter_privacy_safe_notifications
@@ -1264,6 +1267,8 @@ def run_once(
                 return list(by_actor.values())
             return _logical_groups(visible)
 
+        digest_deferred_ids: set = set()
+
         def _send_combined_digests(groups: dict) -> int:
             """Combined v2 digest: one card email per recipient.
 
@@ -1282,6 +1287,21 @@ def run_once(
             for recipient_id, per_feature in by_recipient.items():
                 recipient = users[recipient_id]
                 if not getattr(recipient, "digest_email_enabled", True):
+                    record_unsent(
+                        session,
+                        [
+                            n.id
+                            for notifs in per_feature.values()
+                            for n in notifs
+                            if not _skip_past(n)
+                        ],
+                        "email",
+                        now,
+                        mode="digest",
+                        source=source,
+                        status="skipped",
+                        detail="Digest emails turned off",
+                    )
                     continue
                 sections: list[dict] = []
                 section_by_key: dict[str, dict] = {}
@@ -1334,8 +1354,17 @@ def run_once(
                         for e in card["entries"]
                         for nid in e["notification_ids"]
                     }
+                    digest_deferred_ids.update(
+                        nid
+                        for s in sections
+                        for e in s["entries"]
+                        for nid in e["notification_ids"]
+                        if nid not in rendered_ids
+                    )
                     batch_id = new_batch_id()
                     for nid in delivered_ids:
+                        if nid not in rendered_ids:
+                            continue
                         record_delivery(
                             session,
                             nid,
@@ -1344,8 +1373,17 @@ def run_once(
                             mode="digest",
                             source=source,
                             batch_id=batch_id,
-                            rendered=nid in rendered_ids,
+                            rendered=True,
                         )
+                else:
+                    record_unsent(
+                        session,
+                        delivered_ids,
+                        "email",
+                        now,
+                        mode="digest",
+                        source=source,
+                    )
             return sent
 
         def _send_email_groups(groups: dict, mode: str) -> int:
@@ -1414,6 +1452,15 @@ def run_once(
                             batch_id=batch_id,
                             rendered=n.id in rendered_ids,
                         )
+                else:
+                    record_unsent(
+                        session,
+                        [n.id for n in visible],
+                        "email",
+                        now,
+                        mode=mode,
+                        source=source,
+                    )
             return sent
 
         digests = (
@@ -1460,7 +1507,7 @@ def run_once(
 
         def _push(recipient_id, notifs: list[Notification], **kwargs) -> int:
             try:
-                return send_push(
+                delivered = send_push(
                     recipient_id,
                     topic=kwargs["tag"],
                     raise_on_transient=True,
@@ -1469,6 +1516,11 @@ def run_once(
             except PushTransientError:
                 push_retry_ids.update(n.id for n in notifs)
                 return 0
+            if not delivered:
+                record_unsent(
+                    session, [n.id for n in notifs], "push", now, source=source
+                )
+            return delivered
 
         for (recipient_id, feature), notifs in push_groups.items():
             visible = [n for n in notifs if not _skip_past(n)]
@@ -1569,11 +1621,13 @@ def run_once(
         # push this run — push has no slot to spend, so this just tracks
         # "already attempted" idempotency across ticks. Rows excluded by
         # the email schedule gate or a per-channel cap stay unstamped on
-        # that channel and roll into a future run.
+        # that channel and roll into a future run, as do digest overflow rows.
         stamped = 0
         # From the tick, these are request-created rows the deliver job missed.
         fast_pushed = 0
         for n in included_for_email:
+            if n.id in digest_deferred_ids:
+                continue
             n.emailed_at = now
             stamped += 1
         for n in included_for_instant:

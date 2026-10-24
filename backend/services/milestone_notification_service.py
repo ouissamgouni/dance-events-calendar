@@ -49,7 +49,12 @@ from backend.db.models import (
     UserMilestone,
 )
 from backend.services.email import send_milestone_instant_email
-from backend.services.notification_delivery import new_batch_id, record_delivery
+from backend.services.notification_delivery import (
+    new_batch_id,
+    record_delivery,
+    record_unsent,
+    take_send_failure,
+)
 from backend.services.notifications import fan_out_milestone
 from backend.services.push_service import send_push
 
@@ -334,6 +339,14 @@ def _dispatch_channels(
     emailed = 0
     emailed_ids: list[int] = []
     batches: dict[tuple[str, int], str] = {}
+    failed: list[tuple[list[int], str, str]] = []
+
+    def _ids(user_id, milestones) -> list[int]:
+        return [
+            nid
+            for milestone in milestones
+            if (nid := notif_ids.get((user_id, milestone.key))) is not None
+        ]
     for user, milestones in by_email_group.values():
         if send_milestone_instant_email(user, milestones):
             emailed += len(milestones)
@@ -343,6 +356,8 @@ def _dispatch_channels(
                 if nid is not None:
                     emailed_ids.append(nid)
                     batches[("email", nid)] = batch_id
+        elif detail := take_send_failure("email"):
+            failed.append((_ids(user.id, milestones), "email", detail))
 
     by_push_group: dict = {}
     for user_id, group_key, milestone in to_push:
@@ -373,21 +388,25 @@ def _dispatch_channels(
                 if nid is not None:
                     pushed_ids.append(nid)
                     batches[("push", nid)] = batch_id
+        elif detail := take_send_failure("push"):
+            failed.append((_ids(user_id, milestones), "push", detail))
 
-    if emailed_ids or pushed_ids:
+    if emailed_ids or pushed_ids or failed:
         if session is not None:
-            _stamp_deliveries(session, emailed_ids, pushed_ids, source, batches)
+            _stamp_deliveries(session, emailed_ids, pushed_ids, source, batches, failed)
             session.commit()
         else:
             with Session(get_engine()) as fresh:
-                _stamp_deliveries(fresh, emailed_ids, pushed_ids, source, batches)
+                _stamp_deliveries(
+                    fresh, emailed_ids, pushed_ids, source, batches, failed
+                )
                 fresh.commit()
 
     return emailed, pushed
 
 
 def _stamp_deliveries(
-    session, emailed_ids, pushed_ids, source=None, batches=None
+    session, emailed_ids, pushed_ids, source=None, batches=None, failed=()
 ) -> None:
     """Stamp ``emailed_at``/``pushed_at`` and log per-channel delivery rows."""
     from sqlmodel import col, update
@@ -425,3 +444,13 @@ def _stamp_deliveries(
                 source=source,
                 batch_id=batches.get(("push", nid)),
             )
+    for ids, channel, detail in failed:
+        record_unsent(
+            session,
+            ids,
+            channel,
+            stamp_now,
+            mode="instant" if channel == "email" else None,
+            source=source,
+            detail=detail,
+        )

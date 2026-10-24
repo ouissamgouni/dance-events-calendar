@@ -1836,6 +1836,7 @@ class SiteSettingsResponse(BaseModel):
     people_prompt_fatigue_pause_days: int = 30
     people_prompt_min_suggestions: int = 3
     people_trail_top_max_friends: int = 9
+    people_trail_max_items: int = 15
     home_overlays_per_session: int = 1
     suggestion_dismissal_ttl_days: int = 90
     people_joined_window_days: int = 14
@@ -1966,7 +1967,8 @@ class NotificationActivityTopicCount(BaseModel):
 
 
 class NotificationActivityItem(BaseModel):
-    notification_id: int
+    # None for sends logged without a Notification row (install invitation).
+    notification_id: Optional[int] = None
     kind: str
     # Delivery feature (app_settings.NOTIFICATION_FEATURES) or "other".
     topic: str
@@ -2002,6 +2004,9 @@ class NotificationActivityRow(BaseModel):
     push_opened: int = 0
     topics: list[NotificationActivityTopicCount]
     items: list[NotificationActivityItem]
+    # None = delivered; "failed" | "skipped" with a short reason in ``detail``.
+    status: Optional[str] = None
+    detail: Optional[str] = None
 
 
 class NotificationActivityGroup(BaseModel):
@@ -2025,6 +2030,10 @@ class NotificationActivitySummary(BaseModel):
     push_items: int = 0
     push_opened: int = 0
     app_read: int = 0
+    # Unsent rows; listed only when the matching ``outcome`` filter is on.
+    push_failed: int = 0
+    email_failed: int = 0
+    digest_skipped: int = 0
 
 
 class NotificationActivityResponse(BaseModel):
@@ -2344,6 +2353,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     people_prompt_fatigue_pause_days: Optional[int] = Field(default=None, ge=1, le=365)
     people_prompt_min_suggestions: Optional[int] = Field(default=None, ge=1, le=5)
     people_trail_top_max_friends: Optional[int] = Field(default=None, ge=1, le=1000)
+    people_trail_max_items: Optional[int] = Field(default=None, ge=1, le=50)
     home_overlays_per_session: Optional[int] = Field(default=None, ge=1, le=3)
     suggestion_dismissal_ttl_days: Optional[int] = Field(default=None, ge=1, le=3650)
     people_joined_window_days: Optional[int] = Field(default=None, ge=1, le=90)
@@ -4695,6 +4705,7 @@ class FoFSuggestionsResponse(BaseModel):
     friend_count: int = 0
     # Where For You places the "Build your tribe" trail (top for small circles).
     trail_position: str = "bottom"
+    trail_size: int = 15
 
 
 class PeoplePromptResponse(BaseModel):

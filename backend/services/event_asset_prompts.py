@@ -41,7 +41,12 @@ from backend.services.email import (
     send_event_ticket_prompt_email,
 )
 from backend.services.event_visibility import apply_event_visibility
-from backend.services.notification_delivery import record_delivery, tracked_url
+from backend.services.notification_delivery import (
+    record_delivery,
+    record_unsent,
+    take_send_failure,
+    tracked_url,
+)
 from backend.services.push_service import send_push
 
 logger = logging.getLogger(__name__)
@@ -275,11 +280,13 @@ def _deliver(
                 to_push.append((user, event, notif.id))
         session.commit()
 
-    emailed_ids = [
-        nid
-        for user, event, nid in to_email
-        if send_email(user, event, notification_id=nid)
-    ]
+    failed: list[tuple[int, str, str]] = []
+    emailed_ids = []
+    for user, event, nid in to_email:
+        if send_email(user, event, notification_id=nid):
+            emailed_ids.append(nid)
+        elif detail := take_send_failure("email"):
+            failed.append((nid, "email", detail))
     pushed_ids = []
     for user, event, nid in to_push:
         title, body = push_copy(event.title)
@@ -291,8 +298,10 @@ def _deliver(
             tag=f"{tag}:{event.event_id}",
         ):
             pushed_ids.append(nid)
+        elif detail := take_send_failure("push"):
+            failed.append((nid, "push", detail))
 
-    if emailed_ids or pushed_ids:
+    if emailed_ids or pushed_ids or failed:
         with Session(get_engine()) as session:
             stamp = datetime.now(timezone.utc)
             for ids, column, channel in (
@@ -308,6 +317,10 @@ def _deliver(
                 )
                 for nid in ids:
                     record_delivery(session, nid, channel, stamp, source="tick")
+            for nid, channel, detail in failed:
+                record_unsent(
+                    session, [nid], channel, stamp, source="tick", detail=detail
+                )
             session.commit()
 
     logger.info(
@@ -523,6 +536,8 @@ def _force_send_one(session, spec, event, cand, channels, resend, now, stats) ->
             record_delivery(session, notif.id, "email", now, source="admin")
             stats["emailed"] += 1
             sent = True
+        else:
+            record_unsent(session, [notif.id], "email", now, source="admin")
     if push_wanted and cand["push_enabled"]:
         title, body = spec["push_copy"](event.title)
         delivered = send_push(
@@ -539,6 +554,8 @@ def _force_send_one(session, spec, event, cand, channels, resend, now, stats) ->
             record_delivery(session, notif.id, "push", now, source="admin")
             stats["pushed"] += delivered
             sent = True
+        else:
+            record_unsent(session, [notif.id], "push", now, source="admin")
     session.add(notif)
     if sent:
         return "sent"

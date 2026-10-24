@@ -675,6 +675,7 @@ def mark_email_opened(token: str, session: Session = Depends(get_session)):
             select(NotificationDelivery.batch_id)
             .where(NotificationDelivery.notification_id == nid)
             .where(NotificationDelivery.channel == "email")
+            .where(col(NotificationDelivery.status).is_(None))
             .order_by(col(NotificationDelivery.delivered_at).desc())
             .limit(1)
         ).first()

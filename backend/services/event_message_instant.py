@@ -28,7 +28,11 @@ from backend.services.email import (
     send_event_message_instant_email,
 )
 from backend.services.event_visibility import event_is_user_facing
-from backend.services.notification_delivery import record_delivery, tracked_url
+from backend.services.notification_delivery import (
+    record_delivery,
+    record_unsent,
+    tracked_url,
+)
 from backend.services.push_service import (
     PushTransientError,
     send_push,
@@ -127,6 +131,8 @@ def deliver_for_recipient(session: Session, recipient_id, source: str = "job") -
             session.add(n)
             record_delivery(session, n.id, "email", now, mode="instant", source=source)
             stats["emails"] += 1
+        else:
+            record_unsent(session, [n.id], "email", now, mode="instant", source=source)
 
         if (
             push_ok
@@ -157,6 +163,8 @@ def deliver_for_recipient(session: Session, recipient_id, source: str = "job") -
                 session.add(n)
                 record_delivery(session, n.id, "push", now, source=source)
                 stats["pushes"] += 1
+            else:
+                record_unsent(session, [n.id], "push", now, source=source)
 
     session.commit()
     return stats

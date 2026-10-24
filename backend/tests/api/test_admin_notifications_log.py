@@ -378,6 +378,140 @@ class TestAdminNotificationsActivity:
         assert utc["groups"][0]["day"] == "2026-10-17"
         assert paris["groups"][0]["day"] == "2026-10-18"
 
+    def test_people_joined_push_has_readable_summary(self, client, engine):
+        sent_at = datetime.now(timezone.utc) - timedelta(minutes=30)
+        with Session(engine) as s:
+            alice = _make_user(s, "alice@example.com", "alice")
+            bob = _make_user(s, "bob@example.com", "bob")
+            n = Notification(
+                recipient_user_id=alice.id,
+                actor_user_id=bob.id,
+                kind="suggested_person_joined",
+                context="3",
+                created_at=sent_at,
+            )
+            s.add(n)
+            s.flush()
+            _add_delivery(s, n.id, "push", sent_at, mode="instant", source="tick")
+            s.commit()
+
+        [row] = client.get(ACTIVITY_URL, params=_window()).json()["rows"]
+        assert row["topics"] == [{"topic": "people_suggestions", "count": 1}]
+        assert row["items"][0]["summary"] == "Bob joined Movida · 3 mutual connections"
+
+    def test_digest_items_follow_email_section_order(self, client, engine):
+        sent_at = datetime.now(timezone.utc) - timedelta(minutes=30)
+        with Session(engine) as s:
+            alice = _make_user(s, "alice@example.com", "alice")
+            bob = _make_user(s, "bob@example.com", "bob")
+            notifs = [
+                Notification(
+                    recipient_user_id=alice.id,
+                    actor_user_id=actor,
+                    kind=kind,
+                    event_id=event_id,
+                    created_at=sent_at - timedelta(hours=1),
+                )
+                for kind, actor, event_id in (
+                    ("interest_event", alice.id, "evt-a"),
+                    ("subscription_going", bob.id, "evt-b"),
+                    ("new_follower", bob.id, None),
+                )
+            ]
+            s.add_all(notifs)
+            s.flush()
+            for n in notifs:
+                _add_delivery(
+                    s, n.id, "email", sent_at, mode="digest", source="tick", batch_id="e1"
+                )
+            s.commit()
+
+        [row] = client.get(ACTIVITY_URL, params=_window()).json()["rows"]
+        expected = ["interest_matches", "friends_going", "social_activity"]
+        assert [t["topic"] for t in row["topics"]] == expected
+        assert [i["topic"] for i in row["items"]] == expected
+
+    def test_unsent_rows_need_outcome_filter(self, client, engine):
+        sent_at = datetime.now(timezone.utc) - timedelta(minutes=30)
+        with Session(engine) as s:
+            alice = _make_user(s, "alice@example.com", "alice")
+            bob = _make_user(s, "bob@example.com", "bob")
+            n = Notification(
+                recipient_user_id=alice.id,
+                actor_user_id=bob.id,
+                kind="new_follower",
+                created_at=sent_at,
+            )
+            s.add(n)
+            s.flush()
+            gone = "Device unsubscribed (endpoint gone)"
+            s.add_all(
+                [
+                    NotificationDelivery(
+                        notification_id=n.id,
+                        channel="push",
+                        delivered_at=sent_at,
+                        source="tick",
+                        batch_id="p1",
+                        status="failed",
+                        detail=gone,
+                    ),
+                    NotificationDelivery(
+                        notification_id=n.id,
+                        channel="email",
+                        delivered_at=sent_at,
+                        mode="digest",
+                        source="tick",
+                        batch_id="e1",
+                        status="skipped",
+                        detail="Digest emails turned off",
+                    ),
+                    NotificationDelivery(
+                        recipient_user_id=alice.id,
+                        kind="install_app_invitation",
+                        channel="email",
+                        delivered_at=sent_at,
+                        mode="instant",
+                        source="admin",
+                        batch_id="i1",
+                    ),
+                ]
+            )
+            s.commit()
+            alice_id = alice.id
+
+        body = client.get(ACTIVITY_URL, params=_window()).json()
+        [row] = body["rows"]
+        assert (row["status"], row["trigger"]) == (None, "forced")
+        assert row["topics"] == [{"topic": "install_invite", "count": 1}]
+        [item] = row["items"]
+        assert item["notification_id"] is None
+        assert item["summary"] == "Invitation to install the app"
+        summary = body["summary"]
+        assert (
+            summary["push_failed"],
+            summary["email_failed"],
+            summary["digest_skipped"],
+        ) == (1, 0, 1)
+
+        [failed] = client.get(
+            ACTIVITY_URL, params=_window(outcome="push_failed")
+        ).json()["rows"]
+        assert (failed["channels"], failed["status"], failed["detail"]) == (
+            ["push"],
+            "failed",
+            gone,
+        )
+        [skipped] = client.get(
+            ACTIVITY_URL, params=_window(outcome="digest_skipped")
+        ).json()["rows"]
+        assert (skipped["mode"], skipped["status"]) == ("digest", "skipped")
+
+        by_user = client.get(ACTIVITY_URL, params=_window(user_id=str(alice_id)))
+        assert by_user.json()["total"] == 1
+        by_query = client.get(ACTIVITY_URL, params=_window(q="alice"))
+        assert by_query.json()["total"] == 1
+
     def test_paginates_rows_and_filters_by_user(self, client, engine):
         _seed(engine)
         with Session(engine) as s:
@@ -399,6 +533,7 @@ class TestAdminNotificationsActivity:
             _window(trigger="sometimes"),
             _window(channel="carrier_pigeon"),
             _window(group="team"),
+            _window(outcome="lost"),
         ],
     )
     def test_invalid_params_return_400(self, client, engine, params):

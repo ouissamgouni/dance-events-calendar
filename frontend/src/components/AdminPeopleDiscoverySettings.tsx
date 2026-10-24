@@ -24,6 +24,7 @@ type IntKey =
     | 'people_prompt_fatigue_pause_days'
     | 'people_prompt_min_suggestions'
     | 'people_trail_top_max_friends'
+    | 'people_trail_max_items'
     | 'home_overlays_per_session'
     | 'suggestion_dismissal_ttl_days'
     | 'people_joined_window_days'
@@ -55,6 +56,7 @@ const INT_FIELDS: { key: IntKey; label: string; help: string; fallback: number; 
     { key: 'people_prompt_fatigue_pause_days', label: 'Sheet fatigue: pause (days)', help: 'How long the sheet pauses after the fatigue threshold', fallback: 30, max: 365 },
     { key: 'people_prompt_min_suggestions', label: 'Sheet: min suggestions', help: 'Skip the sheet when fewer people are available', fallback: 3, max: 5 },
     { key: 'people_trail_top_max_friends', label: 'Trail on top: max friends', help: 'For You shows "Build your tribe" right after "You might like" up to this friend count', fallback: 9, max: 1000 },
+    { key: 'people_trail_max_items', label: 'Trails: max people', help: 'Cards per people trail (For You, Home sheet, People page) before the "See more" card', fallback: 15, max: 50 },
     { key: 'home_overlays_per_session', label: 'Home sheets per session', help: 'Review + people sheets combined (forced sheets ignore this)', fallback: 1, max: 3 },
     { key: 'suggestion_dismissal_ttl_days', label: '"Not interested" lasts (days)', help: 'Dismissed people reappear after this', fallback: 90, max: 3650 },
     { key: 'people_joined_window_days', label: 'Joined: window (days)', help: 'New members are matched for this long after sign-up', fallback: 14, max: 90 },

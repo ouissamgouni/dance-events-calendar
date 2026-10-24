@@ -20,7 +20,7 @@ from sqlmodel import Session, col, select
 
 from backend.db.models import CachedEvent, EventRevision, Notification, User
 from backend.services import job_queue
-from backend.services.notification_delivery import record_delivery
+from backend.services.notification_delivery import record_delivery, record_unsent
 
 EVENT_CHANGED = "event_changed"
 EVENT_CANCELLED = "event_cancelled"
@@ -929,6 +929,8 @@ def deliver_change_emails(revision_id: str) -> None:
             ):
                 notification.emailed_at = now
                 record_delivery(session, notification.id, "email", now, source="job")
+            else:
+                record_unsent(session, [notification.id], "email", now, source="job")
             if (
                 push_on
                 and notification.pushed_at is None
@@ -959,6 +961,8 @@ def deliver_change_emails(revision_id: str) -> None:
                 if delivered:
                     notification.pushed_at = now
                     record_delivery(session, notification.id, "push", now, source="job")
+                else:
+                    record_unsent(session, [notification.id], "push", now, source="job")
             session.add(notification)
         session.commit()
 
@@ -1060,6 +1064,8 @@ def deliver_removed_notices(subject_key: str) -> None:
             ):
                 notification.emailed_at = now
                 record_delivery(session, notification.id, "email", now, source="job")
+            else:
+                record_unsent(session, [notification.id], "email", now, source="job")
             if (
                 push_on
                 and notification.pushed_at is None
@@ -1079,6 +1085,8 @@ def deliver_removed_notices(subject_key: str) -> None:
                 if delivered:
                     notification.pushed_at = now
                     record_delivery(session, notification.id, "push", now, source="job")
+                else:
+                    record_unsent(session, [notification.id], "push", now, source="job")
             session.add(notification)
         session.commit()
 

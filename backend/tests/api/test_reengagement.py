@@ -1603,6 +1603,54 @@ def test_activity_digest_drops_past_event_but_stamps_it(session, monkeypatch):
     assert activity_email.run_once(force=True) == {"digests": 0, "pushed": 0}
 
 
+def test_activity_digest_overflow_rolls_into_next_digest(session, monkeypatch):
+    from backend.db.models import NotificationDelivery
+
+    monkeypatch.setattr(
+        activity_email, "send_activity_digest_v2_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+    monkeypatch.setattr(activity_email, "get_digest_max_items", lambda *a: 1)
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    a2 = _make_user(session, "a2@example.com", "a2")
+    _make_event(session, "ev-1", start=datetime.now(timezone.utc) + timedelta(days=2))
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
+    older = _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="subscription_going",
+        event_id="ev-1",
+        created_at=old,
+    )
+    newer = _notif(
+        session,
+        recipient=bob,
+        actor=a2,
+        kind="subscription_going",
+        event_id="ev-1",
+        created_at=old + timedelta(minutes=1),
+    )
+
+    assert activity_email.run_once(force=True)["digests"] == 1
+    session.refresh(older)
+    session.refresh(newer)
+    assert newer.emailed_at is not None
+    assert older.emailed_at is None
+    delivered = session.exec(
+        select(NotificationDelivery.notification_id).where(
+            NotificationDelivery.channel == "email"
+        )
+    ).all()
+    assert delivered == [newer.id]
+
+    assert activity_email.run_once(force=True)["digests"] == 1
+    session.refresh(older)
+    assert older.emailed_at is not None
+
+
 def test_activity_digest_keeps_review_on_past_event(session, monkeypatch):
     """Reviews are inherently about past events, so the past-event guard must
     NOT drop a ``subscription_review`` notice even though its event has ended
@@ -3434,3 +3482,49 @@ async def test_in_process_job_queue_stop_cancels_pending_and_inactive_is_noop():
     await asyncio.sleep(0.05)
 
     assert runs == []
+
+
+def test_failed_reminder_push_is_logged(session, monkeypatch):
+    from backend.db.models import NotificationDelivery
+    from backend.services.notification_delivery import note_send_failure
+
+    def _failing_push(uid, **_):
+        note_send_failure("push", "Push error: HTTP 500")
+        return 0
+
+    monkeypatch.setattr(
+        reminder_service, "send_event_reminder_email", lambda *a, **k: False
+    )
+    monkeypatch.setattr(reminder_service, "send_push", _failing_push)
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(
+        session, "ev-soon", start=datetime.now(timezone.utc) + timedelta(hours=3)
+    )
+    _going(session, alice, "ev-soon")
+
+    assert reminder_service.run_once()["pushed"] == 0
+    rows = session.exec(
+        select(NotificationDelivery).where(NotificationDelivery.channel != "app")
+    ).all()
+    assert [(r.channel, r.status, r.detail) for r in rows] == [
+        ("push", "failed", "Push error: HTTP 500")
+    ]
+
+
+def test_digest_opt_out_is_logged_as_skipped(session, monkeypatch):
+    from backend.db.models import NotificationDelivery
+
+    digests = _capture_digest(monkeypatch)
+    bob = _make_user(session, "bob@example.com", "bob", digest_email_enabled=False)
+    amy = _make_user(session, "amy@example.com", "amy")
+    n = _notif(session, recipient=bob, actor=amy, kind="new_follower")
+
+    activity_email.run_once(force=True)
+
+    assert digests == []
+    rows = session.exec(
+        select(NotificationDelivery).where(NotificationDelivery.channel == "email")
+    ).all()
+    assert [(r.notification_id, r.mode, r.status) for r in rows] == [
+        (n.id, "digest", "skipped")
+    ]
