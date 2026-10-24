@@ -15,6 +15,7 @@ from backend.services import app_settings
 from backend.services.notification_delivery import (
     new_batch_id,
     record_delivery,
+    record_unsent,
     tracked_url,
 )
 from backend.services.timezones import to_event_local
@@ -253,6 +254,10 @@ def _push(
                 source=source,
                 batch_id=batch_id,
             )
+    if not delivered:
+        record_unsent(
+            session, [n.id for n in rows], "push", now, mode="instant", source=source
+        )
     return bool(delivered)
 
 

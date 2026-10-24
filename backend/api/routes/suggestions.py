@@ -1740,7 +1740,7 @@ def _enqueue_decision_email(suggestion: EventSuggestion, kind: str) -> None:
 def _deliver_decision_email(key: str) -> None:
     """Job: email the submitter an admin decision that still stands."""
     from backend.db.database import get_engine
-    from backend.services.notification_delivery import record_delivery
+    from backend.services.notification_delivery import record_delivery, record_unsent
 
     suggestion_id, _, kind = key.partition(":")
     with Session(get_engine()) as session:
@@ -1785,6 +1785,8 @@ def _deliver_decision_email(key: str) -> None:
             notification.emailed_at = now
             record_delivery(session, notification.id, "email", now, source="job")
             session.add(notification)
+            session.commit()
+        elif record_unsent(session, [notification.id], "email", source="job"):
             session.commit()
 
 

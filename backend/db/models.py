@@ -2244,7 +2244,15 @@ class NotificationDelivery(SQLModel, table=True):
     __tablename__ = "notification_deliveries"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    notification_id: int = Field(foreign_key="notifications.id", index=True)
+    # NULL for sends with no Notification row (e.g. install invitation email);
+    # those carry ``recipient_user_id`` + ``kind`` instead.
+    notification_id: Optional[int] = Field(
+        default=None, foreign_key="notifications.id", index=True
+    )
+    recipient_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+    kind: Optional[str] = Field(default=None, max_length=40)
     channel: str = Field(index=True)  # "app" | "email" | "push"
     mode: Optional[str] = Field(
         default=None, max_length=16
@@ -2259,6 +2267,9 @@ class NotificationDelivery(SQLModel, table=True):
     batch_id: Optional[str] = Field(default=None, max_length=32, index=True)
     # Digest email only: False when the item was cut by the email's per-kind/total cap.
     rendered: Optional[bool] = Field(default=None)
+    # NULL = delivered; "failed" (push/email error) or "skipped" (e.g. digest opt-out).
+    status: Optional[str] = Field(default=None, max_length=16)
+    detail: Optional[str] = Field(default=None, max_length=120)
 
 
 class PushSubscription(SQLModel, table=True):

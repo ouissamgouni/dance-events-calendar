@@ -2058,7 +2058,7 @@ def notify_program_available(
     session: Session = Depends(get_session),
 ):
     from backend.services.email import send_schedule_program_available_email
-    from backend.services.notification_delivery import record_delivery
+    from backend.services.notification_delivery import record_delivery, record_unsent
     from backend.services.push_service import send_push
 
     schedule = _schedule_for_event(session, event_id)
@@ -2222,6 +2222,14 @@ def notify_program_available(
             did_send = True
             email_status = "sent"
         else:
+            record_unsent(
+                session,
+                [notification.id],
+                "email",
+                stamp_now,
+                mode="instant",
+                source="admin",
+            )
             email_status = "failed"
 
         if not user.push_schedule_updates_enabled:
@@ -2252,6 +2260,9 @@ def notify_program_available(
                 did_send = True
                 push_status = "sent"
             else:
+                record_unsent(
+                    session, [notification.id], "push", stamp_now, source="admin"
+                )
                 push_status = "unavailable"
         session.add(notification)
         results.append(
@@ -2514,7 +2525,7 @@ def _deliver_publication(key: str) -> None:
         send_schedule_program_available_email,
         send_schedule_program_updated_email,
     )
-    from backend.services.notification_delivery import record_delivery
+    from backend.services.notification_delivery import record_delivery, record_unsent
     from backend.services.push_service import send_push
 
     event_id, _, version = key.rpartition(":")
@@ -2578,6 +2589,14 @@ def _deliver_publication(key: str) -> None:
                         mode="instant",
                         source="job",
                     )
+                else:
+                    record_unsent(
+                        session,
+                        [notification.id],
+                        "email",
+                        mode="instant",
+                        source="job",
+                    )
             if notification.pushed_at is None and user.push_schedule_updates_enabled:
                 if kind == "planned_session_changed":
                     title = f"Your plan changed · {event.title}"
@@ -2607,6 +2626,8 @@ def _deliver_publication(key: str) -> None:
                     now = datetime.now(timezone.utc)
                     notification.pushed_at = now
                     record_delivery(session, notification.id, "push", now, source="job")
+                else:
+                    record_unsent(session, [notification.id], "push", source="job")
             session.add(notification)
         session.commit()
 
@@ -2624,7 +2645,7 @@ def _notify_publication_going_attendees(
         send_schedule_program_available_email,
         send_schedule_program_updated_email,
     )
-    from backend.services.notification_delivery import record_delivery
+    from backend.services.notification_delivery import record_delivery, record_unsent
     from backend.services.push_service import send_push
 
     schedule = _schedule_for_event(session, event_id)
@@ -2747,6 +2768,14 @@ def _notify_publication_going_attendees(
                 emailed += 1
                 email_status = "sent"
             else:
+                record_unsent(
+                    session,
+                    [notification.id],
+                    "email",
+                    delivered_at,
+                    mode="instant",
+                    source="admin",
+                )
                 email_status = "failed"
 
         if not deliver:
@@ -2784,6 +2813,9 @@ def _notify_publication_going_attendees(
                 pushed += delivered
                 push_status = "sent"
             else:
+                record_unsent(
+                    session, [notification.id], "push", delivered_at, source="admin"
+                )
                 push_status = "unavailable"
         session.add(notification)
         results.append(

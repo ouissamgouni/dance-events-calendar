@@ -413,6 +413,8 @@ export default function ForYouPage() {
             onDismiss={(h) => void people.dismiss(h)}
             testId="for-you-build-your-tribe"
             onSeen={onPeopleTrailSeen}
+            onRefresh={people.refresh && (() => void people.refresh?.())}
+            refreshing={people.refreshing}
         />
     ) : null;
 

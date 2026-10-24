@@ -17,7 +17,8 @@ import {
     type UserSearchResult,
 } from '../api';
 import FollowRequestsPanel from './FollowRequestsPanel';
-import SuggestionsCarousel from './SuggestionsCarousel';
+import PeopleSuggestionsTrail from './PeopleSuggestionsTrail';
+import { usePeopleSuggestions } from '../hooks/usePeopleSuggestions';
 import PersonRowMenu, { type RowMenuItem } from './PersonRowMenu';
 import UserResultCard from './UserResultCard';
 import { ConfirmDialog } from './AppDialog';
@@ -97,6 +98,7 @@ export default function NetworkPanel() {
     } | null>(null);
 
     const searchRef = useRef<HTMLInputElement>(null);
+    const people = usePeopleSuggestions(true);
 
     const invalidate = useCallback(() => {
         setListData({ followers: null, following: null, friends: null });
@@ -316,7 +318,21 @@ export default function NetworkPanel() {
                 />
             ) : (
                 <>
-                    <SuggestionsCarousel />
+                    {people.items && people.items.length > 0 && (
+                        <div className="mb-5">
+                            <PeopleSuggestionsTrail
+                                title="Suggestions for you"
+                                items={people.items}
+                                total={people.total}
+                                pending={people.pending}
+                                onFollow={(h) => void people.follow(h)}
+                                onDismiss={(h) => void people.dismiss(h)}
+                                onRefresh={people.refresh && (() => void people.refresh?.())}
+                                refreshing={people.refreshing}
+                                testId="network-suggestions"
+                            />
+                        </div>
+                    )}
 
                     {/* Top-level tabs */}
                     <div

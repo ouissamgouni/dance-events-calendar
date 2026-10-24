@@ -55,7 +55,12 @@ from backend.db.models import (
     UserFollow,
 )
 from backend.services.email import send_event_review_prompt_email
-from backend.services.notification_delivery import record_delivery, tracked_url
+from backend.services.notification_delivery import (
+    record_delivery,
+    record_unsent,
+    take_send_failure,
+    tracked_url,
+)
 from backend.services.push_service import send_push
 
 logger = logging.getLogger(__name__)
@@ -296,6 +301,7 @@ def run_once() -> dict:
 
     emailed = 0
     emailed_ids: list[int] = []
+    failed: list[tuple[int, str, str]] = []
     for user, event, phrase in to_email:
         nid = notif_ids.get((user.id, event.event_id))
         if send_event_review_prompt_email(
@@ -304,6 +310,8 @@ def run_once() -> dict:
             emailed += 1
             if nid is not None:
                 emailed_ids.append(nid)
+        elif nid is not None and (detail := take_send_failure("email")):
+            failed.append((nid, "email", detail))
 
     pushed = 0
     pushed_ids: list[int] = []
@@ -321,8 +329,10 @@ def run_once() -> dict:
         if delivered:
             if nid is not None:
                 pushed_ids.append(nid)
+        elif nid is not None and (detail := take_send_failure("push")):
+            failed.append((nid, "push", detail))
 
-    if emailed_ids or pushed_ids:
+    if emailed_ids or pushed_ids or failed:
         from sqlmodel import col, update
 
         with Session(get_engine()) as session:
@@ -345,6 +355,16 @@ def run_once() -> dict:
                 )
                 for nid in pushed_ids:
                     record_delivery(session, nid, "push", stamp_now, source="tick")
+            for nid, channel, detail in failed:
+                record_unsent(
+                    session,
+                    [nid],
+                    channel,
+                    stamp_now,
+                    mode="instant" if channel == "email" else None,
+                    source="tick",
+                    detail=detail,
+                )
             session.commit()
 
     logger.info(
@@ -577,6 +597,10 @@ def _force_send_one(
         record_delivery(session, notif.id, "email", now, mode="instant", source="admin")
         stats["emailed"] += 1
         used.append("email")
+    elif email_wanted:
+        record_unsent(
+            session, [notif.id], "email", now, mode="instant", source="admin"
+        )
     if push_wanted:
         push_title, push_body = review_prompt_push_copy(event.title, phrase)
         delivered = send_push_fn(
@@ -591,5 +615,7 @@ def _force_send_one(
             record_delivery(session, notif.id, "push", now, source="admin")
             stats["pushed"] += delivered
             used.append("push")
+        else:
+            record_unsent(session, [notif.id], "push", now, source="admin")
     session.add(notif)
     return used

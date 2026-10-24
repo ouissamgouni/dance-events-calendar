@@ -57,6 +57,7 @@ const TextSearchPage = lazy(() => import('./pages/TextSearchPage'));
 const InstallPage = lazy(() => import('./pages/InstallPage'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
 const NetworkPage = lazy(() => import('./pages/NetworkPage'));
+const DiscoverPeoplePage = lazy(() => import('./pages/DiscoverPeoplePage'));
 const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
 const FollowingReviewsPage = lazy(() => import('./pages/FollowingReviewsPage'));
 const MySubmissionsPage = lazy(() => import('./pages/MySubmissionsPage'));
@@ -291,6 +292,7 @@ function AppShell() {
                 </Route>
                 <Route path="/my-events" element={<MyCalendar />} />
                 <Route path="/passport" element={<ProtectedRoute><PassportPage /></ProtectedRoute>} />
+                <Route path="/people/discover" element={<ProtectedRoute><DiscoverPeoplePage /></ProtectedRoute>} />
                 <Route path="/reviews" element={<MyReviewsPage />} />
                 <Route path="/me/submissions" element={<MySubmissionsPage />} />
                 <Route path="/hosting" element={<HostingPage />} />

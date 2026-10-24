@@ -35,7 +35,12 @@ from backend.db.models import CachedEvent, Notification, User, UserEventAttendan
 from backend.services.email import send_event_reminder_email
 from backend.services.event_asset_prompts import ticket_cta_pairs
 from backend.services.event_visibility import STATUS_CANCELLED, apply_event_visibility
-from backend.services.notification_delivery import record_delivery, tracked_url
+from backend.services.notification_delivery import (
+    record_delivery,
+    record_unsent,
+    take_send_failure,
+    tracked_url,
+)
 from backend.services.push_service import send_push
 
 logger = logging.getLogger(__name__)
@@ -161,6 +166,7 @@ def run_once() -> dict:
     # SMTP is slow/unavailable. Best-effort; failures are logged, not raised.
     emailed = 0
     emailed_ids: list[int] = []
+    failed: list[tuple[int, str, str]] = []
     for user, event, ask, ticket in to_email:
         when_label = _format_when(event.start, event.timezone or user.timezone)
         nid = notif_ids.get((user.id, event.event_id))
@@ -175,6 +181,8 @@ def run_once() -> dict:
             emailed += 1
             if nid is not None:
                 emailed_ids.append(nid)
+        elif nid is not None and (detail := take_send_failure("email")):
+            failed.append((nid, "email", detail))
 
     # Web-push is independent of the email opt-out (separate toggle). No-ops
     # when web-push is unconfigured.
@@ -201,12 +209,14 @@ def run_once() -> dict:
         if delivered:
             if nid is not None:
                 pushed_ids.append(nid)
+        elif nid is not None and (detail := take_send_failure("push")):
+            failed.append((nid, "push", detail))
 
     # Stamp emailed_at/pushed_at on the notifications actually delivered so
     # the admin Notifications log can report accurate per-channel support,
     # same convention as activity_email.run_once(). Also record a
     # NotificationDelivery audit row per actually-delivered channel.
-    if emailed_ids or pushed_ids:
+    if emailed_ids or pushed_ids or failed:
         with Session(get_engine()) as session:
             stamp_now = datetime.now(timezone.utc)
             if emailed_ids:
@@ -227,6 +237,16 @@ def run_once() -> dict:
                 )
                 for nid in pushed_ids:
                     record_delivery(session, nid, "push", stamp_now, source="tick")
+            for nid, channel, detail in failed:
+                record_unsent(
+                    session,
+                    [nid],
+                    channel,
+                    stamp_now,
+                    mode="instant" if channel == "email" else None,
+                    source="tick",
+                    detail=detail,
+                )
             session.commit()
 
     logger.info(

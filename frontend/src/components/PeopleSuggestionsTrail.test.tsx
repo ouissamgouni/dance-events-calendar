@@ -22,14 +22,24 @@ function item(handle: string) {
     }
 }
 
+const TRAIL_SIZE = 5
+
 // Server-side pool: dismissed handles drop out, so a refetch backfills.
 function poolHandlers(size: number) {
     const dismissed = new Set<string>()
     const pool = () => Array.from({ length: size }, (_, i) => item(`pop${i + 1}`)).filter((it) => !dismissed.has(it.handle))
     return [
         http.get('*/api/social/me/suggestions', ({ request }) => {
-            const limit = Number(new URL(request.url).searchParams.get('limit') ?? '6')
-            return HttpResponse.json({ items: pool().slice(0, limit), total: pool().length, friend_count: 0, trail_position: 'top' })
+            const sp = new URL(request.url).searchParams
+            const limit = sp.get('trail') === 'true' ? TRAIL_SIZE : Number(sp.get('limit') ?? '12')
+            const offset = Number(sp.get('offset') ?? '0')
+            return HttpResponse.json({
+                items: pool().slice(offset, offset + limit),
+                total: pool().length,
+                friend_count: 0,
+                trail_position: 'top',
+                trail_size: TRAIL_SIZE,
+            })
         }),
         http.post('*/api/social/me/suggestions/:handle/dismiss', ({ params }) => {
             dismissed.add(String(params.handle))
@@ -48,6 +58,8 @@ function Trail() {
             pending={people.pending}
             onFollow={(h) => void people.follow(h)}
             onDismiss={(h) => void people.dismiss(h)}
+            onRefresh={people.refresh && (() => void people.refresh?.())}
+            refreshing={people.refreshing}
         />
     )
 }
@@ -62,17 +74,37 @@ afterEach(() => {
 })
 
 describe('PeopleSuggestionsTrail', () => {
-    it('shows 5 people with See all, and backfills after Not interested', async () => {
+    it('caps to the trail size with See more, and backfills after Not interested', async () => {
         server.use(...poolHandlers(8))
         const { user } = renderWithProviders(<Trail />)
 
         expect(await screen.findByText('POP5')).toBeInTheDocument()
         expect(screen.queryByText('POP6')).not.toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'See all' })).toHaveAttribute('href', '/tribe/network')
+        expect(screen.getByRole('link', { name: 'See all' })).toHaveAttribute('href', '/people/discover')
+        expect(screen.getByRole('link', { name: /See more/ })).toHaveAttribute('href', '/people/discover')
 
         await user.click(screen.getByRole('button', { name: 'Not interested in pop1' }))
         await waitFor(() => expect(screen.getByText('POP6')).toBeInTheDocument())
         expect(screen.queryByText('POP1')).not.toBeInTheDocument()
+    })
+
+    it('refresh rotates to the next batch', async () => {
+        server.use(...poolHandlers(7))
+        const { user } = renderWithProviders(<Trail />)
+
+        expect(await screen.findByText('POP1')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Refresh suggestions' }))
+        await waitFor(() => expect(screen.getByText('POP6')).toBeInTheDocument())
+        expect(screen.queryByText('POP1')).not.toBeInTheDocument()
+    })
+
+    it('hides See more and refresh when the pool fits in one batch', async () => {
+        server.use(...poolHandlers(3))
+        renderWithProviders(<Trail />)
+
+        expect(await screen.findByText('POP3')).toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: /See more/ })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Refresh suggestions' })).not.toBeInTheDocument()
     })
 })
 

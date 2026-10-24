@@ -113,6 +113,10 @@ export default function MenuDrawer({ open, onClose }: { open: boolean; onClose: 
                                 <img src="/tribe.png" alt="" aria-hidden="true" className={iconClass} />
                                 People
                             </Link>
+                            <Link to="/people/discover" onClick={onClose} className={rowClass}>
+                                <img src="/tribe.png" alt="" aria-hidden="true" className={iconClass} />
+                                Discover people
+                            </Link>
                             <Link to="/reviews" onClick={onClose} className={rowClass}>
                                 <img src="/review.png" alt="" aria-hidden="true" className={iconClass} />
                                 <span>Reviews</span>

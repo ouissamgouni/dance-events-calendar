@@ -420,6 +420,7 @@ PEOPLE_DISCOVERY_INT_DEFAULTS: dict[str, int] = {
     "people_prompt_fatigue_pause_days": 30,
     "people_prompt_min_suggestions": 3,
     "people_trail_top_max_friends": 9,
+    "people_trail_max_items": 15,
     "home_overlays_per_session": 1,
     "suggestion_dismissal_ttl_days": 90,
     "people_joined_window_days": 14,

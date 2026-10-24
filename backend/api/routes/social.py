@@ -15,6 +15,7 @@ Privacy notes:
 from datetime import datetime, timedelta, timezone
 import logging
 import os
+import random
 from typing import Optional
 from uuid import UUID
 
@@ -3020,6 +3021,9 @@ def admin_set_force_install_prompt_by_id(
 
 # --- Admin: send install-app invitation email -------------------------------
 
+# Logged in notification_deliveries without a Notification row (no in-app item).
+INSTALL_APP_INVITATION = "install_app_invitation"
+
 
 @router.post("/admin/users/id/{user_id}/send-install-email")
 def admin_send_install_email(
@@ -3033,8 +3037,21 @@ def admin_send_install_email(
     Best-effort — ``status`` is ``"skipped"`` (not an HTTP error) when the
     user has no email or SMTP isn't configured; see ``_send_email``.
     """
+    from backend.services.notification_delivery import record_delivery, record_unsent
+
     user = _resolve_admin_user_id(session, user_id)
     sent = send_install_app_invitation_email(user)
+    log = {
+        "mode": "instant",
+        "source": "admin",
+        "recipient_user_id": user.id,
+        "kind": INSTALL_APP_INVITATION,
+    }
+    if sent:
+        record_delivery(session, None, "email", **log)
+    else:
+        record_unsent(session, [None], "email", **log)
+    session.commit()
     return {"status": "sent" if sent else "skipped", "user_id": str(user.id)}
 
 
@@ -4663,16 +4680,28 @@ def _fof_items(
 
 
 def _build_fof_suggestions(
-    session: Session, viewer: User, limit: int, offset: int = 0
+    session: Session,
+    viewer: User,
+    limit: int,
+    offset: int = 0,
+    seed: int | None = None,
 ) -> FoFSuggestionsResponse:
     pool = _fof_pool(session, viewer)
+    if seed is not None:
+        # Seeded so a refetch after follow/dismiss keeps the same shuffle.
+        random.Random(seed).shuffle(pool)
     friend_count = _friend_count(session, viewer.id)
     return FoFSuggestionsResponse(
         items=_fof_items(session, viewer, pool[offset : offset + limit]),
         total=len(pool),
         friend_count=friend_count,
         trail_position=people_prompt.trail_position(session, friend_count),
+        trail_size=_trail_size(session),
     )
+
+
+def _trail_size(session: Session) -> int:
+    return app_settings.get_people_discovery_int("people_trail_max_items", session)
 
 
 @router.get(
@@ -4684,11 +4713,15 @@ def friend_of_friend_suggestions(
     request: Request,
     limit: int = Query(default=12, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
+    trail: bool = Query(default=False),
+    seed: int | None = Query(default=None, ge=0),
     session: Session = Depends(get_session),
     viewer: User = Depends(require_user),
 ):
     """Anonymous viewers never hit this route (``require_user``)."""
-    return _build_fof_suggestions(session, viewer, limit, offset)
+    if trail:
+        limit = _trail_size(session)
+    return _build_fof_suggestions(session, viewer, limit, offset, seed)
 
 
 @router.post("/me/suggestions/{handle}/dismiss", status_code=204)
@@ -4719,9 +4752,6 @@ def undismiss_suggestion(
     session.commit()
 
 
-_PEOPLE_PROMPT_ITEMS = 5
-
-
 def build_people_prompt(session: Session, viewer: User) -> PeoplePromptResponse:
     pool = _fof_pool(session, viewer)
     friend_count = _friend_count(session, viewer.id)
@@ -4744,7 +4774,7 @@ def build_people_prompt(session: Session, viewer: User) -> PeoplePromptResponse:
             "home_overlays_per_session", session
         ),
         items=(
-            _fof_items(session, viewer, pool[:_PEOPLE_PROMPT_ITEMS]) if show else []
+            _fof_items(session, viewer, pool[: _trail_size(session)]) if show else []
         ),
         total=len(pool),
     )

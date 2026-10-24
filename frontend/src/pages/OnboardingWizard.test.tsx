@@ -205,6 +205,30 @@ describe('OnboardingWizard', () => {
         expect(await screen.findByText('home page')).toBeInTheDocument()
     })
 
+    it('turns alerts on for the signup default profile on first onboarding', async () => {
+        const patched: Record<string, unknown>[] = []
+        useBaseHandlers()
+        server.use(
+            http.get('*/api/interest-profiles', () => HttpResponse.json([{
+                id: 7, label: 'Default', area_label: 'Europe & nearby', geo_kind: 'area',
+                min_lat: 24, min_lng: -18, max_lat: 69, max_lng: 50, center_lat: null, center_lng: null, radius_km: null,
+                dance_tag_ids: [], reach_filter: 'international', reach_tag_ids: [], matches_enabled: false, notify_enabled: false,
+                is_active: true, created_at: '2026-10-12T00:00:00Z',
+            }])),
+            http.patch('*/api/interest-profiles/:id', async ({ request, params }) => {
+                const body = await request.json() as Record<string, unknown>
+                patched.push(body)
+                return HttpResponse.json({ id: Number(params.id), ...body, notify_enabled: body.matches_enabled, created_at: new Date().toISOString() })
+            }),
+        )
+        const user = userEvent.setup()
+        renderWizard()
+        await reachReview(user)
+        await user.click(screen.getByRole('button', { name: 'Start exploring' }))
+        await waitFor(() => expect(patched).toHaveLength(1))
+        expect(patched[0]).toMatchObject({ reach_filter: 'international', matches_enabled: true })
+    })
+
     it('restores Build your tribe with suggestions, search, undo, skip, and review editing', async () => {
         const followed: string[] = []
         const unfollowed: string[] = []

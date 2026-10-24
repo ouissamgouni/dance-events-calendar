@@ -85,7 +85,7 @@ describe('AdminNotificationsTab', () => {
         const user = userEvent.setup()
         renderTab()
 
-        const digest = await screen.findByRole('button', { name: /Bob is going to Salsa Night\s*\+1 more/ })
+        const digest = await screen.findByRole('button', { name: /^Friends going\s*1\s*Interest matches\s*1$/ })
         const names = screen.getAllByRole('button', { name: /\(@(alice|bob)\)/ }).map((b) => b.textContent)
         expect(names).toEqual(['Alice (@alice)', 'Bob (@bob)'])
         expect(screen.getByText('Clicked 1/2')).toBeInTheDocument()
@@ -166,5 +166,28 @@ describe('AdminNotificationsTab', () => {
         expect(await screen.findByText('1 recipient-day')).toBeInTheDocument()
         expect(screen.queryByText('Salsa Night starts soon')).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Alice (@alice)' })).toBeInTheDocument()
+    })
+
+    it('shows unsent rows only through their pill', async () => {
+        const user = userEvent.setup()
+        vi.mocked(api.fetchAdminNotificationActivity).mockResolvedValue({ ...RESPONSE, summary: { ...SUMMARY, push_failed: 2 } })
+        renderTab()
+
+        const pill = await screen.findByRole('button', { name: /Push failed\s*2/ })
+        expect(vi.mocked(api.fetchAdminNotificationActivity).mock.calls[0][0].outcome).toBeUndefined()
+        vi.mocked(api.fetchAdminNotificationActivity).mockResolvedValue({
+            ...RESPONSE,
+            rows: [{ ...REMINDER, channels: ['push'], status: 'failed', detail: 'Device unsubscribed (endpoint gone)' }],
+            total: 1,
+        })
+
+        await user.click(pill)
+
+        await waitFor(() => {
+            const last = vi.mocked(api.fetchAdminNotificationActivity).mock.calls.at(-1)?.[0]
+            expect(last?.outcome).toBe('push_failed')
+        })
+        expect(await screen.findByText('Failed · Device unsubscribed (endpoint gone)')).toBeInTheDocument()
+        expect(pill).toHaveAttribute('aria-pressed', 'true')
     })
 })

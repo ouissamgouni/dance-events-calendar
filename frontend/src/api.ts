@@ -909,6 +909,7 @@ export interface SiteSettings {
     people_prompt_fatigue_pause_days?: number;
     people_prompt_min_suggestions?: number;
     people_trail_top_max_friends?: number;
+    people_trail_max_items?: number;
     home_overlays_per_session?: number;
     suggestion_dismissal_ttl_days?: number;
     people_joined_window_days?: number;
@@ -1274,6 +1275,7 @@ export async function fetchNotificationToggleCounts(): Promise<NotificationToggl
 
 export type NotificationActivityChannel = 'app' | 'email' | 'push';
 export type NotificationActivityTrigger = 'auto' | 'user' | 'forced' | 'unknown';
+export type NotificationActivityOutcome = 'delivered' | 'push_failed' | 'email_failed' | 'digest_skipped';
 
 export interface NotificationActivityTopicCount {
     topic: string;
@@ -1281,7 +1283,8 @@ export interface NotificationActivityTopicCount {
 }
 
 export interface NotificationActivityItem {
-    notification_id: number;
+    /** Null for sends logged without a notification (install invitation). */
+    notification_id: number | null;
     kind: string;
     topic: string;
     summary: string;
@@ -1320,6 +1323,9 @@ export interface NotificationActivityRow {
     push_opened: number;
     topics: NotificationActivityTopicCount[];
     items: NotificationActivityItem[];
+    /** Null when delivered; otherwise why it wasn't. */
+    status?: 'failed' | 'skipped' | null;
+    detail?: string | null;
 }
 
 export interface NotificationActivityGroup {
@@ -1343,6 +1349,9 @@ export interface NotificationActivitySummary {
     push_items: number;
     push_opened: number;
     app_read: number;
+    push_failed?: number;
+    email_failed?: number;
+    digest_skipped?: number;
 }
 
 export interface NotificationActivityResponse {
@@ -1366,6 +1375,7 @@ export interface NotificationActivityParams {
     include_in_app?: boolean;
     engaged?: boolean;
     unread?: boolean;
+    outcome?: NotificationActivityOutcome;
     group?: 'none' | 'recipient';
     limit?: number;
     offset?: number;
@@ -2545,14 +2555,19 @@ export interface FoFSuggestionsResponse {
     friend_count?: number;
     /** Where For You places the "Build your tribe" trail (top for small circles). */
     trail_position?: 'top' | 'bottom';
+    /** Admin-configured max people shown in a trail. */
+    trail_size?: number;
 }
 
+/** ``trail: true`` makes the server cap the page to the admin trail size. */
 export async function fetchMySuggestions(
-    opts?: { limit?: number; offset?: number },
+    opts?: { limit?: number; offset?: number; trail?: boolean; seed?: number },
 ): Promise<FoFSuggestionsResponse> {
     const sp = new URLSearchParams();
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));
+    if (opts?.trail) sp.set('trail', 'true');
+    if (opts?.seed !== undefined) sp.set('seed', String(opts.seed));
     const qs = sp.toString();
     const res = await fetch(
         `${BASE}/social/me/suggestions${qs ? `?${qs}` : ''}`,
