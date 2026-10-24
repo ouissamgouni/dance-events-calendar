@@ -406,6 +406,9 @@ def test_joined_push_batched_once_per_day_in_window(session, monkeypatch):
     people_joined_service.push_pending(session, noon)
     alice_pushes = [title for uid, title in pushes if uid == alice.id]
     assert len(alice_pushes) == 1 and "1 other" in alice_pushes[0]
+    stats = people_joined_service.stats(session, noon - timedelta(days=1))
+    assert stats["joined_created"] > stats["joined_pushed"] == len(pushes)
+    assert stats["joined_push_failed"] == 0
 
     _follow(session, _user(session, "n3", days_old=1), bob)
     people_joined_service.detect(session, noon)

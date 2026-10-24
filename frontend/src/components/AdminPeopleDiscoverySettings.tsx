@@ -231,7 +231,8 @@ export default function AdminPeopleDiscoverySettings({ onMessage }: { onMessage:
                             {conversion != null && ` (${conversion}%)`} · {stats.follows} follows · forced {stats.forced_shown}
                         </p>
                         <p className="text-[11px] text-ink-soft">
-                            Joined: notified {stats.joined_created} · pushed {stats.joined_pushed} · followed back {stats.joined_followed}
+                            Joined: notified {stats.joined_created} in-app · pushes sent {stats.joined_pushed}
+                            {stats.joined_push_failed > 0 && ` (${stats.joined_push_failed} failed)`} · followed back {stats.joined_followed}
                         </p>
                     </>
                 ) : (

@@ -10,7 +10,13 @@ from uuid import UUID
 from sqlmodel import Session, col, or_, select
 
 from backend.api.deps import get_admin_user_id
-from backend.db.models import Notification, SuggestionDismissal, User, UserFollow
+from backend.db.models import (
+    Notification,
+    NotificationDelivery,
+    SuggestionDismissal,
+    User,
+    UserFollow,
+)
 from backend.services import app_settings
 from backend.services.notification_delivery import (
     new_batch_id,
@@ -381,9 +387,18 @@ def stats(session: Session, since: datetime) -> dict:
             ).all()
         )
         followed = len(pairs & follows)
+    # pushed_at also marks opted-out/undelivered rows; count real sends (one batch = one push).
+    push_sends = session.exec(
+        select(NotificationDelivery.batch_id, NotificationDelivery.status)
+        .join(Notification, Notification.id == NotificationDelivery.notification_id)
+        .where(Notification.kind == SUGGESTED_PERSON_JOINED)
+        .where(Notification.created_at >= since)
+        .where(NotificationDelivery.channel == "push")
+    ).all()
     return {
         "joined_created": len(rows),
-        "joined_pushed": sum(1 for *_, p in rows if p is not None),
+        "joined_pushed": len({b for b, s in push_sends if s is None}),
+        "joined_push_failed": len({b for b, s in push_sends if s is not None}),
         "joined_followed": followed,
     }
 
