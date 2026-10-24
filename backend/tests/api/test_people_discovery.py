@@ -174,6 +174,23 @@ def test_trail_size_setting_caps_trail_and_sheet(client, session, monkeypatch):
     assert len(client.get("/api/social/me/people-prompt").json()["items"]) == 2
 
 
+def test_seed_shuffles_pool_deterministically(client, session):
+    viewer = _user(session, "viewer")
+    _curators(session, 8)
+    _login(client, viewer)
+
+    ranked = _handles(client.get("/api/social/me/suggestions?limit=50"))
+    a = _handles(client.get("/api/social/me/suggestions?limit=50&seed=7"))
+    b = _handles(client.get("/api/social/me/suggestions?limit=50&seed=7"))
+    others = [
+        _handles(client.get(f"/api/social/me/suggestions?limit=50&seed={s}"))
+        for s in range(1, 6)
+    ]
+    assert a == b and sorted(a) == sorted(ranked)
+    assert any(o != ranked for o in others)
+    assert _handles(client.get("/api/social/me/suggestions?limit=50")) == ranked
+
+
 def test_people_prompt_skipped_for_large_circle_and_min_suggestions(session):
     viewer = _user(session, "viewer")
     assert people_prompt.should_show(session, viewer, 10, 5) == (False, False)
