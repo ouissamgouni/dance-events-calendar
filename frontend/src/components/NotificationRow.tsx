@@ -131,6 +131,8 @@ function groupVerb(item: NotificationItem): string {
             return 'reviewed';
         case 'subscription_memories':
             return 'shared memories from';
+        case 'suggested_person_joined':
+            return 'you may know joined Movida';
         default:
             return getNotificationVerb(item);
     }
@@ -695,7 +697,7 @@ export default function NotificationRow({
     // Inline affordances that live in the row's trailing slot (page) or inside
     // the row button (panel).
     let actionNode: ReactNode = null;
-    if (item.kind === 'new_follower' || item.kind === 'suggested_person_joined') {
+    if (item.kind === 'new_follower' || (item.kind === 'suggested_person_joined' && !isMulti)) {
         actionNode = following ? (
             <span className="inline-flex min-h-9 items-center px-3 text-sm border border-line bg-surface text-ink-soft">
                 ✓ Following

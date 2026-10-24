@@ -416,6 +416,31 @@ def test_joined_push_batched_once_per_day_in_window(session, monkeypatch):
     assert len([uid for uid, _ in pushes if uid == alice.id]) == 1
 
 
+def test_joined_feed_rows_collapse_per_day(client, session):
+    viewer = _user(session, "viewer", timezone="UTC")
+    for handle, mutual in (("j1", "1"), ("j2", "3"), ("j3", "2")):
+        session.add(
+            Notification(
+                recipient_user_id=viewer.id,
+                actor_user_id=_user(session, handle, days_old=1).id,
+                kind=people_joined_service.SUGGESTED_PERSON_JOINED,
+                context=mutual,
+                created_at=NOW,
+            )
+        )
+    session.commit()
+    _login(client, viewer)
+
+    body = client.get("/api/notifications").json()
+    assert body["unread_count"] == 1
+    [item] = body["items"]
+    assert item["actor_count"] == 3
+    assert [a["handle"] for a in item["actors"]] == ["j2", "j3", "j1"]
+
+    client.post(f"/api/notifications/{item['id']}/read")
+    assert client.get("/api/notifications/unread-count").json()["count"] == 0
+
+
 # --- digest people section ----------------------------------------------------
 
 

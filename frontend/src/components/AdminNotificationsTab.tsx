@@ -48,7 +48,7 @@ const TOPIC_LABELS: Record<string, string> = {
     schedule_updates: 'Program & event updates',
     promo_codes: 'Promo codes',
     promo_code_matches: 'Deals',
-    people_suggestions: 'People suggestions',
+    people_suggestions: 'People you may know',
     install_invite: 'Install invite',
     other: 'Other',
 };
